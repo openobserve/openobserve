@@ -42,7 +42,7 @@
 
     <!-- Monitor name -->
     <template #cell-name="{ row }">
-      <div class="flex items-center gap-1.5 min-w-0 overflow-hidden">
+      <div class="flex min-w-0 items-center gap-1.5 overflow-hidden">
         <span class="truncate">{{ (row as any).name || "—" }}</span>
       </div>
       <OTooltip
@@ -149,7 +149,7 @@
           />
           <span
             :class="
-              'font-mono text-sm font-semibold min-w-11 text-right text-xs ' +
+              'min-w-11 text-right font-mono text-sm text-xs font-semibold ' +
               ((row as any).uptime >= 99
                 ? 'text-[var(--color-success-600)]'
                 : (row as any).uptime >= 95
@@ -160,22 +160,22 @@
           >
         </div>
       </template>
-      <span v-else class="text-xs text-text-secondary">—</span>
+      <span v-else class="text-text-secondary text-xs">—</span>
     </template>
 
     <!-- Locations with tooltip (monitors mode) -->
     <template #cell-locations="{ row }">
       <div
-        class="flex items-center gap-1 cursor-default"
+        class="flex cursor-default items-center gap-1"
         @mouseenter="showLoc($event, (row as any).locations)"
         @mouseleave="hideLoc"
       >
-        <span class="text-xs truncate max-w-[4.375rem]">{{
+        <span class="max-w-[4.375rem] truncate text-xs">{{
           locationLabel((row as any).locations[0])
         }}</span>
         <span
           v-if="(row as any).locations.length > 1"
-          class="text-xs font-bold px-1 py-0.5 rounded-default bg-[var(--color-surface-subtle)] whitespace-nowrap shrink-0"
+          class="rounded-default shrink-0 bg-[var(--color-surface-subtle)] px-1 py-0.5 text-xs font-bold whitespace-nowrap"
           >+{{ (row as any).locations.length - 1 }}</span
         >
       </div>
@@ -197,7 +197,7 @@
         <!-- Enable/Pause toggle with per-row spinner -->
         <div
           v-if="props.toggleLoadingMap[(row as any).id]"
-          class="flex items-center justify-center w-7 h-8"
+          class="flex h-8 w-7 items-center justify-center"
           :data-test="`${dataTest}-toggle-spinner`"
         >
           <OSpinner size="xs" />
@@ -252,7 +252,7 @@
             <!-- Show spinner when trigger is in flight for this row -->
             <div
               v-if="props.triggerLoadingMap[(row as any).id]"
-              class="flex items-center justify-center w-7 h-8"
+              class="flex h-8 w-7 items-center justify-center"
               :data-test="`${dataTest}-trigger-spinner`"
             >
               <OSpinner size="xs" />
@@ -317,8 +317,8 @@
 
     <!-- Footer with count + bulk action buttons -->
     <template #bottom>
-      <div class="flex w-full justify-between items-center h-12 gap-1">
-        <span class="text-xs text-secondary min-w-25">
+      <div class="flex h-12 w-full items-center justify-between gap-1">
+        <span class="text-secondary min-w-25 text-xs">
           <template v-if="localSelectedIds.length > 0">{{
             t("synthetics.table.selectedCount", {
               selected: localSelectedIds.length,

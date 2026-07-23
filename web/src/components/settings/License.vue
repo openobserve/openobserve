@@ -3,14 +3,14 @@
   <div>
     <LicensePeriod @updateLicense="showUpdateFormAndFocus"></LicensePeriod>
 
-    <div v-if="loading" class="p-3 flex flex-col items-center justify-center">
+    <div v-if="loading" class="flex flex-col items-center justify-center p-3">
       <OSpinner size="md" />
       <div class="mt-3">{{ t("about.loading_license_info") }}</div>
     </div>
-    <div v-else class="grid grid-cols-1 gap-4 items-start pb-4">
+    <div v-else class="grid grid-cols-1 items-start gap-4 pb-4">
       <div class="col-span-1 min-h-0">
         <div v-if="licenseData.license === null || !licenseData.license">
-          <OCard class="mb-4 border border-solid border-card-glass-border">
+          <OCard class="border-card-glass-border mb-4 border border-solid">
             <OCardSection role="body">
               <div class="text-xl font-semibold">{{ t("about.no_license_found") }}</div>
               <div class="mt-2 text-sm">
@@ -25,7 +25,7 @@
                 data-test="no-license-get-license-btn"
                 variant="primary"
                 size="sm-action"
-                class="ml-2 mt-2"
+                class="mt-2 ml-2"
                 @click="redirectToGetLicense"
               >
                 {{ t("about.get_license") }}
@@ -33,9 +33,9 @@
             </OCardSection>
           </OCard>
 
-          <OCard class="border border-solid border-card-glass-border">
+          <OCard class="border-card-glass-border border border-solid">
             <OCardSection role="body">
-              <div class="text-base font-medium mb-3">
+              <div class="mb-3 text-base font-medium">
                 {{ t("about.enter_license_key") }}
               </div>
               <OForm
@@ -54,7 +54,7 @@
                 />
                 <div v-if="isLicenseKeyAutoFilled" class="mt-2 mb-3">
                   <div
-                    class="flex items-center py-3 px-4 bg-banner-success-bg border border-solid border-banner-success-border rounded-default backdrop-blur-md transition-all duration-200 dark:shadow-md"
+                    class="bg-banner-success-bg border-banner-success-border rounded-default flex items-center border border-solid px-4 py-3 backdrop-blur-md transition-all duration-200 dark:shadow-md"
                   >
                     <OIcon name="check-circle" class="text-status-positive mr-2" size="md" />
                     <span class="text-sm">{{ t("about.license_auto_filled") }}</span>
@@ -76,30 +76,30 @@
         </div>
 
         <div v-else>
-          <OCard class="border border-solid border-card-glass-border">
+          <OCard class="border-card-glass-border border border-solid">
             <OCardSection role="body">
-              <div class="text-xl font-semibold mb-3">{{ t("about.license_info") }}</div>
-              <table class="w-full border-collapse border border-solid border-table-header-border">
+              <div class="mb-3 text-xl font-semibold">{{ t("about.license_info") }}</div>
+              <table class="border-table-header-border w-full border-collapse border border-solid">
                 <tbody>
-                  <tr class="border-b border-solid border-table-row-divider">
+                  <tr class="border-table-row-divider border-b border-solid">
                     <td
-                      class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-table-row-divider"
+                      class="border-table-row-divider border-r border-solid px-3 py-2 leading-[1.2] font-bold"
                     >
                       {{ t("about.installation_id") }}
                     </td>
                     <td class="px-3 py-2 leading-[1.2]">{{ licenseData.installation_id }}</td>
                   </tr>
-                  <tr class="border-b border-solid border-table-row-divider">
+                  <tr class="border-table-row-divider border-b border-solid">
                     <td
-                      class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-table-row-divider"
+                      class="border-table-row-divider border-r border-solid px-3 py-2 leading-[1.2] font-bold"
                     >
                       {{ t("about.license_id") }}
                     </td>
                     <td class="px-3 py-2 leading-[1.2]">{{ licenseData.license.license_id }}</td>
                   </tr>
-                  <tr class="border-b border-solid border-table-row-divider">
+                  <tr class="border-table-row-divider border-b border-solid">
                     <td
-                      class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-table-row-divider"
+                      class="border-table-row-divider border-r border-solid px-3 py-2 leading-[1.2] font-bold"
                     >
                       {{ t("about.status_lbl") }}
                     </td>
@@ -109,9 +109,9 @@
                       </OBadge>
                     </td>
                   </tr>
-                  <tr class="border-b border-solid border-table-row-divider">
+                  <tr class="border-table-row-divider border-b border-solid">
                     <td
-                      class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-table-row-divider"
+                      class="border-table-row-divider border-r border-solid px-3 py-2 leading-[1.2] font-bold"
                     >
                       {{ t("about.create_at_lbl") }}
                     </td>
@@ -119,9 +119,9 @@
                       {{ formatDate(licenseData.license.created_at) }}
                     </td>
                   </tr>
-                  <tr class="border-b border-solid border-table-row-divider">
+                  <tr class="border-table-row-divider border-b border-solid">
                     <td
-                      class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-table-row-divider"
+                      class="border-table-row-divider border-r border-solid px-3 py-2 leading-[1.2] font-bold"
                     >
                       {{ t("about.expires_at_lbl") }}
                     </td>
@@ -129,17 +129,17 @@
                       {{ formatDate(licenseData.license.expires_at) }}
                     </td>
                   </tr>
-                  <tr class="border-b border-solid border-table-row-divider">
+                  <tr class="border-table-row-divider border-b border-solid">
                     <td
-                      class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-table-row-divider"
+                      class="border-table-row-divider border-r border-solid px-3 py-2 leading-[1.2] font-bold"
                     >
                       {{ t("about.company") }}
                     </td>
                     <td class="px-3 py-2 leading-[1.2]">{{ licenseData.license.company }}</td>
                   </tr>
-                  <tr v-if="licenseData.key" class="border-b border-solid border-table-row-divider">
+                  <tr v-if="licenseData.key" class="border-table-row-divider border-b border-solid">
                     <td
-                      class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-table-row-divider"
+                      class="border-table-row-divider border-r border-solid px-3 py-2 leading-[1.2] font-bold"
                     >
                       {{ t("about.license_key") }}
                     </td>
@@ -160,10 +160,10 @@
                   </tr>
                   <tr
                     v-if="licenseData.license.contact_name"
-                    class="border-b border-solid border-table-row-divider"
+                    class="border-table-row-divider border-b border-solid"
                   >
                     <td
-                      class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-table-row-divider"
+                      class="border-table-row-divider border-r border-solid px-3 py-2 leading-[1.2] font-bold"
                     >
                       {{ t("about.contact_name") }}
                     </td>
@@ -171,10 +171,10 @@
                   </tr>
                   <tr
                     v-if="licenseData.license.contact_email"
-                    class="border-b border-solid border-table-row-divider"
+                    class="border-table-row-divider border-b border-solid"
                   >
                     <td
-                      class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-table-row-divider"
+                      class="border-table-row-divider border-r border-solid px-3 py-2 leading-[1.2] font-bold"
                     >
                       {{ t("about.contact_email") }}
                     </td>
@@ -182,7 +182,7 @@
                   </tr>
                   <tr v-if="licenseData.license.environment_type">
                     <td
-                      class="font-bold px-3 py-2 leading-[1.2] border-r border-solid border-table-row-divider"
+                      class="border-table-row-divider border-r border-solid px-3 py-2 leading-[1.2] font-bold"
                     >
                       {{ t("about.environment_type") }}
                     </td>
@@ -222,9 +222,9 @@
             </OCardSection>
           </OCard>
 
-          <OCard v-show="showUpdateForm" class="mt-4 border border-solid border-card-glass-border">
+          <OCard v-show="showUpdateForm" class="border-card-glass-border mt-4 border border-solid">
             <OCardSection role="body">
-              <div class="text-base font-medium mb-2">
+              <div class="mb-2 text-base font-medium">
                 {{ t("about.update_license_key") }}
               </div>
               <OForm
@@ -243,7 +243,7 @@
                 />
                 <div v-if="isLicenseKeyAutoFilled" class="mt-2 mb-3">
                   <div
-                    class="flex items-center py-3 px-4 bg-banner-success-bg border border-solid border-banner-success-border rounded-default backdrop-blur-md transition-all duration-200 dark:shadow-md"
+                    class="bg-banner-success-bg border-banner-success-border rounded-default flex items-center border border-solid px-4 py-3 backdrop-blur-md transition-all duration-200 dark:shadow-md"
                   >
                     <OIcon name="check-circle" class="text-status-positive mr-2" size="md" />
                     <span class="text-sm">{{ t("about.license_auto_filled") }}</span>
@@ -281,26 +281,26 @@
 
       <div class="col-span-1 self-start">
         <OCard
-          class="futuristic-card border border-solid border-card-glass-border dark:bg-[linear-gradient(135deg,rgba(99,102,241,0.08)_0%,rgba(168,85,247,0.08)_100%)] dark:border-[rgba(99,102,241,0.25)]"
+          class="futuristic-card border-card-glass-border border border-solid dark:border-[rgba(99,102,241,0.25)] dark:bg-[linear-gradient(135deg,rgba(99,102,241,0.08)_0%,rgba(168,85,247,0.08)_100%)]"
         >
           <OCardSection class="p-3">
             <div>
               <div
                 class="dark:bg-[radial-gradient(ellipse_at_center,rgba(99,102,241,0.15)_0%,transparent_70%)]"
               ></div>
-              <div class="text-xl font-semibold relative z-10">
+              <div class="relative z-10 text-xl font-semibold">
                 {{ t("about.usage_information") }}
               </div>
             </div>
 
-            <div class="flex flex-col gap-2 mt-3">
+            <div class="mt-3 flex flex-col gap-2">
               <!-- Summary Message -->
               <div
-                class="ingestion-summary-compact border border-solid rounded-default py-3 px-3.5 [backdrop-filter:blur(10px)] relative overflow-hidden border-[rgba(99,102,241,0.2)] dark:bg-[linear-gradient(135deg,rgba(99,102,241,0.1)_0%,rgba(168,85,247,0.1)_100%)] dark:border-[rgba(99,102,241,0.3)]"
+                class="ingestion-summary-compact rounded-default relative overflow-hidden border border-solid border-[rgba(99,102,241,0.2)] px-3.5 py-3 [backdrop-filter:blur(10px)] dark:border-[rgba(99,102,241,0.3)] dark:bg-[linear-gradient(135deg,rgba(99,102,241,0.1)_0%,rgba(168,85,247,0.1)_100%)]"
               >
-                <div class="summary-text-compact text-sm leading-[1.6] text-inherit text-compact">
+                <div class="summary-text-compact text-compact text-sm leading-[1.6] text-inherit">
                   <!-- Line 1: License Info -->
-                  <div class="flex items-center gap-2 mb-2">
+                  <div class="mb-2 flex items-center gap-2">
                     <OIcon name="info" size="sm" class="flex-shrink-0" />
                     <span v-if="isIngestionUnlimited">
                       {{ t("about.license_allows_unlimited_ingestion") }}
@@ -368,7 +368,7 @@
                         ></span
                         ><span
                           v-if="licenseData?.ingestion_exceeded > limitBreachAllowedCount"
-                          class="inline-flex items-center text-inherit font-semibold"
+                          class="inline-flex items-center font-semibold text-inherit"
                           v-html="
                             DOMPurify.sanitize(
                               t('about.limit_exceeded_warning', {
@@ -380,7 +380,7 @@
                         ></span
                         ><span
                           v-else
-                          class="text-xs opacity-80 italic"
+                          class="text-xs italic opacity-80"
                           v-html="
                             DOMPurify.sanitize(
                               t('about.limit_exceeded_info', {
@@ -412,7 +412,7 @@
               <!-- Chart -->
               <div v-if="usageDashboardData">
                 <div class="chart-wrapper relative">
-                  <div class="usage-chart-container w-full overflow-visible p-0 mx-auto">
+                  <div class="usage-chart-container mx-auto w-full overflow-visible p-0">
                     <RenderDashboardCharts
                       :key="dashboardRenderKey"
                       :dashboardData="usageDashboardData"
@@ -424,7 +424,7 @@
                   </div>
                   <div
                     v-if="isIngestionUnlimited"
-                    class="text-xs text-text-secondary mt-1 text-center"
+                    class="text-text-secondary mt-1 text-center text-xs"
                     style="font-size: var(--text-3xs)"
                   >
                     {{ t("about.usage_shows_zero_unlimited") }}
@@ -450,7 +450,7 @@
       @click:secondary="showLicenseKeyModal = false"
       @click:primary="copyLicenseKey"
     >
-      <div class="text-sm mb-3">
+      <div class="mb-3 text-sm">
         {{ t("about.your_complete_license_key") }}
       </div>
       <OTextarea

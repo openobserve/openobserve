@@ -229,7 +229,7 @@ onBeforeUnmount(() => {
         :class="[
           'outline-none',
           // Surface
-          'bg-dropdown-bg border border-dropdown-border rounded-default shadow-md',
+          'bg-dropdown-bg border-dropdown-border rounded-default border shadow-md',
           // Open/close reveal animation (matches ODropdown)
           'data-[state=open]:animate-[o2-reveal-down-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
           'data-[state=closed]:animate-[o2-reveal-down-out_100ms_cubic-bezier(0.4,0,1,1)]',

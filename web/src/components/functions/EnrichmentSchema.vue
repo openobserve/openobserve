@@ -27,48 +27,48 @@
     @update:open="$emit('update:open', $event)"
   >
     <div>
-      <div v-if="loadingState" class="flex items-center justify-center h-full w-full py-10">
+      <div v-if="loadingState" class="flex h-full w-full items-center justify-center py-10">
         <OSpinner size="md" data-test="enrichment-schema-loading-indicator" />
       </div>
-      <div v-else class="indexDetailsContainer p-5 w-full h-screen">
+      <div v-else class="indexDetailsContainer h-screen w-full p-5">
         <div
-          class="titleContainer flex flex-col items-flex-start gap-5 bg-surface-subtle border border-input-border rounded-default p-4"
+          class="titleContainer items-flex-start bg-surface-subtle border-input-border rounded-default flex flex-col gap-5 border p-4"
         >
           <div
             data-test="stream-details-container"
-            class="stream_details_container flex justify-between gap-5 flex-wrap"
+            class="stream_details_container flex flex-wrap justify-between gap-5"
           >
             <div data-test="schema-stream-title-text">
               {{ t("alerts.stream_name") }}
-              <span class="title pl-1 mb-4 font-bold"> {{ schemaData.name }}</span>
+              <span class="title mb-4 pl-1 font-bold"> {{ schemaData.name }}</span>
             </div>
             <div
               v-if="store.state.zoConfig.show_stream_stats_doc_num"
               data-test="schema-stream-title-text"
             >
               {{ t("logStream.docsCount") }}
-              <span class="title pl-1 mb-4 font-bold">
+              <span class="title mb-4 pl-1 font-bold">
                 {{ parseInt(schemaData.stats.doc_num).toLocaleString("en-US") }}
               </span>
             </div>
             <div data-test="schema-stream-title-text">
               {{ t("logStream.storageSize") }}
-              <span class="title pl-1 mb-4 font-bold">
+              <span class="title mb-4 pl-1 font-bold">
                 {{ formatSizeFromMB(schemaData.stats.storage_size) }}</span
               >
             </div>
             <div v-if="isCloud !== 'true'" data-test="schema-stream-title-text">
               {{ t("logStream.compressedSize") }}
-              <span class="title pl-1 mb-4 font-bold">
+              <span class="title mb-4 pl-1 font-bold">
                 {{ formatSizeFromMB(schemaData.stats.compressed_size) }}</span
               >
             </div>
           </div>
         </div>
-        <div class="flex items-center justify-between gap-4 mt-4">
+        <div class="mt-4 flex items-center justify-between gap-4">
           <div
             data-test="enrichment-schema-total-fields"
-            class="text-sm w-28.75 h-7.5 rounded-default flex items-center justify-center bg-theme-accent text-text-inverse"
+            class="rounded-default bg-theme-accent text-text-inverse flex h-7.5 w-28.75 items-center justify-center text-sm"
           >
             All Fields ({{ schemaData.schema.length }})
           </div>

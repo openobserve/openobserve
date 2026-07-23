@@ -49,7 +49,7 @@ const fillClasses = computed(() => [
     <div :class="fillClasses" :style="{ width: percentage }">
       <span
         v-if="$slots.default"
-        class="text-progress-bar-label text-xs font-semibold leading-none select-none"
+        class="text-progress-bar-label text-xs leading-none font-semibold select-none"
       >
         <slot />
       </span>

@@ -275,9 +275,9 @@ const alignClasses: Record<NonNullable<OTabsProps["align"]>, string> = {
       <div
         ref="tablistRef"
         :class="[
-          'o-tabs flex flex-col gap-0.5 relative p-1',
+          'o-tabs relative flex flex-col gap-0.5 p-1',
           alignClasses[align],
-          { 'border-b border-solid border-card-glass-border': bordered },
+          { 'border-card-glass-border border-b border-solid': bordered },
         ]"
         @dragstart="onTabDragStart"
         @dragover="onTabDragOver"
@@ -301,7 +301,7 @@ const alignClasses: Record<NonNullable<OTabsProps["align"]>, string> = {
     <div
       :class="[
         'flex flex-row items-stretch',
-        { 'border-b border-solid border-card-glass-border': bordered },
+        { 'border-card-glass-border border-b border-solid': bordered },
       ]"
     >
       <!-- Left arrow -->
@@ -311,18 +311,18 @@ const alignClasses: Record<NonNullable<OTabsProps["align"]>, string> = {
         type="button"
         aria-hidden="true"
         tabindex="-1"
-        class="flex items-center justify-center shrink-0 w-10 cursor-pointer text-tabs-active-text enabled:hover:text-tabs-indicator disabled:opacity-30 disabled:cursor-default border-b-2 border-transparent bg-transparent outline-none"
+        class="text-tabs-active-text enabled:hover:text-tabs-indicator flex w-10 shrink-0 cursor-pointer items-center justify-center border-b-2 border-transparent bg-transparent outline-none disabled:cursor-default disabled:opacity-30"
         @click="scrollTabs(-1)"
       >
         <OIcon name="chevron-left" size="md" />
       </button>
 
       <!-- Overflow-hidden scroll container -->
-      <div ref="scrollRef" class="flex-1 overflow-x-hidden relative pt-0.75">
+      <div ref="scrollRef" class="relative flex-1 overflow-x-hidden pt-0.75">
         <TabsList as-child :loop="true">
           <div
             ref="tablistRef"
-            :class="['o-tabs flex flex-row relative px-0.75', alignClasses[align]]"
+            :class="['o-tabs relative flex flex-row px-0.75', alignClasses[align]]"
             @focusin="handleFocusin"
             @dragstart="onTabDragStart"
             @dragover="onTabDragOver"
@@ -335,7 +335,7 @@ const alignClasses: Record<NonNullable<OTabsProps["align"]>, string> = {
               v-show="indicator.visible"
               aria-hidden="true"
               data-test="otabs-active-indicator"
-              class="absolute bottom-0 left-0 h-0.5 rounded-full bg-tabs-indicator pointer-events-none z-10"
+              class="bg-tabs-indicator pointer-events-none absolute bottom-0 left-0 z-10 h-0.5 rounded-full"
               :class="indicatorReady ? 'transition-[transform,width] duration-300 ease-out' : ''"
               :style="{
                 transform: `translateX(${indicator.left}px)`,
@@ -354,7 +354,7 @@ const alignClasses: Record<NonNullable<OTabsProps["align"]>, string> = {
         type="button"
         aria-hidden="true"
         tabindex="-1"
-        class="flex items-center justify-center shrink-0 w-10 cursor-pointer text-tabs-active-text enabled:hover:text-tabs-indicator disabled:opacity-30 disabled:cursor-default border-b-2 border-transparent bg-transparent outline-none"
+        class="text-tabs-active-text enabled:hover:text-tabs-indicator flex w-10 shrink-0 cursor-pointer items-center justify-center border-b-2 border-transparent bg-transparent outline-none disabled:cursor-default disabled:opacity-30"
         @click="scrollTabs(1)"
       >
         <OIcon name="chevron-right" size="md" />

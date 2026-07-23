@@ -31,10 +31,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #actions>
       <div
         v-if="profileData && !hasNoData"
-        class="flex items-center gap-1.5 px-2 py-1 rounded-default border bg-surface-panel border-border-default"
+        class="rounded-default bg-surface-panel border-border-default flex items-center gap-1.5 border px-2 py-1"
       >
         <svg
-          class="w-3.5 h-3.5 opacity-70 text-icon-color"
+          class="text-icon-color h-3.5 w-3.5 opacity-70"
           viewBox="0 0 24 24"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
@@ -49,31 +49,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </svg>
         <div class="flex items-center gap-1.5">
           <span
-            class="text-3xs font-small px-1.5 py-0.5 rounded-default text-text-secondary bg-surface-subtle"
+            class="text-3xs font-small rounded-default text-text-secondary bg-surface-subtle px-1.5 py-0.5"
           >
             {{ store.state.timezone || "UTC" }}
           </span>
-          <div class="text-xs font-semibold text-text-body">
+          <div class="text-text-body text-xs font-semibold">
             {{ formatTimeRange(profileData.start_time, profileData.end_time) }}
           </div>
         </div>
       </div>
     </template>
-    <div class="w-full flex flex-col flex-1 min-h-0 overflow-hidden pt-2.5">
+    <div class="flex min-h-0 w-full flex-1 flex-col overflow-hidden pt-2.5">
       <!-- Summary Stats Card -->
-      <div v-if="!loading" class="mb-2.5 mx-2.5 shrink-0">
+      <div v-if="!loading" class="mx-2.5 mb-2.5 shrink-0">
         <div class="grid gap-3" style="grid-template-columns: 1fr 1fr 1fr 1.6fr 0.9fr">
           <!-- Results Returned -->
           <div class="stat-tile">
             <div
-              class="rounded-default p-3 border h-28 flex flex-col justify-between bg-surface-base border-border-default"
+              class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3"
             >
-              <div class="flex justify-between items-start">
-                <div class="text-base font-small text-text-label">
+              <div class="flex items-start justify-between">
+                <div class="font-small text-text-label text-base">
                   {{ t("logs.searchJobInspector.results") }}
                 </div>
                 <div
-                  class="w-10 h-10 rounded-default flex items-center justify-center border"
+                  class="rounded-default flex h-10 w-10 items-center justify-center border"
                   style="
                     background: rgba(57, 126, 246, 0.2);
                     border-color: rgba(57, 126, 246, 0.35);
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div class="flex flex-col gap-1">
-                <div class="text-2xl font-bold text-text-body">
+                <div class="text-text-body text-2xl font-bold">
                   {{ hasNoData ? "NA" : (profileData?.data_records || 0).toLocaleString() }}
                 </div>
                 <div class="text-3xs text-text-secondary">
@@ -100,14 +100,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Events Scanned -->
           <div class="stat-tile">
             <div
-              class="rounded-default p-3 border h-28 flex flex-col justify-between bg-surface-base border-border-default"
+              class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3"
             >
-              <div class="flex justify-between items-start">
-                <div class="text-base font-small text-text-label">
+              <div class="flex items-start justify-between">
+                <div class="font-small text-text-label text-base">
                   {{ t("logs.searchJobInspector.scannedEvents") }}
                 </div>
                 <div
-                  class="w-10 h-10 rounded-default flex items-center justify-center border"
+                  class="rounded-default flex h-10 w-10 items-center justify-center border"
                   style="
                     background: rgba(57, 126, 246, 0.2);
                     border-color: rgba(57, 126, 246, 0.35);
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div class="flex flex-col gap-1">
-                <div class="text-2xl font-bold text-text-body">
+                <div class="text-text-body text-2xl font-bold">
                   {{ hasNoData ? "NA" : (profileData?.scan_records || 0).toLocaleString() }}
                 </div>
                 <div class="text-3xs text-text-secondary">
@@ -134,18 +134,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Time Taken -->
           <div class="stat-tile">
             <div
-              class="rounded-default p-3 border h-28 flex flex-col justify-between bg-surface-base border-border-default"
+              class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3"
             >
-              <div class="flex justify-between items-start">
-                <div class="text-base font-small text-text-label">
+              <div class="flex items-start justify-between">
+                <div class="font-small text-text-label text-base">
                   {{ t("logs.searchJobInspector.timeTaken") }}
                 </div>
                 <div
-                  class="w-10 h-10 rounded-default flex items-center justify-center border"
+                  class="rounded-default flex h-10 w-10 items-center justify-center border"
                   style="background: rgba(34, 197, 94, 0.2); border-color: rgba(34, 197, 94, 0.35)"
                 >
                   <svg
-                    class="h-6 w-6 text-status-positive"
+                    class="text-status-positive h-6 w-6"
                     viewBox="0 0 24 24"
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div class="flex flex-col gap-1">
-                <div class="text-2xl font-bold text-text-body">
+                <div class="text-text-body text-2xl font-bold">
                   {{
                     hasNoData
                       ? "NA"
@@ -191,14 +191,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Trace ID -->
           <div class="stat-tile">
             <div
-              class="rounded-default p-3 border h-28 flex flex-col justify-between bg-surface-base border-border-default"
+              class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3"
             >
-              <div class="flex justify-between items-start">
-                <div class="text-base font-small text-text-label">
+              <div class="flex items-start justify-between">
+                <div class="font-small text-text-label text-base">
                   {{ t("logs.searchJobInspector.traceId") }}
                 </div>
                 <div
-                  class="w-10 h-10 rounded-default flex items-center justify-center border"
+                  class="rounded-default flex h-10 w-10 items-center justify-center border"
                   style="
                     background: rgba(242, 220, 245, 0.25);
                     border-color: rgba(242, 220, 245, 0.45);
@@ -230,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="flex flex-col gap-1">
                 <div
-                  class="text-sm font-mono truncate font-semibold leading-tight overflow-hidden"
+                  class="truncate overflow-hidden font-mono text-sm leading-tight font-semibold"
                   :class="hasNoData ? 'text-text-secondary' : 'text-text-link'"
                 >
                   {{ hasNoData ? "NA" : traceId }}
@@ -243,23 +243,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- View Query -->
           <div class="stat-tile">
             <div
-              class="rounded-default p-3 border h-28 flex flex-col items-center justify-center transition-all bg-surface-base border-border-default"
+              class="rounded-default bg-surface-base border-border-default flex h-28 flex-col items-center justify-center border p-3 transition-all"
               :class="
                 hasNoData
-                  ? 'opacity-50 cursor-not-allowed'
-                  : 'cursor-pointer hover:border-primary hover:shadow-lg'
+                  ? 'cursor-not-allowed opacity-50'
+                  : 'hover:border-primary cursor-pointer hover:shadow-lg'
               "
               @click="!hasNoData && (showSqlDialog = true)"
             >
               <div
-                class="w-12 h-12 rounded-default flex items-center justify-center border mb-2"
+                class="rounded-default mb-2 flex h-12 w-12 items-center justify-center border"
                 style="
                   background: rgba(245, 235, 147, 0.25);
                   border-color: rgba(245, 235, 147, 0.45);
                 "
               >
                 <svg
-                  class="h-7 w-7 text-status-warning-text"
+                  class="text-status-warning-text h-7 w-7"
                   viewBox="0 0 24 24"
                   fill="none"
                   xmlns="http://www.w3.org/2000/svg"
@@ -273,7 +273,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </svg>
               </div>
-              <div class="text-sm font-semibold text-text-link">
+              <div class="text-text-link text-sm font-semibold">
                 {{ t("logs.searchJobInspector.viewQuery") }}
               </div>
             </div>
@@ -294,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Profile Data Table (OTable handles loading skeleton) -->
       <div
         v-if="loading || (profileData && profileData.events)"
-        class="w-full flex-1 min-h-0 overflow-hidden"
+        class="min-h-0 w-full flex-1 overflow-hidden"
       >
         <div class="bg-card-glass-bg h-full">
           <OTable
@@ -318,15 +318,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #cell-duration="{ row }">
-              <div class="flex items-center gap-2 min-w-37.5">
+              <div class="flex min-w-37.5 items-center gap-2">
                 <div
-                  class="h-5 rounded-default min-w-1 transition-[width] duration-300 ease-in-out"
+                  class="rounded-default h-5 min-w-1 transition-[width] duration-300 ease-in-out"
                   :style="{
                     width: calculateBarWidth(row.duration) + '%',
                     backgroundColor: getDurationColor(row.duration),
                   }"
                 ></div>
-                <span class="text-compact whitespace-nowrap min-w-12.5">{{
+                <span class="text-compact min-w-12.5 whitespace-nowrap">{{
                   formatDuration(row.duration)
                 }}</span>
               </div>
@@ -377,9 +377,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </OButton>
       </template>
-      <div class="rounded-default p-4 max-h-[calc(100vh-150px)] overflow-auto bg-surface-subtle">
+      <div class="rounded-default bg-surface-subtle max-h-[calc(100vh-150px)] overflow-auto p-4">
         <pre
-          class="font-mono text-compact leading-[1.6] m-0 whitespace-pre-wrap break-words"
+          class="text-compact m-0 font-mono leading-[1.6] break-words whitespace-pre-wrap"
           data-test="inspector-sql-query-content"
           >{{ profileData?.sql || t("logs.searchJobInspector.noSqlAvailable") }}</pre
         >
@@ -395,7 +395,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="flex items-center gap-3">
         <div
-          class="flex-1 font-mono text-sm break-all p-3 rounded-default border bg-surface-panel border-border-default text-text-link"
+          class="rounded-default bg-surface-panel border-border-default text-text-link flex-1 border p-3 font-mono text-sm break-all"
         >
           {{ traceId }}
         </div>

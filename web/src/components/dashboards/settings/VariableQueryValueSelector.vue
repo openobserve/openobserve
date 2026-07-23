@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :options="computedOptions"
       labelKey="label"
       valueKey="value"
-      class="textbox flex flex-col no-case o2-custom-select-dashboard min-w-37.5 max-w-160"
+      class="textbox no-case o2-custom-select-dashboard flex max-w-160 min-w-37.5 flex-col"
       :loading="variableItem.isLoading && !isOpen"
       :data-test="`variable-selector-${variableItem.name}-inner`"
       :multiple="variableItem.multiSelect"
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template #trigger>
         <span
-          class="flex-1 text-start truncate text-xs font-semibold leading-4 text-select-text"
+          class="text-select-text flex-1 truncate text-start text-xs leading-4 font-semibold"
           :data-test="`variable-selector-${variableItem.name}-inner-value`"
           >{{ displayValue }}</span
         >
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- multiSelect: show checkbox + Select All -->
           <div
             v-if="variableItem.multiSelect"
-            class="flex items-center gap-2 px-3 py-2 cursor-pointer"
+            class="flex cursor-pointer items-center gap-2 px-3 py-2"
             @click.stop="toggleSelectAll"
           >
             <OCheckbox
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- single-select: show plain All -->
           <div
             v-else
-            class="flex items-center gap-2 px-3 py-2 cursor-pointer"
+            class="flex cursor-pointer items-center gap-2 px-3 py-2"
             @click.stop="toggleSelectAll"
           >
             <span>{{ t("dashboard.variableQueryValueSelector.all") }}</span>
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OSeparator />
           <div
-            class="flex items-center gap-2 px-3 py-2 cursor-pointer"
+            class="flex cursor-pointer items-center gap-2 px-3 py-2"
             @click.stop="handleCustomValue(currentSearchTerm)"
           >
             {{ currentSearchTerm }}
@@ -86,19 +86,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <div
           v-if="variableItem.isLoading && hasVisibleFilteredOptions"
-          class="flex justify-center items-center py-2"
+          class="flex items-center justify-center py-2"
           data-test="variable-query-value-selector-loading-more"
         >
           <OSpinner size="sm" />
         </div>
       </template>
       <template #empty>
-        <div v-if="variableItem.isLoading" class="flex justify-center items-center py-3">
+        <div v-if="variableItem.isLoading" class="flex items-center justify-center py-3">
           <OSpinner size="sm" />
         </div>
         <div
           v-else-if="currentSearchTerm && !isSearchTermExistingOption"
-          class="flex items-center gap-2 cursor-pointer text-select-text"
+          class="text-select-text flex cursor-pointer items-center gap-2"
           @click.stop="handleCustomValue(currentSearchTerm)"
         >
           {{ currentSearchTerm }}
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-else
-          class="italic text-text-muted flex justify-center items-center py-3"
+          class="text-text-muted flex items-center justify-center py-3 italic"
           data-test="variable-query-value-selector-no-data"
         >
           {{ t("dashboard.variableQueryValueSelector.noDataFound") }}

@@ -832,13 +832,13 @@ defineExpose({
 
     <!-- ── Bordered wrapper: search + loading + top pagination + table area ── -->
     <div
-      class="flex-1 flex flex-col min-h-0"
-      :class="props.frame ? 'border border-border-default' : ''"
+      class="flex min-h-0 flex-1 flex-col"
+      :class="props.frame ? 'border-border-default border' : ''"
     >
       <!-- ── Custom toolbar slot (rendered INSIDE the frame, above the table) ── -->
       <div
         v-if="slots.toolbar || slots['toolbar-trailing']"
-        class="flex items-center px-page-edge py-2 gap-2 border-b border-table-row-divider"
+        class="px-page-edge border-table-row-divider flex items-center gap-2 border-b py-2"
         data-test="o2-table-toolbar"
       >
         <slot name="toolbar" />
@@ -861,20 +861,20 @@ defineExpose({
       <!-- ── Built-in global search ─────────────────────────── -->
       <div
         v-if="props.showGlobalFilter && !slots.top && !slots.toolbar"
-        class="flex items-center gap-2 px-page-edge py-2 border-b border-table-row-divider bg-table-header-bg"
+        class="px-page-edge border-table-row-divider bg-table-header-bg flex items-center gap-2 border-b py-2"
         data-test="o2-table-global-filter"
       >
         <div class="relative max-w-xs flex-1">
           <OIcon
             name="search"
             size="sm"
-            class="absolute left-2 top-1/2 -translate-y-1/2 text-secondary"
+            class="text-secondary absolute top-1/2 left-2 -translate-y-1/2"
           />
           <input
             :value="globalFilterLocal"
             type="text"
             :placeholder="props.globalFilterPlaceholder"
-            class="pl-7 pr-2 py-1 text-sm bg-transparent border-none text-primary placeholder-text-disabled outline-none w-full"
+            class="text-primary placeholder-text-disabled w-full border-none bg-transparent py-1 pr-2 pl-7 text-sm outline-none"
             data-test="o2-table-global-filter-input"
             @input="handleGlobalFilterChange(($event.target as HTMLInputElement).value)"
           />
@@ -915,7 +915,7 @@ defineExpose({
       <div
         ref="scrollContainerRef"
         :class="[
-          'flex flex-col overflow-y-auto min-h-0 relative',
+          'relative flex min-h-0 flex-col overflow-y-auto',
           allowHorizontalScroll ? 'overflow-x-auto' : 'overflow-x-hidden',
           props.fillHeight ? 'flex-1' : '',
         ]"
@@ -1113,8 +1113,8 @@ defineExpose({
                 :colspan="header.colSpan"
                 :data-test="`o2-table-footer-cell-${header.id}`"
                 :class="[
-                  'px-2 py-1 text-left text-text-body text-xs',
-                  'border-t border-table-header-border',
+                  'text-text-body px-2 py-1 text-left text-xs',
+                  'border-table-header-border border-t',
                   (header.column.columnDef.meta as any)?.align === 'center' ? 'text-center' : '',
                   (header.column.columnDef.meta as any)?.align === 'right' ? 'text-right' : '',
                 ]"
@@ -1150,7 +1150,7 @@ defineExpose({
         <!-- ── Custom loading slot (overlay) ───────────────────── -->
         <div
           v-if="showLoadingOverlay && slots.loading"
-          class="absolute inset-0 z-10 bg-surface-base/70 flex items-center justify-center"
+          class="bg-surface-base/70 absolute inset-0 z-10 flex items-center justify-center"
           data-test="o2-table-loading-slot"
         >
           <slot name="loading" />
@@ -1176,7 +1176,7 @@ defineExpose({
         <div
           v-if="showStreaming"
           data-test="o2-table-streaming-bar"
-          class="sticky bottom-0 h-1 w-full bg-table-streaming-bar animate-pulse z-10"
+          class="bg-table-streaming-bar sticky bottom-0 z-10 h-1 w-full animate-pulse"
           aria-label="Data streaming in progress"
         />
       </div>

@@ -64,14 +64,14 @@ function handleCheckbox(val: (string | number)[]) {
 </script>
 
 <template>
-  <div v-bind="wrapperAttrs" class="flex flex-col gap-2 w-full">
+  <div v-bind="wrapperAttrs" class="flex w-full flex-col gap-2">
     <div
       v-if="$slots.label || label || $slots.tooltip"
       :class="[
-        'o-input-label text-compact leading-tight flex items-center gap-1',
+        'o-input-label text-compact flex items-center gap-1 leading-tight',
         disabled
-          ? 'font-normal text-input-label-text-disabled'
-          : 'font-medium text-input-label-text',
+          ? 'text-input-label-text-disabled font-normal'
+          : 'text-input-label-text font-medium',
       ]"
     >
       <slot name="label">{{ label }}</slot
@@ -130,12 +130,12 @@ function handleCheckbox(val: (string | number)[]) {
     <div v-if="effectiveError || helpText" class="flex items-center gap-2">
       <span
         v-if="effectiveError && effectiveError.trim()"
-        class="text-xs text-option-group-error-text leading-none"
+        class="text-option-group-error-text text-xs leading-none"
         role="alert"
       >
         {{ effectiveError }}
       </span>
-      <span v-else-if="helpText" class="text-xs text-option-group-label leading-none">
+      <span v-else-if="helpText" class="text-option-group-label text-xs leading-none">
         {{ helpText }}
       </span>
     </div>

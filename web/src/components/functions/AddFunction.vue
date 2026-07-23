@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="w-full h-full flex flex-col min-h-0">
+  <div class="flex h-full min-h-0 w-full flex-col">
     <!-- The toolbar hosts the form-owned name + transType fields and the Save
          button (type="submit"), so it lives INSIDE the <OForm>. The editor +
          TestFunction below stay OUTSIDE the form. Inline form → Enter submits
@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OForm
       id="add-function-form"
       :form="addFunctionForm"
-      class="shrink-0 px-2 border-b border-border-default"
+      class="border-border-default shrink-0 border-b px-2"
       v-slot="{ isSubmitting }"
     >
       <FunctionsToolbar
@@ -39,21 +39,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </OForm>
 
-    <div class="flex flex-1 min-h-0">
+    <div class="flex min-h-0 flex-1">
       <div
-        class="flex overflow-hidden min-h-0"
+        class="flex min-h-0 overflow-hidden"
         :class="[store.state.isAiChatEnabled && !isAddFunctionComponent ? 'w-3/4' : 'w-full']"
       >
         <OSplitter
           v-model="splitterModel"
           :limits="[30, 100]"
-          class="overflow-hidden w-full"
+          class="w-full overflow-hidden"
           :horizontal="false"
           separator-class="w-[0.0625rem] bg-card-glass-border"
         >
           <template v-slot:before>
-            <div class="px-2 pt-2 pb-3 bg-card-glass-bg h-full flex flex-col min-h-0">
-              <div class="pb-2 o2-input flex flex-col flex-1 min-h-0">
+            <div class="bg-card-glass-bg flex h-full min-h-0 flex-col px-2 pt-2 pb-3">
+              <div class="o2-input flex min-h-0 flex-1 flex-col pb-2">
                 <FullViewContainer
                   name="function"
                   v-model:is-expanded="expandState.functions"
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   min-header-height="2.125rem"
                 />
-                <div v-show="expandState.functions" class="mb-1.5 relative flex-1 min-h-0">
+                <div v-show="expandState.functions" class="relative mb-1.5 min-h-0 flex-1">
                   <!-- Unified Query Editor (with built-in AI bar) -->
                   <UnifiedQueryEditor
                     data-test="logs-vrl-function-editor"
@@ -97,10 +97,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                          vrl but passes no defaultCode. -->
                   <div
                     v-if="!formData.function && functionEditorPlaceholderFlag"
-                    class="absolute inset-0 flex items-start pt-0.75 pr-2 pb-0 pl-[2.15rem] pointer-events-none z-1 select-none"
+                    class="pointer-events-none absolute inset-0 z-1 flex items-start pt-0.75 pr-2 pb-0 pl-[2.15rem] select-none"
                   >
                     <span
-                      class="font-mono text-[var(--text-sm)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden [text-overflow:ellipsis]"
+                      class="text-text-placeholder overflow-hidden font-mono [line-height:1.3125rem] [text-overflow:ellipsis] whitespace-nowrap text-[var(--text-sm)]"
                       >{{ transType === "1" ? jsPlaceholder : vrlPlaceholder }}</span
                     >
                   </div>
@@ -120,10 +120,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       v-if="expandState.functionError"
                       data-test="function-error-details"
-                      class="px-2 pb-2 border-l-4 border-status-negative bg-surface-subtle"
+                      class="border-status-negative bg-surface-subtle border-l-4 px-2 pb-2"
                     >
                       <pre
-                        class="my-0 text-status-error-text whitespace-pre-wrap"
+                        class="text-status-error-text my-0 whitespace-pre-wrap"
                         style="font-family: var(--font-mono); font-size: var(--text-compact)"
                         >{{ vrlFunctionError }}</pre
                       >
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template v-slot:after>
-            <div class="px-2 pt-2 pb-3 h-full overflow-y-auto bg-card-glass-bg">
+            <div class="bg-card-glass-bg h-full overflow-y-auto px-2 pt-2 pb-3">
               <TestFunction
                 ref="testFunctionRef"
                 :vrlFunction="vrlFunctionData"

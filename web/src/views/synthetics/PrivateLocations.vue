@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 <template>
-  <div class="flex-1 flex flex-col overflow-hidden min-w-0">
+  <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
     <OTable
       :data="filteredLocations"
       :columns="columns"
@@ -17,8 +17,8 @@
       @row-click="openDetail"
     >
       <template #toolbar>
-        <div class="flex items-center gap-2 flex-1 min-w-0">
-          <div class="flex-1 min-w-0">
+        <div class="flex min-w-0 flex-1 items-center gap-2">
+          <div class="min-w-0 flex-1">
             <OInput
               v-model="search"
               :placeholder="t('synthetics.privateLocations.searchPlaceholder')"
@@ -51,9 +51,9 @@
 
       <!-- Name + pool subtext -->
       <template #cell-name="{ row }">
-        <div class="flex flex-col min-w-0">
+        <div class="flex min-w-0 flex-col">
           <span class="truncate font-medium">{{ (row as any).name }}</span>
-          <span class="truncate text-xs text-text-muted">{{ (row as any).pool }}</span>
+          <span class="text-text-muted truncate text-xs">{{ (row as any).pool }}</span>
         </div>
       </template>
 
@@ -61,7 +61,7 @@
       <template #cell-agents="{ row }">
         <div class="flex flex-col">
           <span>{{ (row as any).live_agents }}/{{ (row as any).agents_total }}</span>
-          <span v-if="(row as any).version" class="text-xs text-text-muted">
+          <span v-if="(row as any).version" class="text-text-muted text-xs">
             v{{ (row as any).version }}
           </span>
         </div>

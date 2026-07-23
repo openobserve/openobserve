@@ -24,18 +24,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     id="organization-deduplication-settings-form"
     :form="form"
     v-slot="{ isSubmitting }"
-    class="w-full h-full bg-card-glass-bg flex flex-col"
+    class="bg-card-glass-bg flex h-full w-full flex-col"
   >
     <!-- Scrollable content area -->
-    <div class="flex-1 overflow-y-auto pr-2 pt-4">
+    <div class="flex-1 overflow-y-auto pt-4 pr-2">
       <div class="mb-4">
-        <div class="text-sm font-semibold leading-tight text-text-heading">
+        <div class="text-text-heading text-sm leading-tight font-semibold">
           {{ t("alerts.correlation.title") }}
         </div>
-        <div class="text-xs text-text-secondary mt-1">
+        <div class="text-text-secondary mt-1 text-xs">
           {{ t("alerts.correlation.description") }}
         </div>
-        <div class="text-xs text-text-secondary mt-1 italic">
+        <div class="text-text-secondary mt-1 text-xs italic">
           {{ t("alerts.correlation.semanticFieldNote") }}
         </div>
       </div>
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Cross-Alert Fingerprint Groups -->
       <div class="mb-6" v-if="enabled && alertDedupEnabled">
-        <div class="font-semibold pb-2 flex items-center">
+        <div class="flex items-center pb-2 font-semibold">
           {{ t("alerts.correlation.fingerprintGroups") }}
           <span class="text-status-error-text ml-1">*</span>
           <OIcon name="info" size="sm" class="ml-1 cursor-pointer" :class="'text-text-secondary'">
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </OIcon>
         </div>
-        <div class="text-sm text-text-secondary mb-2">
+        <div class="text-text-secondary mb-2 text-sm">
           {{ t("alerts.correlation.fingerprintGroupsHint") }}
         </div>
         <!-- The selected group ids ARE the form's alert_fingerprint_groups
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Time Window -->
       <div class="mb-6">
-        <div class="font-semibold pb-2 flex items-center">
+        <div class="flex items-center pb-2 font-semibold">
           {{ t("alerts.correlation.defaultWindow") }}
           <OIcon name="info" size="sm" class="ml-1 cursor-pointer" :class="'text-text-secondary'" />
           <OTooltip
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :content="t('alerts.correlation.defaultWindowTooltip')"
           />
         </div>
-        <div class="text-sm text-text-secondary mb-2">
+        <div class="text-text-secondary mb-2 text-sm">
           {{ t("alerts.correlation.defaultWindowDescription") }}
         </div>
         <OFormInput
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Sticky footer with buttons -->
     <div
-      class="flex justify-end gap-3 pt-4 pb-2 border-t border-border-default bg-inherit sticky bottom-0"
+      class="border-border-default sticky bottom-0 flex justify-end gap-3 border-t bg-inherit pt-4 pb-2"
     >
       <OButton
         variant="outline"

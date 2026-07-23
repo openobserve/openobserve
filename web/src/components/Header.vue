@@ -15,13 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-nowrap items-center h-10 w-full bg-surface-chrome-deeper shrink-0">
+  <div class="bg-surface-chrome-deeper flex h-10 w-full shrink-0 flex-nowrap items-center">
     <!-- LEFT SIDE: Logo -->
-    <div class="flex items-center justify-start shrink-0 pl-3">
+    <div class="flex shrink-0 items-center justify-start pl-3">
       <!-- LOGO SECTION: Displays custom or default OpenObserve logo -->
       <!-- Shows custom logo/text if configured in enterprise mode -->
       <div
-        class="flex relative-position"
+        class="relative-position flex"
         v-if="
           (config.isEnterprise == 'true' &&
             store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           :href="homeUrl"
           @click.prevent="goToHome"
-          class="text-xl font-semibold font-bold p-0 cursor-pointer mr-2 flex items-center no-underline text-inherit"
+          class="mr-2 flex cursor-pointer items-center p-0 text-xl font-bold font-semibold text-inherit no-underline"
           >{{ store.state.zoConfig.custom_logo_text }}</a
         >
 
@@ -90,12 +90,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- OpenObserve logo (shown alongside custom logo if configured) -->
         <div
           v-if="store.state.zoConfig.custom_hide_self_logo == false"
-          class="relative inline-flex items-center min-h-10"
+          class="relative inline-flex min-h-10 items-center"
         >
           <a :href="homeUrl" @click.prevent="goToHome" class="inline-flex items-center">
             <img
               data-test="header-openobserve-logo"
-              class="openobserve-logo cursor-pointer h-8 max-w-37.5 block transition-opacity duration-200 hover:opacity-80"
+              class="openobserve-logo block h-8 max-w-37.5 cursor-pointer transition-opacity duration-200 hover:opacity-80"
               :src="
                 getImageURL(
                   isDark
@@ -110,11 +110,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Default OpenObserve logo (when no custom logo) -->
-      <div v-else class="relative-position relative inline-flex items-center min-h-10">
+      <div v-else class="relative-position relative inline-flex min-h-10 items-center">
         <a :href="homeUrl" @click.prevent="goToHome" class="inline-flex items-center">
           <img
             data-test="header-openobserve-logo"
-            class="openobserve-logo cursor-pointer h-8 max-w-37.5 block transition-opacity duration-200 hover:opacity-80"
+            class="openobserve-logo block h-8 max-w-37.5 cursor-pointer transition-opacity duration-200 hover:opacity-80"
             :src="
               getImageURL(
                 isDark
@@ -130,16 +130,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- end left side -->
 
     <!-- CENTER: elastic spacer so the right-side controls stay right-aligned. -->
-    <div class="flex-1 min-w-0" />
+    <div class="min-w-0 flex-1" />
 
     <!-- RIGHT SIDE: Controls -->
-    <div class="flex items-center justify-end shrink-0 pr-3 gap-1">
+    <div class="flex shrink-0 items-center justify-end gap-1 pr-3">
       <!-- QUOTA WARNING SECTION: Shows warning when quota threshold is reached -->
       <div
         class="mr-4 flex items-center gap-1"
         v-if="store.state.organizationData.quotaThresholdMsg"
       >
-        <div type="warning" icon="cloud" class="inline bg-status-warning-bg p-1.25 rounded-default">
+        <div type="warning" icon="cloud" class="bg-status-warning-bg rounded-default inline p-1.25">
           <OIcon name="warning" size="xs" class="text-warning" />{{
             store.state.organizationData.quotaThresholdMsg
           }}
@@ -219,14 +219,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-toolbar"
               @click="toggleAIChat"
               data-test="menu-link-ai-item"
-              class="group [background:var(--color-gradient-ai-subtle)]! text-ai-accent! dark:text-white! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] dark:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] hover:[background:var(--color-gradient-ai)]! hover:text-white! hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)] dark:hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)]"
+              class="group text-ai-accent! [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)] hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] dark:hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)]"
               :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
               @mouseenter="handleMouseEnter"
               @mouseleave="handleMouseLeave"
             >
               <img
                 :src="getBtnLogo"
-                class="w-5 h-5 shrink-0 [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
+                class="h-5 w-5 shrink-0 [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
               />
               <OTooltip
                 side="bottom"
@@ -327,7 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- User information (non-clickable info row) -->
               <div class="flex items-center gap-3 px-3 py-2">
                 <OIcon :name="user.picture ? user.picture : 'person'" size="xs" />
-                <span class="text-sm truncate">{{
+                <span class="truncate text-sm">{{
                   user.given_name ? user.given_name + " " + user.family_name : user.email
                 }}</span>
               </div>
@@ -336,17 +336,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Language selector — nested sub-dropdown (click to open) -->
               <div
                 data-test="header-language-submenu-trigger"
-                class="relative flex items-center gap-3 py-1.5 px-3 text-sm leading-[1.2] cursor-pointer select-none hover:bg-dropdown-item-hover-bg"
+                class="hover:bg-dropdown-item-hover-bg relative flex cursor-pointer items-center gap-3 px-3 py-1.5 text-sm leading-[1.2] select-none"
                 @click.stop="showLanguageSubmenu = !showLanguageSubmenu"
               >
                 <OIcon size="xs" name="language" class="padding-none" />
                 <span class="flex-1 whitespace-nowrap">{{ t("menu.language") }}</span>
-                <span class="inline-flex items-center gap-1.5 opacity-75 whitespace-nowrap">
+                <span class="inline-flex items-center gap-1.5 whitespace-nowrap opacity-75">
                   <img
                     v-if="selectedLanguage.icon && selectedLanguage.icon.startsWith('img:')"
                     :src="selectedLanguage.icon.slice(4)"
                     :alt="selectedLanguage.label"
-                    class="w-4 h-3 object-cover rounded-default inline-block shrink-0"
+                    class="rounded-default inline-block h-3 w-4 shrink-0 object-cover"
                   />
                   <OIcon
                     v-else-if="selectedLanguage.icon"
@@ -361,7 +361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Submenu — absolutely positioned to the left of parent dropdown -->
                 <div
                   v-if="showLanguageSubmenu"
-                  class="absolute right-full top-0 mr-1 min-w-50 border rounded-default py-1 z-9999 bg-dropdown-bg border-dropdown-border shadow-[0_8px_24px_rgba(0,0,0,0.15)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.5)]"
+                  class="rounded-default bg-dropdown-bg border-dropdown-border absolute top-0 right-full z-9999 mr-1 min-w-50 border py-1 shadow-[0_8px_24px_rgba(0,0,0,0.15)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.5)]"
                   data-test="language-dropdown-item"
                   @click.stop
                 >
@@ -370,7 +370,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :key="lang.code"
                     type="button"
                     :data-test="`language-dropdown-item-${lang.code}`"
-                    class="flex items-center gap-2.5 w-full py-1.5 px-3 text-sm leading-[1.2] text-left bg-transparent border-0 cursor-pointer text-inherit"
+                    class="flex w-full cursor-pointer items-center gap-2.5 border-0 bg-transparent px-3 py-1.5 text-left text-sm leading-[1.2] text-inherit"
                     :class="[
                       'hover:bg-dropdown-item-hover-bg',
                       { 'font-semibold': selectedLanguage.code === lang.code },
@@ -384,7 +384,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="lang.icon && lang.icon.startsWith('img:')"
                       :src="lang.icon.slice(4)"
                       :alt="lang.label"
-                      class="w-4 h-3 object-cover rounded-default inline-block shrink-0"
+                      class="rounded-default inline-block h-3 w-4 shrink-0 object-cover"
                     />
                     <OIcon v-else-if="lang.icon" size="xs" :name="lang.icon" />
                     <span class="flex-1">{{ lang.label }}</span>

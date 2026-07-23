@@ -193,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="flex items-center gap-3">
       <div
-        class="bg-accent text-text-inverse inline-flex items-center justify-center w-10 h-10 rounded-full shrink-0"
+        class="bg-accent text-text-inverse inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
       >
         <OIcon name="info" size="sm" />
       </div>

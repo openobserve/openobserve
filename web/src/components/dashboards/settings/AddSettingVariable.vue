@@ -16,11 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="h-full">
-    <div class="flex flex-col h-full">
+    <div class="flex h-full flex-col">
       <DashboardHeader :title="title" backButton @back="close"> </DashboardHeader>
 
       <div
-        class="overflow-y-auto px-0.75 pb-4 flex-1 min-h-0 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-default [scrollbar-color:var(--color-border-strong)_transparent] [&::-webkit-scrollbar-thumb]:bg-border-strong"
+        class="[&::-webkit-scrollbar-thumb]:rounded-default [&::-webkit-scrollbar-thumb]:bg-border-strong min-h-0 flex-1 overflow-y-auto px-0.75 pb-4 [scrollbar-color:var(--color-border-strong)_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:bg-transparent"
       >
         <OForm greedy id="add-setting-variable-form" :form="form" class="px-0.5">
           <div class="mt-3">
@@ -78,11 +78,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dashboard-variable-type-select"
               />
             </div>
-            <div class="text-base font-bold mt-4">
+            <div class="mt-4 text-base font-bold">
               {{ t("dashboard.addGeneralSettings") }}
             </div>
-            <div class="flex gap-4 mt-3">
-              <div class="flex-1 flex flex-col">
+            <div class="mt-3 flex gap-4">
+              <div class="flex flex-1 flex-col">
                 <OFormInput
                   name="name"
                   :label="t('dashboard.nameOfVariable')"
@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="dashboard-variable-name"
                 />
               </div>
-              <div class="flex-1 flex flex-col">
+              <div class="flex flex-1 flex-col">
                 <OFormInput
                   name="label"
                   :label="t('dashboard.labelOfVariable')"
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div
-              class="flex justify-between w-full text-base font-bold mt-4"
+              class="mt-4 flex w-full justify-between text-base font-bold"
               v-if="variableData.type !== 'dynamic_filters'"
             >
               <span>{{ t("dashboard.extraOptions") }}</span>
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                    line at the bottom of that select. Bottom-aligning would shove the
                    error-free sibling down to stay flush; top-aligning keeps both
                    inputs aligned and lets the error hang below. -->
-              <div class="flex gap-x-4 items-start">
+              <div class="flex items-start gap-x-4">
                 <OFormSelect
                   name="query_data.stream_type"
                   :label="t('dashboard.selectStreamType')"
@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                 </OFormSelect>
               </div>
-              <div class="flex mt-4">
+              <div class="mt-4 flex">
                 <OFormSelect
                   name="query_data.field"
                   :label="t('dashboard.selectField')"
@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div>
                   <div
-                    class="flex flex-row items-start gap-x-2 mb-4 w-full min-w-0"
+                    class="mb-4 flex w-full min-w-0 flex-row items-start gap-x-2"
                     v-for="(filter, index) in variableData.query_data.filter"
                     :key="index"
                   >
@@ -208,17 +208,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :title="filter.name || undefined"
                       @update:model-value="filterUpdated(index, $event)"
                       data-test="dashboard-query-values-filter-name-selector"
-                      class="flex-2 min-w-0"
+                      class="min-w-0 flex-2"
                     >
                       <template #empty>
-                        <span class="italic text-text-secondary">{{
+                        <span class="text-text-secondary italic">{{
                           t("dashboard.noDataFound")
                         }}</span>
                       </template>
                     </OFormSelect>
                     <OFormSelect
                       :name="`query_data.filter[${index}].operator`"
-                      class="operator flex-[1.5] min-w-0"
+                      class="operator min-w-0 flex-[1.5]"
                       data-test="dashboard-query-values-filter-operator-selector"
                       :options="[
                         '=',
@@ -248,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :items="dashboardVariablesFilterItems"
                       search-regex="(?:^|[^$])\$?(\w+)"
                       :debounce="1000"
-                      class="flex-2 min-w-0"
+                      class="min-w-0 flex-2"
                       :placeholder="t('dashboard.addSettingVariable.enterValueCap')"
                       :data-test="`dashboard-query-values-filter-value-selector-${index}`"
                     />
@@ -256,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                          centered on the input row while the row is items-start
                          (so per-field validation errors hang below without
                          nudging the inputs/button out of alignment). -->
-                    <div class="flex items-center h-[2.125rem] shrink-0">
+                    <div class="flex h-[2.125rem] shrink-0 items-center">
                       <OButton
                         variant="ghost"
                         size="icon"
@@ -309,13 +309,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="variableData.type == 'custom'">
             <div class="flex">
               <div class="w-6"></div>
-              <div class="flex-1 font-semibold text-text-label">
+              <div class="text-text-label flex-1 font-semibold">
                 {{ t("common.label") }}
               </div>
-              <div class="flex-1 font-semibold text-text-label">
+              <div class="text-text-label flex-1 font-semibold">
                 {{ t("common.value") }}
               </div>
-              <div class="w-12 flex items-center justify-center">
+              <div class="flex w-12 items-center justify-center">
                 <span v-if="!variableData.multiSelect">
                   {{ t("dashboard.addSettingVariable.default") }}
                 </span>
@@ -333,20 +333,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="w-6"></div>
             </div>
             <div v-for="(option, index) in variableData.options" :key="index" class="flex">
-              <span class="pt-3.5 w-6">{{ index + 1 }}</span>
+              <span class="w-6 pt-3.5">{{ index + 1 }}</span>
               <OFormInput
                 :name="`options[${index}].label`"
-                class="flex-1 mr-2"
+                class="mr-2 flex-1"
                 :data-test="`dashboard-custom-variable-${index}-label`"
                 :placeholder="t('dashboard.addSettingVariable.labelPlaceholder', { n: index + 1 })"
               />
               <OFormInput
                 :name="`options[${index}].value`"
-                class="flex-1 mr-2"
+                class="mr-2 flex-1"
                 :data-test="`dashboard-custom-variable-${index}-value`"
                 :placeholder="t('dashboard.addSettingVariable.valuePlaceholder', { n: index + 1 })"
               />
-              <div class="flex w-12 item-center justify-center">
+              <div class="item-center flex w-12 justify-center">
                 <OFormCheckbox
                   :name="`options[${index}].selected`"
                   :data-test="`dashboard-custom-variable-${index}-checkbox`"
@@ -391,7 +391,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- it can be first value or all values -->
           <div v-if="['query_values'].includes(variableData.type)">
             <div class="mt-1.5 mb-1.5">
-              <div class="mt-1.25 mb-1.25 text-sm font-semibold text-text-secondary">
+              <div class="text-text-secondary mt-1.25 mb-1.25 text-sm font-semibold">
                 {{ t("dashboard.byDefaultSelect") }}
               </div>
               <OFormToggleGroup name="selectAllValueForMultiSelect">
@@ -429,7 +429,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :key="index"
                 class="mt-3 flex-wrap"
               >
-                <div class="flex mr-2 w-1/2">
+                <div class="mr-2 flex w-1/2">
                   <OFormInput
                     :name="`customMultiSelectValue[${index}]`"
                     :placeholder="t('dashboard.addSettingVariable.enterValue')"
@@ -490,7 +490,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OForm>
       </div>
       <div
-        class="sticky bottom-0 left-0 w-full py-3 px-4 flex justify-end gap-3 z-10 border-t border-t-border-default [box-shadow:var(--color-grey-150)_0_-0.25rem_0.4375rem_0] dark:[box-shadow:var(--color-grey-900)_0_-0.25rem_0.4375rem_0]"
+        class="border-t-border-default sticky bottom-0 left-0 z-10 flex w-full justify-end gap-3 border-t px-4 py-3 [box-shadow:var(--color-grey-150)_0_-0.25rem_0.4375rem_0] dark:[box-shadow:var(--color-grey-900)_0_-0.25rem_0.4375rem_0]"
       >
         <OButton
           variant="outline"

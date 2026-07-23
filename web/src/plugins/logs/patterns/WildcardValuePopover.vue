@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-show="visible && !!anchorEl"
     ref="popoverRef"
-    class="wcp w-72 bg-card-glass-solid border border-border-default rounded-default overflow-hidden shadow-[0_0.5rem_1.5rem_rgba(0,0,0,0.14),0_0.125rem_0.375rem_rgba(0,0,0,0.06)]"
+    class="wcp bg-card-glass-solid border-border-default rounded-default w-72 overflow-hidden border shadow-[0_0.5rem_1.5rem_rgba(0,0,0,0.14),0_0.125rem_0.375rem_rgba(0,0,0,0.06)]"
     :class="{ 'wcp--flip-up': flipUpward }"
     :style="popoverStyle"
     data-test="wildcard-value-popover"
@@ -26,21 +26,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @mouseleave="$emit('popoverLeave')"
   >
     <!-- ── Header ── -->
-    <div class="wcp__header flex items-center justify-between gap-2 pt-2.5 px-3 pb-1.5">
-      <div class="wcp__header-left flex items-center gap-1.5 min-w-0">
+    <div class="wcp__header flex items-center justify-between gap-2 px-3 pt-2.5 pb-1.5">
+      <div class="wcp__header-left flex min-w-0 items-center gap-1.5">
         <OTag
           type="fieldType"
           :value="tokenType"
           :label="tokenType"
           class="wcp__type-badge shrink-0 font-mono font-bold"
         />
-        <span class="wcp__title text-compact font-semibold text-text-heading truncate">{{
+        <span class="wcp__title text-compact text-text-heading truncate font-semibold">{{
           t("logs.wildcardValuePopover.variableSlot", { type: tokenType })
         }}</span>
       </div>
-      <div class="wcp__header-right flex items-baseline gap-1 shrink-0">
+      <div class="wcp__header-right flex shrink-0 items-baseline gap-1">
         <span
-          class="wcp__unique-count text-sm font-bold text-text-body [font-variant-numeric:tabular-nums]"
+          class="wcp__unique-count text-text-body text-sm font-bold [font-variant-numeric:tabular-nums]"
           >{{ displayValues.length }}</span
         >
         <span class="wcp__unique-label text-2xs text-text-secondary">{{
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- ── Value rows ── -->
-    <div class="wcp__body py-1 max-h-80 overflow-y-auto">
+    <div class="wcp__body max-h-80 overflow-y-auto py-1">
       <div
         v-for="(item, i) in displayValues.slice(0, 10)"
         :key="i"
@@ -58,19 +58,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`wildcard-value-row-${i}`"
       >
         <!-- Value name + count -->
-        <div class="wcp__row-top flex items-baseline justify-between gap-2 mb-1">
+        <div class="wcp__row-top mb-1 flex items-baseline justify-between gap-2">
           <span
-            class="wcp__row-value text-xs font-semibold font-mono text-text-body truncate flex-1 min-w-0"
+            class="wcp__row-value text-text-body min-w-0 flex-1 truncate font-mono text-xs font-semibold"
             >{{ item.value || t("logs.wildcardValuePopover.empty") }}</span
           >
           <span
-            class="wcp__row-count text-compact font-bold text-text-body [font-variant-numeric:tabular-nums] shrink-0"
+            class="wcp__row-count text-compact text-text-body shrink-0 font-bold [font-variant-numeric:tabular-nums]"
             >{{ item.count.toLocaleString() }}</span
           >
         </div>
         <!-- Full-width progress bar -->
         <div
-          class="wcp__bar-track w-full h-1 bg-card-glass-border rounded-full overflow-hidden mb-[0.1875rem]"
+          class="wcp__bar-track bg-card-glass-border mb-[0.1875rem] h-1 w-full overflow-hidden rounded-full"
         >
           <div
             class="wcp__bar-fill h-full rounded-full transition-[width] duration-200"
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div
         v-if="displayValues.length === 0"
-        class="wcp__empty py-6 px-3 text-center text-2xs text-text-muted"
+        class="wcp__empty text-2xs text-text-muted px-3 py-6 text-center"
       >
         {{ t("search.patternNoValuesAvailable") }}
       </div>
@@ -95,10 +95,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ── Footer ── -->
     <div
       v-if="displayValues.length > 0 && totalOccurrences > 0"
-      class="wcp__footer flex items-center justify-end py-[0.4375rem] px-3 border-t border-card-glass-border"
+      class="wcp__footer border-card-glass-border flex items-center justify-end border-t px-3 py-[0.4375rem]"
     >
       <span
-        class="wcp__occurrences text-2xs font-semibold text-text-secondary [font-variant-numeric:tabular-nums]"
+        class="wcp__occurrences text-2xs text-text-secondary font-semibold [font-variant-numeric:tabular-nums]"
         >{{
           t("logs.wildcardValuePopover.occurrences", { count: totalOccurrences.toLocaleString() })
         }}</span

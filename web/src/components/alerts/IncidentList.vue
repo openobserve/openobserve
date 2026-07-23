@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @row-click="viewIncident"
       >
         <template #toolbar>
-          <div class="flex items-center justify-between gap-2 w-full">
+          <div class="flex w-full items-center justify-between gap-2">
             <OToggleGroup
               :model-value="statusFilter"
               @update:model-value="(v) => filterByStatus(v as string)"
@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #cell-dimensions="{ row }">
-          <div class="flex flex-nowrap items-center gap-1 min-w-0 overflow-hidden">
+          <div class="flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden">
             <ODimensionChip
               v-for="[key, value] in getSortedDimensions(row.group_values).slice(0, 2)"
               :key="key"
@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #cell-actions="{ row }">
-          <div class="flex justify-end items-center">
+          <div class="flex items-center justify-end">
             <OButton
               v-if="row.status === 'open'"
               variant="ghost-warning"
@@ -200,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Empty state -->
         <template #empty>
-          <div v-if="!loading" class="flex items-center justify-center w-full h-full">
+          <div v-if="!loading" class="flex h-full w-full items-center justify-center">
             <OEmptyState
               size="hero"
               preset="no-incidents"
@@ -213,8 +213,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Bottom -->
         <template #bottom>
-          <div class="flex w-full justify-between items-center h-12">
-            <div class="text-xs font-normal flex items-center w-25 mr-md">
+          <div class="flex h-12 w-full items-center justify-between">
+            <div class="mr-md flex w-25 items-center text-xs font-normal">
               {{ visibleIncidents.length }}
               {{ visibleIncidents.length === 1 ? "Incident" : "Incidents" }}
             </div>

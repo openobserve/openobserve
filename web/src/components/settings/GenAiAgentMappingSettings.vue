@@ -48,7 +48,7 @@
 
     <template v-else>
       <!-- Scrollable form body -->
-      <div class="flex-1 min-h-0 overflow-y-auto px-4 py-4">
+      <div class="min-h-0 flex-1 overflow-y-auto px-4 py-4">
         <div class="grid grid-cols-1 gap-5">
           <OTextarea
             v-model="agentNameText"
@@ -82,7 +82,7 @@
       <!-- Sticky footer action bar (mirrors AddAlert): primary Save pinned at
            the bottom-right while the body scrolls. -->
       <div
-        class="flex items-center justify-end gap-2 shrink-0 px-4 py-2.5 border-t border-border-default"
+        class="border-border-default flex shrink-0 items-center justify-end gap-2 border-t px-4 py-2.5"
       >
         <OButton
           data-test="gen-ai-agent-mapping-save-btn"
@@ -108,7 +108,7 @@
       @click:secondary="clearRegistryDialogOpen = false"
       @click:primary="clearAgentRegistry"
     >
-      <p class="text-sm text-text-body">
+      <p class="text-text-body text-sm">
         {{ t("settings.genAiAgentMapping.clearRegistryDescription") }}
       </p>
     </ODialog>

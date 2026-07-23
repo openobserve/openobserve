@@ -17,16 +17,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="logs-search-bar-component" id="searchBarComponent">
     <div
-      class="flex m-0! p-1.5! items-center! w-full overflow-hidden border-b solid border-b-card-glass-border"
+      class="solid border-b-card-glass-border m-0! flex w-full items-center! overflow-hidden border-b p-1.5!"
     >
-      <div ref="toolbarLeftRef" class="flex items-center gap-1 flex-nowrap flex-1 min-w-0">
+      <div ref="toolbarLeftRef" class="flex min-w-0 flex-1 flex-nowrap items-center gap-1">
         <!-- Collapsible region — clips its overflow so the More button (a
              shrink-0 sibling below) always stays visible. Pinned items hide via
              the pinBudget computation before they would clip. `flex-initial`
              (not `flex-1`) keeps this sized to its content so the More button
              sits right after the pinned items instead of being pushed to the
              far right; it still shrinks + clips when content overflows. -->
-        <div class="flex items-center gap-1 flex-nowrap flex-initial min-w-0 overflow-hidden">
+        <div class="flex min-w-0 flex-initial flex-nowrap items-center gap-1 overflow-hidden">
           <!-- View Mode: Dropdown when very narrow, Toggle Group otherwise -->
           <ODropdown v-if="toolbarToggleAsDropdown" side="bottom" align="start">
             <template #trigger>
@@ -203,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButtonGroup
             v-if="showPinnedSavedViews"
             data-test="logs-search-bar-saved-views-pinned"
-            class="p-0 element-box-shadow border border-button-outline-border"
+            class="element-box-shadow border-button-outline-border border p-0"
           >
             <!-- A real dropdown, not a modal: one click to open, one click to
                apply. The heavyweight list dialog stays reachable via Manage. -->
@@ -227,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdownGroup :label="t('search.savedViewsLabel')">
                 <div
                   v-if="searchObj.loadingSavedView"
-                  class="flex items-center gap-2 px-3 py-1.5 text-sm text-text-secondary"
+                  class="text-text-secondary flex items-center gap-2 px-3 py-1.5 text-sm"
                 >
                   <OSpinner size="xs" />
                   {{ t("confirmDialog.loading") }}
@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :class="favoriteViews.includes(view.view_id) ? 'text-favorite' : ''"
                       />
                     </template>
-                    <span class="truncate max-w-56">{{ view.view_name }}</span>
+                    <span class="max-w-56 truncate">{{ view.view_name }}</span>
                     <template #icon-right>
                       <OButton
                         variant="ghost"
@@ -309,7 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #trigger>
             <OButton
               data-test="logs-search-bar-utilities-menu-btn"
-              class="p-1! ml-1 [border:0.0625rem_solid_var(--color-button-outline-border)]! rounded-default [transition:all_0.2s_ease] min-h-[1.875rem]! text-xs font-medium hover:bg-button-outline-hover-bg element-box-shadow"
+              class="rounded-default hover:bg-button-outline-hover-bg element-box-shadow ml-1 min-h-[1.875rem]! p-1! text-xs font-medium [border:0.0625rem_solid_var(--color-button-outline-border)]! [transition:all_0.2s_ease]"
               icon-left="more-horiz"
               variant="outline"
               size="xs"
@@ -329,7 +329,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #icon-left>
                 <span
-                  class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0"
+                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
                 >
                   <OIcon name="code" size="sm" />
                 </span>
@@ -369,7 +369,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #icon-left>
                 <span
-                  class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0"
+                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
                 >
                   <OIcon name="restart-alt" size="sm" />
                 </span>
@@ -384,7 +384,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #icon-left>
                 <span
-                  class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0"
+                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
                 >
                   <OIcon name="bar-chart" size="sm" />
                 </span>
@@ -422,7 +422,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #icon-left>
                 <span
-                  class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0"
+                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
                 >
                   <OIcon name="bolt" size="sm" />
                 </span>
@@ -462,7 +462,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #icon-left>
                 <span
-                  class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0 font-mono text-compact italic font-bold text-accent"
+                  class="rounded-default bg-section-header-bg text-text-secondary text-compact text-accent inline-flex h-7 w-7 shrink-0 items-center justify-center font-mono font-bold italic"
                   >fx</span
                 >
               </template>
@@ -516,7 +516,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #icon-left>
                 <span
-                  class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0"
+                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
                 >
                   <OIcon name="format-list-bulleted" size="sm" />
                 </span>
@@ -531,7 +531,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #icon-left>
                 <span
-                  class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0"
+                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
                 >
                   <OIcon name="add" size="sm" />
                 </span>
@@ -543,7 +543,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdownSeparator />
 
           <!-- SYNTAX GUIDE -->
-          <div class="flex items-center w-full pr-2">
+          <div class="flex w-full items-center pr-2">
             <SyntaxGuide
               :sqlmode="searchObj.meta.sqlMode"
               :menuItem="true"
@@ -567,7 +567,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODropdown>
       </div>
 
-      <div ref="toolbarRightRef" class="flex items-center gap-1 flex-shrink-0">
+      <div ref="toolbarRightRef" class="flex flex-shrink-0 items-center gap-1">
         <template v-if="searchObj.meta.showTransformEditor && !shouldMoveShareToMenu">
           <TransformSelector
             v-if="isActionsEnabled"
@@ -631,7 +631,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #icon-left>
                 <span
-                  class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0"
+                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
                 >
                   <OIcon name="history" size="sm" />
                 </span>
@@ -650,13 +650,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :aria-disabled="isDownloadDisabled || undefined"
               @mouseenter="!isDownloadDisabled && (showDownloadSubmenu = true)"
               @mouseleave="showDownloadSubmenu = false"
-              class="relative flex items-center gap-2 py-1.5 px-3 text-[var(--text-sm)] [line-height:1.2] cursor-pointer select-none hover:bg-interactive-hover-bg search-download-item before:content-[''] before:absolute before:top-0 before:right-full before:w-2.5 before:h-full"
+              class="hover:bg-interactive-hover-bg search-download-item relative flex cursor-pointer items-center gap-2 px-3 py-1.5 [line-height:1.2] text-[var(--text-sm)] select-none before:absolute before:top-0 before:right-full before:h-full before:w-2.5 before:content-['']"
               :class="{
-                'cursor-not-allowed! text-text-muted hover:bg-transparent!': isDownloadDisabled,
+                'text-text-muted cursor-not-allowed! hover:bg-transparent!': isDownloadDisabled,
               }"
             >
               <span
-                class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0"
+                class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
               >
                 <OIcon size="sm" name="download" />
               </span>
@@ -665,13 +665,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <div
                 v-if="showDownloadSubmenu && !isDownloadDisabled"
-                class="search-download-submenu absolute right-full top-0 mr-1 min-w-40 bg-dropdown-bg [border:0.063rem_solid_var(--color-card-glass-border)] rounded-default [box-shadow:0_0.5rem_1.5rem_var(--color-hover-shadow)] py-1 px-0 z-[9999]"
+                class="search-download-submenu bg-dropdown-bg rounded-default absolute top-0 right-full z-[9999] mr-1 min-w-40 px-0 py-1 [box-shadow:0_0.5rem_1.5rem_var(--color-hover-shadow)] [border:0.063rem_solid_var(--color-card-glass-border)]"
                 data-test="search-download-submenu"
               >
                 <button
                   type="button"
                   data-test="search-download-csv-btn"
-                  class="flex items-center gap-2.5 w-full py-1.5 px-3 text-[var(--text-sm)] [line-height:1.2] text-left bg-transparent border-0 cursor-pointer text-text-body hover:bg-interactive-hover-bg"
+                  class="text-text-body hover:bg-interactive-hover-bg flex w-full cursor-pointer items-center gap-2.5 border-0 bg-transparent px-3 py-1.5 text-left [line-height:1.2] text-[var(--text-sm)]"
                   @click="
                     downloadLogs(searchObj.data.queryResults.hits, 'csv');
                     showDownloadSubmenu = false;
@@ -683,7 +683,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <button
                   type="button"
                   data-test="search-download-json-btn"
-                  class="flex items-center gap-2.5 w-full py-1.5 px-3 text-[var(--text-sm)] [line-height:1.2] text-left bg-transparent border-0 cursor-pointer text-text-body hover:bg-interactive-hover-bg"
+                  class="text-text-body hover:bg-interactive-hover-bg flex w-full cursor-pointer items-center gap-2.5 border-0 bg-transparent px-3 py-1.5 text-left [line-height:1.2] text-[var(--text-sm)]"
                   @click="
                     downloadLogs(searchObj.data.queryResults.hits, 'json');
                     showDownloadSubmenu = false;
@@ -702,12 +702,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #icon-left>
                 <span
-                  class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0"
+                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
                 >
                   <img
                     :src="customRangeIcon"
                     :alt="t('logs.searchBar.customRangeAlt')"
-                    class="w-4 h-4"
+                    class="h-4 w-4"
                   />
                 </span>
               </template>
@@ -728,12 +728,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #icon-left>
                 <span
-                  class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0"
+                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
                 >
                   <img
                     :src="createScheduledSearchIcon"
                     :alt="t('logs.searchBar.createScheduledSearchAlt')"
-                    class="w-4 h-4"
+                    class="h-4 w-4"
                   />
                 </span>
               </template>
@@ -749,12 +749,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #icon-left>
                 <span
-                  class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0"
+                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
                 >
                   <img
                     :src="listScheduledSearchIcon"
                     :alt="t('logs.searchBar.listScheduledSearchAlt')"
-                    class="w-4 h-4"
+                    class="h-4 w-4"
                   />
                 </span>
               </template>
@@ -777,7 +777,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdownItem data-test="search-inspect-btn" @select="openSearchInspectDialog">
               <template #icon-left>
                 <span
-                  class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0"
+                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
                 >
                   <OIcon name="troubleshoot" size="sm" />
                 </span>
@@ -796,7 +796,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #icon-left>
                 <span
-                  class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0"
+                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
                 >
                   <OIcon name="lightbulb" size="sm" />
                 </span>
@@ -819,7 +819,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="logs-search-bar-function-editor-pinned-btn"
           size="xs"
           variant="outline"
-          class="gap-1.5 mr-1 order-1 element-box-shadow"
+          class="element-box-shadow order-1 mr-1 gap-1.5"
           @click="searchObj.meta.showTransformEditor = !searchObj.meta.showTransformEditor"
         >
           <OSwitch
@@ -827,11 +827,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :size="toolbarToggleIconOnly ? 'sm' : 'md'"
             @click.stop
           />
-          <span class="font-mono text-sm italic font-bold text-accent shrink-0">fx</span>
+          <span class="text-accent shrink-0 font-mono text-sm font-bold italic">fx</span>
           <OTooltip :content="t('search.functionEditorLabel')" />
         </OButton>
 
-        <div class="mr-1 order-1">
+        <div class="order-1 mr-1">
           <DateTime
             ref="dateTimeRef"
             auto-apply
@@ -855,7 +855,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="search-time order-2">
           <div class="flex">
             <OButtonGroup
-              class="p-0 mr-1 element-box-shadow border border-card-glass-border"
+              class="element-box-shadow border-card-glass-border mr-1 border p-0"
               v-if="
                 config.isEnterprise == 'true' &&
                 Object.keys(store.state.regionInfo).length > 0 &&
@@ -874,15 +874,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon name="arrow-drop-down" size="sm" class="ml-1" />
                   </OButton>
                 </template>
-                <div class="p-2 min-w-60" data-test="logs-search-bar-region-menu">
+                <div class="min-w-60 p-2" data-test="logs-search-bar-region-menu">
                   <OInput
                     clearable
-                    class="mb-1.5! indexlist-search-input mx-2 mt-2"
+                    class="indexlist-search-input mx-2 mt-2 mb-1.5!"
                     v-model="regionFilter"
                     :label="t('search.regionFilterMsg')"
                   />
                   <OTree
-                    class="w-full col-sm-6 mx-2 mb-2"
+                    class="col-sm-6 mx-2 mb-2 w-full"
                     :nodes="store.state.regionInfo"
                     node-key="label"
                     :filter="regionFilter"
@@ -906,7 +906,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('search.cancel')"
                   variant="ghost"
                   size="sm-toolbar"
-                  class="p-0 h-[1.875rem]! font-medium! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow rounded-s-default! rounded-e-none!"
+                  class="bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow rounded-s-default! h-[1.875rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
                   @click="cancelVisualizeQueries"
                   >{{ t("search.cancel") }}</OButton
                 >
@@ -927,11 +927,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       !searchObj.data.stream.selectedStream.length)
                   "
                   :size="isNaturalLanguageDetected && !searchObj.meta.nlpMode ? 'md' : 'sm-toolbar'"
-                  class="p-0 h-[1.875rem]! element-box-shadow"
+                  class="element-box-shadow h-[1.875rem]! p-0"
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? 'o2-ai-generate-button rounded-s-default! rounded-e-none!'
-                      : 'font-medium! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
+                      : 'bg-button-primary! text-button-primary-foreground! w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
                     'rounded-s-default! rounded-e-none!',
                   ]"
                   @click="
@@ -960,7 +960,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
                             ? 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]'
                             : '',
-                        'rounded-s-none! rounded-e-default!',
+                        'rounded-e-default! rounded-s-none!',
                       ]"
                     >
                       <OIcon name="arrow-drop-down" size="sm" />
@@ -978,7 +978,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template #icon-left><OIcon name="refresh" size="sm" /></template>
                     {{ t("search.refreshCacheAndRunQuery") }}
                   </ODropdownItem>
-                  <p v-else class="text-xs text-text-secondary text-center px-3 py-2">
+                  <p v-else class="text-text-secondary px-3 py-2 text-center text-xs">
                     {{ t("nlMode.noAdditionalOptions") }}
                   </p>
                 </ODropdown>
@@ -991,7 +991,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   :title="t('search.cancel')"
                   size="sm-toolbar"
-                  class="p-0 h-[1.875rem]! font-medium! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow rounded-s-default! rounded-e-none!"
+                  class="bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow rounded-s-default! h-[1.875rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
                   @click="cancelVisualizeQueries"
                   >{{ t("search.cancel") }}</OButton
                 >
@@ -1013,11 +1013,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       !searchObj.data.stream.selectedStream.length)
                   "
                   :size="isNaturalLanguageDetected && !searchObj.meta.nlpMode ? 'md' : 'sm-toolbar'"
-                  class="p-0 h-[1.875rem]! element-box-shadow"
+                  class="element-box-shadow h-[1.875rem]! p-0"
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? 'o2-ai-generate-button rounded-s-default! rounded-e-none!'
-                      : 'font-medium! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
+                      : 'bg-button-primary! text-button-primary-foreground! w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
                     'rounded-s-default! rounded-e-none!',
                   ]"
                   @click="
@@ -1046,7 +1046,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
                             ? 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]'
                             : '',
-                        'rounded-s-none! rounded-e-default!',
+                        'rounded-e-default! rounded-s-none!',
                       ]"
                     >
                       <OIcon name="arrow-drop-down" size="sm" />
@@ -1064,7 +1064,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template #icon-left><OIcon name="refresh" size="sm" /></template>
                     {{ t("search.refreshCacheAndRunQuery") }}
                   </ODropdownItem>
-                  <p v-else class="text-xs text-text-secondary text-center px-3 py-2">
+                  <p v-else class="text-text-secondary px-3 py-2 text-center text-xs">
                     {{ t("nlMode.noAdditionalOptions") }}
                   </p>
                 </ODropdown>
@@ -1078,7 +1078,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 :title="t('search.cancel')"
                 size="sm-toolbar"
-                class="p-0 h-[1.875rem]! font-medium! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow rounded-default"
+                class="bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow rounded-default h-[1.875rem]! w-[5.875rem]! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
                 @click="cancelPatterns"
                 >{{ t("search.cancel") }}</OButton
               >
@@ -1095,7 +1095,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="primary"
                 :title="t('search.cancel')"
                 size="sm-toolbar"
-                class="p-0 h-[1.875rem]! font-medium! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow"
+                class="bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow h-[1.875rem]! w-[5.875rem]! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
                 :class="
                   config.isEnterprise == 'true'
                     ? 'rounded-s-default! rounded-e-none!'
@@ -1116,11 +1116,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : t('search.runQuery')
                 "
                 :size="isNaturalLanguageDetected && !searchObj.meta.nlpMode ? 'md' : 'sm-toolbar'"
-                class="p-0 h-[1.875rem]! element-box-shadow"
+                class="element-box-shadow h-[1.875rem]! p-0"
                 :class="[
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? 'o2-ai-generate-button'
-                    : 'font-medium! leading-4! px-1! w-[5.875rem]! whitespace-normal break-words text-center [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
+                    : 'bg-button-primary! text-button-primary-foreground! w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
                   store.state.zoConfig.auto_query_enabled
                     ? 'rounded-s-default! rounded-e-none!'
                     : 'rounded-default',
@@ -1189,7 +1189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           ? 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]'
                           : '',
                       store.state.zoConfig.auto_query_enabled
-                        ? 'rounded-s-none! rounded-e-default!'
+                        ? 'rounded-e-default! rounded-s-none!'
                         : 'rounded-default',
                     ]"
                   >
@@ -1240,7 +1240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           : t("search.turnOnLiveMode")
                       }}
                     </div>
-                    <div class="text-xs text-text-secondary">
+                    <div class="text-text-secondary text-xs">
                       {{ t("search.liveModeTooltip") }}
                     </div>
                   </span>
@@ -1248,7 +1248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- NLP mode: info message -->
                 <p
                   v-if="isNaturalLanguageDetected && !searchObj.meta.nlpMode"
-                  class="text-xs text-text-secondary text-center px-3 py-2"
+                  class="text-text-secondary px-3 py-2 text-center text-xs"
                 >
                   {{ t("nlMode.noAdditionalOptions") }}
                 </p>
@@ -1278,8 +1278,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          reads as a stray card. -->
     <div
       ref="editorContainerRef"
-      class="flex relative query-editor-container w-full overflow-visible"
-      :class="{ 'overflow-hidden! bg-theme-body-bg-primary!': isFocused }"
+      class="query-editor-container relative flex w-full overflow-visible"
+      :class="{ 'bg-theme-body-bg-primary! overflow-hidden!': isFocused }"
       :data-fullscreen="isFocused ? 'true' : 'false'"
       :style="editorFullscreenStyle"
     >
@@ -1290,11 +1290,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost"
         size="icon-toolbar"
         @click="toggleEditorFullscreen"
-        class="absolute! z-[51] top-[0.1875rem] right-1 [border:1px_solid_var(--color-card-glass-border)]! rounded-default w-7.5! h-7.5! min-w-7.5! min-h-7.5!"
+        class="rounded-default absolute! top-[0.1875rem] right-1 z-[51] h-7.5! min-h-7.5! w-7.5! min-w-7.5! [border:1px_solid_var(--color-card-glass-border)]!"
       >
         <OTooltip :content="isFocused ? t('search.collapse') : t('search.expand')" />
       </OButton>
-      <div class="flex flex-col h-full w-full min-w-0">
+      <div class="flex h-full w-full min-w-0 flex-col">
         <OSplitter
           class="h-full!"
           v-model="searchObj.config.fnSplitterModel"
@@ -1305,9 +1305,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #before>
             <div
-              class="flex flex-col overflow-hidden h-full relative"
+              class="relative flex h-full flex-col overflow-hidden"
               :class="{
-                'border-r-0 rounded-r-none': searchObj.data.transformType,
+                'rounded-r-none border-r-0': searchObj.data.transformType,
                 'fn-editor-open': showFunctionEditor,
               }"
             >
@@ -1352,7 +1352,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   searchObj.meta.queryEditorPlaceholderFlag &&
                   !searchObj.meta.nlpMode
                 "
-                class="query-editor-placeholder-overlay absolute top-0 left-0 right-0 bottom-0 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-[1] select-none"
+                class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-[1] flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] select-none"
               >
                 <span class="query-editor-placeholder-typewriter">{{ editorPlaceholder }}</span>
               </div>
@@ -1362,7 +1362,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               data-test="logs-vrl-function-editor"
               v-if="searchObj.data.transformType"
-              class="w-full h-full"
+              class="h-full w-full"
             >
               <template v-if="showFunctionEditor">
                 <div class="relative h-full w-full">
@@ -1396,14 +1396,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.meta.functionEditorPlaceholderFlag &&
                         !isVrlEditorDisabled
                       "
-                      class="query-editor-placeholder-overlay absolute top-0 left-0 right-0 bottom-0 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-[1] select-none"
+                      class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-[1] flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] select-none"
                     >
                       <span class="query-editor-placeholder-typewriter">{{ vrlPlaceholder }}</span>
                     </div>
                     <!-- VRL disabled warning for non-table charts -->
                     <div
                       v-if="isVrlEditorDisabled"
-                      class="absolute bottom-0 w-full mt-3 flex items-center bg-black/10 dark:bg-[rgba(255,255,255,0.1)]"
+                      class="absolute bottom-0 mt-3 flex w-full items-center bg-black/10 dark:bg-[rgba(255,255,255,0.1)]"
                       data-test="vrl-editor-disabled-warning"
                     >
                       <OIcon name="warning" size="md" class="mx-2" />
@@ -1484,7 +1484,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="py-2"
         />
         <div>
-          <div class="text-sm font-semibold leading-tight pr-2 text-text-label">
+          <div class="text-text-label pr-2 text-sm leading-tight font-semibold">
             {{ t("search.fileType") }}
           </div>
           <OButtonGroup
@@ -1622,7 +1622,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:primary="addJobScheduler"
     >
       <div>
-        <div class="text-left mb-1">
+        <div class="mb-1 text-left">
           {{ t("search.noOfRecords") }}:
           <OIcon name="info-outline" size="sm" class="ml-1 cursor-pointer" />
           <OTooltip side="right" align="center" max-width="300px">
@@ -1641,8 +1641,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="text-left">
         {{ t("search.maxEventsScheduleJob") }}
       </div>
-      <div class="opacity-80 text-left mapping-warning-msg mt-3">
-        <OIcon name="warning" size="sm" class="mr-2 text-status-error-text" />
+      <div class="mapping-warning-msg mt-3 text-left opacity-80">
+        <OIcon name="warning" size="sm" class="text-status-error-text mr-2" />
         <span>{{ t("search.histogramDisabledScheduleJob") }}</span>
       </div>
     </ODialog>
@@ -1659,7 +1659,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="searchInspectDialog = false"
       @click:primary="navigateToSearchInspect"
     >
-      <div class="text-left mb-1">{{ t("search.traceIdLabel") }}</div>
+      <div class="mb-1 text-left">{{ t("search.traceIdLabel") }}</div>
       <OInput
         v-model="searchInspectTraceId"
         :placeholder="t('search.enterTraceIdPlaceholder')"
@@ -1703,7 +1703,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div data-test="logs-search-saved-view-list" class="flex">
           <div
             class="flex flex-col"
-            :class="localSavedViews.length > 0 ? 'border-r border-card-glass-border' : ''"
+            :class="localSavedViews.length > 0 ? 'border-card-glass-border border-r' : ''"
             :style="localSavedViews.length > 0 ? 'width: 60%' : 'width: 100%'"
           >
             <div class="flex flex-col" style="max-height: 486px; min-height: 280px">
@@ -1715,10 +1715,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :global-filter="searchObj.data.savedViewFilterFields"
                 :page-size="rowsPerPage"
                 :page-size-options="[10, 20, 50]"
-                class="saved-view-table h-full! max-h-full o2-table-hide-header"
+                class="saved-view-table o2-table-hide-header h-full! max-h-full"
               >
                 <template #top>
-                  <div class="px-2 py-2 w-full min-w-0 box-border">
+                  <div class="box-border w-full min-w-0 px-2 py-2">
                     <OSearchInput
                       data-test="log-search-saved-view-field-search-input"
                       v-model="searchObj.data.savedViewFilterFields"
@@ -1729,7 +1729,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
                   <div v-if="searchObj.loadingSavedView == true" class="w-full p-2">
-                    <div class="text-sm font-medium font-bold">
+                    <div class="text-sm font-bold font-medium">
                       <OSpinner size="xs" />
                       {{ t("confirmDialog.loading") }}
                     </div>
@@ -1737,7 +1737,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <template #cell-view_name="{ row, value }">
                   <div
-                    class="truncate cursor-pointer text-sm min-w-0 w-full"
+                    class="w-full min-w-0 cursor-pointer truncate text-sm"
                     :title="value"
                     :data-test="`logs-search-bar-apply-${value}-saved-view-btn`"
                     @click.stop="
@@ -1789,7 +1789,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
                 <template #empty>
-                  <div v-if="searchObj.loadingSavedView == false" class="text-center p-2 w-full">
+                  <div v-if="searchObj.loadingSavedView == false" class="w-full p-2 text-center">
                     <span>{{ t("search.savedViewsNotFound") }}</span>
                   </div>
                 </template>
@@ -1797,7 +1797,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="flex flex-col w-[40%] ml-0 pl-3" v-if="localSavedViews.length > 0">
+          <div class="ml-0 flex w-[40%] flex-col pl-3" v-if="localSavedViews.length > 0">
             <div class="flex flex-col" style="max-height: 480px; min-height: 280px">
               <OTable
                 data-test="log-search-saved-view-favorite-list-fields-table"
@@ -1805,19 +1805,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :columns="savedViewColumns"
                 row-key="view_id"
                 pagination="none"
-                class="saved-view-table h-full! max-h-full o2-table-hide-header"
+                class="saved-view-table o2-table-hide-header h-full! max-h-full"
               >
                 <template #top>
                   <div
-                    class="p-2 font-bold text-xs leading-6 uppercase tracking-wide text-muted-foreground"
+                    class="text-muted-foreground p-2 text-xs leading-6 font-bold tracking-wide uppercase"
                   >
                     {{ t("search.favoriteViews") }}
                   </div>
-                  <div class="border-t my-1 border-border" />
+                  <div class="border-border my-1 border-t" />
                 </template>
                 <template #cell-view_name="{ row, value }">
                   <div
-                    class="truncate cursor-pointer text-sm min-w-0 w-full"
+                    class="w-full min-w-0 cursor-pointer truncate text-sm"
                     :title="value"
                     :data-test="`logs-search-bar-dialog-favorite-saved-view-row-${value}`"
                     @click.stop="

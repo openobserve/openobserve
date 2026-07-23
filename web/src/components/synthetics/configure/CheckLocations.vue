@@ -73,21 +73,21 @@ function agentSubtext(location: SyntheticsLocation): string {
 </script>
 
 <template>
-  <div class="rounded-default border border-border-default mb-4">
-    <div class="flex items-center border-b border-border-default py-2.5 px-3">
-      <div class="w-[0.1875rem] h-4 rounded-default mr-2 shrink-0 bg-primary-600" />
-      <h3 class="text-base font-semibold text-text-heading">
+  <div class="rounded-default border-border-default mb-4 border">
+    <div class="border-border-default flex items-center border-b px-3 py-2.5">
+      <div class="rounded-default bg-primary-600 mr-2 h-4 w-[0.1875rem] shrink-0" />
+      <h3 class="text-text-heading text-base font-semibold">
         {{ t("synthetics.locations.title") }}
       </h3>
     </div>
-    <div class="px-3 py-2 flex flex-col gap-3">
+    <div class="flex flex-col gap-3 px-3 py-2">
       <OCheckboxGroup
         v-if="locations.length"
         v-model="selectedLocations"
         data-test="synthetics-check-locations-group"
       >
         <template v-if="allowPrivate && publicLocations.length">
-          <div class="text-xs font-medium text-text-muted uppercase pb-1">
+          <div class="text-text-muted pb-1 text-xs font-medium uppercase">
             {{ t("synthetics.locations.publicTitle") }}
           </div>
         </template>
@@ -108,7 +108,7 @@ function agentSubtext(location: SyntheticsLocation): string {
 
         <template v-if="allowPrivate">
           <div class="flex items-center justify-between pt-2 pb-1">
-            <div class="text-xs font-medium text-text-muted uppercase">
+            <div class="text-text-muted text-xs font-medium uppercase">
               {{ t("synthetics.locations.privateTitle") }}
             </div>
             <OButton
@@ -134,7 +134,7 @@ function agentSubtext(location: SyntheticsLocation): string {
                 <span class="flex flex-col gap-0.5">
                   <span class="flex items-center gap-1.5">
                     <span
-                      class="inline-block w-2 h-2 rounded-full shrink-0"
+                      class="inline-block h-2 w-2 shrink-0 rounded-full"
                       :class="
                         location.status === 'online'
                           ? 'bg-status-success-text'
@@ -149,10 +149,10 @@ function agentSubtext(location: SyntheticsLocation): string {
                       {{ t("synthetics.locations.privateBadge") }}
                     </OTag>
                   </span>
-                  <span class="text-xs text-text-muted">{{ agentSubtext(location) }}</span>
+                  <span class="text-text-muted text-xs">{{ agentSubtext(location) }}</span>
                   <span
                     v-if="location.status !== 'online'"
-                    class="text-xs text-status-warning-text"
+                    class="text-status-warning-text text-xs"
                     :data-test="`synthetics-check-locations-warning-${location.id}`"
                   >
                     {{ t("synthetics.locations.offlineWarning") }}
@@ -164,7 +164,7 @@ function agentSubtext(location: SyntheticsLocation): string {
 
           <div
             v-else
-            class="flex flex-col items-center gap-2 rounded-default border border-dashed border-border-default px-3 py-4 text-sm text-text-muted"
+            class="rounded-default border-border-default text-text-muted flex flex-col items-center gap-2 border border-dashed px-3 py-4 text-sm"
             data-test="synthetics-check-locations-private-empty"
           >
             <span>{{ t("synthetics.locations.privateEmptyBody") }}</span>
@@ -183,14 +183,14 @@ function agentSubtext(location: SyntheticsLocation): string {
 
       <div
         v-else
-        class="flex items-center justify-center rounded-default border border-dashed border-border-default px-3 py-3 text-sm text-text-muted"
+        class="rounded-default border-border-default text-text-muted flex items-center justify-center border border-dashed px-3 py-3 text-sm"
         data-test="synthetics-check-locations-empty"
       >
         {{ t("synthetics.locations.empty") }}
       </div>
       <p
         v-if="props.validationErrors?.locations"
-        class="mt-2 text-xs text-status-error-text"
+        class="text-status-error-text mt-2 text-xs"
         data-test="synthetics-check-locations-error"
       >
         {{ props.validationErrors.locations }}

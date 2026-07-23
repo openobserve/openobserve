@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:selected-ids="handleSelectedIdsUpdate"
     >
       <template #toolbar>
-        <div class="flex items-center gap-3 flex-1 min-w-0">
+        <div class="flex min-w-0 flex-1 items-center gap-3">
           <span
             class="text-xs font-bold whitespace-nowrap"
             data-test="running-queries-last-refresh"

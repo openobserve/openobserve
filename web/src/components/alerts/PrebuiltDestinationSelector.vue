@@ -16,14 +16,14 @@ limitations under the License. -->
   <div data-test="prebuilt-destination-selector">
     <!-- Destination Type Grid -->
     <div
-      class="selector-grid grid gap-3 mb-4 [grid-template-columns:repeat(auto-fill,minmax(8.75rem,1fr))]"
+      class="selector-grid mb-4 grid [grid-template-columns:repeat(auto-fill,minmax(8.75rem,1fr))] gap-3"
     >
       <div
         v-for="type in filteredDestinationTypes"
         :key="type.id"
         data-test="destination-type-card"
         :data-type="type.id"
-        class="destination-card group/dest-card relative py-5 px-3 border-2 border-card-glass-border rounded-default cursor-pointer transition-all duration-300 [min-height:7.5rem] flex flex-col hover:-translate-y-0.5 hover:shadow-[0_0.25rem_0.75rem_rgba(25,118,210,0.15)] hover:border-accent"
+        class="destination-card group/dest-card border-card-glass-border rounded-default hover:border-accent relative flex [min-height:7.5rem] cursor-pointer flex-col border-2 px-3 py-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_0.25rem_0.75rem_rgba(25,118,210,0.15)]"
         :class="
           selectedType === type.id
             ? 'selected border-accent bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] shadow-[0_0.25rem_1rem_rgba(25,118,210,0.2)]'
@@ -32,17 +32,17 @@ limitations under the License. -->
         @click="selectType(type.id)"
       >
         <!-- Card Content -->
-        <div class="card-content flex flex-col items-center text-center h-full relative">
+        <div class="card-content relative flex h-full flex-col items-center text-center">
           <!-- Icon/Image -->
           <div
             data-test="destination-type-icon"
-            class="mb-2 text-icon-color group-[.selected]/dest-card:text-accent"
+            class="text-icon-color group-[.selected]/dest-card:text-accent mb-2"
           >
             <img
               v-if="type.image"
               :src="type.image"
               :alt="type.name"
-              class="destination-logo w-6 h-6 [object-fit:contain]"
+              class="destination-logo h-6 w-6 [object-fit:contain]"
             />
             <OIcon v-else :name="getIconName(type.icon)" size="md" />
           </div>
@@ -50,7 +50,7 @@ limitations under the License. -->
           <!-- Name -->
           <div
             data-test="destination-type-name"
-            class="card-title text-compact font-medium mt-1 mb-0 text-text-heading [line-height:1.3] text-center"
+            class="card-title text-compact text-text-heading mt-1 mb-0 text-center [line-height:1.3] font-medium"
           >
             {{ type.name }}
           </div>
@@ -58,7 +58,7 @@ limitations under the License. -->
           <!-- Description -->
           <div
             data-test="destination-type-description"
-            class="text-2xs text-text-secondary mt-1 mb-0 [line-height:1.2] grow text-center hidden min-[75rem]:block"
+            class="text-2xs text-text-secondary mt-1 mb-0 hidden grow text-center [line-height:1.2] min-[75rem]:block"
           >
             {{ type.description }}
           </div>
@@ -67,7 +67,7 @@ limitations under the License. -->
         <!-- Selection Indicator -->
         <div
           v-if="selectedType === type.id"
-          class="check-icon absolute top-1.5 right-1.5 w-5 h-5 rounded-full overflow-hidden bg-status-positive text-white flex items-center justify-center z-[1]"
+          class="check-icon bg-status-positive absolute top-1.5 right-1.5 z-[1] flex h-5 w-5 items-center justify-center overflow-hidden rounded-full text-white"
         >
           <OIcon name="check" size="xs" />
         </div>
@@ -77,7 +77,7 @@ limitations under the License. -->
       <div
         data-test="destination-type-card"
         data-type="custom"
-        class="destination-card custom-card group/dest-card relative py-5 px-3 border-2 border-card-glass-border border-dashed rounded-default cursor-pointer transition-all duration-300 [min-height:7.5rem] flex flex-col hover:-translate-y-0.5 hover:shadow-[0_0.25rem_0.75rem_rgba(25,118,210,0.15)] hover:border-accent"
+        class="destination-card custom-card group/dest-card border-card-glass-border rounded-default hover:border-accent relative flex [min-height:7.5rem] cursor-pointer flex-col border-2 border-dashed px-3 py-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_0.25rem_0.75rem_rgba(25,118,210,0.15)]"
         :class="
           selectedType === 'custom'
             ? 'selected border-accent bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] shadow-[0_0.25rem_1rem_rgba(25,118,210,0.2)]'
@@ -85,22 +85,22 @@ limitations under the License. -->
         "
         @click="selectType('custom')"
       >
-        <div class="card-content flex flex-col items-center text-center h-full relative">
+        <div class="card-content relative flex h-full flex-col items-center text-center">
           <div
             data-test="destination-type-icon"
-            class="mb-2 text-icon-color group-[.selected]/dest-card:text-accent"
+            class="text-icon-color group-[.selected]/dest-card:text-accent mb-2"
           >
             <OIcon name="settings" size="md" />
           </div>
           <div
             data-test="destination-type-name"
-            class="card-title text-compact font-medium mt-1 mb-0 text-text-heading [line-height:1.3] text-center"
+            class="card-title text-compact text-text-heading mt-1 mb-0 text-center [line-height:1.3] font-medium"
           >
             {{ t("alerts.customDestination") }}
           </div>
           <div
             data-test="destination-type-description"
-            class="text-2xs text-text-secondary mt-1 mb-0 [line-height:1.2] grow text-center hidden min-[75rem]:block"
+            class="text-2xs text-text-secondary mt-1 mb-0 hidden grow text-center [line-height:1.2] min-[75rem]:block"
           >
             {{ t("alerts.customDestinationDescription") }}
           </div>
@@ -109,7 +109,7 @@ limitations under the License. -->
         <!-- Selection Indicator -->
         <div
           v-if="selectedType === 'custom'"
-          class="check-icon absolute top-1.5 right-1.5 w-5 h-5 rounded-full overflow-hidden bg-status-positive text-white flex items-center justify-center z-[1]"
+          class="check-icon bg-status-positive absolute top-1.5 right-1.5 z-[1] flex h-5 w-5 items-center justify-center overflow-hidden rounded-full text-white"
         >
           <OIcon name="check" size="xs" />
         </div>

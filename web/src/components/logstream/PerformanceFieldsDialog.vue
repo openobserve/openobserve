@@ -28,9 +28,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="$emit('add-fields')"
   >
     <div v-if="fieldsByType.fts.length > 0" class="mb-2">
-      <div class="text-xs font-medium mb-1">Full Text Search ({{ fieldsByType.fts.length }})</div>
+      <div class="mb-1 text-xs font-medium">Full Text Search ({{ fieldsByType.fts.length }})</div>
       <div
-        class="p-2 max-h-50 overflow-y-auto border rounded-default border-border-default bg-surface-subtle"
+        class="rounded-default border-border-default bg-surface-subtle max-h-50 overflow-y-auto border p-2"
       >
         <OTag
           v-for="field in fieldsByType.fts"
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <button
               type="button"
               :aria-label="`Remove ${field.name}`"
-              class="inline-flex items-center justify-center cursor-pointer hover:opacity-70"
+              class="inline-flex cursor-pointer items-center justify-center hover:opacity-70"
               @click="$emit('remove-field', 'fts', field.name)"
             >
               <OIcon name="close" size="xs" />
@@ -55,11 +55,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div v-if="fieldsByType.secondaryIndex.length > 0">
-      <div class="text-xs font-medium mb-1">
+      <div class="mb-1 text-xs font-medium">
         Secondary Index ({{ fieldsByType.secondaryIndex.length }})
       </div>
       <div
-        class="p-2 max-h-50 overflow-y-auto border rounded-default border-border-default bg-surface-subtle"
+        class="rounded-default border-border-default bg-surface-subtle max-h-50 overflow-y-auto border p-2"
       >
         <OTag
           v-for="field in fieldsByType.secondaryIndex"
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <button
               type="button"
               :aria-label="`Remove ${field.name}`"
-              class="inline-flex items-center justify-center cursor-pointer hover:opacity-70"
+              class="inline-flex cursor-pointer items-center justify-center hover:opacity-70"
               @click="$emit('remove-field', 'secondaryIndex', field.name)"
             >
               <OIcon name="close" size="xs" />

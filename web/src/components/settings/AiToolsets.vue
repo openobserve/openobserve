@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #toolbar>
             <OSearchInput
               v-model="filterQuery"
-              class="w-64 no-border o2-search-input"
+              class="no-border o2-search-input w-64"
               :placeholder="t('aiToolset.search')"
             />
           </template>

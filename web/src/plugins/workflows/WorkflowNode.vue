@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #actions>
       <div
         v-show="showButtons && meta?.category !== 'trigger'"
-        class="absolute -top-7.5 right-0 flex gap-1.5 z-10 pt-1.25 px-1.25 pb-2.5"
+        class="absolute -top-7.5 right-0 z-10 flex gap-1.5 px-1.25 pt-1.25 pb-2.5"
         :data-test="`workflow-node-${data?.node_type}-actions`"
         @mouseenter="handleActionsEnter"
         @mouseleave="handleActionsLeave"
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="ghost"
           size="icon"
-          class="min-w-5! w-5! h-5! p-0! rounded-default! bg-surface-overlay/95! border! border-status-negative! text-status-negative!"
+          class="rounded-default! bg-surface-overlay/95! border-status-negative! text-status-negative! h-5! w-5! min-w-5! border! p-0!"
           :data-test="`workflow-node-${data?.node_type}-delete-btn`"
           @click.stop="requestDeleteNode(id)"
         >
@@ -93,18 +93,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-else-if="testStatus === 'error'"
-        class="wf-test-badge wf-test-pop nodrag bg-status-negative text-white cursor-pointer transition-transform duration-150 hover:scale-110"
+        class="wf-test-badge wf-test-pop nodrag bg-status-negative cursor-pointer text-white transition-transform duration-150 hover:scale-110"
         :data-test="`workflow-node-${data?.node_type}-test-error`"
         @pointerdown.stop
         @click.stop="openResult"
       >
         <OIcon name="error" size="xs" />
-        <span v-if="errorCount > 1" class="wf-test-count bg-white text-status-negative">{{
+        <span v-if="errorCount > 1" class="wf-test-count text-status-negative bg-white">{{
           errorCount
         }}</span>
         <OTooltip side="top" align="center" :side-offset="8" max-width="360px">
           <template #content>
-            <div class="p-2 text-left flex flex-col gap-1">
+            <div class="flex flex-col gap-1 p-2 text-left">
               <div v-for="(m, i) in errorMessages" :key="i" class="text-xs leading-[1.35]">
                 {{ m }}
               </div>
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <button
           type="button"
-          class="wf-plus-btn border-2 border-dashed border-border-strong bg-surface-overlay text-text-muted hover:border-solid hover:border-accent hover:text-accent hover:bg-accent/10"
+          class="wf-plus-btn border-border-strong bg-surface-overlay text-text-muted hover:border-accent hover:text-accent hover:bg-accent/10 border-2 border-dashed hover:border-solid"
           :data-test="`workflow-node-${data?.node_type}-add-${p.handle}`"
           @click.stop="openStepPicker(id, p.handle)"
         >

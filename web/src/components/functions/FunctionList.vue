@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div data-test="function-list-page" class="flex flex-col h-full min-h-0">
+  <div data-test="function-list-page" class="flex h-full min-h-0 flex-col">
     <OPageLayout
       v-if="!showAddJSTransformDialog"
       :title="t('function.header')"
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t(`function.add`) }}
         </OButton>
       </template>
-      <div class="w-full flex-1 min-h-0 overflow-hidden">
+      <div class="min-h-0 w-full flex-1 overflow-hidden">
         <div class="h-full">
           <OTable
             :frame="false"
@@ -56,10 +56,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :show-global-filter="false"
             :default-columns="false"
             width="100%"
-            class="w-full h-full"
+            class="h-full w-full"
           >
             <template #toolbar>
-              <div class="flex items-center gap-2 w-full">
+              <div class="flex w-full items-center gap-2">
                 <OSearchInput
                   data-test="functions-list-search-input"
                   v-model="filterQuery"
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #cell-actions="{ row }">
-              <div class="flex items-center actions-container">
+              <div class="actions-container flex items-center">
                 <OButton
                   variant="ghost"
                   size="icon-sm"
@@ -147,8 +147,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #bottom>
-              <div class="flex items-center justify-between w-full py-2">
-                <div class="flex items-center text-xs font-normal mr-4">
+              <div class="flex w-full items-center justify-between py-2">
+                <div class="mr-4 flex items-center text-xs font-normal">
                   {{ resultTotal }} {{ t("function.header") }}
                 </div>
                 <OButton
@@ -168,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </OPageLayout>
-    <div v-else class="flex-1 min-h-0">
+    <div v-else class="min-h-0 flex-1">
       <AddFunction
         v-model="formData"
         :isUpdated="isUpdated"
@@ -202,12 +202,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="`Pipelines Associated with ${selectedDelete?.name}`"
     >
       <div v-if="transformedPipelineList.length > 0" class="max-h-50 overflow-y-auto">
-        <ul class="scrollable-list flex flex-col list-none p-0 m-0">
+        <ul class="scrollable-list m-0 flex list-none flex-col p-0">
           <li
             v-for="(pipeline, index) in transformedPipelineList"
             :key="pipeline.value"
             @click="onPipelineSelect(pipeline)"
-            class="flex items-center px-3 py-2 cursor-pointer hover:bg-muted/50"
+            class="hover:bg-muted/50 flex cursor-pointer items-center px-3 py-2"
             :data-test="`function-list-pipeline-item-${pipeline.value}`"
           >
             <span class="text-sm">{{ index + 1 }}. {{ pipeline.label }}</span>
@@ -215,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ul>
       </div>
       <div v-else>
-        <div class="text-xl font-semibold text-center">
+        <div class="text-center text-xl font-semibold">
           No pipelines associated with this function
         </div>
       </div>

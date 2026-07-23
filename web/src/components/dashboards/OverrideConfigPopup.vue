@@ -29,11 +29,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       data-test="override-config-accordion"
-      class="grid grid-cols-[16.5rem_minmax(0,1fr)_22.5rem] max-[56.25rem]:grid-cols-[13.75rem_minmax(0,1fr)] h-[calc(86vh-9.375rem)] overflow-hidden -mx-dialog-content-px -my-dialog-content-py"
+      class="-mx-dialog-content-px -my-dialog-content-py grid h-[calc(86vh-9.375rem)] grid-cols-[16.5rem_minmax(0,1fr)_22.5rem] overflow-hidden max-[56.25rem]:grid-cols-[13.75rem_minmax(0,1fr)]"
     >
       <!-- Left: add-field dropdown + list of added fields -->
       <div
-        class="flex flex-col gap-2.5 min-w-0 p-3 border-r border-[color-mix(in_srgb,var(--color-grey-500)_18%,transparent)]"
+        class="flex min-w-0 flex-col gap-2.5 border-r border-[color-mix(in_srgb,var(--color-grey-500)_18%,transparent)] p-3"
       >
         <ODropdown
           v-model:open="addOpenLeft"
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <button
               type="button"
               data-test="dashboard-addpanel-config-add-column"
-              class="flex items-center justify-center gap-1.5 w-full shrink-0 p-2.25 rounded-default border border-dashed border-[color-mix(in_srgb,var(--color-primary-600)_50%,transparent)] bg-transparent cursor-pointer text-sm font-medium text-primary-600 transition-colors hover:bg-[color-mix(in_srgb,var(--color-primary-600)_5%,transparent)] hover:border-primary-600"
+              class="rounded-default text-primary-600 hover:border-primary-600 flex w-full shrink-0 cursor-pointer items-center justify-center gap-1.5 border border-dashed border-[color-mix(in_srgb,var(--color-primary-600)_50%,transparent)] bg-transparent p-2.25 text-sm font-medium transition-colors hover:bg-[color-mix(in_srgb,var(--color-primary-600)_5%,transparent)]"
             >
               <OIcon name="add" size="sm" />
               {{ t("dashboard.columnFormattingAddField") }}
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <span class="flex items-center gap-2">
                 <span
-                  class="shrink-0 text-3xs font-bold tracking-[0.05em] uppercase py-0.5 px-1.25 rounded-default"
+                  class="text-3xs rounded-default shrink-0 px-1.25 py-0.5 font-bold tracking-[0.05em] uppercase"
                   :class="badgeClass(opt.isNumeric)"
                 >
                   {{ opt.isNumeric ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span>{{ opt.label }}</span>
               </span>
             </ODropdownItem>
-            <div v-if="!availableToAdd.length" class="py-2 px-2.5 text-xs text-text-secondary">
+            <div v-if="!availableToAdd.length" class="text-text-secondary px-2.5 py-2 text-xs">
               {{ t("dashboard.columnFormattingAllAdded") }}
             </div>
           </div>
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div
           v-if="columnOverrides.length"
-          class="flex-1 min-h-0 overflow-y-auto flex flex-col gap-1"
+          class="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto"
         >
           <div
             v-for="(col, idx) in columnOverrides"
@@ -83,10 +83,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             role="button"
             tabindex="0"
             :data-test="`override-config-row-${idx}`"
-            class="group relative flex items-center gap-2 w-full py-2 pl-2.25 pr-1.5 rounded-default border-l-[0.1875rem] border-transparent cursor-pointer outline-none transition-colors hover:bg-[color-mix(in_srgb,var(--color-grey-500)_5%,transparent)]"
+            class="group rounded-default relative flex w-full cursor-pointer items-center gap-2 border-l-[0.1875rem] border-transparent py-2 pr-1.5 pl-2.25 transition-colors outline-none hover:bg-[color-mix(in_srgb,var(--color-grey-500)_5%,transparent)]"
             :class="
               idx === selectedIdx
-                ? 'bg-[color-mix(in_srgb,var(--color-primary-600)_6%,transparent)] border-l-primary-600!'
+                ? 'border-l-primary-600! bg-[color-mix(in_srgb,var(--color-primary-600)_6%,transparent)]'
                 : ''
             "
             @click="selectedIdx = idx"
@@ -94,13 +94,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @keydown.space.prevent="selectedIdx = idx"
           >
             <span
-              class="shrink-0 text-3xs font-bold tracking-[0.05em] uppercase py-0.5 px-1.25 rounded-default"
+              class="text-3xs rounded-default shrink-0 px-1.25 py-0.5 font-bold tracking-[0.05em] uppercase"
               :class="badgeClass(isNumericColumn(col))"
             >
               {{ isNumericColumn(col) ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
             </span>
             <span
-              class="flex-1 min-w-0 font-semibold text-sm overflow-hidden text-ellipsis whitespace-nowrap group-hover:pr-7"
+              class="min-w-0 flex-1 overflow-hidden text-sm font-semibold text-ellipsis whitespace-nowrap group-hover:pr-7"
             >
               {{ getFieldLabel(col.field) || t("dashboard.columnFormattingPick") }}
             </span>
@@ -110,20 +110,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="close"
               :title="t('common.remove')"
               :data-test="`dashboard-addpanel-config-delete-column-${idx}`"
-              class="absolute! right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity"
+              class="absolute! top-1/2 right-1 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100"
               @click.stop="removeColumn(idx)"
             />
           </div>
         </div>
         <div
           v-else
-          class="flex-1 flex flex-col items-center justify-center gap-1.5 text-center p-4"
+          class="flex flex-1 flex-col items-center justify-center gap-1.5 p-4 text-center"
         >
           <OIcon name="format-color-text" size="lg" class="text-text-secondary" />
-          <div class="font-semibold text-sm">
+          <div class="text-sm font-semibold">
             {{ t("dashboard.columnFormattingNoFields") }}
           </div>
-          <div class="text-xs text-text-secondary leading-[1.4]">
+          <div class="text-text-secondary text-xs leading-[1.4]">
             {{ t("dashboard.columnFormattingNoFieldsHint") }}
           </div>
         </div>
@@ -135,16 +135,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ColumnFormatControls :col="selectedCol" :is-numeric="isNumericColumn(selectedCol)" />
         </div>
         <div
-          class="flex flex-col gap-2 min-w-0 overflow-y-auto p-3 border-l border-[color-mix(in_srgb,var(--color-grey-500)_18%,transparent)]"
+          class="flex min-w-0 flex-col gap-2 overflow-y-auto border-l border-[color-mix(in_srgb,var(--color-grey-500)_18%,transparent)] p-3"
         >
           <div
-            class="flex items-center gap-1.25 text-3xs font-bold tracking-[0.06em] uppercase text-text-secondary"
+            class="text-3xs text-text-secondary flex items-center gap-1.25 font-bold tracking-[0.06em] uppercase"
           >
             <OIcon name="visibility" size="xs" />
             <span>{{ t("dashboard.inlinePreview") }}</span>
           </div>
           <div
-            class="border border-[color-mix(in_srgb,var(--color-grey-500)_18%,transparent)] rounded-default overflow-hidden [&_[data-test=dashboard-table-cell-copy-btn]]:hidden!"
+            class="rounded-default overflow-hidden border border-[color-mix(in_srgb,var(--color-grey-500)_18%,transparent)] [&_[data-test=dashboard-table-cell-copy-btn]]:hidden!"
           >
             <TableRenderer
               v-if="selectedPreview"
@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Empty state: nothing added yet -->
       <div
         v-else
-        class="col-start-2 col-end-4 max-[56.25rem]:col-end-3 flex items-center justify-center p-6"
+        class="col-start-2 col-end-4 flex items-center justify-center p-6 max-[56.25rem]:col-end-3"
       >
         <OEmptyState
           size="block"
@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #illustration>
             <div
-              class="w-18 h-18 rounded-default bg-[color-mix(in_srgb,var(--color-grey-500)_8%,transparent)] flex items-center justify-center text-text-secondary"
+              class="rounded-default text-text-secondary flex h-18 w-18 items-center justify-center bg-[color-mix(in_srgb,var(--color-grey-500)_8%,transparent)]"
             >
               <OIcon name="tune" size="xl" />
             </div>
@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <span class="flex items-center gap-2">
                     <span
-                      class="shrink-0 text-3xs font-bold tracking-[0.05em] uppercase py-0.5 px-1.25 rounded-default"
+                      class="text-3xs rounded-default shrink-0 px-1.25 py-0.5 font-bold tracking-[0.05em] uppercase"
                       :class="badgeClass(opt.isNumeric)"
                     >
                       {{ opt.isNumeric ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
@@ -209,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span>{{ opt.label }}</span>
                   </span>
                 </ODropdownItem>
-                <div v-if="!availableToAdd.length" class="py-2 px-2.5 text-xs text-text-secondary">
+                <div v-if="!availableToAdd.length" class="text-text-secondary px-2.5 py-2 text-xs">
                   {{ t("dashboard.columnFormattingAllAdded") }}
                 </div>
               </div>
@@ -220,8 +220,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <template #footer>
-      <div class="flex items-center justify-between w-full">
-        <span class="text-xs text-text-secondary">{{ footerSummary }}</span>
+      <div class="flex w-full items-center justify-between">
+        <span class="text-text-secondary text-xs">{{ footerSummary }}</span>
         <div class="flex gap-2">
           <OButton variant="outline" data-test="override-config-popup-cancel" @click="closePopup">
             {{ t("dashboard.cancel") }}

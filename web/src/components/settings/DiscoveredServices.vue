@@ -15,20 +15,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col w-full h-full bg-card-glass-bg discovered-services">
+  <div class="bg-card-glass-bg discovered-services flex h-full w-full flex-col">
     <!-- Loading State -->
     <div v-if="loading" class="flex flex-1 items-center justify-center">
       <OSpinner size="sm" data-test="discovered-services-loading-indicator" />
     </div>
 
     <!-- Error State -->
-    <div v-else-if="error" class="flex flex-col flex-1 items-center justify-center gap-3">
+    <div v-else-if="error" class="flex flex-1 flex-col items-center justify-center gap-3">
       <OIcon
         name="error-outline"
         class="text-status-error-text"
         style="width: 3rem; height: 3rem"
       />
-      <div class="text-base text-status-error-text">{{ error }}</div>
+      <div class="text-status-error-text text-base">{{ error }}</div>
       <OButton
         data-test="retry-discovered-services-btn"
         variant="outline"
@@ -65,16 +65,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Services List -->
-    <div v-else class="flex flex-col flex-1 min-h-0 pt-3">
+    <div v-else class="flex min-h-0 flex-1 flex-col pt-3">
       <!-- Info banner -->
       <div
-        class="info-banner shrink-0 mb-3 mx-page-edge rounded-default flex items-center gap-3 py-3 px-4 bg-banner-info-bg border border-banner-info-border"
+        class="info-banner mx-page-edge rounded-default bg-banner-info-bg border-banner-info-border mb-3 flex shrink-0 items-center gap-3 border px-4 py-3"
       >
-        <OIcon name="info" size="md" class="shrink-0 info-banner-icon text-status-info-text" />
-        <div class="text-sm leading-relaxed info-banner-text text-text-body">
+        <OIcon name="info" size="md" class="info-banner-icon text-status-info-text shrink-0" />
+        <div class="info-banner-text text-text-body text-sm leading-relaxed">
           {{ t("settings.correlation.discoveredServicesDescription") }}
           <a
-            class="cursor-pointer inline-block mx-1 px-2 py-0.5 rounded-default text-xs font-semibold no-underline align-middle border border-text-link text-text-link bg-badge-blue-soft-bg transition-[background] duration-150 hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
+            class="rounded-default border-text-link text-text-link bg-badge-blue-soft-bg mx-1 inline-block cursor-pointer border px-2 py-0.5 align-middle text-xs font-semibold no-underline transition-[background] duration-150 hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
             @click.prevent="$emit('navigate-to-configuration')"
             >{{ t("settings.correlation.goToConfiguration") }}</a
           >
@@ -83,11 +83,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Header with title -->
-      <div class="bg-card-glass-bg shrink-0 mb-2.5">
+      <div class="bg-card-glass-bg mb-2.5 shrink-0">
         <div
-          class="services-header-bar flex justify-between items-center w-full py-3 px-page-edge h-[4.25rem]"
+          class="services-header-bar px-page-edge flex h-[4.25rem] w-full items-center justify-between py-3"
         >
-          <div class="text-xl tracking-[0.005em] font-[600]" data-test="services-list-title">
+          <div class="text-xl font-[600] tracking-[0.005em]" data-test="services-list-title">
             {{ t("settings.correlation.discoveredServicesTitle") }}
           </div>
           <!-- Filter bar -->
@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Grouped Services Table -->
-      <div class="flex-1 min-h-0">
+      <div class="min-h-0 flex-1">
         <div class="h-full">
           <OTable
             :data="refreshing ? [] : filteredGroups"
@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <template #cell-service_name="{ row }">
-              <div v-if="row.__type === 'group'" class="flex items-center gap-2 ml-2">
+              <div v-if="row.__type === 'group'" class="ml-2 flex items-center gap-2">
                 <span class="font-semibold">{{ row.service_name }}</span>
                 <OTag type="countChip" value="neutral">
                   {{ row.instances.length }}
@@ -207,9 +207,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }}
                 </OTag>
               </div>
-              <div v-else class="flex items-center gap-2 flex-wrap">
+              <div v-else class="flex flex-wrap items-center gap-2">
                 <span
-                  class="set-id-badge inline-flex items-center py-[0.0625rem] px-2 rounded-default text-2xs font-semibold border whitespace-nowrap shrink-0 bg-badge-purple-soft-bg text-badge-purple-soft-text border-badge-purple-ol-border"
+                  class="set-id-badge rounded-default text-2xs bg-badge-purple-soft-bg text-badge-purple-soft-text border-badge-purple-ol-border inline-flex shrink-0 items-center border px-2 py-[0.0625rem] font-semibold whitespace-nowrap"
                   >{{ row.set_id }}</span
                 >
                 <ODimensionChip
@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <span
                   v-if="Object.keys(row.disambiguation).length === 0"
-                  class="text-xs italic no-dimensions-text text-text-muted"
+                  class="no-dimensions-text text-text-muted text-xs italic"
                   >{{ t("settings.correlation.noDimensions") }}</span
                 >
               </div>
@@ -230,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-telemetry="{ row }">
               <div
                 v-if="row.__type === 'group'"
-                class="instance-telemetry-grid inline-grid grid-cols-[minmax(4rem,auto)_minmax(5rem,auto)_minmax(5.75rem,auto)] gap-1 items-center justify-items-start"
+                class="instance-telemetry-grid inline-grid grid-cols-[minmax(4rem,auto)_minmax(5rem,auto)_minmax(5.75rem,auto)] items-center justify-items-start gap-1"
               >
                 <OTag v-if="row.totalLogs > 0" type="streamType" :value="'logs'" />
                 <span v-else class="telemetry-slot-empty inline-block"></span>
@@ -241,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-else
-                class="instance-telemetry-grid inline-grid grid-cols-[minmax(4rem,auto)_minmax(5rem,auto)_minmax(5.75rem,auto)] gap-1 items-center justify-items-start"
+                class="instance-telemetry-grid inline-grid grid-cols-[minmax(4rem,auto)_minmax(5rem,auto)_minmax(5.75rem,auto)] items-center justify-items-start gap-1"
               >
                 <span v-if="row.logs_streams.length > 0" class="inline-flex min-w-0">
                   <OTag type="streamType" :value="'logs'">
@@ -291,8 +291,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Bottom -->
             <template #bottom>
-              <div class="flex items-center justify-between w-full h-9">
-                <div class="text-xs font-normal w-[15.625rem] mr-md">
+              <div class="flex h-9 w-full items-center justify-between">
+                <div class="mr-md w-[15.625rem] text-xs font-normal">
                   {{
                     filteredGroupCount === 1
                       ? t("settings.correlation.serviceCountSingular", {
@@ -330,7 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template #header-right>
         <span
-          class="set-id-badge inline-flex items-center py-[0.0625rem] px-2 rounded-default text-2xs font-semibold border whitespace-nowrap shrink-0 bg-badge-purple-soft-bg text-badge-purple-soft-text border-badge-purple-ol-border"
+          class="set-id-badge rounded-default text-2xs bg-badge-purple-soft-bg text-badge-purple-soft-text border-badge-purple-ol-border inline-flex shrink-0 items-center border px-2 py-[0.0625rem] font-semibold whitespace-nowrap"
           >{{ selectedService?.set_id }}</span
         >
       </template>
@@ -338,9 +338,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Default set warning banner -->
       <div
         v-if="selectedService?.set_id === 'default'"
-        class="panel-warning-banner flex items-start gap-2.5 py-3 px-5 bg-banner-warning-bg border-b border-b-banner-warning-border text-banner-warning-text"
+        class="panel-warning-banner bg-banner-warning-bg border-b-banner-warning-border text-banner-warning-text flex items-start gap-2.5 border-b px-5 py-3"
       >
-        <OIcon name="info-outline" size="sm" class="shrink-0 mt-0.5" />
+        <OIcon name="info-outline" size="sm" class="mt-0.5 shrink-0" />
         <div class="text-xs leading-relaxed">
           <span class="font-semibold">{{ t("settings.correlation.defaultSetWarningTitle") }}</span>
           {{ t("settings.correlation.defaultSetWarningBody") }}
@@ -352,9 +352,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Scrollable body -->
       <div class="panel-body flex-1 overflow-y-auto p-0">
         <!-- Instance Identity -->
-        <div class="panel-block py-4 px-5 border-b border-b-border-default">
+        <div class="panel-block border-b-border-default border-b px-5 py-4">
           <div
-            class="panel-block-label text-xs font-semibold normal-case tracking-normal text-text-label mb-2.5"
+            class="panel-block-label text-text-label mb-2.5 text-xs font-semibold tracking-normal normal-case"
           >
             {{ t("settings.correlation.instanceIdentity") }}
           </div>
@@ -377,9 +377,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Stream Sources -->
-        <div class="panel-block py-4 px-5 border-b border-b-border-default">
+        <div class="panel-block border-b-border-default border-b px-5 py-4">
           <div
-            class="panel-block-label text-xs font-semibold normal-case tracking-normal text-text-label mb-2.5"
+            class="panel-block-label text-text-label mb-2.5 text-xs font-semibold tracking-normal normal-case"
           >
             {{ t("settings.correlation.streamSources") }}
           </div>
@@ -392,7 +392,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span
                     v-for="stream in selectedService.logs_streams"
                     :key="stream"
-                    class="stream-name-badge inline-flex items-center py-[0.0625rem] px-[0.4375rem] rounded-default text-2xs font-mono border whitespace-nowrap bg-surface-subtle text-text-body border-border-default"
+                    class="stream-name-badge rounded-default text-2xs bg-surface-subtle text-text-body border-border-default inline-flex items-center border px-[0.4375rem] py-[0.0625rem] font-mono whitespace-nowrap"
                     >{{ stream }}</span
                   >
                 </div>
@@ -407,7 +407,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span
                     v-for="stream in selectedService.traces_streams"
                     :key="stream"
-                    class="stream-name-badge inline-flex items-center py-[0.0625rem] px-[0.4375rem] rounded-default text-2xs font-mono border whitespace-nowrap bg-surface-subtle text-text-body border-border-default"
+                    class="stream-name-badge rounded-default text-2xs bg-surface-subtle text-text-body border-border-default inline-flex items-center border px-[0.4375rem] py-[0.0625rem] font-mono whitespace-nowrap"
                     >{{ stream }}</span
                   >
                 </div>
@@ -422,7 +422,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span
                     v-for="stream in selectedService.metrics_streams"
                     :key="stream"
-                    class="stream-name-badge inline-flex items-center py-[0.0625rem] px-[0.4375rem] rounded-default text-2xs font-mono border whitespace-nowrap bg-surface-subtle text-text-body border-border-default"
+                    class="stream-name-badge rounded-default text-2xs bg-surface-subtle text-text-body border-border-default inline-flex items-center border px-[0.4375rem] py-[0.0625rem] font-mono whitespace-nowrap"
                     >{{ stream }}</span
                   >
                 </div>
@@ -434,10 +434,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Field Name Mapping -->
         <div
           v-if="selectedService && Object.keys(selectedService.field_name_mapping ?? {}).length > 0"
-          class="panel-block py-4 px-5 border-b border-b-border-default"
+          class="panel-block border-b-border-default border-b px-5 py-4"
         >
           <div
-            class="panel-block-label text-xs font-semibold normal-case tracking-normal text-text-label mb-2.5"
+            class="panel-block-label text-text-label mb-2.5 text-xs font-semibold tracking-normal normal-case"
           >
             {{ t("settings.correlation.fieldNameMapping") }}
           </div>
@@ -449,12 +449,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="raw"
             >
               <span
-                class="mapping-key font-mono text-2xs py-[0.0625rem] px-1.5 rounded-default border whitespace-nowrap bg-surface-subtle text-text-body border-border-default"
+                class="mapping-key text-2xs rounded-default bg-surface-subtle text-text-body border-border-default border px-1.5 py-[0.0625rem] font-mono whitespace-nowrap"
                 >{{ raw }}</span
               >
               <OIcon name="arrow-forward" size="xs" class="text-text-muted justify-self-center" />
               <span
-                class="mapping-val font-mono text-2xs py-[0.0625rem] px-1.5 rounded-default border whitespace-nowrap bg-badge-success-soft-bg text-badge-success-soft-text border-badge-success-ol-border"
+                class="mapping-val text-2xs rounded-default bg-badge-success-soft-bg text-badge-success-soft-text border-badge-success-ol-border border px-1.5 py-[0.0625rem] font-mono whitespace-nowrap"
                 >{{ mapped }}</span
               >
             </template>

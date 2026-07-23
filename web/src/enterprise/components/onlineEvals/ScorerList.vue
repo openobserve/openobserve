@@ -19,13 +19,13 @@
         :persist-columns="true"
         table-id="scorer-list"
         width="100%"
-        class="w-full h-full"
+        class="h-full w-full"
         @row-click="(row: any) => $emit('view', row)"
       >
         <template #toolbar>
           <OSearchInput
             :model-value="search"
-            class="flex-1 min-w-0"
+            class="min-w-0 flex-1"
             :placeholder="t('onlineEvals.scorer.searchPlaceholder')"
             data-test="scorer-list-search-input"
             clearable
@@ -132,7 +132,7 @@
         </template>
 
         <template #cell-actions="{ row }">
-          <div class="flex items-center actions-container">
+          <div class="actions-container flex items-center">
             <OButton
               :data-test="`scorer-list-${row.name}-edit-btn`"
               data-row-action="edit"

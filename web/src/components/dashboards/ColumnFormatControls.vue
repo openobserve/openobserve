@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Field type -->
     <div class="px-3 py-2">
       <div
-        class="o-input-label text-compact font-medium leading-tight text-input-label-text block mb-1.5"
+        class="o-input-label text-compact text-input-label-text mb-1.5 block leading-tight font-medium"
       >
         {{ t("dashboard.sectionFieldType") }}
       </div>
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Value formatting (numeric only) -->
     <div v-if="isNumeric" class="px-3 py-2">
       <div
-        class="o-input-label text-compact font-medium leading-tight text-input-label-text block mb-1.5"
+        class="o-input-label text-compact text-input-label-text mb-1.5 block leading-tight font-medium"
       >
         {{ t("dashboard.sectionValueFormatting") }}
       </div>
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :model-value="colModel.customUnit ?? ''"
         @update:model-value="colModel.customUnit = String($event)"
         :label="t('dashboard.customunitLabel')"
-        class="w-full max-w-[22.5rem] mt-2"
+        class="mt-2 w-full max-w-[22.5rem]"
         :data-test="`o2-format-custom-unit-${col.field}`"
       />
     </div>
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Alignment -->
     <div class="px-3 py-2">
       <div
-        class="o-input-label text-compact font-medium leading-tight text-input-label-text block mb-1.5"
+        class="o-input-label text-compact text-input-label-text mb-1.5 block leading-tight font-medium"
       >
         {{ t("dashboard.sectionAlignment") }}
       </div>
@@ -76,13 +76,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Styling -->
     <div class="px-3 py-2">
       <div
-        class="o-input-label text-compact font-medium leading-tight text-input-label-text block mb-1.5"
+        class="o-input-label text-compact text-input-label-text mb-1.5 block leading-tight font-medium"
       >
         {{ t("dashboard.sectionStyling") }}
       </div>
-      <div class="flex items-center gap-2 mt-2 flex-wrap">
+      <div class="mt-2 flex flex-wrap items-center gap-2">
         <span
-          class="o-input-label text-compact font-medium leading-tight text-input-label-text shrink-0 w-24"
+          class="o-input-label text-compact text-input-label-text w-24 shrink-0 leading-tight font-medium"
           >{{ t("dashboard.textColor") }}</span
         >
         <ColorSwatchPicker
@@ -91,9 +91,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`o2-format-text-color-${col.field}`"
         />
       </div>
-      <div class="flex items-center gap-2 mt-2 flex-wrap">
+      <div class="mt-2 flex flex-wrap items-center gap-2">
         <span
-          class="o-input-label text-compact font-medium leading-tight text-input-label-text shrink-0 w-24"
+          class="o-input-label text-compact text-input-label-text w-24 shrink-0 leading-tight font-medium"
           >{{ t("dashboard.bgColor") }}</span
         >
         <ColorSwatchPicker
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <button
         type="button"
-        class="inline-flex items-center gap-2 py-1.5 px-2.5 mt-3 rounded-default border cursor-pointer text-left transition-colors hover:border-primary-600"
+        class="rounded-default hover:border-primary-600 mt-3 inline-flex cursor-pointer items-center gap-2 border px-2.5 py-1.5 text-left transition-colors"
         :class="
           col.autoColor
             ? 'border-primary-600 bg-[color-mix(in_srgb,var(--color-primary-600)_7%,transparent)]'
@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OCheckbox :model-value="col.autoColor" size="sm" class="pointer-events-none" />
         <span
-          class="o-input-label text-compact font-medium leading-tight text-input-label-text cursor-pointer"
+          class="o-input-label text-compact text-input-label-text cursor-pointer leading-tight font-medium"
           >{{ t("dashboard.overrideConfigUniqueValueColor") }}</span
         >
       </button>
@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Conditional (numeric only) -->
     <div v-if="isNumeric" class="px-3 py-2">
       <div
-        class="o-input-label text-compact font-medium leading-tight text-input-label-text block mb-1.5"
+        class="o-input-label text-compact text-input-label-text mb-1.5 block leading-tight font-medium"
       >
         {{ t("dashboard.sectionConditionalStyling") }}
       </div>
@@ -134,11 +134,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="(rule, ruleIdx) in col.conditions"
         :key="ruleIdx"
-        class="flex flex-col gap-2 py-2 px-2.5 mb-1.5 rounded-default bg-[color-mix(in_srgb,var(--color-grey-500)_4%,transparent)] border border-[color-mix(in_srgb,var(--color-grey-500)_10%,transparent)]"
+        class="rounded-default mb-1.5 flex flex-col gap-2 border border-[color-mix(in_srgb,var(--color-grey-500)_10%,transparent)] bg-[color-mix(in_srgb,var(--color-grey-500)_4%,transparent)] px-2.5 py-2"
       >
-        <div class="flex items-center gap-2 flex-wrap">
+        <div class="flex flex-wrap items-center gap-2">
           <span
-            class="o-input-label text-compact font-medium leading-tight text-input-label-text shrink-0 w-28"
+            class="o-input-label text-compact text-input-label-text w-28 shrink-0 leading-tight font-medium"
             >{{ t("dashboard.conditionIfValue") }}</span
           >
           <div class="w-52 shrink-0">
@@ -158,13 +158,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-xs"
             icon-left="close"
             :title="t('common.remove')"
-            class="shrink-0 ml-auto"
+            class="ml-auto shrink-0"
             @click="colModel.conditions.splice(ruleIdx, 1)"
           />
         </div>
-        <div class="flex items-center gap-2 flex-wrap">
+        <div class="flex flex-wrap items-center gap-2">
           <span
-            class="o-input-label text-compact font-medium leading-tight text-input-label-text shrink-0 w-28"
+            class="o-input-label text-compact text-input-label-text w-28 shrink-0 leading-tight font-medium"
             >{{ t("dashboard.conditionThenText") }}</span
           >
           <ColorSwatchPicker
@@ -173,9 +173,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`o2-format-cond-text-${col.field}-${ruleIdx}`"
           />
         </div>
-        <div class="flex items-center gap-2 flex-wrap">
+        <div class="flex flex-wrap items-center gap-2">
           <span
-            class="o-input-label text-compact font-medium leading-tight text-input-label-text shrink-0 w-28"
+            class="o-input-label text-compact text-input-label-text w-28 shrink-0 leading-tight font-medium"
             >{{ t("dashboard.conditionAndBg") }}</span
           >
           <ColorSwatchPicker

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col h-full p-0">
+  <div class="flex h-full flex-col p-0">
     <template v-if="!showImportRegexPatternDialog">
       <!-- Standard section header: title + actions only. Search moved to toolbar. -->
       <OPageLayout
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ t("regex_patterns.create_pattern") }}</OButton
           >
         </template>
-        <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
+        <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
           <OTable
             :frame="false"
             data-test="regex-pattern-list-table"
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTimeCell :value="row.updated_at" unit="iso" :timezone="store.state.timezone" />
             </template>
             <template #cell-actions="{ row }">
-              <div class="flex items-center gap-1 justify-center">
+              <div class="flex items-center justify-center gap-1">
                 <OButton
                   :data-test="`regex-pattern-list-${row.id}-export-regex-pattern`"
                   data-row-action="export"

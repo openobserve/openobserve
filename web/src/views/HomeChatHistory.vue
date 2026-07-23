@@ -91,10 +91,10 @@ function formatTime(ts: string): string {
 
 <template>
   <div
-    class="flex flex-col h-full text-base w-[15em] shrink-0 border-r border-r-[0.0625em] border-card-glass-border bg-card-glass-bg overflow-hidden"
+    class="border-card-glass-border bg-card-glass-bg flex h-full w-[15em] shrink-0 flex-col overflow-hidden border-r border-r-[0.0625em] text-base"
   >
     <!-- Header -->
-    <div class="flex items-center justify-between px-3 pt-[0.625em] pb-[0.375em] shrink-0">
+    <div class="flex shrink-0 items-center justify-between px-3 pt-[0.625em] pb-[0.375em]">
       <span class="text-[0.8125em] font-semibold opacity-70">{{ t("chatHistory.title") }}</span>
       <OButton variant="ghost-muted" size="icon" :title="t('chatHistory.newChat')" @click="newChat">
         <svg
@@ -114,10 +114,10 @@ function formatTime(ts: string): string {
     </div>
 
     <!-- Search -->
-    <div class="px-2 pb-[0.375em] shrink-0">
-      <div class="flex items-center gap-[0.375em] bg-input-bg rounded-default px-[0.375em]">
+    <div class="shrink-0 px-2 pb-[0.375em]">
+      <div class="bg-input-bg rounded-default flex items-center gap-[0.375em] px-[0.375em]">
         <svg
-          class="opacity-50 shrink-0"
+          class="shrink-0 opacity-50"
           width="0.875em"
           height="0.875em"
           viewBox="0 0 24 24"
@@ -132,7 +132,7 @@ function formatTime(ts: string): string {
         </svg>
         <input
           v-model="searchTerm"
-          class="hch-search-input flex-1 min-w-0 border-0 bg-transparent outline-none text-[0.8125em] text-text-body py-[0.375em] placeholder:text-text-muted placeholder:opacity-70"
+          class="hch-search-input text-text-body placeholder:text-text-muted min-w-0 flex-1 border-0 bg-transparent py-[0.375em] text-[0.8125em] outline-none placeholder:opacity-70"
           :placeholder="t('chatHistory.search')"
           type="text"
         />
@@ -154,29 +154,29 @@ function formatTime(ts: string): string {
     </div>
 
     <!-- List -->
-    <div class="hch-list flex-1 overflow-y-auto py-1 px-[0.375em]">
+    <div class="hch-list flex-1 overflow-y-auto px-[0.375em] py-1">
       <div
         v-for="chat in filtered"
         :key="chat.id"
-        class="group flex items-center gap-1 py-[0.4375em] px-2 rounded-default cursor-pointer transition-[background] duration-[120ms] hover:bg-interactive-hover-bg"
+        class="group rounded-default hover:bg-interactive-hover-bg flex cursor-pointer items-center gap-1 px-2 py-[0.4375em] transition-[background] duration-[120ms]"
         :class="{
           'bg-primary-100!': activeChatId === chat.id,
         }"
         @click="selectChat(chat.id)"
       >
-        <div class="flex-1 min-w-0">
+        <div class="min-w-0 flex-1">
           <div
-            class="text-[0.8125em] leading-[1.35] truncate text-text-body"
+            class="text-text-body truncate text-[0.8125em] leading-[1.35]"
             :class="{ 'font-medium': activeChatId === chat.id }"
           >
             {{ chat.title }}
           </div>
-          <div class="text-[0.6875em] text-text-secondary mt-[0.0625em]">
+          <div class="text-text-secondary mt-[0.0625em] text-[0.6875em]">
             {{ formatTime(chat.timestamp) }}
           </div>
         </div>
         <span
-          class="inline-flex items-center shrink-0 opacity-0 transition-opacity duration-[120ms] group-hover:opacity-100"
+          class="inline-flex shrink-0 items-center opacity-0 transition-opacity duration-[120ms] group-hover:opacity-100"
         >
           <OButton
             variant="ghost-destructive"
@@ -206,7 +206,7 @@ function formatTime(ts: string): string {
 
       <div
         v-if="filtered.length === 0"
-        class="text-center text-[0.8125em] opacity-[0.45] py-[1.5em]"
+        class="py-[1.5em] text-center text-[0.8125em] opacity-[0.45]"
       >
         {{ searchTerm ? t("chatHistory.noMatches") : t("chatHistory.noHistory") }}
       </div>
@@ -215,7 +215,7 @@ function formatTime(ts: string): string {
     <!-- Clear all -->
     <div
       v-if="history.length > 0"
-      class="shrink-0 py-[0.375em] px-2 border-t border-t-[0.0625em] border-t-card-glass-border"
+      class="border-t-card-glass-border shrink-0 border-t border-t-[0.0625em] px-2 py-[0.375em]"
     >
       <OButton variant="ghost-subtle" :block="true" @click="clearAll">
         <svg

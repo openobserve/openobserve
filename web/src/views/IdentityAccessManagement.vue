@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #sidebar>
       <SectionRail :groups="sectionGroups" :active-key="activeSection" :title="t('menu.iam')" />
     </template>
-    <section class="h-full min-w-0 min-h-0 overflow-y-auto">
+    <section class="h-full min-h-0 min-w-0 overflow-y-auto">
       <RouterView />
     </section>
   </OPageLayout>

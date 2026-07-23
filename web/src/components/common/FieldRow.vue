@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="showQuickMode && field.name !== timestampColumn"
       :name="field.isInterestingField ? 'info-filled' : 'info-outline'"
       variant="ghost-neutral"
-      class="gap-0! mr-1"
+      class="mr-1 gap-0!"
       size="icon"
       :title="
         field.isInterestingField ? 'Remove from interesting fields' : 'Add to interesting fields'

@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="w-full flex flex-col items-center justify-center gap-2 text-2xl">
+  <div class="flex w-full flex-col items-center justify-center gap-2 text-2xl">
     <img
-      class="size-50 mt-[20vh]"
+      class="mt-[20vh] size-50"
       data-test="no-organization-selected-image"
       :src="getImageURL('images/common/selectOrganization.svg')"
       alt=""
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       data-test="no-organization-selected-message"
-      class="m-0 text-sm font-normal leading-5 text-text-secondary"
+      class="text-text-secondary m-0 text-sm leading-5 font-normal"
     >
       {{ t("ticket.selectOrganizationForQuota") }}
     </div>

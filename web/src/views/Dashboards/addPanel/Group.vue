@@ -2,14 +2,14 @@
   <div
     data-test="dashboard-group"
     :style="`--group-index: ${groupNestedIndex};`"
-    class="flex p-0 rounded-default bg-[color-mix(in_srgb,var(--color-brand-indigo)_calc(12%*var(--group-index)),transparent)]"
+    class="rounded-default flex bg-[color-mix(in_srgb,var(--color-brand-indigo)_calc(12%*var(--group-index)),transparent)] p-0"
     :class="groupNestedIndex > 0 ? 'pl-1.25' : 'pl-0'"
   >
     <div class="flex flex-row flex-wrap items-center" data-test="dashboard-group-conditions">
       <div
         v-for="(condition, index) in group.conditions"
         :key="index"
-        class="inline-flex items-center mr-2.5 min-h-8.75 gap-2"
+        class="mr-2.5 inline-flex min-h-8.75 items-center gap-2"
         data-test="dashboard-group-condition-group"
       >
         <Group
@@ -57,7 +57,7 @@
     </div>
     <div
       v-if="groupNestedIndex !== 0"
-      class="border-l border-border-default flex justify-between items-center"
+      class="border-border-default flex items-center justify-between border-l"
     >
       <OButton
         variant="ghost"

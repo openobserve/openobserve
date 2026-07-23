@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="scroll max-h-100 overflow-y-auto py-0.75">
         <div
           v-if="legends.length === 0"
-          class="p-3 text-center min-h-25 flex items-center justify-center"
+          class="flex min-h-25 items-center justify-center p-3 text-center"
         >
           {{ t("dashboard.noLegendsAvailable") }}
         </div>
@@ -57,13 +57,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="legend-item group px-2 py-1 last:border-b-0"
             :data-test="`dashboard-legend-item-${index}`"
           >
-            <div class="flex items-center flex-nowrap w-full">
+            <div class="flex w-full flex-nowrap items-center">
               <div
-                class="w-5 h-3 rounded-default mr-2.5 shrink-0"
+                class="rounded-default mr-2.5 h-3 w-5 shrink-0"
                 :style="{ backgroundColor: legend.color || DEFAULT_LEGEND_COLOR }"
               ></div>
               <div
-                class="break-all overflow-wrap-anywhere whitespace-normal leading-[1.4] text-xs"
+                class="overflow-wrap-anywhere text-xs leading-[1.4] break-all whitespace-normal"
                 data-test="dashboard-legend-item-text"
               >
                 {{ legend.name }}
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="icon"
-                class="ml-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-in-out"
+                class="ml-1 shrink-0 opacity-0 transition-opacity duration-200 ease-in-out group-hover:opacity-100"
                 data-test="dashboard-legend-copy-btn"
                 :data-copied="isLegendCopied(Number(index)) ? 'true' : undefined"
                 @click.stop="copyLegend(legend.name, Number(index))"

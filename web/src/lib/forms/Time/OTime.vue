@@ -227,11 +227,11 @@ const fieldClasses = computed(() => [
 </script>
 
 <template>
-  <div v-bind="wrapperAttrs" class="flex flex-col gap-1 w-full">
+  <div v-bind="wrapperAttrs" class="flex w-full flex-col gap-1">
     <label
       v-if="$slots.label || label || $slots.tooltip"
       :for="inputId"
-      class="o-input-label text-sm font-semibold leading-tight flex items-center gap-1"
+      class="o-input-label flex items-center gap-1 text-sm leading-tight font-semibold"
     >
       <slot name="label">{{ label }}</slot
       ><span v-if="required" aria-hidden="true" class="select-none">*</span>
@@ -240,7 +240,7 @@ const fieldClasses = computed(() => [
         name="info-outline"
         size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
-        class="cursor-help text-datepicker-label"
+        class="text-datepicker-label cursor-help"
         ><slot name="tooltip"
       /></OIcon>
     </label>
@@ -259,7 +259,7 @@ const fieldClasses = computed(() => [
           as="button"
           type="button"
           tabindex="-1"
-          class="flex items-center ps-3 text-datepicker-icon shrink-0 select-none outline-none cursor-pointer focus-visible:opacity-80"
+          class="text-datepicker-icon flex shrink-0 cursor-pointer items-center ps-3 outline-none select-none focus-visible:opacity-80"
           :disabled="disabled || undefined"
           aria-label="Open time picker"
         >
@@ -274,7 +274,7 @@ const fieldClasses = computed(() => [
           :disabled="disabled || undefined"
           :readonly="readonly || undefined"
           :class="[
-            'flex-1 min-w-0 ps-2 bg-transparent outline-none text-datepicker-text',
+            'text-datepicker-text min-w-0 flex-1 bg-transparent ps-2 outline-none',
             clearable ? 'pe-2' : 'pe-3',
           ]"
           @input="handleNativeTimeChange"
@@ -287,7 +287,7 @@ const fieldClasses = computed(() => [
           type="button"
           tabindex="-1"
           aria-label="Clear"
-          class="flex items-center pe-2 text-datepicker-icon hover:opacity-80 transition-colors"
+          class="text-datepicker-icon flex items-center pe-2 transition-colors hover:opacity-80"
           @click="handleClear"
         >
           <svg
@@ -308,7 +308,7 @@ const fieldClasses = computed(() => [
         :side-offset="4"
         align="start"
         :class="[
-          'z-60 rounded-default border shadow-md overflow-hidden bg-datepicker-popup-bg border-datepicker-popup-border outline-none',
+          'rounded-default bg-datepicker-popup-bg border-datepicker-popup-border z-60 overflow-hidden border shadow-md outline-none',
           withSeconds ? 'w-64' : 'w-56',
         ]"
         data-test="otime-popup"
@@ -320,26 +320,26 @@ const fieldClasses = computed(() => [
             <button
               type="button"
               :class="[
-                'text-2xl font-semibold tabular-nums rounded-default px-1 pb-0.5 outline-none ring-offset-1 ring-offset-surface-base transition-[color,background-color,border-color,box-shadow] duration-150 border-b-2 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring',
+                'rounded-default ring-offset-surface-base focus-visible:ring-datepicker-focus-ring border-b-2 px-1 pb-0.5 text-2xl font-semibold tabular-nums ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2',
                 clockMode === 'hour'
                   ? 'text-datepicker-day-selected-bg border-datepicker-day-selected-bg'
-                  : 'text-datepicker-heading-text border-transparent hover:text-datepicker-day-selected-bg',
+                  : 'text-datepicker-heading-text hover:text-datepicker-day-selected-bg border-transparent',
               ]"
               :aria-label="`Hour: ${displayHour}`"
               @click="clockMode = 'hour'"
             >
               {{ displayHour }}
             </button>
-            <span class="text-2xl font-semibold text-datepicker-weekday-text pb-0.5 select-none"
+            <span class="text-datepicker-weekday-text pb-0.5 text-2xl font-semibold select-none"
               >:</span
             >
             <button
               type="button"
               :class="[
-                'text-2xl font-semibold tabular-nums rounded-default px-1 pb-0.5 outline-none ring-offset-1 ring-offset-surface-base transition-[color,background-color,border-color,box-shadow] duration-150 border-b-2 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring',
+                'rounded-default ring-offset-surface-base focus-visible:ring-datepicker-focus-ring border-b-2 px-1 pb-0.5 text-2xl font-semibold tabular-nums ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2',
                 clockMode === 'minute'
                   ? 'text-datepicker-day-selected-bg border-datepicker-day-selected-bg'
-                  : 'text-datepicker-heading-text border-transparent hover:text-datepicker-day-selected-bg',
+                  : 'text-datepicker-heading-text hover:text-datepicker-day-selected-bg border-transparent',
               ]"
               :aria-label="`Minute: ${displayMinute}`"
               @click="clockMode = 'minute'"
@@ -347,16 +347,16 @@ const fieldClasses = computed(() => [
               {{ displayMinute }}
             </button>
             <template v-if="withSeconds">
-              <span class="text-2xl font-semibold text-datepicker-weekday-text pb-0.5 select-none"
+              <span class="text-datepicker-weekday-text pb-0.5 text-2xl font-semibold select-none"
                 >:</span
               >
               <button
                 type="button"
                 :class="[
-                  'text-2xl font-semibold tabular-nums rounded-default px-1 pb-0.5 outline-none ring-offset-1 ring-offset-surface-base transition-[color,background-color,border-color,box-shadow] duration-150 border-b-2 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring',
+                  'rounded-default ring-offset-surface-base focus-visible:ring-datepicker-focus-ring border-b-2 px-1 pb-0.5 text-2xl font-semibold tabular-nums ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2',
                   clockMode === 'second'
                     ? 'text-datepicker-day-selected-bg border-datepicker-day-selected-bg'
-                    : 'text-datepicker-heading-text border-transparent hover:text-datepicker-day-selected-bg',
+                    : 'text-datepicker-heading-text hover:text-datepicker-day-selected-bg border-transparent',
                 ]"
                 :aria-label="`Second: ${displaySecond}`"
                 @click="clockMode = 'second'"
@@ -368,12 +368,12 @@ const fieldClasses = computed(() => [
 
           <!-- AM / PM horizontal pill -->
           <div
-            class="flex rounded-default border border-datepicker-border overflow-hidden ms-3 shrink-0"
+            class="rounded-default border-datepicker-border ms-3 flex shrink-0 overflow-hidden border"
           >
             <button
               type="button"
               :class="[
-                'px-2.5 py-1 text-xs font-medium outline-none ring-offset-1 ring-offset-surface-base transition-[color,background-color,border-color,box-shadow] duration-150 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring',
+                'ring-offset-surface-base focus-visible:ring-datepicker-focus-ring px-2.5 py-1 text-xs font-medium ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2',
                 isAM
                   ? 'bg-datepicker-day-selected-bg text-datepicker-day-selected-text'
                   : 'text-datepicker-weekday-text hover:bg-datepicker-clock-hover-bg',
@@ -383,11 +383,11 @@ const fieldClasses = computed(() => [
             >
               AM
             </button>
-            <div class="w-px bg-datepicker-border shrink-0" aria-hidden="true" />
+            <div class="bg-datepicker-border w-px shrink-0" aria-hidden="true" />
             <button
               type="button"
               :class="[
-                'px-2.5 py-1 text-xs font-medium outline-none ring-offset-1 ring-offset-surface-base transition-[color,background-color,border-color,box-shadow] duration-150 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring',
+                'ring-offset-surface-base focus-visible:ring-datepicker-focus-ring px-2.5 py-1 text-xs font-medium ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2',
                 !isAM
                   ? 'bg-datepicker-day-selected-bg text-datepicker-day-selected-text'
                   : 'text-datepicker-weekday-text hover:bg-datepicker-clock-hover-bg',
@@ -401,7 +401,7 @@ const fieldClasses = computed(() => [
         </div>
 
         <!-- Clock face SVG -->
-        <div class="px-3 pb-1 flex justify-center">
+        <div class="flex justify-center px-3 pb-1">
           <svg
             viewBox="0 0 220 220"
             width="200"
@@ -434,7 +434,7 @@ const fieldClasses = computed(() => [
               tabindex="0"
               :aria-label="`${num.label} ${clockMode}`"
               :aria-pressed="isClockNumSelected(num)"
-              class="cursor-pointer group"
+              class="group cursor-pointer"
               @click="onClockClick(num)"
               @keydown.enter.prevent="onClockClick(num)"
               @keydown.space.prevent="onClockClick(num)"
@@ -446,7 +446,7 @@ const fieldClasses = computed(() => [
                 :class="
                   isClockNumSelected(num)
                     ? 'fill-datepicker-clock-selected-bg'
-                    : 'fill-transparent group-hover:fill-datepicker-clock-hover-bg'
+                    : 'group-hover:fill-datepicker-clock-hover-bg fill-transparent'
                 "
               />
               <text
@@ -474,10 +474,10 @@ const fieldClasses = computed(() => [
             <button
               type="button"
               :class="[
-                'rounded-full transition-all outline-none ring-offset-1 ring-offset-surface-base focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring',
+                'ring-offset-surface-base focus-visible:ring-datepicker-focus-ring rounded-full ring-offset-1 transition-all outline-none focus-visible:ring-2',
                 clockMode === 'hour'
-                  ? 'w-4 h-2 bg-datepicker-day-selected-bg'
-                  : 'size-2 bg-datepicker-border hover:bg-datepicker-weekday-text',
+                  ? 'bg-datepicker-day-selected-bg h-2 w-4'
+                  : 'bg-datepicker-border hover:bg-datepicker-weekday-text size-2',
               ]"
               aria-label="Hour"
               @click="clockMode = 'hour'"
@@ -485,10 +485,10 @@ const fieldClasses = computed(() => [
             <button
               type="button"
               :class="[
-                'rounded-full transition-all outline-none ring-offset-1 ring-offset-surface-base focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring',
+                'ring-offset-surface-base focus-visible:ring-datepicker-focus-ring rounded-full ring-offset-1 transition-all outline-none focus-visible:ring-2',
                 clockMode === 'minute'
-                  ? 'w-4 h-2 bg-datepicker-day-selected-bg'
-                  : 'size-2 bg-datepicker-border hover:bg-datepicker-weekday-text',
+                  ? 'bg-datepicker-day-selected-bg h-2 w-4'
+                  : 'bg-datepicker-border hover:bg-datepicker-weekday-text size-2',
               ]"
               aria-label="Minute"
               @click="clockMode = 'minute'"
@@ -497,10 +497,10 @@ const fieldClasses = computed(() => [
               v-if="withSeconds"
               type="button"
               :class="[
-                'rounded-full transition-all outline-none ring-offset-1 ring-offset-surface-base focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring',
+                'ring-offset-surface-base focus-visible:ring-datepicker-focus-ring rounded-full ring-offset-1 transition-all outline-none focus-visible:ring-2',
                 clockMode === 'second'
-                  ? 'w-4 h-2 bg-datepicker-day-selected-bg'
-                  : 'size-2 bg-datepicker-border hover:bg-datepicker-weekday-text',
+                  ? 'bg-datepicker-day-selected-bg h-2 w-4'
+                  : 'bg-datepicker-border hover:bg-datepicker-weekday-text size-2',
               ]"
               aria-label="Second"
               @click="clockMode = 'second'"
@@ -508,7 +508,7 @@ const fieldClasses = computed(() => [
           </div>
           <button
             type="button"
-            class="text-xs font-medium text-datepicker-day-selected-bg outline-none ring-offset-1 ring-offset-surface-base hover:opacity-80 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring transition-[box-shadow] duration-150"
+            class="text-datepicker-day-selected-bg ring-offset-surface-base focus-visible:ring-datepicker-focus-ring text-xs font-medium ring-offset-1 transition-[box-shadow] duration-150 outline-none hover:opacity-80 focus-visible:ring-2"
             data-test="otime-close"
             @click="popoverOpen = false"
           >
@@ -521,12 +521,12 @@ const fieldClasses = computed(() => [
     <div v-if="effectiveError || helpText" class="flex items-center gap-2">
       <span
         v-if="effectiveError && effectiveError.trim()"
-        class="text-xs text-datepicker-error-text leading-none"
+        class="text-datepicker-error-text text-xs leading-none"
         role="alert"
       >
         {{ effectiveError }}
       </span>
-      <span v-else-if="helpText" class="text-xs text-datepicker-label leading-none">
+      <span v-else-if="helpText" class="text-datepicker-label text-xs leading-none">
         {{ helpText }}
       </span>
     </div>

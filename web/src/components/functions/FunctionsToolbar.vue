@@ -18,7 +18,7 @@
             name="name"
             data-test="add-function-name-input"
             :placeholder="t('function.name')"
-            class="p-0 w-full"
+            class="w-full p-0"
             :readonly="disableName"
             :disabled="disableName"
             required
@@ -27,7 +27,7 @@
           />
         </div>
         <!-- Transform Type Radio Buttons -->
-        <div class="flex items-center gap-4 h-9">
+        <div class="flex h-9 items-center gap-4">
           <!-- Language toggle hidden when a host forces a single language
                (e.g. workflow function nodes are JS-only); the info tip stays. -->
           <OFormRadioGroup
@@ -38,27 +38,27 @@
           >
             <div class="flex items-center gap-1">
               <ORadio value="0" data-test="function-transform-type-vrl-radio" />
-              <span class="text-compact font-medium leading-none">{{
+              <span class="text-compact leading-none font-medium">{{
                 transformTypeOptions[0]?.label
               }}</span>
             </div>
             <!-- JavaScript option only shown in _meta organization -->
             <div v-if="transformTypeOptions[1]" class="flex items-center gap-1">
               <ORadio value="1" data-test="function-transform-type-js-radio" />
-              <span class="text-compact font-medium leading-none">{{
+              <span class="text-compact leading-none font-medium">{{
                 transformTypeOptions[1]?.label
               }}</span>
             </div>
           </OFormRadioGroup>
           <!-- Info icon with tooltip -->
-          <OIcon name="info-outline" size="sm" class="cursor-pointer text-icon-color shrink-0">
+          <OIcon name="info-outline" size="sm" class="text-icon-color shrink-0 cursor-pointer">
             <OTooltip>
               <template #content>
                 <!-- Wrap in one column container: OTooltip renders the #content
                      slot inside an inline-flex row, so sibling blocks would sit
                      side-by-side. A single flex-col child keeps title over body. -->
                 <div class="flex flex-col">
-                  <div class="font-semibold mb-1">
+                  <div class="mb-1 font-semibold">
                     {{ transTypeValue === "1" ? t("function.javascript") : t("function.vrl") }} Tip:
                   </div>
                   <div>
@@ -86,7 +86,7 @@
         size="icon-sm"
         @click="emit('open:chat', !store.state.isAiChatEnabled)"
         data-test="menu-link-ai-item"
-        class="![background:var(--color-gradient-ai-subtle)] transition-[background,box-shadow] duration-300 ease-in-out hover:![background:var(--color-gradient-ai)] hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)] rounded-default"
+        class="rounded-default transition-[background,box-shadow] duration-300 ease-in-out ![background:var(--color-gradient-ai-subtle)] hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)] hover:![background:var(--color-gradient-ai)]"
         :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
         :disabled="isSubmitting"
         @mouseenter="isHovered = true"

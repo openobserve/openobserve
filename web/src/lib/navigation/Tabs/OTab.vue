@@ -155,7 +155,7 @@ const heightClasses = computed<string>(() => {
       <span
         v-if="isDropTarget"
         aria-hidden="true"
-        class="absolute rounded-full bg-primary-600 pointer-events-none z-20"
+        class="bg-primary-600 pointer-events-none absolute z-20 rounded-full"
         :class="dropIndicatorClass"
       />
       <!-- Drag handle — shown only in reorderable mode to signal the tab can be
@@ -164,7 +164,7 @@ const heightClasses = computed<string>(() => {
         v-if="isReorderable"
         name="drag-indicator"
         size="sm"
-        class="o-tab__drag-handle shrink-0 opacity-40 -ml-0.5"
+        class="o-tab__drag-handle -ml-0.5 shrink-0 opacity-40"
         aria-hidden="true"
       />
       <!--
@@ -192,7 +192,7 @@ const heightClasses = computed<string>(() => {
           <!-- Fallback: Material icon font glyph (legacy underscore names) -->
           <span
             v-else-if="icon"
-            class="o-tab__icon text-base leading-none shrink-0 material-icons-outlined"
+            class="o-tab__icon material-icons-outlined shrink-0 text-base leading-none"
             >{{ icon }}</span
           >
         </slot>

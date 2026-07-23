@@ -15,18 +15,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="mt-3 border border-solid border-card-glass-border rounded-default">
-    <div class="text-base text-text-heading font-bold ml-1 mb-2">Distributed Trace</div>
+  <div class="border-card-glass-border rounded-default mt-3 border border-solid">
+    <div class="text-text-heading mb-2 ml-1 text-base font-bold">Distributed Trace</div>
 
     <template v-if="isLoading">
       <div class="p-3 text-center">
         <OSpinner size="sm" />
-        <div class="mt-2 text-text-muted">Loading trace data...</div>
+        <div class="text-text-muted mt-2">Loading trace data...</div>
       </div>
     </template>
 
     <template v-else-if="!traceId">
-      <div class="p-3 text-center text-text-muted">
+      <div class="text-text-muted p-3 text-center">
         <OIcon name="info" size="md" class="mb-2" />
         <div>No trace information available for this event</div>
       </div>
@@ -35,12 +35,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-else>
       <!-- Trace ID Section -->
       <div class="bg-card-glass-bg p-3">
-        <div class="flex items-center mb-3">
-          <div class="w-1/4 text-text-label">Trace ID:</div>
-          <div class="w-3/4 flex items-center flex-nowrap">
+        <div class="mb-3 flex items-center">
+          <div class="text-text-label w-1/4">Trace ID:</div>
+          <div class="flex w-3/4 flex-nowrap items-center">
             <code
               data-test="trace-correlation-card-trace-id-text"
-              class="font-mono text-sm py-1 px-2 bg-surface-accent rounded-default text-text-body"
+              class="bg-surface-accent rounded-default text-text-body px-2 py-1 font-mono text-sm"
               >{{ formatTraceId(traceId) }}</code
             >
             <OButton
@@ -55,12 +55,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div class="flex items-center mb-3" v-if="spanId">
-          <div class="w-1/4 text-text-label">Span ID:</div>
+        <div class="mb-3 flex items-center" v-if="spanId">
+          <div class="text-text-label w-1/4">Span ID:</div>
           <div class="w-3/4">
             <code
               data-test="trace-correlation-card-span-id-text"
-              class="font-mono text-sm py-1 px-2 bg-surface-accent rounded-default text-text-body"
+              class="bg-surface-accent rounded-default text-text-body px-2 py-1 font-mono text-sm"
               >{{ formatSpanId(spanId) }}</code
             >
           </div>
@@ -74,12 +74,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="circle" size="xs" class="mr-1" />
               <span class="text-text-secondary">Application Span</span>
             </div>
-            <div class="flex items-center py-1 text-sm ml-3">
+            <div class="ml-3 flex items-center py-1 text-sm">
               <OIcon name="arrow-right" size="sm" class="mr-1" />
               <OIcon name="circle" size="xs" class="mr-1" />
               <span class="text-text-secondary">Browser SDK Span ({{ formatSpanId(spanId) }})</span>
             </div>
-            <div class="flex items-center py-1 text-sm ml-4" v-if="backendSpanCount > 0">
+            <div class="ml-4 flex items-center py-1 text-sm" v-if="backendSpanCount > 0">
               <OIcon name="arrow-right" size="sm" class="mr-1" />
               <OIcon name="circle" size="xs" class="mr-1" />
               <span class="text-text-secondary">Backend Spans ({{ backendSpanCount }})</span>
@@ -90,13 +90,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Performance Breakdown -->
         <div v-if="performanceData" class="mb-3">
           <div class="text-text-label mb-1">Performance Breakdown:</div>
-          <div class="p-2 bg-surface-accent rounded-default text-sm">
-            <div class="flex items-center mb-1">
-              <div class="w-5/12 text-text-label">Total Duration:</div>
+          <div class="bg-surface-accent rounded-default p-2 text-sm">
+            <div class="mb-1 flex items-center">
+              <div class="text-text-label w-5/12">Total Duration:</div>
               <div class="w-7/12 font-bold">{{ performanceData.total_duration_ms }}ms</div>
             </div>
-            <div class="flex items-center mb-1" v-if="performanceData.browser_duration_ms">
-              <div class="w-5/12 text-text-label">Browser:</div>
+            <div class="mb-1 flex items-center" v-if="performanceData.browser_duration_ms">
+              <div class="text-text-label w-5/12">Browser:</div>
               <div class="w-7/12">
                 {{ performanceData.browser_duration_ms }}ms
                 <span class="text-text-secondary"
@@ -109,8 +109,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
               </div>
             </div>
-            <div class="flex items-center mb-1" v-if="performanceData.network_latency_ms">
-              <div class="w-5/12 text-text-label">Network:</div>
+            <div class="mb-1 flex items-center" v-if="performanceData.network_latency_ms">
+              <div class="text-text-label w-5/12">Network:</div>
               <div class="w-7/12">
                 {{ performanceData.network_latency_ms }}ms
                 <span class="text-text-secondary"
@@ -123,8 +123,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
               </div>
             </div>
-            <div class="flex items-center mb-1" v-if="performanceData.backend_duration_ms">
-              <div class="w-5/12 text-text-label">Backend:</div>
+            <div class="mb-1 flex items-center" v-if="performanceData.backend_duration_ms">
+              <div class="text-text-label w-5/12">Backend:</div>
               <div class="w-7/12">
                 {{ performanceData.backend_duration_ms }}ms
                 <span class="text-text-secondary"
@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Missing trace notice -->
-        <div v-if="!hasBackendTrace && traceId" class="mt-3 p-2 bg-surface-accent rounded-default">
+        <div v-if="!hasBackendTrace && traceId" class="bg-surface-accent rounded-default mt-3 p-2">
           <div class="flex items-center">
             <OIcon name="info" size="sm" class="mr-2" />
             <div class="text-text-secondary text-xs">

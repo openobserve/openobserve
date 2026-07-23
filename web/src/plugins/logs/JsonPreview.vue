@@ -1,9 +1,9 @@
 <template>
   <div>
-    <div class="pb-1 flex justify-start px-3 copy-log-btn">
+    <div class="copy-log-btn flex justify-start px-3 pb-1">
       <AppTabs
         v-if="filteredTabs.length"
-        class="mb-1.5 mr-2 h-fit overflow-hidden border-t border-l border-r border-solid border-card-glass-border rounded-default"
+        class="border-card-glass-border rounded-default mr-2 mb-1.5 h-fit overflow-hidden border-t border-r border-l border-solid"
         data-test="logs-json-preview-tabs"
         :tabs="filteredTabs"
         v-model:active-tab="activeTab"
@@ -14,7 +14,7 @@
         :label="t('common.copyToClipboard')"
         size="xs"
         variant="outline"
-        class="mb-1.5 mr-2"
+        class="mr-2 mb-1.5"
         @click="copyLogToClipboard"
         ><OIcon name="content-copy" size="xs" class="mr-1" />{{
           t("common.copyToClipboard")
@@ -24,7 +24,7 @@
         v-if="showViewRelatedBtn"
         size="xs"
         variant="outline"
-        class="mb-1.5 mr-2"
+        class="mr-2 mb-1.5"
         @click="openCorrelation"
         data-test="log-correlation-btn"
       >
@@ -33,7 +33,7 @@
       </OButton>
       <div
         v-if="showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)"
-        class="o2-input flex items-center logs-trace-selector"
+        class="o2-input logs-trace-selector flex items-center"
       >
         <OSelect
           data-test="log-search-index-list-select-stream"
@@ -73,7 +73,7 @@
     <div v-show="activeTab !== 'unflattened'" class="pl-3">
       {
       <div
-        class="log_json_content whitespace-pre-wrap font-mono text-xs flex"
+        class="log_json_content flex font-mono text-xs whitespace-pre-wrap"
         v-for="(key, index) in Object.keys(value)"
         :key="key"
         :data-test="`log-detail-row-${key}`"
@@ -89,7 +89,7 @@
               data-test="log-details-include-exclude-field-btn"
               size="xs"
               variant="ghost"
-              class="ml-2 h-5! w-5! min-h-5! min-w-5! p-0! align-middle"
+              class="ml-2 h-5! min-h-5! w-5! min-w-5! p-0! align-middle"
               :aria-label="t('logs.jsonPreview.addIcon')"
             >
               <OIcon :name="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'" size="sm" />
@@ -186,7 +186,7 @@
       }
       <div
         v-if="showMenu"
-        class="context-menu shadow-lg rounded-default min-w-50 py-1 [font-size: var(--text-compact)] bg-surface-overlay border border-border-default text-text-body"
+        class="context-menu rounded-default [font-size: var(--text-compact)] bg-surface-overlay border-border-default text-text-body min-w-50 border py-1 shadow-lg"
         :style="{
           position: 'fixed',
           top: `${menuY}px`,
@@ -195,14 +195,14 @@
         }"
       >
         <div
-          class="py-1.5 px-3 flex items-center cursor-pointer [transition:background-color_0.2s] hover:bg-dropdown-item-hover-bg"
+          class="hover:bg-dropdown-item-hover-bg flex cursor-pointer items-center px-3 py-1.5 [transition:background-color_0.2s]"
           @click="copySelectedText"
         >
           <OIcon name="content-copy" size="sm" class="mr-2" />
           {{ t("logs.jsonPreview.copy") }}
         </div>
         <div
-          class="py-1.5 px-3 flex items-center cursor-pointer [transition:background-color_0.2s] hover:bg-dropdown-item-hover-bg"
+          class="hover:bg-dropdown-item-hover-bg flex cursor-pointer items-center px-3 py-1.5 [transition:background-color_0.2s]"
           @click="handleCreateRegex"
         >
           <img

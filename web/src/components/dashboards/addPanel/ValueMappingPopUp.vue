@@ -41,9 +41,9 @@
         <div
           v-for="(mapping, index) in editedValueMapping"
           :key="index"
-          class="flex items-center justify-between mb-2"
+          class="mb-2 flex items-center justify-between"
         >
-          <div class="self-center cursor-move p-2">
+          <div class="cursor-move self-center p-2">
             <OIcon
               name="drag-indicator"
               size="sm"
@@ -51,7 +51,7 @@
               :data-test="`dashboard-addpanel-config-value-mapping-drag-handle-${index}`"
             />
           </div>
-          <div class="flex items-center justify-between flex-1 gap-x-6">
+          <div class="flex flex-1 items-center justify-between gap-x-6">
             <OSelect
               v-model="mapping.type"
               :label="t('dashboard.valueMappingType')"
@@ -73,7 +73,7 @@
                 :data-test="`dashboard-addpanel-config-value-mapping-pattern-input-${index}`"
               />
             </div>
-            <div v-if="mapping.type === 'range'" class="input-container flex-1 flex flex-col gap-2">
+            <div v-if="mapping.type === 'range'" class="input-container flex flex-1 flex-col gap-2">
               <OInput
                 v-model="mapping.from"
                 :placeholder="t('dashboard.valueMappingFrom')"
@@ -93,11 +93,11 @@
               :data-test="`dashboard-addpanel-config-value-mapping-text-input-${index}`"
             />
             <div
-              class="flex items-center flex-1"
+              class="flex flex-1 items-center"
               :data-test="`dashboard-addpanel-config-value-mapping-color-section-${index}`"
             >
-              <div v-if="mapping.color !== null" class="items-center flex gap-1">
-                <OColor v-model="mapping.color" class="flex-1 h-9 mt-3" />
+              <div v-if="mapping.color !== null" class="flex items-center gap-1">
+                <OColor v-model="mapping.color" class="mt-3 h-9 flex-1" />
                 <OButton
                   variant="ghost"
                   size="icon"

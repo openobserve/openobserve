@@ -48,8 +48,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template v-if="recentStreams.length" #extra>
-      <div class="flex items-center justify-center gap-2 flex-wrap">
-        <span class="text-sm font-semibold text-text-secondary">
+      <div class="flex flex-wrap items-center justify-center gap-2">
+        <span class="text-text-secondary text-sm font-semibold">
           {{ t("logs.noStream.recent") }}
         </span>
         <EmptyStateIngestionChip
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon="storage"
           :data-test="`logs-no-stream-recent-${stream}`"
           @click="emit('pick-stream', stream)"
-          ><span class="truncate max-w-40">{{ stream }}</span></EmptyStateIngestionChip
+          ><span class="max-w-40 truncate">{{ stream }}</span></EmptyStateIngestionChip
         >
       </div>
     </template>

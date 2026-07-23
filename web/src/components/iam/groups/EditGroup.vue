@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :back="{ label: t('iam.groups'), onClick: cancelEditGroup }"
     bleed
   >
-    <div data-test="edit-group-section-title" class="px-page-edge pt-2.5 pb-2.5 flex-shrink-0">
+    <div data-test="edit-group-section-title" class="px-page-edge flex-shrink-0 pt-2.5 pb-2.5">
       <div class="bg-card-glass-bg py-3">
         <AppTabs
           data-test="edit-group-tabs"
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
-    <div class="flex-1 min-h-0 overflow-hidden">
+    <div class="min-h-0 flex-1 overflow-hidden">
       <GroupUsers
         v-show="activeTab === 'users'"
         :groupUsers="groupDetails.users"
@@ -59,11 +59,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       data-test="edit-group-footer"
-      class="flex justify-end w-full flex-shrink-0"
+      class="flex w-full flex-shrink-0 justify-end"
       style="z-index: 2"
     >
       <div
-        class="bg-card-glass-bg w-full py-2 px-page-edge justify-end flex gap-2 border-t border-border-default"
+        class="bg-card-glass-bg px-page-edge border-border-default flex w-full justify-end gap-2 border-t py-2"
       >
         <OButton
           data-test="edit-group-cancel-btn"

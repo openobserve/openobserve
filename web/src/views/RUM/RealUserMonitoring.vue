@@ -15,12 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="h-full overflow-hidden flex flex-col">
+  <div class="flex h-full flex-col overflow-hidden">
     <template v-if="isLoading.length">
-      <div class="pb-4 flex items-center justify-center text-center pt-1 h-[calc(100vh-11.875rem)]">
+      <div class="flex h-[calc(100vh-11.875rem)] items-center justify-center pt-1 pb-4 text-center">
         <div>
           <OSpinner size="md" class="mx-auto block" data-test="rum-loading-indicator" />
-          <div class="text-center w-full">
+          <div class="w-full text-center">
             {{ t("rum.loadingMsg") }}
           </div>
         </div>
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OPageHeader>
       <router-view v-slot="{ Component }">
         <template v-if="$route.meta.keepAlive">
-          <keep-alive class="flex-1 min-h-0 flex flex-col">
+          <keep-alive class="flex min-h-0 flex-1 flex-col">
             <component
               :is="Component"
               :isRumEnabled="isRumEnabled"
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </keep-alive>
         </template>
         <template v-else>
-          <div class="flex-1 min-h-0 flex flex-col">
+          <div class="flex min-h-0 flex-1 flex-col">
             <component
               :is="Component"
               :isRumEnabled="isRumEnabled"
@@ -90,8 +90,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #extra>
-          <div class="flex items-center justify-center gap-2 flex-wrap">
-            <span class="text-sm font-semibold text-text-secondary mr-1">
+          <div class="flex flex-wrap items-center justify-center gap-2">
+            <span class="text-text-secondary mr-1 text-sm font-semibold">
               {{ t("rum.emptyState.learnMore") }}
             </span>
             <EmptyStateIngestionChip

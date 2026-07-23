@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- drifting + confetti -->
     <g
-      class="es-cf es-cf-a [transform-box:fill-box] origin-center"
+      class="es-cf es-cf-a origin-center [transform-box:fill-box]"
       transform="translate(196 40)"
       stroke="var(--color-primary-400)"
       stroke-width="3"
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <line x1="0" y1="-5" x2="0" y2="5" />
     </g>
     <g
-      class="es-cf es-cf-b [transform-box:fill-box] origin-center"
+      class="es-cf es-cf-b origin-center [transform-box:fill-box]"
       transform="translate(40 56)"
       stroke="var(--color-primary-300)"
       stroke-width="3"
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </g>
 
     <!-- sparkle near the slot -->
-    <g class="es-spark [transform-box:fill-box] origin-center" transform="translate(190 92)">
+    <g class="es-spark origin-center [transform-box:fill-box]" transform="translate(190 92)">
       <path
         d="M0 -6 L1.4 -1.4 L6 0 L1.4 1.4 L0 6 L-1.4 1.4 L-6 0 L-1.4 -1.4 Z"
         fill="var(--color-primary-400)"

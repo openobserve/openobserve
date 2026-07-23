@@ -84,22 +84,22 @@ function toggle(browserId: string, deviceId: string) {
 
 <template>
   <div
-    class="rounded-default border border-border-default mb-4"
+    class="rounded-default border-border-default mb-4 border"
     data-test="synthetics-check-browser-devices"
   >
-    <div class="flex items-center border-b border-border-default py-2.5 px-3">
-      <div class="w-[0.1875rem] h-4 rounded-default mr-2 shrink-0 bg-primary-600" />
-      <h3 class="text-base font-semibold text-text-heading">
+    <div class="border-border-default flex items-center border-b px-3 py-2.5">
+      <div class="rounded-default bg-primary-600 mr-2 h-4 w-[0.1875rem] shrink-0" />
+      <h3 class="text-text-heading text-base font-semibold">
         {{ t("synthetics.browserDevices.title") }}
       </h3>
     </div>
-    <div class="px-3 py-2 flex flex-col gap-3">
+    <div class="flex flex-col gap-3 px-3 py-2">
       <!-- Device column headers -->
-      <div class="flex items-center gap-10 pl-36 pb-2">
+      <div class="flex items-center gap-10 pb-2 pl-36">
         <div
           v-for="device in activeDevices"
           :key="device.id"
-          class="flex items-center gap-1 text-xs font-semibold capitalize w-20 text-text-label"
+          class="text-text-label flex w-20 items-center gap-1 text-xs font-semibold capitalize"
         >
           <OIcon :name="DEVICE_ICONS[device.id] ?? 'devices'" size="sm" />
           {{ t(deviceLabelKey(device.label)) }}
@@ -108,9 +108,9 @@ function toggle(browserId: string, deviceId: string) {
 
       <!-- Browser rows -->
       <div v-for="browser in activeBrowsers" :key="browser.id" class="flex items-center gap-10">
-        <div class="flex items-center gap-2 w-32 shrink-0">
+        <div class="flex w-32 shrink-0 items-center gap-2">
           <img :src="BROWSER_ICONS[browser.id]" class="size-5" alt="" />
-          <span class="text-sm font-medium text-text-body capitalize">{{ browser.label }}</span>
+          <span class="text-text-body text-sm font-medium capitalize">{{ browser.label }}</span>
         </div>
         <div v-for="device in activeDevices" :key="device.id" class="w-20">
           <OCheckbox
@@ -125,7 +125,7 @@ function toggle(browserId: string, deviceId: string) {
       <!-- Validation error -->
       <p
         v-if="props.validationErrors?.browserDevices"
-        class="text-xs text-status-error-text"
+        class="text-status-error-text text-xs"
         data-test="synthetics-check-browser-devices-error"
       >
         {{ props.validationErrors.browserDevices }}

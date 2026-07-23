@@ -1,7 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <template>
-  <div class="flex flex-col h-full min-h-0 w-full" data-test="o-field-list">
+  <div class="flex h-full min-h-0 w-full flex-col" data-test="o-field-list">
     <!-- before-list slot (stream selectors, etc.) -->
     <div v-if="$slots['before-list']" class="shrink-0">
       <slot name="before-list" />
@@ -12,7 +12,7 @@
          the page header instead of each panel supplying its own gutter — that's
          how this drifted to four different values. `searchClass` remains as an
          escape hatch for a panel that genuinely needs to differ. -->
-    <div v-if="showSearch" class="shrink-0 py-1.5 px-page-edge" :class="searchClass">
+    <div v-if="showSearch" class="px-page-edge shrink-0 py-1.5" :class="searchClass">
       <OInput
         :model-value="searchModel"
         data-test="o-field-list-search"
@@ -29,7 +29,7 @@
     <!-- Scrollable field list body -->
     <div
       ref="scrollContainerRef"
-      class="flex-1 overflow-y-auto overflow-x-hidden min-h-0"
+      class="min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
       @scroll="onScroll"
     >
       <!-- Loading state -->
@@ -40,7 +40,7 @@
       <!-- Empty state -->
       <div
         v-else-if="paginatedFields.length === 0"
-        class="flex items-center justify-center p-4 text-field-list-empty-text text-xs"
+        class="text-field-list-empty-text flex items-center justify-center p-4 text-xs"
       >
         <slot name="empty" />
       </div>
@@ -51,7 +51,7 @@
           <!-- Group header -->
           <div
             v-if="row.isGroup"
-            class="o-field-list__group-header h-7 px-page-edge flex items-center justify-between text-2xs font-semibold text-field-list-group-text cursor-default select-none tracking-[0.01em] sticky top-0 z-[2] bg-surface-panel"
+            class="o-field-list__group-header px-page-edge text-2xs text-field-list-group-text bg-surface-panel sticky top-0 z-[2] flex h-7 cursor-default items-center justify-between font-semibold tracking-[0.01em] select-none"
             :data-test="`o-field-list-group-${row.groupName}`"
           >
             <slot name="group-header" :row="row" :group-name="row.groupName">
@@ -62,7 +62,7 @@
           <!-- Field row -->
           <div
             v-else
-            class="o-field-list__row group mt-1 flex items-center w-full min-h-6 px-page-edge relative cursor-pointer rounded-default text-xs leading-[0.8rem]"
+            class="o-field-list__row group px-page-edge rounded-default relative mt-1 flex min-h-6 w-full cursor-pointer items-center text-xs leading-[0.8rem]"
             :class="{ 'o-field-list__row--draggable': draggable }"
             :data-test="`o-field-list-row-${row.name}`"
             :draggable="draggable && isDragEnabled(row, row._index ?? 0)"
@@ -72,7 +72,7 @@
             @dragend="(e: DragEvent) => onDragEnd(row, e)"
             @dragover.prevent
           >
-            <div class="flex items-center gap-1 min-w-0 flex-1">
+            <div class="flex min-w-0 flex-1 items-center gap-1">
               <slot
                 name="field-row"
                 :row="row"
@@ -86,7 +86,7 @@
                     name="drag-indicator"
                     size="sm"
                     :class="[
-                      'shrink-0 inline-flex items-center justify-center w-4 text-field-list-drag-icon',
+                      'text-field-list-drag-icon inline-flex w-4 shrink-0 items-center justify-center',
                       isDragEnabled(row, row._index ?? 0)
                         ? 'cursor-grab'
                         : 'cursor-not-allowed opacity-40',
@@ -99,7 +99,7 @@
             </div>
             <div
               v-if="$slots['field-actions']"
-              class="o-field-list__actions flex items-stretch shrink-0 invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-[opacity,visibility] duration-[120ms] ease-[ease] absolute right-1 top-1/2 -translate-y-1/2 border border-field-list-actions-border rounded-default overflow-hidden bg-field-list-actions-bg"
+              class="o-field-list__actions border-field-list-actions-border rounded-default bg-field-list-actions-bg invisible absolute top-1/2 right-1 flex shrink-0 -translate-y-1/2 items-stretch overflow-hidden border opacity-0 transition-[opacity,visibility] duration-[120ms] ease-[ease] group-hover:visible group-hover:opacity-100"
             >
               <slot name="field-actions" :row="row" :index="row._index" />
             </div>
@@ -108,7 +108,7 @@
           <!-- Expanded content -->
           <div
             v-if="isExpanded(row) && $slots.expansion"
-            class="w-full pt-1 pb-1.5 border border-field-list-expansion-border border-t-0 rounded-b-default mb-1.5 relative z-[1] box-border"
+            class="border-field-list-expansion-border rounded-b-default relative z-[1] mb-1.5 box-border w-full border border-t-0 pt-1 pb-1.5"
           >
             <slot name="expansion" :row="row" />
           </div>

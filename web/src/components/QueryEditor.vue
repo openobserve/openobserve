@@ -5,22 +5,22 @@
 -->
 
 <template>
-  <div class="flex flex-col w-full relative outline-transparent" :style="rootStyle">
+  <div class="relative flex w-full flex-col outline-transparent" :style="rootStyle">
     <!-- AI Input Bar (shown in NL Mode) - Positioned at top -->
     <!-- Height locked to 1.875rem = same as icon-toolbar expand button -->
     <div
       v-if="isAIMode"
       :data-test="`${dataTestPrefix}-ai-input-bar`"
       :class="[
-        'bg-[image:var(--color-gradient-ai-faint)] border-b border-b-card-glass-border h-9 flex items-center gap-2 px-2 shrink-0 z-10',
+        'border-b-card-glass-border z-10 flex h-9 shrink-0 items-center gap-2 border-b bg-[image:var(--color-gradient-ai-faint)] px-2',
         props.hasExpandButton && 'pr-10',
       ]"
     >
       <!-- Show streaming status with spinner + stop button -->
       <template v-if="isGenerating">
-        <img :src="nlpIcon" alt="AI" class="w-5 h-5 shrink-0" />
+        <img :src="nlpIcon" alt="AI" class="h-5 w-5 shrink-0" />
         <OSpinner variant="dots" size="xs" />
-        <span class="text-sm flex-1 truncate">{{
+        <span class="flex-1 truncate text-sm">{{
           streamingText || aiStatusText || t("search.analyzingQuery")
         }}</span>
         <OButton
@@ -29,7 +29,7 @@
           icon-left="stop"
           :data-test="`${dataTestPrefix}-ai-stop-btn`"
           @click="cancelGeneration"
-          class="text-status-error-text! transition-all! duration-200! hover:bg-[rgba(231,76,60,0.1)] shrink-0"
+          class="text-status-error-text! shrink-0 transition-all! duration-200! hover:bg-[rgba(231,76,60,0.1)]"
         >
           <OTooltip :content="t('common.stopGenerating')" />
         </OButton>
@@ -44,7 +44,7 @@
           @keydown.enter="handleAIInputEnter"
         >
           <template #icon-left>
-            <img :src="nlpIcon" alt="AI" class="w-5 h-5" />
+            <img :src="nlpIcon" alt="AI" class="h-5 w-5" />
           </template>
         </OInput>
         <!-- Send Button -->
@@ -55,7 +55,7 @@
           :disabled="!aiInputText.trim() || props.disableAi"
           :data-test="`${dataTestPrefix}-ai-send-btn`"
           @click="handleAIGenerate"
-          class="bg-[image:var(--color-gradient-ai)]! text-text-inverse! transition-all! duration-200! min-w-7! min-h-7! w-7! h-7! enabled:hover:-translate-y-px enabled:hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.4)]! enabled:active:translate-y-0 disabled:opacity-40! disabled:bg-surface-subtle!"
+          class="text-text-inverse! disabled:bg-surface-subtle! h-7! min-h-7! w-7! min-w-7! bg-[image:var(--color-gradient-ai)]! transition-all! duration-200! enabled:hover:-translate-y-px enabled:hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.4)]! enabled:active:translate-y-0 disabled:opacity-40!"
         >
           <OTooltip
             v-if="props.disableAi && props.disableAiReason"
@@ -81,7 +81,7 @@
     </div>
 
     <!-- Code Editor with relative positioning for floating button -->
-    <div class="overflow-hidden relative flex-1 min-h-0">
+    <div class="relative min-h-0 flex-1 overflow-hidden">
       <CodeQueryEditor
         :ref="(el) => (editorRef = el)"
         :editor-id="`${dataTestPrefix}-editor-${currentLanguage}`"
@@ -102,7 +102,7 @@
         @generation-start="handleGenerationStart"
         @generation-end="handleGenerationEnd"
         @generation-success="handleGenerationSuccess"
-        class="w-full h-full"
+        class="h-full w-full"
       />
 
       <!-- Floating AI Icon (top-right corner of editor) - hidden when AI bar is open -->
@@ -118,13 +118,13 @@
         size="icon-toolbar"
         :disabled="props.disableAi"
         @click="nlpMode = true"
-        class="group absolute! top-0.75 z-100 bg-[image:var(--color-gradient-ai-subtle)]! text-text-inverse! [transition:background_0.3s_ease,box-shadow_0.3s_ease]! w-7.5! h-7.5! min-w-7.5! min-h-7.5! rounded-default hover:bg-[image:var(--color-gradient-ai)]! hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)]!"
+        class="group text-text-inverse! rounded-default absolute! top-0.75 z-100 h-7.5! min-h-7.5! w-7.5! min-w-7.5! bg-[image:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease]! hover:bg-[image:var(--color-gradient-ai)]! hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)]!"
         :style="props.hasExpandButton ? { right: '2.375rem' } : { right: '0.25rem' }"
       >
         <img
           :src="nlpIcon"
           alt="AI Mode"
-          class="w-4.5 h-4.5 transition-transform duration-[600ms] ease-[ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert"
+          class="h-4.5 w-4.5 transition-transform duration-[600ms] ease-[ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert"
         />
         <OTooltip
           :content="

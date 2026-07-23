@@ -54,8 +54,8 @@ function onSelect(card: CheckTypeCard) {
       :key="card.type"
       class="relative"
       :class="{
-        'opacity-50 cursor-not-allowed': isDisabled(card),
-        'opacity-70 cursor-not-allowed': isComingSoon(card) && !isDisabled(card),
+        'cursor-not-allowed opacity-50': isDisabled(card),
+        'cursor-not-allowed opacity-70': isComingSoon(card) && !isDisabled(card),
         'cursor-pointer': isClickable(card),
       }"
       :data-test="`check-type-picker-${layout}-card-${card.type}`"

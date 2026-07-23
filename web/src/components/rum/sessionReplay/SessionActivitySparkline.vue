@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div ref="rootEl" class="min-h-4">
     <small
       v-if="isBounce"
-      class="italic text-text-muted"
+      class="text-text-muted italic"
       data-test="rum-session-activity-bounced"
       >{{ t("rum.noActivityBounced") }}</small
     >
@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="rum-session-activity-sparkline"
     >
       <div
-        class="flex items-end gap-[0.0938rem] h-7"
+        class="flex h-7 items-end gap-[0.0938rem]"
         role="img"
         :aria-label="ariaLabel"
         :title="ariaLabel"
@@ -39,11 +39,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="bucket in activity.buckets"
           :key="bucket.index"
-          class="flex flex-col items-center justify-end h-full w-1.5"
+          class="flex h-full w-1.5 flex-col items-center justify-end"
         >
           <span
             v-if="bucket.errors > 0 || bucket.frustrations > 0"
-            class="w-1 h-1 rounded-full shrink-0 mb-[0.0938rem]"
+            class="mb-[0.0938rem] h-1 w-1 shrink-0 rounded-full"
             :class="bucket.errors > 0 ? 'bg-severity-error-color' : 'bg-severity-warning-color'"
             :data-test="`rum-session-activity-dot-${bucket.index}`"
           />
@@ -63,14 +63,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        "no data" for rows that simply haven't been fetched yet. -->
     <div
       v-else-if="loading || !started"
-      class="flex items-end gap-[0.0938rem] h-7 animate-pulse"
+      class="flex h-7 animate-pulse items-end gap-[0.0938rem]"
       data-test="rum-session-activity-loading"
       :aria-label="t('rum.loadingMsg')"
     >
       <span
         v-for="index in 24"
         :key="index"
-        class="rounded-default bg-card-glass-border opacity-60 w-1.5"
+        class="rounded-default bg-card-glass-border w-1.5 opacity-60"
         :style="{ height: `${20 + ((index * 7) % 60)}%` }"
       />
     </div>

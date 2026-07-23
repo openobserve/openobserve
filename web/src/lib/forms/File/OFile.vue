@@ -193,11 +193,11 @@ const wrapperClasses = computed(() => [
 </script>
 
 <template>
-  <div v-bind="wrapperAttrs" class="flex flex-col gap-1 w-full">
+  <div v-bind="wrapperAttrs" class="flex w-full flex-col gap-1">
     <label
       v-if="$slots.label || label || $slots.tooltip"
       :for="inputId"
-      class="o-input-label text-compact font-medium leading-tight text-input-label-text flex items-center gap-1"
+      class="o-input-label text-compact text-input-label-text flex items-center gap-1 leading-tight font-medium"
     >
       <slot name="label">{{ label }}</slot
       ><span v-if="required" aria-hidden="true" class="select-none">*</span>
@@ -206,7 +206,7 @@ const wrapperClasses = computed(() => [
         name="info-outline"
         size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
-        class="cursor-help text-file-label"
+        class="text-file-label cursor-help"
         ><slot name="tooltip"
       /></OIcon>
     </label>
@@ -238,7 +238,7 @@ const wrapperClasses = computed(() => [
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 16 16"
         fill="currentColor"
-        class="size-4 text-file-icon shrink-0"
+        class="text-file-icon size-4 shrink-0"
         aria-hidden="true"
       >
         <path
@@ -250,7 +250,7 @@ const wrapperClasses = computed(() => [
       </svg>
 
       <!-- Selected files / placeholder -->
-      <div v-if="files.length === 0" class="flex-1 min-w-0 text-file-placeholder truncate">
+      <div v-if="files.length === 0" class="text-file-placeholder min-w-0 flex-1 truncate">
         {{
           placeholder ||
           (dropZone
@@ -263,18 +263,18 @@ const wrapperClasses = computed(() => [
 
       <div
         v-else
-        class="o-file-chips flex-1 min-w-0 flex flex-nowrap gap-1.5 items-center overflow-x-auto"
+        class="o-file-chips flex min-w-0 flex-1 flex-nowrap items-center gap-1.5 overflow-x-auto"
       >
         <span
           v-for="(file, i) in files"
           :key="`${file.name}-${i}`"
-          class="inline-flex items-center gap-1 rounded-default bg-file-chip-bg text-file-chip-text px-2 py-0.5 text-xs max-w-48 shrink-0"
+          class="rounded-default bg-file-chip-bg text-file-chip-text inline-flex max-w-48 shrink-0 items-center gap-1 px-2 py-0.5 text-xs"
           :data-test="`o-file-chip-${i}`"
         >
           <span class="truncate" :title="`${file.name} (${formatSize(file.size)})`">
             {{ file.name }}
           </span>
-          <span class="text-3xs opacity-70 shrink-0">
+          <span class="text-3xs shrink-0 opacity-70">
             {{ formatSize(file.size) }}
           </span>
           <button
@@ -283,7 +283,7 @@ const wrapperClasses = computed(() => [
             tabindex="-1"
             aria-label="Remove file"
             :data-test="`o-file-chip-${i}-remove-btn`"
-            class="flex items-center text-file-chip-remove hover:opacity-80"
+            class="text-file-chip-remove flex items-center hover:opacity-80"
             @click.stop="removeFile(i, $event)"
           >
             <svg
@@ -306,7 +306,7 @@ const wrapperClasses = computed(() => [
         type="button"
         tabindex="-1"
         aria-label="Clear all"
-        class="flex items-center text-file-icon hover:opacity-80 shrink-0"
+        class="text-file-icon flex shrink-0 items-center hover:opacity-80"
         @click.stop="handleClear($event)"
       >
         <svg
@@ -327,12 +327,12 @@ const wrapperClasses = computed(() => [
       <span
         v-if="effectiveError && effectiveError.trim()"
         :data-test="parentDataTest ? `${parentDataTest}-error` : undefined"
-        class="text-xs text-file-error-text leading-none"
+        class="text-file-error-text text-xs leading-none"
         role="alert"
       >
         {{ effectiveError }}
       </span>
-      <span v-else-if="helpText" class="text-xs text-file-label leading-none">
+      <span v-else-if="helpText" class="text-file-label text-xs leading-none">
         {{ helpText }}
       </span>
     </div>

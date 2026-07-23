@@ -28,41 +28,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex items-center gap-2.5">
         <div
           data-test="add-alert-back-btn"
-          class="flex justify-center items-center cursor-pointer opacity-60 hover:opacity-100 transition-opacity flex-shrink-0 border-[1.5px] rounded-full size-5"
+          class="flex size-5 flex-shrink-0 cursor-pointer items-center justify-center rounded-full border-[1.5px] opacity-60 transition-opacity hover:opacity-100"
           :title="t('common.goBack')"
           @click="closeDialog"
         >
           <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
-        <span class="text-lg font-semibold text-dialog-header-text truncate block">{{
+        <span class="text-dialog-header-text block truncate text-lg font-semibold">{{
           t("alerts.addConditions")
         }}</span>
 
         <!-- Separator -->
-        <div class="w-px h-4 opacity-30 bg-border-strong" />
+        <div class="bg-border-strong h-4 w-px opacity-30" />
 
         <!-- Stream Type + Stream Name -->
         <div class="flex items-center gap-2">
           <div
             v-if="streamType"
-            class="inline-flex flex-row items-center gap-1.25 py-0.75 px-2.5 rounded-default bg-[color-mix(in_srgb,var(--color-info)_10%,transparent)] border border-[color-mix(in_srgb,var(--color-info)_28%,transparent)]"
+            class="rounded-default inline-flex flex-row items-center gap-1.25 border border-[color-mix(in_srgb,var(--color-info)_28%,transparent)] bg-[color-mix(in_srgb,var(--color-info)_10%,transparent)] px-2.5 py-0.75"
           >
-            <span class="text-2xs font-semibold text-text-label">{{ t("alerts.streamType") }}</span>
-            <span class="text-2xs opacity-30 text-text-label">:</span>
-            <span class="text-xs font-bold text-text-link">{{ streamType }}</span>
+            <span class="text-2xs text-text-label font-semibold">{{ t("alerts.streamType") }}</span>
+            <span class="text-2xs text-text-label opacity-30">:</span>
+            <span class="text-text-link text-xs font-bold">{{ streamType }}</span>
           </div>
           <span v-if="streamType && streamName" class="opacity-20 select-none">|</span>
           <div
-            class="inline-flex flex-row items-center gap-1.25 py-0.75 px-2.5 rounded-default bg-[color-mix(in_srgb,var(--color-sql-accent)_10%,transparent)] border border-[color-mix(in_srgb,var(--color-sql-accent)_28%,transparent)]"
+            class="rounded-default inline-flex flex-row items-center gap-1.25 border border-[color-mix(in_srgb,var(--color-sql-accent)_28%,transparent)] bg-[color-mix(in_srgb,var(--color-sql-accent)_10%,transparent)] px-2.5 py-0.75"
           >
-            <span class="text-2xs font-semibold text-text-label">{{
+            <span class="text-2xs text-text-label font-semibold">{{
               t("alerts.stream_name")
             }}</span>
-            <span class="text-2xs opacity-30 text-text-label">:</span>
-            <span v-if="streamName" class="text-xs font-bold text-sql-accent">{{
+            <span class="text-2xs text-text-label opacity-30">:</span>
+            <span v-if="streamName" class="text-sql-accent text-xs font-bold">{{
               streamName
             }}</span>
-            <span v-else class="text-xs font-bold opacity-40 italic text-sql-accent">{{
+            <span v-else class="text-sql-accent text-xs font-bold italic opacity-40">{{
               t("alerts.queryEditor.noStream")
             }}</span>
           </div>
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="menu-link-ai-item"
           variant="ghost"
           size="icon-toolbar"
-          class="[background:var(--color-gradient-ai-subtle)]! transition-[background,box-shadow] duration-300 ease-[ease] hover:[background:var(--color-gradient-ai)]! hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)] group"
+          class="group transition-[background,box-shadow] duration-300 ease-[ease] [background:var(--color-gradient-ai-subtle)]! hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)] hover:[background:var(--color-gradient-ai)]!"
           @mouseenter="isHovered = true"
           @mouseleave="isHovered = false"
         >
@@ -94,17 +94,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <div
       data-test="query-editor-dialog-card"
-      class="flex h-[calc(100vh-3.5rem)] overflow-hidden bg-card-glass-bg"
+      class="bg-card-glass-bg flex h-[calc(100vh-3.5rem)] overflow-hidden"
     >
-      <div class="h-full flex overflow-hidden flex-1">
-        <div class="h-full w-full flex flex-col">
+      <div class="flex h-full flex-1 overflow-hidden">
+        <div class="flex h-full w-full flex-col">
           <!-- Main Content Grid: field browser | editors | output -->
           <div
-            class="grid flex-1 min-h-0 w-full grid-cols-[20fr_45fr_35fr] gap-x-2 px-2 pr-2 py-2 overflow-hidden"
+            class="grid min-h-0 w-full flex-1 grid-cols-[20fr_45fr_35fr] gap-x-2 overflow-hidden px-2 py-2 pr-2"
           >
             <!-- Left Section (25%) — Field Browser -->
             <div
-              class="h-full rounded-default overflow-hidden p-2.5 border border-border-default bg-surface-base"
+              class="rounded-default border-border-default bg-surface-base h-full overflow-hidden border p-2.5"
             >
               <SearchFieldList
                 :fields="fieldListItems"
@@ -118,20 +118,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Input Section (40%) -->
-            <div class="flex w-full h-full min-h-0 overflow-y-auto">
-              <div ref="editorsColumnRef" class="flex w-full flex-col min-h-full gap-y-2">
+            <div class="flex h-full min-h-0 w-full overflow-y-auto">
+              <div ref="editorsColumnRef" class="flex min-h-full w-full flex-col gap-y-2">
                 <!-- SQL/PromQL Editor Pane + Status Bar wrapper -->
-                <div class="flex-[3] w-full flex flex-col overflow-visible min-h-55">
+                <div class="flex min-h-55 w-full flex-[3] flex-col overflow-visible">
                   <!-- Editor Pane (no overflow:hidden bottom clip issue for status bar) -->
                   <div
-                    class="flex-1 w-full flex flex-col overflow-hidden rounded-default border border-border-default border-b-0 rounded-b-none"
+                    class="rounded-default border-border-default flex w-full flex-1 flex-col overflow-hidden rounded-b-none border border-b-0"
                   >
                     <!-- Pane Header -->
                     <div
-                      class="flex items-center justify-between py-2 px-3 min-h-12 shrink-0 bg-surface-subtle border-b border-border-default"
+                      class="bg-surface-subtle border-border-default flex min-h-12 shrink-0 items-center justify-between border-b px-3 py-2"
                     >
                       <div class="flex items-center gap-2">
-                        <div class="w-0.75 h-3.5 rounded-default shrink-0 bg-theme-accent" />
+                        <div class="rounded-default bg-theme-accent h-3.5 w-0.75 shrink-0" />
                         <span class="text-xs font-semibold">{{
                           localTab === "sql" ? t("alerts.sqlEditor") : t("alerts.promqlEditor")
                         }}</span>
@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           data-test="alert-run-query-btn"
                           variant="primary"
                           size="sm"
-                          class="h-7 text-xs rounded-default px-3!"
+                          class="rounded-default h-7 px-3! text-xs"
                           :disabled="
                             localTab == 'sql' ? localSqlQuery == '' : localPromqlQuery == ''
                           "
@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
 
                     <!-- Unified Query Editor -->
-                    <div class="flex-1 min-h-0 relative">
+                    <div class="relative min-h-0 flex-1">
                       <UnifiedQueryEditor
                         ref="queryEditorRef"
                         :languages="availableLanguages"
@@ -194,10 +194,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           (localTab === 'sql' ? !localSqlQuery : !localPromqlQuery) &&
                           queryEditorPlaceholderFlag
                         "
-                        class="absolute top-0 left-0 right-0 bottom-0 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-[1] select-none"
+                        class="pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-[1] flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] select-none"
                       >
                         <span
-                          class="font-mono text-[var(--text-sm)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden text-ellipsis"
+                          class="text-text-placeholder overflow-hidden font-mono [line-height:1.3125rem] text-ellipsis whitespace-nowrap text-[var(--text-sm)]"
                           >{{ fullEditorPlaceholder }}</span
                         >
                       </div>
@@ -206,17 +206,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Status bar: outside overflow:hidden pane so border-bottom is never clipped -->
                   <div
-                    class="relative h-5.5 shrink-0 text-compact font-medium cursor-default"
+                    class="text-compact relative h-5.5 shrink-0 cursor-default font-medium"
                     :class="[
                       sqlStatusBarClasses,
-                      'border-l border-r border-b border-border-default rounded-bl-default rounded-br-default',
+                      'border-border-default rounded-bl-default rounded-br-default border-r border-b border-l',
                     ]"
                   >
-                    <div class="absolute inset-0 flex items-center gap-1.25 px-2.5 overflow-hidden">
+                    <div class="absolute inset-0 flex items-center gap-1.25 overflow-hidden px-2.5">
                       <template v-if="sqlStatusState === 'sql-status-bar--error'">
                         <OIcon name="error-outline" size="xs" class="shrink-0" />
                         <span
-                          class="whitespace-nowrap overflow-hidden text-ellipsis min-w-0 flex-1"
+                          class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
                           >{{ localSqlQueryErrorMsg || sqlQueryErrorMsg }}</span
                         >
                       </template>
@@ -254,23 +254,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- VRL Editor Pane -->
                 <div
                   v-if="localTab !== 'promql'"
-                  class="w-full flex flex-col overflow-hidden rounded-default"
+                  class="rounded-default flex w-full flex-col overflow-hidden"
                   :class="[
-                    'border border-border-default',
-                    sqlEditorMaximized ? 'flex-none' : 'flex-[2] min-h-40',
+                    'border-border-default border',
+                    sqlEditorMaximized ? 'flex-none' : 'min-h-40 flex-[2]',
                   ]"
                 >
                   <!-- Pane Header -->
                   <div
-                    class="flex items-center justify-between py-2 px-3 min-h-12 shrink-0 bg-surface-subtle border-b border-border-default"
+                    class="bg-surface-subtle border-border-default flex min-h-12 shrink-0 items-center justify-between border-b px-3 py-2"
                   >
                     <div class="flex items-center gap-2">
                       <div
-                        class="w-0.75 h-3.5 rounded-default shrink-0 bg-section-accent-secondary"
+                        class="rounded-default bg-section-accent-secondary h-3.5 w-0.75 shrink-0"
                       />
                       <span class="text-xs font-semibold">{{ t("alerts.vrlEditor") }}</span>
                     </div>
-                    <div v-if="!sqlEditorMaximized" class="flex gap-2 items-center">
+                    <div v-if="!sqlEditorMaximized" class="flex items-center gap-2">
                       <!-- Saved functions -->
                       <OSelect
                         v-model="selectedFunction"
@@ -285,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :placeholder="t('alerts.placeholders.savedFunctions')"
                       >
                         <template #empty>
-                          <div class="px-3 py-2 text-muted-foreground">
+                          <div class="text-muted-foreground px-3 py-2">
                             {{ t("search.noResult") }}
                           </div>
                         </template>
@@ -295,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="alert-apply-vrl-btn"
                         variant="primary"
                         size="sm"
-                        class="h-7 text-xs rounded-default px-3!"
+                        class="rounded-default h-7 px-3! text-xs"
                         :disabled="vrlFunctionContent == ''"
                         @click="runTestFunction"
                       >
@@ -307,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- VRL Editor -->
                   <div
                     v-if="!sqlEditorMaximized && vrlContentMounted"
-                    class="flex-1 min-h-0 relative"
+                    class="relative min-h-0 flex-1"
                   >
                     <UnifiedQueryEditor
                       data-test="scheduled-alert-vrl-function-editor"
@@ -323,7 +323,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :ai-tooltip="t('search.enterFunctionPrompt')"
                       :debounce-time="300"
                       editor-height="100%"
-                      class="w-full h-full"
+                      class="h-full w-full"
                       @update:query="updateVrlFunction"
                       @focus="functionEditorPlaceholderFlag = false"
                       @blur="onBlurFunctionEditor"
@@ -334,10 +334,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <div
                       v-if="!vrlFunctionContent && functionEditorPlaceholderFlag"
-                      class="absolute top-0 left-0 right-0 bottom-0 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-[1] select-none"
+                      class="pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-[1] flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] select-none"
                     >
                       <span
-                        class="font-mono text-[var(--text-sm)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden text-ellipsis"
+                        class="text-text-placeholder overflow-hidden font-mono [line-height:1.3125rem] text-ellipsis whitespace-nowrap text-[var(--text-sm)]"
                         >{{ vrlPlaceholder }}</span
                       >
                     </div>
@@ -347,37 +347,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Output Section (35%) -->
-            <div class="flex flex-col h-full min-h-0 gap-y-2 overflow-y-auto">
+            <div class="flex h-full min-h-0 flex-col gap-y-2 overflow-y-auto">
               <!-- Query Result Pane -->
               <div
-                class="flex-1 flex flex-col overflow-hidden rounded-default border border-border-default min-h-55"
+                class="rounded-default border-border-default flex min-h-55 flex-1 flex-col overflow-hidden border"
               >
                 <!-- Pane Header -->
                 <div
-                  class="flex items-center justify-between py-2 px-3 min-h-12 shrink-0 bg-surface-subtle border-b border-border-default"
+                  class="bg-surface-subtle border-border-default flex min-h-12 shrink-0 items-center justify-between border-b px-3 py-2"
                 >
                   <div class="flex items-center gap-2">
-                    <div class="w-0.75 h-3.5 rounded-default shrink-0 bg-theme-accent" />
+                    <div class="rounded-default bg-theme-accent h-3.5 w-0.75 shrink-0" />
                     <span class="text-xs font-semibold">{{
                       t("alerts.queryEditor.queryResult")
                     }}</span>
                     <span
                       v-if="multiTimeRange && multiTimeRange.length > 0"
-                      class="text-3xs font-bold py-px px-1.75 rounded-default tracking-[0.04em] bg-status-info-bg border border-banner-info-border text-text-link"
+                      class="text-3xs rounded-default bg-status-info-bg border-banner-info-border text-text-link border px-1.75 py-px font-bold tracking-[0.04em]"
                       >{{ t("alerts.queryEditor.resultsAcrossWindows") }}</span
                     >
                   </div>
                 </div>
 
                 <!-- Content -->
-                <div class="flex-1 min-h-0 overflow-hidden">
+                <div class="min-h-0 flex-1 overflow-hidden">
                   <!-- Idle: not yet run -->
                   <div
                     v-if="!tempRunQuery && outputEvents == ''"
-                    class="flex flex-col justify-center items-center h-full w-full bg-card-glass-bg"
+                    class="bg-card-glass-bg flex h-full w-full flex-col items-center justify-center"
                   >
                     <div class="flex flex-col items-center gap-2">
-                      <OIcon name="table-chart" class="opacity-[0.18] size-12!" />
+                      <OIcon name="table-chart" class="size-12! opacity-[0.18]" />
                       <span class="text-xs opacity-[0.45]">{{
                         t("alerts.runQueryForOutput")
                       }}</span>
@@ -386,7 +386,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- No results after run -->
                   <div
                     v-else-if="outputEvents == '' && !runQueryLoading"
-                    class="flex flex-col justify-center items-center h-full bg-card-glass-bg"
+                    class="bg-card-glass-bg flex h-full flex-col items-center justify-center"
                   >
                     <div class="flex flex-col items-center gap-2">
                       <OIcon name="warning" size="xl" class="text-warning opacity-60" />
@@ -395,7 +395,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Loading -->
                   <div
                     v-else-if="runQueryLoading"
-                    class="flex flex-col justify-center items-center h-full gap-2"
+                    class="flex h-full flex-col items-center justify-center gap-2"
                   >
                     <OSpinner size="md" />
                     <span class="text-sm opacity-60">{{ t("search.fetchingResults") }}</span>
@@ -403,7 +403,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Results -->
                   <QueryEditor
                     v-else
-                    class="w-full h-full overflow-y-auto"
+                    class="h-full w-full overflow-y-auto"
                     data-test="sql-output-editor"
                     ref="outputEventsEditorRef"
                     editor-id="sql-output-editor"
@@ -417,44 +417,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Combined Output Pane (SQL + VRL only) -->
               <div
                 v-if="localTab !== 'promql'"
-                class="flex-1 flex flex-col overflow-hidden rounded-default border border-border-default min-h-50"
+                class="rounded-default border-border-default flex min-h-50 flex-1 flex-col overflow-hidden border"
               >
                 <!-- Pane Header -->
                 <div
-                  class="flex items-center justify-between py-2 px-3 min-h-12 shrink-0 bg-surface-subtle border-b border-border-default"
+                  class="bg-surface-subtle border-border-default flex min-h-12 shrink-0 items-center justify-between border-b px-3 py-2"
                 >
                   <div class="flex items-center gap-2">
                     <div
-                      class="w-0.75 h-3.5 rounded-default shrink-0 bg-section-accent-secondary"
+                      class="rounded-default bg-section-accent-secondary h-3.5 w-0.75 shrink-0"
                     />
                     <span class="text-xs font-semibold">{{
                       t("alerts.queryEditor.combinedOutput")
                     }}</span>
                     <span
-                      class="text-3xs font-bold py-px px-1.75 rounded-default tracking-[0.04em] bg-badge-purple-soft-bg border border-badge-purple-ol-border text-badge-purple-ol-text"
+                      class="text-3xs rounded-default bg-badge-purple-soft-bg border-badge-purple-ol-border text-badge-purple-ol-text border px-1.75 py-px font-bold tracking-[0.04em]"
                       >SQL + VRL</span
                     >
                   </div>
                   <!-- Running indicator -->
                   <div v-if="runFnQueryLoading" class="flex items-center gap-1">
                     <span
-                      class="query-editor-run-dot w-1.5 h-1.5 rounded-full bg-status-positive"
+                      class="query-editor-run-dot bg-status-positive h-1.5 w-1.5 rounded-full"
                     />
-                    <span class="text-3xs font-semibold text-status-positive">{{
+                    <span class="text-3xs text-status-positive font-semibold">{{
                       t("alerts.queryEditor.running")
                     }}</span>
                   </div>
                 </div>
 
                 <!-- Content -->
-                <div class="flex-1 min-h-0 overflow-hidden">
+                <div class="min-h-0 flex-1 overflow-hidden">
                   <!-- Idle -->
                   <div
                     v-if="!tempTestFunction && !runFnQueryLoading"
-                    class="flex flex-col justify-center items-center h-full w-full bg-card-glass-bg"
+                    class="bg-card-glass-bg flex h-full w-full flex-col items-center justify-center"
                   >
                     <div class="flex flex-col items-center gap-2">
-                      <OIcon name="data-object" class="opacity-[0.18] size-12!" />
+                      <OIcon name="data-object" class="size-12! opacity-[0.18]" />
                       <span class="text-xs opacity-[0.45]">{{
                         t("alerts.applyVRLForOutput")
                       }}</span>
@@ -463,7 +463,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- No results -->
                   <div
                     v-else-if="outputFnEvents == '' && !runFnQueryLoading && tempTestFunction"
-                    class="flex flex-col justify-center items-center h-full bg-card-glass-bg"
+                    class="bg-card-glass-bg flex h-full flex-col items-center justify-center"
                   >
                     <div class="flex flex-col items-center gap-2">
                       <OIcon name="warning" size="xl" class="text-warning opacity-60" />
@@ -472,7 +472,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Loading -->
                   <div
                     v-else-if="runFnQueryLoading"
-                    class="flex flex-col justify-center items-center h-full gap-2"
+                    class="flex h-full flex-col items-center justify-center gap-2"
                   >
                     <OSpinner size="md" />
                     <span class="text-sm opacity-60">{{ t("search.fetchingResults") }}</span>
@@ -480,7 +480,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Results -->
                   <QueryEditor
                     v-else
-                    class="w-full h-full"
+                    class="h-full w-full"
                     data-test="vrl-function-test-events-output-editor"
                     ref="outputFnEventsEditorRef"
                     editor-id="test-function-events-output-editor"
@@ -497,7 +497,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- AI Chat Panel -->
       <div
-        class="ml-2 w-[24.5vw] max-w-full min-w-18.75 bg-surface-base"
+        class="bg-surface-base ml-2 w-[24.5vw] max-w-full min-w-18.75"
         v-if="store.state.isAiChatEnabled"
       >
         <O2AIChat

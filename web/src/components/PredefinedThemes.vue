@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Light / Dark segmented mode toggle -->
-    <OCardSection class="pt-2 px-2">
+    <OCardSection class="px-2 pt-2">
       <OToggleGroup
         :model-value="activeTab"
         type="single"
@@ -61,13 +61,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Theme list for the active mode. Selecting a row applies it immediately;
          the applied row is highlighted rather than carrying an Apply button. -->
-    <OCardSection class="py-2 px-2 max-h-[calc(100vh-100px)] overflow-y-auto">
-      <ul class="list-none m-0 p-0 flex flex-col gap-2">
+    <OCardSection class="max-h-[calc(100vh-100px)] overflow-y-auto px-2 py-2">
+      <ul class="m-0 flex list-none flex-col gap-2 p-0">
         <li v-for="theme in predefinedThemes" :key="theme.id">
           <button
             type="button"
             :data-test="`predefined-themes-apply-btn-${mode}-${themeNameSlug(theme.name)}`"
-            class="flex items-center w-full py-2 px-3 border rounded-default cursor-pointer transition-[border-color,background-color,box-shadow] duration-150 focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-accent)_40%,transparent)]"
+            class="rounded-default flex w-full cursor-pointer items-center border px-3 py-2 transition-[border-color,background-color,box-shadow] duration-150 focus-visible:shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-accent)_40%,transparent)] focus-visible:outline-none"
             :class="
               isThemeApplied(theme, mode)
                 ? 'border-accent bg-[color-mix(in_srgb,var(--color-accent)_8%,var(--color-card-glass-bg))] shadow-[inset_0_0_0_1px_var(--color-accent)]'
@@ -78,14 +78,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="applyTheme(theme, mode)"
           >
             <span
-              class="w-8 h-8 rounded-default border border-card-glass-border shrink-0 relative"
+              class="rounded-default border-card-glass-border relative h-8 w-8 shrink-0 border"
               :style="swatchStyle(theme[mode])"
             />
             <span class="ml-2 min-w-0 flex-1 text-left">
-              <span class="block text-sm font-medium truncate">{{
+              <span class="block truncate text-sm font-medium">{{
                 themeDisplayName(theme.name)
               }}</span>
-              <span class="block text-xs text-text-secondary truncate">{{
+              <span class="text-text-secondary block truncate text-xs">{{
                 theme[mode].themeColor
               }}</span>
             </span>
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <button
             type="button"
             :data-test="`predefined-themes-card-${mode}-custom-color`"
-            class="flex items-center w-full py-2 px-3 border border-dashed rounded-default cursor-pointer transition-[border-color,background-color,box-shadow] duration-150 focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-accent)_40%,transparent)]"
+            class="rounded-default flex w-full cursor-pointer items-center border border-dashed px-3 py-2 transition-[border-color,background-color,box-shadow] duration-150 focus-visible:shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-accent)_40%,transparent)] focus-visible:outline-none"
             :class="
               isCustomThemeApplied(mode)
                 ? 'border-accent bg-[color-mix(in_srgb,var(--color-accent)_8%,var(--color-card-glass-bg))] shadow-[inset_0_0_0_1px_var(--color-accent)]'
@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <span
               :data-test="`predefined-themes-custom-color-preview-${mode}`"
-              class="w-8 h-8 rounded-default border border-card-glass-border shrink-0 relative"
+              class="rounded-default border-card-glass-border relative h-8 w-8 shrink-0 border"
               :style="{ backgroundColor: mode === 'light' ? customLightColor : customDarkColor }"
             >
               <OIcon
@@ -125,8 +125,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </span>
             <span class="ml-2 min-w-0 flex-1 text-left">
-              <span class="block text-sm font-medium truncate">Custom Color</span>
-              <span class="block text-xs text-text-secondary truncate">
+              <span class="block truncate text-sm font-medium">Custom Color</span>
+              <span class="text-text-secondary block truncate text-xs">
                 {{
                   isCustomThemeApplied(mode)
                     ? mode === "light"
@@ -148,9 +148,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OCardSection>
 
     <!-- Note at the bottom -->
-    <OCardSection class="pt-0 pb-2 px-2">
+    <OCardSection class="px-2 pt-0 pb-2">
       <OSeparator class="mb-2" />
-      <div class="text-xs text-text-secondary flex items-start gap-1 italic">
+      <div class="text-text-secondary flex items-start gap-1 text-xs italic">
         <OIcon name="info-outline" size="xs" class="mt-0.5" />
         <span
           >Saved to this device only — themes don't sync across different browsers or devices.</span

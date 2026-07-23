@@ -16,11 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="w-full h-full"
+    class="h-full w-full"
     @mouseleave="hidePopupsAndOverlays"
     @mouseenter="showPopupsAndOverlays"
   >
-    <div class="h-full relative" ref="chartPanelRef" :class="chartPanelClass">
+    <div class="relative h-full" ref="chartPanelRef" :class="chartPanelClass">
       <div v-if="!errorDetail?.message" :style="{ height: chartPanelHeight, width: '100%' }">
         <MapsRenderer
           v-if="panelSchema.type == 'maps'"
@@ -59,11 +59,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           v-else-if="panelSchema.type == 'html'"
-          class="flex flex-col column w-full h-full flex-1"
+          class="column flex h-full w-full flex-1 flex-col"
         >
           <HTMLRenderer
             :htmlContent="panelSchema.htmlContent"
-            class="flex flex-col w-full h-full"
+            class="flex h-full w-full flex-col"
             :variablesData="currentVariablesData || variablesData"
             :tabId="tabId"
             :panelId="panelSchema.id"
@@ -71,11 +71,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-else-if="panelSchema.type == 'markdown'"
-          class="flex flex-col column w-full h-full flex-1"
+          class="column flex h-full w-full flex-1 flex-col"
         >
           <MarkdownRenderer
             :markdownContent="panelSchema.markdownContent"
-            class="flex flex-col w-full h-full"
+            class="flex h-full w-full flex-col"
             :variablesData="currentVariablesData || variablesData"
             :tabId="tabId"
             :panelId="panelSchema.id"
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <CustomChartRenderer
           v-else-if="panelSchema.type == 'custom_chart'"
           :data="panelData"
-          class="flex flex-col w-full h-full"
+          class="flex h-full w-full flex-col"
           @error="errorDetail = $event"
         />
         <ChartRenderer
@@ -103,11 +103,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-if="metricItems.length && !noData && !loading"
-        class="absolute inset-0 pointer-events-none z-8"
+        class="pointer-events-none absolute inset-0 z-8"
         data-test="dashboard-metric-copy-overlay"
       >
         <div
-          class="absolute pointer-events-auto"
+          class="pointer-events-auto absolute"
           v-for="m in metricItems"
           :key="m.idx"
           :style="metricZoneStyle(m)"
@@ -141,11 +141,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="t('panel.noData')"
         :backdrop="false"
         data-test="no-data"
-        class="noData absolute! inset-0 w-full h-full !min-h-0 !p-2 [container-type:size]"
+        class="noData [container-type:size] absolute! inset-0 h-full !min-h-0 w-full !p-2"
       />
       <div
         v-if="errorDetail?.message && !panelSchema?.error_config?.custom_error_handeling"
-        class="absolute top-[20%] w-full h-[80%] overflow-hidden text-center text-ellipsis"
+        class="absolute top-[20%] h-[80%] w-full overflow-hidden text-center text-ellipsis"
         data-test="panel-schema-renderer-error-message"
       >
         <OIcon size="md" name="warning" />
@@ -164,12 +164,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           !panelSchema?.error_config?.default_data_on_error &&
           panelSchema?.error_config?.custom_error_message
         "
-        class="absolute top-[20%] w-full h-[80%] overflow-hidden text-center text-ellipsis"
+        class="absolute top-[20%] h-[80%] w-full overflow-hidden text-center text-ellipsis"
         data-test="panel-schema-renderer-custom-error-message"
       >
         {{ panelSchema?.error_config?.custom_error_message }}
       </div>
-      <div class="flex absolute top-0 w-full z-999">
+      <div class="absolute top-0 z-999 flex w-full">
         <LoadingProgress
           :loading="loading"
           :loadingProgressPercentage="loadingProgressPercentage"
@@ -177,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div
-        class="absolute z-9999999 min-w-50 py-1 px-0 hidden whitespace-nowrap top-0 left-0 rounded-default border border-dropdown-border bg-dropdown-bg shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_15%,transparent)] dark:shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
+        class="rounded-default border-dropdown-border bg-dropdown-bg absolute top-0 left-0 z-9999999 hidden min-w-50 border px-0 py-1 whitespace-nowrap shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_15%,transparent)] dark:shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
         data-test="drilldown-menu"
         ref="drilldownPopUpRef"
         @mouseleave="hidePopupsAndOverlays"
@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           />
           <div
-            class="flex items-center py-2 px-4 cursor-pointer transition-colors duration-200 text-sm text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg"
+            class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm transition-colors duration-200"
             :data-test="`drilldown-menu-item-${drilldown.name}`"
             @click="openDrilldown(index)"
           >
@@ -201,10 +201,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </div>
       <div
-        class="border border-border-default rounded-default p-0.75 absolute top-0 left-0 hidden max-w-50 whitespace-normal [word-wrap:break-word] [overflow-wrap:break-word] z-9999999 bg-surface-base"
+        class="border-border-default rounded-default bg-surface-base absolute top-0 left-0 z-9999999 hidden max-w-50 border p-0.75 [overflow-wrap:break-word] whitespace-normal [word-wrap:break-word]"
         ref="annotationPopupRef"
       >
-        <div class="px-2 py-1 flex flex-row items-center relative break-words">
+        <div class="relative flex flex-row items-center px-2 py-1 break-words">
           <span class="break-words">{{ selectedAnnotationData.text }}</span>
         </div>
       </div>

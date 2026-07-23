@@ -11,7 +11,7 @@
     @update:open="handleOpenChange"
   >
     <!-- Body: the tab bar stays pinned; only the tab content scrolls. -->
-    <div class="flex flex-col h-full min-h-0">
+    <div class="flex h-full min-h-0 flex-col">
       <!-- Tab strip -->
       <OTabs
         :model-value="activeTab"
@@ -38,48 +38,48 @@
         </OTab>
       </OTabs>
 
-      <div class="flex-1 overflow-auto px-5 py-4.5 flex flex-col gap-4.5 min-h-0 bg-card-bg">
+      <div class="bg-card-bg flex min-h-0 flex-1 flex-col gap-4.5 overflow-auto px-5 py-4.5">
         <!-- ─────────── OVERVIEW TAB ─────────── -->
         <template v-if="activeTab === 'overview'">
           <section v-if="row.description" class="flex flex-col gap-2">
             <h4
-              class="scd-section__title m-0 font-semibold text-compact leading-normal text-text-heading pb-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] inline-flex items-center gap-1.5"
+              class="scd-section__title text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-normal font-semibold"
             >
               {{ t("onlineEvals.scoreConfig.detail.descriptionSection") }}
             </h4>
-            <p class="m-0 text-compact leading-[1.55] text-text-body">{{ row.description }}</p>
+            <p class="text-compact text-text-body m-0 leading-[1.55]">{{ row.description }}</p>
           </section>
 
           <section class="flex flex-col gap-2">
             <h4
-              class="scd-section__title m-0 font-semibold text-compact leading-normal text-text-heading pb-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] inline-flex items-center gap-1.5"
+              class="scd-section__title text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-normal font-semibold"
             >
               {{ t("onlineEvals.scoreConfig.detail.configurationSection") }}
             </h4>
-            <dl class="grid grid-cols-[7.5rem_1fr] gap-x-3.5 gap-y-1.5 m-0">
-              <dt class="text-xs font-semibold text-text-secondary">
+            <dl class="m-0 grid grid-cols-[7.5rem_1fr] gap-x-3.5 gap-y-1.5">
+              <dt class="text-text-secondary text-xs font-semibold">
                 {{ t("onlineEvals.scoreConfig.detail.dataTypeLabel") }}
               </dt>
-              <dd class="m-0 text-compact text-text-body">
+              <dd class="text-compact text-text-body m-0">
                 <OTag type="evalDataType" :value="dataType" />
               </dd>
 
               <template v-if="dataType === 'numeric' && numericRange">
-                <dt class="text-xs font-semibold text-text-secondary">
+                <dt class="text-text-secondary text-xs font-semibold">
                   {{ t("onlineEvals.scoreConfig.detail.rangeLabel") }}
                 </dt>
                 <dd
-                  class="m-0 text-compact text-text-body font-mono [font-variant-numeric:tabular-nums]"
+                  class="text-compact text-text-body m-0 font-mono [font-variant-numeric:tabular-nums]"
                 >
                   {{ numericRange.min }} – {{ numericRange.max }}
                 </dd>
               </template>
 
               <template v-if="dataType === 'categorical' && categories.length">
-                <dt class="text-xs font-semibold text-text-secondary">
+                <dt class="text-text-secondary text-xs font-semibold">
                   {{ t("onlineEvals.scoreConfig.detail.categoriesLabel") }}
                 </dt>
-                <dd class="m-0 text-compact text-text-body">
+                <dd class="text-compact text-text-body m-0">
                   <OTag v-for="cat in categories" :key="cat" type="fieldTag" value="soft">{{
                     cat
                   }}</OTag>
@@ -87,11 +87,11 @@
               </template>
 
               <template v-if="dataType === 'boolean'">
-                <dt class="text-xs font-semibold text-text-secondary">
+                <dt class="text-text-secondary text-xs font-semibold">
                   {{ t("onlineEvals.scoreConfig.detail.valuesLabel") }}
                 </dt>
                 <dd
-                  class="m-0 text-compact text-text-body font-mono [font-variant-numeric:tabular-nums]"
+                  class="text-compact text-text-body m-0 font-mono [font-variant-numeric:tabular-nums]"
                 >
                   true / false
                 </dd>
@@ -101,37 +101,37 @@
 
           <section class="flex flex-col gap-2">
             <h4
-              class="scd-section__title m-0 font-semibold text-compact leading-normal text-text-heading pb-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] inline-flex items-center gap-1.5"
+              class="scd-section__title text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-normal font-semibold"
             >
               {{ t("onlineEvals.scoreConfig.detail.thresholdSection") }}
               <OTag v-if="!healthyLabel" type="thresholdFlag" value="notdeclared" />
             </h4>
             <div
               v-if="healthyLabel"
-              class="flex items-baseline gap-2 p-[12px_14px] border border-[color-mix(in_srgb,var(--color-status-success-text)_35%,transparent)] bg-[color-mix(in_srgb,var(--color-status-success-text)_8%,transparent)] rounded-default"
+              class="rounded-default flex items-baseline gap-2 border border-[color-mix(in_srgb,var(--color-status-success-text)_35%,transparent)] bg-[color-mix(in_srgb,var(--color-status-success-text)_8%,transparent)] p-[12px_14px]"
             >
-              <span class="text-lg font-bold text-status-success-text">{{ thresholdSign }}</span>
-              <span class="font-mono font-bold text-sm text-text-body">{{ healthyLabel }}</span>
-              <span class="ml-auto text-2xs text-text-secondary">{{
+              <span class="text-status-success-text text-lg font-bold">{{ thresholdSign }}</span>
+              <span class="text-text-body font-mono text-sm font-bold">{{ healthyLabel }}</span>
+              <span class="text-2xs text-text-secondary ml-auto">{{
                 t("onlineEvals.scoreConfig.detail.thresholdHint")
               }}</span>
             </div>
-            <p v-else class="m-0 text-compact leading-[1.55] text-text-secondary">
+            <p v-else class="text-compact text-text-secondary m-0 leading-[1.55]">
               {{ t("onlineEvals.scoreConfig.detail.noThresholdHint") }}
             </p>
           </section>
 
           <section class="flex flex-col gap-2">
             <h4
-              class="scd-section__title m-0 font-semibold text-compact leading-normal text-text-heading pb-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] inline-flex items-center gap-1.5"
+              class="scd-section__title text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-normal font-semibold"
             >
               {{ t("onlineEvals.scoreConfig.detail.metadataSection") }}
             </h4>
-            <dl class="grid grid-cols-[7.5rem_1fr] gap-x-3.5 gap-y-1.5 m-0">
-              <dt class="text-xs font-semibold text-text-secondary">
+            <dl class="m-0 grid grid-cols-[7.5rem_1fr] gap-x-3.5 gap-y-1.5">
+              <dt class="text-text-secondary text-xs font-semibold">
                 {{ t("onlineEvals.scoreConfig.detail.statusLabel") }}
               </dt>
-              <dd class="m-0 text-compact text-text-body">
+              <dd class="text-compact text-text-body m-0">
                 <OTag type="booleanState" :value="isActive ? 'enabled' : 'disabled'">
                   {{
                     isActive
@@ -140,29 +140,29 @@
                   }}
                 </OTag>
               </dd>
-              <dt class="text-xs font-semibold text-text-secondary">
+              <dt class="text-text-secondary text-xs font-semibold">
                 {{ t("onlineEvals.scoreConfig.detail.versionLabel") }}
               </dt>
               <dd
-                class="m-0 text-compact text-text-body font-mono [font-variant-numeric:tabular-nums]"
+                class="text-compact text-text-body m-0 font-mono [font-variant-numeric:tabular-nums]"
               >
                 v{{ row.version }}
               </dd>
-              <dt v-if="createdAt" class="text-xs font-semibold text-text-secondary">
+              <dt v-if="createdAt" class="text-text-secondary text-xs font-semibold">
                 {{ t("onlineEvals.scoreConfig.detail.createdLabel") }}
               </dt>
               <dd
                 v-if="createdAt"
-                class="m-0 text-compact text-text-body font-mono [font-variant-numeric:tabular-nums]"
+                class="text-compact text-text-body m-0 font-mono [font-variant-numeric:tabular-nums]"
               >
                 {{ formatTimestamp(createdAt) }}
               </dd>
-              <dt v-if="updatedAt" class="text-xs font-semibold text-text-secondary">
+              <dt v-if="updatedAt" class="text-text-secondary text-xs font-semibold">
                 {{ t("onlineEvals.scoreConfig.detail.updatedLabel") }}
               </dt>
               <dd
                 v-if="updatedAt"
-                class="m-0 text-compact text-text-body font-mono [font-variant-numeric:tabular-nums]"
+                class="text-compact text-text-body m-0 font-mono [font-variant-numeric:tabular-nums]"
               >
                 {{ formatTimestamp(updatedAt) }}
               </dd>
@@ -172,21 +172,21 @@
 
         <!-- ─────────── VERSIONS TAB ─────────── -->
         <template v-else-if="activeTab === 'versions'">
-          <p class="m-0 text-xs leading-normal text-text-secondary">
+          <p class="text-text-secondary m-0 text-xs leading-normal">
             {{ t("onlineEvals.scoreConfig.detail.versionsIntro") }}
           </p>
-          <ul class="list-none m-0 p-0 flex flex-col gap-2">
+          <ul class="m-0 flex list-none flex-col gap-2 p-0">
             <li
-              class="p-[12px_14px] bg-card-bg border border-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_5%,var(--color-card-bg))]! rounded-default"
+              class="bg-card-bg rounded-default border border-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_5%,var(--color-card-bg))]! p-[12px_14px]"
             >
               <div class="flex items-center gap-2">
                 <span
-                  class="font-mono [font-variant-numeric:tabular-nums] font-bold text-compact text-text-body"
+                  class="text-compact text-text-body font-mono font-bold [font-variant-numeric:tabular-nums]"
                   >v{{ row.version }}</span
                 >
                 <OTag type="activeVersionFlag" value="active" />
               </div>
-              <div v-if="updatedAt" class="mt-1.5 text-2xs text-text-secondary">
+              <div v-if="updatedAt" class="text-2xs text-text-secondary mt-1.5">
                 {{ t("onlineEvals.scoreConfig.detail.lastUpdated") }}
                 <span class="font-mono [font-variant-numeric:tabular-nums]">{{
                   formatTimestamp(updatedAt)
@@ -198,28 +198,28 @@
 
         <!-- ─────────── USED BY TAB ─────────── -->
         <template v-else-if="activeTab === 'usedBy'">
-          <p class="m-0 text-xs leading-normal text-text-secondary">
+          <p class="text-text-secondary m-0 text-xs leading-normal">
             {{ t("onlineEvals.scoreConfig.detail.usedByIntro") }}
           </p>
           <div
             v-if="usedByScorers.length === 0"
-            class="inline-flex items-center gap-1.5 p-[8px_10px] bg-[color-mix(in_srgb,var(--color-text-secondary)_6%,transparent)] rounded-default text-xs text-text-secondary"
+            class="rounded-default text-text-secondary inline-flex items-center gap-1.5 bg-[color-mix(in_srgb,var(--color-text-secondary)_6%,transparent)] p-[8px_10px] text-xs"
           >
             <OIcon name="info" size="xs" />
             <span>{{ t("onlineEvals.scoreConfig.detail.usedByEmpty") }}</span>
           </div>
-          <ul v-else class="list-none m-0 p-0 flex flex-col gap-2">
+          <ul v-else class="m-0 flex list-none flex-col gap-2 p-0">
             <li v-for="scorer in usedByScorers" :key="scorer.id">
               <OButton
                 variant="ghost"
-                class="scd-used-card w-full bg-card-bg! border! border-[color-mix(in_srgb,var(--color-text-secondary)_16%,transparent)]! rounded-default! transition-[border-color,background] duration-150"
+                class="scd-used-card bg-card-bg! rounded-default! w-full border! border-[color-mix(in_srgb,var(--color-text-secondary)_16%,transparent)]! transition-[border-color,background] duration-150"
                 :data-test="`score-config-detail-used-by-item-${scorer.name}`"
                 @click="emit('view-scorer', scorer)"
               >
-                <div class="flex-1 min-w-0">
+                <div class="min-w-0 flex-1">
                   <div class="flex items-center gap-2">
                     <span
-                      class="font-mono [font-variant-numeric:tabular-nums] font-bold text-compact text-text-heading"
+                      class="text-compact text-text-heading font-mono font-bold [font-variant-numeric:tabular-nums]"
                       >{{ scorer.name }}</span
                     >
                     <OTag type="scorerType" :value="scorerTypeOf(scorer)" />
@@ -231,7 +231,7 @@
                 <OIcon
                   name="chevron-right"
                   size="sm"
-                  class="scd-used-card__chevron shrink-0 text-text-secondary opacity-50"
+                  class="scd-used-card__chevron text-text-secondary shrink-0 opacity-50"
                 />
               </OButton>
             </li>

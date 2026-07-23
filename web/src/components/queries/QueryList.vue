@@ -1,9 +1,9 @@
 <template>
-  <OCard class="flex flex-col h-full flex-nowrap" style="min-width: 480px; max-width: 800px">
+  <OCard class="flex h-full flex-col flex-nowrap" style="min-width: 480px; max-width: 800px">
     <!-- Header -->
     <div class="px-2 py-3">
       <OCardSection role="header" class="w-full">
-        <div class="flex items-center justify-between w-full">
+        <div class="flex w-full items-center justify-between">
           <div class="text-base font-bold" data-test="queryList-title-text">
             {{ t("queries.queryList") }}
           </div>

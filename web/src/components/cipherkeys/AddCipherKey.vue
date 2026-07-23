@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                while staying fluid below the breakpoint. -->
           <div class="w-full max-w-3xl">
             <div class="flex">
-              <div class="w-1/3 o2-input flex mx-3 mt-3 mb-4">
+              <div class="o2-input mx-3 mt-3 mb-4 flex w-1/3">
                 <OFormInput
                   data-test="add-cipher-key-name-input"
                   name="name"
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 orientation="vertical"
                 animated
                 navigable
-                class="mx-3 p-0 h-full"
+                class="mx-3 h-full p-0"
               >
                 <OStep
                   data-test="cipher-key-key-store-detils-step"
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="mt-2"
                       :is-update="isUpdatingCipherKey"
                     />
-                    <div class="flex gap-2 mt-4">
+                    <div class="mt-4 flex gap-2">
                       <OButton
                         data-test="add-report-step1-continue-btn"
                         variant="primary"
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :done="step > 2"
                 >
                   <AddEncryptionMechanism />
-                  <div class="flex gap-2 mt-4">
+                  <div class="mt-4 flex gap-2">
                     <OButton
                       data-test="add-cipher-key-step2-back-btn"
                       variant="outline"
@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="mx-2">
           <div
-            class="flex justify-end px-2 py-4 w-full gap-2 border-t border-border-default sticky"
+            class="border-border-default sticky flex w-full justify-end gap-2 border-t px-2 py-4"
             style="bottom: 0px; z-index: 2"
           >
             <OButton

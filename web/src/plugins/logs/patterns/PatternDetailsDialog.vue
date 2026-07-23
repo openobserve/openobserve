@@ -30,18 +30,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
     >
       <template #header>
-        <div class="flex-1 min-w-0 flex flex-col gap-0.5 overflow-hidden">
+        <div class="flex min-w-0 flex-1 flex-col gap-0.5 overflow-hidden">
           <!-- Row 1: level badge · title · token & slot OBadges (right of title) -->
-          <div class="flex items-center gap-2 min-w-0">
+          <div class="flex min-w-0 items-center gap-2">
             <span
               v-if="patternLevelInfo"
-              class="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-default text-xs font-semibold uppercase tracking-wide text-white"
+              class="rounded-default inline-flex shrink-0 items-center px-1.5 py-0.5 text-xs font-semibold tracking-wide text-white uppercase"
               :style="{ backgroundColor: patternLevelInfo.color }"
             >
               {{ patternLevelInfo.level }}
             </span>
             <h4
-              class="font-semibold text-text-heading truncate min-w-0 text-base leading-tight m-0"
+              class="text-text-heading m-0 min-w-0 truncate text-base leading-tight font-semibold"
             >
               {{ selectedPattern?.pattern?.description || t("search.patternDetailsTitle") }}
             </h4>
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Row 2: full-width module path, truncates at edge -->
           <code
             v-if="selectedPattern && patternPathToken"
-            class="block w-full truncate text-text-code font-mono text-2xs text-text-secondary"
+            class="text-text-code text-2xs text-text-secondary block w-full truncate font-mono"
             >{{ patternPathToken }}</code
           >
         </div>
@@ -77,10 +77,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Actions (moved here from each row) — highlighted bar with prominent,
              semantically-colored buttons so they're impossible to miss. -->
           <div
-            class="flex items-center gap-2 mb-4 p-2.5 rounded-surface bg-surface-subtle border border-solid border-card-glass-border"
+            class="rounded-surface bg-surface-subtle border-card-glass-border mb-4 flex items-center gap-2 border border-solid p-2.5"
             data-test="pattern-detail-actions"
           >
-            <span class="text-xs font-medium text-text-secondary uppercase tracking-wide mr-1">
+            <span class="text-text-secondary mr-1 text-xs font-medium tracking-wide uppercase">
               {{ t("logs.patternList.actionsLabel") }}
             </span>
             <OButton
@@ -114,18 +114,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Statistics -->
           <div class="mb-4">
-            <div class="text-sm font-medium mb-1.5">
+            <div class="mb-1.5 text-sm font-medium">
               {{ t("search.patternStatistics") }}
             </div>
             <div class="flex gap-3">
               <div class="w-1/2">
-                <OCard class="bg-card-glass-solid border border-solid border-card-glass-border">
+                <OCard class="bg-card-glass-solid border-card-glass-border border border-solid">
                   <OCardSection class="p-1.5">
                     <div class="text-xs" :class="'text-text-secondary'">
                       {{ t("search.patternOccurrences") }}
                     </div>
                     <div
-                      class="text-2xl font-semibold font-bold text-primary mt-1"
+                      class="text-primary mt-1 text-2xl font-bold font-semibold"
                       :title="
                         volumeCount !== null
                           ? t('logs.patternList.exactCountTooltip', {
@@ -140,12 +140,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OCard>
               </div>
               <div class="w-1/2">
-                <OCard class="bg-card-glass-solid border border-solid border-card-glass-border">
+                <OCard class="bg-card-glass-solid border-card-glass-border border border-solid">
                   <OCardSection class="p-1.5">
                     <div class="text-xs" :class="'text-text-secondary'">
                       {{ t("search.patternPercentage") }}
                     </div>
-                    <div class="text-2xl font-semibold font-bold text-primary mt-1">
+                    <div class="text-primary mt-1 text-2xl font-bold font-semibold">
                       {{ selectedPattern.pattern.percentage.toFixed(2) }}%
                     </div>
                   </OCardSection>
@@ -154,14 +154,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div v-if="selectedPattern.pattern.is_anomaly" class="mt-3">
               <div
-                class="rounded-default border border-solid border-status-error-text px-3 py-2 flex gap-3 items-start bg-surface-base"
+                class="rounded-default border-status-error-text bg-surface-base flex items-start gap-3 border border-solid px-3 py-2"
               >
                 <OIcon name="warning" size="sm" class="mt-0.5 shrink-0" />
                 <div>
-                  <div class="font-bold text-status-error-text">
+                  <div class="text-status-error-text font-bold">
                     {{ t("search.patternAnomalyDetected") }}
                   </div>
-                  <div class="text-xs mt-1 text-text-secondary">
+                  <div class="text-text-secondary mt-1 text-xs">
                     {{ anomalyExplanationForSelected }}
                   </div>
                   <div
@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       selectedPattern.pattern.z_score < -1.5 &&
                       selectedPattern.pattern.avg_frequency
                     "
-                    class="text-xs mt-1"
+                    class="mt-1 text-xs"
                     :class="'text-text-secondary'"
                   >
                     {{
@@ -189,11 +189,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Variables Summary -->
           <div class="mb-4">
-            <div class="text-sm font-medium mb-1.5">
+            <div class="mb-1.5 text-sm font-medium">
               {{ t("search.patternVariablesHeader") }}
             </div>
             <div
-              class="px-2.5 py-1.5 rounded-default border-l-4 border-solid border-l-accent bg-surface-subtle"
+              class="rounded-default border-l-accent bg-surface-subtle border-l-4 border-solid px-2.5 py-1.5"
             >
               {{
                 selectedPattern.pattern.examples?.[0]?.variables
@@ -207,17 +207,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Pattern Template -->
           <div class="mb-4">
-            <div class="text-sm font-medium mb-1.5">
+            <div class="mb-1.5 text-sm font-medium">
               {{ t("search.patternTemplate") }}
             </div>
             <div
-              class="px-2.5 py-1.5 font-mono text-compact leading-[1.6] rounded-default border-l-4 border-solid border-l-accent whitespace-pre-wrap break-all bg-surface-subtle"
+              class="text-compact rounded-default border-l-accent bg-surface-subtle border-l-4 border-solid px-2.5 py-1.5 font-mono leading-[1.6] break-all whitespace-pre-wrap"
             >
               <template v-for="(tok, i) in selectedTemplateTokens" :key="i">
                 <span v-if="tok.kind === 'text'">{{ tok.value }}</span>
                 <span
                   v-else
-                  class="rounded-default px-0.5 bg-pattern-var-bg text-pattern-var-text"
+                  class="rounded-default bg-pattern-var-bg text-pattern-var-text px-0.5"
                   @mouseenter="onMouseEnter(tok.value, tok.sampleValues, $event)"
                   @mouseleave="onMouseLeave"
                   >{{ tok.mask ?? wildcardLabel(tok.value, tok.sampleValues) }}</span
@@ -231,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="selectedPattern.pattern.variables && selectedPattern.pattern.variables.length > 0"
             class="mb-4"
           >
-            <div class="text-sm font-medium mb-1.5">
+            <div class="mb-1.5 text-sm font-medium">
               {{
                 t("search.patternVariablesWithCount", {
                   count: selectedPattern.pattern.variables.length,
@@ -246,10 +246,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :show-global-filter="false"
               :default-columns="false"
               :max-height="undefined"
-              class="w-full border border-solid border-card-glass-border"
+              class="border-card-glass-border w-full border border-solid"
             >
               <template #cell-name="{ row }">
-                <div class="text-left font-bold text-primary">
+                <div class="text-primary text-left font-bold">
                   {{ row.name || "var_" + row.index }}
                 </div>
               </template>
@@ -271,7 +271,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="selectedPattern.pattern.examples && selectedPattern.pattern.examples.length > 0"
             class="mb-4"
           >
-            <div class="text-sm font-medium mb-1.5">
+            <div class="mb-1.5 text-sm font-medium">
               {{
                 t("search.patternExampleLogsWithCount", {
                   count: selectedPattern.pattern.examples.length,
@@ -281,7 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="(example, exIdx) in selectedPattern.pattern.examples"
               :key="exIdx"
-              class="px-2.5 py-1.5 mb-1.5 font-mono text-xs leading-[1.6] rounded-default break-all whitespace-pre-wrap border-l-[0.1875rem] border-solid bg-surface-panel border-l-border-default"
+              class="rounded-default bg-surface-panel border-l-border-default mb-1.5 border-l-[0.1875rem] border-solid px-2.5 py-1.5 font-mono text-xs leading-[1.6] break-all whitespace-pre-wrap"
             >
               <LogsHighLighting
                 :data="example.log_message"
@@ -297,7 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Footer Navigation -->
       <template #footer>
-        <div class="flex items-center flex-nowrap justify-between">
+        <div class="flex flex-nowrap items-center justify-between">
           <div class="col-auto">
             <OButton
               variant="outline"
@@ -311,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
           <div class="col-auto text-center">
-            <span class="text-xs text-text-secondary">
+            <span class="text-text-secondary text-xs">
               {{
                 t("search.patternXofYShort", {
                   index: (selectedPattern?.index ?? 0) + 1,

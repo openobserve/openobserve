@@ -21,12 +21,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        (pushFieldValue/removeFieldValue). No v-model, no local mirrors — the
        consuming form's schema owns validation (Rule ②). -->
   <div
-    class="w-full py-2 variables-input"
+    class="variables-input w-full py-2"
     :class="{
-      'flex gap-2 items-center w-full': formRows.length == 0,
+      'flex w-full items-center gap-2': formRows.length == 0,
     }"
   >
-    <div class="pb-1 custom-input-label font-bold">
+    <div class="custom-input-label pb-1 font-bold">
       <span>
         {{ t("alerts.variables.label") }}
       </span>
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </div>
     <template v-if="!formRows.length">
-      <div class="flex justify-between items-center">
+      <div class="flex items-center justify-between">
         <OButton
           data-test="alert-variables-add-btn"
           size="sm"
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="(row, index) in formRows"
         :key="index"
-        class="gap-2 pb-2 flex items-center"
+        class="flex items-center gap-2 pb-2"
         :data-test="`alert-variables-${index + 1}`"
       >
         <div class="ml-0">
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="min-width: 250px"
           />
         </div>
-        <div class="w-1/6 ml-0">
+        <div class="ml-0 w-1/6">
           <OButton
             data-test="alert-variables-delete-variable-btn"
             class="ml-1"

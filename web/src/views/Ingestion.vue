@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="globalSearchQuery"
           :placeholder="t('common.search')"
           clearable
-          class="w-full indexlist-search-input"
+          class="indexlist-search-input w-full"
           data-test="recommended-list-search-input"
         />
       </div>
@@ -189,11 +189,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         store.state.zoConfig.restricted_routes_on_empty_data == true &&
         store.state.organizationData.isDataIngested == false
       "
-      class="text-subtitle bg-warning p-2 font-bold mx-2.5 mt-1 rounded-default"
+      class="text-subtitle bg-warning rounded-default mx-2.5 mt-1 p-2 font-bold"
     >
       {{ t("ingestion.redirectionIngestionMsg") }}
     </div>
-    <div class="flex-1 min-h-0">
+    <div class="min-h-0 flex-1">
       <router-view
         :title="ingestTabType"
         :currOrgIdentifier="currentOrgIdentifier"

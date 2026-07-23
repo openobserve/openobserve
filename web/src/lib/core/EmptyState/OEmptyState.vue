@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="showBackdrop"
       aria-hidden="true"
-      class="absolute inset-0 pointer-events-none"
+      class="pointer-events-none absolute inset-0"
       :style="dotGridStyle"
     />
 
@@ -73,10 +73,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon :name="inlineIcon" :size="size === 'inline' ? 'lg' : 'xl'" />
       </span>
 
-      <div :class="['flex flex-col max-w-xl', sizeClass.copy]">
+      <div :class="['flex max-w-xl flex-col', sizeClass.copy]">
         <component
           :is="size === 'inline' ? 'p' : 'h2'"
-          :class="['font-medium text-text-heading tracking-[-0.01em]', sizeClass.title]"
+          :class="['text-text-heading font-medium tracking-[-0.01em]', sizeClass.title]"
         >
           <slot name="title">{{ resolvedTitle }}</slot>
         </component>

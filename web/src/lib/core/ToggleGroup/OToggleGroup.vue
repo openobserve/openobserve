@@ -245,10 +245,10 @@ provide(TOGGLE_GROUP_CONTEXT_KEY, context);
   <div v-if="hasLabel" :class="wrapperClasses">
     <span
       :class="[
-        'o-input-label text-compact select-none leading-tight',
+        'o-input-label text-compact leading-tight select-none',
         disabled
-          ? 'font-normal text-input-label-text-disabled'
-          : 'font-medium text-input-label-text',
+          ? 'text-input-label-text-disabled font-normal'
+          : 'text-input-label-text font-medium',
       ]"
     >
       <slot name="label">{{ label }}</slot>
@@ -296,7 +296,7 @@ provide(TOGGLE_GROUP_CONTEXT_KEY, context);
       'relative inline-flex items-stretch',
       orientation === 'vertical' ? 'flex-col' : 'flex-row',
       'bg-toggle-track-bg rounded-default p-0.5',
-      'border border-toggle-border',
+      'border-toggle-border border',
     ]"
     v-bind="dragListeners"
     @update:model-value="

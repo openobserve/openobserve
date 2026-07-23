@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="traces-search-result-list h-auto! flex flex-col bg-card-glass-solid">
+  <div class="traces-search-result-list bg-card-glass-solid flex h-auto! flex-col">
     <!-- ════════════════════ Empty State ════════════════════ -->
     <TracesNoEventsState
       v-if="noResults"
@@ -33,10 +33,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else
       v-show="hasResults || loading"
       data-test="traces-table-wrapper"
-      class="flex flex-col h-auto! traces-table-container"
+      class="traces-table-container flex h-auto! flex-col"
     >
       <!-- Table scroll area: no overflow here — parent handles unified scroll -->
-      <div data-test="traces-search-result-list" class="w-full h-auto! relative">
+      <div data-test="traces-search-result-list" class="relative h-auto! w-full">
         <TenstackTable
           class="h-auto!"
           :columns="searchObj.data.resultGrid.columns"
@@ -82,20 +82,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-operation_name="{ item }">
-            <span class="text-xs truncate text-text-body" data-test="trace-row-operation-name">
+            <span class="text-text-body truncate text-xs" data-test="trace-row-operation-name">
               {{ item.operation_name }}
               <OTooltip :content="item.operation_name" side="bottom" align="center" />
             </span>
           </template>
 
           <template #cell-duration="{ item }">
-            <span class="text-xs text-text-body font-mono" data-test="trace-row-duration">
+            <span class="text-text-body font-mono text-xs" data-test="trace-row-duration">
               {{ formatTimeWithSuffix(item.duration) || "0us" }}
             </span>
           </template>
 
           <template #cell-spans="{ item }">
-            <span class="text-xs text-text-body font-mono" data-test="trace-row-spans">
+            <span class="text-text-body font-mono text-xs" data-test="trace-row-spans">
               {{ item.spans }}
             </span>
           </template>
@@ -112,19 +112,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <TraceStatusCell :item="item" />
           </template>
           <template #cell-input_tokens="{ item }">
-            <span class="text-xs text-text-body font-mono" data-test="trace-row-input-tokens">
+            <span class="text-text-body font-mono text-xs" data-test="trace-row-input-tokens">
               {{ isLLMTrace(item) ? formatTokens(extractLLMData(item)?.usage?.input ?? 0) : "-" }}
             </span>
           </template>
 
           <template #cell-output_tokens="{ item }">
-            <span class="text-xs text-text-body font-mono" data-test="trace-row-output-tokens">
+            <span class="text-text-body font-mono text-xs" data-test="trace-row-output-tokens">
               {{ isLLMTrace(item) ? formatTokens(extractLLMData(item)?.usage?.output ?? 0) : "-" }}
             </span>
           </template>
 
           <template #cell-cost="{ item }">
-            <span class="text-xs text-text-body font-mono" data-test="trace-row-cost">
+            <span class="text-text-body font-mono text-xs" data-test="trace-row-cost">
               {{
                 isLLMTrace(item) ? `$${formatCost(extractLLMData(item)?.cost?.total ?? 0)}` : "-"
               }}

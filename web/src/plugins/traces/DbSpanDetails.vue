@@ -90,15 +90,15 @@ const metadataRows = computed(() =>
 </script>
 
 <template>
-  <div class="flex flex-col h-full overflow-auto gap-3">
+  <div class="flex h-full flex-col gap-3 overflow-auto">
     <OCard data-test="traces-db-span-details-metadata-grid">
-      <OCardSection class="py-0! px-0!">
+      <OCardSection class="px-0! py-0!">
         <div class="flex flex-wrap gap-2">
           <span
             v-for="row in metadataRows"
             :key="row.key"
             :data-test="`traces-db-span-details-tag-${row.key}`"
-            class="inline-flex items-center gap-1 rounded-default px-2 py-1 text-sm"
+            class="rounded-default inline-flex items-center gap-1 px-2 py-1 text-sm"
             style="
               background: var(--color-surface-base);
               border: 1px solid var(--color-border-default);
@@ -112,8 +112,8 @@ const metadataRows = computed(() =>
       </OCardSection>
     </OCard>
 
-    <OCard class="flex-1 flex flex-col" data-test="traces-db-span-details-query-editor">
-      <OCardSection class="flex-1 flex flex-col p-0 min-h-[18.75rem] p-1.5!">
+    <OCard class="flex flex-1 flex-col" data-test="traces-db-span-details-query-editor">
+      <OCardSection class="flex min-h-[18.75rem] flex-1 flex-col p-0 p-1.5!">
         <CodeQueryEditor
           v-if="queryText"
           :query="queryText"
@@ -127,7 +127,7 @@ const metadataRows = computed(() =>
         <div
           v-else
           data-test="traces-db-span-details-no-query"
-          class="p-4 text-sm text-text-secondary"
+          class="text-text-secondary p-4 text-sm"
         >
           {{ t("traces.dbSpanDetails.noQueryText") }}
         </div>
@@ -140,31 +140,31 @@ const metadataRows = computed(() =>
       :label="t('traces.dbSpanDetails.performance')"
       data-test="traces-db-span-details-performance"
     >
-      <div class="py-2 px-3">
+      <div class="px-3 py-2">
         <div class="grid grid-cols-2 gap-x-4 gap-y-1">
           <template v-if="span.db_response_returned_rows">
-            <div class="text-xs text-text-secondary">
+            <div class="text-text-secondary text-xs">
               {{ t("traces.dbSpanDetails.rowsReturned") }}
             </div>
             <div class="text-xs">{{ span.db_response_returned_rows }}</div>
           </template>
           <template v-if="span.db_operation_batch_size">
-            <div class="text-xs text-text-secondary">
+            <div class="text-text-secondary text-xs">
               {{ t("traces.dbSpanDetails.batchSize") }}
             </div>
             <div class="text-xs">{{ span.db_operation_batch_size }}</div>
           </template>
           <template v-if="span.db_query_summary">
-            <div class="text-xs text-text-secondary">
+            <div class="text-text-secondary text-xs">
               {{ t("traces.dbSpanDetails.querySummary") }}
             </div>
             <div class="text-xs">{{ span.db_query_summary }}</div>
           </template>
           <template v-if="span.db_response_status_code">
-            <div class="text-xs text-text-secondary">
+            <div class="text-text-secondary text-xs">
               {{ t("traces.dbSpanDetails.responseStatus") }}
             </div>
-            <div class="text-xs text-status-error-text">
+            <div class="text-status-error-text text-xs">
               {{ span.db_response_status_code }}
             </div>
           </template>

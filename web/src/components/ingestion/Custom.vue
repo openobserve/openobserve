@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </template>
 
-    <div class="overflow-hidden h-full">
+    <div class="h-full overflow-hidden">
       <router-view
         :title="tabs"
         :currOrgIdentifier="currOrgIdentifier"

@@ -40,14 +40,14 @@ const screenshotDescription = computed(() => {
 </script>
 
 <template>
-  <div class="rounded-default border border-border-default mb-4">
-    <div class="flex items-center border-b border-border-default py-2.5 px-3">
-      <div class="w-[0.1875rem] h-4 rounded-default mr-2 shrink-0 bg-primary-600" />
-      <h3 class="text-base font-semibold text-text-heading">{{ t("synthetics.capture.title") }}</h3>
+  <div class="rounded-default border-border-default mb-4 border">
+    <div class="border-border-default flex items-center border-b px-3 py-2.5">
+      <div class="rounded-default bg-primary-600 mr-2 h-4 w-[0.1875rem] shrink-0" />
+      <h3 class="text-text-heading text-base font-semibold">{{ t("synthetics.capture.title") }}</h3>
     </div>
-    <div class="px-3 py-2 flex flex-col gap-4">
+    <div class="flex flex-col gap-4 px-3 py-2">
       <div class="flex items-center gap-4">
-        <label class="text-sm font-medium text-text-body w-24 shrink-0">{{
+        <label class="text-text-body w-24 shrink-0 text-sm font-medium">{{
           t("synthetics.capture.screenshot")
         }}</label>
         <OSelect
@@ -56,7 +56,7 @@ const screenshotDescription = computed(() => {
           class="w-40!"
           data-test="synthetics-check-capture-screenshot"
         />
-        <p class="text-sm text-text-secondary">
+        <p class="text-text-secondary text-sm">
           {{ screenshotDescription }}
         </p>
       </div>

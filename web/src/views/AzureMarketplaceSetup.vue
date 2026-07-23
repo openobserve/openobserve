@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="azure-marketplace-setup min-h-screen bg-surface-base">
-    <div class="flex relative-position px-3 pt-2">
+  <div class="azure-marketplace-setup bg-surface-base min-h-screen">
+    <div class="relative-position flex px-3 pt-2">
       <img
         data-test="azure-marketplace-setup-logo"
         class="h-10"
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <div class="max-w-125 mx-auto pt-15 p-6">
+    <div class="mx-auto max-w-125 p-6 pt-15">
       <!-- No Token Error -->
       <div v-if="state === 'no_token'" class="text-center">
         <OIcon name="warning" style="width: 80px; height: 80px" />
@@ -59,10 +59,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           Link your Azure Marketplace subscription to an organization
         </p>
 
-        <div class="max-w-100 mx-auto">
+        <div class="mx-auto max-w-100">
           <!-- Create New Org -->
           <OCard
-            class="rounded-default transition-all duration-200 hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)] mb-4"
+            class="rounded-default mb-4 transition-all duration-200 hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)]"
           >
             <OCardSection role="body">
               <div class="text-xl font-semibold">Create New Organization</div>

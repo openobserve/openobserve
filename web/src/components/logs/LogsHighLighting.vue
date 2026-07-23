@@ -36,7 +36,7 @@ Usage Examples:
 -->
 <template>
   <span
-    class="logs-highlight-json font-mono text-xs wrap-break-word inline"
+    class="logs-highlight-json inline font-mono text-xs wrap-break-word"
     v-html="colorizedJson"
   ></span>
 </template>

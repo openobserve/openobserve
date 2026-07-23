@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </template>
     <OTabs
-      class="shrink-0 px-page-edge border-b border-border-default"
+      class="px-page-edge border-border-default shrink-0 border-b"
       v-model="activePerformanceTab"
       align="left"
       dense
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <router-view v-slot="{ Component }">
       <keep-alive>
-        <div class="flex-1 min-h-0">
+        <div class="min-h-0 flex-1">
           <div class="bg-card-glass-bg h-full overflow-hidden">
             <component
               :is="Component"

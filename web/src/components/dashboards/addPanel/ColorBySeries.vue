@@ -16,7 +16,7 @@
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div>
-    <div class="mb-2 font-semibold flex items-center">
+    <div class="mb-2 flex items-center font-semibold">
       <span>{{ t("dashboard.colorBySeriesTitle") }}</span>
       <OButton
         variant="ghost"

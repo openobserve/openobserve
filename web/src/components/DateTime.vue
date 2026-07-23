@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div icon="info" class="justify-between date-time-container">
+  <div icon="info" class="date-time-container justify-between">
     <OPopover
       v-model:open="menuOpen"
       side="bottom"
@@ -41,18 +41,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="disable"
           icon-left="schedule"
         >
-          <span class="date-time-label font-semibold flex-1 text-left">{{ triggerLabel }}</span>
+          <span class="date-time-label flex-1 text-left font-semibold">{{ triggerLabel }}</span>
           <template #icon-right
             ><OIcon
               name="arrow-drop-down"
               size="sm"
-              class="date-time-arrow transition-transform duration-250 ml-auto text-lg!"
+              class="date-time-arrow ml-auto text-lg! transition-transform duration-250"
           /></template>
         </OButton>
       </template>
       <div
         id="date-time-menu"
-        class="date-time-dialog w-81.25 z-10001 max-h-(--reka-popper-available-height,600px) overflow-y-auto"
+        class="date-time-dialog z-10001 max-h-(--reka-popper-available-height,600px) w-81.25 overflow-y-auto"
         @keydown.capture="onPickerKeydown"
       >
         <div v-if="!disableRelative" class="flex justify-evenly py-2">
@@ -82,11 +82,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTabPanel v-if="!disableRelative" name="relative">
               <div class="date-time-table relative flex flex-col">
                 <div
-                  class="relative-row [&>*]:mr-1.5 flex items-center border-b border-border-default pl-3 py-2"
+                  class="relative-row border-border-default flex items-center border-b py-2 pl-3 [&>*]:mr-1.5"
                   v-for="(period, index) in relativePeriods"
                   :key="'date_' + index"
                 >
-                  <div class="text-sm font-semibold min-w-18.75">
+                  <div class="min-w-18.75 text-sm font-semibold">
                     {{ period.label }}
                   </div>
                   <div v-for="(item, item_index) in relativeDates[period.value]" :key="item">
@@ -125,9 +125,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <div
-                  class="relative-row [&>*]:mr-1.5 flex items-center border-b border-border-default px-3 py-2"
+                  class="relative-row border-border-default flex items-center border-b px-3 py-2 [&>*]:mr-1.5"
                 >
-                  <div class="text-sm font-semibold min-w-18.75">{{ t("common.custom") }}</div>
+                  <div class="min-w-18.75 text-sm font-semibold">{{ t("common.custom") }}</div>
                   <OTooltip
                     side="right"
                     align="center"
@@ -136,8 +136,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :content="queryRangeRestrictionMsg"
                   />
 
-                  <div class="flex gap-2 flex-1 min-w-0">
-                    <div class="flex flex-col w-20">
+                  <div class="flex min-w-0 flex-1 gap-2">
+                    <div class="flex w-20 flex-col">
                       <OInput
                         v-model.number="relativeValue"
                         type="number"
@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @update:model-value="onCustomPeriodSelect"
                       />
                     </div>
-                    <div class="flex flex-col flex-1 min-w-0">
+                    <div class="flex min-w-0 flex-1 flex-col">
                       <OSelect
                         v-model="relativePeriod"
                         :options="relativePeriodsSelect"
@@ -185,28 +185,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @update:end-date="selectedDate.to = $event"
                   />
                 </div>
-                <div class="pr-6 pl-6 text-3xs">{{ t("common.datetimeMessage") }}</div>
+                <div class="text-3xs pr-6 pl-6">{{ t("common.datetimeMessage") }}</div>
                 <OSeparator v-if="!disableRelative" class="my-2" />
 
                 <table
                   v-if="!hideRelativeTime"
-                  class="px-3 w-[calc(100%-0.8rem)] mx-[0.4rem] mt-2 mb-[0.3rem] startEndTime"
+                  class="startEndTime mx-[0.4rem] mt-2 mb-[0.3rem] w-[calc(100%-0.8rem)] px-3"
                 >
                   <tbody>
                     <tr>
                       <td
-                        class="label o-input-label text-compact font-medium leading-tight text-input-label-text pr-1.5 w-1/2"
+                        class="label o-input-label text-compact text-input-label-text w-1/2 pr-1.5 leading-tight font-medium"
                       >
                         Start time
                       </td>
                       <td
-                        class="label o-input-label text-compact font-medium leading-tight text-input-label-text pl-1.5 w-1/2"
+                        class="label o-input-label text-compact text-input-label-text w-1/2 pl-1.5 leading-tight font-medium"
                       >
                         End time
                       </td>
                     </tr>
                     <tr>
-                      <td class="pr-1.5 w-1/2">
+                      <td class="w-1/2 pr-1.5">
                         <OTime
                           class="w-full"
                           v-model="selectedTime.startTime"
@@ -215,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @blur="resetTime(selectedTime.startTime, selectedTime.endTime)"
                         />
                       </td>
-                      <td class="pl-1.5 w-1/2">
+                      <td class="w-1/2 pl-1.5">
                         <OTime
                           class="w-full"
                           v-model="selectedTime.endTime"
@@ -241,10 +241,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="onTimezoneChange"
             @open="isTimezoneSelectOpen = true"
             @close="isTimezoneSelectOpen = false"
-            class="my-2 mx-[0.4rem]"
+            class="mx-[0.4rem] my-2"
           />
         </div>
-        <div v-if="!autoApply" class="flex justify-end py-2 px-3">
+        <div v-if="!autoApply" class="flex justify-end px-3 py-2">
           <OButton
             data-test="date-time-apply-btn"
             variant="primary"

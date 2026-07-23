@@ -15,9 +15,9 @@
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div class="h-full flex flex-col overflow-hidden" data-test="view-panel-screen">
-    <div class="flex justify-between items-center p-3">
-      <div class="flex items-center text-xl tracking-[0.005em] mr-3">
+  <div class="flex h-full flex-col overflow-hidden" data-test="view-panel-screen">
+    <div class="flex items-center justify-between p-3">
+      <div class="mr-3 flex items-center text-xl tracking-[0.005em]">
         <span data-test="dashboard-viewpanel-title">
           {{ dashboardPanelData.data.title }}
         </span>
@@ -27,14 +27,14 @@
         <HistogramIntervalDropDown
           v-if="!promqlMode && histogramFields.length"
           v-model="histogramInterval"
-          class="h-8 transition-all duration-200 hover:bg-interactive-hover-bg w-37.5"
+          class="hover:bg-interactive-hover-bg h-8 w-37.5 transition-all duration-200"
           data-test="dashboard-viewpanel-histogram-interval-dropdown"
         />
 
         <DateTimePickerDashboard
           v-model="selectedDate"
           ref="dateTimePickerRef"
-          class="h-8 min-h-8 transition-all duration-200 hover:bg-interactive-hover-bg"
+          class="hover:bg-interactive-hover-bg h-8 min-h-8 transition-all duration-200"
           data-test="dashboard-viewpanel-date-time-picker"
           :disable="disable"
           @hide="setTimeForVariables()"
@@ -44,7 +44,7 @@
           trigger
           :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
           @trigger="refreshData"
-          class="h-8 transition-all duration-200 hover:bg-interactive-hover-bg"
+          class="hover:bg-interactive-hover-bg h-8 transition-all duration-200"
           data-test="dashboard-viewpanel-refresh-interval"
         />
         <OButton
@@ -82,10 +82,10 @@
     </div>
     <OSeparator />
     <div class="flex flex-1 overflow-hidden">
-      <div class="flex flex-col w-full h-full">
+      <div class="flex h-full w-full flex-col">
         <div class="flex h-full w-full">
-          <div class="flex flex-col h-full w-full">
-            <div class="flex flex-col h-full">
+          <div class="flex h-full w-full flex-col">
+            <div class="flex h-full flex-col">
               <VariablesValueSelector
                 :variablesConfig="currentDashboardData.data?.variables"
                 :showDynamicFilters="currentDashboardData.data?.variables?.showDynamicFilters"
@@ -99,7 +99,7 @@
               />
               <div class="flex-1 overflow-hidden">
                 <div
-                  class="flex justify-end mr-2 items-center"
+                  class="mr-2 flex items-center justify-end"
                   data-test="view-panel-last-refreshed-at"
                 >
                   <!-- Error/Warning tooltips -->

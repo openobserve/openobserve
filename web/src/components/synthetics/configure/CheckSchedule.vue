@@ -187,19 +187,19 @@ const startTime = computed({
 </script>
 
 <template>
-  <div class="rounded-default border border-border-default mb-4">
-    <div class="flex items-center border-b border-border-default py-2.5 px-3">
-      <div class="w-[0.1875rem] h-4 rounded-default mr-2 shrink-0 bg-primary-600" />
-      <h3 class="text-base font-semibold text-text-heading">
+  <div class="rounded-default border-border-default mb-4 border">
+    <div class="border-border-default flex items-center border-b px-3 py-2.5">
+      <div class="rounded-default bg-primary-600 mr-2 h-4 w-[0.1875rem] shrink-0" />
+      <h3 class="text-text-heading text-base font-semibold">
         {{ t("synthetics.scheduleAlert.schedule") }}
       </h3>
     </div>
-    <div class="px-3 py-2 flex flex-col gap-4">
+    <div class="flex flex-col gap-4 px-3 py-2">
       <!-- ── Frequency + Schedule Now/Later (same row) ───────────────── -->
-      <div class="flex items-end gap-8 flex-wrap">
+      <div class="flex flex-wrap items-end gap-8">
         <!-- Frequency -->
         <div>
-          <label class="text-sm font-medium text-text-body mb-1 block">
+          <label class="text-text-body mb-1 block text-sm font-medium">
             {{ t("synthetics.scheduleAlert.frequency") }}
           </label>
           <OToggleGroup
@@ -241,7 +241,7 @@ const startTime = computed({
               {{ t("synthetics.scheduleAlert.scheduleLater") }}
             </OToggleGroupItem>
           </OToggleGroup>
-          <OIcon name="info-outline" size="sm" class="cursor-pointer text-text-muted">
+          <OIcon name="info-outline" size="sm" class="text-text-muted cursor-pointer">
             <OTooltip side="right" align="center">
               <template #content>
                 {{ t("synthetics.scheduleAlert.scheduleNowTooltip") }}<br />
@@ -253,7 +253,7 @@ const startTime = computed({
       </div>
 
       <!-- Cron inputs -->
-      <div v-if="check.schedule.type === 'cron'" class="flex items-start gap-3 flex-wrap">
+      <div v-if="check.schedule.type === 'cron'" class="flex flex-wrap items-start gap-3">
         <OInput
           v-model="cron"
           :label="t('synthetics.scheduleAlert.cronExpression')"
@@ -271,7 +271,7 @@ const startTime = computed({
       </div>
 
       <!-- Custom interval inputs -->
-      <div v-if="frequencyPreset === 'custom'" class="flex items-start gap-3 flex-wrap">
+      <div v-if="frequencyPreset === 'custom'" class="flex flex-wrap items-start gap-3">
         <OInput
           v-model="customIntervalValue"
           :label="t('synthetics.scheduleAlert.customIntervalValue')"
@@ -292,7 +292,7 @@ const startTime = computed({
       <!-- Validation error -->
       <p
         v-if="props.validationErrors?.schedule"
-        class="text-xs text-status-error-text"
+        class="text-status-error-text text-xs"
         data-test="synthetics-check-schedule-error"
       >
         {{ props.validationErrors.schedule }}
@@ -301,7 +301,7 @@ const startTime = computed({
       <!-- Schedule Later date/time pickers -->
       <div
         v-if="startType === 'later' && check.schedule.type !== 'cron'"
-        class="flex items-start gap-3 flex-wrap"
+        class="flex flex-wrap items-start gap-3"
       >
         <ODate
           v-model="startDate"

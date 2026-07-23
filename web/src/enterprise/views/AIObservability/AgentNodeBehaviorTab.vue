@@ -33,7 +33,7 @@
          behavior tables — it stays a summary stat). -->
     <div
       v-if="costSummary"
-      class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-secondary"
+      class="text-text-secondary flex flex-wrap items-center gap-x-4 gap-y-1 text-xs"
       data-test="agent-node-behavior-cost"
     >
       <span>
@@ -52,7 +52,7 @@
 
     <!-- Looping tools for this agent -->
     <div class="flex flex-col gap-1.5">
-      <div class="text-xs font-semibold text-text-heading">
+      <div class="text-text-heading text-xs font-semibold">
         {{ t("aiObservability.behavior.loopsTitle") }}
       </div>
       <OTable
@@ -72,7 +72,7 @@
 
     <!-- Failure classes for this agent -->
     <div class="flex flex-col gap-1.5">
-      <div class="text-xs font-semibold text-text-heading">
+      <div class="text-text-heading text-xs font-semibold">
         {{ t("aiObservability.behavior.failuresTitle") }}
       </div>
       <OTable
@@ -92,7 +92,7 @@
 
     <div
       v-if="disabledHint"
-      class="text-xs text-text-secondary italic"
+      class="text-text-secondary text-xs italic"
       data-test="agent-node-behavior-disabled"
     >
       {{ disabledHint }}

@@ -60,8 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template #extra>
-      <div class="flex items-center justify-center gap-2 flex-wrap">
-        <span class="text-sm font-semibold text-text-secondary mr-1">
+      <div class="flex flex-wrap items-center justify-center gap-2">
+        <span class="text-text-secondary mr-1 text-sm font-semibold">
           {{ t("home.noDataState.or") }}
         </span>
         <EmptyStateIngestionChip
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <img
             :src="getImageURL('images/common/kubernetes.svg')"
-            class="w-3.5 h-3.5 shrink-0 object-contain"
+            class="h-3.5 w-3.5 shrink-0 object-contain"
             alt=""
           />
           {{ t("home.noDataState.kubernetes") }}
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <EmptyStateIngestionChip data-test="home-no-data-aws-btn" @click="go('AWSConfig')">
           <img
             :src="getImageURL('images/ingestion/aws.svg')"
-            class="w-3.5 h-3.5 shrink-0 object-contain"
+            class="h-3.5 w-3.5 shrink-0 object-contain"
             alt=""
           />
           {{ t("home.noDataState.aws") }}

@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col h-full flex-nowrap searchdetaildialog" data-test="dialog-box">
+  <div class="searchdetaildialog flex h-full flex-col flex-nowrap" data-test="dialog-box">
     <!-- Single Tab Row -->
-    <div class="flex justify-between items-center shrink-0">
-      <div class="flex items-center gap-2 -mb-0.75">
+    <div class="flex shrink-0 items-center justify-between">
+      <div class="-mb-0.75 flex items-center gap-2">
         <OTabs v-model="tab" align="left">
           <OTab data-test="log-detail-json-tab" name="json" :label="t('common.json')" />
           <OTab data-test="log-detail-table-tab" name="table" :label="t('common.table')" />
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </OTabs>
       </div>
-      <div class="flex items-center gap-2 pr-3 shrink-0">
+      <div class="flex shrink-0 items-center gap-2 pr-3">
         <O2AIContextAddBtn
           data-test="logs-detail-ai-context-btn"
           @sendToAiChat="sendToAiChat(JSON.stringify(rowData))"
@@ -63,8 +63,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       :class="[
-        'flex flex-col flex-1 min-h-0',
-        tab.startsWith('correlated-') ? 'overflow-hidden full-height-panels' : 'overflow-y-auto',
+        'flex min-h-0 flex-1 flex-col',
+        tab.startsWith('correlated-') ? 'full-height-panels overflow-hidden' : 'overflow-y-auto',
       ]"
     >
       <OTabPanels
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="tab.startsWith('correlated-') ? 'overflow-hidden!' : 'overflow-y-auto!'"
       >
         <OTabPanel name="json">
-          <OCardSection data-test="log-detail-json-content" class="px-page-edge pt-2 mb-6">
+          <OCardSection data-test="log-detail-json-content" class="px-page-edge mb-6 pt-2">
             <JsonPreview
               :value="rowData"
               show-copy-button
@@ -95,10 +95,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTabPanel>
         <OTabPanel name="table">
           <OCardSection
-            class="px-page-edge py-[0.675rem] mb-6"
+            class="px-page-edge mb-6 py-[0.675rem]"
             data-test="log-detail-table-content"
           >
-            <div v-if="rowData.length == 0" class="pt-3 max-w-87.5">
+            <div v-if="rowData.length == 0" class="max-w-87.5 pt-3">
               {{ t("logs.detailTable.noDataAvailable") }}
             </div>
             <OTable
@@ -109,12 +109,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               row-key="_rowKey"
               pagination="none"
               :default-columns="false"
-              class="o2-table o2-row-md o2-schema-table log-detail-source-table w-full border border-solid border-card-glass-border"
+              class="o2-table o2-row-md o2-schema-table log-detail-source-table border-card-glass-border w-full border border-solid"
             >
               <template #cell-field="{ value }">
                 <div
                   :data-test="`log-detail-${value}-key`"
-                  class="text-left text-status-error-text"
+                  class="text-status-error-text text-left"
                 >
                   {{ value }}
                 </div>
@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :data-test="`log-details-include-exclude-field-btn-${row.field}`"
                           size="icon-xs"
                           variant="ghost"
-                          class="h-5! w-5! min-h-5! min-w-5! p-0! align-middle"
+                          class="h-5! min-h-5! w-5! min-w-5! p-0! align-middle"
                           :aria-label="t('logs.detailTable.addIcon')"
                         >
                           <OIcon
@@ -224,10 +224,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </ODropdown>
                     <pre
                       :data-test="`log-detail-${row.field}-value`"
-                      class="wrap-break-word inline font-normal font-mono m-0 p-0 flex-1 min-w-0"
+                      class="m-0 inline min-w-0 flex-1 p-0 font-mono font-normal wrap-break-word"
                       :class="
                         !shouldWrapValues
-                          ? 'whitespace-nowrap overflow-hidden text-ellipsis'
+                          ? 'overflow-hidden text-ellipsis whitespace-nowrap'
                           : 'whitespace-pre-wrap'
                       "
                     ><ChunkedContent
@@ -273,7 +273,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @addSearchTerm="addSearchTerm"
           />
           <!-- Loading/Empty state when no data -->
-          <div v-else class="flex items-center justify-center h-full py-20">
+          <div v-else class="flex h-full items-center justify-center py-20">
             <div class="text-center">
               <OSpinner
                 v-if="correlationLoading"
@@ -281,10 +281,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="mb-4"
                 data-test="logs-correlation-loading-indicator"
               />
-              <div v-else-if="correlationError" class="text-base text-status-error-text">
+              <div v-else-if="correlationError" class="text-status-error-text text-base">
                 {{ correlationError }}
               </div>
-              <div v-else class="text-base text-text-muted">
+              <div v-else class="text-text-muted text-base">
                 {{ t("correlation.clickToLoadLogs") }}
               </div>
             </div>
@@ -315,7 +315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @close="tab = 'json'"
           />
           <!-- Loading/Empty state when no data -->
-          <div v-else class="flex items-center justify-center h-full py-20">
+          <div v-else class="flex h-full items-center justify-center py-20">
             <div class="text-center">
               <OSpinner
                 v-if="correlationLoading"
@@ -323,10 +323,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="mb-4"
                 data-test="logs-correlation-loading-indicator"
               />
-              <div v-else-if="correlationError" class="text-base text-status-error-text">
+              <div v-else-if="correlationError" class="text-status-error-text text-base">
                 {{ correlationError }}
               </div>
-              <div v-else class="text-base text-text-muted">
+              <div v-else class="text-text-muted text-base">
                 {{ t("correlation.clickToLoadMetrics") }}
               </div>
             </div>
@@ -357,7 +357,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @close="tab = 'json'"
           />
           <!-- Loading/Empty state when no data -->
-          <div v-else class="flex items-center justify-center h-full py-20">
+          <div v-else class="flex h-full items-center justify-center py-20">
             <div class="text-center">
               <OSpinner
                 v-if="correlationLoading"
@@ -365,10 +365,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="mb-4"
                 data-test="logs-correlation-loading-indicator"
               />
-              <div v-else-if="correlationError" class="text-base text-status-error-text">
+              <div v-else-if="correlationError" class="text-status-error-text text-base">
                 {{ correlationError }}
               </div>
-              <div v-else class="text-base text-text-muted">
+              <div v-else class="text-text-muted text-base">
                 {{ t("correlation.clickToLoadTraces") }}
               </div>
             </div>
@@ -381,9 +381,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OSeparator v-if="tab === 'json' || tab === 'table'" />
     <OCardSection
       v-if="tab === 'json' || tab === 'table'"
-      class="px-page-edge py-4 sticky bottom-0 bg-dialog-bg z-10"
+      class="px-page-edge bg-dialog-bg sticky bottom-0 z-10 py-4"
     >
-      <div class="flex items-center flex-nowrap justify-between">
+      <div class="flex flex-nowrap items-center justify-between">
         <div class="w-1/12">
           <OButton
             data-test="log-detail-previous-detail-btn"

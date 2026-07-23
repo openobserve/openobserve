@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('dashboard.setting')"
     @update:open="$emit('update:open', $event)"
   >
-    <div data-test="dashboard-settings-main-container" class="p-0 [min-height:inherit] h-full">
+    <div data-test="dashboard-settings-main-container" class="h-full [min-height:inherit] p-0">
       <OSplitter class="h-full" v-model="splitterModel" unit="px" disabled>
         <template v-slot:before>
           <div class="functions-tabs w-full">

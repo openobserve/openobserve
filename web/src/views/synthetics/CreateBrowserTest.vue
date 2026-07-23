@@ -528,9 +528,9 @@ function onClearResults() {
     bleed
   >
     <!-- ── Gate phase: URL + name ── -->
-    <main v-if="phase === 'gate'" class="flex-1 flex flex-col items-center justify-center">
-      <div class="max-w-[48rem] w-full mx-auto py-4 px-4">
-        <div class="flex justify-center mb-6">
+    <main v-if="phase === 'gate'" class="flex flex-1 flex-col items-center justify-center">
+      <div class="mx-auto w-full max-w-[48rem] px-4 py-4">
+        <div class="mb-6 flex justify-center">
           <EmptyBrowserCheck :width="140" />
         </div>
         <p class="mb-8 pb-4">
@@ -574,7 +574,7 @@ function onClearResults() {
           <small class="mt-1 block">{{ t("synthetics.createBrowserTest.nameHint") }}</small>
         </div>
 
-        <div class="flex gap-3 mb-6">
+        <div class="mb-6 flex gap-3">
           <OButton
             variant="primary"
             :disabled="!isGateUrlValid"
@@ -609,35 +609,35 @@ function onClearResults() {
     <!-- ── Extension setup phase (only when extension not yet installed) ── -->
     <main
       v-else-if="phase === 'extension-setup'"
-      class="flex-1 flex flex-col items-center justify-center"
+      class="flex flex-1 flex-col items-center justify-center"
     >
-      <div class="max-w-[48rem] w-full mx-auto py-4 px-4">
-        <div class="flex justify-center mb-6">
+      <div class="mx-auto w-full max-w-[48rem] px-4 py-4">
+        <div class="mb-6 flex justify-center">
           <div
-            class="rounded-default border border-border-default bg-surface-base p-6 flex items-center justify-center"
+            class="rounded-default border-border-default bg-surface-base flex items-center justify-center border p-6"
           >
             <OIcon name="open-in-browser" size="xl" class="text-accent" aria-hidden="true" />
           </div>
         </div>
 
-        <p class="mb-8 text-left pb-4">
+        <p class="mb-8 pb-4 text-left">
           {{ t("synthetics.createBrowserTest.setupDescription", { url: check.url }) }}
         </p>
 
         <div
-          class="rounded-default border border-border-default divide-y divide-border-default mb-6"
+          class="rounded-default border-border-default divide-border-default mb-6 divide-y border"
         >
           <!-- Step 1: Install the OpenObserve Recorder -->
           <div class="flex items-start gap-4 p-4">
             <span
-              class="flex-shrink-0 w-7 h-7 rounded-full bg-accent text-text-inverse flex items-center justify-center text-sm font-semibold"
+              class="bg-accent text-text-inverse flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold"
               >1</span
             >
-            <div class="flex-1 min-w-0">
-              <h4 class="text-sm font-semibold text-text-heading m-0 mb-1">
+            <div class="min-w-0 flex-1">
+              <h4 class="text-text-heading m-0 mb-1 text-sm font-semibold">
                 {{ t("synthetics.createBrowserTest.setupStep1Title") }}
               </h4>
-              <p class="text-xs text-text-secondary m-0">
+              <p class="text-text-secondary m-0 text-xs">
                 {{ t("synthetics.createBrowserTest.setupStep1Description") }}
               </p>
             </div>
@@ -646,20 +646,20 @@ function onClearResults() {
           <!-- Step 2: Enable incognito mode -->
           <div class="flex items-start gap-4 p-4">
             <span
-              class="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-sm font-semibold"
+              class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold"
               :class="
                 incognitoAllowed
-                  ? 'bg-[var(--color-status-success-text)]! text-text-inverse'
+                  ? 'text-text-inverse bg-[var(--color-status-success-text)]!'
                   : 'bg-accent text-text-inverse'
               "
               >2</span
             >
-            <div class="flex-1 min-w-0 flex justify-between">
+            <div class="flex min-w-0 flex-1 justify-between">
               <div class="flex flex-col items-start">
-                <h4 class="text-sm font-semibold text-text-heading m-0 mb-1">
+                <h4 class="text-text-heading m-0 mb-1 text-sm font-semibold">
                   {{ t("synthetics.createBrowserTest.setupStep3Title") }}
                 </h4>
-                <p class="text-xs text-text-secondary m-0 mb-3">
+                <p class="text-text-secondary m-0 mb-3 text-xs">
                   {{
                     t("synthetics.createBrowserTest.setupStep3IncognitoHint", {
                       details: CHROME_UI_LABELS.details,
@@ -679,24 +679,24 @@ function onClearResults() {
           <!-- Step 3: Click the extension icon to activate -->
           <div class="flex items-start gap-4 p-4" :class="{ 'opacity-60': !incognitoAllowed }">
             <span
-              class="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-sm font-semibold"
+              class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold"
               :class="
                 extensionReady
-                  ? 'bg-[var(--color-status-success-text)]! text-text-inverse'
+                  ? 'text-text-inverse bg-[var(--color-status-success-text)]!'
                   : incognitoAllowed
                     ? 'bg-accent text-text-inverse'
                     : 'bg-surface-subtle text-text-muted'
               "
               >3</span
             >
-            <div class="flex-1 min-w-0">
-              <h4 class="text-sm font-semibold text-text-heading m-0 mb-1">
+            <div class="min-w-0 flex-1">
+              <h4 class="text-text-heading m-0 mb-1 text-sm font-semibold">
                 {{ t("synthetics.createBrowserTest.setupStep2Title") }}
               </h4>
-              <p class="text-xs text-text-secondary m-0">
+              <p class="text-text-secondary m-0 text-xs">
                 {{ t("synthetics.createBrowserTest.setupStep2Description") }}
               </p>
-              <p v-if="extensionReady" class="text-xs font-medium text-status-success-text! mt-2">
+              <p v-if="extensionReady" class="text-status-success-text! mt-2 text-xs font-medium">
                 {{ t("synthetics.createBrowserTest.setupConnected") }}
               </p>
             </div>
@@ -706,7 +706,7 @@ function onClearResults() {
         <OButton
           variant="primary"
           size="lg"
-          class="w-full mb-4"
+          class="mb-4 w-full"
           :disabled="!extensionReady || !incognitoAllowed"
           data-test="synthetics-setup-open-record-btn"
           icon-left="smart-display"
@@ -719,7 +719,7 @@ function onClearResults() {
           <OButton
             variant="ghost"
             size="sm"
-            class="text-sm text-text-link underline"
+            class="text-text-link text-sm underline"
             data-test="synthetics-setup-skip-link"
             @click="onExtensionSetupSkip"
           >
@@ -732,7 +732,7 @@ function onClearResults() {
     <!-- ── Editor phase ── -->
     <template v-else>
       <CreateBrowserTestSkeleton v-if="isLoadingEdit" :rows="10" />
-      <div v-else-if="loadError" class="flex-1 flex flex-col items-center justify-center">
+      <div v-else-if="loadError" class="flex flex-1 flex-col items-center justify-center">
         <OEmptyState
           preset="load-error"
           size="block"
@@ -740,11 +740,11 @@ function onClearResults() {
           @action="onLoadRetry"
         />
       </div>
-      <div v-else class="flex-1 flex flex-col min-h-0">
+      <div v-else class="flex min-h-0 flex-1 flex-col">
         <OStepper
           v-model="currentStep"
           :navigable="true"
-          class="flex-1 overflow-y-auto min-h-0 my-2 h-full"
+          class="my-2 h-full min-h-0 flex-1 overflow-y-auto"
         >
           <OStep
             :name="1"
@@ -796,13 +796,13 @@ function onClearResults() {
 
         <!-- Sticky footer — tab-aware, always visible -->
         <div
-          class="flex items-center px-3 py-2.5 gap-2 border-t border-border-default shrink-0 bg-surface-base"
+          class="border-border-default bg-surface-base flex shrink-0 items-center gap-2 border-t px-3 py-2.5"
         >
           <!-- Journey step: Cancel | Selection actions (left) | Replay status + Continue (right) -->
           <template v-if="currentStep === 1">
             <!-- Selection actions — moved from BrowserJourney, kept on the left -->
             <template v-if="journeySelectionState.count > 0 && !journeySelectionState.isRecording">
-              <span class="text-sm text-text-secondary whitespace-nowrap">{{
+              <span class="text-text-secondary text-sm whitespace-nowrap">{{
                 t("synthetics.journey.selectedCount", { count: journeySelectionState.count })
               }}</span>
               <OButton

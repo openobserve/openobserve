@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex mt-4 ml-1">
+  <div class="mt-4 ml-1 flex">
     <div class="w-full">
-      <div class="text-base font-bold mb-1">{{ t("rum.errorStack") }}</div>
+      <div class="mb-1 text-base font-bold">{{ t("rum.errorStack") }}</div>
       <div class="mb-2">{{ error_stack[0] }}</div>
 
       <!-- Tabs for Pretty and Raw views -->
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-if="index"
                 data-test="error-stack-trace-line"
-                class="border-b border-l border-r border-solid border-border-default text-compact py-1.5 px-2"
+                class="border-border-default text-compact border-r border-b border-l border-solid px-2 py-1.5"
                 :style="{
                   'border-top': Number(index) === 1 ? '1px solid var(--color-border-default)' : '',
                   'border-radius':

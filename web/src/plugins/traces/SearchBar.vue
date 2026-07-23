@@ -15,11 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="search-bar-component pb-px h-full flex flex-col" id="searchBarComponent">
-    <div class="flex m-0! p-1.5 items-center justify-between w-full border-b border-border-default">
+  <div class="search-bar-component flex h-full flex-col pb-px" id="searchBarComponent">
+    <div class="border-border-default m-0! flex w-full items-center justify-between border-b p-1.5">
       <div
         ref="toolbarLeftRef"
-        class="flex flex-row items-center gap-1.5 flex-1 min-w-0 overflow-hidden"
+        class="flex min-w-0 flex-1 flex-row items-center gap-1.5 overflow-hidden"
       >
         <!-- Unified View Toggle: Service Graph / Traces / Spans -->
         <OToggleGroup
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
 
           <div
-            class="py-1 px-1.5 flex items-center justify-center border border-button-outline-border rounded-default transition-all duration-200 cursor-pointer hover:bg-button-outline-hover-bg"
+            class="border-button-outline-border rounded-default hover:bg-button-outline-hover-bg flex cursor-pointer items-center justify-center border px-1.5 py-1 transition-all duration-200"
           >
             <OSwitch
               data-test="traces-search-bar-show-metrics-toggle-btn"
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODropdown>
       </div>
       <!-- Right toolbar — persistent wrapper so toolbarRightRef is always observable -->
-      <div ref="toolbarRightRef" class="flex-shrink-0 flex items-center">
+      <div ref="toolbarRightRef" class="flex flex-shrink-0 items-center">
         <div
           v-if="
             searchObj.meta.searchMode !== 'service-graph' &&
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 data-test="traces-search-bar-cancel-btn"
                 :title="t('search.cancel')"
-                class="p-0 h-[1.875rem]! [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease] text-xs! font-medium! leading-4! px-1! py-0! w-[5.875rem]! whitespace-normal break-words text-center bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow ![border-radius:0.375rem_0_0_0.375rem]"
+                class="bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow h-[1.875rem]! w-[5.875rem]! ![border-radius:0.375rem_0_0_0.375rem] p-0 px-1! py-0! text-center text-xs! leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease]"
                 @click="cancelQueryData"
                 >{{ t("search.cancel") }}</OButton
               >
@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="logs-search-bar-refresh-btn"
                 data-cy="search-bar-refresh-button"
                 :title="t('search.runQuery')"
-                class="p-0 h-[1.875rem]! element-box-shadow [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease] hover:opacity-90 hover:shadow-[0_0_0.5rem_color-mix(in_srgb,var(--color-button-primary),transparent_30%)] text-xs! font-medium! leading-4! px-1! py-0! w-[5.875rem]! whitespace-normal break-words text-center bg-button-primary! text-button-primary-foreground!"
+                class="element-box-shadow bg-button-primary! text-button-primary-foreground! h-[1.875rem]! w-[5.875rem]! p-0 px-1! py-0! text-center text-xs! leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease] hover:opacity-90 hover:shadow-[0_0_0.5rem_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]"
                 :class="
                   store.state.zoConfig.auto_query_enabled
                     ? '![border-radius:0.375rem_0_0_0.375rem]'
@@ -214,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </template>
                   <span>
-                    <div class="font-medium text-xs">
+                    <div class="text-xs font-medium">
                       {{
                         searchObj.meta.liveMode
                           ? t("search.turnOffLiveMode")
@@ -292,7 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="searchObj.meta.serviceGraphLayoutType"
               :options="serviceGraphLayoutOptions"
               :searchable="false"
-              class="w-[7.5rem] min-h-8! h-8!"
+              class="h-8! min-h-8! w-[7.5rem]"
               :disabled="searchObj.meta.serviceGraphVisualizationType === 'graph'"
               @update:model-value="onServiceGraphLayoutChange"
             />
@@ -313,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
               :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
               data-test="services-catalog-date-time-picker"
-              class="h-8! mr-1.5"
+              class="mr-1.5 h-8!"
               @on:date-change="updateDateTime"
             />
           </div>
@@ -327,9 +327,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         searchObj.meta.searchMode !== 'services-catalog' &&
         searchObj.meta.showQuery
       "
-      class="flex flex-1 min-h-0 border-b border-border-default"
+      class="border-border-default flex min-h-0 flex-1 border-b"
     >
-      <div class="flex flex-col overflow-hidden h-full w-full relative">
+      <div class="relative flex h-full w-full flex-col overflow-hidden">
         <CodeQueryEditor
           ref="queryEditorRef"
           editor-id="traces-query-editor"
@@ -343,7 +343,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           v-if="searchObj.data.editorValue == '' && searchObj.meta.queryEditorPlaceholderFlag"
-          class="query-editor-placeholder-overlay absolute top-0 left-0 right-0 bottom-0 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-[1] select-none"
+          class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-[1] flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] select-none"
         >
           <span class="query-editor-placeholder-typewriter">{{ traceEditorPlaceholder }}</span>
         </div>

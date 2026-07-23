@@ -35,20 +35,20 @@
           :placeholder="t('crossLinks.urlPlaceholder')"
           data-test="cross-link-url-input"
         />
-        <div class="text-xs mt-1 text-text-muted">
+        <div class="text-text-muted mt-1 text-xs">
           {{ t("crossLinks.urlHint") }}
         </div>
       </div>
 
       <!-- Fields -->
       <div class="mb-2">
-        <label class="block text-sm font-semibold mb-1 text-text-heading">{{
+        <label class="text-text-heading mb-1 block text-sm font-semibold">{{
           t("crossLinks.fields")
         }}</label>
-        <div class="text-xs mb-2 text-text-muted">
+        <div class="text-text-muted mb-2 text-xs">
           {{ t("crossLinks.fieldsHint") }}
         </div>
-        <div v-if="formFields.length > 0" class="flex flex-wrap gap-1 mb-2">
+        <div v-if="formFields.length > 0" class="mb-2 flex flex-wrap gap-1">
           <OTag
             v-for="(field, idx) in formFields"
             :key="idx"
@@ -62,7 +62,7 @@
                 type="button"
                 :aria-label="`Remove ${field.name}`"
                 :data-test="`cross-link-field-chip-remove-${idx}`"
-                class="inline-flex items-center justify-center cursor-pointer hover:opacity-70"
+                class="inline-flex cursor-pointer items-center justify-center hover:opacity-70"
                 @click="removeField(idx)"
               >
                 <OIcon name="close" size="xs" />
@@ -70,7 +70,7 @@
             </template>
           </OTag>
         </div>
-        <div class="flex gap-2 items-center" @keydown="onFieldKeydown">
+        <div class="flex items-center gap-2" @keydown="onFieldKeydown">
           <!--
                 Chip-builder scratch input — now a form-owned `newFieldName`
                 field (R1-strict: no bare control inside the OForm). The

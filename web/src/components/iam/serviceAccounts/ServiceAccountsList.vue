@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("serviceAccounts.add") }}
       </OButton>
     </template>
-    <div class="w-full flex-1 min-h-0 overflow-hidden">
+    <div class="min-h-0 w-full flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <OTable
           :frame="false"
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:selected-ids="handleSelectedIdsUpdate"
         >
           <template #toolbar>
-            <div class="flex items-center gap-2 w-full">
+            <div class="flex w-full items-center gap-2">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('serviceAccounts.search')"
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      username) beneath it. -->
               <div :data-test="`service-accounts-email-${row.email}`" class="flex flex-col">
                 <span class="font-medium">{{ saDisplayName(row.email) }}</span>
-                <span class="text-xs text-text-secondary">{{ row.email }}</span>
+                <span class="text-text-secondary text-xs">{{ row.email }}</span>
               </div>
             </template>
             <template v-else>
@@ -254,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            an access summary (creation only — rotate shows the token alone). -->
       <div data-test="service-accounts-token-wizard">
         <div data-test="service-accounts-token-step-1">
-          <p class="text-xs text-text-secondary mb-3">
+          <p class="text-text-secondary mb-3 text-xs">
             {{ t("serviceAccounts.tokenReveal.copyHint") }}
           </p>
 
@@ -267,25 +267,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTabPanels v-model="tokenTab" animated>
             <OTabPanel name="curl">
               <pre
-                class="bg-surface-subtle text-text-body p-3 rounded-default text-xs overflow-auto whitespace-pre-wrap"
+                class="bg-surface-subtle text-text-body rounded-default overflow-auto p-3 text-xs whitespace-pre-wrap"
                 >{{ tokenCurlSnippet }}</pre
               >
             </OTabPanel>
             <OTabPanel name="header">
               <pre
-                class="bg-surface-subtle text-text-body p-3 rounded-default text-xs overflow-auto whitespace-pre-wrap"
+                class="bg-surface-subtle text-text-body rounded-default overflow-auto p-3 text-xs whitespace-pre-wrap"
                 >{{ tokenHeaderSnippet }}</pre
               >
             </OTabPanel>
             <OTabPanel name="env">
               <pre
-                class="bg-surface-subtle text-text-body p-3 rounded-default text-xs overflow-auto whitespace-pre-wrap"
+                class="bg-surface-subtle text-text-body rounded-default overflow-auto p-3 text-xs whitespace-pre-wrap"
                 >{{ tokenEnvSnippet }}</pre
               >
             </OTabPanel>
           </OTabPanels>
 
-          <div class="flex items-center gap-2 mt-3">
+          <div class="mt-3 flex items-center gap-2">
             <OButton
               data-test="service-accounts-list-token-copy-btn"
               variant="outline"
@@ -300,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OIcon name="content-copy" size="sm" />
             </OButton>
-            <span class="text-xs text-text-secondary">{{ t("serviceAccounts.copyToken") }}</span>
+            <span class="text-text-secondary text-xs">{{ t("serviceAccounts.copyToken") }}</span>
 
             <OButton
               data-test="service-accounts-list-token-download-btn"
@@ -312,7 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OIcon name="file-download" size="sm" />
             </OButton>
-            <span class="text-xs text-text-secondary">{{
+            <span class="text-text-secondary text-xs">{{
               t("serviceAccounts.downloadToken")
             }}</span>
           </div>
@@ -330,7 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="mt-4 flex items-center gap-2"
           >
             <OSpinner size="xs" />
-            <span class="text-xs text-text-secondary">{{
+            <span class="text-text-secondary text-xs">{{
               t("serviceAccounts.tokenReveal.applying")
             }}</span>
           </div>
@@ -340,28 +340,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="service-accounts-token-access-summary"
             class="mt-4"
           >
-            <div v-if="grantedRolesText" class="flex items-start gap-2 mb-1">
+            <div v-if="grantedRolesText" class="mb-1 flex items-start gap-2">
               <OIcon name="check" size="sm" class="text-status-success-text mt-0.5 shrink-0" />
-              <span class="text-xs text-text-secondary">{{ grantedRolesText }}</span>
+              <span class="text-text-secondary text-xs">{{ grantedRolesText }}</span>
             </div>
-            <div v-if="grantedGroupsText" class="flex items-start gap-2 mb-1">
+            <div v-if="grantedGroupsText" class="mb-1 flex items-start gap-2">
               <OIcon name="check" size="sm" class="text-status-success-text mt-0.5 shrink-0" />
-              <span class="text-xs text-text-secondary">{{ grantedGroupsText }}</span>
+              <span class="text-text-secondary text-xs">{{ grantedGroupsText }}</span>
             </div>
 
             <div
               v-if="failedRolesText"
               data-test="service-accounts-token-access-failed"
-              class="flex items-start gap-2 mb-1"
+              class="mb-1 flex items-start gap-2"
             >
               <OIcon name="warning" size="sm" class="text-status-warning-text mt-0.5 shrink-0" />
-              <span class="text-xs text-text-secondary">{{ failedRolesText }}</span>
+              <span class="text-text-secondary text-xs">{{ failedRolesText }}</span>
             </div>
-            <div v-if="failedGroupsText" class="flex items-start gap-2 mb-1">
+            <div v-if="failedGroupsText" class="mb-1 flex items-start gap-2">
               <OIcon name="warning" size="sm" class="text-status-warning-text mt-0.5 shrink-0" />
-              <span class="text-xs text-text-secondary">{{ failedGroupsText }}</span>
+              <span class="text-text-secondary text-xs">{{ failedGroupsText }}</span>
             </div>
-            <p v-if="hasAccessFailures" class="text-xs text-text-secondary mt-1">
+            <p v-if="hasAccessFailures" class="text-text-secondary mt-1 text-xs">
               {{ t("serviceAccounts.tokenReveal.failedHint") }}
             </p>
           </div>
@@ -374,14 +374,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm"
                 class="text-status-warning-text mt-0.5"
               />
-              <span class="text-xs text-text-secondary">{{ tokenNextStepHint }}</span>
+              <span class="text-text-secondary text-xs">{{ tokenNextStepHint }}</span>
             </div>
 
-            <div v-if="showGroupLink" class="flex flex-wrap items-center justify-center gap-3 mt-3">
+            <div v-if="showGroupLink" class="mt-3 flex flex-wrap items-center justify-center gap-3">
               <router-link
                 data-test="service-accounts-list-token-add-to-role"
                 :to="roleLinkTarget"
-                class="group inline-flex items-center gap-1.5 rounded-default border border-border-default px-2.5 py-1.5 text-xs text-text-body transition-colors hover:border-primary hover:bg-primary/5"
+                class="group rounded-default border-border-default text-text-body hover:border-primary hover:bg-primary/5 inline-flex items-center gap-1.5 border px-2.5 py-1.5 text-xs transition-colors"
                 @click="isShowToken = false"
               >
                 <OIcon name="shield" size="sm" class="text-primary shrink-0" />
@@ -395,7 +395,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <router-link
                 data-test="service-accounts-list-token-add-to-group"
                 :to="groupLinkTarget"
-                class="group inline-flex items-center gap-1.5 rounded-default border border-border-default px-2.5 py-1.5 text-xs text-text-body transition-colors hover:border-primary hover:bg-primary/5"
+                class="group rounded-default border-border-default text-text-body hover:border-primary hover:bg-primary/5 inline-flex items-center gap-1.5 border px-2.5 py-1.5 text-xs transition-colors"
                 @click="isShowToken = false"
               >
                 <OIcon name="group" size="sm" class="text-primary shrink-0" />
@@ -409,7 +409,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="flex justify-end mt-4 pt-3 border-t border-border-default">
+          <div class="border-border-default mt-4 flex justify-end border-t pt-3">
             <OButton
               data-test="service-accounts-token-done-btn"
               variant="primary"

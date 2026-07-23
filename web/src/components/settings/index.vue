@@ -28,15 +28,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Form-style sections (general, org params, license, domain): a section
          header above a centered reading column. -->
-    <div v-if="isConstrainedSection" class="h-full min-h-0 flex flex-col">
+    <div v-if="isConstrainedSection" class="flex h-full min-h-0 flex-col">
       <OPageHeader
         :title="activeSectionItem?.label || ''"
         :title-data-test="`settings-${activeSectionItem?.key}-page-title`"
         :subtitle="activeSectionItem?.description || ''"
         :icon="activeSectionItem?.icon as any"
-        class="shrink-0 border-b border-border-default"
+        class="border-border-default shrink-0 border-b"
       />
-      <ConstrainedPage size="lg" align="left" :padded="false" class="flex-1 min-h-0 px-4 py-3">
+      <ConstrainedPage size="lg" align="left" :padded="false" class="min-h-0 flex-1 px-4 py-3">
         <router-view title="" />
       </ConstrainedPage>
     </div>
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          pass a `title` attr here: these children are OPageLayout-rooted, so a
          fallthrough `title` would clobber their own `:title` prop and blank the
          header (regression seen on Query Management / Nodes). -->
-    <section v-else class="h-full min-w-0 min-h-0 overflow-y-auto overflow-x-hidden">
+    <section v-else class="h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto">
       <router-view />
     </section>
   </OPageLayout>

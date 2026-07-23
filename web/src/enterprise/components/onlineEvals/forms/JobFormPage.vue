@@ -1,6 +1,6 @@
 <template>
   <OForm
-    class="job-form flex flex-col flex-1 min-h-0 gap-2.5"
+    class="job-form flex min-h-0 flex-1 flex-col gap-2.5"
     :form="form"
     v-slot="{ isSubmitting }"
   >
@@ -34,22 +34,22 @@
 
       <div class="flex min-h-0 flex-1 gap-2 overflow-hidden max-[68.75rem]:flex-col">
         <div
-          class="flex min-h-0 min-w-0 flex-[6.5] flex-col gap-2 overflow-auto p-2 [&_textarea]:max-h-[12.5rem] [&_textarea]:overflow-y-auto max-[68.75rem]:flex-[1_1_auto]"
+          class="flex min-h-0 min-w-0 flex-[6.5] flex-col gap-2 overflow-auto p-2 max-[68.75rem]:flex-[1_1_auto] [&_textarea]:max-h-[12.5rem] [&_textarea]:overflow-y-auto"
         >
           <!-- Details — job identity only. Kept separate from Evaluation Target
              so each heading actually describes its fields: naming the job and
              choosing what it reads are different decisions. -->
           <section
-            class="card-container shrink-0 overflow-hidden rounded-default border border-border-default bg-surface-base"
+            class="card-container rounded-default border-border-default bg-surface-base shrink-0 overflow-hidden border"
             data-test="job-form-details-section"
           >
-            <div class="flex items-center border-b border-border-default px-3 py-2.5">
-              <div class="mr-2 h-4 w-[0.1875rem] shrink-0 rounded-default bg-theme-accent" />
-              <span class="text-compact font-semibold tracking-[0.01em] text-text-heading">{{
+            <div class="border-border-default flex items-center border-b px-3 py-2.5">
+              <div class="rounded-default bg-theme-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+              <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.detailsSection")
               }}</span>
             </div>
-            <div class="flex flex-col gap-3 py-3.5 px-4">
+            <div class="flex flex-col gap-3 px-4 py-3.5">
               <div>
                 <OFormInput
                   name="name"
@@ -77,16 +77,16 @@
 
           <!-- Evaluation Target -->
           <section
-            class="card-container shrink-0 overflow-hidden rounded-default border border-border-default bg-surface-base"
+            class="card-container rounded-default border-border-default bg-surface-base shrink-0 overflow-hidden border"
             data-test="job-form-target-section"
           >
-            <div class="flex items-center border-b border-border-default px-3 py-2.5">
-              <div class="mr-2 h-4 w-[0.1875rem] shrink-0 rounded-default bg-theme-accent" />
-              <span class="text-compact font-semibold tracking-[0.01em] text-text-heading">{{
+            <div class="border-border-default flex items-center border-b px-3 py-2.5">
+              <div class="rounded-default bg-theme-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+              <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.targetSection")
               }}</span>
             </div>
-            <div class="flex flex-col gap-3 py-3.5 px-4">
+            <div class="flex flex-col gap-3 px-4 py-3.5">
               <div>
                 <OFormSelect
                   name="targetScope"
@@ -118,16 +118,16 @@
              samples the matching subset (§OnlineEval-D15), so the form reads
              in the same order the job actually executes. -->
           <section
-            class="card-container shrink-0 overflow-hidden rounded-default border border-border-default bg-surface-base"
+            class="card-container rounded-default border-border-default bg-surface-base shrink-0 overflow-hidden border"
             data-test="job-form-filtering-section"
           >
-            <div class="flex items-center border-b border-border-default px-3 py-2.5">
-              <div class="mr-2 h-4 w-[0.1875rem] shrink-0 rounded-default bg-theme-accent" />
-              <span class="text-compact font-semibold tracking-[0.01em] text-text-heading">{{
+            <div class="border-border-default flex items-center border-b px-3 py-2.5">
+              <div class="rounded-default bg-theme-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+              <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.filteringSection")
               }}</span>
             </div>
-            <div class="flex flex-col gap-3 py-3.5 px-4">
+            <div class="flex flex-col gap-3 px-4 py-3.5">
               <JobFilterBuilder
                 name-prefix="filterGroup"
                 :target-scope="formValues.targetScope"
@@ -139,16 +139,16 @@
 
           <!-- Sampling -->
           <section
-            class="card-container shrink-0 overflow-hidden rounded-default border border-border-default bg-surface-base"
+            class="card-container rounded-default border-border-default bg-surface-base shrink-0 overflow-hidden border"
             data-test="job-form-sampling-section"
           >
-            <div class="flex items-center border-b border-border-default px-3 py-2.5">
-              <div class="mr-2 h-4 w-[0.1875rem] shrink-0 rounded-default bg-theme-accent" />
-              <span class="text-compact font-semibold tracking-[0.01em] text-text-heading">{{
+            <div class="border-border-default flex items-center border-b px-3 py-2.5">
+              <div class="rounded-default bg-theme-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+              <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.stepper.sampling")
               }}</span>
             </div>
-            <div class="flex flex-col gap-3 py-3.5 px-4">
+            <div class="flex flex-col gap-3 px-4 py-3.5">
               <div class="grid grid-cols-2 gap-[0.875rem] max-[68.75rem]:grid-cols-1">
                 <div>
                   <OFormSelect
@@ -182,16 +182,16 @@
 
           <!-- Scorers + Mapping -->
           <section
-            class="card-container shrink-0 overflow-hidden rounded-default border border-border-default bg-surface-base"
+            class="card-container rounded-default border-border-default bg-surface-base shrink-0 overflow-hidden border"
             data-test="job-form-scorers-section"
           >
-            <div class="flex items-center border-b border-border-default px-3 py-2.5">
-              <div class="mr-2 h-4 w-[0.1875rem] shrink-0 rounded-default bg-theme-accent" />
-              <span class="text-compact font-semibold tracking-[0.01em] text-text-heading">{{
+            <div class="border-border-default flex items-center border-b px-3 py-2.5">
+              <div class="rounded-default bg-theme-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+              <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.scorersSection")
               }}</span>
             </div>
-            <div class="flex flex-col gap-3 py-3.5 px-4">
+            <div class="flex flex-col gap-3 px-4 py-3.5">
               <JobScorerPicker
                 :model-value="formValues.scorerIds"
                 :target-scope="formValues.targetScope"
@@ -216,17 +216,17 @@
           <!-- Trace/session completion -->
           <section
             v-if="formValues.targetScope !== 'span'"
-            class="card-container shrink-0 overflow-hidden rounded-default border border-border-default bg-surface-base"
+            class="card-container rounded-default border-border-default bg-surface-base shrink-0 overflow-hidden border"
             data-test="job-form-completion-section"
           >
-            <div class="flex items-center border-b border-border-default px-3 py-2.5">
-              <div class="mr-2 h-4 w-[0.1875rem] shrink-0 rounded-default bg-theme-accent" />
-              <span class="text-compact font-semibold tracking-[0.01em] text-text-heading">{{
+            <div class="border-border-default flex items-center border-b px-3 py-2.5">
+              <div class="rounded-default bg-theme-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+              <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.completionSection")
               }}</span>
             </div>
-            <div class="flex flex-col gap-3 py-3.5 px-4">
-              <div class="text-xs text-input-help-text leading-none">
+            <div class="flex flex-col gap-3 px-4 py-3.5">
+              <div class="text-input-help-text text-xs leading-none">
                 {{ t(`onlineEvals.job.completionHelp.${formValues.targetScope}`) }}
               </div>
               <div class="grid grid-cols-2 gap-[0.875rem] max-[68.75rem]:grid-cols-1">
@@ -277,7 +277,7 @@
       </div>
 
       <footer
-        class="sticky bottom-0 flex items-center justify-end gap-2 px-5.5 py-3 bg-surface-base border-t border-border-default shrink-0 z-1"
+        class="bg-surface-base border-border-default sticky bottom-0 z-1 flex shrink-0 items-center justify-end gap-2 border-t px-5.5 py-3"
       >
         <OButton
           data-test="job-form-cancel-btn"

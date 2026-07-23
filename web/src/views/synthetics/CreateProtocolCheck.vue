@@ -260,7 +260,7 @@ async function saveCheck() {
   >
     <CreateBrowserTestSkeleton v-if="isLoadingEdit" :rows="10" />
     <template v-else>
-      <div class="flex-1 overflow-y-auto min-h-0">
+      <div class="min-h-0 flex-1 overflow-y-auto">
         <CheckConfigure
           :check="check"
           :check-type="checkType"
@@ -285,7 +285,7 @@ async function saveCheck() {
 
       <!-- Sticky footer -->
       <div
-        class="flex items-center px-3 py-2.5 gap-2 border-t border-border-default shrink-0 bg-surface-base"
+        class="border-border-default bg-surface-base flex shrink-0 items-center gap-2 border-t px-3 py-2.5"
       >
         <span class="flex-1" aria-hidden="true" />
         <OButton

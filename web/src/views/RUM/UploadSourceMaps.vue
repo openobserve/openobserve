@@ -31,12 +31,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- Form Content Area -->
       <div
-        class="flex-1 overflow-y-auto bg-card-glass-bg mb-[0.675rem] p-6 overflow-auto"
+        class="bg-card-glass-bg mb-[0.675rem] flex-1 overflow-auto overflow-y-auto p-6"
         style="height: calc(100vh - 172px)"
       >
-        <div class="max-w-300 mx-auto">
+        <div class="mx-auto max-w-300">
           <!-- Input Fields -->
-          <div class="grid grid-cols-1 gap-4 mb-6">
+          <div class="mb-6 grid grid-cols-1 gap-4">
             <!-- Service Input -->
             <OFormInput
               name="service"
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- File Upload Area (form-owned `file` field, schema-validated) -->
           <div class="mb-6">
-            <div class="text-sm font-medium font-medium mb-2">Source Map ZIP File *</div>
+            <div class="mb-2 text-sm font-medium">Source Map ZIP File *</div>
             <SourceMapDropzone name="file" />
           </div>
         </div>
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Bottom Action Bar -->
       <div
-        class="action-bar shrink-0 bg-card-glass-bg flex items-center justify-end gap-3 py-3 pr-3 border-t border-card-glass-border sticky"
+        class="action-bar bg-card-glass-bg border-card-glass-border sticky flex shrink-0 items-center justify-end gap-3 border-t py-3 pr-3"
         style="z-index: 2"
       >
         <OButton

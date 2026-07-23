@@ -15,10 +15,10 @@
   >
     <div
       data-test="dashboard-json-editor-container"
-      class="w-[70vw] flex flex-col h-[calc(100vh-116px)] bg-surface-base"
+      class="bg-surface-base flex h-[calc(100vh-116px)] w-[70vw] flex-col"
     >
       <!-- Monaco editor fills remaining space; flex-1 + min-h-0 lets it expand without overflow -->
-      <div class="flex-1 min-h-0">
+      <div class="min-h-0 flex-1">
         <QueryEditor
           data-test="dashboard-json-editor"
           ref="queryEditorRef"
@@ -35,9 +35,9 @@
       <div
         v-if="validationErrors.length > 0"
         data-test="dashboard-json-editor-validation-errors"
-        class="p-3 text-status-error-text max-h-50 overflow-y-auto"
+        class="text-status-error-text max-h-50 overflow-y-auto p-3"
       >
-        <div class="font-bold mb-2">{{ t("dashboard.dashboardJsonEditor.pleaseFixIssues") }}</div>
+        <div class="mb-2 font-bold">{{ t("dashboard.dashboardJsonEditor.pleaseFixIssues") }}</div>
         <ul class="ml-3">
           <li v-for="(error, index) in validationErrors" :key="index">
             {{ error }}

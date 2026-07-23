@@ -1,16 +1,16 @@
 <template>
   <div
     v-if="showBanner && config.isEnterprise == 'true' && config.isCloud === 'false'"
-    class="w-full rounded-default p-3"
+    class="rounded-default w-full p-3"
     :class="bannerClass"
   >
     <div class="flex">
       <div class="flex flex-col">
-        <span class="text-lg font-semibold leading-(--leading-xl) text-text-heading">{{
+        <span class="text-text-heading text-lg leading-(--leading-xl) font-semibold">{{
           message
         }}</span>
         <br />
-        <span class="text-base font-normal leading-(--leading-md) text-text-body">{{
+        <span class="text-text-body text-base leading-(--leading-md) font-normal">{{
           subtitle
         }}</span>
       </div>

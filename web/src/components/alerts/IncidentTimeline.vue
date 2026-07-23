@@ -15,26 +15,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="min-h-100 flex flex-col h-full">
+  <div class="flex h-full min-h-100 flex-col">
     <!-- Loading -->
-    <div v-if="loading" class="flex justify-center items-center py-12">
+    <div v-if="loading" class="flex items-center justify-center py-12">
       <OSpinner variant="dots" size="md" />
     </div>
 
     <!-- Empty state -->
     <div
       v-else-if="events.length === 0"
-      class="flex flex-col items-center justify-center py-16 text-text-muted"
+      class="text-text-muted flex flex-col items-center justify-center py-16"
     >
-      <OIcon name="forum" class="mb-3 opacity-40 size-14!" />
-      <div class="text-base font-medium mb-1">No activity yet</div>
-      <div class="text-sm text-text-muted">Events and comments will appear here</div>
+      <OIcon name="forum" class="mb-3 size-14! opacity-40" />
+      <div class="mb-1 text-base font-medium">No activity yet</div>
+      <div class="text-text-muted text-sm">Events and comments will appear here</div>
     </div>
 
     <!-- Activity Feed with Timeline -->
-    <div v-else class="flex-1 flex flex-col min-h-0 relative">
+    <div v-else class="relative flex min-h-0 flex-1 flex-col">
       <!-- Scroll buttons -->
-      <div class="absolute top-2 right-3 flex flex-col gap-1 z-10">
+      <div class="absolute top-2 right-3 z-10 flex flex-col gap-1">
         <OButton
           variant="ghost-muted"
           size="icon-circle-sm"
@@ -51,10 +51,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         /></OButton>
       </div>
 
-      <div ref="timelineContainer" class="flex-1 min-h-0 overflow-y-auto px-3 pt-2 pb-4">
+      <div ref="timelineContainer" class="min-h-0 flex-1 overflow-y-auto px-3 pt-2 pb-4">
         <div class="relative">
           <!-- Vertical Timeline Line -->
-          <div class="absolute left-3 top-0 bottom-0 w-0.5 bg-border-default my-3"></div>
+          <div class="bg-border-default absolute top-0 bottom-0 left-3 my-3 w-0.5"></div>
 
           <!-- Events -->
           <div class="relative space-y-4">
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- User Avatar -->
                     <div
                       v-if="getUserId(event) !== 'System'"
-                      class="w-6 h-6 rounded-full flex items-center justify-center z-10 relative bg-surface-base border border-border-default"
+                      class="bg-surface-base border-border-default relative z-10 flex h-6 w-6 items-center justify-center rounded-full border"
                     >
                       <OIcon
                         name="person"
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- System Event Icon -->
                     <div
                       v-else
-                      class="w-6 h-6 rounded-full flex items-center justify-center z-10 relative bg-surface-subtle border border-border-default"
+                      class="bg-surface-subtle border-border-default relative z-10 flex h-6 w-6 items-center justify-center rounded-full border"
                     >
                       <OIcon
                         :name="getEventIcon(event)"
@@ -90,17 +90,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Event Description -->
                   <div class="flex-1">
-                    <div class="flex items-center gap-2 flex-wrap">
+                    <div class="flex flex-wrap items-center gap-2">
                       <!-- For User Events: username, badge, text -->
                       <template v-if="getUserId(event) !== 'System'">
-                        <span class="font-semibold text-sm" :class="'text-text-body'">
+                        <span class="text-sm font-semibold" :class="'text-text-body'">
                           {{ getUserId(event) }}
                         </span>
                         <span
                           v-if="
                             event.type !== 'SeverityUpgrade' && event.type !== 'SeverityOverride'
                           "
-                          class="inline-flex items-center px-2 py-0.5 rounded-default text-xs font-semibold"
+                          class="rounded-default inline-flex items-center px-2 py-0.5 text-xs font-semibold"
                           :style="badgeStyle(getEventBadgeColor(event))"
                         >
                           {{ getEventBadgeText(event) }}
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           "
                         >
                           <span
-                            class="inline-flex items-center px-2 py-0.5 rounded-default text-xs font-semibold"
+                            class="rounded-default inline-flex items-center px-2 py-0.5 text-xs font-semibold"
                             :style="badgeStyle(getEventBadgeColor(event))"
                           >
                             AI SRE
@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <!-- For Alert events, show badge first -->
                         <template v-else-if="event.type === 'Alert'">
                           <span
-                            class="inline-flex items-center px-2 py-0.5 rounded-default text-xs font-semibold"
+                            class="rounded-default inline-flex items-center px-2 py-0.5 text-xs font-semibold"
                             :style="badgeStyle(getEventBadgeColor(event))"
                           >
                             {{ getEventBadgeText(event) }}
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             v-if="
                               event.type !== 'SeverityUpgrade' && event.type !== 'SeverityOverride'
                             "
-                            class="inline-flex items-center px-2 py-0.5 rounded-default text-xs font-semibold"
+                            class="rounded-default inline-flex items-center px-2 py-0.5 text-xs font-semibold"
                             :style="badgeStyle(getEventBadgeColor(event))"
                           >
                             {{ getEventBadgeText(event) }}
@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Avatar -->
                   <div class="flex-shrink-0">
                     <div
-                      class="w-6 h-6 rounded-full flex items-center justify-center z-10 relative bg-surface-base border border-border-default"
+                      class="bg-surface-base border-border-default relative z-10 flex h-6 w-6 items-center justify-center rounded-full border"
                     >
                       <OIcon
                         name="person"
@@ -198,16 +198,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <!-- Comment Card -->
-                  <div class="flex-1 min-w-0">
+                  <div class="min-w-0 flex-1">
                     <!-- Comment Box -->
                     <div
-                      class="rounded-default overflow-hidden hover:shadow-md transition-shadow bg-surface-base border border-border-default"
+                      class="rounded-default bg-surface-base border-border-default overflow-hidden border transition-shadow hover:shadow-md"
                     >
                       <!-- Header -->
                       <div
-                        class="px-4 py-2 flex items-center gap-2 border-b bg-surface-subtle border-b-border-default"
+                        class="bg-surface-subtle border-b-border-default flex items-center gap-2 border-b px-4 py-2"
                       >
-                        <span class="font-semibold text-sm" :class="'text-text-body'">
+                        <span class="text-sm font-semibold" :class="'text-text-body'">
                           {{ getUserId(event) }}
                         </span>
                         <span class="text-xs" :class="'text-text-secondary'">
@@ -218,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Comment Body -->
                       <div class="px-4 py-3">
                         <div
-                          class="text-sm whitespace-pre-wrap break-words leading-relaxed"
+                          class="text-sm leading-relaxed break-words whitespace-pre-wrap"
                           :class="'text-text-body'"
                         >
                           {{ event.data?.comment || "" }}
@@ -240,14 +240,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Current User Avatar -->
         <div class="flex-shrink-0 pt-1">
           <div
-            class="w-6 h-6 rounded-full flex items-center justify-center bg-surface-base border border-border-default"
+            class="bg-surface-base border-border-default flex h-6 w-6 items-center justify-center rounded-full border"
           >
             <OIcon name="person" size="xs" :style="{ color: getAvatarColor(getCurrentUserId()) }" />
           </div>
         </div>
 
         <!-- Input Area -->
-        <div class="flex-1 relative">
+        <div class="relative flex-1">
           <OInput
             v-model="commentText"
             type="textarea"
@@ -259,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <!-- Send button inside textarea -->
-          <div class="absolute bottom-3 right-3">
+          <div class="absolute right-3 bottom-3">
             <OButton
               variant="primary"
               size="icon-circle-sm"

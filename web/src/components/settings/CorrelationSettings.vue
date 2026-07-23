@@ -49,12 +49,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Tab content -->
-    <div class="flex-1 min-h-0 overflow-hidden">
+    <div class="min-h-0 flex-1 overflow-hidden">
       <div v-show="activeTab === 'services'" class="h-full">
         <DiscoveredServices @navigate-to-configuration="onTabChange('discovery')" />
       </div>
 
-      <div v-show="activeTab === 'discovery'" class="h-full overflow-y-auto px-page-edge py-4">
+      <div v-show="activeTab === 'discovery'" class="px-page-edge h-full overflow-y-auto py-4">
         <ServiceIdentitySetup
           :org-identifier="store.state.selectedOrganization.identifier"
           :semantic-groups="semanticGroups"
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <div v-show="activeTab === 'alert-correlation'" class="h-full overflow-y-auto px-page-edge">
+      <div v-show="activeTab === 'alert-correlation'" class="px-page-edge h-full overflow-y-auto">
         <OrganizationDeduplicationSettings
           :org-id="store.state.selectedOrganization.identifier"
           :config="store.state.organizationSettings?.deduplication_config"
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <div v-show="activeTab === 'field-aliases'" class="h-full overflow-y-auto px-page-edge py-4">
+      <div v-show="activeTab === 'field-aliases'" class="px-page-edge h-full overflow-y-auto py-4">
         <SemanticFieldGroupsConfig
           :key="`field-aliases-${fieldAliasesEditorKey}`"
           :semantic-field-groups="draftSemanticGroups"

@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Count display -->
-    <span class="text-xs px-2" data-test="dashboard-table-row-count">
+    <span class="px-2 text-xs" data-test="dashboard-table-row-count">
       {{ countDisplay }}
     </span>
 

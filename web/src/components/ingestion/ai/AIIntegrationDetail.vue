@@ -85,7 +85,7 @@ const richContent = computed(() =>
     <AIIntegrationCard v-else-if="cardContent" :content="cardContent" :doc-url="docURL" />
     <div v-else class="text-base">
       <CopyContent :content="aiContent" />
-      <div class="font-bold pt-6 pb-2">
+      <div class="pt-6 pb-2 font-bold">
         Click
         <a
           :href="safeHttpUrl(docURL)"

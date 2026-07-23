@@ -136,7 +136,7 @@ const alignClassFor = (col: Column<any, any>): string => {
     <tr
       v-for="r in rowCount"
       :key="`o2-skel-${r}`"
-      class="o2-skel-row opacity-0 [animation:o2-skel-row-in_320ms_ease-out_forwards]"
+      class="o2-skel-row [animation:o2-skel-row-in_320ms_ease-out_forwards] opacity-0"
       :style="{
         animationDelay: `${(r - 1) * 40}ms`,
         height: 'var(--table-row-height, 2.25rem)',
@@ -157,7 +157,7 @@ const alignClassFor = (col: Column<any, any>): string => {
         }"
       >
         <span
-          class="inline-block h-3.5 w-3.5 rounded-default border border-skeleton-base"
+          class="rounded-default border-skeleton-base inline-block h-3.5 w-3.5 border"
           aria-hidden="true"
         />
       </td>
@@ -179,7 +179,7 @@ const alignClassFor = (col: Column<any, any>): string => {
           'align-middle',
           alignClassFor(col),
           isActionCol(col) ? 'w-0 whitespace-nowrap' : '',
-          bordered ? 'border-b border-table-row-divider' : '',
+          bordered ? 'border-table-row-divider border-b' : '',
         ]"
         :style="cellStyle(col)"
       >
@@ -189,12 +189,12 @@ const alignClassFor = (col: Column<any, any>): string => {
           <span
             v-for="a in actionCountFor(col)"
             :key="`a-${r}-${c}-${a}`"
-            class="inline-flex items-center justify-center shrink-0 w-8 h-8"
+            class="inline-flex h-8 w-8 shrink-0 items-center justify-center"
             aria-hidden="true"
           >
             <span
               :class="[
-                'o2-skel-pill inline-block [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)] [background-size:200%_100%] [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite]',
+                'o2-skel-pill inline-block [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite] [background-size:200%_100%] [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)]',
                 actionDimsFor(col),
               ]"
             />
@@ -207,7 +207,7 @@ const alignClassFor = (col: Column<any, any>): string => {
         <!-- Data column → chunky rounded-default bar with shimmer; td text-align positions it -->
         <span
           v-else
-          class="o2-skel-pill inline-block h-3 rounded-default align-middle [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)] [background-size:200%_100%] [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite]"
+          class="o2-skel-pill rounded-default inline-block h-3 [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite] [background-size:200%_100%] align-middle [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)]"
           :style="{ width: `${cellWidth(r - 1, c)}%` }"
           aria-hidden="true"
         />

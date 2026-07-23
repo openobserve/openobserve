@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             isConfigOptionVisible('promqlTable', 'visible-columns') ||
             isConfigOptionVisible('promqlTable', 'hidden-columns')
           "
-          class="mb-2 text-sm font-medium mt-3"
+          class="mt-3 mb-2 text-sm font-medium"
         >
           {{ t("dashboard.promQLChartConfig.columnFilters") }}
         </div>
@@ -261,7 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             isConfigOptionVisible('promqlTable', 'sticky-first-column') ||
             isConfigOptionVisible('promqlTable', 'sticky-columns')
           "
-          class="mb-2 text-sm font-medium mt-3"
+          class="mt-3 mb-2 text-sm font-medium"
         >
           {{ t("dashboard.promQLChartConfig.stickyColumns") }}
         </div>

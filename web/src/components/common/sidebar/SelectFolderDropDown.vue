@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex justify-start items-end">
+  <div class="flex items-end justify-start">
     <!-- select new folder -->
     <OSelect
       v-model="selectedFolder"

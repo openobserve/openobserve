@@ -2,7 +2,7 @@
   <div class="flex flex-col gap-2.5">
     <div class="flex flex-col gap-0.5">
       <div class="flex flex-wrap items-center gap-1">
-        <span class="text-compact leading-tight font-medium text-input-label-text">{{
+        <span class="text-compact text-input-label-text leading-tight font-medium">{{
           t("onlineEvals.job.inputMapping.title")
         }}</span>
         <OButton
@@ -18,7 +18,7 @@
           <span>{{ t("alerts.alertSettings.helpLearnMore") }}</span>
         </OButton>
       </div>
-      <span class="text-xs text-input-help-text leading-none">{{
+      <span class="text-input-help-text text-xs leading-none">{{
         t(`onlineEvals.job.inputMapping.hint.${targetScope}`)
       }}</span>
     </div>
@@ -35,8 +35,8 @@
         <!-- `bleed` drops ODrawer's body inset so the table runs edge to edge.
              The vertical rhythm and the prose inset are re-applied with the
              same tokens the drawer would have used, so only the table bleeds. -->
-        <div class="flex flex-col gap-3 py-dialog-content-py">
-          <span class="px-dialog-content-px text-xs leading-relaxed text-text-secondary">
+        <div class="py-dialog-content-py flex flex-col gap-3">
+          <span class="px-dialog-content-px text-text-secondary text-xs leading-relaxed">
             {{ systemProvidedDescriptionText }}
           </span>
 
@@ -58,7 +58,7 @@
           >
             <template #cell-variable="{ row }">
               <code
-                class="w-fit max-w-full rounded-default bg-surface-subtle px-1.5 py-0.5"
+                class="rounded-default bg-surface-subtle w-fit max-w-full px-1.5 py-0.5"
                 :data-test="`job-input-mapping-system-variable-${row.name}`"
                 >{{ formatTemplateVariable(row.name) }}</code
               >
@@ -80,7 +80,7 @@
     </template>
     <div
       v-if="selectedScorers.length === 0"
-      class="py-2.5 px-3 border border-dashed border-dialog-header-border rounded-default text-text-secondary text-xs text-center"
+      class="border-dialog-header-border rounded-default text-text-secondary border border-dashed px-3 py-2.5 text-center text-xs"
     >
       {{ t("onlineEvals.job.inputMapping.selectScorers") }}
     </div>
@@ -88,13 +88,13 @@
       <article
         v-for="scorer in selectedScorers"
         :key="entityId(scorer)"
-        class="border border-dialog-header-border rounded-default bg-card-bg overflow-hidden"
+        class="border-dialog-header-border rounded-default bg-card-bg overflow-hidden border"
       >
         <div
-          class="flex items-center justify-between gap-3 py-2.5 px-3 border-b border-dialog-header-border"
+          class="border-dialog-header-border flex items-center justify-between gap-3 border-b px-3 py-2.5"
         >
-          <div class="flex flex-col gap-px min-w-0">
-            <strong class="truncate text-compact font-semibold text-text-heading">{{
+          <div class="flex min-w-0 flex-col gap-px">
+            <strong class="text-compact text-text-heading truncate font-semibold">{{
               scorer.name
             }}</strong>
             <small class="text-2xs text-text-secondary">{{
@@ -104,7 +104,7 @@
               })
             }}</small>
           </div>
-          <span class="shrink-0 text-2xs font-semibold text-text-secondary">
+          <span class="text-2xs text-text-secondary shrink-0 font-semibold">
             {{
               t("onlineEvals.job.inputMapping.variableCount", {
                 count: variablesFor(scorer).length,
@@ -119,11 +119,11 @@
              so activation could be blocked with no way to satisfy it. -->
         <div
           v-if="targetScope === 'trace'"
-          class="flex flex-col gap-1 border-b border-dialog-header-border py-2 px-3"
+          class="border-dialog-header-border flex flex-col gap-1 border-b px-3 py-2"
           :data-test="`job-input-mapping-span-selector-${entityId(scorer)}`"
         >
           <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span class="text-2xs font-semibold text-text-secondary">
+            <span class="text-2xs text-text-secondary font-semibold">
               {{ t("onlineEvals.job.spanSelector.editorTitle") }}
               <span aria-hidden="true">*</span>
             </span>
@@ -138,19 +138,19 @@
           </div>
           <!-- Required with no explanation is why this read as arbitrary: say
                what a selector does and why a trace needs one. -->
-          <span class="text-2xs leading-[1.4] text-text-secondary">
+          <span class="text-2xs text-text-secondary leading-[1.4]">
             {{ t("onlineEvals.job.spanSelector.bindingHelp") }}
           </span>
         </div>
 
-        <div v-if="variablesFor(scorer).length" class="grid gap-1.5 py-2.5 px-3">
+        <div v-if="variablesFor(scorer).length" class="grid gap-1.5 px-3 py-2.5">
           <div
             v-for="variable in variablesFor(scorer)"
             :key="`${entityId(scorer)}-${variable}`"
             class="grid grid-cols-[minmax(8.125rem,0.35fr)_minmax(0,1fr)] items-start gap-2.5"
           >
             <code
-              class="mt-0.5 truncate overflow-hidden rounded-default bg-surface-subtle px-2 py-1.25"
+              class="rounded-default bg-surface-subtle mt-0.5 truncate overflow-hidden px-2 py-1.25"
               >{{ formatTemplateVariable(variable) }}</code
             >
             <div
@@ -163,8 +163,8 @@
                    is true of most rows, which is what made the list read as
                    noise rather than as a list. `spans` reads the same way — the
                    selector that fills it is bound once per scorer above. -->
-              <OIcon name="bolt" size="xs" class="shrink-0 text-text-tertiary" />
-              <span class="text-2xs leading-[1.4] text-text-secondary">
+              <OIcon name="bolt" size="xs" class="text-text-tertiary shrink-0" />
+              <span class="text-2xs text-text-secondary leading-[1.4]">
                 {{ systemProvidedDescription(variable) }}
               </span>
             </div>
@@ -183,7 +183,7 @@
                   variant="ghost-muted"
                   size="icon-chip"
                   icon-left="content-copy"
-                  class="pointer-events-none opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
+                  class="pointer-events-none opacity-0 transition-opacity group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
                   :aria-label="t('common.copy')"
                   :title="t('common.copy')"
                   :data-test="`job-input-mapping-copy-${entityId(scorer)}-${variable}`"
@@ -195,7 +195,7 @@
         </div>
         <div
           v-else
-          class="py-2.5 px-3 border border-dashed border-dialog-header-border rounded-default text-text-secondary text-xs text-center"
+          class="border-dialog-header-border rounded-default text-text-secondary border border-dashed px-3 py-2.5 text-center text-xs"
         >
           {{ t("onlineEvals.job.inputMapping.noVariables") }}
         </div>

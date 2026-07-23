@@ -20,11 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     :class="[
       'bg-surface-base',
-      frame ? 'border border-border-default rounded-default' : '',
+      frame ? 'border-border-default rounded-default border' : '',
       store.state.printMode ? '' : 'h-full overflow-y-auto',
     ]"
   >
-    <div class="px-page-edge pt-2 render-dashboard-charts-container">
+    <div class="px-page-edge render-dashboard-charts-container pt-2">
       <!-- flag to check if dashboardVariablesAndPanelsDataLoaded which is used while print mode-->
       <span
         class="hidden"
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <slot name="before_panels" />
-      <div class="displayDiv clear-both min-h-0 h-auto mt-2">
+      <div class="displayDiv clear-both mt-2 h-auto min-h-0">
         <div
           class="h-full w-full"
           v-if="store.state.printMode && panels.length === 1 && panels[0]?.type === 'table'"
@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-else-if="panels.length > 0"
           ref="gridStackContainer"
-          class="grid-stack bg-transparent m-0.5"
+          class="grid-stack m-0.5 bg-transparent"
         >
           <div
             v-for="item in panels"
@@ -137,11 +137,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :gs-h="getPanelLayout(item, 'h')"
             :gs-min-w="getMinimumWidth(item.type)"
             :gs-min-h="getMinimumHeight(item.type)"
-            class="grid-stack-item gridBackground bg-transparent! rounded-default border-border-default!"
+            class="grid-stack-item gridBackground rounded-default border-border-default! bg-transparent!"
           >
             <div class="grid-stack-item-content">
               <!-- Panel with Panel-Level Variables -->
-              <div class="panel-with-variables h-full flex flex-col">
+              <div class="panel-with-variables flex h-full flex-col">
                 <!-- Original Panel Container -->
 
                 <PanelContainer
@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              (90vh − body padding) so ViewPanel can use height:100% and
              flex:1 works all the way down without causing a body scrollbar. -->
         <div
-          class="view-panel-height-wrapper h-[calc(90vh-var(--spacing-dialog-content-py)*2)] -my-dialog-content-py -mx-dialog-content-px flex flex-col overflow-hidden"
+          class="view-panel-height-wrapper -my-dialog-content-py -mx-dialog-content-px flex h-[calc(90vh-var(--spacing-dialog-content-py)*2)] flex-col overflow-hidden"
         >
           <ViewPanel
             :folderId="folderId"

@@ -20,10 +20,10 @@
       v-for="(data, index) in dashboardPanelData.data.config.drilldown"
       :key="JSON.stringify(data) + index"
     >
-      <div class="flex justify-between mb-1.25">
+      <div class="mb-1.25 flex justify-between">
         <div
           @click="onDrilldownClick(index)"
-          class="cursor-pointer pl-2.5 w-62.5 truncate"
+          class="w-62.5 cursor-pointer truncate pl-2.5"
           :data-test="`dashboard-addpanel-config-drilldown-name-${index}`"
         >
           {{ Number(index) + 1 }}. {{ data.name }}

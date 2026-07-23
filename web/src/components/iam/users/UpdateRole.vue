@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OFormInput
           name="first_name"
           :label="t('user.name')"
-          class="py-3 showLabelOnTop"
+          class="showLabelOnTop py-3"
           readonly
         />
 
@@ -43,11 +43,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('user.role')"
           :options="roleOptions"
           required
-          class="pt-3 pb-2 showLabelOnTop"
+          class="showLabelOnTop pt-3 pb-2"
           data-test="iam-update-role-select"
         />
 
-        <div class="flex justify-center mt-4 gap-2">
+        <div class="mt-4 flex justify-center gap-2">
           <OButton
             @click="$emit('update:open', false)"
             variant="outline"

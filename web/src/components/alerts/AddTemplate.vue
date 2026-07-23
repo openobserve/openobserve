@@ -32,9 +32,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <OSplitter class="h-full" v-model="splitterModel" unit="%" :horizontal="false">
       <template v-slot:before>
-        <OForm :form="form" v-slot="{ isSubmitting }" class="bg-card-glass-bg h-full flex flex-col">
-          <div class="p-3 overflow-auto">
-            <div class="w-full pb-2 pt-2 o2-input">
+        <OForm :form="form" v-slot="{ isSubmitting }" class="bg-card-glass-bg flex h-full flex-col">
+          <div class="overflow-auto p-3">
+            <div class="o2-input w-full pt-2 pb-2">
               <OFormInput
                 name="name"
                 data-test="add-template-name-input"
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
             </div>
-            <div v-if="templateType === 'email'" class="w-full pt-1 o2-input">
+            <div v-if="templateType === 'email'" class="o2-input w-full pt-1">
               <OFormInput
                 name="title"
                 data-test="add-template-email-title-input"
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="w-full py-3">
               <div
-                class="pb-2 font-bold flex items-center gap-0.5"
+                class="flex items-center gap-0.5 pb-2 font-bold"
                 data-test="add-template-body-input-title"
               >
                 <span>{{ t("alert_templates.body") }}</span>
@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :key="bodyLanguage"
                 data-test="template-body-editor"
                 editor-id="template-body-editor"
-                class="w-full min-h-77.5! rounded-default border border-card-glass-border resize-y overflow-auto mb-3"
+                class="rounded-default border-card-glass-border mb-3 min-h-77.5! w-full resize-y overflow-auto border"
                 :language="bodyLanguage"
                 :query="body"
                 @update:query="onBodyChange"
@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div
-            class="flex justify-end gap-2 px-4 py-4 w-full bg-surface-base border-t border-border-default"
+            class="bg-surface-base border-border-default flex w-full justify-end gap-2 border-t px-4 py-4"
           >
             <OButton
               v-close-popup
@@ -113,12 +113,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OForm>
       </template>
       <template v-slot:after>
-        <div class="px-2 pt-2 h-full overflow-auto bg-card-glass-bg border-l border-border-default">
-          <div class="font-bold py-2 px-1 text-sm font-medium">
+        <div class="bg-card-glass-bg border-border-default h-full overflow-auto border-l px-2 pt-2">
+          <div class="px-1 py-2 text-sm font-bold font-medium">
             {{ t("alert_templates.variable_guide_header") }}
           </div>
-          <OSeparator class="-ml-2 mr-2" />
-          <div class="py-3 px-1">
+          <OSeparator class="mr-2 -ml-2" />
+          <div class="px-1 py-3">
             <div>org_name, stream_type, stream_name</div>
             <div>alert_name, alert_type</div>
             <div>alert_period, alert_operator, alert_threshold</div>
@@ -134,8 +134,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div>{{ t("alert_templates.variableLimits") }}</div>
           </div>
-          <div class="pb-3 px-1">
-            <div class="font-bold text-body-1 pb-2">
+          <div class="px-1 pb-3">
+            <div class="text-body-1 pb-2 font-bold">
               {{ t("alert_templates.variable_usage_examples") }}:
             </div>
             <div
@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="template.name"
               :data-test="`add-template-sample-template-${index}`"
             >
-              <div class="flex justify-between items-center">
+              <div class="flex items-center justify-between">
                 <div class="pb-1">{{ template.name }}</div>
                 <OIcon
                   data-test="add-template-sample-template-copy-btn"
@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 data-test="add-template-sample-template-text"
-                class="bg-black/[0.07] px-2 rounded-default"
+                class="rounded-default bg-black/[0.07] px-2"
               >
                 <pre class="text-3xs my-0">
                     {{ template.body }}

@@ -28,12 +28,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #title>
         <!-- Incident name (inline-editable) -->
         <input
-          class="min-w-75 max-w-125"
+          class="max-w-125 min-w-75"
           v-if="incidentDetails && isEditingTitle"
           v-model="editableTitle"
           ref="titleInputRef"
           :class="[
-            'font-bold px-2 py-1 rounded-default outline-none border-2',
+            'rounded-default border-2 px-2 py-1 font-bold outline-none',
             'text-text-link bg-status-info-bg border-text-link',
           ]"
         />
@@ -131,9 +131,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Content -->
       <div
         v-if="!loading && incidentDetails"
-        class="bg-card-glass-bg flex flex-col overflow-hidden flex-1 min-h-0"
+        class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden"
       >
-        <div class="flex-shrink-0 px-page-edge border-b border-border-default">
+        <div class="px-page-edge border-border-default flex-shrink-0 border-b">
           <OTabs v-model="activeTab" align="left" class="flex-1" mobile-arrows :breakpoint="0">
             <OTab name="overview" label="Overview" data-test="incident-overview-tab" />
             <OTab name="activity" label="Activity" data-test="incident-activity-tab" />
@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Left Column: Incident Details (only show on Incident Analysis tab, HIDDEN for Overview) -->
           <div
             v-if="activeTab === 'incidentAnalysis'"
-            class="w-100 min-w-100 max-w-100 flex-shrink-0 flex flex-col h-full order-1"
+            class="order-1 flex h-full w-100 max-w-100 min-w-100 flex-shrink-0 flex-col"
           >
             <!-- Table of Contents (only on Incident Analysis) -->
             <IncidentTableOfContents
@@ -177,46 +177,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Right Column: Content -->
-          <div class="flex-1 min-w-0 flex flex-col overflow-hidden order-2">
+          <div class="order-2 flex min-w-0 flex-1 flex-col overflow-hidden">
             <!-- Tab Content Area -->
-            <div class="flex-1 flex flex-col px-page-edge pt-4 pb-2 overflow-hidden relative">
+            <div class="px-page-edge relative flex flex-1 flex-col overflow-hidden pt-4 pb-2">
               <!-- Overview Tab Content - REDESIGNED -->
-              <div v-if="activeTab === 'overview'" class="flex flex-col flex-1 overflow-hidden">
+              <div v-if="activeTab === 'overview'" class="flex flex-1 flex-col overflow-hidden">
                 <!-- SECTION 1: Hero Metrics (100px height) -->
-                <div class="flex gap-3 mb-3 h-25">
+                <div class="mb-3 flex h-25 gap-3">
                   <!-- 1. Total Alerts Card -->
                   <div
-                    class="flex-1 flex flex-col justify-between border border-card-glass-border rounded-default bg-card-glass-bg transition-all duration-200 cursor-pointer p-3"
+                    class="border-card-glass-border rounded-default bg-card-glass-bg flex flex-1 cursor-pointer flex-col justify-between border p-3 transition-all duration-200"
                   >
                     <!-- Top: Title and Icon -->
-                    <div class="flex justify-between items-start">
+                    <div class="flex items-start justify-between">
                       <div :class="'text-text-secondary'" class="text-sm font-medium">
                         Total Alerts
                       </div>
                       <div
-                        class="w-8 h-8 rounded-default flex items-center justify-center bg-badge-amber-soft-bg"
+                        class="rounded-default bg-badge-amber-soft-bg flex h-8 w-8 items-center justify-center"
                       >
                         <OIcon name="bolt" size="sm" class="text-badge-amber-soft-text" />
                       </div>
                     </div>
 
                     <!-- Bottom: Large Number -->
-                    <div :class="'text-text-body'" class="text-3xl font-semibold leading-none">
+                    <div :class="'text-text-body'" class="text-3xl leading-none font-semibold">
                       {{ triggers.length }}
                     </div>
                   </div>
 
                   <!-- 2. Unique Alerts Card -->
                   <div
-                    class="flex-1 flex flex-col justify-between border border-card-glass-border rounded-default bg-card-glass-bg transition-all duration-200 cursor-pointer p-3"
+                    class="border-card-glass-border rounded-default bg-card-glass-bg flex flex-1 cursor-pointer flex-col justify-between border p-3 transition-all duration-200"
                   >
                     <!-- Top: Title and Icon -->
-                    <div class="flex justify-between items-start">
+                    <div class="flex items-start justify-between">
                       <div :class="'text-text-secondary'" class="text-sm font-medium">
                         {{ t("alerts.incidents.uniqueAlerts") }}
                       </div>
                       <div
-                        class="w-8 h-8 rounded-default flex items-center justify-center bg-badge-blue-soft-bg"
+                        class="rounded-default bg-badge-blue-soft-bg flex h-8 w-8 items-center justify-center"
                       >
                         <OIcon
                           name="notifications-active"
@@ -227,51 +227,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
 
                     <!-- Bottom: Large Number -->
-                    <div :class="'text-text-body'" class="text-3xl font-semibold leading-none">
+                    <div :class="'text-text-body'" class="text-3xl leading-none font-semibold">
                       {{ uniqueAlertsCount }}
                     </div>
                   </div>
 
                   <!-- 3. Affected Services Card -->
                   <div
-                    class="flex-1 flex flex-col justify-between border border-card-glass-border rounded-default bg-card-glass-bg transition-all duration-200 cursor-pointer p-3"
+                    class="border-card-glass-border rounded-default bg-card-glass-bg flex flex-1 cursor-pointer flex-col justify-between border p-3 transition-all duration-200"
                   >
                     <!-- Top: Title and Icon -->
-                    <div class="flex justify-between items-start">
+                    <div class="flex items-start justify-between">
                       <div :class="'text-text-secondary'" class="text-sm font-medium">
                         Affected Services
                       </div>
                       <div
-                        class="w-8 h-8 rounded-default flex items-center justify-center bg-badge-purple-soft-bg"
+                        class="rounded-default bg-badge-purple-soft-bg flex h-8 w-8 items-center justify-center"
                       >
                         <OIcon name="dns" size="sm" class="text-badge-purple-soft-text" />
                       </div>
                     </div>
 
                     <!-- Bottom: Large Number -->
-                    <div :class="'text-text-body'" class="text-3xl font-semibold leading-none">
+                    <div :class="'text-text-body'" class="text-3xl leading-none font-semibold">
                       {{ affectedServicesCount }}
                     </div>
                   </div>
 
                   <!-- 4. Active Duration Card -->
                   <div
-                    class="flex-1 flex flex-col justify-between border border-card-glass-border rounded-default bg-card-glass-bg transition-all duration-200 cursor-pointer p-3"
+                    class="border-card-glass-border rounded-default bg-card-glass-bg flex flex-1 cursor-pointer flex-col justify-between border p-3 transition-all duration-200"
                   >
                     <!-- Top: Title and Icon -->
-                    <div class="flex justify-between items-start">
+                    <div class="flex items-start justify-between">
                       <div :class="'text-text-secondary'" class="text-sm font-medium">
                         Active Duration
                       </div>
                       <div
-                        class="w-8 h-8 rounded-default flex items-center justify-center bg-badge-success-soft-bg"
+                        class="rounded-default bg-badge-success-soft-bg flex h-8 w-8 items-center justify-center"
                       >
                         <OIcon name="schedule" size="sm" class="text-badge-success-soft-text" />
                       </div>
                     </div>
 
                     <!-- Bottom: Large Number -->
-                    <div :class="'text-text-body'" class="text-2xl font-semibold leading-none">
+                    <div :class="'text-text-body'" class="text-2xl leading-none font-semibold">
                       {{
                         incidentDetails?.first_alert_at && incidentDetails?.last_alert_at
                           ? calculateDuration(
@@ -285,36 +285,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- 5. Alert Frequency Card -->
                   <div
-                    class="flex-1 flex flex-col justify-between border border-card-glass-border rounded-default bg-card-glass-bg transition-all duration-200 cursor-pointer p-3"
+                    class="border-card-glass-border rounded-default bg-card-glass-bg flex flex-1 cursor-pointer flex-col justify-between border p-3 transition-all duration-200"
                   >
                     <!-- Top: Title and Icon -->
-                    <div class="flex justify-between items-start">
+                    <div class="flex items-start justify-between">
                       <div :class="'text-text-secondary'" class="text-sm font-medium">
                         Alert Frequency
                       </div>
                       <div
-                        class="w-8 h-8 rounded-default flex items-center justify-center bg-badge-error-soft-bg"
+                        class="rounded-default bg-badge-error-soft-bg flex h-8 w-8 items-center justify-center"
                       >
                         <OIcon name="show-chart" size="sm" class="text-badge-error-soft-text" />
                       </div>
                     </div>
 
                     <!-- Bottom: Large Text -->
-                    <div :class="'text-text-body'" class="text-lg font-semibold leading-tight">
+                    <div :class="'text-text-body'" class="text-lg leading-tight font-semibold">
                       {{ alertFrequency }}
                     </div>
                   </div>
                 </div>
 
                 <!-- SECTION 2: Main Content (2:1 Ratio Layout) with calc(100vh - 236px) height (was 276px) -->
-                <div class="flex gap-3 flex-1 h-[calc(100vh-23.75rem)]">
+                <div class="flex h-[calc(100vh-23.75rem)] flex-1 gap-3">
                   <!-- PART 1: Primary Content (66.67% width) -->
-                  <div class="flex flex-col gap-3 w-2/3">
+                  <div class="flex w-2/3 flex-col gap-3">
                     <!-- 2.1A: Top Row - Incident Details (2/3) + Incident Timeline (1/3) -->
-                    <div class="flex gap-3 h-1/2">
+                    <div class="flex h-1/2 gap-3">
                       <!-- Incident Timeline (33.33% width) -->
                       <div
-                        class="border border-card-glass-border rounded-default bg-card-glass-bg flex flex-col overflow-hidden w-1/3"
+                        class="border-card-glass-border rounded-default bg-card-glass-bg flex w-1/3 flex-col overflow-hidden border"
                       >
                         <!-- Header -->
                         <div class="flex items-center justify-between px-4 py-3">
@@ -322,26 +322,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             {{ t("alerts.incidents.incidentTimeline") }}
                           </div>
                           <div
-                            class="px-2 py-0.5 rounded-default text-xs font-medium bg-surface-panel text-text-secondary"
+                            class="rounded-default bg-surface-panel text-text-secondary px-2 py-0.5 text-xs font-medium"
                           >
                             UTC
                           </div>
                         </div>
 
                         <!-- Content with vertical timeline -->
-                        <div class="flex flex-col gap-6 px-4 py-2 overflow-y-auto relative">
+                        <div class="relative flex flex-col gap-6 overflow-y-auto px-4 py-2">
                           <!-- Vertical line -->
                           <div
-                            class="absolute w-0.5 left-5.25 top-5.25 bottom-5.25 bg-surface-panel"
+                            class="bg-surface-panel absolute top-5.25 bottom-5.25 left-5.25 w-0.5"
                           ></div>
 
                           <!-- First Alert Received -->
-                          <div class="flex items-start gap-3 relative">
+                          <div class="relative flex items-start gap-3">
                             <div
-                              class="w-2.5 h-2.5 rounded-full flex-shrink-0 z-10 mt-2 bg-timeline-dot-success"
+                              class="bg-timeline-dot-success z-10 mt-2 h-2.5 w-2.5 flex-shrink-0 rounded-full"
                             ></div>
                             <div class="flex-1">
-                              <div :class="'text-text-heading'" class="text-sm font-medium mb-1">
+                              <div :class="'text-text-heading'" class="mb-1 text-sm font-medium">
                                 First Alert Received
                               </div>
                               <div :class="'text-text-secondary'" class="text-xs">
@@ -357,12 +357,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
 
                           <!-- Peak Activity (if available) -->
-                          <div v-if="peakActivity" class="flex items-start gap-3 relative">
+                          <div v-if="peakActivity" class="relative flex items-start gap-3">
                             <div
-                              class="w-2.5 h-2.5 rounded-full flex-shrink-0 z-10 mt-2 bg-status-warning-text"
+                              class="bg-status-warning-text z-10 mt-2 h-2.5 w-2.5 flex-shrink-0 rounded-full"
                             ></div>
                             <div class="flex-1">
-                              <div :class="'text-text-heading'" class="text-sm font-medium mb-1">
+                              <div :class="'text-text-heading'" class="mb-1 text-sm font-medium">
                                 Peak Activity
                               </div>
                               <div :class="'text-text-secondary'" class="text-xs">
@@ -378,9 +378,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
 
                           <!-- Latest Alert -->
-                          <div class="flex items-start gap-3 relative">
+                          <div class="relative flex items-start gap-3">
                             <div
-                              class="w-2.5 h-2.5 rounded-full flex-shrink-0 z-10 mt-2"
+                              class="z-10 mt-2 h-2.5 w-2.5 flex-shrink-0 rounded-full"
                               :class="
                                 incidentDetails?.status === 'resolved'
                                   ? 'bg-timeline-dot-success'
@@ -388,7 +388,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               "
                             ></div>
                             <div class="flex-1">
-                              <div :class="'text-text-heading'" class="text-sm font-medium mb-1">
+                              <div :class="'text-text-heading'" class="mb-1 text-sm font-medium">
                                 Latest Alert
                               </div>
                               <div :class="'text-text-secondary'" class="text-xs">
@@ -409,7 +409,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
 
                         <!-- Show Full Activity Button -->
-                        <div class="border-t border-border-default p-2 flex justify-end">
+                        <div class="border-border-default flex justify-end border-t p-2">
                           <OButton
                             variant="ghost-primary"
                             size="sm"
@@ -421,7 +421,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                       <!-- Incident Details (66.67% width) -->
                       <div
-                        class="border border-card-glass-border rounded-default bg-card-glass-bg flex flex-col overflow-hidden w-2/3"
+                        class="border-card-glass-border rounded-default bg-card-glass-bg flex w-2/3 flex-col overflow-hidden border"
                       >
                         <!-- Header -->
                         <div class="px-4 pt-2 pb-1">
@@ -431,16 +431,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
 
                         <!-- Content -->
-                        <div class="flex flex-col gap-3 p-4 overflow-y-auto">
+                        <div class="flex flex-col gap-3 overflow-y-auto p-4">
                           <!-- Incident ID -->
-                          <div class="grid gap-2 grid-cols-[7.5rem_1fr]">
+                          <div class="grid grid-cols-[7.5rem_1fr] gap-2">
                             <div :class="'text-text-secondary'" class="text-xs font-medium">
                               {{ t("alerts.incidents.incidentId") }}
                             </div>
                             <div
-                              class="flex items-center gap-2 px-2.5 py-1 rounded-default border text-xs font-mono min-w-0 bg-surface-panel border-border-default text-text-body"
+                              class="rounded-default bg-surface-panel border-border-default text-text-body flex min-w-0 items-center gap-2 border px-2.5 py-1 font-mono text-xs"
                             >
-                              <span class="truncate flex-1 min-w-0">{{
+                              <span class="min-w-0 flex-1 truncate">{{
                                 incidentDetails?.id || "N/A"
                               }}</span>
                               <OIcon
@@ -449,23 +449,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 :class="
                                   copiedField === 'incident_id'
                                     ? 'text-status-positive'
-                                    : 'opacity-60 hover:opacity-100 hover:text-text-link'
+                                    : 'hover:text-text-link opacity-60 hover:opacity-100'
                                 "
-                                class="cursor-pointer transition-all flex-shrink-0"
+                                class="flex-shrink-0 cursor-pointer transition-all"
                                 @click="copyToClipboard(incidentDetails?.id, 'incident_id')"
                               />
                             </div>
                           </div>
 
                           <!-- Incident Name -->
-                          <div class="grid gap-2 grid-cols-[7.5rem_1fr]">
+                          <div class="grid grid-cols-[7.5rem_1fr] gap-2">
                             <div :class="'text-text-secondary'" class="text-xs font-medium">
                               {{ t("alerts.incidents.incidentName") }}
                             </div>
                             <div
-                              class="flex items-center gap-2 px-2.5 py-1 rounded-default border text-xs min-w-0 bg-surface-panel border-border-default text-text-body"
+                              class="rounded-default bg-surface-panel border-border-default text-text-body flex min-w-0 items-center gap-2 border px-2.5 py-1 text-xs"
                             >
-                              <span class="truncate flex-1 min-w-0">{{
+                              <span class="min-w-0 flex-1 truncate">{{
                                 incidentDetails?.title || "N/A"
                               }}</span>
                               <OIcon
@@ -474,23 +474,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 :class="
                                   copiedField === 'incident_title'
                                     ? 'text-status-positive'
-                                    : 'opacity-60 hover:opacity-100 hover:text-text-link'
+                                    : 'hover:text-text-link opacity-60 hover:opacity-100'
                                 "
-                                class="cursor-pointer transition-all flex-shrink-0"
+                                class="flex-shrink-0 cursor-pointer transition-all"
                                 @click="copyToClipboard(incidentDetails?.title, 'incident_title')"
                               />
                             </div>
                           </div>
 
                           <!-- Correlated By -->
-                          <div class="grid gap-2 grid-cols-[7.5rem_1fr]">
+                          <div class="grid grid-cols-[7.5rem_1fr] gap-2">
                             <div :class="'text-text-secondary'" class="text-xs font-medium">
                               Correlated By
                             </div>
                             <div
-                              class="flex items-center gap-2 px-2.5 py-1 rounded-default border text-xs min-w-0 bg-surface-panel border-border-default text-text-body"
+                              class="rounded-default bg-surface-panel border-border-default text-text-body flex min-w-0 items-center gap-2 border px-2.5 py-1 text-xs"
                             >
-                              <span class="truncate flex-1 min-w-0">{{
+                              <span class="min-w-0 flex-1 truncate">{{
                                 getCorrelationMethodLabel(incidentDetails?.key_type)
                               }}</span>
                               <OIcon
@@ -499,9 +499,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 :class="
                                   copiedField === 'key_type'
                                     ? 'text-status-positive'
-                                    : 'opacity-60 hover:opacity-100 hover:text-text-link'
+                                    : 'hover:text-text-link opacity-60 hover:opacity-100'
                                 "
-                                class="cursor-pointer transition-all flex-shrink-0"
+                                class="flex-shrink-0 cursor-pointer transition-all"
                                 @click="
                                   copyToClipboard(
                                     getCorrelationMethodLabel(incidentDetails?.key_type),
@@ -513,7 +513,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
 
                           <!-- Created At -->
-                          <div class="grid gap-2 grid-cols-[7.5rem_1fr]">
+                          <div class="grid grid-cols-[7.5rem_1fr] gap-2">
                             <div :class="'text-text-secondary'" class="text-xs font-medium">
                               Created At
                             </div>
@@ -527,7 +527,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
 
                           <!-- Updated At -->
-                          <div class="grid gap-2 grid-cols-[7.5rem_1fr]">
+                          <div class="grid grid-cols-[7.5rem_1fr] gap-2">
                             <div :class="'text-text-secondary'" class="text-xs font-medium">
                               Updated At
                             </div>
@@ -545,7 +545,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- alert activity -->
                     <!-- 2.1B: Alert Activity Chart (50% height, full width) -->
                     <div
-                      class="border border-card-glass-border rounded-default bg-card-glass-bg flex flex-col overflow-hidden h-1/2"
+                      class="border-card-glass-border rounded-default bg-card-glass-bg flex h-1/2 flex-col overflow-hidden border"
                     >
                       <!-- Header -->
                       <div class="px-4 pt-2 pb-1">
@@ -559,17 +559,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <CustomChartRenderer
                           v-if="alertActivityChartData"
                           :data="alertActivityChartData"
-                          class="w-full h-full"
+                          class="h-full w-full"
                         />
                       </div>
                     </div>
                   </div>
 
                   <!-- PART 2: Sidebar Content (33.33% width) - 3 sections -->
-                  <div class="flex flex-col gap-2 w-1/3 h-full">
+                  <div class="flex h-full w-1/3 flex-col gap-2">
                     <!-- 2.2A: Manage Panel (40% of available height after gaps) -->
                     <div
-                      class="border border-card-glass-border rounded-default bg-card-glass-bg flex flex-col overflow-hidden h-[calc(35%-0.4rem)]"
+                      class="border-card-glass-border rounded-default bg-card-glass-bg flex h-[calc(35%-0.4rem)] flex-col overflow-hidden border"
                     >
                       <!-- Header -->
                       <div class="px-4 pt-2 pb-1">
@@ -577,13 +577,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
 
                       <!-- Content -->
-                      <div class="flex flex-col gap-3 p-3 overflow-y-auto">
+                      <div class="flex flex-col gap-3 overflow-y-auto p-3">
                         <!-- Status Section -->
                         <div class="flex flex-col gap-2">
                           <div :class="'text-text-secondary'" class="text-xs font-semibold">
                             Status
                           </div>
-                          <div class="flex gap-2 flex-wrap">
+                          <div class="flex flex-wrap gap-2">
                             <button
                               v-for="option in statusOptions"
                               :key="option.value"
@@ -619,7 +619,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <div :class="'text-text-secondary'" class="text-xs font-semibold">
                             Severity
                           </div>
-                          <div class="flex gap-2 flex-wrap">
+                          <div class="flex flex-wrap gap-2">
                             <button
                               v-for="option in severityOptions"
                               :key="option.value"
@@ -653,7 +653,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- 2.2B: Dimensions Panel (35% when Alert Flow present, 60% when absent, or when no triggers) -->
                     <div
-                      class="border border-card-glass-border rounded-default bg-card-glass-bg flex flex-col overflow-hidden min-h-0 shrink-0"
+                      class="border-card-glass-border rounded-default bg-card-glass-bg flex min-h-0 shrink-0 flex-col overflow-hidden border"
                       :class="
                         sortedAlertsByTriggerCount?.length
                           ? 'h-[calc(35%-0.35rem)]'
@@ -668,7 +668,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
 
                       <!-- Content -->
-                      <div class="flex flex-col p-3 overflow-y-auto gap-0 flex-1 min-h-0">
+                      <div class="flex min-h-0 flex-1 flex-col gap-0 overflow-y-auto p-3">
                         <div
                           v-if="
                             incidentDetails?.group_values &&
@@ -679,7 +679,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <div
                             v-for="(value, key) in incidentDetails.group_values"
                             :key="key"
-                            class="py-2.5 border-b flex gap-2 border-border-default"
+                            class="border-border-default flex gap-2 border-b py-2.5"
                             :class="{
                               'border-b-0':
                                 key ===
@@ -690,11 +690,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >
                             <div
                               :class="'text-text-secondary'"
-                              class="text-xs font-medium capitalize min-w-fit"
+                              class="min-w-fit text-xs font-medium capitalize"
                             >
                               {{ getSemanticGroupDisplayName(key) }}:
                             </div>
-                            <div :class="'text-text-body'" class="text-xs break-words flex-1">
+                            <div :class="'text-text-body'" class="flex-1 text-xs break-words">
                               {{ value }}
                             </div>
                           </div>
@@ -702,7 +702,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div
                           v-else
                           :class="'text-text-muted'"
-                          class="text-sm italic text-center py-4"
+                          class="py-4 text-center text-sm italic"
                         >
                           {{ t("alerts.incidents.noDimensionsAvailable") }}
                         </div>
@@ -712,7 +712,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- 2.2C: Alert Flow Panel (25% of available height after gaps) - Conditional -->
                     <div
                       v-if="sortedAlertsByTriggerCount?.length"
-                      class="border border-card-glass-border rounded-default bg-card-glass-bg flex flex-col overflow-hidden h-[calc(30%-0.25rem)]"
+                      class="border-card-glass-border rounded-default bg-card-glass-bg flex h-[calc(30%-0.25rem)] flex-col overflow-hidden border"
                     >
                       <!-- Header -->
                       <div class="px-4 pt-2 pb-1">
@@ -722,26 +722,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
 
                       <!-- Content - Vertical list -->
-                      <div class="px-3 pb-3 overflow-y-auto flex-1 min-h-0">
+                      <div class="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
                         <div class="flex flex-col gap-0">
                           <div
                             v-for="(alert, index) in sortedAlertsByTriggerCount"
                             :key="alert.id"
-                            class="py-2.5 border-b border-border-default"
+                            class="border-border-default border-b py-2.5"
                             :class="{
                               'border-b-0': index === sortedAlertsByTriggerCount.length - 1,
                             }"
                           >
                             <div
                               :class="'text-text-heading'"
-                              class="text-xs flex gap-2 items-center"
+                              class="flex items-center gap-2 text-xs"
                             >
-                              <span :class="'text-text-muted'" class="font-medium flex-shrink-0">
+                              <span :class="'text-text-muted'" class="flex-shrink-0 font-medium">
                                 {{ index + 1 }}.
                               </span>
-                              <div class="flex-1 min-w-0">
+                              <div class="min-w-0 flex-1">
                                 <OTooltip v-if="alert.name.length > 30" :content="alert.name" />
-                                <span class="font-medium truncate block">
+                                <span class="block truncate font-medium">
                                   {{
                                     alert.name.length > 30
                                       ? alert.name.substring(0, 30) + "..."
@@ -749,7 +749,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   }}
                                 </span>
                               </div>
-                              <div class="flex-shrink-0 w-30">
+                              <div class="w-30 flex-shrink-0">
                                 <span :class="'text-text-secondary'">
                                   {{ t("alerts.incidents.firedTimes", { count: alert.count }) }}
                                 </span>
@@ -795,10 +795,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Alert Triggers Tab Content -->
               <div v-if="activeTab === 'alertTriggers'" class="flex flex-1 overflow-hidden">
                 <!-- Left Section: Alert Triggers Table -->
-                <div class="flex-1 flex flex-col overflow-hidden pr-2 pt-4">
+                <div class="flex flex-1 flex-col overflow-hidden pt-4 pr-2">
                   <div
                     :class="[
-                      'border border-card-glass-border rounded-default overflow-hidden flex flex-col flex-1',
+                      'border-card-glass-border rounded-default flex flex-1 flex-col overflow-hidden border',
                     ]"
                   >
                     <IncidentAlertTriggersTable
@@ -810,16 +810,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Right Section: Trigger Details -->
-                <div class="w-100 flex-shrink-0 flex flex-col pt-4">
+                <div class="flex w-100 flex-shrink-0 flex-col pt-4">
                   <div
                     :class="[
-                      'border border-card-glass-border rounded-default overflow-hidden flex flex-col flex-1',
+                      'border-card-glass-border rounded-default flex flex-1 flex-col overflow-hidden border',
                     ]"
                   >
                     <!-- Header -->
                     <div
                       :class="[
-                        '!bg-[var(--color-theme-table-header-bg)] px-3 py-2 flex items-center gap-2 border-b flex-shrink-0',
+                        'flex flex-shrink-0 items-center gap-2 border-b !bg-[var(--color-theme-table-header-bg)] px-3 py-2',
                         'border-border-default',
                       ]"
                     >
@@ -829,7 +829,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </span>
                     </div>
                     <!-- Content -->
-                    <div class="p-3 flex-1 overflow-auto">
+                    <div class="flex-1 overflow-auto p-3">
                       <!-- No alerts available -->
                       <div
                         v-if="!alerts || alerts.length === 0"
@@ -843,7 +843,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div
                         v-else-if="selectedAlertIndex === -1"
                         :class="'text-text-muted'"
-                        class="text-sm italic text-center mt-8"
+                        class="mt-8 text-center text-sm italic"
                       >
                         {{ t("alerts.incidents.clickOnTriggerToViewDetails") }}
                       </div>
@@ -856,7 +856,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <div class="flex flex-col gap-0.5">
                             <span
                               :class="'text-text-secondary'"
-                              class="text-3xs uppercase tracking-wide"
+                              class="text-3xs tracking-wide uppercase"
                             >
                               Alert Name
                             </span>
@@ -870,7 +870,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <div class="flex flex-col gap-0.5">
                               <span
                                 :class="'text-text-secondary'"
-                                class="text-3xs uppercase tracking-wide"
+                                class="text-3xs tracking-wide uppercase"
                               >
                                 Stream Type
                               </span>
@@ -883,11 +883,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <div class="flex flex-col gap-0.5">
                               <span
                                 :class="'text-text-secondary'"
-                                class="text-3xs uppercase tracking-wide"
+                                class="text-3xs tracking-wide uppercase"
                               >
                                 Stream Name
                               </span>
-                              <span :class="'text-text-body'" class="text-sm font-medium truncate">
+                              <span :class="'text-text-body'" class="truncate text-sm font-medium">
                                 {{ alerts[selectedAlertIndex]?.stream_name || "N/A" }}
                               </span>
                             </div>
@@ -898,7 +898,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <div class="flex flex-col gap-0.5">
                               <span
                                 :class="'text-text-secondary'"
-                                class="text-3xs uppercase tracking-wide"
+                                class="text-3xs tracking-wide uppercase"
                               >
                                 Threshold
                               </span>
@@ -912,7 +912,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <div class="flex flex-col gap-0.5">
                               <span
                                 :class="'text-text-secondary'"
-                                class="text-3xs uppercase tracking-wide"
+                                class="text-3xs tracking-wide uppercase"
                               >
                                 Period
                               </span>
@@ -931,7 +931,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <div class="flex flex-col gap-0.5">
                               <span
                                 :class="'text-text-secondary'"
-                                class="text-3xs uppercase tracking-wide"
+                                class="text-3xs tracking-wide uppercase"
                               >
                                 Frequency
                               </span>
@@ -948,7 +948,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <div class="flex flex-col gap-0.5">
                               <span
                                 :class="'text-text-secondary'"
-                                class="text-3xs uppercase tracking-wide"
+                                class="text-3xs tracking-wide uppercase"
                               >
                                 Silence
                               </span>
@@ -965,19 +965,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <!-- Alert Conditions Section -->
                         <div
                           :class="[
-                            'rounded-default border flex flex-col border-card-glass-border rounded-default',
+                            'rounded-default border-card-glass-border rounded-default flex flex-col border',
                           ]"
-                          class="overflow-hidden h-98"
+                          class="h-98 overflow-hidden"
                         >
                           <div
                             :class="[
-                              '!bg-[var(--color-theme-table-header-bg)] px-2.5 py-1.5 border-b flex items-center justify-between flex-shrink-0',
+                              'flex flex-shrink-0 items-center justify-between border-b !bg-[var(--color-theme-table-header-bg)] px-2.5 py-1.5',
                               'border-border-default',
                             ]"
                           >
                             <span
                               :class="'text-text-secondary'"
-                              class="text-2xs font-semibold uppercase tracking-wide"
+                              class="text-2xs font-semibold tracking-wide uppercase"
                             >
                               {{
                                 alerts[selectedAlertIndex]?.query_condition?.type === "sql"
@@ -988,12 +988,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               }}
                             </span>
                           </div>
-                          <div class="p-2.5 overflow-y-auto flex-1">
+                          <div class="flex-1 overflow-y-auto p-2.5">
                             <!-- SQL Query -->
                             <div v-if="alerts[selectedAlertIndex]?.query_condition?.sql">
                               <pre
                                 :class="[
-                                  'text-compact overflow-x-auto whitespace-pre-wrap break-words',
+                                  'text-compact overflow-x-auto break-words whitespace-pre-wrap',
                                   'text-text-body',
                                 ]"
                                 >{{ alerts[selectedAlertIndex]?.query_condition?.sql }}</pre
@@ -1004,7 +1004,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <div v-else-if="alerts[selectedAlertIndex]?.query_condition?.promql">
                               <pre
                                 :class="[
-                                  'text-compact overflow-x-auto whitespace-pre-wrap break-words',
+                                  'text-compact overflow-x-auto break-words whitespace-pre-wrap',
                                   'text-text-body',
                                 ]"
                                 >{{ alerts[selectedAlertIndex]?.query_condition?.promql }}</pre
@@ -1017,7 +1017,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             >
                               <pre
                                 :class="[
-                                  'text-compact overflow-x-auto whitespace-pre-wrap break-words',
+                                  'text-compact overflow-x-auto break-words whitespace-pre-wrap',
                                   'text-text-body',
                                 ]"
                               >
@@ -1038,11 +1038,11 @@ if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.condit
               </div>
 
               <!-- Logs Tab Content -->
-              <div v-if="activeTab === 'logs'" class="flex flex-col flex-1 overflow-hidden h-full">
+              <div v-if="activeTab === 'logs'" class="flex h-full flex-1 flex-col overflow-hidden">
                 <!-- Loading State -->
                 <div
                   v-if="correlationLoading"
-                  class="flex flex-col items-center justify-center flex-1 h-[70vh]"
+                  class="flex h-[70vh] flex-1 flex-col items-center justify-center"
                 >
                   <OSpinner
                     size="lg"
@@ -1054,7 +1054,7 @@ if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.condit
                 <!-- Error/No Data State -->
                 <div
                   v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams"
-                  class="flex flex-1 flex-col items-center justify-center gap-2 h-full"
+                  class="flex h-full flex-1 flex-col items-center justify-center gap-2"
                 >
                   <OIcon
                     :name="
@@ -1065,7 +1065,7 @@ if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.condit
                         : 'info-outline'
                     "
                     :class="[
-                      'w-16 h-16',
+                      'h-16 w-16',
                       correlationError
                         ? correlationError.includes('disambiguation fields')
                           ? 'text-warning'
@@ -1073,12 +1073,12 @@ if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.condit
                         : 'text-text-muted',
                     ]"
                   />
-                  <div class="text-xl font-semibold mt-3">
+                  <div class="mt-3 text-xl font-semibold">
                     {{ correlationError || "No correlated logs found" }}
                   </div>
                   <div
                     v-if="correlationError && correlationError.includes('disambiguation fields')"
-                    class="text-sm text-text-secondary mt-2 max-w-125 text-center"
+                    class="text-text-secondary mt-2 max-w-125 text-center text-sm"
                   >
                     The service discovery configuration (disambiguation fields) was changed after
                     this incident was created.
@@ -1096,7 +1096,7 @@ if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.condit
                 <!-- Success State - CorrelatedLogsTable -->
                 <div
                   v-else-if="hasCorrelatedData && correlationData"
-                  class="flex-1 overflow-hidden h-full"
+                  class="h-full flex-1 overflow-hidden"
                 >
                   <CorrelatedLogsTable
                     :service-name="correlationData.serviceName"
@@ -1120,12 +1120,12 @@ if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.condit
               <!-- Metrics Tab Content -->
               <div
                 v-if="activeTab === 'metrics'"
-                class="flex flex-col flex-1 overflow-hidden h-full"
+                class="flex h-full flex-1 flex-col overflow-hidden"
               >
                 <!-- Loading State -->
                 <div
                   v-if="correlationLoading"
-                  class="flex flex-col items-center justify-center flex-1 h-full"
+                  class="flex h-full flex-1 flex-col items-center justify-center"
                 >
                   <OSpinner
                     size="lg"
@@ -1138,7 +1138,7 @@ if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.condit
                 <!-- Error/No Data State -->
                 <div
                   v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams"
-                  class="flex flex-1 flex-col items-center justify-center gap-2 h-full"
+                  class="flex h-full flex-1 flex-col items-center justify-center gap-2"
                 >
                   <OIcon
                     :name="
@@ -1149,7 +1149,7 @@ if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.condit
                         : 'info-outline'
                     "
                     :class="[
-                      'w-16 h-16',
+                      'h-16 w-16',
                       correlationError
                         ? correlationError.includes('disambiguation fields')
                           ? 'text-warning'
@@ -1157,12 +1157,12 @@ if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.condit
                         : 'text-text-muted',
                     ]"
                   />
-                  <div class="text-xl font-semibold mt-3">
+                  <div class="mt-3 text-xl font-semibold">
                     {{ correlationError || "No correlated metrics found" }}
                   </div>
                   <div
                     v-if="correlationError && correlationError.includes('disambiguation fields')"
-                    class="text-sm text-text-secondary mt-2 max-w-125 text-center"
+                    class="text-text-secondary mt-2 max-w-125 text-center text-sm"
                   >
                     The service discovery configuration (disambiguation fields) was changed after
                     this incident was created.
@@ -1202,7 +1202,7 @@ if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.condit
               <!-- Traces Tab Content -->
               <div
                 v-if="activeTab === 'traces'"
-                class="flex flex-col flex-1 overflow-hidden h-full"
+                class="flex h-full flex-1 flex-col overflow-hidden"
               >
                 <!-- Refresh Button (shown when traces data is loaded) -->
                 <div
@@ -1211,7 +1211,7 @@ if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.condit
                     !correlationLoading &&
                     (correlationData?.traceStreams?.length ?? 0) > 0
                   "
-                  class="px-4 py-2 border-b border-solid border-card-glass-border flex items-center gap-2"
+                  class="border-card-glass-border flex items-center gap-2 border-b border-solid px-4 py-2"
                 >
                   <span class="text-xs">{{ t("alerts.incidents.showingCorrelatedTraces") }}</span>
                   <OButton
@@ -1227,7 +1227,7 @@ if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.condit
                 <!-- Loading State -->
                 <div
                   v-if="correlationLoading"
-                  class="flex flex-col items-center justify-center flex-1 h-full"
+                  class="flex h-full flex-1 flex-col items-center justify-center"
                 >
                   <OSpinner
                     size="lg"
@@ -1240,7 +1240,7 @@ if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.condit
                 <!-- Error/No Data State -->
                 <div
                   v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams"
-                  class="flex flex-1 flex-col items-center justify-center gap-2 h-full"
+                  class="flex h-full flex-1 flex-col items-center justify-center gap-2"
                 >
                   <OIcon
                     :name="
@@ -1251,7 +1251,7 @@ if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.condit
                         : 'info-outline'
                     "
                     :class="[
-                      'w-16 h-16',
+                      'h-16 w-16',
                       correlationError
                         ? correlationError.includes('disambiguation fields')
                           ? 'text-warning'
@@ -1259,12 +1259,12 @@ if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.condit
                         : 'text-text-muted',
                     ]"
                   />
-                  <div class="text-xl font-semibold mt-3">
+                  <div class="mt-3 text-xl font-semibold">
                     {{ correlationError || "No correlated traces found" }}
                   </div>
                   <div
                     v-if="correlationError && correlationError.includes('disambiguation fields')"
-                    class="text-sm text-text-secondary mt-2 max-w-125 text-center"
+                    class="text-text-secondary mt-2 max-w-125 text-center text-sm"
                   >
                     The service discovery configuration (disambiguation fields) was changed after
                     this incident was created.
@@ -1304,7 +1304,7 @@ if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.condit
       </div>
 
       <!-- Loading state -->
-      <div v-if="loading" class="flex-1 flex items-center justify-center">
+      <div v-if="loading" class="flex flex-1 items-center justify-center">
         <OSpinner size="md" />
       </div>
     </OPageLayout>

@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-toolbar"
           @click="toggleAIChat"
           data-test="add-regex-pattern-open-close-ai-btn"
-          class="group [background:var(--color-gradient-ai-subtle)]! text-ai-accent! dark:text-white! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] dark:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] hover:[background:var(--color-gradient-ai)]! hover:text-white! hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)] dark:hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)]"
+          class="group text-ai-accent! [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)] hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] dark:hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)]"
           :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
           @mouseenter="isHovered = true"
           @mouseleave="isHovered = false"
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <!-- form inputs starts here -->
-    <div class="flex w-full h-full">
+    <div class="flex h-full w-full">
       <div
         :class="
           store.state.isAiChatEnabled ? (isFullScreen ? 'w-[75%] pl-2' : 'w-[65%] pl-2') : 'w-full'
@@ -93,21 +93,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :placeholder="t('settings.addRegexPattern.descriptionPlaceholder')"
             />
             <OBanner variant="info" icon="info" dense data-test="add-regex-pattern-lookaround-note">
-              <div class="text-xs font-normal leading-4.5">
+              <div class="text-xs leading-4.5 font-normal">
                 {{ t("regex_patterns.unsupported_lookaround_note") }}
                 {{ t("regex_patterns.unsupported_lookaround_example") }}
-                <code class="font-mono text-xs px-1 py-px rounded-default bg-banner-info-border"
+                <code class="rounded-default bg-banner-info-border px-1 py-px font-mono text-xs"
                   >(?=openobserve)\w+</code
                 >
-                <OIcon name="arrow-right-alt" size="xs" class="inline-block align-middle mx-1" />
-                <code class="font-mono text-xs px-1 py-px rounded-default bg-banner-info-border"
+                <OIcon name="arrow-right-alt" size="xs" class="mx-1 inline-block align-middle" />
+                <code class="rounded-default bg-banner-info-border px-1 py-px font-mono text-xs"
                   >openobserve\w*</code
                 >
               </div>
             </OBanner>
             <div class="regex-pattern-input-container">
               <div class="flex items-center justify-between">
-                <span class="text-sm font-bold leading-5.25">{{
+                <span class="text-sm leading-5.25 font-bold">{{
                   t("settings.addRegexPattern.regexPatternLabel")
                 }}</span>
                 <OButton
@@ -116,16 +116,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="sm"
                   @click="toggleAIChat"
                 >
-                  <img :src="goToAILogo" class="w-5 h-5 mr-1" />
-                  <span class="text-brand-indigo text-sm flex items-center gap-1">
+                  <img :src="goToAILogo" class="mr-1 h-5 w-5" />
+                  <span class="text-brand-indigo flex items-center gap-1 text-sm">
                     {{ t("settings.addRegexPattern.tryAiAssistant") }}
                   </span>
-                  <OIcon size="sm" name="arrow-right-alt" class="text-brand-indigo w-5 h-5 ml-1" />
+                  <OIcon size="sm" name="arrow-right-alt" class="text-brand-indigo ml-1 h-5 w-5" />
                 </OButton>
               </div>
               <div class="regex-pattern-input">
-                <div class="py-0.5 h-6 bg-surface-subtle">
-                  <div class="text-xs font-[500] px-2 text-text-secondary">
+                <div class="bg-surface-subtle h-6 py-0.5">
+                  <div class="text-text-secondary px-2 text-xs font-[500]">
                     {{ t("settings.addRegexPattern.writePattern") }}
                   </div>
                 </div>
@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSeparator class="my-2" />
             <div>
               <div class="flex items-center justify-between">
-                <span class="text-sm font-bold leading-5.25">
+                <span class="text-sm leading-5.25 font-bold">
                   {{ t("settings.addRegexPattern.testRegexPattern") }}
                 </span>
                 <OButton
@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 name="query"
                 v-model:is-expanded="expandState.regexTestString"
                 :label="t('settings.addRegexPattern.inputStringLabel')"
-                class="mt-1 py-md h-6"
+                class="py-md mt-1 h-6"
                 labelClass="text-text-secondary font-medium text-xs leading-5.25 -ml-1"
               >
                 <template #right> </template>
@@ -183,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 name="output"
                 v-model:is-expanded="expandState.outputString"
                 :label="t('settings.addRegexPattern.outputLabel')"
-                class="mt-1 py-md h-6"
+                class="py-md mt-1 h-6"
                 labelClass="text-text-secondary font-medium text-xs leading-5.25 -ml-1"
               >
               </FullViewContainer>
@@ -201,16 +201,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <div
                   v-else
-                  class="flex flex-col items-center justify-center h-27.75 rounded-default border border-input-border bg-input-bg"
+                  class="rounded-default border-input-border bg-input-bg flex h-27.75 flex-col items-center justify-center border"
                 >
                   <div v-if="!testLoading && outputStringValue.length === 0">
                     <OIcon name="lightbulb" size="md" class="text-icon-color" />
-                    <span class="text-xs font-[400] text-center text-text-secondary">
+                    <span class="text-text-secondary text-center text-xs font-[400]">
                       {{ t("settings.addRegexPattern.clickTestInputHint") }}
                     </span>
                   </div>
                   <div v-else-if="testLoading">
-                    <span class="flex items-center justify-center h-27.75">
+                    <span class="flex h-27.75 items-center justify-center">
                       <OSpinner size="sm" />
                     </span>
                   </div>

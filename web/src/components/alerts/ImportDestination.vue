@@ -27,10 +27,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Output Section with Destination-specific Error Display -->
     <template #output-content>
-      <div class="w-full h-full flex flex-col border-l border-border-default min-w-100">
+      <div class="border-border-default flex h-full w-full min-w-100 flex-col border-l">
         <div
           v-if="destinationErrorsToDisplay.length > 0 || destinationCreators.length > 0"
-          class="text-center text-sm font-semibold text-text-heading py-3 shrink-0"
+          class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"
         >
           {{
             destinationErrorsToDisplay.length > 0
@@ -38,13 +38,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : t("alert_destinations.import.outputMessages")
           }}
         </div>
-        <div v-else class="text-center text-sm font-semibold text-text-heading py-3 shrink-0">
+        <div v-else class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold">
           {{ t("alert_destinations.import.outputMessages") }}
         </div>
         <OSeparator class="mt-1 shrink-0" />
-        <div class="flex-1 min-h-0 overflow-auto [resize:none] w-full min-w-100">
+        <div class="min-h-0 w-full min-w-100 flex-1 [resize:none] overflow-auto">
           <!-- Destination Errors Section -->
-          <div class="error-section p-2.5 mb-2.5" v-if="destinationErrorsToDisplay.length > 0">
+          <div class="error-section mb-2.5 p-2.5" v-if="destinationErrorsToDisplay.length > 0">
             <div class="error-list">
               <!-- Iterate through the outer array -->
               <div v-for="(errorGroup, index) in destinationErrorsToDisplay" :key="index">
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="(errorMessage, errorIndex) in errorGroup"
                   :key="errorIndex"
-                  class="py-1.25 px-0 text-sm wrap-break-word"
+                  class="px-0 py-1.25 text-sm wrap-break-word"
                   :data-test="`destination-import-error-${index}-${errorIndex}`"
                 >
                   <!-- Destination Name Error -->
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                         :options="destinationTypes"
                         :label="t('alert_destinations.destination_type') + ' *'"
-                        class="py-2 showLabelOnTop no-case"
+                        class="showLabelOnTop no-case py-2"
                       />
                     </div>
                   </span>
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                         :options="destinationMethods"
                         :label="t('alert_destinations.import.destinationMethod') + ' *'"
-                        class="py-2 showLabelOnTop no-case"
+                        class="showLabelOnTop no-case py-2"
                       />
                     </div>
                   </span>
@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                         :options="filteredTemplates"
                         :label="t('alert_destinations.import.templates') + ' *'"
-                        class="py-2 showLabelOnTop no-case"
+                        class="showLabelOnTop no-case py-2"
                         :error="!!templateErrors[index]"
                         :error-message="templateErrors[index]"
                         @search="filterTemplates"
@@ -227,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :label="t('alert_destinations.import.actions') + ' *'"
                         labelKey="label"
                         valueKey="value"
-                        class="py-2 showLabelOnTop no-case w-75!"
+                        class="showLabelOnTop no-case w-75! py-2"
                         :error="!!actionErrors[index]"
                         :error-message="actionErrors[index]"
                         @search="filterActions"
@@ -261,9 +261,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Destination Creation Success Messages -->
-          <div class="error-section p-2.5 mb-2.5" v-if="destinationCreators.length > 0">
+          <div class="error-section mb-2.5 p-2.5" v-if="destinationCreators.length > 0">
             <div
-              class="text-base mb-2.5 uppercase text-primary"
+              class="text-primary mb-2.5 text-base uppercase"
               data-test="destination-import-creation-title"
             >
               {{ t("alert_destinations.import.destinationCreation") }}
@@ -276,14 +276,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div
                 :class="{
-                  'font-bold py-1.25 px-0 text-sm wrap-break-word': true,
-                  'text-green ': val.success,
+                  'px-0 py-1.25 text-sm font-bold wrap-break-word': true,
+                  'text-green': val.success,
                   'text-status-negative': !val.success,
                 }"
                 :data-test="`destination-import-creation-${index}-message`"
               >
                 <pre
-                  class="[white-space:pre-wrap] [word-wrap:break-word] [word-break:break-word] [overflow-wrap:break-word] font-[inherit] m-0"
+                  class="m-0 font-[inherit] [overflow-wrap:break-word] [word-break:break-word] [white-space:pre-wrap] [word-wrap:break-word]"
                   >{{ val.message }}</pre
                 >
               </div>

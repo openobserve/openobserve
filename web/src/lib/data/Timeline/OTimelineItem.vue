@@ -41,7 +41,7 @@ const isOIcon = computed<boolean>(() =>
 <template>
   <li class="relative flex gap-4 pb-6 last:pb-0">
     <!-- Left column: dot + vertical connector line -->
-    <div class="relative flex flex-col items-center shrink-0">
+    <div class="relative flex shrink-0 flex-col items-center">
       <!-- Dot / icon circle -->
       <div
         class="relative z-10 flex size-7 shrink-0 items-center justify-center rounded-full"
@@ -51,7 +51,7 @@ const isOIcon = computed<boolean>(() =>
         <OIcon v-if="icon && isOIcon" :name="icon as any" size="xs" />
         <span
           v-else-if="icon"
-          class="material-icons text-sm leading-none text-timeline-dot-fg select-none"
+          class="material-icons text-timeline-dot-fg text-sm leading-none select-none"
           >{{ icon }}</span
         >
       </div>
@@ -61,15 +61,15 @@ const isOIcon = computed<boolean>(() =>
         OTimeline's scoped :deep rule hides this element when the
         parent <li> is :last-child.
       -->
-      <div class="timeline-connector w-px flex-1 bg-timeline-line mt-1" />
+      <div class="timeline-connector bg-timeline-line mt-1 w-px flex-1" />
     </div>
 
     <!-- Right column: title, subtitle, extra slot content -->
-    <div class="flex-1 min-w-0 pt-0.5 pb-1">
-      <p v-if="title" class="m-0 text-sm font-medium leading-snug text-text-heading">
+    <div class="min-w-0 flex-1 pt-0.5 pb-1">
+      <p v-if="title" class="text-text-heading m-0 text-sm leading-snug font-medium">
         {{ title }}
       </p>
-      <p v-if="subtitle" class="m-0 mt-0.5 text-xs leading-normal text-text-secondary">
+      <p v-if="subtitle" class="text-text-secondary m-0 mt-0.5 text-xs leading-normal">
         {{ subtitle }}
       </p>
       <slot />

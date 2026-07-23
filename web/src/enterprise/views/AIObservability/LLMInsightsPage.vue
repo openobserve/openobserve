@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Whole-page last-refresh + refresh control (logs-style): relative
              time + freshness dot, ticking on its own. -->
       <div
-        class="inline-flex items-center border border-border-default rounded-default px-1 h-8 overflow-hidden"
+        class="border-border-default rounded-default inline-flex h-8 items-center overflow-hidden border px-1"
       >
         <ORefreshButton
           :last-run-at="dashboardLastRunAt"
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :stream-name="streamName"
       :start-time="timeRange.startTime"
       :end-time="timeRange.endTime"
-      class="flex-1 min-h-0"
+      class="min-h-0 flex-1"
     />
   </OPageLayout>
 </template>

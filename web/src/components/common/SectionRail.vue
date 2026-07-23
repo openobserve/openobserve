@@ -22,13 +22,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   tinted-active treatment. Sentence-case group headings, soft single-line items.
 -->
 <template>
-  <nav class="flex flex-col h-full min-h-0 bg-surface-panel" data-test="section-rail">
+  <nav class="bg-surface-panel flex h-full min-h-0 flex-col" data-test="section-rail">
     <!-- Title aligns with the item LABELS below it (the page-edge grid line the
          OTab pills' text lands on), not the pill edge — so 'IAM'/'Settings' sits
          directly above 'Users'. Matches FolderList's heading. -->
     <div
       v-if="title"
-      class="shrink-0 pl-page-edge pr-1.5 pt-3 pb-1 text-sm font-semibold text-text-heading truncate"
+      class="pl-page-edge text-text-heading shrink-0 truncate pt-3 pr-1.5 pb-1 text-sm font-semibold"
     >
       {{ title }}
     </div>
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTabs
         :model-value="activeKey ?? ''"
         orientation="vertical"
-        class="w-full section-rail-tabs"
+        class="section-rail-tabs w-full"
         @change="onTabChange"
       >
         <template v-for="(group, idx) in visibleGroups" :key="group.label">
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- pl-1.5 (on top of the container's px-1.5) puts the section label on
                the same 12px item-label grid line as the tabs below it. -->
           <div
-            class="py-1 pl-1.5 text-xs font-semibold text-text-secondary"
+            class="text-text-secondary py-1 pl-1.5 text-xs font-semibold"
             :class="{ 'mt-3': idx > 0 }"
           >
             {{ group.label }}

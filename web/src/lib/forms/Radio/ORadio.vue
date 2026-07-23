@@ -86,10 +86,10 @@ const resolvedSize = computed(() => (props.size ?? "md") as "xs" | "sm" | "md");
       :data-test="parentDataTest"
       :data-test-value="parentDataTestValue"
       :class="[
-        'shrink-0 rounded-full border-2 flex items-center justify-center',
+        'flex shrink-0 items-center justify-center rounded-full border-2',
         'transition-[color,background-color,border-color,box-shadow] duration-150',
-        'outline-none ring-offset-1 ring-offset-surface-base',
-        'focus-visible:ring-2 focus-visible:ring-radio-focus-ring',
+        'ring-offset-surface-base ring-offset-1 outline-none',
+        'focus-visible:ring-radio-focus-ring focus-visible:ring-2',
         circleSize[resolvedSize],
         'bg-radio-bg border-radio-border',
         'enabled:hover:border-radio-hover-border',
@@ -100,16 +100,16 @@ const resolvedSize = computed(() => (props.size ?? "md") as "xs" | "sm" | "md");
         'data-disabled:cursor-not-allowed',
       ]"
     >
-      <RadioGroupIndicator :class="['rounded-full bg-radio-checked-dot', dotSize[resolvedSize]]" />
+      <RadioGroupIndicator :class="['bg-radio-checked-dot rounded-full', dotSize[resolvedSize]]" />
     </RadioGroupItem>
 
     <span
       v-if="$slots.label || props.label"
       :class="[
-        'o-input-label text-compact select-none leading-tight',
+        'o-input-label text-compact leading-tight select-none',
         props.disabled
-          ? 'font-normal text-input-label-text-disabled'
-          : 'font-medium text-input-label-text',
+          ? 'text-input-label-text-disabled font-normal'
+          : 'text-input-label-text font-medium',
       ]"
     >
       <slot name="label">{{ props.label }}</slot>

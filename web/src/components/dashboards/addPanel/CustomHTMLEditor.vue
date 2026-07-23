@@ -17,17 +17,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="dashboard-custom-html-editor-container"
-    class="bg-card-glass-bg w-full h-full overflow-hidden"
+    class="bg-card-glass-bg h-full w-full overflow-hidden"
   >
-    <div class="w-full h-full" data-test="dashboard-custom-html-editor-inner">
+    <div class="h-full w-full" data-test="dashboard-custom-html-editor-inner">
       <OSplitter
         v-model="splitterModel"
-        class="w-full h-full!"
+        class="h-full! w-full"
         @update:modelValue="layoutSplitterUpdated"
         data-test="dashboard-html-editor-splitter"
       >
         <template #before>
-          <div data-test="dashboard-custom-html-editor-flex-col" class="flex flex-col h-full">
+          <div data-test="dashboard-custom-html-editor-flex-col" class="flex h-full flex-col">
             <CodeQueryEditor
               class="h-full flex-1"
               language="html"
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #separator>
           <div
-            class="w-1 h-full bg-border-default transition-colors hover:bg-table-resize-handle"
+            class="bg-border-default hover:bg-table-resize-handle h-full w-1 transition-colors"
           ></div>
         </template>
         <template #after>

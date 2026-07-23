@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="trace-details h-[calc(100vh-2.625rem)] overflow-hidden w-full flex flex-col relative">
+  <div class="trace-details relative flex h-[calc(100vh-2.625rem)] w-full flex-col overflow-hidden">
     <!-- Original View -->
     <div
-      class="flex-1 flex flex-col min-h-0 overflow-hidden box-border"
+      class="box-border flex min-h-0 flex-1 flex-col overflow-hidden"
       v-if="
         traceTree.length &&
         effectiveSpanList.length &&
@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div
         v-if="showHeader"
-        class="trace-combined-header-wrapper bg-card-glass-bg py-[0.2rem] shrink-0"
+        class="trace-combined-header-wrapper bg-card-glass-bg shrink-0 py-[0.2rem]"
       >
         <!-- Standalone (routed) header: shared OPageHeader -->
         <OPageHeader
@@ -48,9 +48,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class=""
         >
           <template #subtitle>
-            <div class="flex items-center space-x-2 text-2xs text-text-secondary whitespace-nowrap">
+            <div class="text-2xs text-text-secondary flex items-center space-x-2 whitespace-nowrap">
               <span>{{ formatTimestamp(traceStartTime, store.state.timezone) }}</span>
-              <div class="bg-text-label py-0 w-px h-4" />
+              <div class="bg-text-label h-4 w-px py-0" />
               <span class="mr-1">
                 {{ t("traces.traceId") }}:
                 <span
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Session ID (LLM traces) -->
               <template v-if="sessionId">
-                <div class="bg-text-label py-0 w-px h-4" />
+                <div class="bg-text-label h-4 w-px py-0" />
                 <span class="mr-1">
                   {{ t("traces.traceDetails.sessionId") }}:
                   <span
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </template>
 
-              <div class="bg-text-label py-0 w-px h-4" />
+              <div class="bg-text-label h-4 w-px py-0" />
               <!-- Span Count Badge -->
               <span class="inline-flex">
                 <OTag type="logsResultChip" value="neutral" data-test="trace-details-spans-count">
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip :content="effectiveSpanList.length + ' ' + t('traces.spansLabel')" />
               </span>
 
-              <div class="bg-text-label py-0 w-px h-4" />
+              <div class="bg-text-label h-4 w-px py-0" />
 
               <!-- Error Count Badge -->
               <span class="inline-flex">
@@ -165,9 +165,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Embedded (logs) header -->
         <header
           v-else
-          class="h-auto py-0.5 flex! items-center justify-between bg-surface-base pl-1"
+          class="bg-surface-base flex! h-auto items-center justify-between py-0.5 pl-1"
         >
-          <div class="flex items-center space-x-4 w-fit!">
+          <div class="flex w-fit! items-center space-x-4">
             <!-- Back button -->
             <OButton
               v-if="isStandaloneMode && showBackButton"
@@ -185,11 +185,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </OButton>
 
-            <div class="flex min-w-0 w-full gap-2.5! items-center">
+            <div class="flex w-full min-w-0 items-center gap-2.5!">
               <!-- Operation Name -->
               <div
                 data-test="trace-details-operation-name"
-                class="text-base font-semibold leading-tight text-text-heading truncate min-w-0 max-w-96!"
+                class="text-text-heading max-w-96! min-w-0 truncate text-base leading-tight font-semibold"
                 :title="traceTree[0]?.operationName"
               >
                 {{ traceTree[0]?.operationName || t("traces.loadingTrace") }}
@@ -198,16 +198,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Service, Timestamp, and Trace ID -->
               <div
-                class="flex items-center space-x-2 text-2xs text-text-secondary whitespace-nowrap"
+                class="text-2xs text-text-secondary flex items-center space-x-2 whitespace-nowrap"
               >
                 <span>{{ formatTimestamp(traceStartTime, store.state.timezone) }}</span>
-                <div class="bg-text-label py-0 w-px h-4" />
+                <div class="bg-text-label h-4 w-px py-0" />
                 <span class="mr-1">
                   {{ t("traces.traceId") }}:
                   <span
                     v-if="mode === 'embedded'"
                     data-test="trace-details-trace-id"
-                    class="text-text-body font-mono cursor-pointer hover:text-theme-accent transition-colors"
+                    class="text-text-body hover:text-theme-accent cursor-pointer font-mono transition-colors"
                     :title="t('traces.openInTraces')"
                     @click="handleExpandToFullView"
                   >
@@ -235,7 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Session ID (LLM traces) -->
                 <template v-if="sessionId">
-                  <div class="bg-text-label py-0 w-px h-4" />
+                  <div class="bg-text-label h-4 w-px py-0" />
                   <span class="mr-1">
                     {{ t("traces.traceDetails.sessionId") }}:
                     <span
@@ -268,7 +268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
 
-              <div class="bg-text-label py-0 w-px h-4" />
+              <div class="bg-text-label h-4 w-px py-0" />
               <!-- Span Count Badge -->
               <span class="inline-flex">
                 <OTag type="logsResultChip" value="neutral" data-test="trace-details-spans-count">
@@ -280,10 +280,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip :content="effectiveSpanList.length + ' ' + t('traces.spansLabel')" />
               </span>
 
-              <div class="bg-text-label py-0 w-px h-4" />
+              <div class="bg-text-label h-4 w-px py-0" />
 
               <!-- Error Count Badge -->
-              <span class="inline-flex mr-[0.85rem]">
+              <span class="mr-[0.85rem] inline-flex">
                 <OTag
                   type="logsResultChip"
                   value="error"
@@ -298,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="flex justify-end items-center space-x-3 w-fit!">
+          <div class="flex w-fit! items-center justify-end space-x-3">
             <!-- Apply filters button (standalone mode, right side) -->
             <OButton
               v-if="isStandaloneMode && areFiltersAdded"
@@ -350,13 +350,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </header>
       </div>
-      <div class="bg-card-glass-bg overflow-hidden h-full flex flex-col min-h-0">
+      <div class="bg-card-glass-bg flex h-full min-h-0 flex-col overflow-hidden">
         <!-- Tabs & Search Bar -->
         <div
-          class="py-0 border-b border-border-default flex items-center justify-between bg-white bg-card-glass-bg!"
+          class="border-border-default bg-card-glass-bg! flex items-center justify-between border-b bg-white py-0"
         >
           <div
-            class="flex items-center space-x-4 trace-details-view-tabs ml-[0.325rem] py-[0.325rem]"
+            class="trace-details-view-tabs ml-[0.325rem] flex items-center space-x-4 py-[0.325rem]"
           >
             <!--
               Tabs are data-driven from `traceTabs` so they can be dragged to
@@ -385,11 +385,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroup>
           </div>
 
-          <div class="flex items-center space-x-2 gap-2 pr-[0.325rem]">
+          <div class="flex items-center gap-2 space-x-2 pr-[0.325rem]">
             <!-- Unified Search Input Group -->
             <div
               v-if="activeTab !== 'flame-graph' && activeTab !== 'map' && activeTab !== 'thread'"
-              class="unified-search-group mr-1! gap-1 flex items-stretch w-fit rounded-default transition-colors duration-200"
+              class="unified-search-group rounded-default mr-1! flex w-fit items-stretch gap-1 transition-colors duration-200"
             >
               <div class="log-stream-search-input">
                 <OSearchInput
@@ -404,10 +404,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <!-- Search Results Navigation -->
               <div
-                class="inline-flex items-center bg-transparent px-0.5 [transition:all_0.2s_ease] rounded-default border border-input-border dark:hover:border-theme-accent h-8.2! py-0!"
+                class="rounded-default border-input-border dark:hover:border-theme-accent h-8.2! inline-flex items-center border bg-transparent px-0.5 py-0! [transition:all_0.2s_ease]"
               >
                 <div
-                  class="flex items-center text-xs font-medium px-1 gap-[0.0625rem] select-none"
+                  class="flex items-center gap-[0.0625rem] px-1 text-xs font-medium select-none"
                   data-test="trace-details-search-results"
                 >
                   <span class="text-text-secondary">{{
@@ -416,7 +416,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="text-text-secondary mx-0.5">/</span>
                   <span class="text-text-secondary">{{ searchResults }}</span>
                 </div>
-                <div class="flex items-center h-full ml-1">
+                <div class="ml-1 flex h-full items-center">
                   <OButton
                     data-test="trace-details-search-prev-btn"
                     :disabled="!searchResults || currentIndex === 0"
@@ -427,7 +427,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon name="keyboard-arrow-up" size="sm" />
                     <OTooltip :content="t('traces.previousMatch')" />
                   </OButton>
-                  <div class="w-px h-[1.125rem] bg-card-glass-border mx-0.5"></div>
+                  <div class="bg-card-glass-border mx-0.5 h-[1.125rem] w-px"></div>
                   <OButton
                     data-test="trace-details-search-next-btn"
                     :disabled="!searchResults || currentIndex + 1 === searchResults"
@@ -444,7 +444,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Log Stream Selector (if enabled) -->
             <div
               v-if="showLogStreamSelector && config.isEnterprise !== 'true'"
-              class="log-stream-search-input flex items-center trace-logs-selector mx-1!"
+              class="log-stream-search-input trace-logs-selector mx-1! flex items-center"
             >
               <OSelect
                 data-test="trace-details-log-streams-select"
@@ -462,7 +462,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="trace-details-view-logs-btn"
                     variant="outline"
                     size="sm"
-                    class="text-xs h-8! font-normal!"
+                    class="h-8! text-xs font-normal!"
                     :disabled="isViewLogsDisabled"
                     @click="redirectToLogs"
                   >
@@ -497,18 +497,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div
-          class="min-h-0 relative pb-2 flex flex-col flex-1"
+          class="relative flex min-h-0 flex-1 flex-col pb-2"
           :class="[
             isSidebarOpen ? 'histogram-container' : 'histogram-container-full',
             isTimelineExpanded ? '' : 'full',
           ]"
           ref="parentContainer"
         >
-          <div class="overflow-hidden flex-1 min-h-0 box-border flex flex-col">
+          <div class="box-border flex min-h-0 flex-1 flex-col overflow-hidden">
             <!-- Waterfall View - show for waterfall tab, or when no LLM spans -->
-            <div v-if="activeTab === 'waterfall'" class="flex h-full bg-card-glass-bg!">
+            <div v-if="activeTab === 'waterfall'" class="bg-card-glass-bg! flex h-full">
               <div
-                class="flex flex-col min-h-0"
+                class="flex min-h-0 flex-col"
                 :style="{
                   width: isSidebarOpen ? leftWidth + 'px' : '100%',
                 }"
@@ -522,13 +522,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <div
                   ref="traceScrollContainer"
-                  class="relative-position trace-content-scroll overflow-y-auto! overflow-x-hidden! min-h-0! [scrollbar-gutter:stable]! flex-1! max-w-full!"
+                  class="relative-position trace-content-scroll min-h-0! max-w-full! flex-1! overflow-x-hidden! overflow-y-auto! [scrollbar-gutter:stable]!"
                   :style="{
                     width: isSidebarOpen ? leftWidth + 'px' : '100%',
                   }"
                 >
                   <div
-                    class="pt-0 pb-0 mb-0 min-h-full bg-card-glass-bg!"
+                    class="bg-card-glass-bg! mb-0 min-h-full pt-0 pb-0"
                     data-test="trace-details-tree-container"
                   >
                     <div class="position-relative">
@@ -538,7 +538,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           left: `${leftWidth}px`,
                           zIndex: 999,
                         }"
-                        class="absolute resize h-full cursor-col-resize top-0 w-px bg-border-default hover:bg-accent rounded-default transition-colors duration-200 after:content-[''] after:absolute after:h-full after:-left-2.5 after:-right-2.5 after:top-0 after:bottom-0 after:z-999"
+                        class="bg-border-default hover:bg-accent rounded-default absolute top-0 h-full w-px cursor-col-resize resize transition-colors duration-200 after:absolute after:top-0 after:-right-2.5 after:bottom-0 after:-left-2.5 after:z-999 after:h-full after:content-['']"
                         @mousedown="startResize"
                       />
                       <TraceTree
@@ -571,7 +571,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
-                class="shrink-0 overflow-y-auto overflow-x-hidden min-h-0 transition-all duration-300 border-l border-l-solid border-l-card-glass-border"
+                class="border-l-solid border-l-card-glass-border min-h-0 shrink-0 overflow-x-hidden overflow-y-auto border-l transition-all duration-300"
                 :class="isTimelineExpanded ? '' : 'full'"
                 :style="{
                   width: `calc(100% - ${leftWidth}px)`,
@@ -599,7 +599,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- DAG View - only for LLM traces -->
-            <div v-if="hasLLMSpans && activeTab === 'dag'" class="flex flex-1 min-h-0">
+            <div v-if="hasLLMSpans && activeTab === 'dag'" class="flex min-h-0 flex-1">
               <div
                 class="h-[calc(100vh-12.5rem)] min-w-[12.5rem] overflow-hidden p-4"
                 :style="{
@@ -622,11 +622,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Resizable divider -->
               <div
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
-                class="dag-resizer group w-2 cursor-col-resize flex items-center justify-center shrink-0 relative z-10"
+                class="dag-resizer group relative z-10 flex w-2 shrink-0 cursor-col-resize items-center justify-center"
                 @mousedown="startDagResize"
               >
                 <div
-                  class="dag-resizer-line w-0.75 h-full bg-border-default group-hover:bg-accent rounded-default transition-colors duration-200"
+                  class="dag-resizer-line bg-border-default group-hover:bg-accent rounded-default h-full w-0.75 transition-colors duration-200"
                 ></div>
               </div>
               <div
@@ -660,7 +660,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Flame Graph View -->
             <div
               v-if="activeTab === 'flame-graph'"
-              class="w-full bg-card-glass-bg! flex flex-1 min-h-0"
+              class="bg-card-glass-bg! flex min-h-0 w-full flex-1"
             >
               <FlameGraphView
                 :spans="flatSpans"
@@ -690,7 +690,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             -->
             <div
               v-if="config.showLLMUI !== 'false' && activeTab === 'thread'"
-              class="w-full bg-card-glass-bg! flex flex-1 min-h-0"
+              class="bg-card-glass-bg! flex min-h-0 w-full flex-1"
             >
               <div
                 class="thread-left-panel h-full min-w-[20rem] overflow-hidden"
@@ -706,7 +706,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
-                class="border-l border-l-solid border-l-card-glass-border h-full overflow-hidden"
+                class="border-l-solid border-l-card-glass-border h-full overflow-hidden border-l"
                 style="width: 40%; min-width: 300px"
               >
                 <TraceDetailsSidebar
@@ -733,11 +733,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Spans Table View Placeholder -->
             <div
               v-if="activeTab === 'spans'"
-              class="flex flex-1 min-h-0 items-center justify-center"
+              class="flex min-h-0 flex-1 items-center justify-center"
             >
-              <div class="text-center p-10" style="color: var(--color-text-secondary)">
+              <div class="p-10 text-center" style="color: var(--color-text-secondary)">
                 <OIcon name="table-chart" class="mb-4" style="width: 48px; height: 48px" />
-                <div class="font-semibold mb-2" style="font-size: var(--text-base)">
+                <div class="mb-2 font-semibold" style="font-size: var(--text-base)">
                   {{ t("traces.spansTableView") }}
                 </div>
                 <div style="font-size: var(--text-sm)">{{ t("traces.comingSoon") }}</div>
@@ -745,10 +745,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Map View with Pattern/Span Toggle -->
-            <div v-if="activeTab === 'map'" class="w-full h-full flex flex-1 min-h-0 flex-col">
+            <div v-if="activeTab === 'map'" class="flex h-full min-h-0 w-full flex-1 flex-col">
               <!-- Chart Container -->
-              <div class="flex flex-1 min-h-0 items-center justify-center">
-                <div class="w-full h-full p-2.5 text-center">
+              <div class="flex min-h-0 flex-1 items-center justify-center">
+                <div class="h-full w-full p-2.5 text-center">
                   <ChartRenderer
                     ref="chartRendererRef"
                     data-test="trace-details-service-map-chart"
@@ -787,7 +787,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="showFilterPopover = false"
       @click:primary="applyAndViewTraces"
     >
-      <div class="flex-1 border border-border-default rounded-default">
+      <div class="border-border-default rounded-default flex-1 border">
         <CodeQueryEditor v-model:query="localEditorValue" language="sql" class="h-full w-full" />
       </div>
     </ODrawer>

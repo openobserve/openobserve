@@ -22,42 +22,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span
         v-if="parentPrefix"
         data-test="query-plan-node-tree-indent"
-        class="text-text-muted font-bold select-none whitespace-pre"
+        class="text-text-muted font-bold whitespace-pre select-none"
         >{{ parentPrefix }}</span
       >
 
       <!-- Tree connector -->
       <span
         data-test="query-plan-node-tree-connector"
-        class="text-text-muted font-bold select-none pr-1"
+        class="text-text-muted pr-1 font-bold select-none"
         >{{ connector }}</span
       >
 
       <!-- Expand/collapse icon for nodes with children -->
       <span
         v-if="node.children.length > 0"
-        class="expand-icon cursor-pointer select-none text-theme-accent text-3xs w-4 inline-block text-center hover:opacity-70"
+        class="expand-icon text-theme-accent text-3xs inline-block w-4 cursor-pointer text-center select-none hover:opacity-70"
         data-test="query-plan-node-expand-icon"
         @click="toggleChildrenExpanded"
       >
         {{ childrenExpanded ? "▼" : "▶" }}
       </span>
-      <span v-else data-test="query-plan-node-expand-icon-spacer" class="w-4 inline-block"></span>
+      <span v-else data-test="query-plan-node-expand-icon-spacer" class="inline-block w-4"></span>
 
       <!-- Operator name -->
       <span
         data-test="query-plan-node-operator-name"
-        class="font-semibold text-text-heading pl-1"
+        class="text-text-heading pl-1 font-semibold"
         >{{ node.name }}</span
       >
 
       <!-- Inline details (clickable to expand if truncated) -->
       <span
         v-if="inlineDetails"
-        class="inline-details text-text-secondary font-normal text-xs italic"
+        class="inline-details text-text-secondary text-xs font-normal italic"
         :class="{
-          'cursor-pointer hover:text-text-body': hasLongDetails,
-          'whitespace-nowrap overflow-hidden [text-overflow:ellipsis] max-w-150 truncated':
+          'hover:text-text-body cursor-pointer': hasLongDetails,
+          'truncated max-w-150 overflow-hidden [text-overflow:ellipsis] whitespace-nowrap':
             !detailsExpanded && hasLongDetails,
         }"
         data-test="query-plan-node-inline-details"
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span
           v-if="node.metrics.output_rows !== undefined"
           data-test="query-plan-node-metric-badge"
-          class="inline-flex items-center gap-1 py-0.5 px-2 bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] rounded-default text-2xs font-medium text-theme-accent whitespace-nowrap dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_20%,transparent)]"
+          class="rounded-default text-2xs text-theme-accent inline-flex items-center gap-1 bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] px-2 py-0.5 font-medium whitespace-nowrap dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_20%,transparent)]"
         >
           <OIcon name="format-list-numbered" size="xs" />
           {{ formatNumber(node.metrics.output_rows) }} rows
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span
           v-if="node.metrics.elapsed_compute"
           data-test="query-plan-node-metric-badge"
-          class="inline-flex items-center gap-1 py-0.5 px-2 bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] rounded-default text-2xs font-medium text-theme-accent whitespace-nowrap dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_20%,transparent)]"
+          class="rounded-default text-2xs text-theme-accent inline-flex items-center gap-1 bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] px-2 py-0.5 font-medium whitespace-nowrap dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_20%,transparent)]"
         >
           <OIcon name="schedule" size="xs" />
           {{ node.metrics.elapsed_compute }}
@@ -103,9 +103,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="detailsExpanded && hasLongDetails"
       data-test="query-plan-node-details"
-      class="pt-0.5 pb-0.5 text-text-secondary text-xs italic whitespace-pre-wrap break-words"
+      class="text-text-secondary pt-0.5 pb-0.5 text-xs break-words whitespace-pre-wrap italic"
     >
-      <span class="text-text-muted font-bold select-none whitespace-pre">{{ childPrefix }} </span>
+      <span class="text-text-muted font-bold whitespace-pre select-none">{{ childPrefix }} </span>
       <span>{{ inlineDetails }}</span>
     </div>
 

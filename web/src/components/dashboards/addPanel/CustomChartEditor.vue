@@ -17,17 +17,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="dashboard-custom-chart-editor-container"
-    class="bg-card-glass-bg w-full h-full overflow-hidden flex flex-col"
+    class="bg-card-glass-bg flex h-full w-full flex-col overflow-hidden"
   >
-    <div class="w-full h-full flex flex-col" data-test="dashboard-custom-chart-editor-inner">
-      <div data-test="dashboard-custom-chart-editor-flex-col" class="flex flex-col h-full">
+    <div class="flex h-full w-full flex-col" data-test="dashboard-custom-chart-editor-inner">
+      <div data-test="dashboard-custom-chart-editor-flex-col" class="flex h-full flex-col">
         <QueryEditor
           v-model:query="javascriptCodeContent"
           :debounceTime="500"
           @update:query="onEditorValueChange"
           data-test="dashboard-markdown-editor-query-editor"
           language="javascript"
-          class="javascript-query-editor pl-5 h-full flex-1 bg-code-block-bg"
+          class="javascript-query-editor bg-code-block-bg h-full flex-1 pl-5"
         />
       </div>
     </div>

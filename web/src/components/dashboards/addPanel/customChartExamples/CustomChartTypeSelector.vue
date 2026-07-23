@@ -20,12 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        inner right-content area as the single scroller instead of stacking a
        second scrollbar on the dialog body. -->
   <OCard
-    class="p-0 w-full h-[calc(90vh_-_2rem)] overflow-hidden flex flex-col"
+    class="flex h-[calc(90vh_-_2rem)] w-full flex-col overflow-hidden p-0"
     data-test="custom-chart-type-selector-popup"
   >
     <!-- Header -->
     <OCardSection role="header">
-      <div class="flex items-center gap-3 w-full">
+      <div class="flex w-full items-center gap-3">
         <OIcon name="bar-chart" size="sm" />
         <span class="text-xl font-semibold whitespace-nowrap">{{
           t("dashboard.customChartTypeSelector.exampleOfCustomCharts")
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="searchQuery"
           :placeholder="t('dashboard.customChartTypeSelector.searchCharts')"
           clearable
-          class="w-70 flex-[0_0_17.5rem] ml-4"
+          class="ml-4 w-70 flex-[0_0_17.5rem]"
           @clear="searchQuery = ''"
         />
         <div class="flex-1" />
@@ -53,18 +53,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Main Content -->
     <OCardSection class="flex h-[calc(100%_-_3.75rem)] overflow-hidden p-0">
-      <div class="flex flex-nowrap h-full w-full">
+      <div class="flex h-full w-full flex-nowrap">
         <!-- Left Sidebar -->
-        <OCard class="p-4 w-40 h-full shrink-0 overflow-y-auto">
-          <div class="text-sm font-medium mb-3 font-bold">
+        <OCard class="h-full w-40 shrink-0 overflow-y-auto p-4">
+          <div class="mb-3 text-sm font-bold font-medium">
             {{ t("dashboard.customChartTypeSelector.chartTypes") }}
           </div>
-          <ul class="flex flex-col list-none p-0 m-0">
+          <ul class="m-0 flex list-none flex-col p-0">
             <li
               v-for="(category, index) in chartCategories"
               :key="index"
               @click="scrollToCategory(category.chartLabel)"
-              class="flex items-center px-3 py-2 cursor-pointer rounded-default mb-1 transition-all duration-200"
+              class="rounded-default mb-1 flex cursor-pointer items-center px-3 py-2 transition-all duration-200"
               :class="
                 selectedCategory === category.chartLabel
                   ? 'bg-theme-accent text-text-inverse font-semibold'
@@ -80,20 +80,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Right Content Area -->
         <div
           ref="contentArea"
-          class="p-3 flex-1 h-full overflow-y-auto overflow-x-hidden"
+          class="h-full flex-1 overflow-x-hidden overflow-y-auto p-3"
           @scroll="handleScroll"
         >
           <!-- No Results Message -->
           <div
             v-if="filteredCategories.length === 0"
-            class="flex justify-center items-center h-full"
+            class="flex h-full items-center justify-center"
           >
             <div class="text-center">
-              <OIcon class="w-16 h-16" name="search-off" />
-              <div class="text-xl font-semibold text-text-muted mt-3">
+              <OIcon class="h-16 w-16" name="search-off" />
+              <div class="text-text-muted mt-3 text-xl font-semibold">
                 {{ t("dashboard.customChartTypeSelector.noResultsFound") }}
               </div>
-              <div class="text-sm text-text-muted mt-2">
+              <div class="text-text-muted mt-2 text-sm">
                 {{ t("dashboard.customChartTypeSelector.trySearchingDifferentKeywords") }}
               </div>
             </div>
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-category="category.chartLabel"
             data-test="chart-category-section"
           >
-            <div class="text-xl font-semibold mb-3 font-medium">
+            <div class="mb-3 text-xl font-medium font-semibold">
               {{ category.chartLabel }}
             </div>
             <div class="flex gap-3">
@@ -117,9 +117,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="col-xs-12 col-sm-6 col-md-4 col-lg-3"
               >
                 <OCard
-                  class="cursor-pointer transition-all duration-200 h-full hover:shadow-[0_4px_12px_color-mix(in_srgb,var(--color-black)_15%,transparent)] hover:-translate-y-0.5"
+                  class="h-full cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_4px_12px_color-mix(in_srgb,var(--color-black)_15%,transparent)]"
                   :class="{
-                    'border-2 border-theme-accent shadow-[0_4px_12px_color-mix(in_srgb,var(--color-theme-accent)_30%,transparent)]':
+                    'border-theme-accent border-2 shadow-[0_4px_12px_color-mix(in_srgb,var(--color-theme-accent)_30%,transparent)]':
                       selectedChart?.value === chart.value,
                   }"
                   @click="selectChart(chart)"
@@ -127,18 +127,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <OCardSection class="p-2">
                     <div
-                      class="w-full h-37.5 flex items-center justify-center bg-surface-subtle rounded-default overflow-hidden"
+                      class="bg-surface-subtle rounded-default flex h-37.5 w-full items-center justify-center overflow-hidden"
                     >
                       <img
                         :src="chart.asset"
                         :alt="chart.label"
-                        class="w-full h-full object-cover"
+                        class="h-full w-full object-cover"
                         loading="lazy"
                       />
                     </div>
                   </OCardSection>
-                  <OCardSection class="pt-0 px-2 pb-2">
-                    <div class="text-xs text-center font-medium">
+                  <OCardSection class="px-2 pt-0 pb-2">
+                    <div class="text-center text-xs font-medium">
                       {{ chart.label }}
                     </div>
                   </OCardSection>

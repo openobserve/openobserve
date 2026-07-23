@@ -5,15 +5,15 @@
     <div
       v-for="n in count"
       :key="n"
-      class="px-3.5 py-2.5 bg-card-glass-bg border border-border-default rounded-default flex flex-col gap-2 min-h-24"
+      class="bg-card-glass-bg border-border-default rounded-default flex min-h-24 flex-col gap-2 border px-3.5 py-2.5"
       data-test="quality-kpi-skeleton"
     >
-      <OSkeleton type="text" class="w-[55%] h-2.75" />
+      <OSkeleton type="text" class="h-2.75 w-[55%]" />
       <div class="flex items-baseline justify-between gap-2">
-        <OSkeleton type="text" class="w-[50%] h-5.5" />
-        <OSkeleton type="text" class="w-[22%] h-2.75" />
+        <OSkeleton type="text" class="h-5.5 w-[50%]" />
+        <OSkeleton type="text" class="h-2.75 w-[22%]" />
       </div>
-      <div class="flex items-end gap-0.75 h-7 mt-auto">
+      <div class="mt-auto flex h-7 items-end gap-0.75">
         <OSkeleton
           type="text"
           v-for="bar in 14"

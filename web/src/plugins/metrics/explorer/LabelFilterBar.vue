@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     ref="barRef"
-    class="relative flex items-center gap-2 min-w-0 flex-1"
+    class="relative flex min-w-0 flex-1 items-center gap-2"
     :class="expanded ? 'flex-wrap' : 'flex-nowrap'"
     data-test="metrics-explorer-label-filter-bar"
   >
@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          monopolises the row. -->
     <div
       ref="measureRef"
-      class="absolute invisible h-0 overflow-hidden flex gap-2 pointer-events-none"
+      class="pointer-events-none invisible absolute flex h-0 gap-2 overflow-hidden"
       aria-hidden="true"
     >
       <OTag
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         value="primarysm"
         class="max-w-62.5"
       >
-        <span class="font-mono text-xs truncate"
+        <span class="truncate font-mono text-xs"
           >{{ filter.label }} {{ filter.operator || "=" }} {{ filter.value }}</span
         >
         <template #trailing>
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            who wanted OR and now knows they did not get it. -->
       <span
         v-if="i > 0"
-        class="text-3xs uppercase tracking-wide text-text-secondary shrink-0 select-none"
+        class="text-3xs text-text-secondary shrink-0 tracking-wide uppercase select-none"
         :title="t('metrics.explorer.labels.andSeparatorTitle')"
         data-test="metrics-explorer-label-and"
         >{{ t("metrics.explorer.labels.andSeparator") }}</span
@@ -66,19 +66,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTag
         type="fieldTag"
         value="primarysm"
-        class="min-w-0 max-w-62.5"
+        class="max-w-62.5 min-w-0"
         :data-test="`metrics-explorer-label-chip-${filter.label}`"
       >
         <!-- The chip truncates its value; the tooltip is where the whole matcher
              stays readable. -->
         <OTooltip :content="`${filter.label} ${filter.operator || '='} ${filter.value}`" />
-        <span class="font-mono text-xs truncate"
+        <span class="truncate font-mono text-xs"
           >{{ filter.label }} {{ filter.operator || "=" }} {{ filter.value }}</span
         >
         <template #trailing>
           <button
             type="button"
-            class="ml-1 inline-flex items-center cursor-pointer"
+            class="ml-1 inline-flex cursor-pointer items-center"
             :aria-label="
               t('metrics.explorer.labels.removeFilterAria', {
                 filter: labelFilterKey(filter),
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       value="neutral"
       size="sm"
       clickable
-      class="shrink-0 h-7"
+      class="h-7 shrink-0"
       role="button"
       tabindex="0"
       :aria-label="t('metrics.explorer.labels.moreFiltersTooltip')"
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          wraps, they move to the next line together — never split across lines. -->
     <div
       ref="actionsRef"
-      class="flex items-center gap-2 shrink-0"
+      class="flex shrink-0 items-center gap-2"
       data-test="metrics-explorer-label-actions"
     >
       <OButton
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          bar itself reports that the grid is still narrowing. -->
       <span
         v-if="schemaLoading"
-        class="inline-flex items-center cursor-help"
+        class="inline-flex cursor-help items-center"
         role="status"
         :aria-label="t('metrics.explorer.labels.schemaLoadingAria')"
         data-test="metrics-explorer-label-schema-loading"
@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex items-center gap-2"
           data-test="metrics-explorer-label-picker-value"
         >
-          <span class="text-xs font-mono text-text-secondary shrink-0">
+          <span class="text-text-secondary shrink-0 font-mono text-xs">
             {{ draftLabel }}
           </span>
           <!-- Defaulted to `=`, one click to change. All four PromQL matchers are
@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <span
             v-if="suggestionsUnavailable"
-            class="text-xs text-text-secondary shrink-0"
+            class="text-text-secondary shrink-0 text-xs"
             data-test="metrics-explorer-label-picker-no-suggestions"
           >
             {{ t("metrics.explorer.labels.noSuggestions") }}
@@ -270,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          out of the way the moment there is a chip or an open picker. -->
       <span
         v-if="step === 'idle' && !filters.length"
-        class="query-editor-placeholder-overlay min-w-0 flex-1 overflow-hidden pointer-events-none select-none"
+        class="query-editor-placeholder-overlay pointer-events-none min-w-0 flex-1 overflow-hidden select-none"
         aria-hidden="true"
         data-test="metrics-explorer-label-hint"
       >

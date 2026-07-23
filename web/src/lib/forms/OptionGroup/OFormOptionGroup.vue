@@ -47,7 +47,7 @@ if (import.meta.env.DEV && !form) {
             <slot name="label" />
           </template>
         </OOptionGroup>
-        <div v-if="field.state.meta.errors.length > 0" class="text-xs text-option-group-error-text">
+        <div v-if="field.state.meta.errors.length > 0" class="text-option-group-error-text text-xs">
           {{ firstFieldError(field.state.meta.errors) }}
         </div>
       </div>

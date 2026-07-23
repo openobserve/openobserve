@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('dashboard.customChartConfirmDialog.alsoReplaceQuery')"
           data-test="replace-query-checkbox"
         />
-        <div class="text-xs mt-1 ml-7 text-text-secondary">
+        <div class="text-text-secondary mt-1 ml-7 text-xs">
           {{ t("dashboard.customChartConfirmDialog.exampleQueryInserted") }}
         </div>
       </div>

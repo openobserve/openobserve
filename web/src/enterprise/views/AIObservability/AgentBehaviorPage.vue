@@ -41,7 +41,7 @@
       <!-- Last-refresh + refresh control, consistent with LLM Insights /
              Sessions page headers. -->
       <div
-        class="inline-flex items-center border border-border-default rounded-default px-1 h-8 overflow-hidden"
+        class="border-border-default rounded-default inline-flex h-8 items-center overflow-hidden border px-1"
       >
         <ORefreshButton
           :last-run-at="behaviorLastRunAt"
@@ -58,7 +58,7 @@
          the stream; Agent tab narrows to one discovered agent (and follows its
          source_stream). Lives in OPageLayout's #subnav (full-bleed divider). -->
     <template #subnav>
-      <div class="flex items-center gap-3 px-page-edge py-2">
+      <div class="px-page-edge flex items-center gap-3 py-2">
         <OToggleGroup
           :model-value="filterMode"
           type="single"
@@ -87,7 +87,7 @@
             :options="agentSelectOptions"
             labelKey="label"
             valueKey="value"
-            class="w-full rounded-default"
+            class="rounded-default w-full"
           />
         </div>
         <div v-else data-test="agent-behavior-stream-selector" class="w-56 flex-shrink-0">
@@ -98,7 +98,7 @@
             :options="availableStreams.map((s) => ({ label: s, value: s }))"
             labelKey="label"
             valueKey="value"
-            class="w-full rounded-default"
+            class="rounded-default w-full"
           />
         </div>
       </div>
@@ -107,10 +107,10 @@
     <!-- Full-height column: the panel splits the available height between its
          two cards, so the page itself never scrolls — each table scrolls
          internally when its rows overflow. -->
-    <div class="flex-1 min-h-0 flex flex-col px-page-edge py-4">
+    <div class="px-page-edge flex min-h-0 flex-1 flex-col py-4">
       <AgentBehaviorPanel
         ref="panelRef"
-        class="flex-1 min-h-0"
+        class="min-h-0 flex-1"
         :source-stream="effectiveStream"
         :agent-filter="agentFilter"
         :start-time="timeRange.startTime"

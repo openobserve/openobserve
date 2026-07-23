@@ -1,8 +1,8 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <template>
-  <div class="w-full h-full flex flex-col bg-surface-panel border-r border-border-default">
-    <div class="flex items-center justify-between shrink-0 my-3 px-page-edge">
+  <div class="bg-surface-panel border-border-default flex h-full w-full flex-col border-r">
+    <div class="px-page-edge my-3 flex shrink-0 items-center justify-between">
       <span class="text-base font-bold">{{ t("panel.fields") }}</span>
       <OButton
         variant="outline"
@@ -16,7 +16,7 @@
     </div>
     <OFieldList
       ref="fieldListRef"
-      class="flex-1 min-h-0"
+      class="min-h-0 flex-1"
       :fields="flattenGroupedFields"
       :search="dashboardPanelData.meta.stream.filterField"
       :search-placeholder="t('search.searchField')"
@@ -71,10 +71,10 @@
       <!-- Group header -->
       <template #group-header="{ row }">
         <div
-          class="h-7! w-[calc(100%+2*var(--spacing-page-edge))] shrink-0 -ml-page-edge px-page-edge flex justify-between items-center font-semibold text-xs cursor-default select-none bg-section-header-bg text-text-secondary"
+          class="-ml-page-edge px-page-edge bg-section-header-bg text-text-secondary flex h-7! w-[calc(100%+2*var(--spacing-page-edge))] shrink-0 cursor-default items-center justify-between text-xs font-semibold select-none"
           :title="row.groupName"
         >
-          <div class="flex-1 min-w-0">{{ row.groupName }}</div>
+          <div class="min-w-0 flex-1">{{ row.groupName }}</div>
         </div>
       </template>
 
@@ -332,7 +332,7 @@
       <template #loading>
         <div class="flex flex-col">
           <div v-for="i in 6" :key="i" class="flex items-center gap-2 py-1">
-            <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default flex-shrink-0" />
+            <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 flex-shrink-0" />
             <OSkeleton type="text" class="flex-1" />
           </div>
         </div>
@@ -340,7 +340,7 @@
 
       <!-- Empty state -->
       <template #empty>
-        <div class="text-center py-[0.725rem] flex items-center justify-center">
+        <div class="flex items-center justify-center py-[0.725rem] text-center">
           <OIcon name="info" size="xs" />
           <span class="pl-1.5">{{ t("search.noFieldFound") }}</span>
         </div>

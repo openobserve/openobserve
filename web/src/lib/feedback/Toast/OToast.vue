@@ -133,7 +133,7 @@ onUnmounted(() => {
     :open="open"
     :duration="0"
     :class="[
-      'relative pointer-events-auto',
+      'pointer-events-auto relative',
       details && details.length > 0 ? 'w-[28rem]' : 'w-[22rem]',
       'max-w-[calc(100vw-2rem)]',
       'data-[state=open]:animate-in data-[state=open]:fade-in-0',
@@ -158,7 +158,7 @@ onUnmounted(() => {
       v-if="count > 1"
       :class="[
         'absolute -top-2 -right-2 z-10 flex items-center justify-center',
-        'min-w-5 h-5 px-1.5 rounded-full text-xs font-semibold shadow',
+        'h-5 min-w-5 rounded-full px-1.5 text-xs font-semibold shadow',
         badgeColorClasses[variant ?? 'default'],
       ]"
       :data-test="`o-toast-count-${count}`"
@@ -169,7 +169,7 @@ onUnmounted(() => {
     <!-- Inner shell: carries all visual styling + overflow-hidden to clip the progress bar -->
     <div
       :class="[
-        'relative flex gap-2 rounded-default overflow-hidden p-3 shadow-toast w-full',
+        'rounded-default shadow-toast relative flex w-full gap-2 overflow-hidden p-3',
         title ? 'items-start' : 'items-center',
         variantClasses[variant ?? 'default'],
       ]"
@@ -177,7 +177,7 @@ onUnmounted(() => {
       <!-- Icon -->
       <div
         v-if="hasIcon"
-        :class="['shrink-0 flex items-center', iconColorClasses[variant ?? 'default']]"
+        :class="['flex shrink-0 items-center', iconColorClasses[variant ?? 'default']]"
         aria-hidden="true"
       >
         <OIcon
@@ -193,10 +193,10 @@ onUnmounted(() => {
       </div>
 
       <!-- Content -->
-      <div class="flex-1 min-w-0">
+      <div class="min-w-0 flex-1">
         <!-- Title row: text + optional count badge side-by-side -->
         <div :class="['flex items-center gap-2', !title ? 'sr-only' : '']">
-          <ToastTitle class="text-sm font-semibold text-toast-fg leading-snug">
+          <ToastTitle class="text-toast-fg text-sm leading-snug font-semibold">
             {{ title ?? screenReaderTitle }}
           </ToastTitle>
           <OTag v-if="title && titleCount !== undefined" type="countChip" value="errorstrong">{{
@@ -221,10 +221,10 @@ onUnmounted(() => {
             v-if="action"
             type="button"
             :class="[
-              'inline-flex items-center gap-1 justify-center rounded-default px-2.5 py-0.5 text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
+              'rounded-default inline-flex items-center justify-center gap-1 px-2.5 py-0.5 text-xs font-semibold transition-all focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none',
               actionSucceeded
-                ? 'bg-toast-success-icon text-white focus-visible:ring-toast-success-icon'
-                : 'bg-toast-action-text text-white hover:bg-toast-action-hover focus-visible:ring-toast-action-text',
+                ? 'bg-toast-success-icon focus-visible:ring-toast-success-icon text-white'
+                : 'bg-toast-action-text hover:bg-toast-action-hover focus-visible:ring-toast-action-text text-white',
             ]"
             @click.stop="handleActionClick"
           >
@@ -243,7 +243,7 @@ onUnmounted(() => {
         <div v-if="details && details.length > 0" class="mt-2 w-full" data-test="o-toast-details">
           <button
             type="button"
-            class="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-toast-fg-secondary hover:text-toast-fg transition-colors cursor-pointer"
+            class="text-toast-fg-secondary hover:text-toast-fg flex cursor-pointer items-center gap-1 text-xs font-semibold tracking-wide uppercase transition-colors"
             :aria-expanded="detailsExpanded"
             data-test="o-toast-details-toggle"
             @click.stop="detailsExpanded = !detailsExpanded"
@@ -262,9 +262,9 @@ onUnmounted(() => {
               :key="detail.url"
               class="flex items-baseline justify-between gap-2 text-xs"
             >
-              <span class="font-medium text-toast-fg shrink-0">{{ detail.label }}</span>
+              <span class="text-toast-fg shrink-0 font-medium">{{ detail.label }}</span>
               <span
-                class="text-toast-fg-secondary truncate font-mono text-right"
+                class="text-toast-fg-secondary truncate text-right font-mono"
                 :title="detail.url"
                 >{{ detail.url }}</span
               >
@@ -276,7 +276,7 @@ onUnmounted(() => {
       <!-- Dismiss button -->
       <ToastClose
         :class="[
-          'shrink-0 flex items-center rounded-default p-0.5 text-toast-fg-secondary hover:text-toast-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-toast-info-border',
+          'rounded-default text-toast-fg-secondary hover:text-toast-fg focus-visible:ring-toast-info-border flex shrink-0 items-center p-0.5 focus-visible:ring-2 focus-visible:outline-none',
           title ? 'self-start' : 'self-center',
         ]"
         aria-label="Dismiss notification"
@@ -290,7 +290,7 @@ onUnmounted(() => {
       <div
         v-if="(timeout ?? 0) > 0"
         :key="timerKey"
-        class="absolute bottom-0 left-0 right-0 h-0.5"
+        class="absolute right-0 bottom-0 left-0 h-0.5"
         aria-hidden="true"
       >
         <div

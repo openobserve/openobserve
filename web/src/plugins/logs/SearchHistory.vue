@@ -10,7 +10,7 @@
         data-test="search-history-wrap-content-btn"
         variant="ghost"
         size="icon"
-        class="h-6! min-h-6! w-[1.45rem]! p-0! m-0 border-[0.0626rem]! border-solid! border-card-glass-border! rounded-default! [transition:all_0.2s_ease] backdrop-blur-[0.625rem]! flex! items-center! justify-center!"
+        class="border-card-glass-border! rounded-default! m-0 flex! h-6! min-h-6! w-[1.45rem]! items-center! justify-center! border-[0.0626rem]! border-solid! p-0! backdrop-blur-[0.625rem]! [transition:all_0.2s_ease]"
         :class="
           wrapText
             ? 'bg-theme-accent! text-white hover:opacity-85'
@@ -22,7 +22,7 @@
         <OTooltip :content="t('search.messageWrapContent')" />
       </OButton>
       <div
-        class="text-status-warning-text border border-status-warning-text flex items-center px-2 h-9 rounded-default"
+        class="text-status-warning-text border-status-warning-text rounded-default flex h-9 items-center border px-2"
       >
         <OIcon name="info" class="mr-1" size="sm" />
         <div>
@@ -58,7 +58,7 @@
         </OButton>
       </div>
     </template>
-    <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
+    <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
       <OTable
         :frame="false"
         :data="dataToBeLoaded"
@@ -96,7 +96,7 @@
           <!-- px-4 matches the SQL/Function/More-Details blocks below so the
                    tabs line up with the query content instead of sitting flush
                    to the cell edge (same inset the scheduler list uses). -->
-          <div class="app-tabs-container w-fit my-1 px-4">
+          <div class="app-tabs-container my-1 w-fit px-4">
             <AppTabs
               data-test="expanded-list-tabs"
               class="tabs-selection-container"
@@ -106,9 +106,9 @@
           </div>
           <div v-show="activeTab === 'query'">
             <div
-              class="text-left mb-2 px-4 py-0 w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] max-h-screen overflow-hidden"
+              class="mb-2 max-h-screen w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] overflow-hidden px-4 py-0 text-left"
             >
-              <div class="flex items-center py-2 gap-2">
+              <div class="flex items-center gap-2 py-2">
                 <strong
                   >{{ t("logs.searchHistory.sqlQueryLabel") }}
                   <span>
@@ -159,7 +159,7 @@
               </div>
               <div class="flex items-start justify-center">
                 <div
-                  class="w-full overflow-y-auto p-2.5 h-full max-h-50 border border-border-default border-l-3 border-l-sql-accent bg-surface-subtle text-text-body o2-colorized-query"
+                  class="border-border-default border-l-sql-accent bg-surface-subtle text-text-body o2-colorized-query h-full max-h-50 w-full overflow-y-auto border border-l-3 p-2.5"
                 >
                   <!-- Monaco-colorized SQL (sanitized in colorizeRow), same
                            as the dashboard Query Inspector. Falls back to plain
@@ -167,13 +167,13 @@
                            Monaco throws (colorizeQuery escapes on failure). -->
                   <pre
                     v-if="colorizedSql[row.uuid]"
-                    class="font-mono text-compact leading-[1.6] m-0 whitespace-pre-wrap break-words"
+                    class="text-compact m-0 font-mono leading-[1.6] break-words whitespace-pre-wrap"
                     data-test="search-history-sql-colorized"
                     v-html="colorizedSql[row.uuid]"
                   ></pre>
                   <pre
                     v-else
-                    class="font-mono text-compact leading-[1.6] m-0 whitespace-pre-wrap break-words"
+                    class="text-compact m-0 font-mono leading-[1.6] break-words whitespace-pre-wrap"
                     >{{ row?.sql }}</pre
                   >
                 </div>
@@ -181,7 +181,7 @@
             </div>
             <div
               v-if="row?.function"
-              class="text-left mb-2 px-4 py-0 w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] max-h-screen overflow-hidden"
+              class="mb-2 max-h-screen w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] overflow-hidden px-4 py-0 text-left"
             >
               <div class="flex items-center py-2">
                 <strong
@@ -206,17 +206,17 @@
 
               <div class="flex items-start justify-center">
                 <div
-                  class="w-full overflow-y-auto p-2.5 h-full max-h-50 border border-border-default border-l-3 border-l-function-accent bg-surface-subtle text-text-body o2-colorized-query"
+                  class="border-border-default border-l-function-accent bg-surface-subtle text-text-body o2-colorized-query h-full max-h-50 w-full overflow-y-auto border border-l-3 p-2.5"
                 >
                   <pre
                     v-if="colorizedFunction[row.uuid]"
-                    class="font-mono text-compact leading-[1.6] m-0 whitespace-pre-wrap break-words"
+                    class="text-compact m-0 font-mono leading-[1.6] break-words whitespace-pre-wrap"
                     data-test="search-history-function-colorized"
                     v-html="colorizedFunction[row.uuid]"
                   ></pre>
                   <pre
                     v-else
-                    class="font-mono text-compact leading-[1.6] m-0 whitespace-pre-wrap break-words"
+                    class="text-compact m-0 font-mono leading-[1.6] break-words whitespace-pre-wrap"
                     >{{ row?.function }}</pre
                   >
                 </div>
@@ -245,11 +245,11 @@
         </template>
 
         <template #bottom>
-          <div class="flex items-center justify-between w-full h-12">
-            <div class="text-xs font-normal flex items-center w-25 mr-md">
+          <div class="flex h-12 w-full items-center justify-between">
+            <div class="mr-md flex w-25 items-center text-xs font-normal">
               {{ resultTotal }} {{ t("search_history.results") }}
             </div>
-            <div class="ml-auto mr-2">{{ t("logs.searchHistory.maxLimit") }} <b>1000</b></div>
+            <div class="mr-2 ml-auto">{{ t("logs.searchHistory.maxLimit") }} <b>1000</b></div>
           </div>
         </template>
       </OTable>

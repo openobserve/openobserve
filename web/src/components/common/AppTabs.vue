@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ tab.label }}
       <span
         v-if="tab.dirty"
-        class="ml-1.5 w-2 h-2 rounded-full bg-button-primary shrink-0"
+        class="bg-button-primary ml-1.5 h-2 w-2 shrink-0 rounded-full"
         :title="dirtyTitle"
         :data-test="`tab-${tab.value}-dirty-dot`"
         aria-hidden="true"

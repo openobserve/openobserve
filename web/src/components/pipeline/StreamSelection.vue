@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="h-full bg-surface-base">
+  <div class="bg-surface-base h-full">
     <div>
-      <div class="flex justify-between items-center px-3 py-2">
+      <div class="flex items-center justify-between px-3 py-2">
         <div data-test="add-pipeline-section-title" style="font-size: var(--text-lg)">
           {{ t("pipeline.addPipeline") }}
         </div>
@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <div class="w-full bg-separator" style="height: 1px" />
+      <div class="bg-separator w-full" style="height: 1px" />
 
       <!-- Inline form — the Save button lives inside the <OForm>, so Enter submits
            natively via type="submit" (no form-id needed; R4 case 1). -->
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div class="flex gap-2 mt-4 px-3">
+        <div class="mt-4 flex gap-2 px-3">
           <OButton
             variant="outline"
             size="sm-action"

@@ -19,13 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="visible"
       ref="menuRef"
-      class="fixed z-9999 bg-dropdown-bg border border-dropdown-border rounded-default shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_15%,transparent)] dark:shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_40%,transparent)] min-w-70 py-1 px-0"
+      class="bg-dropdown-bg border-dropdown-border rounded-default fixed z-9999 min-w-70 border px-0 py-1 shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_15%,transparent)] dark:shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
       :style="menuStyle"
       @click.stop
       data-test="alert-context-menu"
     >
       <div
-        class="flex items-center py-2 px-4 cursor-pointer [transition:background-color_0.2s] text-sm text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg"
+        class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
         @click="handleMenuItemClick('above')"
         data-test="alert-context-menu-above"
       >
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="select-none">Create Alert with threshold above {{ formattedValue }}</span>
       </div>
       <div
-        class="flex items-center py-2 px-4 cursor-pointer [transition:background-color_0.2s] text-sm text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg"
+        class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
         @click="handleMenuItemClick('below')"
         data-test="alert-context-menu-below"
       >

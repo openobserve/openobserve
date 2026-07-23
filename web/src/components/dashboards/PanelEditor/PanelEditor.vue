@@ -15,12 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex-1 flex min-h-0 h-full w-full" data-test="panel-editor-container">
+  <div class="flex h-full min-h-0 w-full flex-1" data-test="panel-editor-container">
     <div class="flex" :style="rowStyle">
       <!-- Chart Type Selection Sidebar -->
       <div>
         <div
-          class="flex flex-col scroll bg-surface-panel! border-r border-border-default overflow-y-auto overflow-x-hidden h-full min-w-25 max-w-25"
+          class="scroll bg-surface-panel! border-border-default flex h-full max-w-25 min-w-25 flex-col overflow-x-hidden overflow-y-auto border-r"
         >
           <ChartSelection
             v-model:selectedChartType="dashboardPanelData.data.type"
@@ -39,17 +39,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Collapsed field list bar -->
         <div
           v-if="!dashboardPanelData.layout.showFieldList"
-          class="cursor-pointer overflow-y-auto flex flex-col items-center justify-start bg-surface-panel! border-r border-border-default w-12.5 h-full shrink-0"
+          class="bg-surface-panel! border-border-default flex h-full w-12.5 shrink-0 cursor-pointer flex-col items-center justify-start overflow-y-auto border-r"
           data-test="panel-editor-field-list-sidebar-collapsed"
           @click="collapseFieldList"
         >
           <OIcon
             name="expand-all"
             size="sm"
-            class="mt-2.5 text-xl rotate-90"
+            class="mt-2.5 rotate-90 text-xl"
             data-test="panel-editor-field-list-collapsed-icon"
           />
-          <div class="[writing-mode:vertical-rl] [text-orientation:mixed] font-bold text-base">
+          <div class="text-base font-bold [text-orientation:mixed] [writing-mode:vertical-rl]">
             {{ t("panel.fields") }}
           </div>
         </div>
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div :class="fieldListWrapperClass">
               <div
                 v-if="dashboardPanelData.layout.showFieldList"
-                class="flex flex-col bg-surface-panel!"
+                class="bg-surface-panel! flex flex-col"
                 :style="fieldListContainerStyle"
               >
                 <div class="flex flex-col" :style="fieldListInnerStyle">
@@ -86,12 +86,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :style="afterSlotInnerStyle"
                 @scroll.passive="onBuilderScroll"
               >
-                <div class="flex flex-col w-full h-full" :style="layoutPanelContainerStyle">
+                <div class="flex h-full w-full flex-col" :style="layoutPanelContainerStyle">
                   <!-- Mode selection + Add To Dashboard row. Skip when empty (e.g.
                        dashboard mode) so its `my-2` margin isn't dead space. -->
                   <div
                     v-if="pageType === 'build' || resolvedConfig.showAddToDashboardButton"
-                    class="flex justify-between items-center px-2 py-2 border-b border-border-default"
+                    class="border-border-default flex items-center justify-between border-b px-2 py-2"
                   >
                     <QueryTypeSelector v-if="pageType === 'build'" :showQueryType="false" />
                     <div v-else />
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Outdated Warning -->
                   <div v-if="resolvedConfig.showOutdatedWarning && isOutDated" class="p-2">
                     <div
-                      class="border border-banner-warning-border bg-banner-warning-bg p-[1%] rounded-default"
+                      class="border-banner-warning-border bg-banner-warning-bg rounded-default border p-[1%]"
                     >
                       <div class="font-bold">Your chart is not up to date</div>
                       <div>
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <!-- Warning icons and last refreshed time -->
-                  <div class="flex justify-end mr-2 items-center gap-2">
+                  <div class="mr-2 flex items-center justify-end gap-2">
                     <!-- Show Legends button (hidden when the chart has no data) -->
                     <OButton
                       v-if="
@@ -228,7 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Chart Area -->
                   <div
                     v-if="!resolvedConfig.hideChartPreview"
-                    class="flex flex-col relative overflow-hidden h-full"
+                    class="relative flex h-full flex-col overflow-hidden"
                   >
                     <div :class="chartAreaClass" :style="chartAreaStyle">
                       <PanelSchemaRenderer
@@ -312,10 +312,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- HTML Editor Section -->
       <div
         v-if="dashboardPanelData.data.type === 'html'"
-        class="flex flex-col column"
+        class="column flex flex-col"
         :style="{ height: contentHeight, flex: 1 }"
       >
-        <div class="bg-card-glass-bg h-full flex flex-col">
+        <div class="bg-card-glass-bg flex h-full flex-col">
           <!-- Variables Selector for HTML (dashboard mode only) -->
           <VariablesValueSelector
             v-if="resolvedConfig.showVariablesSelector"
@@ -324,14 +324,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :selectedTimeDate="dashboardPanelData.meta.dateTime"
             @variablesData="handleVariablesDataUpdated"
             :initialVariableValues="initialVariableValues"
-            class="shrink-0 mb-2"
+            class="mb-2 shrink-0"
             :showAddVariableButton="true"
             :showAllVisible="true"
             :tabId="tabId"
             :panelId="panelId"
           />
           <CustomHTMLEditor
-            class="flex-1 min-h-0"
+            class="min-h-0 flex-1"
             v-model="dashboardPanelData.data.htmlContent"
             :initialVariableValues="liveVariablesData"
             :tabId="tabId"
@@ -344,10 +344,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Markdown Editor Section -->
       <div
         v-if="dashboardPanelData.data.type === 'markdown'"
-        class="flex flex-col column"
+        class="column flex flex-col"
         :style="{ height: contentHeight, flex: 1 }"
       >
-        <div class="bg-card-glass-bg h-full flex flex-col">
+        <div class="bg-card-glass-bg flex h-full flex-col">
           <!-- Variables Selector for Markdown (dashboard mode only) -->
           <VariablesValueSelector
             v-if="resolvedConfig.showVariablesSelector"
@@ -356,14 +356,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :selectedTimeDate="dashboardPanelData.meta.dateTime"
             @variablesData="handleVariablesDataUpdated"
             :initialVariableValues="initialVariableValues"
-            class="shrink-0 mb-2"
+            class="mb-2 shrink-0"
             :showAddVariableButton="true"
             :showAllVisible="true"
             :tabId="tabId"
             :panelId="panelId"
           />
           <CustomMarkdownEditor
-            class="flex-1 min-h-0"
+            class="min-h-0 flex-1"
             v-model="dashboardPanelData.data.markdownContent"
             :initialVariableValues="liveVariablesData"
             :tabId="tabId"
@@ -382,17 +382,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Collapsed field list bar for custom chart -->
         <div
           v-if="!dashboardPanelData.layout.showFieldList"
-          class="cursor-pointer overflow-y-auto flex flex-col items-center justify-start bg-surface-panel! border-r border-border-default w-12.5 h-full shrink-0"
+          class="bg-surface-panel! border-border-default flex h-full w-12.5 shrink-0 cursor-pointer flex-col items-center justify-start overflow-y-auto border-r"
           data-test="panel-editor-field-list-sidebar-collapsed"
           @click="collapseFieldList"
         >
           <OIcon
             name="expand-all"
             size="sm"
-            class="mt-2.5 text-xl rotate-90"
+            class="mt-2.5 rotate-90 text-xl"
             data-test="panel-editor-field-list-collapsed-icon"
           />
-          <div class="[writing-mode:vertical-rl] [text-orientation:mixed] font-bold text-base">
+          <div class="text-base font-bold [text-orientation:mixed] [writing-mode:vertical-rl]">
             {{ t("panel.fields") }}
           </div>
         </div>
@@ -420,7 +420,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div :class="fieldListWrapperClass">
               <div
                 v-if="dashboardPanelData.layout.showFieldList"
-                class="flex flex-col bg-surface-panel!"
+                class="bg-surface-panel! flex flex-col"
                 :style="fieldListContainerStyle"
               >
                 <div class="flex flex-col" :style="fieldListInnerStyle">
@@ -433,10 +433,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Custom chart content area -->
           <template #after>
             <div
-              class="flex bg-card-glass-bg"
+              class="bg-card-glass-bg flex"
               :style="{ height: contentHeight, overflow: 'hidden' }"
             >
-              <div class="flex flex-col scroll flex-1 min-w-0 h-full">
+              <div class="scroll flex h-full min-w-0 flex-1 flex-col">
                 <!-- Editor/Preview splitter -->
                 <div class="h-125 shrink-0 overflow-hidden">
                   <OSplitter
@@ -446,15 +446,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <!-- Custom Chart Editor -->
                     <template #before>
-                      <div class="relative w-full h-full">
+                      <div class="relative h-full w-full">
                         <CustomChartEditor
-                          class="w-full h-full"
+                          class="h-full w-full"
                           v-model="dashboardPanelData.data.customChartContent"
                         />
                         <!-- Example Charts button (dashboard mode only) -->
                         <div
                           v-if="pageType === 'dashboard'"
-                          class="absolute bottom-2.5 right-2.5 z-10"
+                          class="absolute right-2.5 bottom-2.5 z-10"
                         >
                           <OButton
                             variant="primary"
@@ -483,14 +483,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Splitter separator -->
                     <template #separator>
                       <div
-                        class="w-1 h-full bg-transparent transition-colors duration-300 hover:bg-table-resize-handle"
+                        class="hover:bg-table-resize-handle h-full w-1 bg-transparent transition-colors duration-300"
                       ></div>
                     </template>
 
                     <!-- Chart Preview -->
                     <template #after>
-                      <div class="flex flex-col h-full">
-                        <div class="flex justify-end mr-2 mt-1 items-center gap-2">
+                      <div class="flex h-full flex-col">
+                        <div class="mt-1 mr-2 flex items-center justify-end gap-2">
                           <PanelErrorButtons
                             :error="errorMessage"
                             :maxQueryRangeWarning="maxQueryRangeWarning"

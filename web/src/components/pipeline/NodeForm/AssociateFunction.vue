@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          same contract WorkflowNodeDrawer follows. That is now expressed with
          ODrawer's `bleed` prop above rather than a manual px-3 here: the drawer
          pads its own body (bodyPaddingClass), so padding here would double up. -->
-    <div data-test="add-function-node-routing-section" class="flex flex-col h-full bg-surface-base">
+    <div data-test="add-function-node-routing-section" class="bg-surface-base flex h-full flex-col">
       <!-- NOTE: `is-updating` is deliberately NOT bound to pipelineObj.isEditNode.
            That flag means "editing the NODE"; the picker's isUpdating means
            "editing an existing FUNCTION" (it locks the select). Editing a node

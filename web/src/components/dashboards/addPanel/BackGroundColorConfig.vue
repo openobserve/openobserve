@@ -1,5 +1,5 @@
 <template>
-  <div class="flex items-center w-full">
+  <div class="flex w-full items-center">
     <OSelect
       v-model="backgroundType"
       :options="colorModeOptions"
@@ -11,13 +11,13 @@
     <div v-if="backgroundType === 'single'">
       <div
         data-test="dashboard-config-color-input-wrapper"
-        class="h-6.25 w-6.25 overflow-hidden rounded-full inline-flex items-center relative mt-9 ml-1.25"
+        class="relative mt-9 ml-1.25 inline-flex h-6.25 w-6.25 items-center overflow-hidden rounded-full"
       >
         <input
           data-test="dashboard-config-color-input"
           type="color"
           v-model="backgroundColor"
-          class="absolute h-[4em] w-[4em] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 overflow-hidden border-0 m-0 p-0"
+          class="absolute top-1/2 left-1/2 m-0 h-[4em] w-[4em] -translate-x-1/2 -translate-y-1/2 overflow-hidden border-0 p-0"
         />
       </div>
     </div>

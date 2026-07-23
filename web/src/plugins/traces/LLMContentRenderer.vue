@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div v-if="hasValidContent" class="llm-content-renderer w-full h-full">
+  <div v-if="hasValidContent" class="llm-content-renderer h-full w-full">
     <!-- Tool-specific rendering -->
-    <div v-if="isToolObservation && toolContent !== null" class="tool-content flex flex-col h-full">
-      <div v-if="toolMetadata" class="flex items-center flex-wrap gap-2 mb-2">
+    <div v-if="isToolObservation && toolContent !== null" class="tool-content flex h-full flex-col">
+      <div v-if="toolMetadata" class="mb-2 flex flex-wrap items-center gap-2">
         <OTag v-if="toolMetadata.name" type="toolMeta" value="tool" class="mr-2">{{
           t("traces.lLMContentRenderer.tool", { name: toolMetadata.name })
         }}</OTag>
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-auto-complete="false"
           :show-line-numbers="false"
           :sticky-scroll="false"
-          class="min-h-25 w-full rounded-default overflow-hidden max-h-full! h-full!"
+          class="rounded-default h-full! max-h-full! min-h-25 w-full overflow-hidden"
         />
       </div>
     </div>
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
             >
               <div
-                class="message-role text-xs font-bold p-2 capitalize"
+                class="message-role p-2 text-xs font-bold capitalize"
                 :style="{
                   backgroundColor: roleColor(msg.role),
                   borderBottom: '1px solid var(--color-border-default)',
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="isMessageJson(msg.content)"
-                class="message-content-json p-2 h-full text-compact bg-code-bg"
+                class="message-content-json text-compact bg-code-bg h-full p-2"
               >
                 <CodeQueryEditor
                   :editor-id="`${editorIdPrefix}msg-json-editor-${idx}`"
@@ -89,19 +89,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :show-auto-complete="false"
                   :show-line-numbers="false"
                   :sticky-scroll="false"
-                  class="min-h-25 w-full rounded-default overflow-hidden max-h-full! h-full!"
+                  class="rounded-default h-full! max-h-full! min-h-25 w-full overflow-hidden"
                 />
               </div>
               <div
                 v-else
-                class="message-content markdown-body p-2 overflow-x-auto bg-code-bg"
+                class="message-content markdown-body bg-code-bg overflow-x-auto p-2"
                 v-html="renderMarkdown(msg.content)"
               />
             </div>
           </div>
           <div v-else-if="isPlainText" class="text-content">
             <pre
-              class="plain-text-content m-0 p-2 whitespace-pre-wrap wrap-break-word font-mono text-compact leading-normal bg-code-bg rounded-default overflow-x-auto"
+              class="plain-text-content text-compact bg-code-bg rounded-default m-0 overflow-x-auto p-2 font-mono leading-normal wrap-break-word whitespace-pre-wrap"
               >{{ contentStats.previewText }}</pre
             >
           </div>
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :show-auto-complete="false"
               :show-line-numbers="false"
               :sticky-scroll="false"
-              class="min-h-25 w-full rounded-default overflow-hidden max-h-full! h-full!"
+              class="rounded-default h-full! max-h-full! min-h-25 w-full overflow-hidden"
             />
           </div>
         </div>
@@ -129,11 +129,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :show-auto-complete="false"
             :show-line-numbers="false"
             :sticky-scroll="false"
-            class="min-h-25 w-full rounded-default overflow-hidden max-h-full! h-full!"
+            class="rounded-default h-full! max-h-full! min-h-25 w-full overflow-hidden"
           />
         </div>
 
-        <div class="text-center mt-2">
+        <div class="mt-2 text-center">
           <OButton
             variant="ghost-primary"
             size="sm"
@@ -168,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
             >
               <div
-                class="message-role text-xs font-bold p-2 capitalize"
+                class="message-role p-2 text-xs font-bold capitalize"
                 :style="{
                   backgroundColor: roleColor(msg.role),
                   borderBottom: '1px solid var(--color-border-default)',
@@ -178,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="isMessageJson(msg.content)"
-                class="message-content-json p-2 h-full text-compact bg-code-bg"
+                class="message-content-json text-compact bg-code-bg h-full p-2"
               >
                 <CodeQueryEditor
                   :editor-id="`${editorIdPrefix}msg-json-editor-full-${idx}`"
@@ -188,19 +188,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :show-auto-complete="false"
                   :show-line-numbers="false"
                   :sticky-scroll="false"
-                  class="min-h-25 w-full rounded-default overflow-hidden max-h-full! h-full!"
+                  class="rounded-default h-full! max-h-full! min-h-25 w-full overflow-hidden"
                 />
               </div>
               <div
                 v-else
-                class="message-content markdown-body p-2 overflow-x-auto bg-code-bg"
+                class="message-content markdown-body bg-code-bg overflow-x-auto p-2"
                 v-html="renderMarkdown(msg.content)"
               />
             </div>
           </div>
           <div v-else-if="isPlainText" class="text-content">
             <pre
-              class="plain-text-content m-0 p-2 whitespace-pre-wrap wrap-break-word font-mono text-compact leading-normal bg-code-bg rounded-default overflow-x-auto"
+              class="plain-text-content text-compact bg-code-bg rounded-default m-0 overflow-x-auto p-2 font-mono leading-normal wrap-break-word whitespace-pre-wrap"
               >{{ fullText }}</pre
             >
           </div>
@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :show-auto-complete="false"
               :show-line-numbers="false"
               :sticky-scroll="false"
-              class="min-h-25 w-full rounded-default overflow-hidden max-h-full! h-full"
+              class="rounded-default h-full max-h-full! min-h-25 w-full overflow-hidden"
             />
           </div>
         </div>
@@ -228,11 +228,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :show-auto-complete="false"
             :show-line-numbers="false"
             :sticky-scroll="false"
-            class="h-full max-h-full min-h-25 w-full rounded-default overflow-hidden"
+            class="rounded-default h-full max-h-full min-h-25 w-full overflow-hidden"
           />
         </div>
 
-        <div v-if="contentStats.shouldTruncate" class="text-center mt-2">
+        <div v-if="contentStats.shouldTruncate" class="mt-2 text-center">
           <OButton variant="ghost-primary" size="sm" @click="isExpanded = false">
             {{ t("traces.lLMContentRenderer.collapse") }}
           </OButton>

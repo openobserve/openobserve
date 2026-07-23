@@ -62,7 +62,7 @@ const navigate = (page: number) => {
     <!-- Previous page -->
     <button
       type="button"
-      class="o-pagination__btn flex size-7 items-center justify-center rounded-default transition-colors"
+      class="o-pagination__btn rounded-default flex size-7 items-center justify-center transition-colors"
       :class="[
         isFirst || disable
           ? 'text-pagination-nav-disabled-text cursor-not-allowed opacity-50'
@@ -81,7 +81,7 @@ const navigate = (page: number) => {
       v-for="page in pages"
       :key="page"
       type="button"
-      class="o-pagination__btn flex size-7 items-center justify-center rounded-default text-sm font-medium transition-colors"
+      class="o-pagination__btn rounded-default flex size-7 items-center justify-center text-sm font-medium transition-colors"
       :class="[
         page === modelValue
           ? 'bg-pagination-item-active-bg text-pagination-item-active-text cursor-default'
@@ -103,7 +103,7 @@ const navigate = (page: number) => {
     <!-- Next page -->
     <button
       type="button"
-      class="o-pagination__btn flex size-7 items-center justify-center rounded-default transition-colors"
+      class="o-pagination__btn rounded-default flex size-7 items-center justify-center transition-colors"
       :class="[
         isLast || disable
           ? 'text-pagination-nav-disabled-text cursor-not-allowed opacity-50'

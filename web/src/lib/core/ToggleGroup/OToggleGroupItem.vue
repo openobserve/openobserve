@@ -90,7 +90,7 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
         'bg-toggle-item-bg text-toggle-item-text font-medium whitespace-nowrap',
         'rounded-default',
         'transition-all duration-150',
-        'outline-none cursor-pointer',
+        'cursor-pointer outline-none',
         // Hover (inactive only) — scoped to data-state=off so hovering the
         // active item never repaints over the sliding indicator / active fill.
         'data-[state=off]:hover:bg-toggle-item-hover-bg',
@@ -102,7 +102,7 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
         // Sit above the sliding indicator so the icon/label stay readable.
         isAnimated && 'relative z-10',
         // Focus ring
-        'focus-visible:ring-2 focus-visible:ring-toggle-focus-ring focus-visible:ring-inset',
+        'focus-visible:ring-toggle-focus-ring focus-visible:ring-2 focus-visible:ring-inset',
         // Disabled — cursor is on the wrapper span; pointer-events-none prevents hover/active styles
         'data-disabled:text-toggle-item-disabled data-disabled:opacity-60',
         'data-disabled:pointer-events-none',
@@ -118,7 +118,7 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
       <span
         v-if="isDropTarget"
         aria-hidden="true"
-        class="absolute rounded-full bg-toggle-drop-indicator pointer-events-none z-20"
+        class="bg-toggle-drop-indicator pointer-events-none absolute z-20 rounded-full"
         :class="dropIndicatorClass"
       />
       <!-- Drag handle — shown only in reorderable mode to signal the item can be
@@ -127,7 +127,7 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
         v-if="isReorderable"
         name="drag-indicator"
         :size="iconSize[props.size]"
-        class="shrink-0 opacity-40 -ml-0.5"
+        class="-ml-0.5 shrink-0 opacity-40"
         aria-hidden="true"
       />
       <!-- Slot takes precedence; falls back to `icon-left` prop -->

@@ -1,11 +1,11 @@
 <template>
   <div
-    class="quality-page flex flex-col gap-3.5 pt-3.5 pb-4 min-h-0 flex-1"
+    class="quality-page flex min-h-0 flex-1 flex-col gap-3.5 pt-3.5 pb-4"
     data-test="quality-page"
   >
     <!-- Agent filter — right-aligned at the top of the content container so it
          sits with the KPIs + table it scopes (matches LLM Insights). -->
-    <div class="flex items-center justify-end px-page-edge">
+    <div class="px-page-edge flex items-center justify-end">
       <div class="w-[17rem] flex-shrink-0">
         <!-- While the agent list is loading we swap the select for a skeleton
              of the same height so the control reads as "loading" (and can't be
@@ -14,7 +14,7 @@
           type="text"
           v-if="agentsLoading"
           data-test="quality-agent-filter-skeleton"
-          class="w-full h-8.5"
+          class="h-8.5 w-full"
         />
         <OSelect
           v-else
@@ -45,7 +45,7 @@
          row opens the detail in a right-side ODrawer (70% width). The user
          keeps full context of the list behind the drawer. -->
     <div
-      class="quality-page__tier2 grid gap-3 min-h-0 flex-1"
+      class="quality-page__tier2 grid min-h-0 flex-1 gap-3"
       style="grid-template-columns: minmax(0, 1fr)"
     >
       <QualityScoreConfigsTable
@@ -82,7 +82,7 @@
         />
         <span
           v-if="selectedConfig?.version"
-          class="qpd-version ml-1.5 text-2xs text-text-secondary [font-variant-numeric:tabular-nums]"
+          class="qpd-version text-2xs text-text-secondary ml-1.5 [font-variant-numeric:tabular-nums]"
           data-test="quality-detail-version-badge"
           >v{{ selectedConfig.version }}</span
         >

@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   user searches, filters and drills down from there.
 -->
 <template>
-  <div class="flex flex-col h-full min-h-0 w-full" data-test="metrics-explorer">
+  <div class="flex h-full min-h-0 w-full flex-col" data-test="metrics-explorer">
     <!-- No page title: Metrics is an EXPLORE surface like Logs and Traces, so the
          first row is the toolbar — scope on the left, time on the right, like the
          Logs toolbar. -->
@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- `p-1.5`, the SAME padding the Logs and Traces toolbars use
          (SearchBar.vue:23 / traces SearchBar.vue:19), so the toolbars share geometry. -->
     <div
-      class="flex items-center gap-2 shrink-0 p-1.5 border-b border-border-default"
+      class="border-border-default flex shrink-0 items-center gap-2 border-b p-1.5"
       data-test="metrics-explorer-filter-bar"
     >
       <!-- Page mode toggle at the start of the toolbar — Explore (browse grid)
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            filter-row`). This spacer is what pins the time cluster right. -->
       <div class="flex-1" />
 
-      <div class="flex items-center gap-2 shrink-0">
+      <div class="flex shrink-0 items-center gap-2">
         <DateTimePickerDashboard
           ref="dateTimePickerRef"
           v-model="selectedDate"
@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     -->
     <div
       v-if="isGridMode"
-      class="flex items-center gap-2 shrink-0 p-1.5 border-b border-border-default"
+      class="border-border-default flex shrink-0 items-center gap-2 border-b p-1.5"
       data-test="metrics-explorer-filter-row"
     >
       <!-- No "Filters" caption: the chips already read `action = accept_challenge`
@@ -140,19 +140,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- EXPLORE + FAVOURITES — the same browse grid. Favourites is that grid
          narrowed to the metrics you ♥'d, so the body is identical bar the facet
          panel (Explore only): the right column is the search row + grid. -->
-    <div v-if="isGridMode" class="flex flex-1 min-h-0">
+    <div v-if="isGridMode" class="flex min-h-0 flex-1">
       <!-- Facet panel — EXPLORE only. It is an editing control (filter by
            prefix/suffix/type); Workspace is a read-only lens viewer, so it shows
            just the grid (with the Views rail), no facets. -->
       <aside
         v-if="isExplore"
-        class="w-60 flex-none flex flex-col min-h-0 border-r border-border-default"
+        class="border-border-default flex min-h-0 w-60 flex-none flex-col border-r"
         :aria-label="t('metrics.explorer.railsAriaLabel')"
       >
         <!-- Panel header: the facet selector, stretched to fill the column.
              Clear does NOT live here (it collided with the tabs in a 240px
              column); it sits in each facet's search row below instead. -->
-        <div class="shrink-0 flex items-center px-2 py-2">
+        <div class="flex shrink-0 items-center px-2 py-2">
           <!-- Natural, content-sized segmented control (not forced full-width —
                that fought the component and clumped the labels). The count sits
                in a FIXED-WIDTH slot that is always present (empty when there is
@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="flex items-center gap-1">
                 <span>{{ rail.label }}</span>
                 <span
-                  class="w-4 shrink-0 text-right text-2xs font-semibold tabular-nums text-primary"
+                  class="text-2xs text-primary w-4 shrink-0 text-right font-semibold tabular-nums"
                   :data-test="`metrics-explorer-rail-count-${rail.id}`"
                   >{{ rail.count || "" }}</span
                 >
@@ -190,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <PrefixFilterPanel
           v-if="grid.activeRail.value === 'prefix'"
           mode="prefix"
-          class="flex-1 min-h-0 py-2"
+          class="min-h-0 flex-1 py-2"
           :facets="grid.prefixFacets.value"
           :selected="grid.selectedPrefixes.value"
           :has-selection="railHasSelection"
@@ -200,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <PrefixFilterPanel
           v-else-if="grid.activeRail.value === 'suffix'"
           mode="suffix"
-          class="flex-1 min-h-0 py-2"
+          class="min-h-0 flex-1 py-2"
           :facets="grid.suffixFacets.value"
           :selected="grid.selectedSuffixes.value"
           :has-selection="railHasSelection"
@@ -208,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @clear="clearActiveRail"
         />
 
-        <div v-else-if="grid.activeRail.value === 'type'" class="flex flex-col min-h-0 flex-1 py-2">
+        <div v-else-if="grid.activeRail.value === 'type'" class="flex min-h-0 flex-1 flex-col py-2">
           <!-- Type search — narrows the type LIST (mirrors the prefix/suffix
                rails). The flex-1/py-2 above match the PrefixFilterPanel wrapper
                (class="flex-1 min-h-0 py-2") so the search box sits at the exact
@@ -228,7 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                across all three facets. Count + button always shown; button
                disabled when nothing is selected — no disappearing controls. -->
           <div class="flex items-center justify-between gap-2 px-3 pb-2">
-            <span class="text-xs text-text-secondary tabular-nums">
+            <span class="text-text-secondary text-xs tabular-nums">
               {{
                 t("metrics.explorer.facets.selectedCount", { count: grid.selectedTypes.value.size })
               }}
@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OCheckboxGroup
             v-if="visibleTypeFacets.length"
             :model-value="selectedTypesArray"
-            class="px-3 pb-2 overflow-y-auto"
+            class="overflow-y-auto px-3 pb-2"
             @update:model-value="onSelectedTypesChange"
           >
             <OCheckbox
@@ -276,8 +276,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            is where the grid cards start, so the search bar is width-matched to
            the cards (not the full page), and the facet panel to its left runs
            the full height alongside it. -->
-      <div class="flex-1 min-w-0 flex flex-col min-h-0">
-        <div class="flex items-center gap-2 px-3 py-2 border-b border-border-default">
+      <div class="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div class="border-border-default flex items-center gap-2 border-b px-3 py-2">
           <!-- The scope toggle lives INSIDE the field, the way the dashboard
                list's folder scope does: it is a property of the search — which
                metrics you are looking through — not another control beside it. -->
@@ -288,7 +288,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :debounce="200"
             :placeholder="t('metrics.explorer.searchPlaceholder')"
             data-test="metrics-explorer-search"
-            class="flex-1 min-w-0"
+            class="min-w-0 flex-1"
           >
             <template #icon-right>
               <OToggleGroup
@@ -324,7 +324,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span
             aria-live="polite"
             data-test="metrics-explorer-count"
-            class="shrink-0 whitespace-nowrap text-xs text-text-secondary tabular-nums"
+            class="text-text-secondary shrink-0 text-xs whitespace-nowrap tabular-nums"
             >{{ resultCountLabel }}</span
           >
 
@@ -374,13 +374,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <section
           ref="scrollRef"
-          class="flex-1 min-w-0 overflow-y-auto p-3"
+          class="min-w-0 flex-1 overflow-y-auto p-3"
           :class="gridVisible ? '' : 'flex flex-col items-center justify-center'"
           data-test="metrics-explorer-scroll"
         >
           <div
             v-if="grid.loading.value"
-            class="flex flex-col items-center justify-center gap-2.5 h-3/5 opacity-80"
+            class="flex h-3/5 flex-col items-center justify-center gap-2.5 opacity-80"
           >
             <OSpinner size="lg" />
             <span>{{ t("metrics.explorer.loading") }}</span>
@@ -505,7 +505,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="mode === 'visualize'"
       ref="visualizeRef"
       key="metrics-visualize"
-      class="flex-1 min-h-0"
+      class="min-h-0 flex-1"
       :selected-date-time="visualizeDateTime"
       :seed="visualizeSeed"
       @seed-consumed="visualizeSeed = null"

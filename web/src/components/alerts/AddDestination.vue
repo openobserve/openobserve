@@ -25,12 +25,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     bleed
   >
-    <div class="bg-card-glass-bg py-2 flex-1 overflow-y-auto overflow-x-hidden">
+    <div class="bg-card-glass-bg flex-1 overflow-x-hidden overflow-y-auto py-2">
       <div>
-        <OForm :form="form" id="add-destination-form" class="flex flex-col gap-2 px-3 mt-2 mb-1">
+        <OForm :form="form" id="add-destination-form" class="mt-2 mb-1 flex flex-col gap-2 px-3">
           <!-- Destination Type Selection for Alerts (only show in create mode, not edit) -->
           <div v-if="isAlerts && !destination" class="w-full pb-3">
-            <div class="text-sm font-medium mb-2">
+            <div class="mb-2 text-sm font-medium">
               {{ t("alert_destinations.destination_type") }}
             </div>
             <PrebuiltDestinationSelector
@@ -48,11 +48,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex gap-3">
               <!-- Destination Type (Read-only) -->
               <div class="w-1/2">
-                <div class="text-sm font-medium mb-1 leading-tight">
+                <div class="mb-1 text-sm leading-tight font-medium">
                   {{ t("alert_destinations.destination_type") }}
                 </div>
                 <div
-                  class="flex items-center p-2 border border-card-glass-border rounded-default"
+                  class="border-card-glass-border rounded-default flex items-center border p-2"
                   data-test="destination-type-readonly"
                 >
                   <OIcon :name="getDestinationTypeIcon(dtVal)" size="md" class="mr-2" />
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <div v-else-if="isUpdatingDestination" class="p-3 text-center">
               <OSpinner size="md" data-test="add-destination-loading-indicator" />
-              <div class="mt-2 text-text-muted">{{ t("alert_destinations.loadingData") }}</div>
+              <div class="text-text-muted mt-2">{{ t("alert_destinations.loadingData") }}</div>
             </div>
 
             <!-- Template selector for prebuilt destinations -->
@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 valueKey="value"
                 tabindex="0"
               />
-              <div class="text-xs text-text-secondary mt-1">
+              <div class="text-text-secondary mt-1 text-xs">
                 {{
                   t("alert_destinations.templateHelp", {
                     type: getDestinationTypeName(dtVal),
@@ -129,18 +129,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Additional Settings for Prebuilt Destinations -->
-            <div class="w-full mt-3">
-              <div class="font-bold py-1">
+            <div class="mt-3 w-full">
+              <div class="py-1 font-bold">
                 {{ t("alert_destinations.additional_settings") }}
               </div>
 
               <!-- Custom Headers (hidden for email destinations) -->
               <div v-if="dtVal !== 'email'" class="py-2">
-                <div class="text-sm font-medium pb-1">
+                <div class="pb-1 text-sm font-medium">
                   {{ t("alert_destinations.custom_headers") }}
                 </div>
                 <div v-for="(header, index) in apiHeaders" :key="index" class="flex gap-2 pb-2">
-                  <div class="w-5/12 ml-0">
+                  <div class="ml-0 w-5/12">
                     <OFormInput
                       :data-test="`add-destination-header-${header['key']}-key-input`"
                       :name="`apiHeaders[${index}].key`"
@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       tabindex="0"
                     />
                   </div>
-                  <div class="w-5/12 ml-0">
+                  <div class="ml-0 w-5/12">
                     <OFormInput
                       :data-test="`add-destination-header-${header['key']}-value-input`"
                       :name="`apiHeaders[${index}].value`"
@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       tabindex="0"
                     />
                   </div>
-                  <div class="w-1/6 ml-0">
+                  <div class="ml-0 w-1/6">
                     <OButton
                       :data-test="`add-destination-header-${header['key']}-delete-btn`"
                       class="ml-1"
@@ -204,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Tabs for non-alert destinations OR custom alert destinations -->
           <div v-if="!isAlerts || (isAlerts && dtVal === 'custom')" class="w-full pb-3">
-            <div class="app-tabs-container h-9 mr-2 w-fit">
+            <div class="app-tabs-container mr-2 h-9 w-fit">
               <AppTabs
                 data-test="add-destination-tabs"
                 :tabs="tabs"
@@ -216,9 +216,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-if="typeVal === 'email' && !getFormattedTemplates.length"
-            class="flex items-center w-full mb-3"
+            class="mb-3 flex w-full items-center"
           >
-            <div class="text-sm font-medium mr-2">
+            <div class="mr-2 text-sm font-medium">
               {{ t("alert_destinations.noEmailTemplates") }}
             </div>
             <OButton variant="outline" size="sm" @click="createEmailTemplate">{{
@@ -226,7 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }}</OButton>
           </div>
           <!-- Name + Template row for custom alert destinations -->
-          <div v-if="isAlerts && dtVal === 'custom'" class="flex gap-3 w-full">
+          <div v-if="isAlerts && dtVal === 'custom'" class="flex w-full gap-3">
             <div class="w-1/2 py-1">
               <OFormInput
                 data-test="add-destination-name-input"
@@ -248,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <!-- Name field for non-alert destinations (pipelines) -->
-          <div v-if="!isAlerts" class="py-1 w-full">
+          <div v-if="!isAlerts" class="w-full py-1">
             <OFormInput
               data-test="add-destination-name-input"
               name="name"
@@ -264,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               (!isAlerts && typeVal === 'http')
             "
           >
-            <div class="flex gap-3 w-full">
+            <div class="flex w-full gap-3">
               <div class="w-1/2 py-1">
                 <OFormInput
                   data-test="add-destination-url-input"
@@ -296,9 +296,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div class="w-full py-2">
-              <div class="font-bold py-1">{{ t("alert_destinations.headers") }}</div>
+              <div class="py-1 font-bold">{{ t("alert_destinations.headers") }}</div>
               <div v-for="(header, index) in apiHeaders" :key="index" class="flex gap-2 pb-2">
-                <div class="w-5/12 ml-0">
+                <div class="ml-0 w-5/12">
                   <OFormInput
                     :data-test="`add-destination-header-${header['key']}-key-input`"
                     :name="`apiHeaders[${index}].key`"
@@ -306,7 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     tabindex="0"
                   />
                 </div>
-                <div class="w-5/12 ml-0">
+                <div class="ml-0 w-5/12">
                   <OFormInput
                     :data-test="`add-destination-header-${header['key']}-value-input`"
                     :name="`apiHeaders[${index}].value`"
@@ -314,7 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     tabindex="0"
                   />
                 </div>
-                <div class="w-1/6 ml-0">
+                <div class="ml-0 w-1/6">
                   <OButton
                     :data-test="`add-destination-header-${header['key']}-delete-btn`"
                     class="ml-1"
@@ -358,7 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template v-if="typeVal === 'action' && (!isAlerts || dtVal === 'custom')">
-            <div class="w-1/2 py-1 action-select">
+            <div class="action-select w-1/2 py-1">
               <OFormSelect
                 data-test="add-destination-action-select"
                 name="action_id"
@@ -375,7 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OForm>
       </div>
-      <div class="flex justify-between px-4 py-4 w-full border-t border-border-default">
+      <div class="border-border-default flex w-full justify-between border-t px-4 py-4">
         <!-- Left side: Test and Preview buttons (only for prebuilt destinations) -->
         <div
           v-if="

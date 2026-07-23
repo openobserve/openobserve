@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="p-1.25 h-full w-full" data-test="dashboard-geomap-renderer">
+  <div class="h-full w-full p-1.25" data-test="dashboard-geomap-renderer">
     <div class="h-full w-full" ref="chartRef" id="chart-map"></div>
   </div>
 </template>

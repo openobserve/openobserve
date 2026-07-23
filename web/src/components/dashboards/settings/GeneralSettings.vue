@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col h-full">
+  <div class="flex h-full flex-col">
     <DashboardHeader :title="t('dashboard.generalSettingsTitle')" />
     <div>
       <OForm
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <DateTimePickerDashboard
               v-show="store.state.printMode === false"
               ref="dateTimePicker"
-              class="h-7.5 my-2"
+              class="my-2 h-7.5"
               size="sm"
               :initialTimezone="initialTimezone"
               v-model="dateTimeValue"

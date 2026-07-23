@@ -1,13 +1,13 @@
 <template>
-  <div class="pl-2 flex flex-row">
+  <div class="flex flex-row pl-2">
     <div
       data-test="promql-operations-list-label"
-      class="text-sm whitespace-nowrap flex items-center min-w-21.5"
+      class="flex min-w-21.5 items-center text-sm whitespace-nowrap"
     >
       {{ t("panel.operations") }}
     </div>
-    <span class="flex items-center ml-0.5 mr-0.5">:</span>
-    <div class="m-0.5 flex gap-2 flex-wrap items-center scroll">
+    <span class="mr-0.5 ml-0.5 flex items-center">:</span>
+    <div class="scroll m-0.5 flex flex-wrap items-center gap-2">
       <!-- Operations with Drag and Drop -->
       <draggable
         v-if="props.operations.length"
@@ -15,7 +15,7 @@
         @update:modelValue="handleDragUpdate"
         :item-key="getItemKey"
         handle=".drag-handle"
-        class="flex gap-2 flex-wrap items-center"
+        class="flex flex-wrap items-center gap-2"
       >
         <template v-for="(element, index) in props.operations" :key="getItemKey(element, index)">
           <div data-test="promql-operations-item">
@@ -54,7 +54,7 @@
                     </div>
                     <div
                       v-if="getStepSpec(element.id)?.documentation"
-                      class="text-xs text-text-secondary mb-2"
+                      class="text-text-secondary mb-2 text-xs"
                     >
                       {{ getStepSpec(element.id)?.documentation }}
                     </div>
@@ -146,7 +146,7 @@
     <OSearchInput v-model="searchQuery" data-test="operations-list-search-input" clearable />
 
     <div class="overflow-y-auto" style="max-height: 400px">
-      <div class="border border-border rounded-default divide-y divide-border">
+      <div class="border-border rounded-default divide-border divide-y border">
         <div
           v-for="category in categories"
           :key="category"
@@ -159,14 +159,14 @@
                 :key="op.id"
                 :data-test="`promql-operation-option-${op.id}`"
                 :data-test-value="op.name"
-                class="promql-operation-option px-4 py-2 cursor-pointer hover:bg-primary-background text-sm"
+                class="promql-operation-option hover:bg-primary-background cursor-pointer px-4 py-2 text-sm"
                 @click="
                   addOperation(op);
                   showOperationSelector = false;
                 "
               >
                 <div class="font-medium">{{ op.name }}</div>
-                <div class="text-xs text-text-secondary mt-0.5">{{ op.documentation }}</div>
+                <div class="text-text-secondary mt-0.5 text-xs">{{ op.documentation }}</div>
               </div>
             </div>
           </OCollapsible>

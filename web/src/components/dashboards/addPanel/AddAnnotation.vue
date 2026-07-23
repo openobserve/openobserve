@@ -50,10 +50,10 @@
           :options="groupedPanelsOptions"
           multiple
           :label="t('dashboard.addAnnotation.selectPanels')"
-          class="textbox flex flex-col no-case showLabelOnTop min-w-37.5"
+          class="textbox no-case showLabelOnTop flex min-w-37.5 flex-col"
           data-test="dashboard-add-annotation-panels-select"
         />
-        <div class="text-xs mt-3">
+        <div class="mt-3 text-xs">
           {{ t("dashboard.addAnnotation.timestamp") }} {{ annotationDateString }}
         </div>
       </div>

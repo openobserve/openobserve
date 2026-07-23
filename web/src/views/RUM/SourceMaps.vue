@@ -15,11 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="source-maps-container bg-card-glass-bg flex flex-col h-full overflow-hidden">
+  <div class="source-maps-container bg-card-glass-bg flex h-full flex-col overflow-hidden">
     <!-- Filters Section -->
-    <div class="px-page-edge py-3 bg-surface-base">
-      <div class="flex justify-between items-end">
-        <div class="flex gap-4 items-end">
+    <div class="px-page-edge bg-surface-base py-3">
+      <div class="flex items-end justify-between">
+        <div class="flex items-end gap-4">
           <!-- Version Filter -->
           <OSelect
             v-model="filters.version"
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Columns + Refresh + Upload Buttons -->
-        <div class="flex gap-2 items-center">
+        <div class="flex items-center gap-2">
           <OTableColumnToggle
             :columns="columns"
             :column-visibility="columnVisibility"
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OSeparator />
 
     <!-- Source Maps List -->
-    <div class="source-maps-list flex-1 min-h-0">
+    <div class="source-maps-list min-h-0 flex-1">
       <!-- Source Maps Table (OTable handles loading skeleton) -->
       <OTable
         :data="groupedSourceMaps"
@@ -113,11 +113,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #expansion="{ row }">
           <div
-            class="p-3 bg-surface-base border-t border-(--color-border-default,var(--color-border-default))"
+            class="bg-surface-base border-t border-(--color-border-default,var(--color-border-default)) p-3"
           >
-            <div class="text-sm font-medium mb-2">Source Map Files ({{ row.files.length }})</div>
+            <div class="mb-2 text-sm font-medium">Source Map Files ({{ row.files.length }})</div>
             <ul
-              class="flex flex-col divide-y divide-border border rounded-default overflow-y-auto"
+              class="divide-border rounded-default flex flex-col divide-y overflow-y-auto border"
               style="max-height: 400px"
             >
               <li
@@ -126,13 +126,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="source-maps-file-item"
                 class="flex items-center gap-2 px-3 py-2"
               >
-                <div class="flex flex-col flex-1 min-w-0">
-                  <span class="block text-xs text-muted-foreground">Source File</span>
-                  <span class="font-mono break-all text-sm">{{ file.source_file_name }}</span>
+                <div class="flex min-w-0 flex-1 flex-col">
+                  <span class="text-muted-foreground block text-xs">Source File</span>
+                  <span class="font-mono text-sm break-all">{{ file.source_file_name }}</span>
                 </div>
-                <div class="flex flex-col flex-1 min-w-0">
-                  <span class="block text-xs text-muted-foreground">Source Map File</span>
-                  <span class="font-mono break-all text-sm">{{ file.source_map_file_name }}</span>
+                <div class="flex min-w-0 flex-1 flex-col">
+                  <span class="text-muted-foreground block text-xs">Source Map File</span>
+                  <span class="font-mono text-sm break-all">{{ file.source_map_file_name }}</span>
                 </div>
               </li>
             </ul>

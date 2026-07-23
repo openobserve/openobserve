@@ -1,6 +1,6 @@
 <template>
   <div
-    class="field_overlay absolute right-0 top-[50%] table-cell-actions translate-y-[-50%] h-full! flex! items-center justify-center rounded-default max-h-10! px-2"
+    class="field_overlay table-cell-actions rounded-default absolute top-[50%] right-0 flex! h-full! max-h-10! translate-y-[-50%] items-center justify-center px-2"
     :class="backgroundClass"
     :title="row[column.id]"
     :data-test="`log-add-data-from-column-${row[column.id]}`"

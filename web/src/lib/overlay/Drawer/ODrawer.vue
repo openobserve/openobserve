@@ -309,10 +309,10 @@ watch(internalOpen, (open) => {
         data-test="o-drawer-overlay"
         :class="[
           isContained ? 'absolute inset-0' : 'fixed inset-0',
-          seamless ? 'bg-transparent pointer-events-none' : 'bg-dialog-overlay',
+          seamless ? 'pointer-events-none bg-transparent' : 'bg-dialog-overlay',
           'data-[state=open]:animate-in data-[state=open]:fade-in-0',
           'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
-          'data-[state=open]:duration-120 data-[state=closed]:duration-120',
+          'data-[state=closed]:duration-120 data-[state=open]:duration-120',
         ]"
         :style="{ zIndex: overlayZIndex }"
       />
@@ -328,17 +328,17 @@ watch(internalOpen, (open) => {
           isRight ? 'right-0' : 'left-0',
           // Flex column so header/footer are shrink-0 and body scrolls
           isContained
-            ? 'flex flex-col overflow-hidden h-full'
-            : 'flex flex-col overflow-hidden max-h-screen',
+            ? 'flex h-full flex-col overflow-hidden'
+            : 'flex max-h-screen flex-col overflow-hidden',
           sizeClasses,
           // Surface — reuse dialog tokens (same visual language)
           'bg-dialog-bg text-dialog-content-text',
           isRight
-            ? 'border-s border-t border-dialog-border'
-            : 'border-e border-t border-dialog-border',
+            ? 'border-dialog-border border-s border-t'
+            : 'border-dialog-border border-e border-t',
           'shadow-lg',
           // Focus ring
-          'outline-none focus-visible:ring-2 focus-visible:ring-dialog-focus-ring',
+          'focus-visible:ring-dialog-focus-ring outline-none focus-visible:ring-2',
           // Slide-in animation — direction matches side.
           // Strong decel curve so it shoots in (170ms) and settles; exit is quicker (120ms).
           isRight
@@ -369,24 +369,24 @@ watch(internalOpen, (open) => {
         <div
           v-if="hasHeader"
           :class="[
-            'flex items-center gap-2 shrink-0',
+            'flex shrink-0 items-center gap-2',
             'px-dialog-header-px py-dialog-header-py',
             'bg-dialog-header-bg text-dialog-header-text',
-            'border-b border-dialog-header-border',
+            'border-dialog-header-border border-b',
           ]"
         >
           <!-- CASE 1: Full override — backward compat, sub-slots are ignored -->
-          <div v-if="slots.header" class="flex-1 min-w-0">
+          <div v-if="slots.header" class="min-w-0 flex-1">
             <slot name="header" />
           </div>
 
           <!-- CASE 2: Default / structured layout -->
           <template v-else>
             <!-- Title + subtitle block — fixed width, never grows -->
-            <div v-if="title || subTitle" class="shrink-0 min-w-0">
+            <div v-if="title || subTitle" class="min-w-0 shrink-0">
               <span
                 v-if="title"
-                class="text-base font-semibold text-dialog-header-text truncate block"
+                class="text-dialog-header-text block truncate text-base font-semibold"
                 :data-test="titleDataTest"
               >
                 {{ title }}
@@ -395,7 +395,7 @@ watch(internalOpen, (open) => {
               </span>
               <span
                 v-if="subTitle"
-                class="text-xs text-dialog-content-text opacity-70 truncate block mt-0.5"
+                class="text-dialog-content-text mt-0.5 block truncate text-xs opacity-70"
               >
                 {{ subTitle }}
               </span>
@@ -404,7 +404,7 @@ watch(internalOpen, (open) => {
             <!-- #header-left sub-slot — grows to fill space if present -->
             <div
               v-if="slots['header-left']"
-              class="flex-1 min-w-0 flex items-center justify-start gap-2"
+              class="flex min-w-0 flex-1 items-center justify-start gap-2"
             >
               <slot name="header-left" />
             </div>
@@ -413,7 +413,7 @@ watch(internalOpen, (open) => {
             <div v-if="!slots['header-left']" class="flex-1" />
 
             <!-- #header-right sub-slot — shrinks to content width, anchored just before the close button -->
-            <div v-if="slots['header-right']" class="shrink-0 flex items-center gap-2">
+            <div v-if="slots['header-right']" class="flex shrink-0 items-center gap-2">
               <slot name="header-right" />
             </div>
           </template>
@@ -426,13 +426,13 @@ watch(internalOpen, (open) => {
               data-test="o-drawer-close-btn"
               @mousedown.prevent
               :class="[
-                'shrink-0 flex items-center justify-center',
-                'h-7 w-7 rounded-default',
+                'flex shrink-0 items-center justify-center',
+                'rounded-default h-7 w-7',
                 'text-dialog-close-text',
                 'hover:bg-dialog-close-hover-bg',
                 'active:bg-dialog-close-active-bg',
                 'transition-colors duration-150',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dialog-focus-ring',
+                'focus-visible:ring-dialog-focus-ring focus-visible:ring-2 focus-visible:outline-none',
                 'cursor-pointer',
               ]"
             >
@@ -460,7 +460,7 @@ watch(internalOpen, (open) => {
         <div
           ref="bodyRef"
           :class="[
-            'flex-1 min-h-0 overflow-y-auto overflow-x-hidden',
+            'min-h-0 flex-1 overflow-x-hidden overflow-y-auto',
             'text-dialog-content-text',
             bodyPaddingClass,
             canScrollUp && '[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1)]',
@@ -482,8 +482,8 @@ watch(internalOpen, (open) => {
             'shrink-0',
             'px-dialog-footer-px py-dialog-footer-py',
             'bg-dialog-footer-bg',
-            'border-t border-dialog-footer-border',
-            'border-b border-dialog-footer-border',
+            'border-dialog-footer-border border-t',
+            'border-dialog-footer-border border-b',
           ]"
         >
           <!-- ── Built-in footer buttons ──────────────────────────────────────── -->

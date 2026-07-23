@@ -15,11 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col flex-1 min-h-0">
+  <div class="flex min-h-0 flex-1 flex-col">
     <!-- Loading state -->
     <div
       v-if="loading"
-      class="flex flex-col items-center justify-center h-full gap-3"
+      class="flex h-full flex-col items-center justify-center gap-3"
       data-test="rum-player-traces-tab-loading"
     >
       <OSpinner size="md" />
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Error state -->
     <div
       v-else-if="error"
-      class="flex flex-col items-center justify-center h-full gap-4 p-4"
+      class="flex h-full flex-col items-center justify-center gap-4 p-4"
       data-test="rum-player-traces-tab-error"
     >
       <OIcon name="error-outline" size="lg" class="text-status-error-text" />
@@ -47,20 +47,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Empty state -->
     <div
       v-else-if="correlatedViews.length === 0"
-      class="flex flex-col items-center justify-center h-full gap-3 p-4"
+      class="flex h-full flex-col items-center justify-center gap-3 p-4"
       data-test="rum-player-traces-tab-empty"
     >
       <OIcon name="info" size="lg" class="text-text-muted" />
-      <p class="text-center text-text-secondary">
+      <p class="text-text-secondary text-center">
         {{ t("rum.noCorrelatedTraces") }}
       </p>
     </div>
 
     <!-- Detail view: embedded TraceDetails -->
-    <div v-else-if="selectedTrace" class="flex flex-col h-full overflow-hidden">
+    <div v-else-if="selectedTrace" class="flex h-full flex-col overflow-hidden">
       <!-- Trace detail header -->
       <div
-        class="flex items-center gap-1 px-2 py-1.5 border-b border-solid border-card-glass-border"
+        class="border-card-glass-border flex items-center gap-1 border-b border-solid px-2 py-1.5"
       >
         <OButton
           variant="ghost"
@@ -71,13 +71,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OIcon name="arrow-back" size="sm" />
         </OButton>
-        <code class="text-sm text-text-secondary truncate min-w-0 flex-1">{{
+        <code class="text-text-secondary min-w-0 flex-1 truncate text-sm">{{
           shortRoute(selectedTrace.route) || selectedTrace.label
         }}</code>
-        <div class="flex items-center gap-1.5 flex-shrink-0">
+        <div class="flex flex-shrink-0 items-center gap-1.5">
           <span
             v-if="selectedTrace.metadata?.errorCount > 0"
-            class="font-bold inline-flex items-center gap-1 px-1.5 py-0.5 rounded-default text-2xs bg-status-error-bg! text-status-error-text!"
+            class="rounded-default text-2xs bg-status-error-bg! text-status-error-text! inline-flex items-center gap-1 px-1.5 py-0.5 font-bold"
           >
             <OIcon name="error" size="xs" />
             {{ selectedTrace.metadata.errorCount }}
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <button
             v-if="selectedTrace.metadata?.start_time && props.startTime > 0"
-            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-default text-2xs bg-surface-accent text-text-body whitespace-nowrap cursor-pointer hover:bg-card-glass-border"
+            class="rounded-default text-2xs bg-surface-accent text-text-body hover:bg-card-glass-border inline-flex cursor-pointer items-center gap-1 px-1.5 py-0.5 whitespace-nowrap"
             :title="t('rum.seekToMoment')"
             data-test="rum-player-traces-tab-seek-btn"
             @click="seekToTrace(selectedTrace)"
@@ -95,14 +95,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </button>
           <span
             v-if="selectedTrace.metadata?.e2eDuration"
-            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-default text-2xs bg-surface-accent text-text-body whitespace-nowrap"
+            class="rounded-default text-2xs bg-surface-accent text-text-body inline-flex items-center gap-1 px-1.5 py-0.5 whitespace-nowrap"
           >
             <OIcon name="timer" size="xs" class="text-text-secondary" />
             {{ formatTimeWithSuffix(selectedTrace.metadata.e2eDuration * 1000) }}
           </span>
           <span
             v-if="selectedTrace.metadata?.spanCount"
-            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-default text-2xs bg-surface-accent text-text-body whitespace-nowrap"
+            class="rounded-default text-2xs bg-surface-accent text-text-body inline-flex items-center gap-1 px-1.5 py-0.5 whitespace-nowrap"
           >
             <OIcon name="lan" size="xs" class="text-text-secondary" />
             {{ selectedTrace.metadata.spanCount }}
@@ -145,9 +145,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- List view -->
-    <div v-else class="flex flex-col overflow-hidden h-full px-2">
+    <div v-else class="flex h-full flex-col overflow-hidden px-2">
       <!-- Filter bar -->
-      <div class="flex items-center pr-2 py-1 shrink-0 min-h-8">
+      <div class="flex min-h-8 shrink-0 items-center py-1 pr-2">
         <OTag
           type="logsResultChip"
           value="neutral"
@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Traces table -->
-      <div class="flex-1 min-h-0 overflow-hidden rounded-default">
+      <div class="rounded-default min-h-0 flex-1 overflow-hidden">
         <TenstackTable
           :rows="correlatedViews"
           :columns="traceColumns"
@@ -194,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #cell-route="{ item, cell }">
             <div class="overflow-hidden" :style="{ width: cell.column.getSize() + 'px' }">
-              <span class="truncate font-mono text-xs block" :title="item.route">
+              <span class="block truncate font-mono text-xs" :title="item.route">
                 {{ shortRoute(item.route) }}
               </span>
             </div>
@@ -211,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #cell-status="{ item, cell }">
             <div
-              class="overflow-hidden flex items-center"
+              class="flex items-center overflow-hidden"
               :style="{ width: cell.column.getSize() + 'px' }"
             >
               <TraceStatusCell :item="{ errors: item.metadata?.errorCount ?? 0 }" />

@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
     </template>
 
-    <div class="rounded-default py-2 px-3 overflow-auto">
+    <div class="rounded-default overflow-auto px-3 py-2">
       <div class="w-full">
         <CreateDestinationForm
           :destination="destination"

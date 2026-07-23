@@ -1,5 +1,5 @@
 <template>
-  <OForm class="flex flex-col flex-1 min-h-0 bg-card-bg" :form="form" v-slot="{ isSubmitting }">
+  <OForm class="bg-card-bg flex min-h-0 flex-1 flex-col" :form="form" v-slot="{ isSubmitting }">
     <OPageLayout
       :subtitle="t('onlineEvals.provider.subtitle')"
       :back="{
@@ -33,26 +33,26 @@
 
       <div class="py-4.5 [&_textarea]:max-h-55 [&_textarea]:overflow-y-auto [&_textarea]:font-mono">
         <section class="mb-6">
-          <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
+          <div class="border-dialog-header-border mb-3 flex items-center gap-2.5 border-b pb-2.5">
             <span
-              class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-mono"
+              class="text-text-secondary text-2xs inline-flex h-5.5 w-5.5 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] font-mono font-bold"
               >01</span
             >
-            <div class="m-0 text-sm font-semibold text-text-heading">
+            <div class="text-text-heading m-0 text-sm font-semibold">
               {{ t("onlineEvals.provider.sectionTitle") }}
             </div>
           </div>
 
-          <div class="grid grid-cols-2 max-[56.25rem]:grid-cols-1 gap-3.5">
+          <div class="grid grid-cols-2 gap-3.5 max-[56.25rem]:grid-cols-1">
             <div class="mb-3">
-              <div class="flex items-center text-xs font-semibold text-text-heading mb-1">
+              <div class="text-text-heading mb-1 flex items-center text-xs font-semibold">
                 {{ t("onlineEvals.provider.nameLabel") }}
                 <span class="text-status-error-text ml-0.5">*</span>
                 <OIcon
                   v-if="mode === 'edit'"
                   name="lock"
                   size="xs"
-                  class="ml-1.5 text-text-secondary"
+                  class="text-text-secondary ml-1.5"
                 />
               </div>
               <OFormInput
@@ -68,14 +68,14 @@
             </div>
 
             <div class="mb-3">
-              <div class="flex items-center text-xs font-semibold text-text-heading mb-1">
+              <div class="text-text-heading mb-1 flex items-center text-xs font-semibold">
                 {{ t("onlineEvals.provider.typeLabel") }}
                 <span class="text-status-error-text ml-0.5">*</span>
                 <OIcon
                   v-if="mode === 'edit'"
                   name="lock"
                   size="xs"
-                  class="ml-1.5 text-text-secondary"
+                  class="text-text-secondary ml-1.5"
                 />
               </div>
               <OFormSelect
@@ -89,7 +89,7 @@
           </div>
 
           <div class="mb-3">
-            <div class="flex items-center text-xs font-semibold text-text-heading mb-1">
+            <div class="text-text-heading mb-1 flex items-center text-xs font-semibold">
               {{ t("onlineEvals.provider.endpointLabel") }}
             </div>
             <OFormInput
@@ -100,9 +100,9 @@
             />
           </div>
 
-          <div class="grid grid-cols-2 max-[56.25rem]:grid-cols-1 gap-3.5">
+          <div class="grid grid-cols-2 gap-3.5 max-[56.25rem]:grid-cols-1">
             <div class="mb-3">
-              <div class="flex items-center text-xs font-semibold text-text-heading mb-1">
+              <div class="text-text-heading mb-1 flex items-center text-xs font-semibold">
                 {{ t("onlineEvals.provider.defaultModelLabel") }}
                 <span class="text-status-error-text ml-0.5">*</span>
               </div>
@@ -115,7 +115,7 @@
             </div>
 
             <div class="mb-3">
-              <div class="flex items-center text-xs font-semibold text-text-heading mb-1">
+              <div class="text-text-heading mb-1 flex items-center text-xs font-semibold">
                 {{ t("onlineEvals.provider.availableModelsLabel") }}
               </div>
               <OFormInput
@@ -132,26 +132,26 @@
         </section>
 
         <section class="mb-6">
-          <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
+          <div class="border-dialog-header-border mb-3 flex items-center gap-2.5 border-b pb-2.5">
             <span
-              class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-mono"
+              class="text-text-secondary text-2xs inline-flex h-5.5 w-5.5 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] font-mono font-bold"
               >02</span
             >
-            <div class="m-0 text-sm font-semibold text-text-heading">
+            <div class="text-text-heading m-0 text-sm font-semibold">
               {{ t("onlineEvals.provider.authSection") }}
             </div>
           </div>
 
           <div
             v-if="mode === 'edit'"
-            class="provider-callout flex gap-2 items-start px-3 py-2 mb-3 bg-[color-mix(in_srgb,var(--color-status-info-text)_12%,transparent)] border border-[color-mix(in_srgb,var(--color-status-info-text)_30%,transparent)] rounded-default text-2xs text-text-secondary leading-[1.4]"
+            class="provider-callout rounded-default text-2xs text-text-secondary mb-3 flex items-start gap-2 border border-[color-mix(in_srgb,var(--color-status-info-text)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-status-info-text)_12%,transparent)] px-3 py-2 leading-[1.4]"
           >
-            <OIcon name="lock" size="xs" class="shrink-0 mt-px text-status-info-text" />
+            <OIcon name="lock" size="xs" class="text-status-info-text mt-px shrink-0" />
             <span>{{ t("onlineEvals.provider.authEditNote") }}</span>
           </div>
 
           <div class="mb-3">
-            <div class="flex items-center text-xs font-semibold text-text-heading mb-1">
+            <div class="text-text-heading mb-1 flex items-center text-xs font-semibold">
               {{ t("onlineEvals.provider.apiKeyLabel") }}
               <span v-if="mode === 'create'" class="text-status-error-text ml-0.5">*</span>
             </div>
@@ -170,7 +170,7 @@
       </div>
 
       <footer
-        class="sticky bottom-0 flex items-center justify-end gap-2 px-5.5 py-3 border-t border-dialog-header-border bg-card-bg shrink-0 z-1"
+        class="border-dialog-header-border bg-card-bg sticky bottom-0 z-1 flex shrink-0 items-center justify-end gap-2 border-t px-5.5 py-3"
       >
         <OButton
           data-test="provider-form-cancel-btn"

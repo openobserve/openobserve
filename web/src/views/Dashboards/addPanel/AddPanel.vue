@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('panel.name')"
           required
           labelPosition="inside"
-          class="dynamic-input min-w-50 max-w-125 [transition:width_0.2s_ease]"
+          class="dynamic-input max-w-125 min-w-50 [transition:width_0.2s_ease]"
           :style="inputStyle"
         />
       </OForm>
@@ -152,11 +152,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Add Variable Drawer -->
     <div
       v-if="isAddVariableOpen"
-      class="add-variable-drawer-overlay fixed top-0 left-0 right-0 bottom-0 z-6000 flex justify-end bg-overlay-scrim"
+      class="add-variable-drawer-overlay bg-overlay-scrim fixed top-0 right-0 bottom-0 left-0 z-6000 flex justify-end"
       @click.self="handleCloseAddVariable"
     >
       <div
-        class="add-variable-drawer-panel pl-2 pt-2 w-180 h-screen border-l border-border-default shadow-[-2px_0_8px_color-mix(in_srgb,var(--color-black)_15%,transparent)] overflow-hidden rounded-none! bg-surface-base"
+        class="add-variable-drawer-panel border-border-default bg-surface-base h-screen w-180 overflow-hidden rounded-none! border-l pt-2 pl-2 shadow-[-2px_0_8px_color-mix(in_srgb,var(--color-black)_15%,transparent)]"
       >
         <AddSettingVariable
           @save="handleSaveVariable"

@@ -15,17 +15,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="o-field-label flex items-center gap-1.5 min-w-0 flex-1 py-1">
+  <div class="o-field-label flex min-w-0 flex-1 items-center gap-1.5 py-1">
     <OIcon
       v-if="showTypeIcon"
       :name="getTypeIcon(field.type)"
       size="xs"
-      class="flex-shrink-0 opacity-60 text-field-list-label-icon"
+      class="text-field-list-label-icon flex-shrink-0 opacity-60"
     />
     <OTooltip :content="field.label ?? field.name" :disabled="!isTruncated" side="right">
       <span
         ref="labelRef"
-        class="truncate flex-1 min-w-0 leading-relaxed text-compact text-field-list-label-text"
+        class="text-compact text-field-list-label-text min-w-0 flex-1 truncate leading-relaxed"
       >
         {{ field.label ?? field.name }}
       </span>

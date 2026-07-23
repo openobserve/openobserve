@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col w-full index-menu py-1.5! bg-surface-panel!">
+  <div class="index-menu bg-surface-panel! flex w-full flex-col py-1.5!">
     <!-- Stream selector sits on the same page-edge rail inset as the field list below it. -->
     <div class="px-page-edge">
       <OSelect
@@ -95,8 +95,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :key="p.key"
                       class="flex items-center justify-between py-[0.15rem] pl-2"
                     >
-                      <span class="text-xs w-8 shrink-0">{{ p.label }}</span>
-                      <span class="text-xs flex-1 text-right pr-1">
+                      <span class="w-8 shrink-0 text-xs">{{ p.label }}</span>
+                      <span class="flex-1 pr-1 text-right text-xs">
                         {{ formatPercentile(durationPercentiles[p.key]) }}
                       </span>
                       <div class="flex w-12">
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               `duration>='${formatPercentile(durationPercentiles[p.key])}'`,
                             )
                           "
-                          class="o2-custom-button-hover ml-1! border! border-card-glass-border!"
+                          class="o2-custom-button-hover border-card-glass-border! ml-1! border!"
                         >
                           <OIcon name="arrow-forward-ios" size="sm" class="h-2! w-2!" />
                         </OButton>
@@ -123,14 +123,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               `duration<='${formatPercentile(durationPercentiles[p.key])}'`,
                             )
                           "
-                          class="o2-custom-button-hover mr-2.5! border! border-card-glass-border! ml-auto!"
+                          class="o2-custom-button-hover border-card-glass-border! mr-2.5! ml-auto! border!"
                         >
                           <OIcon name="arrow-back-ios" size="sm" class="h-2! w-2!" />
                         </OButton>
                       </div>
                     </div>
                   </template>
-                  <div v-else class="pl-3 py-1 text-sm font-medium">
+                  <div v-else class="py-1 pl-3 text-sm font-medium">
                     {{ durationPercentileErrMsg || t("traces.indexList.noValuesFound") }}
                   </div>
                 </template>
@@ -155,8 +155,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #loading>
-          <div class="flex items-center justify-center w-full pt-8">
-            <div class="text-sm font-medium w-fit mx-auto my-0 flex items-center gap-1.5">
+          <div class="flex w-full items-center justify-center pt-8">
+            <div class="mx-auto my-0 flex w-fit items-center gap-1.5 text-sm font-medium">
               <OSpinner size="sm" />
               {{ t("traces.loadingStream") }}
             </div>

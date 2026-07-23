@@ -290,11 +290,11 @@ onBeforeUnmount(() => {
         @focus-outside="handleFocusOutside"
         :class="[
           // Layout + stacking (must be above the app header/drawer: 2000/3000)
-          'min-w-40 p-1 z-[6000]',
+          'z-[6000] min-w-40 p-1',
           // Surface
-          'bg-dropdown-bg border border-dropdown-border rounded-default shadow-md',
+          'bg-dropdown-bg border-dropdown-border rounded-default border shadow-md',
           // Typography
-          'text-sm text-dropdown-item-text',
+          'text-dropdown-item-text text-sm',
           // Animation — clip-path reveal: the menu is unveiled at full size from
           // its trigger edge (no scale/squish). Wipes down by default; top-placed
           // menus wipe up. Soft ease-out-expo in (200ms), quick wipe out (140ms).

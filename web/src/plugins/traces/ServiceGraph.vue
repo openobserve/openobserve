@@ -1,5 +1,5 @@
 ﻿<template>
-  <OCard class="h-full flex flex-col">
+  <OCard class="flex h-full flex-col">
     <!-- Top toolbar: [stream-selector] [search-input]  ···spacer···  [legends] -->
     <div class="flex items-center gap-2 p-1.5 pb-0">
       <!-- Stream selector (hidden when a parent drives selection, e.g. the
@@ -14,7 +14,7 @@
           :options="availableStreams.map((s) => ({ label: s, value: s }))"
           labelKey="label"
           valueKey="value"
-          class="w-auto flex-shrink-0 rounded-default"
+          class="rounded-default w-auto flex-shrink-0"
           :disabled="availableStreams.length === 0"
           @update:model-value="onStreamFilterChange"
         />
@@ -39,11 +39,11 @@
       <!-- Legends (horizontal) -->
       <div
         data-test="service-graph-legends"
-        class="flex flex-row items-center gap-3 p-[0.325rem] rounded-default border border-card-glass-border!"
+        class="rounded-default border-card-glass-border! flex flex-row items-center gap-3 border p-[0.325rem]"
       >
-        <div data-test="sg-legend" class="flex flex-row items-center gap-3 min-w-0">
+        <div data-test="sg-legend" class="flex min-w-0 flex-row items-center gap-3">
           <!-- Border Color -->
-          <div class="mb-0! whitespace-nowrap text-text-label! font-bold text-xs">
+          <div class="text-text-label! mb-0! text-xs font-bold whitespace-nowrap">
             {{ t("traces.serviceGraph.borderColor") }}
             <span class="font-normal opacity-55"
               >| {{ t("traces.serviceGraph.borderColorMetric") }}</span
@@ -53,11 +53,11 @@
             <div
               v-for="level in healthLevels"
               :key="level.key"
-              class="flex flex-row items-center gap-1.5 flex-none"
+              class="flex flex-none flex-row items-center gap-1.5"
               :data-test="`sg-legend-${level.key}`"
             >
               <span
-                class="w-3 h-3 rounded-full border-2 bg-transparent flex-none"
+                class="h-3 w-3 flex-none rounded-full border-2 bg-transparent"
                 :class="{
                   'border-service-health-healthy': level.key === 'healthy',
                   'border-service-health-degraded': level.key === 'degraded',
@@ -66,15 +66,15 @@
                 }"
               />
               <div class="flex flex-row items-baseline gap-1">
-                <div class="text-left text-text-secondary! text-xs font-semibold">
+                <div class="text-text-secondary! text-left text-xs font-semibold">
                   {{ level.label }}
                 </div>
-                <div class="text-left text-3xs opacity-55">{{ level.range }}</div>
+                <div class="text-3xs text-left opacity-55">{{ level.range }}</div>
               </div>
             </div>
           </div>
         </div>
-        <OSeparator vertical class="self-stretch mx-1" />
+        <OSeparator vertical class="mx-1 self-stretch" />
         <!-- Inventory chip: total entity count. Click to expand the per-kind
              distribution (read-only; the show/hide toggles live in "Show types"). -->
         <ODropdown side="bottom" align="start">
@@ -85,8 +85,8 @@
               size="xs"
               icon-right="expand-more"
             >
-              <span class="font-bold text-text-secondary">{{ totalEntities }}</span>
-              <span class="ml-1 text-text-body">{{ t("traces.serviceGraph.entities") }}</span>
+              <span class="text-text-secondary font-bold">{{ totalEntities }}</span>
+              <span class="text-text-body ml-1">{{ t("traces.serviceGraph.entities") }}</span>
             </OButton>
           </template>
           <div class="min-w-48" data-test="service-graph-entity-distribution">
@@ -103,11 +103,11 @@
             <ODropdownSeparator />
             <ODropdownItem data-test="service-graph-distribution-total">
               <span class="font-semibold">{{ t("traces.serviceGraph.total") }}</span>
-              <span class="ms-auto ps-4 tabular-nums font-semibold">{{ totalEntities }}</span>
+              <span class="ms-auto ps-4 font-semibold tabular-nums">{{ totalEntities }}</span>
             </ODropdownItem>
           </div>
         </ODropdown>
-        <OSeparator vertical class="self-stretch mx-1" />
+        <OSeparator vertical class="mx-1 self-stretch" />
         <!-- "Show types": unifies the kind inventory (each kind's count) with
              the kind filter (show/hide) and the layout mode. -->
         <ODropdown side="bottom" align="end">
@@ -125,7 +125,7 @@
                    dropdown below. -->
               <span
                 v-if="activeFilterCount > 0"
-                class="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-white"
+                class="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-white"
                 data-test="service-graph-active-filter-indicator"
               />
               <OTooltip
@@ -134,7 +134,7 @@
               />
             </OButton>
           </template>
-          <div class="p-2 flex flex-col gap-2 min-w-52" data-test="service-graph-collapse-mode">
+          <div class="flex min-w-52 flex-col gap-2 p-2" data-test="service-graph-collapse-mode">
             <div class="text-3xs font-bold uppercase opacity-60">
               {{ t("traces.serviceGraph.layout") }}
             </div>
@@ -154,7 +154,7 @@
                 {{ t(`traces.serviceGraph.mode.${m}`) }}
               </OToggleGroupItem>
             </OToggleGroup>
-            <div class="text-3xs font-bold uppercase opacity-60 mt-1">
+            <div class="text-3xs mt-1 font-bold uppercase opacity-60">
               {{ t("traces.serviceGraph.types") }}
             </div>
             <!-- Each row: type name + live count, with a checkbox to show/hide.
@@ -186,15 +186,15 @@
         <OSeparator
           vertical
           v-if="searchObj.meta.serviceGraphVisualizationType === 'graph'"
-          class="self-stretch mx-1"
+          class="mx-1 self-stretch"
         />
         <div
           v-if="searchObj.meta.serviceGraphVisualizationType === 'graph'"
           data-test="sg-node-size-info"
-          class="flex flex-row items-center gap-2 min-w-0"
+          class="flex min-w-0 flex-row items-center gap-2"
         >
           <!-- Node Size — Graph View only (Tree View uses fixed sizes) -->
-          <div class="mb-0! whitespace-nowrap text-text-label! font-bold text-xs">
+          <div class="text-text-label! mb-0! text-xs font-bold whitespace-nowrap">
             {{ t("traces.serviceGraph.nodeSize") }}
             <span class="font-normal opacity-55"
               >| {{ t("traces.serviceGraph.nodeSizeMetric") }}</span
@@ -203,18 +203,18 @@
           <div class="flex items-center gap-1 py-0!">
             <div class="flex flex-row items-center gap-1.5">
               <span
-                class="w-4 h-4 rounded-full border-2 border-service-health-healthy bg-transparent shrink-0"
+                class="border-service-health-healthy h-4 w-4 shrink-0 rounded-full border-2 bg-transparent"
               />
-              <span class="text-xs text-text-secondary!">{{
+              <span class="text-text-secondary! text-xs">{{
                 t("traces.serviceGraph.sizeLow")
               }}</span>
             </div>
-            <div class="opacity-35 text-base tracking-[0.125rem] mb-0">···</div>
+            <div class="mb-0 text-base tracking-[0.125rem] opacity-35">···</div>
             <div class="flex flex-row items-center gap-1.5">
               <span
-                class="w-7 h-7 rounded-full border-2 border-service-health-healthy bg-transparent shrink-0"
+                class="border-service-health-healthy h-7 w-7 shrink-0 rounded-full border-2 bg-transparent"
               />
-              <span class="text-xs text-text-secondary!">{{
+              <span class="text-text-secondary! text-xs">{{
                 t("traces.serviceGraph.sizeHigh")
               }}</span>
             </div>
@@ -223,19 +223,19 @@
       </div>
     </div>
     <OCardSection
-      class="flex-1 min-h-0 relative overflow-hidden service-graph-container bg-surface-subtle!"
+      class="service-graph-container bg-surface-subtle! relative min-h-0 flex-1 overflow-hidden"
     >
       <!-- Graph Visualization -->
       <OCard class="rounded-default h-full">
-        <OCardSection class="p-0 h-full">
+        <OCardSection class="h-full p-0">
           <div
             data-test="service-graph-container"
-            class="graph-container h-full w-full rounded-default overflow-hidden bg-surface-subtle relative"
+            class="graph-container rounded-default bg-surface-subtle relative h-full w-full overflow-hidden"
           >
-            <div v-if="loading" class="flex items-center justify-center h-full">
-              <div class="text-center flex flex-col items-center">
+            <div v-if="loading" class="flex h-full items-center justify-center">
+              <div class="flex flex-col items-center text-center">
                 <OSpinner size="lg" />
-                <div class="text-sm mt-3 text-text-secondary">
+                <div class="text-text-secondary mt-3 text-sm">
                   {{ t("traces.serviceGraph.loading") }}
                 </div>
               </div>
@@ -243,7 +243,7 @@
             <div v-else-if="error" class="flex h-full items-center justify-center p-[0.675rem]">
               <div>
                 <OIcon name="error-outline" style="width: 4em; height: 4em" />
-                <div class="text-xl font-semibold mt-3 text-text-heading">
+                <div class="text-text-heading mt-3 text-xl font-semibold">
                   {{ error }}
                 </div>
                 <OButton
@@ -265,7 +265,7 @@
                 @jump-to-stream-data="(from, to) => $emit('jump-to-stream-data', from, to)"
               />
             </div>
-            <div v-else ref="graphContainerRef" class="h-full relative overflow-hidden">
+            <div v-else ref="graphContainerRef" class="relative h-full overflow-hidden">
               <ChartRenderer
                 ref="chartRendererRef"
                 data-test="service-graph-chart"
@@ -279,7 +279,7 @@
               <!-- Zoom controls: explicit buttons drive zoom + fit-to-screen,
                    floated bottom-right like a map control. -->
               <div
-                class="absolute bottom-3 right-3 z-10 flex flex-col rounded-default border border-border-default bg-surface-panel overflow-hidden"
+                class="rounded-default border-border-default bg-surface-panel absolute right-3 bottom-3 z-10 flex flex-col overflow-hidden border"
                 data-test="service-graph-zoom-controls"
               >
                 <OButton
@@ -347,7 +347,7 @@
     @click:primary="resetSettings"
   >
     <div class="gap-3">
-      <div class="text-xs text-text-muted">
+      <div class="text-text-muted text-xs">
         {{ t("traces.serviceGraph.settingsDescription") }}
         <OTooltip :content="t('traces.serviceGraph.settingsTooltip')" />
       </div>

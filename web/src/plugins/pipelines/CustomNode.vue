@@ -371,7 +371,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
       <template #body>
         <div
           v-if="data.node_type == 'function'"
-          class="flex text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
+          class="flex w-auto text-left text-sm! leading-[1.4]! font-bold! text-wrap text-ellipsis"
           align="left"
         >
           {{ data.name }} -
@@ -381,13 +381,13 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
         <template v-else-if="data.node_type == 'stream'">
           <div
             v-if="data.stream_name && data.stream_name.hasOwnProperty('label')"
-            class="flex text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
+            class="flex w-auto text-left text-sm! leading-[1.4]! font-bold! text-wrap text-ellipsis"
           >
             {{ data.stream_type }} - {{ streamNameLabel }}
           </div>
           <div
             v-else
-            class="flex text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
+            class="flex w-auto text-left text-sm! leading-[1.4]! font-bold! text-wrap text-ellipsis"
           >
             {{ data.stream_type }} - {{ data.stream_name }}
           </div>
@@ -395,21 +395,21 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
 
         <div
           v-else-if="data.node_type == 'query'"
-          class="flex text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
+          class="flex w-auto text-left text-sm! leading-[1.4]! font-bold! text-wrap text-ellipsis"
         >
           {{ data.stream_type }} - {{ data.stream_name }}
         </div>
 
         <div
           v-else-if="data.node_type == 'remote_stream'"
-          class="flex text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
+          class="flex w-auto text-left text-sm! leading-[1.4]! font-bold! text-wrap text-ellipsis"
         >
           {{ data.destination_name }}
         </div>
 
         <div
           v-else-if="data.node_type == 'condition'"
-          class="text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
+          class="w-auto text-left text-sm! leading-[1.4]! font-bold! text-wrap text-ellipsis"
         >
           {{ getTruncatedConditions(data.condition || data.conditions) }}
         </div>
@@ -420,14 +420,14 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
         <div
           v-if="data.node_type == 'function' && hasNodeError"
           data-test="pipeline-node-error-badge"
-          class="absolute -top-3 -right-3 w-5 h-5 bg-status-negative border-2 border-white rounded-full flex items-center justify-center cursor-pointer z-[15] shadow-[0_0.125rem_0.375rem_color-mix(in_srgb,var(--color-status-negative)_50%,transparent)] transition-all duration-200 error-badge"
+          class="bg-status-negative error-badge absolute -top-3 -right-3 z-[15] flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border-2 border-white shadow-[0_0.125rem_0.375rem_color-mix(in_srgb,var(--color-status-negative)_50%,transparent)] transition-all duration-200"
           @click.stop="navigateToFunction(data.name)"
         >
           <OIcon name="error" size="sm" />
           <span
             data-test="pipeline-node-error-count"
             v-if="nodeErrorCount"
-            class="absolute -top-1.5 -right-1.5 bg-status-negative text-white text-3xs font-bold min-w-3.5 h-3.5 rounded-full flex items-center justify-center px-0.75 border-[0.09375rem] border-solid border-white shadow-[0_0.0625rem_0.1875rem_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
+            class="bg-status-negative text-3xs absolute -top-1.5 -right-1.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full border-[0.09375rem] border-solid border-white px-0.75 font-bold text-white shadow-[0_0.0625rem_0.1875rem_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
           >
             {{ nodeErrorCount }}
           </span>
@@ -442,7 +442,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
 
         <div
           v-show="showButtons"
-          class="absolute -top-7.5 right-0 flex gap-1.5 transition-all duration-300 z-10 pt-1.25 px-1.25 pb-2.5 node-action-buttons"
+          class="node-action-buttons absolute -top-7.5 right-0 z-10 flex gap-1.5 px-1.25 pt-1.25 pb-2.5 transition-all duration-300"
           :data-test="`pipeline-node-${io_type}-actions`"
           :style="{ '--node-color': getNodeColor(io_type) }"
           @mouseenter="handleActionButtonsEnter"
@@ -452,7 +452,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
             variant="ghost"
             size="icon"
             @click.stop="deleteNode(id)"
-            class="min-w-5! w-5! h-5! p-0! rounded-default! bg-surface-overlay/95! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! node-action-btn delete-btn"
+            class="rounded-default! bg-surface-overlay/95! node-action-btn delete-btn h-5! w-5! min-w-5! border! border-(--node-color)! p-0! text-(--node-color)! transition-all! duration-200!"
             :data-test="`pipeline-node-${io_type}-delete-btn`"
             @mouseenter="handleDeleteTooltipEnter"
             @mouseleave="handleDeleteTooltipLeave"
@@ -461,11 +461,11 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
           </OButton>
           <div
             v-if="showDeleteTooltip"
-            class="fixed bg-status-negative text-white py-1.5 px-2.5 rounded-default text-2xs z-[1000] shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-black)_30%,transparent)] pointer-events-none whitespace-nowrap left-3.75"
+            class="bg-status-negative rounded-default text-2xs pointer-events-none fixed left-3.75 z-[1000] px-2.5 py-1.5 whitespace-nowrap text-white shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-black)_30%,transparent)]"
           >
             Delete Node
             <div
-              class="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] [border-top-color:#dc2626]"
+              class="absolute top-full left-1/2 h-0 w-0 -translate-x-1/2 border-t-[5px] border-r-[5px] border-l-[5px] [border-top-color:#dc2626] border-r-transparent border-l-transparent"
             ></div>
           </div>
         </div>
@@ -484,7 +484,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
         >
           <button
             type="button"
-            class="pl-plus-btn border-2 border-dashed border-border-strong bg-surface-overlay text-text-muted hover:border-solid hover:border-accent hover:text-accent hover:bg-accent/10"
+            class="pl-plus-btn border-border-strong bg-surface-overlay text-text-muted hover:border-accent hover:text-accent hover:bg-accent/10 border-2 border-dashed hover:border-solid"
             :data-test="`pipeline-node-${io_type}-add-btn`"
             @click.stop="openStepPicker(id)"
           >

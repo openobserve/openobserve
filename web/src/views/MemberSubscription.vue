@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="rounded-default">
-    <div class="text-center w-full" style="font-size: var(--text-3xl); margin: 40px 0px">
+    <div class="w-full text-center" style="font-size: var(--text-3xl); margin: 40px 0px">
       Member Subscription
     </div>
     <div v-if="status == 'processing'">{{ message }}</div>
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <SanitizedHtmlRenderer
       v-else-if="status == 'error' && error !== ''"
       :htmlContent="error"
-      class="text-base leading-7.5 w-[70%] mx-auto text-left"
+      class="mx-auto w-[70%] text-left text-base leading-7.5"
     />
 
     <div v-else>Thank you for your subscription.</div>

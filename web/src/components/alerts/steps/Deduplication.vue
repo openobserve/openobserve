@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="step-deduplication w-full h-full overflow-auto mx-auto">
+  <div class="step-deduplication mx-auto h-full w-full overflow-auto">
     <!-- DESCENDANT step (Rule ③): the AddAlert orchestrator owns the ONE <OForm>
          and provides FORM_CONTEXT_KEY. The fields below bind by nested `name=`
          (deduplication.fingerprint_fields / .time_window_minutes) into that
@@ -23,22 +23,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          back into it (payload parity). -->
     <div>
       <div
-        class="step-content rounded-default min-h-full bg-surface-overlay border border-border-default"
+        class="step-content rounded-default bg-surface-overlay border-border-default min-h-full border"
       >
         <div
-          class="section-header flex items-center gap-0 py-2.5 px-3 border-b border-border-default"
+          class="section-header border-border-default flex items-center gap-0 border-b px-3 py-2.5"
         >
           <div
-            class="section-header-accent w-0.75 h-4 rounded-default mr-2 shrink-0 bg-theme-accent"
+            class="section-header-accent rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0"
           />
-          <span class="section-header-title text-compact font-semibold text-text-heading">{{
+          <span class="section-header-title text-compact text-text-heading font-semibold">{{
             t("alerts.steps.deduplication")
           }}</span>
         </div>
         <div class="px-3 py-2">
           <!-- Fingerprint Fields -->
           <div class="mb-4">
-            <div class="font-semibold pb-2 flex items-center">
+            <div class="flex items-center pb-2 font-semibold">
               {{ t("alerts.deduplication.fingerprintFields") }}
               <OIcon name="info" size="sm" class="ml-1 cursor-pointer">
                 <OTooltip
@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </OIcon>
             </div>
-            <div class="text-sm mb-2 text-text-secondary">
+            <div class="text-text-secondary mb-2 text-sm">
               {{ t("alerts.deduplication.fingerprintFieldsHint") }}
             </div>
             <div class="relative">
@@ -72,17 +72,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Time Window -->
           <div class="mb-4">
-            <div class="font-semibold pb-2 flex items-center">
+            <div class="flex items-center pb-2 font-semibold">
               {{ t("alerts.deduplication.timeWindow") }}
               <OIcon name="info" size="sm" class="ml-1 cursor-pointer">
                 <OTooltip :content="t('alerts.deduplication.timeWindowTooltip')" side="right" />
               </OIcon>
             </div>
-            <div class="text-sm mb-2 text-text-secondary">
+            <div class="text-text-secondary mb-2 text-sm">
               {{ t("alerts.deduplication.timeWindowHint") }}
             </div>
             <div class="flex items-center">
-              <div class="w-52.5 ml-0">
+              <div class="ml-0 w-52.5">
                 <OFormInput
                   name="deduplication.time_window_minutes"
                   type="number"
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   height: 28px;
                   font-weight: normal;
                 "
-                class="flex justify-center items-center bg-surface-subtle"
+                class="bg-surface-subtle flex items-center justify-center"
               >
                 {{ t("alerts.minutes") }}
               </div>

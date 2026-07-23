@@ -15,14 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="pt-2.5 flex flex-col gap-2.5 tile-content">
+  <div class="tile-content flex flex-col gap-2.5 pt-2.5">
     <!-- Toolbar: Stream/Agent toggle + picker. Only in the full-page skeleton
          when the real toolbar is hidden (initial !streamsLoaded). On a mid-session
          switch the real toolbar is already shown, so `hideToolbar` drops this to
          avoid a duplicate toggle/picker row. The kpiOnly variant never shows it. -->
     <div v-if="!kpiOnly && !hideToolbar" class="flex items-center justify-end gap-2 py-2">
-      <OSkeleton type="text" class="w-29 h-8" />
-      <OSkeleton type="text" class="w-56 h-9" />
+      <OSkeleton type="text" class="h-8 w-29" />
+      <OSkeleton type="text" class="h-9 w-56" />
     </div>
 
     <!-- Row 1: 5 KPI cards -->
@@ -30,12 +30,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="n in 5"
         :key="n"
-        class="bg-(--tile-bg) border border-(--tile-border) text-(--text-primary) rounded-default py-2.5 px-3.5 flex flex-col gap-2 h-32.5 tile-content"
+        class="rounded-default tile-content flex h-32.5 flex-col gap-2 border border-(--tile-border) bg-(--tile-bg) px-3.5 py-2.5 text-(--text-primary)"
       >
-        <OSkeleton type="text" class="w-[60%] h-3" />
-        <OSkeleton type="text" class="w-[55%] h-5.5" />
-        <OSkeleton type="text" class="w-[40%] h-2.5" />
-        <div class="flex items-end gap-[0.15rem] h-8 mt-auto">
+        <OSkeleton type="text" class="h-3 w-[60%]" />
+        <OSkeleton type="text" class="h-5.5 w-[55%]" />
+        <OSkeleton type="text" class="h-2.5 w-[40%]" />
+        <div class="mt-auto flex h-8 items-end gap-[0.15rem]">
           <OSkeleton
             type="text"
             v-for="bar in 16"
@@ -52,14 +52,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="n in 4"
         :key="n"
-        class="bg-(--tile-bg) border border-(--tile-border) text-(--text-primary) rounded-default flex flex-col tile-content"
+        class="rounded-default tile-content flex flex-col border border-(--tile-border) bg-(--tile-bg) text-(--text-primary)"
       >
-        <div class="flex flex-col gap-[0.4rem] mb-1 p-1.5">
-          <OSkeleton type="text" class="w-30 h-4" />
-          <OSkeleton type="text" class="w-40 h-2.5" />
+        <div class="mb-1 flex flex-col gap-[0.4rem] p-1.5">
+          <OSkeleton type="text" class="h-4 w-30" />
+          <OSkeleton type="text" class="h-2.5 w-40" />
         </div>
         <div class="relative h-55 overflow-hidden">
-          <svg class="w-full h-full block" viewBox="0 0 200 80" preserveAspectRatio="none">
+          <svg class="block h-full w-full" viewBox="0 0 200 80" preserveAspectRatio="none">
             <path
               class="panel-tile__area-fill fill-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)]"
               d="M0,55 C20,42 35,52 55,46 C72,41 85,30 105,28 C125,26 140,42 160,38 C175,35 190,22 200,18 L200,80 L0,80 Z"
@@ -78,22 +78,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Row 4: w-full recent errors table -->
     <div
       v-if="!kpiOnly"
-      class="bg-(--tile-bg) border border-(--tile-border) text-(--text-primary) rounded-default p-4 flex flex-col gap-[0.4rem] tile-content"
+      class="rounded-default tile-content flex flex-col gap-[0.4rem] border border-(--tile-border) bg-(--tile-bg) p-4 text-(--text-primary)"
     >
-      <OSkeleton type="text" class="w-30 h-4" />
-      <OSkeleton type="text" class="w-40 h-2.5" />
-      <div class="flex flex-col gap-2 mt-2">
+      <OSkeleton type="text" class="h-4 w-30" />
+      <OSkeleton type="text" class="h-2.5 w-40" />
+      <div class="mt-2 flex flex-col gap-2">
         <div
           v-for="row in 5"
           :key="row"
-          class="panel-tile__row flex items-center gap-3 py-1 border-t first:border-t-0 border-(--tile-border)"
+          class="panel-tile__row flex items-center gap-3 border-t border-(--tile-border) py-1 first:border-t-0"
         >
-          <OSkeleton type="text" class="w-17.5 h-3.5" />
-          <OSkeleton type="text" class="w-22.5 h-5" />
-          <OSkeleton type="text" class="w-45 h-3.5" />
-          <OSkeleton type="text" class="w-27.5 h-3.5" />
-          <OSkeleton type="text" class="w-15 h-3.5" />
-          <OSkeleton type="text" class="w-12.5 h-3.5" />
+          <OSkeleton type="text" class="h-3.5 w-17.5" />
+          <OSkeleton type="text" class="h-5 w-22.5" />
+          <OSkeleton type="text" class="h-3.5 w-45" />
+          <OSkeleton type="text" class="h-3.5 w-27.5" />
+          <OSkeleton type="text" class="h-3.5 w-15" />
+          <OSkeleton type="text" class="h-3.5 w-12.5" />
         </div>
       </div>
     </div>

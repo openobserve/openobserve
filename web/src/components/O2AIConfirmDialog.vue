@@ -1,7 +1,7 @@
 <template>
-  <div v-if="visible" class="confirmation-overlay w-full mb-2">
+  <div v-if="visible" class="confirmation-overlay mb-2 w-full">
     <div
-      class="confirmation-dialog w-full pt-4 px-4 pb-3.5 rounded-default flex flex-col gap-3.5 bg-surface-base border-2 border-border-default shadow-[0_2px_8px_rgba(0,0,0,0.1)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
+      class="confirmation-dialog rounded-default bg-surface-base border-border-default flex w-full flex-col gap-3.5 border-2 px-4 pt-4 pb-3.5 shadow-[0_2px_8px_rgba(0,0,0,0.1)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
       @keydown="handleDialogKeydown"
       @click="handleDialogClick"
     >
@@ -9,16 +9,16 @@
         <OIcon
           name="help-outline"
           size="md"
-          class="confirmation-icon shrink-0 mt-0.5 text-icon-color"
+          class="confirmation-icon text-icon-color mt-0.5 shrink-0"
         />
         <span
-          class="confirmation-title flex-1 text-sm font-medium leading-normal text-text-heading"
+          class="confirmation-title text-text-heading flex-1 text-sm leading-normal font-medium"
           >{{ formattedMessage }}</span
         >
       </div>
 
       <div
-        class="confirmation-buttons flex flex-col gap-2.5 w-full pt-3.5 mt-1 border-t border-border-default"
+        class="confirmation-buttons border-border-default mt-1 flex w-full flex-col gap-2.5 border-t pt-3.5"
       >
         <!-- For navigation actions, show 3 buttons -->
         <template v-if="isNavigationAction">
@@ -26,10 +26,10 @@
             ref="yesButtonRef"
             variant="outline"
             :block="true"
-            class="confirmation-btn w-full text-sm font-semibold rounded-default normal-case tracking-normal transition-all duration-200 text-theme-accent border-2 border-border-default bg-surface-base hover:bg-button-ghost-primary-hover-bg hover:border-theme-accent"
+            class="confirmation-btn rounded-default text-theme-accent border-border-default bg-surface-base hover:bg-button-ghost-primary-hover-bg hover:border-theme-accent w-full border-2 text-sm font-semibold tracking-normal normal-case transition-all duration-200"
             :class="
               isFocusedYes
-                ? 'text-white! bg-theme-accent! border-theme-accent! ring-3 ring-theme-accent/40'
+                ? 'bg-theme-accent! border-theme-accent! ring-theme-accent/40 text-white! ring-3'
                 : ''
             "
             tabindex="0"
@@ -42,10 +42,10 @@
             ref="alwaysButtonRef"
             variant="outline"
             :block="true"
-            class="confirmation-btn w-full text-sm font-semibold rounded-default normal-case tracking-normal transition-all duration-200 text-status-positive border-2 border-border-default bg-surface-base hover:bg-button-ghost-success-hover-bg hover:border-status-positive"
+            class="confirmation-btn rounded-default text-status-positive border-border-default bg-surface-base hover:bg-button-ghost-success-hover-bg hover:border-status-positive w-full border-2 text-sm font-semibold tracking-normal normal-case transition-all duration-200"
             :class="
               isFocusedAlways
-                ? 'text-white! bg-status-positive! border-status-positive! ring-3 ring-status-positive/40'
+                ? 'bg-status-positive! border-status-positive! ring-status-positive/40 text-white! ring-3'
                 : ''
             "
             tabindex="1"
@@ -58,10 +58,10 @@
             ref="noButtonRef"
             variant="outline"
             :block="true"
-            class="confirmation-btn w-full text-sm font-semibold rounded-default normal-case tracking-normal transition-all duration-200 text-text-body border-2 border-border-default bg-surface-base hover:bg-button-ghost-destructive-hover-bg hover:border-status-negative"
+            class="confirmation-btn rounded-default text-text-body border-border-default bg-surface-base hover:bg-button-ghost-destructive-hover-bg hover:border-status-negative w-full border-2 text-sm font-semibold tracking-normal normal-case transition-all duration-200"
             :class="
               isFocusedNo
-                ? 'text-white! bg-status-negative! border-status-negative! ring-3 ring-status-negative/40'
+                ? 'bg-status-negative! border-status-negative! ring-status-negative/40 text-white! ring-3'
                 : ''
             "
             tabindex="2"
@@ -78,10 +78,10 @@
             ref="yesButtonRef"
             variant="outline"
             :block="true"
-            class="confirmation-btn w-full text-sm font-semibold rounded-default normal-case tracking-normal transition-all duration-200 text-theme-accent border-2 border-border-default bg-surface-base hover:bg-button-ghost-primary-hover-bg hover:border-theme-accent"
+            class="confirmation-btn rounded-default text-theme-accent border-border-default bg-surface-base hover:bg-button-ghost-primary-hover-bg hover:border-theme-accent w-full border-2 text-sm font-semibold tracking-normal normal-case transition-all duration-200"
             :class="
               isFocusedYes
-                ? 'text-white! bg-theme-accent! border-theme-accent! ring-3 ring-theme-accent/40'
+                ? 'bg-theme-accent! border-theme-accent! ring-theme-accent/40 text-white! ring-3'
                 : ''
             "
             tabindex="0"
@@ -94,10 +94,10 @@
             ref="noButtonRef"
             variant="outline"
             :block="true"
-            class="confirmation-btn w-full text-sm font-semibold rounded-default normal-case tracking-normal transition-all duration-200 text-text-body border-2 border-border-default bg-surface-base hover:bg-button-ghost-destructive-hover-bg hover:border-status-negative"
+            class="confirmation-btn rounded-default text-text-body border-border-default bg-surface-base hover:bg-button-ghost-destructive-hover-bg hover:border-status-negative w-full border-2 text-sm font-semibold tracking-normal normal-case transition-all duration-200"
             :class="
               isFocusedNo
-                ? 'text-white! bg-status-negative! border-status-negative! ring-3 ring-status-negative/40'
+                ? 'bg-status-negative! border-status-negative! ring-status-negative/40 text-white! ring-3'
                 : ''
             "
             tabindex="1"

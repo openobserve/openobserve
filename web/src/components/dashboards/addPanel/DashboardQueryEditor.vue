@@ -17,10 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="col-auto" data-test="dashboard-panel-searchbar">
     <div
-      class="sql-bar flex flex-row items-center justify-between gap-x-3 h-10 bg-section-header-bg"
+      class="sql-bar bg-section-header-bg flex h-10 flex-row items-center justify-between gap-x-3"
       @click.stop
     >
-      <div class="flex flex-row items-center flex-1 min-w-0" data-test="dashboard-query-data">
+      <div class="flex min-w-0 flex-1 flex-row items-center" data-test="dashboard-query-data">
         <div class="max-w-150 overflow-hidden">
           <OTabs
             v-model="dashboardPanelData.layout.currentQueryIndex"
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-if="editingQueryIndex === index"
                 @click.stop
-                class="inline-block w-22.5 min-w-12.5 max-w-40"
+                class="inline-block w-22.5 max-w-40 min-w-12.5"
               >
                 <OInput
                   ref="renameInputRef"
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 v-else
                 @dblclick.stop.prevent="startEditQueryName(index, tab)"
-                class="cursor-pointer select-none whitespace-nowrap text-xs"
+                class="cursor-pointer text-xs whitespace-nowrap select-none"
                 :title="'Double-click to rename'"
                 :data-test="`dashboard-panel-query-tab-name-${index}`"
                 >{{ tab.tabName || "Query " + (Number(index) + 1) }}</span
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                    trigger is scoped to JUST the icon, not the entire OTab. -->
               <span
                 v-if="promqlMode || dashboardPanelData.data.queries.length > 1"
-                class="inline-flex items-center relative"
+                class="relative inline-flex items-center"
               >
                 <OIcon
                   :name="
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? 'visibility-off'
                       : 'visibility'
                   "
-                  class="ml-1 opacity-[0.7] transition-all duration-150 hover:opacity-100 hover:bg-hover-gray hover:rounded-full cursor-pointer"
+                  class="hover:bg-hover-gray ml-1 cursor-pointer opacity-[0.7] transition-all duration-150 hover:rounded-full hover:opacity-100"
                   @click.stop="toggleQueryVisibility(index)"
                   @mousedown.stop.prevent
                   @pointerdown.stop.prevent
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 name="close"
                 size="sm"
-                class="opacity-60 transition-all duration-150 hover:opacity-100 hover:bg-hover-gray hover:rounded-full cursor-pointer"
+                class="hover:bg-hover-gray cursor-pointer opacity-60 transition-all duration-150 hover:rounded-full hover:opacity-100"
                 @click.stop.prevent="removeTab(index)"
                 @mousedown.stop.prevent
                 @pointerdown.stop.prevent
@@ -127,12 +127,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTag
           v-if="multiQueryWarning"
           type="warningNote"
-          class="dashboard-multi-query-warning h-8 mr-2"
+          class="dashboard-multi-query-warning mr-2 h-8"
         >
           {{ multiQueryWarning }}
         </OTag>
       </div>
-      <div class="flex items-center gap-3 shrink-0">
+      <div class="flex shrink-0 items-center gap-3">
         <OSwitch
           data-test="logs-search-bar-show-query-toggle-btn"
           v-model="dashboardPanelData.layout.vrlFunctionToggle"
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="lg"
         >
           <template #label>
-            <img :src="getImageURL('images/common/function.svg')" class="w-4 h-4 dark:invert" />
+            <img :src="getImageURL('images/common/function.svg')" class="h-4 w-4 dark:invert" />
           </template>
         </OSwitch>
         <QueryTypeSelector @click.stop></QueryTypeSelector>
@@ -150,21 +150,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   </div>
   <div
-    class="flex flex-col flex-1 overflow-hidden"
+    class="flex flex-1 flex-col overflow-hidden"
     :style="!dashboardPanelData.layout.showQueryBar ? 'height: 0px; flex: none;' : ''"
     data-test="dashboard-query"
   >
-    <div class="flex flex-col w-full h-full">
-      <div class="flex flex-col w-full h-full">
+    <div class="flex h-full w-full flex-col">
+      <div class="flex h-full w-full flex-col">
         <div class="flex h-full">
           <OSplitter
-            class="w-full h-full"
+            class="h-full w-full"
             v-model="splitterModel"
             :disable="promqlMode || !dashboardPanelData.layout.vrlFunctionToggle"
             :limits="[30, promqlMode || !dashboardPanelData.layout.vrlFunctionToggle ? 100 : 70]"
           >
             <template #separator>
-              <div class="w-1 h-full bg-border-default transition-colors hover:bg-[orange]"></div>
+              <div class="bg-border-default h-full w-1 transition-colors hover:bg-[orange]"></div>
             </template>
             <template #before>
               <UnifiedQueryEditor
@@ -196,10 +196,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <template #after>
-              <div class="flex flex-col h-full w-full">
-                <div class="flex-1 min-h-0 w-full">
+              <div class="flex h-full w-full flex-col">
+                <div class="min-h-0 w-full flex-1">
                   <UnifiedQueryEditor
-                    class="w-full h-full"
+                    class="h-full w-full"
                     v-if="!promqlMode && dashboardPanelData.layout.vrlFunctionToggle"
                     data-test="dashboard-vrl-function-editor"
                     ref="vrlFnEditorRef"
@@ -227,16 +227,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
                         .vrlFunctionQuery && functionEditorPlaceholderFlag
                     "
-                    class="absolute top-0 left-0 right-0 bottom-0 flex items-start pt-0.75 pr-2 pb-0 pl-[2.15rem] pointer-events-none z-1 select-none"
+                    class="pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start pt-0.75 pr-2 pb-0 pl-[2.15rem] select-none"
                   >
                     <span
-                      class="font-mono text-[var(--text-sm)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden text-ellipsis"
+                      class="text-text-placeholder overflow-hidden font-mono [line-height:1.3125rem] text-ellipsis whitespace-nowrap text-[var(--text-sm)]"
                       >{{ vrlPlaceholder }}</span
                     >
                   </div>
                 </div>
-                <div class="shrink-0 w-full">
-                  <div class="items-center flex">
+                <div class="w-full shrink-0">
+                  <div class="flex items-center">
                     <OSelect
                       v-model="selectedFunction"
                       :label="t('dashboard.useSavedFunction')"
@@ -264,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OSplitter>
         </div>
       </div>
-      <div class="text-status-error-text z-100000 mx-2 col-auto">
+      <div class="text-status-error-text z-100000 col-auto mx-2">
         {{ dashboardPanelData.meta.errors.queryErrors.join(", ") }}
       </div>
     </div>

@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div data-test="alert-list-page" class="flex flex-col h-full">
+  <div data-test="alert-list-page" class="flex h-full flex-col">
     <OPageLayout
       bleed
       v-if="!showAddAlertDialog && !showImportAlertDialog"
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #actions>
         <!-- Import button -->
         <OButton
-          :class="isCompactToolbar ? 'py-0! px-2! min-w-0!' : ''"
+          :class="isCompactToolbar ? 'min-w-0! px-2! py-0!' : ''"
           variant="outline"
           size="sm"
           @click="importAlert"
@@ -66,16 +66,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </template>
 
-      <div data-test="alert-list-splitter" class="flex-1 flex min-h-0">
+      <div data-test="alert-list-splitter" class="flex min-h-0 flex-1">
         <!-- Left: FolderList -->
-        <div class="shrink-0 h-full w-rail">
+        <div class="w-rail h-full shrink-0">
           <div class="h-full">
             <FolderList type="alerts" @update:activeFolderId="updateActiveFolderId" />
           </div>
         </div>
         <!-- Right: Table -->
-        <div class="flex-1 min-w-0 h-full">
-          <div class="h-full bg-card-glass-bg">
+        <div class="h-full min-w-0 flex-1">
+          <div class="bg-card-glass-bg h-full">
             <!-- Alert List Table (shows all alert types including anomaly detection rows) -->
             <OTable
               :frame="false"
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <!-- Toolbar: alert-type filter + search (inline folder scope) + refresh. -->
               <template #toolbar>
-                <div class="flex items-center gap-2 w-full">
+                <div class="flex w-full items-center gap-2">
                   <OToggleGroup
                     :model-value="activeTab"
                     @update:model-value="
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ t("alerts.anomalyDetection") }}
                     </OToggleGroupItem>
                   </OToggleGroup>
-                  <div class="flex-1 min-w-0">
+                  <div class="min-w-0 flex-1">
                     <OInput
                       v-model="dynamicQueryModel"
                       :placeholder="
@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OToggleGroup
                           :model-value="searchAcrossFolders ? 'all' : 'this'"
                           type="single"
-                          class="self-center mr-1"
+                          class="mr-1 self-center"
                           @update:model-value="(v) => (searchAcrossFolders = v === 'all')"
                         >
                           <OToggleGroupItem
@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template #cell-name="{ row }">
-                <div class="flex items-center gap-1.5 min-w-0 overflow-hidden">
+                <div class="flex min-w-0 items-center gap-1.5 overflow-hidden">
                   <OIcon
                     v-if="row.is_real_time === 'anomaly'"
                     name="query-stats"
@@ -287,12 +287,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template #cell-actions="{ row }">
-                <div class="flex items-center actions-container">
+                <div class="actions-container flex items-center">
                   <div
                     data-test="alert-list-loading-alert"
                     v-if="alertStateLoadingMap[row.uuid]"
                     style="display: inline-block; width: 33.14px; height: auto"
-                    class="flex justify-center items-center ml-1"
+                    class="ml-1 flex items-center justify-center"
                     :title="`Turning ${row.enabled ? 'Off' : 'On'}`"
                   >
                     <OSpinner size="xs" />
@@ -471,8 +471,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template #bottom>
-                <div class="flex w-full justify-between items-center h-12 gap-1">
-                  <div class="text-xs font-normal flex items-center min-w-25">
+                <div class="flex h-12 w-full items-center justify-between gap-1">
+                  <div class="flex min-w-25 items-center text-xs font-normal">
                     <template v-if="selectedAlerts.length > 0"
                       >{{ selectedAlerts.length }} of {{ resultTotal }} selected</template
                     >

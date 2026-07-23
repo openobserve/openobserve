@@ -18,18 +18,18 @@ limitations under the License. -->
     <div
       v-if="result && result.success"
       data-test="test-result-success"
-      class="flex gap-3 py-3 px-4 rounded-default border-l-[3px] border-solid border-status-positive bg-[rgba(76,175,80,0.08)] dark:bg-[rgba(76,175,80,0.12)]"
+      class="rounded-default border-status-positive flex gap-3 border-l-[3px] border-solid bg-[rgba(76,175,80,0.08)] px-4 py-3 dark:bg-[rgba(76,175,80,0.12)]"
     >
-      <div class="shrink-0 pt-0.5 text-status-positive">
+      <div class="text-status-positive shrink-0 pt-0.5">
         <OIcon name="check-circle" size="md" />
       </div>
-      <div class="flex-1 min-w-0">
-        <div data-test="test-success-message" class="text-compact font-medium leading-[1.4] mb-1">
+      <div class="min-w-0 flex-1">
+        <div data-test="test-success-message" class="text-compact mb-1 leading-[1.4] font-medium">
           {{ t("alerts.testSuccessMessage") }}
         </div>
         <div
           data-test="test-success-timestamp"
-          class="text-2xs text-text-secondary flex items-center gap-2 flex-wrap"
+          class="text-2xs text-text-secondary flex flex-wrap items-center gap-2"
         >
           {{ formatTimestamp(result.timestamp) }}
           <OTag
@@ -39,7 +39,7 @@ limitations under the License. -->
           >
             {{ result.statusCode }}
           </OTag>
-          <span v-if="result.responseTime" class="font-mono text-text-secondary">
+          <span v-if="result.responseTime" class="text-text-secondary font-mono">
             {{ result.responseTime }}ms
           </span>
         </div>
@@ -50,19 +50,19 @@ limitations under the License. -->
     <div
       v-else-if="result && !result.success"
       data-test="test-result-failure"
-      class="flex gap-3 py-3 px-4 rounded-default border-l-[3px] border-solid border-status-negative bg-[rgba(244,67,54,0.08)] dark:bg-[rgba(244,67,54,0.12)]"
+      class="rounded-default border-status-negative flex gap-3 border-l-[3px] border-solid bg-[rgba(244,67,54,0.08)] px-4 py-3 dark:bg-[rgba(244,67,54,0.12)]"
     >
-      <div class="shrink-0 pt-0.5 text-status-negative">
+      <div class="text-status-negative shrink-0 pt-0.5">
         <OIcon name="error" size="md" />
       </div>
-      <div class="flex-1 min-w-0">
-        <div data-test="test-failure-message" class="text-compact font-medium leading-[1.4] mb-1">
+      <div class="min-w-0 flex-1">
+        <div data-test="test-failure-message" class="text-compact mb-1 leading-[1.4] font-medium">
           {{ getFailureMessage(result) }}
         </div>
         <div
           v-if="result.timestamp"
           data-test="test-failure-timestamp"
-          class="text-2xs text-text-secondary flex items-center gap-2 flex-wrap"
+          class="text-2xs text-text-secondary flex flex-wrap items-center gap-2"
         >
           {{ formatTimestamp(result.timestamp) }}
           <OTag
@@ -72,7 +72,7 @@ limitations under the License. -->
           >
             {{ result.statusCode }}
           </OTag>
-          <span v-if="result.responseTime" class="font-mono text-text-secondary">
+          <span v-if="result.responseTime" class="text-text-secondary font-mono">
             {{ result.responseTime }}ms
           </span>
         </div>
@@ -80,7 +80,7 @@ limitations under the License. -->
         <!-- Suggested Fix -->
         <div
           v-if="getSuggestedFix(result)"
-          class="result-suggestion flex items-start gap-2 mt-2 p-2 bg-[rgba(255,193,7,0.1)] dark:bg-[rgba(255,193,7,0.15)] rounded-default text-2xs text-text-secondary leading-[1.4]"
+          class="result-suggestion rounded-default text-2xs text-text-secondary mt-2 flex items-start gap-2 bg-[rgba(255,193,7,0.1)] p-2 leading-[1.4] dark:bg-[rgba(255,193,7,0.15)]"
         >
           <OIcon name="lightbulb" size="sm" />
           <span>{{ getSuggestedFix(result) }}</span>
@@ -94,7 +94,7 @@ limitations under the License. -->
           class="mt-2 bg-transparent"
         >
           <template #trigger>
-            <div class="flex items-center text-text-secondary text-2xs">
+            <div class="text-text-secondary text-2xs flex items-center">
               <OIcon name="info" size="xs" class="mr-1" />
               <span class="text-xs">{{ t("alerts.viewDetails") }}</span>
             </div>
@@ -103,7 +103,7 @@ limitations under the License. -->
           <div data-test="test-failure-details" class="pt-2">
             <div v-if="result.error" data-test="test-error-message" class="error-item mb-3">
               <div
-                class="text-3xs font-semibold uppercase tracking-[0.5px] text-text-secondary mb-1"
+                class="text-3xs text-text-secondary mb-1 font-semibold tracking-[0.5px] uppercase"
               >
                 {{ t("alerts.error") }}
               </div>
@@ -114,7 +114,7 @@ limitations under the License. -->
 
             <div v-if="result.statusCode" data-test="test-http-status" class="error-item mb-3">
               <div
-                class="text-3xs font-semibold uppercase tracking-[0.5px] text-text-secondary mb-1"
+                class="text-3xs text-text-secondary mb-1 font-semibold tracking-[0.5px] uppercase"
               >
                 {{ t("alerts.httpStatus") }}
               </div>
@@ -125,12 +125,12 @@ limitations under the License. -->
 
             <div v-if="result.responseBody" data-test="test-response-body" class="error-item mb-3">
               <div
-                class="text-3xs font-semibold uppercase tracking-[0.5px] text-text-secondary mb-1"
+                class="text-3xs text-text-secondary mb-1 font-semibold tracking-[0.5px] uppercase"
               >
                 {{ t("alerts.responseBody") }}
               </div>
               <pre
-                class="bg-[rgba(0,0,0,0.05)] dark:bg-[rgba(255,255,255,0.05)] border border-[rgba(0,0,0,0.1)] dark:border-[rgba(255,255,255,0.1)] rounded-default p-2 font-mono text-3xs leading-[1.5] max-h-37.5 overflow-y-auto m-0 whitespace-pre text-text-body"
+                class="rounded-default text-3xs text-text-body m-0 max-h-37.5 overflow-y-auto border border-[rgba(0,0,0,0.1)] bg-[rgba(0,0,0,0.05)] p-2 font-mono leading-[1.5] whitespace-pre dark:border-[rgba(255,255,255,0.1)] dark:bg-[rgba(255,255,255,0.05)]"
                 >{{ formatResponseBody(result.responseBody) }}</pre
               >
             </div>
@@ -139,7 +139,7 @@ limitations under the License. -->
 
         <!-- Retry Button -->
         <div
-          class="mt-3 pt-2 border-t border-[rgba(0,0,0,0.08)] dark:border-[rgba(255,255,255,0.08)]"
+          class="mt-3 border-t border-[rgba(0,0,0,0.08)] pt-2 dark:border-[rgba(255,255,255,0.08)]"
         >
           <OButton
             data-test="test-retry-button"
@@ -158,16 +158,16 @@ limitations under the License. -->
     <div
       v-else-if="isLoading"
       data-test="test-result-loading"
-      class="flex gap-3 py-3 px-4 rounded-default border-l-[3px] border-solid border-theme-accent bg-[rgba(33,150,243,0.08)] dark:bg-[rgba(33,150,243,0.12)]"
+      class="rounded-default border-theme-accent flex gap-3 border-l-[3px] border-solid bg-[rgba(33,150,243,0.08)] px-4 py-3 dark:bg-[rgba(33,150,243,0.12)]"
     >
-      <div class="shrink-0 pt-0.5 text-theme-accent">
+      <div class="text-theme-accent shrink-0 pt-0.5">
         <OSpinner size="xs" />
       </div>
-      <div class="flex-1 min-w-0">
-        <div class="text-compact font-medium leading-[1.4] mb-1">
+      <div class="min-w-0 flex-1">
+        <div class="text-compact mb-1 leading-[1.4] font-medium">
           {{ t("alerts.testInProgress") }}
         </div>
-        <div class="text-2xs text-text-secondary flex items-center gap-2 flex-wrap">
+        <div class="text-2xs text-text-secondary flex flex-wrap items-center gap-2">
           {{ t("alerts.sendingNotification") }}
         </div>
       </div>
@@ -177,7 +177,7 @@ limitations under the License. -->
     <div
       v-else
       data-test="test-result-idle"
-      class="flex items-center gap-2 py-2.5 px-3 rounded-default bg-[rgba(0,0,0,0.02)] dark:bg-[rgba(255,255,255,0.02)] border border-[rgba(0,0,0,0.08)] dark:border-[rgba(255,255,255,0.08)]"
+      class="rounded-default flex items-center gap-2 border border-[rgba(0,0,0,0.08)] bg-[rgba(0,0,0,0.02)] px-3 py-2.5 dark:border-[rgba(255,255,255,0.08)] dark:bg-[rgba(255,255,255,0.02)]"
     >
       <OIcon name="info" size="sm" />
       <span class="text-2xs text-text-secondary leading-[1.4]">

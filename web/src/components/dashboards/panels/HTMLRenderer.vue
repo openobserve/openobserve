@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="scroll w-full h-full overflow-auto" data-test="html-renderer-scroll-container">
+  <div class="scroll h-full w-full overflow-auto" data-test="html-renderer-scroll-container">
     <div
       class="min-h-full shrink-0"
       :id="scopeId"

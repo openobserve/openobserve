@@ -16,15 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-  <div :class="position === 'bottom' ? 'py-2' : 'pt-2'" class="w-full flex justify-between">
+  <div :class="position === 'bottom' ? 'py-2' : 'pt-2'" class="flex w-full justify-between">
     <div
       v-if="position === 'bottom' && maxRecords"
-      class="flex items-center whitespace-nowrap w-50 justify-center justify-start"
+      class="flex w-50 items-center justify-center justify-start whitespace-nowrap"
     >
       <span class="mr-4 text-xs font-semibold">{{ t("search.maxRecords") }}</span>
       <OInput v-model="maxRecords" @blur="changeMaxRecordToReturn" />
     </div>
-    <div v-if="position === 'top' && pageTitle" class="font-bold flex items-center">
+    <div v-if="position === 'top' && pageTitle" class="flex items-center font-bold">
       <OButton
         v-if="collapsibleIcon === 'show' && searchCollapseImage == 'collapse_sidebar_icon'"
         variant="ghost"

@@ -228,7 +228,7 @@ function onRowBlur() {
       'transition-colors duration-150',
       clickable ? 'cursor-pointer' : '',
       'hover:bg-table-row-hover-bg',
-      clickable ? 'focus:outline-none focus-visible:bg-table-row-hover-bg' : '',
+      clickable ? 'focus-visible:bg-table-row-hover-bg focus:outline-none' : '',
       isRowSelected ? 'bg-table-row-selected-bg' : '',
       !isRowSelected && isStriped ? 'bg-table-row-striped-bg' : '',
       statusBarColor ? 'o2-table-row-with-status' : '',
@@ -252,7 +252,7 @@ function onRowBlur() {
       v-if="expansionEnabled"
       :class="[
         'w-4 min-w-4 px-0 text-center align-middle',
-        bordered ? 'border-b border-table-row-divider' : '',
+        bordered ? 'border-table-row-divider border-b' : '',
       ]"
       data-test="o2-table-expand-cell"
     >
@@ -269,7 +269,7 @@ function onRowBlur() {
       v-if="selectionEnabled"
       :class="[
         'text-left align-middle',
-        bordered ? 'border-b border-table-row-divider' : '',
+        bordered ? 'border-table-row-divider border-b' : '',
         isRowSelectable && !isRowSelectable(row.original) ? 'cursor-not-allowed' : '',
       ]"
       :style="{
@@ -295,7 +295,7 @@ function onRowBlur() {
       v-if="enableRowReorder"
       :class="[
         'w-4 min-w-4 px-0 text-center align-middle',
-        bordered ? 'border-b border-table-row-divider' : '',
+        bordered ? 'border-table-row-divider border-b' : '',
       ]"
       class="o2-table-drag-handle"
       data-test="o2-table-row-drag-handle"
@@ -352,7 +352,7 @@ function onRowBlur() {
       "
       :class="[
         'o2-table-tree-warning-cell relative',
-        bordered ? 'border-b border-table-row-divider' : '',
+        bordered ? 'border-table-row-divider border-b' : '',
       ]"
       :style="{ '--tree-connector-x': treeConnectorX + 'px' }"
     >
@@ -375,7 +375,7 @@ function onRowBlur() {
         (selectionEnabled ? 1 : 0) +
         (enableRowReorder ? 1 : 0)
       "
-      :class="bordered ? 'border-b border-table-row-divider' : ''"
+      :class="bordered ? 'border-table-row-divider border-b' : ''"
     >
       <slot name="expansion" :row="row.original" />
     </td>

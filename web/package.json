@@ -146,6 +146,7 @@
     "postcss": "^8.5.10",
     "postcss-html": "^1.8.1",
     "prettier": "^3.7.4",
+    "prettier-plugin-tailwindcss": "^0.8.1",
     "rollup-plugin-analyzer": "^4.0.0",
     "rollup-plugin-visualizer": "^6.0.5",
     "sass": "^1.97.1",

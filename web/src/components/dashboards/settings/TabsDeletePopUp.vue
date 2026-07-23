@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dashboard-tab-delete-tab-panels-move"
                 :label="t('dashboard.tabsDeletePopUp.movePanels')"
               />
-              <div v-if="action === 'move'" class="ml-5 min-w-50 max-w-75 mb-2.5">
+              <div v-if="action === 'move'" class="mb-2.5 ml-5 max-w-75 min-w-50">
                 <OSelect
                   v-model="selectedTabToMovePanels"
                   :options="moveTabOptions"

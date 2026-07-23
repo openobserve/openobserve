@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <component v-if="bodyComponent" :is="bodyComponent" ref="bodyRef" />
       <div
         v-else
-        class="flex flex-col items-center justify-center text-center gap-2 py-10 text-text-secondary"
+        class="text-text-secondary flex flex-col items-center justify-center gap-2 py-10 text-center"
       >
         <OIcon :name="meta?.icon || 'help'" size="lg" />
         <div class="text-sm">

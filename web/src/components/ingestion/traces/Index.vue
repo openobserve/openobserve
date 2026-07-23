@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </template>
 
-    <div class="w-full h-full">
+    <div class="h-full w-full">
       <div class="bg-card-glass-bg h-full overflow-y-auto pt-0.5">
         <router-view
           title="Metrics"

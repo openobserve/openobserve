@@ -315,7 +315,7 @@ function handleClick(event: MouseEvent): void {
     <!-- Loading spinner overlay — centered, absolute, shown only when loading -->
     <span
       v-if="loading"
-      class="absolute inset-0 flex items-center justify-center pointer-events-none"
+      class="pointer-events-none absolute inset-0 flex items-center justify-center"
       aria-hidden="true"
     >
       <OIcon name="progress-activity" size="sm" class="animate-spin" />

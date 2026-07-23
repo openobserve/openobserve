@@ -29,11 +29,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Full-width content for diff view -->
     <template #full-width-content>
-      <div class="w-full p-2 h-full flex-1 min-h-0 flex flex-col overflow-hidden">
+      <div class="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden p-2">
         <!-- Compact Header with File Upload -->
-        <div class="bg-card-glass-bg p-2 mb-2">
+        <div class="bg-card-glass-bg mb-2 p-2">
           <div class="flex items-center">
-            <div class="w-full col-md-8">
+            <div class="col-md-8 w-full">
               <OFile
                 v-model="jsonFile"
                 label="Select JSON file"
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
               </OFile>
             </div>
-            <div class="w-full col-md-4 text-right pl-2">
+            <div class="col-md-4 w-full pl-2 text-right">
               <OButton
                 v-if="diffData"
                 variant="primary"
@@ -71,9 +71,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Diff Preview Section with Scrollable Content -->
-        <div v-if="diffData" class="flex flex-col h-full overflow-hidden">
+        <div v-if="diffData" class="flex h-full flex-col overflow-hidden">
           <!-- Compact Summary Bar -->
-          <div class="bg-card-glass-bg p-2 mb-2">
+          <div class="bg-card-glass-bg mb-2 p-2">
             <div class="flex items-center gap-2">
               <div class="col-auto">
                 <OTag type="diffCategory" value="new" class="text-sm!">
@@ -108,33 +108,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Scrollable Groups Container -->
           <div
-            class="bg-card-glass-bg groups-scroll-container flex-1 overflow-y-auto overflow-x-hidden p-2"
+            class="bg-card-glass-bg groups-scroll-container flex-1 overflow-x-hidden overflow-y-auto p-2"
           >
             <!-- Additions -->
             <div v-if="diffData.additions.length > 0" class="mb-2">
               <div
-                class="text-sm font-semibold border-b border-separator mb-1 text-status-positive p-1"
+                class="border-separator text-status-positive mb-1 border-b p-1 text-sm font-semibold"
               >
                 <OIcon name="add-circle" size="sm" />
                 New ({{ selectedAdditions.length }}/{{ diffData.additions.length }})
               </div>
-              <ul class="flex flex-col divide-y divide-border border rounded-default mb-0">
+              <ul class="divide-border rounded-default mb-0 flex flex-col divide-y border">
                 <li
                   v-for="group in diffData.additions"
                   :key="group.id"
                   data-test="semantic-groups-addition-item"
-                  class="compact-item flex items-start gap-2 px-2 py-1 min-h-11 cursor-pointer hover:bg-muted/50"
+                  class="compact-item hover:bg-muted/50 flex min-h-11 cursor-pointer items-start gap-2 px-2 py-1"
                   @click="toggleAddition(group.id)"
                 >
-                  <div class="flex items-start shrink-0 pt-1">
+                  <div class="flex shrink-0 items-start pt-1">
                     <OCheckbox
                       :model-value="selectedAdditions.includes(group.id)"
                       @update:model-value="toggleAddition(group.id)"
                     />
                   </div>
-                  <div class="flex flex-col flex-1 min-w-0 px-2">
+                  <div class="flex min-w-0 flex-1 flex-col px-2">
                     <span class="text-compact font-medium">{{ group.display }}</span>
-                    <span class="block text-2xs text-muted-foreground truncate">
+                    <span class="text-2xs text-muted-foreground block truncate">
                       {{ group.id }} • {{ group.fields.length }} fields
                       <OTag
                         v-if="group.normalize"
@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </span>
                   </div>
-                  <div class="flex items-center shrink-0 ms-auto">
+                  <div class="ms-auto flex shrink-0 items-center">
                     <OButton variant="ghost" size="icon-circle-sm" @click.stop="viewGroup(group)">
                       <OIcon name="visibility" size="sm" />
                     </OButton>
@@ -156,33 +156,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Modifications -->
             <div v-if="diffData.modifications.length > 0" class="mb-2">
               <div
-                class="text-sm font-semibold border-b border-separator mb-1 text-status-warning-text p-1"
+                class="border-separator text-status-warning-text mb-1 border-b p-1 text-sm font-semibold"
               >
                 <OIcon name="edit" size="sm" />
                 Modified ({{ selectedModifications.length }}/{{ diffData.modifications.length }})
               </div>
-              <ul class="flex flex-col divide-y divide-border border rounded-default mb-0">
+              <ul class="divide-border rounded-default mb-0 flex flex-col divide-y border">
                 <li
                   v-for="mod in diffData.modifications"
                   :key="mod.proposed.id"
                   data-test="semantic-groups-modification-item"
-                  class="compact-item flex items-start gap-2 px-2 py-1 min-h-11 cursor-pointer hover:bg-muted/50"
+                  class="compact-item hover:bg-muted/50 flex min-h-11 cursor-pointer items-start gap-2 px-2 py-1"
                   @click="toggleModification(mod.proposed.id)"
                 >
-                  <div class="flex items-start shrink-0 pt-1">
+                  <div class="flex shrink-0 items-start pt-1">
                     <OCheckbox
                       :model-value="selectedModifications.includes(mod.proposed.id)"
                       @update:model-value="toggleModification(mod.proposed.id)"
                     />
                   </div>
-                  <div class="flex flex-col flex-1 min-w-0 px-2">
+                  <div class="flex min-w-0 flex-1 flex-col px-2">
                     <span class="text-compact font-medium">{{ mod.proposed.display }}</span>
-                    <span class="block text-2xs text-muted-foreground truncate">
+                    <span class="text-2xs text-muted-foreground block truncate">
                       {{ mod.proposed.id }} • {{ mod.current.fields.length }} →
                       {{ mod.proposed.fields.length }} fields
                     </span>
                   </div>
-                  <div class="flex items-center shrink-0 ms-auto">
+                  <div class="ms-auto flex shrink-0 items-center">
                     <OButton
                       variant="ghost"
                       size="icon-circle-sm"
@@ -202,15 +202,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :label="`Unchanged (${diffData.unchanged.length})`"
                 icon="check-circle"
               >
-                <ul class="flex flex-col divide-y divide-border border rounded-default mb-0">
+                <ul class="divide-border rounded-default mb-0 flex flex-col divide-y border">
                   <li
                     v-for="group in diffData.unchanged"
                     :key="group.id"
-                    class="compact-item flex items-center gap-2 px-2 py-1 min-h-11"
+                    class="compact-item flex min-h-11 items-center gap-2 px-2 py-1"
                   >
-                    <div class="flex flex-col flex-1 min-w-0 px-2">
+                    <div class="flex min-w-0 flex-1 flex-col px-2">
                       <span class="text-compact">{{ group.display }}</span>
-                      <span class="block text-2xs text-muted-foreground"
+                      <span class="text-2xs text-muted-foreground block"
                         >{{ group.id }} • {{ group.fields.length }} fields</span
                       >
                     </div>
@@ -224,10 +224,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- No Diff State -->
         <div v-else-if="!isImporting && !diffData" class="bg-card-glass-bg p-4 text-center">
           <OIcon name="cloud-upload" class="mb-3 size-16!" />
-          <div class="text-xl font-semibold text-text-muted mb-2">
+          <div class="text-text-muted mb-2 text-xl font-semibold">
             Upload a JSON file to get started
           </div>
-          <div class="text-sm text-text-secondary">
+          <div class="text-text-secondary text-sm">
             The system will analyze the file and show you what will change
           </div>
         </div>
@@ -246,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="showGroupDialog = false"
   >
     <div>
-      <div class="text-sm font-medium mb-2">Fields ({{ selectedGroup?.fields.length }})</div>
+      <div class="mb-2 text-sm font-medium">Fields ({{ selectedGroup?.fields.length }})</div>
       <OTag
         v-for="field in selectedGroup?.fields"
         :key="field"
@@ -274,10 +274,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="flex gap-3">
       <div class="w-1/2">
-        <div class="text-sm font-medium text-status-error-text mb-2">Current</div>
-        <div class="text-xs mb-1">{{ selectedModification?.current.fields.length }} fields</div>
+        <div class="text-status-error-text mb-2 text-sm font-medium">Current</div>
+        <div class="mb-1 text-xs">{{ selectedModification?.current.fields.length }} fields</div>
         <div
-          class="field-chips-container max-h-62.5 overflow-y-auto p-2 bg-surface-base rounded-default"
+          class="field-chips-container bg-surface-base rounded-default max-h-62.5 overflow-y-auto p-2"
         >
           <OTag
             v-for="field in selectedModification?.current.fields"
@@ -291,10 +291,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div class="w-1/2">
-        <div class="text-sm font-medium text-status-positive mb-2">Proposed</div>
-        <div class="text-xs mb-1">{{ selectedModification?.proposed.fields.length }} fields</div>
+        <div class="text-status-positive mb-2 text-sm font-medium">Proposed</div>
+        <div class="mb-1 text-xs">{{ selectedModification?.proposed.fields.length }} fields</div>
         <div
-          class="field-chips-container max-h-62.5 overflow-y-auto p-2 bg-surface-base rounded-default"
+          class="field-chips-container bg-surface-base rounded-default max-h-62.5 overflow-y-auto p-2"
         >
           <OTag
             v-for="field in selectedModification?.proposed.fields"

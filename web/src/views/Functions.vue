@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :icon="showPipelineActions ? 'lan' : undefined"
         :back="detailBack"
         :tabs-below="showPipelineActions"
-        class="border-b border-border-default"
+        class="border-border-default border-b"
       >
         <!-- Section switcher tabs (Stream Pipelines / Functions / …) next to the
            title on the list page; hidden on detail sub-pages (editor/history).
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OPageHeader>
     </template>
 
-    <div class="flex-1 min-h-0 flex flex-col overflow-hidden">
+    <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
       <RouterView v-slot="{ Component }">
         <component :is="Component" class="h-full" @sendToAiChat="sendToAiChat" />
       </RouterView>

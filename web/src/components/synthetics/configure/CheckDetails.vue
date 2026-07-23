@@ -87,14 +87,14 @@ function handleTagKeydown(event: KeyboardEvent) {
 </script>
 
 <template>
-  <div class="rounded-default border border-border-default mb-4">
-    <div class="flex items-center border-b border-border-default py-2.5 px-3">
-      <div class="w-[0.1875rem] h-4 rounded-default mr-2 shrink-0 bg-primary-600" />
-      <h3 class="text-base font-semibold text-text-heading">
+  <div class="rounded-default border-border-default mb-4 border">
+    <div class="border-border-default flex items-center border-b px-3 py-2.5">
+      <div class="rounded-default bg-primary-600 mr-2 h-4 w-[0.1875rem] shrink-0" />
+      <h3 class="text-text-heading text-base font-semibold">
         {{ t("synthetics.checkDetails.title") }}
       </h3>
     </div>
-    <div class="px-3 py-2 flex flex-col gap-4">
+    <div class="flex flex-col gap-4 px-3 py-2">
       <OInput
         v-model="name"
         :label="t('synthetics.checkDetails.name')"
@@ -139,10 +139,10 @@ function handleTagKeydown(event: KeyboardEvent) {
       />
 
       <div>
-        <label class="text-sm font-medium text-text-body mb-1 block">{{
+        <label class="text-text-body mb-1 block text-sm font-medium">{{
           t("synthetics.checkDetails.tags")
         }}</label>
-        <div class="flex items-center gap-2 mb-2">
+        <div class="mb-2 flex items-center gap-2">
           <OInput
             v-model="tagInput"
             :placeholder="t('synthetics.checkDetails.tagPlaceholder')"

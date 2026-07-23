@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div class="flex flex-col h-full p-0">
+  <div class="flex h-full flex-col p-0">
     <OPageLayout
       v-if="!showAddDialog"
       :title="t('cipherKey.header')"
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t(`cipherKey.add`) }}
         </OButton>
       </template>
-      <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
+      <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
         <OTable
           :frame="false"
           :data="visibleRows"
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template v-if="selectedKeys.length > 0" #bottom>
-            <span class="text-xs text-text-body font-medium">
+            <span class="text-text-body text-xs font-medium">
               {{ t("settings.cipherKeysPage.selected", { count: selectedKeys.length }) }}
             </span>
             <OButton

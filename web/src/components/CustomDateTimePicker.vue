@@ -8,7 +8,7 @@
         }"
         data-test="date-time-btn"
         variant="outline"
-        class="h-full rounded-default py-0 px-1.25 text-xs min-w-auto bg-[rgba(89,96,178,0.2)]!"
+        class="rounded-default h-full min-w-auto bg-[rgba(89,96,178,0.2)]! px-1.25 py-0 text-xs"
         :class="changeStyle ? computedClass : 'h-8!'"
         :disabled="isFirstEntry"
       >
@@ -26,17 +26,17 @@
         </template>
       </OButton>
     </template>
-    <div class="date-time-dialog w-85.25 z-[10001] max-h-150">
+    <div class="date-time-dialog z-[10001] max-h-150 w-85.25">
       <div class="flex justify-between">
         <OTabPanels v-model="picker.activeTab">
           <OTabPanel name="relative">
             <div class="date-time-table relative flex flex-col">
               <div
-                class="relative-row [&>*]:mr-1.5 px-3 py-2 flex items-center border-b border-border-default"
+                class="relative-row border-border-default flex items-center border-b px-3 py-2 [&>*]:mr-1.5"
                 v-for="(period, periodIndex) in relativePeriods"
                 :key="'date_' + periodIndex"
               >
-                <div class="text-sm font-semibold min-w-18.75">{{ period.label }}</div>
+                <div class="min-w-18.75 text-sm font-semibold">{{ period.label }}</div>
                 <div v-for="item in relativeDates[period.value]" :key="item">
                   <OButton
                     :data-test="`date-time-relative-${item}-${period.value}-btn`"
@@ -53,11 +53,11 @@
                 </div>
               </div>
               <div
-                class="relative-row [&>*]:mr-1.5 px-3 py-2 flex items-center border-b border-border-default"
+                class="relative-row border-border-default flex items-center border-b px-3 py-2 [&>*]:mr-1.5"
               >
-                <div class="text-sm font-semibold min-w-18.75">Custom</div>
+                <div class="min-w-18.75 text-sm font-semibold">Custom</div>
                 <div class="flex gap-2">
-                  <div class="flex flex-col w-20">
+                  <div class="flex w-20 flex-col">
                     <OInput
                       v-model.number="picker.data.selectedDate.relative.value"
                       type="number"

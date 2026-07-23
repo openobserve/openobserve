@@ -6,10 +6,10 @@ the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version. -->
 
 <template>
-  <div class="flex flex-col h-full p-4 min-h-0" data-test="scorer-library">
+  <div class="flex h-full min-h-0 flex-col p-4" data-test="scorer-library">
     <div
       v-if="isLoadingCatalog"
-      class="flex flex-col items-center justify-center flex-1 p-8"
+      class="flex flex-1 flex-col items-center justify-center p-8"
       data-test="scorer-library-loading"
     >
       <OSpinner size="lg" />
@@ -17,7 +17,7 @@ the Free Software Foundation, either version 3 of the License, or
 
     <div
       v-else-if="loadError"
-      class="flex flex-col items-center justify-center flex-1 p-8 text-text-secondary"
+      class="text-text-secondary flex flex-1 flex-col items-center justify-center p-8"
       data-test="scorer-library-error"
     >
       <OIcon name="error-outline" class="mb-2" style="width: 3em; height: 3em" />
@@ -27,16 +27,16 @@ the Free Software Foundation, either version 3 of the License, or
 
     <div
       v-else-if="providers.length === 0"
-      class="flex flex-col items-center justify-center flex-1 p-8 text-text-secondary"
+      class="text-text-secondary flex flex-1 flex-col items-center justify-center p-8"
       data-test="scorer-library-no-providers"
     >
       Create a Provider first before importing LLM Judge scorers.
     </div>
 
-    <div v-else class="flex flex-col min-h-0 flex-1">
-      <div class="flex items-end gap-3 mb-4">
-        <div class="flex items-center gap-2 shrink-0 w-60">
-          <label class="text-xs font-semibold text-text-secondary whitespace-nowrap"
+    <div v-else class="flex min-h-0 flex-1 flex-col">
+      <div class="mb-4 flex items-end gap-3">
+        <div class="flex w-60 shrink-0 items-center gap-2">
+          <label class="text-text-secondary text-xs font-semibold whitespace-nowrap"
             >Provider</label
           >
           <OSelect
@@ -52,24 +52,24 @@ the Free Software Foundation, either version 3 of the License, or
           v-model="searchQuery"
           placeholder="Search Scorers..."
           clearable
-          class="flex-1 min-w-0"
+          class="min-w-0 flex-1"
           data-test="scorer-library-search"
         />
       </div>
 
-      <div class="flex items-center justify-between gap-3 mb-2 pl-4.25 pr-3">
+      <div class="mb-2 flex items-center justify-between gap-3 pr-3 pl-4.25">
         <label
           v-if="filteredEntries.length > 0"
-          class="inline-flex items-center gap-2 py-0.5 px-1 text-xs font-medium text-text-secondary select-none"
+          class="text-text-secondary inline-flex items-center gap-2 px-1 py-0.5 text-xs font-medium select-none"
           data-test="scorer-library-select-all"
         >
           <OCheckbox :model-value="allVisibleSelected" @update:model-value="toggleSelectAll" />
           <span>{{ allVisibleSelected ? "Clear all" : "Select all" }}</span>
         </label>
-        <span class="text-xs text-text-secondary"> {{ filteredEntries.length }} scorer(s) </span>
+        <span class="text-text-secondary text-xs"> {{ filteredEntries.length }} scorer(s) </span>
       </div>
 
-      <div class="overflow-y-auto flex-1 min-h-0">
+      <div class="min-h-0 flex-1 overflow-y-auto">
         <section
           v-for="group in groupedEntries"
           :key="group.category"
@@ -77,20 +77,20 @@ the Free Software Foundation, either version 3 of the License, or
           :data-test="`scorer-library-section-${group.category}`"
         >
           <h4
-            class="flex items-baseline gap-1.5 m-0 mb-1.5 text-xs font-bold uppercase tracking-[0.04em] text-text-heading"
+            class="text-text-heading m-0 mb-1.5 flex items-baseline gap-1.5 text-xs font-bold tracking-[0.04em] uppercase"
           >
             <span>{{ group.category }}</span>
-            <span class="font-medium text-text-secondary">({{ group.entries.length }})</span>
+            <span class="text-text-secondary font-medium">({{ group.entries.length }})</span>
           </h4>
-          <ul class="flex flex-col rounded-default border border-border-default">
+          <ul class="rounded-default border-border-default flex flex-col border">
             <li
               v-for="entry in group.entries"
               :key="entry.name"
-              class="flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors duration-200 border-l-4"
+              class="flex cursor-pointer items-center gap-2 border-l-4 px-3 py-2 transition-colors duration-200"
               :class="[
                 isSelected(entry.name)
-                  ? 'selected-item bg-[color-mix(in_srgb,var(--color-primary-600)_6%,transparent)] border-primary'
-                  : 'border-transparent hover:bg-table-row-hover-bg',
+                  ? 'selected-item border-primary bg-[color-mix(in_srgb,var(--color-primary-600)_6%,transparent)]'
+                  : 'hover:bg-table-row-hover-bg border-transparent',
               ]"
               :data-test="`scorer-library-item-${entry.name}`"
               @click="toggle(entry)"
@@ -102,9 +102,9 @@ the Free Software Foundation, either version 3 of the License, or
                   @click.stop
                 />
               </div>
-              <div class="flex flex-col flex-1 min-w-0">
+              <div class="flex min-w-0 flex-1 flex-col">
                 <span class="text-sm font-medium">{{ entry.displayName }}</span>
-                <span v-if="entry.description" class="block text-xs text-text-secondary">
+                <span v-if="entry.description" class="text-text-secondary block text-xs">
                   {{ entry.description }}
                 </span>
               </div>

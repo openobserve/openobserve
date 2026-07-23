@@ -107,22 +107,22 @@ function onTickChange(newVal: CheckboxModelValue) {
           ? 'indeterminate'
           : 'false'
     "
-    class="list-none m-0 p-0"
+    class="m-0 list-none p-0"
   >
     <!-- Node row ────────────────────────────────────────────────────── -->
     <div
-      class="flex items-center gap-1 min-h-7 px-1 rounded-default select-none transition-colors duration-100"
+      class="rounded-default flex min-h-7 items-center gap-1 px-1 transition-colors duration-100 select-none"
       :class="
         !isLeaf
-          ? 'cursor-pointer hover:bg-tree-node-hover-bg'
-          : 'cursor-default hover:bg-tree-node-hover-bg'
+          ? 'hover:bg-tree-node-hover-bg cursor-pointer'
+          : 'hover:bg-tree-node-hover-bg cursor-default'
       "
       @click="toggleExpand"
     >
       <!-- Expand / collapse arrow (parents only) -->
       <span
         v-if="!isLeaf"
-        class="flex items-center justify-center size-4 shrink-0 text-text-secondary transition-transform duration-200 ease-in-out"
+        class="text-text-secondary flex size-4 shrink-0 items-center justify-center transition-transform duration-200 ease-in-out"
         :class="isExpanded ? 'rotate-0' : '-rotate-90'"
         aria-hidden="true"
       >
@@ -151,7 +151,7 @@ function onTickChange(newVal: CheckboxModelValue) {
         The negative left overflows into the ul's padding area which is
         NOT clipped by overflow:hidden (clips to padding box, not content box).
       -->
-      <span v-else class="relative shrink-0 self-stretch opacity-35 w-4" aria-hidden="true">
+      <span v-else class="relative w-4 shrink-0 self-stretch opacity-35" aria-hidden="true">
         <!-- Elbow connector. The 0.75px offsets are half the 1.5px hairline, so
              the stroke lands on the same physical line as the sibling connectors.
              `- -0.75px` is deliberate and means `+ 0.75px`: Tailwind's candidate
@@ -159,7 +159,7 @@ function onTickChange(newVal: CheckboxModelValue) {
              silently compiles to NOTHING. Subtracting a negative is the only form
              that survives extraction. Verified against the compiled stylesheet. -->
         <span
-          class="absolute top-0 left-[calc(-0.75rem_-_0.75px)] w-[calc(1.75rem_-_-0.75px)] h-[calc(50%_-_-0.75px)] border-l-[1.5px] border-b-[1.5px] rounded-bl-default"
+          class="rounded-bl-default absolute top-0 left-[calc(-0.75rem_-_0.75px)] h-[calc(50%_-_-0.75px)] w-[calc(1.75rem_-_-0.75px)] border-b-[1.5px] border-l-[1.5px]"
         />
       </span>
 
@@ -175,7 +175,7 @@ function onTickChange(newVal: CheckboxModelValue) {
 
       <!-- Label -->
       <span
-        class="text-sm text-text-body leading-snug truncate"
+        class="text-text-body truncate text-sm leading-snug"
         :class="isDisabled ? 'opacity-50' : ''"
       >
         {{ node.label }}
@@ -185,10 +185,10 @@ function onTickChange(newVal: CheckboxModelValue) {
     <!-- Children (recursive) — animated expand/collapse ──────────── -->
     <div
       v-if="!isLeaf"
-      class="overflow-hidden transition-[grid-template-rows] duration-200 ease-in-out grid"
+      class="grid overflow-hidden transition-[grid-template-rows] duration-200 ease-in-out"
       :style="{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }"
     >
-      <ul role="group" class="list-none m-0 p-0 pl-5 overflow-hidden min-h-0">
+      <ul role="group" class="m-0 min-h-0 list-none overflow-hidden p-0 pl-5">
         <template v-if="isExpanded">
           <OTreeNode
             v-for="child in node.children"

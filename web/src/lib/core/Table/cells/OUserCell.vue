@@ -28,5 +28,5 @@ const displayText = computed(() =>
 
 <template>
   <span v-if="isEmpty" class="text-text-body">{{ emptyLabel }}</span>
-  <span v-else class="whitespace-nowrap text-text-body" :title="raw">{{ displayText }}</span>
+  <span v-else class="text-text-body whitespace-nowrap" :title="raw">{{ displayText }}</span>
 </template>

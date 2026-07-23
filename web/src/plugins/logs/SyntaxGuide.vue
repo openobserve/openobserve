@@ -24,11 +24,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-cy="syntax-guide-button"
           variant="ghost"
           size="sm"
-          class="w-full! justify-start! px-3! py-1.5! h-auto! rounded-default! gap-2! font-normal!"
+          class="rounded-default! h-auto! w-full! justify-start! gap-2! px-3! py-1.5! font-normal!"
         >
           <template #icon-left>
             <span
-              class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0"
+              class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
             >
               <OIcon name="help" size="sm" />
             </span>
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             noBorder ? 'display-none!' : 'ml-1',
             sqlmode ? 'sql-mode' : 'normal-mode',
             noBorder
-              ? 'border-0! bg-transparent! p-0! m-0! w-full justify-start hover:bg-transparent!'
+              ? 'm-0! w-full justify-start border-0! bg-transparent! p-0! hover:bg-transparent!'
               : '',
           ]"
           class="h-4.5!"
@@ -74,11 +74,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="w-105">
           <div class="label text-sm font-bold">{{ t("search.syntaxGuideLabel") }}</div>
         </div>
-        <div class="border-t my-1 border-dropdown-separator" />
+        <div class="border-dropdown-separator my-1 border-t" />
         <div class="answers">
           <div class="mb-1.25">
-            <div class="text-xs ml-1.25">
-              <ul class="px-2.5 mt-2.5 mb-0 text-sm leading-[1.4375rem]">
+            <div class="ml-1.25 text-xs">
+              <ul class="mt-2.5 mb-0 px-2.5 text-sm leading-[1.4375rem]">
                 <li>
                   For inverted index search of value 'error' use
                   <span class="bg-highlight-bg px-1.25">match_all('error')</span>
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <a
                     href="https://openobserve.ai/docs/example-queries/"
                     target="_blank"
-                    class="hover:underline text-primary"
+                    class="text-primary hover:underline"
                     >click here</a
                   >.
                 </li>
@@ -140,11 +140,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="w-105">
           <div class="label text-sm font-bold">Syntax Guide: SQL Mode</div>
         </div>
-        <div class="border-t my-1 border-dropdown-separator" />
+        <div class="border-dropdown-separator my-1 border-t" />
         <div class="answers">
           <div class="mb-1.25">
-            <div class="text-xs ml-1.25">
-              <ul class="px-2.5 mt-2.5 mb-0 text-sm leading-[1.4375rem]">
+            <div class="ml-1.25 text-xs">
+              <ul class="mt-2.5 mb-0 px-2.5 text-sm leading-[1.4375rem]">
                 <li>
                   For inverted index search of value 'error' use
                   <span class="bg-highlight-bg px-1.25"
@@ -209,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <a
                     href="https://openobserve.ai/docs/example-queries/"
                     target="_blank"
-                    class="hover:underline text-primary"
+                    class="text-primary hover:underline"
                     >click here</a
                   >.
                 </li>

@@ -55,16 +55,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Loading State -->
-      <div v-if="isLoading" class="text-center p-4">
+      <div v-if="isLoading" class="p-4 text-center">
         <OSpinner variant="dots" size="lg" />
-        <div class="text-sm text-text-muted mt-3">Analyzing file...</div>
+        <div class="text-text-muted mt-3 text-sm">Analyzing file...</div>
       </div>
 
       <!-- Diff Preview -->
       <div v-else-if="diffData" class="diff-preview">
         <!-- Summary -->
         <div class="summary-bar mb-3">
-          <div class="flex gap-2 items-center">
+          <div class="flex items-center gap-2">
             <div class="col-auto">
               <OTag type="diffCategory" value="new">
                 <strong>{{ diffData.additions.length }}</strong
@@ -102,31 +102,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="max-h-[calc(100vh-400px)] overflow-y-auto">
           <!-- Additions -->
           <div v-if="diffData.additions.length > 0" class="mb-3">
-            <div class="text-sm font-semibold border-b border-separator text-status-positive p-2">
+            <div class="border-separator text-status-positive border-b p-2 text-sm font-semibold">
               <OIcon name="add-circle" size="sm" />
               New ({{ selectedAdditions.length }}/{{ diffData.additions.length }})
             </div>
-            <ul class="flex flex-col divide-y divide-border border rounded-default">
+            <ul class="divide-border rounded-default flex flex-col divide-y border">
               <li
                 v-for="group in diffData.additions"
                 :key="group.id"
                 data-test="semantic-groups-drawer-addition-item"
-                class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/50"
+                class="hover:bg-muted/50 flex cursor-pointer items-center gap-2 px-3 py-2"
                 @click="toggleAddition(group.id)"
               >
-                <div class="flex items-center shrink-0">
+                <div class="flex shrink-0 items-center">
                   <OCheckbox
                     :model-value="selectedAdditions.includes(group.id)"
                     @update:model-value="toggleAddition(group.id)"
                   />
                 </div>
-                <div class="flex flex-col flex-1 min-w-0">
+                <div class="flex min-w-0 flex-1 flex-col">
                   <span class="text-sm font-medium">{{ group.display }}</span>
-                  <span class="block text-xs text-muted-foreground">
+                  <span class="text-muted-foreground block text-xs">
                     {{ group.id }} • {{ group.fields.length }} fields
                   </span>
                 </div>
-                <div class="flex items-center shrink-0 ms-auto">
+                <div class="ms-auto flex shrink-0 items-center">
                   <OButton variant="ghost" size="icon-circle-sm" @click.stop="viewGroup(group)">
                     <OIcon name="visibility" size="sm" />
                   </OButton>
@@ -138,33 +138,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Modifications -->
           <div v-if="diffData.modifications.length > 0" class="mb-3">
             <div
-              class="text-sm font-semibold border-b border-separator text-status-warning-text p-2"
+              class="border-separator text-status-warning-text border-b p-2 text-sm font-semibold"
             >
               <OIcon name="edit" size="sm" />
               Modified ({{ selectedModifications.length }}/{{ diffData.modifications.length }})
             </div>
-            <ul class="flex flex-col divide-y divide-border border rounded-default">
+            <ul class="divide-border rounded-default flex flex-col divide-y border">
               <li
                 v-for="mod in diffData.modifications"
                 :key="mod.proposed.id"
                 data-test="semantic-groups-drawer-modification-item"
-                class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/50"
+                class="hover:bg-muted/50 flex cursor-pointer items-center gap-2 px-3 py-2"
                 @click="toggleModification(mod.proposed.id)"
               >
-                <div class="flex items-center shrink-0">
+                <div class="flex shrink-0 items-center">
                   <OCheckbox
                     :model-value="selectedModifications.includes(mod.proposed.id)"
                     @update:model-value="toggleModification(mod.proposed.id)"
                   />
                 </div>
-                <div class="flex flex-col flex-1 min-w-0">
+                <div class="flex min-w-0 flex-1 flex-col">
                   <span class="text-sm font-medium">{{ mod.proposed.display }}</span>
-                  <span class="block text-xs text-muted-foreground">
+                  <span class="text-muted-foreground block text-xs">
                     {{ mod.proposed.id }} • {{ mod.current.fields.length }} →
                     {{ mod.proposed.fields.length }} fields
                   </span>
                 </div>
-                <div class="flex items-center shrink-0 ms-auto">
+                <div class="ms-auto flex shrink-0 items-center">
                   <OButton
                     variant="ghost"
                     size="icon-circle-sm"
@@ -184,15 +184,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="`Unchanged (${diffData.unchanged.length})`"
               icon="check-circle"
             >
-              <ul class="flex flex-col divide-y divide-border border rounded-default">
+              <ul class="divide-border rounded-default flex flex-col divide-y border">
                 <li
                   v-for="group in diffData.unchanged"
                   :key="group.id"
                   class="flex items-center gap-2 px-3 py-2"
                 >
-                  <div class="flex flex-col flex-1 min-w-0">
+                  <div class="flex min-w-0 flex-1 flex-col">
                     <span class="text-sm">{{ group.display }}</span>
-                    <span class="block text-xs text-muted-foreground"
+                    <span class="text-muted-foreground block text-xs"
                       >{{ group.id }} • {{ group.fields.length }} fields</span
                     >
                   </div>
@@ -204,10 +204,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Empty State -->
-      <div v-else class="empty-state text-center p-4">
+      <div v-else class="empty-state p-4 text-center">
         <OIcon name="cloud-upload" class="mb-3 size-16!" />
-        <div class="text-xl font-semibold text-text-muted mb-2">Upload a JSON file</div>
-        <div class="text-sm text-text-secondary">
+        <div class="text-text-muted mb-2 text-xl font-semibold">Upload a JSON file</div>
+        <div class="text-text-secondary text-sm">
           The system will analyze the file and show you what will change
         </div>
       </div>
@@ -225,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="showGroupDialog = false"
   >
     <div>
-      <div class="text-sm font-medium mb-2">Fields ({{ selectedGroup?.fields.length }})</div>
+      <div class="mb-2 text-sm font-medium">Fields ({{ selectedGroup?.fields.length }})</div>
       <OTag
         v-for="field in selectedGroup?.fields"
         :key="field"
@@ -250,9 +250,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="flex gap-3">
       <div class="w-1/2">
-        <div class="text-sm font-medium text-status-error-text mb-2">Current</div>
-        <div class="text-xs mb-1">{{ selectedModification?.current.fields.length }} fields</div>
-        <div class="max-h-62.5 overflow-y-auto p-2 bg-surface-subtle rounded-default">
+        <div class="text-status-error-text mb-2 text-sm font-medium">Current</div>
+        <div class="mb-1 text-xs">{{ selectedModification?.current.fields.length }} fields</div>
+        <div class="bg-surface-subtle rounded-default max-h-62.5 overflow-y-auto p-2">
           <OTag
             v-for="field in selectedModification?.current.fields"
             :key="`current-${field}`"
@@ -265,9 +265,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div class="w-1/2">
-        <div class="text-sm font-medium text-status-positive mb-2">Proposed</div>
-        <div class="text-xs mb-1">{{ selectedModification?.proposed.fields.length }} fields</div>
-        <div class="max-h-62.5 overflow-y-auto p-2 bg-surface-subtle rounded-default">
+        <div class="text-status-positive mb-2 text-sm font-medium">Proposed</div>
+        <div class="mb-1 text-xs">{{ selectedModification?.proposed.fields.length }} fields</div>
+        <div class="bg-surface-subtle rounded-default max-h-62.5 overflow-y-auto p-2">
           <OTag
             v-for="field in selectedModification?.proposed.fields"
             :key="`proposed-${field}`"

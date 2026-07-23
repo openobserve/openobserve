@@ -173,25 +173,25 @@ function failedAtStep(steps: StepResult[]): string {
 </script>
 
 <template>
-  <div class="run-expansion border-t border-border-default bg-surface-panel">
+  <div class="run-expansion border-border-default bg-surface-panel border-t">
     <!-- Loading skeleton -->
     <div v-if="loading" class="flex flex-col gap-2 p-4">
-      <div class="flex gap-3 items-center py-2">
-        <div class="bg-[var(--color-border-default)] animate-pulse h-4 w-24 rounded-default" />
-        <div class="bg-[var(--color-border-default)] animate-pulse h-4 w-16 rounded-default" />
-        <div class="bg-[var(--color-border-default)] animate-pulse h-4 w-40 rounded-default" />
+      <div class="flex items-center gap-3 py-2">
+        <div class="rounded-default h-4 w-24 animate-pulse bg-[var(--color-border-default)]" />
+        <div class="rounded-default h-4 w-16 animate-pulse bg-[var(--color-border-default)]" />
+        <div class="rounded-default h-4 w-40 animate-pulse bg-[var(--color-border-default)]" />
       </div>
-      <div class="bg-[var(--color-border-default)] animate-pulse h-24 w-full rounded-default" />
+      <div class="rounded-default h-24 w-full animate-pulse bg-[var(--color-border-default)]" />
     </div>
 
     <!-- Query error -->
-    <div v-else-if="queryError" class="flex items-center gap-2 p-4 text-xs text-status-error-text">
+    <div v-else-if="queryError" class="text-status-error-text flex items-center gap-2 p-4 text-xs">
       <OIcon name="error_outline" size="sm" />
       <span>{{ queryError }}</span>
     </div>
 
     <!-- No data -->
-    <div v-else-if="!executions.length" class="flex items-center gap-2 p-4 text-xs text-text-muted">
+    <div v-else-if="!executions.length" class="text-text-muted flex items-center gap-2 p-4 text-xs">
       <OIcon name="info" size="sm" />
       <span v-if="runStatus === 'error'">{{
         t("synthetics.runRowExpansion.probeInfraError")
@@ -207,19 +207,19 @@ function failedAtStep(steps: StepResult[]): string {
           locationGroups.some((g) => g.status === 'warning') &&
           locationGroups.every((g) => g.status !== 'failed' && g.status !== 'error')
         "
-        class="flex items-center gap-2 px-4 py-2 text-xs text-(--color-orange-600) bg-(--color-orange-500)/10 border-b border-(--color-orange-500)/20"
+        class="flex items-center gap-2 border-b border-(--color-orange-500)/20 bg-(--color-orange-500)/10 px-4 py-2 text-xs text-(--color-orange-600)"
       >
         <OIcon name="warning" size="xs" />
         {{ t("synthetics.runRowExpansion.flakyWarning") }}
       </div>
 
-      <div class="flex flex-col divide-y divide-border-default">
+      <div class="divide-border-default flex flex-col divide-y">
         <div v-for="group in locationGroups" :key="group.location" class="location-group">
           <!-- Location header row — click to expand/collapse -->
           <OButton
             variant="ghost"
             size="xs"
-            class="w-full justify-start gap-2 px-4 py-2.5 text-xs font-medium text-left"
+            class="w-full justify-start gap-2 px-4 py-2.5 text-left text-xs font-medium"
             :data-test="`synthetics-run-row-toggle-location-${group.location}-btn`"
             @click="toggleLocation(group.location)"
           >
@@ -228,7 +228,7 @@ function failedAtStep(steps: StepResult[]): string {
               size="sm"
               class="text-text-muted shrink-0"
             />
-            <span :class="STATUS_COLOR[group.status]" class="font-bold text-sm">
+            <span :class="STATUS_COLOR[group.status]" class="text-sm font-bold">
               {{ statusDot(group.status) }}
             </span>
             <span class="text-text-heading font-semibold">{{ group.location }}</span>
@@ -236,7 +236,7 @@ function failedAtStep(steps: StepResult[]): string {
               {{ statusLabel(group.status) }}
             </span>
             <span class="text-text-muted">{{ fmtDuration(group.durationMs) }}</span>
-            <span class="ml-auto text-text-muted">
+            <span class="text-text-muted ml-auto">
               {{ t("synthetics.runRowExpansion.executions", { count: group.execs.length }) }}
             </span>
           </OButton>
@@ -244,42 +244,42 @@ function failedAtStep(steps: StepResult[]): string {
           <!-- Location expansion: execution table -->
           <div v-if="expandedLocations.has(group.location)" class="px-4 pb-3">
             <!-- Execution summary table -->
-            <div class="rounded-default border border-border-default overflow-hidden mb-3">
+            <div class="rounded-default border-border-default mb-3 overflow-hidden border">
               <table class="w-full text-xs">
                 <thead>
-                  <tr class="bg-surface-panel border-b border-border-default">
+                  <tr class="bg-surface-panel border-border-default border-b">
                     <th
-                      class="px-3 py-2 text-left font-semibold text-text-muted uppercase tracking-wide text-3xs"
+                      class="text-text-muted text-3xs px-3 py-2 text-left font-semibold tracking-wide uppercase"
                     >
                       {{ t("synthetics.runRowExpansion.browserHeader") }}
                     </th>
                     <th
-                      class="px-3 py-2 text-left font-semibold text-text-muted uppercase tracking-wide text-3xs"
+                      class="text-text-muted text-3xs px-3 py-2 text-left font-semibold tracking-wide uppercase"
                     >
                       {{ t("synthetics.runRowExpansion.deviceHeader") }}
                     </th>
                     <th
-                      class="px-3 py-2 text-left font-semibold text-text-muted uppercase tracking-wide text-3xs"
+                      class="text-text-muted text-3xs px-3 py-2 text-left font-semibold tracking-wide uppercase"
                     >
                       {{ t("synthetics.results.status") }}
                     </th>
                     <th
-                      class="px-3 py-2 text-right font-semibold text-text-muted uppercase tracking-wide text-3xs"
+                      class="text-text-muted text-3xs px-3 py-2 text-right font-semibold tracking-wide uppercase"
                     >
                       {{ t("synthetics.results.duration") }}
                     </th>
                     <th
-                      class="px-3 py-2 text-left font-semibold text-text-muted uppercase tracking-wide text-3xs"
+                      class="text-text-muted text-3xs px-3 py-2 text-left font-semibold tracking-wide uppercase"
                     >
                       {{ t("synthetics.runRowExpansion.failedAtHeader") }}
                     </th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-border-default">
+                <tbody class="divide-border-default divide-y">
                   <tr
                     v-for="ex in group.execs"
                     :key="ex.executionId"
-                    class="hover:bg-surface-subtle-hover transition-colors cursor-pointer"
+                    class="hover:bg-surface-subtle-hover cursor-pointer transition-colors"
                     @click="openDrawer(ex)"
                   >
                     <td class="px-3 py-2 font-medium capitalize">{{ ex.browserEngine }}</td>
@@ -296,15 +296,15 @@ function failedAtStep(steps: StepResult[]): string {
                       >
                         <span class="text-base leading-none">{{ statusDot(ex.status) }}</span>
                         {{ statusLabel(ex.status) }}
-                        <span v-if="ex.status === 'warning'" class="font-normal text-text-muted">{{
+                        <span v-if="ex.status === 'warning'" class="text-text-muted font-normal">{{
                           t("synthetics.runRowExpansion.flaky")
                         }}</span>
                       </span>
                     </td>
-                    <td class="px-3 py-2 text-right tabular-nums text-text-secondary">
+                    <td class="text-text-secondary px-3 py-2 text-right tabular-nums">
                       {{ fmtDuration(ex.durationMs) }}
                     </td>
-                    <td class="px-3 py-2 text-text-muted font-mono truncate max-w-48">
+                    <td class="text-text-muted max-w-48 truncate px-3 py-2 font-mono">
                       {{ ex.status !== "passed" ? failedAtStep(ex.steps) : "—" }}
                     </td>
                   </tr>

@@ -4,17 +4,17 @@
 -->
 <template>
   <div
-    class="flame-graph-view flex flex-col h-full bg-white w-full bg-card-glass-bg!"
+    class="flame-graph-view bg-card-glass-bg! flex h-full w-full flex-col bg-white"
     style="min-height: 400px"
   >
     <!-- Upper area: controls + ruler + chart -->
-    <div class="flex flex-col flex-1 min-h-0">
+    <div class="flex min-h-0 flex-1 flex-col">
       <!-- Controls Bar -->
       <div
-        class="px-6 py-3 border-b border-border-default flex items-center justify-between bg-card-glass-bg!"
+        class="border-border-default bg-card-glass-bg! flex items-center justify-between border-b px-6 py-3"
       >
         <div class="flex items-center space-x-4">
-          <div class="text-xs font-bold text-text-secondary">
+          <div class="text-text-secondary text-xs font-bold">
             <span class="text-text-body">{{ totalSpans }}</span>
             {{ t("traces.flameGraphView.spans") }}
             <span class="mx-2">•</span>
@@ -27,17 +27,17 @@
       <!-- Ruler + chart: outer flex column, mousemove for cursor badge on ruler -->
       <div
         data-test="flame-graph-view-chart-wrapper"
-        class="flex flex-col flex-1 min-h-0"
+        class="flex min-h-0 flex-1 flex-col"
         @mousemove="handleChartMouseMove"
         @mouseleave="cursorVisible = false"
       >
         <!-- Timeline Ruler — stays fixed above the scrollable chart -->
-        <div class="relative bg-card-glass-bg select-none flex-shrink-0" style="height: 1.5rem">
+        <div class="bg-card-glass-bg relative flex-shrink-0 select-none" style="height: 1.5rem">
           <!-- Static tick labels -->
           <span
             v-for="(tick, index) in timelineTicks"
             :key="'lbl-' + index"
-            class="absolute text-3xs text-text-secondary leading-none whitespace-nowrap"
+            class="text-3xs text-text-secondary absolute leading-none whitespace-nowrap"
             style="top: 50%; padding-left: 3px"
             :style="{ left: tick.left, transform: tick.transform }"
             >{{ tick.label }}</span
@@ -47,7 +47,7 @@
           <template v-for="(tick, index) in timelineTicks" :key="'tic-' + index">
             <div
               v-if="index > 0 && index < timelineTicks.length - 1"
-              class="absolute w-px bottom-0 h-full bg-grey-400"
+              class="bg-grey-400 absolute bottom-0 h-full w-px"
               :style="{ left: tick.left, transform: 'translateX(-50%)' }"
             ></div>
           </template>
@@ -55,12 +55,12 @@
           <!-- Cursor time badge with downward arrow -->
           <div
             v-if="cursorVisible"
-            class="absolute pointer-events-none flex flex-col items-center z-20"
+            class="pointer-events-none absolute z-20 flex flex-col items-center"
             style="top: 2px; transform: translateX(-50%)"
             :style="{ left: cursorX + 'px' }"
           >
             <div
-              class="text-3xs text-white px-1.5 py-0.5 rounded-default whitespace-nowrap font-medium"
+              class="text-3xs rounded-default px-1.5 py-0.5 font-medium whitespace-nowrap text-white"
               style="background: rgba(30, 30, 30, 0.9); line-height: 1.4"
             >
               {{ cursorTimeLabel }}
@@ -79,7 +79,7 @@
         </div>
 
         <!-- Scrollable chart area: grows to fit all rows, scrolls vertically -->
-        <div ref="chartScrollRef" class="flex-1 overflow-y-auto overflow-x-hidden relative min-h-0">
+        <div ref="chartScrollRef" class="relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
           <div
             :style="{
               height: chartContentHeight + 'px',
@@ -97,7 +97,7 @@
             <!-- Vertical cursor line -->
             <div
               v-if="cursorVisible"
-              class="absolute top-0 bottom-0 pointer-events-none z-10"
+              class="pointer-events-none absolute top-0 bottom-0 z-10"
               style="width: 1px; background: rgba(80, 80, 80, 0.6)"
               :style="{ left: cursorX + 'px' }"
             ></div>
@@ -111,7 +111,7 @@
         class="absolute inset-0 flex items-center justify-center bg-white"
         style="top: 60px"
       >
-        <div class="text-center text-text-secondary">
+        <div class="text-text-secondary text-center">
           <div class="text-sm">{{ t("traces.flameGraphView.noSpansToDisplay") }}</div>
         </div>
       </div>
@@ -120,7 +120,7 @@
     <!-- Resize handle -->
     <div
       v-if="sidebarVisible"
-      class="h-1 cursor-row-resize bg-border-default hover:bg-accent flex-shrink-0 transition-colors"
+      class="bg-border-default hover:bg-accent h-1 flex-shrink-0 cursor-row-resize transition-colors"
       style="min-height: 4px"
       data-test="flame-graph-resizer"
       @mousedown="startResize"
@@ -130,7 +130,7 @@
     <div
       v-if="sidebarVisible"
       data-test="trace-details-flame-graph-sidebar"
-      class="border-t border-t-solid border-t-card-glass-border bg-card-glass-bg! flex-shrink-0 overflow-hidden"
+      class="border-t-solid border-t-card-glass-border bg-card-glass-bg! flex-shrink-0 overflow-hidden border-t"
       :style="{ height: bottomPanelHeight + 'px' }"
     >
       <TraceDetailsSidebar

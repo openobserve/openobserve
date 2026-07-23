@@ -16,11 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OCard
-    class="border border-border h-full flex flex-col transition-all duration-200 ease-in-out rounded-default hover:-translate-y-0.5 hover:shadow-lg"
+    class="border-border rounded-default flex h-full flex-col border transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-lg"
   >
-    <OCardSection class="p-4 pb-2 flex-1">
-      <div class="flex items-start justify-between mb-2">
-        <div class="font-semibold text-base leading-snug text-text-heading">
+    <OCardSection class="flex-1 p-4 pb-2">
+      <div class="mb-2 flex items-start justify-between">
+        <div class="text-text-heading text-base leading-snug font-semibold">
           {{ integration.displayName }}
         </div>
         <OButton
@@ -28,14 +28,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon-circle-sm"
           @click="handleDocumentation()"
-          class="docs-btn opacity-70 hover:opacity-100 transition-opacity duration-200 ease-in-out"
+          class="docs-btn opacity-70 transition-opacity duration-200 ease-in-out hover:opacity-100"
           :data-test="`aws-${integration.id}-docs-btn`"
         >
           <OIcon name="description" size="sm" />
           <OTooltip :content="t('ingestion.awsSetup.viewDocumentation')" />
         </OButton>
       </div>
-      <div class="text-sm mb-3 leading-normal min-h-[3em] text-text-secondary">
+      <div class="text-text-secondary mb-3 min-h-[3em] text-sm leading-normal">
         {{ integration.description }}
       </div>
     </OCardSection>
@@ -82,31 +82,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :secondary-button-label="t('common.cancel')"
       @click:secondary="showTemplateDialog = false"
     >
-      <div class="text-sm font-medium mb-3">
+      <div class="mb-3 text-sm font-medium">
         {{
           t("ingestion.awsSetup.chooseMethodPrompt", {
             service: integration.displayName,
           })
         }}
       </div>
-      <ul class="aws-integration-options-list flex flex-col list-none p-0 m-0">
+      <ul class="aws-integration-options-list m-0 flex list-none flex-col p-0">
         <!-- CloudFormation Templates -->
         <li
           v-for="(template, index) in integration.cloudFormationTemplates"
           :key="`cf-${index}`"
           @click="handleTemplateSelection(template)"
-          class="flex items-center gap-2 px-3 py-2 mb-2 cursor-pointer rounded-default border border-border hover:bg-muted/50"
+          class="rounded-default border-border hover:bg-muted/50 mb-2 flex cursor-pointer items-center gap-2 border px-3 py-2"
           :data-test="`aws-${integration.id}-template-option-${index}`"
         >
-          <div class="flex flex-col flex-1 min-w-0">
+          <div class="flex min-w-0 flex-1 flex-col">
             <span class="text-sm font-medium">
               {{ template.name }}
             </span>
-            <span class="block text-xs text-muted-foreground mt-1">
+            <span class="text-muted-foreground mt-1 block text-xs">
               {{ template.description }}
             </span>
           </div>
-          <OIcon name="chevron-right" size="sm" class="shrink-0 ms-auto" />
+          <OIcon name="chevron-right" size="sm" class="ms-auto shrink-0" />
         </li>
 
         <!-- Component Options -->
@@ -114,18 +114,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="(option, index) in integration.componentOptions"
           :key="`comp-${index}`"
           @click="handleComponentSelection(option)"
-          class="flex items-center gap-2 px-3 py-2 mb-2 cursor-pointer rounded-default border border-border hover:bg-muted/50"
+          class="rounded-default border-border hover:bg-muted/50 mb-2 flex cursor-pointer items-center gap-2 border px-3 py-2"
           :data-test="`aws-${integration.id}-component-option-${index}`"
         >
-          <div class="flex flex-col flex-1 min-w-0">
+          <div class="flex min-w-0 flex-1 flex-col">
             <span class="text-sm font-medium">
               {{ option.name }}
             </span>
-            <span class="block text-xs text-muted-foreground mt-1">
+            <span class="text-muted-foreground mt-1 block text-xs">
               {{ option.description }}
             </span>
           </div>
-          <OIcon name="chevron-right" size="sm" class="shrink-0 ms-auto" />
+          <OIcon name="chevron-right" size="sm" class="ms-auto shrink-0" />
         </li>
       </ul>
     </ODialog>

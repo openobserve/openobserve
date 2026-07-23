@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div
-    class="rounded-default tracePage h-full min-h-full! max-h-full! overflow-hidden!"
+    class="rounded-default tracePage h-full max-h-full! min-h-full! overflow-hidden!"
     id="tracePage"
     style="min-height: auto"
   >
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- px-1 (4px): the search bar's own 6px internal inset (toolbar p-1.5)
                + 4px = 10px, aligning the bar with the 10px field-list & results
                panels below (matches the Logs page). -->
-          <div class="w-full h-full">
+          <div class="h-full w-full">
             <!-- Search Bar with Tab Toggle - Always visible to show tabs -->
             <SearchBar
               data-test="logs-search-bar"
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="h-full w-full"
               >
                 <template #before>
-                  <div class="h-full border-r border-border-default bg-surface-panel">
+                  <div class="border-border-default bg-surface-panel h-full border-r">
                     <IndexList
                       v-show="searchObj.meta.showFields"
                       ref="indexListRef"
@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                        so the empties don't flash in between. -->
                     <div
                       v-else-if="searchObj.loadingStream"
-                      class="bg-card-glass-bg h-full flex flex-col items-center justify-center gap-2 text-text-secondary"
+                      class="bg-card-glass-bg text-text-secondary flex h-full flex-col items-center justify-center gap-2"
                       data-test="traces-search-loading"
                     >
                       <OSpinner size="lg" />
@@ -155,9 +155,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       class="bg-card-glass-bg h-full"
                     >
-                      <div class="text-center pt-8">
+                      <div class="pt-8 text-center">
                         <!-- Actual error case -->
-                        <div data-test="traces-search-error-message" class="text-xl pt-4">
+                        <div data-test="traces-search-error-message" class="pt-4 text-xl">
                           {{ t("traces.errorRetrievingTraces") }}
                           <OButton
                             v-if="searchObj.data.errorDetail || searchObj?.data?.errorMsg"
@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                         <!-- Collapsible error detail — shown below results when toggled -->
                         <div class="text-center">
-                          <div class="my-none text-base! px-8!">
+                          <div class="my-none px-8! text-base!">
                             <span v-if="disableMoreErrorDetails">
                               <SanitizedHtmlRenderer
                                 data-test="traces-search-detail-error-message"
@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               />
                               <div
                                 v-if="searchObj?.data?.errorDetail"
-                                class="error-display__message pt-4! text-text-secondary!"
+                                class="error-display__message text-text-secondary! pt-4!"
                               >
                                 {{ searchObj.data.errorDetail }}
                               </div>
@@ -210,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         !searchObj.loading
                       "
                       data-test="traces-search-error-text"
-                      class="text-center py-10 text-xl bg-card-glass-bg h-full"
+                      class="bg-card-glass-bg h-full py-10 text-center text-xl"
                     >
                       <SanitizedHtmlRenderer
                         data-test="traces-search-detail-error-message"

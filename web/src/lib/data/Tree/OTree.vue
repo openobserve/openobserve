@@ -108,7 +108,7 @@ provide(TREE_CONTEXT_KEY, {
 </script>
 
 <template>
-  <ul role="tree" class="list-none m-0 p-0" v-bind="$attrs">
+  <ul role="tree" class="m-0 list-none p-0" v-bind="$attrs">
     <OTreeNode v-for="node in nodes" :key="node[nodeKey] as TreeNodeKey" :node="node" :depth="0" />
   </ul>
 </template>

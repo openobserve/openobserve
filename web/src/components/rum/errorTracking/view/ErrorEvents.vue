@@ -24,11 +24,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <NoData />
     </div>
 
-    <ol v-else class="event-timeline list-none m-0 p-0" data-test="error-events-timeline">
+    <ol v-else class="event-timeline m-0 list-none p-0" data-test="error-events-timeline">
       <li
         v-for="(event, index) in timelineEvents"
         :key="index"
-        class="event-timeline__item relative flex items-start gap-2 pl-5 pb-3"
+        class="event-timeline__item relative flex items-start gap-2 pb-3 pl-5"
         :class="{ 'event-timeline__item--error': isErrorEvent(event) }"
         :data-test="`error-events-timeline-item-${index}`"
       >
@@ -39,9 +39,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           aria-hidden="true"
         />
-        <ErrorTypeIcons :column="event" class="shrink-0 mt-0.5" />
-        <div class="flex-1 min-w-0">
-          <div class="flex items-baseline gap-1.5 flex-wrap">
+        <ErrorTypeIcons :column="event" class="mt-0.5 shrink-0" />
+        <div class="min-w-0 flex-1">
+          <div class="flex flex-wrap items-baseline gap-1.5">
             <span class="font-medium" :data-test="`error-events-timeline-category-${index}`">{{
               getErrorCategory(event)
             }}</span>
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="shrink-0 text-right">
           <span
-            class="tabular-nums text-text-secondary"
+            class="text-text-secondary tabular-nums"
             :data-test="`error-events-timeline-offset-${index}`"
             :title="getFormattedDate(event._timestamp / 1000)"
             >{{ offsetLabel(event) }}</span

@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span>{{ s.label }}</span>
       <span
         v-if="s.count != null"
-        class="text-2xs font-bold leading-none px-1.5 py-1 rounded-full"
+        class="text-2xs rounded-full px-1.5 py-1 leading-none font-bold"
         :class="
           s.key === activeSectionKey
             ? 'bg-primary-100 text-primary-700'

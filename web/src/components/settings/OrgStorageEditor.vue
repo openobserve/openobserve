@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Stepper -->
-    <div class="bg-card-glass-bg h-[calc(100vh-7rem)] py-2 px-3 overflow-auto">
+    <div class="bg-card-glass-bg h-[calc(100vh-7rem)] overflow-auto px-3 py-2">
       <div style="max-width: 720px">
         <OForm
           ref="storageForm"
@@ -45,16 +45,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :done="step > 1"
               :navigable="step > 1 && !isEditMode"
             >
-              <div class="text-sm text-text-secondary mb-3">
+              <div class="text-text-secondary mb-3 text-sm">
                 {{ t("storage_settings.selectProviderDesc") }}
                 {{ t("settings.orgStorageEditor.selectProviderDescCont") }}
               </div>
               <div
                 v-if="!isEditMode"
-                class="flex items-start gap-2.5 px-3 py-2.5 mb-3 rounded-default border bg-banner-warning-bg border-banner-warning-border"
+                class="rounded-default bg-banner-warning-bg border-banner-warning-border mb-3 flex items-start gap-2.5 border px-3 py-2.5"
               >
-                <OIcon name="warning" size="sm" class="flex-shrink-0 mt-px" />
-                <div class="text-compact leading-[1.55] text-text-body">
+                <OIcon name="warning" size="sm" class="mt-px flex-shrink-0" />
+                <div class="text-compact text-text-body leading-[1.55]">
                   {{ t("settings.orgStorageEditor.irreversibleWarnPre")
                   }}<strong>{{ t("settings.orgStorageEditor.irreversibleWarnEmphasis") }}</strong
                   >{{ t("settings.orgStorageEditor.irreversibleWarnPost") }}
@@ -62,25 +62,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="!isEditMode"
-                class="flex items-start gap-2.5 px-3 py-2.5 mb-3 rounded-default border bg-banner-info-bg border-banner-info-border"
+                class="rounded-default bg-banner-info-bg border-banner-info-border mb-3 flex items-start gap-2.5 border px-3 py-2.5"
               >
-                <OIcon name="info" size="sm" class="flex-shrink-0 mt-px" />
-                <div class="text-compact leading-[1.55] text-text-body">
+                <OIcon name="info" size="sm" class="mt-px flex-shrink-0" />
+                <div class="text-compact text-text-body leading-[1.55]">
                   {{ t("settings.orgStorageEditor.credentialsOnlyInfo") }}
                 </div>
               </div>
-              <div class="text-sm font-medium mb-2">
+              <div class="mb-2 text-sm font-medium">
                 {{ t("settings.orgStorageEditor.selectStorageProviderLabel")
                 }}<span class="text-status-negative">*</span>
               </div>
               <div
-                class="destination-type-grid grid gap-3 grid-cols-[repeat(auto-fill,minmax(8.75rem,1fr))]"
+                class="destination-type-grid grid grid-cols-[repeat(auto-fill,minmax(8.75rem,1fr))] gap-3"
               >
                 <div
                   v-for="provider in availableProviders"
                   :key="provider.value"
                   :data-test="`storage-settings-provider-card-${provider.value}`"
-                  class="group/card relative flex flex-col items-center justify-center py-5 px-3 border-2 rounded-default cursor-pointer transition-all duration-300 min-h-30 hover:-translate-y-0.5 hover:shadow-md"
+                  class="group/card rounded-default relative flex min-h-30 cursor-pointer flex-col items-center justify-center border-2 px-3 py-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
                   :class="
                     selectedProvider === provider.value
                       ? 'selected bg-table-row-selected-bg border-accent shadow-md'
@@ -92,22 +92,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="provider.image"
                     :src="provider.image"
                     :alt="provider.label"
-                    class="card-image w-12 h-12 mb-2 object-contain"
+                    class="card-image mb-2 h-12 w-12 object-contain"
                   />
                   <OIcon
                     v-else
                     :name="provider.icon"
                     size="lg"
-                    class="mb-2 text-text-secondary [transition:color_0.3s_ease] group-[.selected]/card:text-card-glass-border"
+                    class="text-text-secondary group-[.selected]/card:text-card-glass-border mb-2 [transition:color_0.3s_ease]"
                   />
                   <div
-                    class="text-compact font-medium text-center [line-height:1.3] mt-1 text-text-body"
+                    class="text-compact text-text-body mt-1 text-center [line-height:1.3] font-medium"
                   >
                     {{ provider.label }}
                   </div>
                   <div
                     v-if="selectedProvider === provider.value"
-                    class="check-icon absolute top-1.5 right-1.5 w-5 h-5 rounded-full overflow-hidden bg-status-positive text-white flex items-center justify-center z-[1]"
+                    class="check-icon bg-status-positive absolute top-1.5 right-1.5 z-[1] flex h-5 w-5 items-center justify-center overflow-hidden rounded-full text-white"
                   >
                     <OIcon name="check" size="xs" />
                   </div>
@@ -250,10 +250,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- AwsRoleArn Fields -->
                 <template v-if="selectedProvider === 'AwsRoleArn'">
                   <div
-                    class="flex items-start gap-2.5 px-3 py-2.5 mb-3 rounded-default border bg-banner-info-bg border-banner-info-border"
+                    class="rounded-default bg-banner-info-bg border-banner-info-border mb-3 flex items-start gap-2.5 border px-3 py-2.5"
                   >
-                    <OIcon name="info" size="sm" class="flex-shrink-0 mt-px" />
-                    <div class="text-compact leading-[1.55] text-text-body">
+                    <OIcon name="info" size="sm" class="mt-px flex-shrink-0" />
+                    <div class="text-compact text-text-body leading-[1.55]">
                       <template v-if="isCloud">
                         {{ t("storage_settings.awsStsCloudInfo") }}
                       </template>
@@ -304,12 +304,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OStepper>
 
           <!-- Form buttons -->
-          <div class="flex justify-start mt-3">
+          <div class="mt-3 flex justify-start">
             <div v-if="step === 1">
               <OButton
                 data-test="step1-cancel-btn"
                 variant="outline"
-                class="o2-secondary-button h-9 mr-2"
+                class="o2-secondary-button mr-2 h-9"
                 :class="isDark ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                 @click="emit('cancel')"
               >
@@ -331,7 +331,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="!isEditMode"
                 data-test="step2-back-btn"
                 variant="outline"
-                class="o2-secondary-button h-9 mr-2"
+                class="o2-secondary-button mr-2 h-9"
                 :class="isDark ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                 @click="prevStep"
               >
@@ -349,7 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 data-test="storage-settings-submit-btn"
                 variant="primary"
-                class="no-border ml-2 o2-primary-button h-9"
+                class="no-border o2-primary-button ml-2 h-9"
                 :class="isDark ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
                 type="submit"
               >

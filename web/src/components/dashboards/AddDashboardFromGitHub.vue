@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Loading -->
     <div
       v-if="loading"
-      class="flex flex-col items-center justify-center gap-3 min-h-80 px-page-edge"
+      class="px-page-edge flex min-h-80 flex-col items-center justify-center gap-3"
     >
       <OSpinner size="lg" />
       <OText variant="meta">{{ t("dashboard.addDashboardFromGitHub.loading") }}</OText>
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else class="flex flex-col">
       <!-- Toolbar — sticks flush to the top; its opaque bg covers cards that
            scroll underneath. Keeps the drawer's own scroll shadow. -->
-      <div class="sticky top-0 z-20 flex flex-col gap-2 bg-dialog-bg px-page-edge pt-3 pb-2">
+      <div class="bg-dialog-bg px-page-edge sticky top-0 z-20 flex flex-col gap-2 pt-3 pb-2">
         <OSearchInput
           v-model="searchQuery"
           :placeholder="t('dashboard.addDashboardFromGitHub.searchPlaceholder')"
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <!-- Fixed-height meta row: 'available' pinned right, 'selected' badge
              appears to its left so neither the search nor the count ever shifts. -->
-        <div class="flex items-center justify-end gap-2 min-h-6 whitespace-nowrap">
+        <div class="flex min-h-6 items-center justify-end gap-2 whitespace-nowrap">
           <OTag v-if="selectedDashboards.length" variant="primary-soft" size="xs">
             {{
               t("dashboard.addDashboardFromGitHub.selectedCount", {
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <!-- Grouped sections -->
-      <div v-else class="flex flex-col gap-6 px-page-edge pb-3">
+      <div v-else class="px-page-edge flex flex-col gap-6 pb-3">
         <div
           v-for="[category, items] in groupedDashboards"
           :key="category"
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Group header — sticks just below the toolbar while its category
                scrolls (top ≈ toolbar height 5.375rem, tucked slightly under). -->
           <div
-            class="sticky top-21 z-10 flex items-center gap-2 pt-0.5 pb-1.5 bg-dialog-bg border-b border-border-default"
+            class="bg-dialog-bg border-border-default sticky top-21 z-10 flex items-center gap-2 border-b pt-0.5 pb-1.5"
           >
             <OTag
               :variant="getCategoryInfo(items[0]).variant"
@@ -113,14 +113,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- 2-column card grid for this group -->
-          <div class="grid grid-cols-2 gap-1.5 content-start">
+          <div class="grid grid-cols-2 content-start gap-1.5">
             <div
               v-for="dashboard in items"
               :key="dashboard.name"
               role="button"
               tabindex="0"
               :aria-pressed="isSelected(dashboard)"
-              class="flex items-center gap-3 px-3 py-2.5 rounded-default border select-none min-w-0 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              class="rounded-default focus-visible:ring-accent flex min-w-0 cursor-pointer items-center gap-3 border px-3 py-2.5 transition-colors select-none focus-visible:ring-2 focus-visible:outline-none"
               :class="
                 isSelected(dashboard)
                   ? 'border-accent bg-surface-accent-hover'
@@ -131,13 +131,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @keydown.enter.prevent="toggleDashboard(dashboard)"
               @keydown.space.prevent="toggleDashboard(dashboard)"
             >
-              <span class="flex-1 min-w-0 truncate text-sm font-medium text-text-heading">{{
+              <span class="text-text-heading min-w-0 flex-1 truncate text-sm font-medium">{{
                 dashboard.displayName
               }}</span>
               <OCheckbox
                 :model-value="isSelected(dashboard)"
                 size="sm"
-                class="shrink-0 pointer-events-none"
+                class="pointer-events-none shrink-0"
               />
             </div>
           </div>
@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="grow"
           data-test="add-dashboard-github-folder-select"
         />
-        <div class="w-10 mb-0.5">
+        <div class="mb-0.5 w-10">
           <OButton
             variant="outline"
             size="icon-xs"

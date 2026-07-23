@@ -61,14 +61,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @remove-group="(id) => removeGroup(id)"
           @input:update="onInputUpdate"
         />
-        <div v-else class="p-3 text-text-muted">{{ t("flow.condition.loading") }}</div>
+        <div v-else class="text-text-muted p-3">{{ t("flow.condition.loading") }}</div>
       </div>
 
       <!-- The saved condition could not be parsed, so the builder reset to an
            empty group. Warn BEFORE the user saves over it. -->
       <div
         v-if="loadError"
-        class="text-xs text-input-error-text mt-1"
+        class="text-input-error-text mt-1 text-xs"
         data-test="condition-builder-load-error"
       >
         {{ t("flow.condition.loadError") }}
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            renders it, so surface the form-level `conditions` error here). -->
       <div
         v-if="conditionsError"
-        class="text-xs text-input-error-text mt-1"
+        class="text-input-error-text mt-1 text-xs"
         data-test="add-condition-error"
       >
         {{ conditionsError }}

@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OCollapsible
     :model-value="isExpanded"
     @update:model-value="handleToggle"
-    class="field-expansion-item w-full rounded-default overflow-hidden"
+    class="field-expansion-item rounded-default w-full overflow-hidden"
     trigger-class="px-0! py-0!"
   >
     <template #trigger>
@@ -26,9 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`log-search-expand-${field.name}-field-btn`"
         :highlight="isFieldSelected"
       >
-        <span class="w-[0.55rem] shrink-0 flex items-center justify-center mr-1">
+        <span class="mr-1 flex w-[0.55rem] shrink-0 items-center justify-center">
           <OIcon
-            class="inline-flex items-center justify-center shrink-0 w-4 text-text-muted"
+            class="text-text-muted inline-flex w-4 shrink-0 items-center justify-center"
             :name="isExpanded ? 'expand-more' : 'chevron-right'"
             size="sm"
           />
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
           v-if="showQuickMode"
           variant="ghost-neutral"
-          class="gap-0! mr-1"
+          class="mr-1 gap-0!"
           :title="
             field.isInterestingField
               ? 'Remove from interesting fields'
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OFieldRow>
     </template>
 
-    <div class="pl-4 pr-2 py-0">
+    <div class="py-0 pr-2 pl-4">
       <slot name="body">
         <FieldValuesPanel
           ref="fieldValuesPanelRef"

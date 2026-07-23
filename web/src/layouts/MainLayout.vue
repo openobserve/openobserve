@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </header>
 
-    <div class="flex-1 flex min-h-0">
+    <div class="flex min-h-0 flex-1">
       <ONavbar
         v-if="store.state.printMode !== true"
         :links-list="navLinks"
@@ -78,11 +78,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @menu-hover="handleMenuHover"
       />
 
-      <div class="flex-1 min-w-0 flex min-h-0 h-full">
+      <div class="flex h-full min-h-0 min-w-0 flex-1">
         <!-- Main Panel -->
         <main
           data-test="main-content"
-          class="flex flex-col min-h-0 bg-surface-chrome-deeper pr-2 pb-2"
+          class="bg-surface-chrome-deeper flex min-h-0 flex-col pr-2 pb-2"
           :style="{
             width: store.state.isAiChatEnabled && !store.state.isAiChatExpanded ? '75%' : '100%',
           }"
@@ -90,13 +90,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Content card — all pages render inside this. The border stays present in both
                themes (transparent in light) so toggling dark mode can't shift page content by 1px. -->
           <div
-            class="flex-1 flex flex-col min-h-0 bg-surface-base rounded-surface overflow-hidden border shadow-[0_1px_3px_rgba(16,40,55,0.06),0_6px_20px_rgba(16,40,55,0.08)]"
+            class="bg-surface-base rounded-surface flex min-h-0 flex-1 flex-col overflow-hidden border shadow-[0_1px_3px_rgba(16,40,55,0.06),0_6px_20px_rgba(16,40,55,0.08)]"
             :class="isDark ? 'border-border-default' : 'border-transparent'"
           >
             <div
               v-if="isLoading"
               :key="store.state.selectedOrganization?.identifier"
-              class="o2-content-scroll flex-1 overflow-y-auto h-full"
+              class="o2-content-scroll h-full flex-1 overflow-y-auto"
             >
               <router-view v-slot="{ Component }">
                 <component :is="Component" class="h-full" @sendToAiChat="sendToAiChat" />
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Right Panel (AI Chat - unified for both general and context-specific usage) -->
         <aside
           v-show="store.state.isAiChatEnabled && isLoading"
-          class="o2-sidebar o2-sidebar-right overflow-y-auto sticky top-[var(--navbar-height,2.25rem)] self-start shrink-0"
+          class="o2-sidebar o2-sidebar-right sticky top-[var(--navbar-height,2.25rem)] shrink-0 self-start overflow-y-auto"
           :class="[
             isDark ? 'dark-mode-chat-container' : 'light-mode-chat-container',
             { 'o2-sidebar--expanded': store.state.isAiChatExpanded },

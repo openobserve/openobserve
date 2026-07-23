@@ -45,10 +45,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="(row, index) in formRows"
           :key="index"
-          class="flex justify-start items-end gap-2 pb-2"
+          class="flex items-end justify-start gap-2 pb-2"
           :data-test="`alert-conditions-${index + 1}`"
         >
-          <div class="ml-0 o2-input">
+          <div class="o2-input ml-0">
             <OFormSelect
               :name="`${namePrefix}[${index}].column`"
               :options="props.streamFields"
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @create="(val: string) => setRowColumn(index, val)"
             />
           </div>
-          <div class="ml-0 o2-input">
+          <div class="o2-input ml-0">
             <OFormSelect
               :name="`${namePrefix}[${index}].operator`"
               :options="triggerOperators"
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-conditions-operator-select"
             />
           </div>
-          <div class="ml-0 flex items-end o2-input">
+          <div class="o2-input ml-0 flex items-end">
             <OFormInput
               :name="`${namePrefix}[${index}].value`"
               :placeholder="t('common.value')"
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-conditions-value-input"
             />
           </div>
-          <div class="ml-0 alerts-condition-action mb-3">
+          <div class="alerts-condition-action mb-3 ml-0">
             <OButton
               data-test="alert-conditions-delete-condition-btn"
               class="ml-1"
@@ -127,14 +127,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="(field, index) in fields"
           :key="field.uuid"
-          class="flex justify-start items-end gap-2 pb-2"
+          class="flex items-end justify-start gap-2 pb-2"
           :data-test="`alert-conditions-${index + 1}`"
         >
-          <div class="ml-0 o2-input">
+          <div class="o2-input ml-0">
             <OSelect
               v-model="field.column"
               :options="props.streamFields"
-              class="py-2 min-w-55"
+              class="min-w-55 py-2"
               :placeholder="t('alerts.column')"
               :creatable="props.enableNewValueMode"
               :error="!!fieldErrors[`${field.uuid}-column`]"
@@ -156,11 +156,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             />
           </div>
-          <div class="ml-0 o2-input">
+          <div class="o2-input ml-0">
             <OSelect
               v-model="field.operator"
               :options="triggerOperators"
-              class="py-2 min-w-30"
+              class="min-w-30 py-2"
               :error="!!fieldErrors[`${field.uuid}-operator`]"
               :error-message="fieldErrors[`${field.uuid}-operator`] || ''"
               data-test="alert-conditions-operator-select"
@@ -174,11 +174,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             />
           </div>
-          <div class="ml-0 flex items-end o2-input">
+          <div class="o2-input ml-0 flex items-end">
             <OInput
               v-model="field.value"
               :placeholder="t('common.value')"
-              class="py-2 min-w-37.5"
+              class="min-w-37.5 py-2"
               :error="!!fieldErrors[`${field.uuid}-value`]"
               :error-message="fieldErrors[`${field.uuid}-value`] || ''"
               data-test="alert-conditions-value-input"
@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             />
           </div>
-          <div class="ml-0 alerts-condition-action mb-3">
+          <div class="alerts-condition-action mb-3 ml-0">
             <OButton
               data-test="alert-conditions-delete-condition-btn"
               class="ml-1"

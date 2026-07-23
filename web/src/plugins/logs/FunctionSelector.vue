@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <OButtonGroup
-    class="p-0 float-left mr-1 function-selector element-box-shadow border border-button-outline-border"
+    class="function-selector element-box-shadow border-button-outline-border float-left mr-1 border p-0"
   >
     <div v-if="!hideToggle" class="flex items-center px-1">
       <OSwitch
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="(item, i) in filteredFunctionOptions"
             :key="'saved-view-' + i"
             :data-test="`logs-search-saved-function-${item.name}`"
-            class="saved-view-item border-b border-card-glass-border rounded-none last:border-none"
+            class="saved-view-item border-card-glass-border rounded-none border-b last:border-none"
             @select="applyFunction(item, true)"
           >
             {{ item.name }}
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div v-else>
           <div class="flex items-center gap-2 px-3 py-2">
-            <div class="flex flex-col flex-1 min-w-0">
+            <div class="flex min-w-0 flex-1 flex-col">
               <span class="text-sm">{{ t("search.savedFunctionNotFound") }}</span>
             </div>
           </div>

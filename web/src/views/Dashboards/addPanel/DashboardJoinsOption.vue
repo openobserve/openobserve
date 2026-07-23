@@ -1,15 +1,15 @@
 <template>
   <div v-if="shouldShowJoins" class="w-full" data-test="dashboard-joins-container">
     <div class="flex flex-row pl-3">
-      <div class="text-sm whitespace-nowrap min-w-32.5 flex items-center">
+      <div class="flex min-w-32.5 items-center text-sm whitespace-nowrap">
         {{ t("panel.joins") }}
       </div>
-      <span class="flex items-center mx-0.5">:</span>
+      <span class="mx-0.5 flex items-center">:</span>
       <div
-        class="m-1.25 flex flex-row items-center flex-wrap gap-2"
+        class="m-1.25 flex flex-row flex-wrap items-center gap-2"
         data-test="dashboard-filter-layout"
       >
-        <div v-for="(joinObj, index) in currentJoins" :key="index" class="flex flex-row mr-2 my-1">
+        <div v-for="(joinObj, index) in currentJoins" :key="index" class="my-1 mr-2 flex flex-row">
           <OButtonGroup class="axis-field" radius="sm">
             <ODropdown>
               <template #trigger>

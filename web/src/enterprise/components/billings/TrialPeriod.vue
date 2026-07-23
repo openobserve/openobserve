@@ -18,13 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-if="showTrialPeriodMsg"
     data-test="trial-period-container"
-    class="flex items-center gap-3 px-4 py-2 rounded-default w-full bg-status-warning-bg border border-status-warning-text text-status-warning-text"
+    class="rounded-default bg-status-warning-bg border-status-warning-text text-status-warning-text flex w-full items-center gap-3 border px-4 py-2"
   >
     <!-- Warning icon -->
-    <OIcon name="warning" size="sm" class="shrink-0 text-status-warning-text" />
+    <OIcon name="warning" size="sm" class="text-status-warning-text shrink-0" />
 
     <!-- Message + subtitle on one line -->
-    <p class="flex-1 min-w-0 m-0 text-sm truncate">
+    <p class="m-0 min-w-0 flex-1 truncate text-sm">
       <strong class="font-semibold">{{ getTrialPeriodMessage() }}</strong>
       <span class="mx-1 opacity-60">·</span>
       <span>Upgrade to a plan to continue enjoying the services by OpenObserve.</span>

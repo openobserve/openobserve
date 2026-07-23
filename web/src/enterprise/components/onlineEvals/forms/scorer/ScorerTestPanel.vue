@@ -1,16 +1,16 @@
 <template>
   <aside
-    class="eval-form-page__side eval-form-page__side--test p-0 max-[60rem]:border-l-0 max-[60rem]:border-t max-[60rem]:border-border-default"
+    class="eval-form-page__side eval-form-page__side--test max-[60rem]:border-border-default p-0 max-[60rem]:border-t max-[60rem]:border-l-0"
   >
     <section
-      class="eval-test-panel min-h-full p-5 bg-surface-base rounded-default shadow-[0_0_0.313rem_0.063rem_var(--color-hover-shadow)]"
+      class="eval-test-panel bg-surface-base rounded-default min-h-full p-5 shadow-[0_0_0.313rem_0.063rem_var(--color-hover-shadow)]"
     >
       <!-- Header -->
       <div class="flex flex-col gap-1">
-        <h3 class="m-0 text-text-heading text-sm font-bold">
+        <h3 class="text-text-heading m-0 text-sm font-bold">
           {{ t("onlineEvals.scorer.testPanel.title") }}
         </h3>
-        <p class="m-0 text-text-secondary text-xs leading-[1.45]">
+        <p class="text-text-secondary m-0 text-xs leading-[1.45]">
           {{ t("onlineEvals.scorer.testPanel.hint") }}
         </p>
       </div>
@@ -18,7 +18,7 @@
       <!-- Variable inputs -->
       <div v-if="variables.length" class="eval-test-panel__fields flex flex-col gap-3">
         <div v-for="variable in variables" :key="variable" class="flex flex-col gap-1.5">
-          <label class="text-text-label font-semibold text-xs font-mono">{{
+          <label class="text-text-label font-mono text-xs font-semibold">{{
             formatTemplateVariable(variable)
           }}</label>
           <textarea
@@ -30,14 +30,14 @@
               })
             "
             :data-test="`scorer-test-input-${variable}`"
-            class="w-full box-border border border-border-default rounded-default bg-surface-base text-text-body font-normal text-xs font-sans leading-normal py-2 px-2.25 [resize:vertical] max-h-40 overflow-y-auto placeholder:text-text-muted focus:outline-none focus:border-primary-600"
+            class="border-border-default rounded-default bg-surface-base text-text-body placeholder:text-text-muted focus:border-primary-600 box-border max-h-40 w-full [resize:vertical] overflow-y-auto border px-2.25 py-2 font-sans text-xs leading-normal font-normal focus:outline-none"
             @input="updateInput(variable, ($event.target as HTMLTextAreaElement).value)"
           />
         </div>
       </div>
       <div
         v-else
-        class="eval-test-panel__empty text-text-secondary text-xs py-2.5 px-3 border border-border-default rounded-default bg-surface-base [&_code]:font-mono [&_code]:font-semibold [&_code]:text-text-body"
+        class="eval-test-panel__empty text-text-secondary border-border-default rounded-default bg-surface-base [&_code]:text-text-body border px-3 py-2.5 text-xs [&_code]:font-mono [&_code]:font-semibold"
       >
         {{ t("onlineEvals.scorer.testPanel.emptyPrefix") }}<code v-text="'{{ input }}'" />{{
           t("onlineEvals.scorer.testPanel.emptySuffix")
@@ -45,7 +45,7 @@
       </div>
 
       <!-- Run -->
-      <div class="eval-test-panel__actions flex flex-col items-start gap-1.5 mt-3.5">
+      <div class="eval-test-panel__actions mt-3.5 flex flex-col items-start gap-1.5">
         <OButton
           variant="primary"
           size="sm-action"
@@ -59,7 +59,7 @@
         </OButton>
         <span
           v-if="!canRun && state !== 'running'"
-          class="text-2xs italic text-text-secondary"
+          class="text-2xs text-text-secondary italic"
           data-test="scorer-test-disabled-hint"
         >
           {{ t("onlineEvals.scorer.testPanel.disabledHint") }}
@@ -69,11 +69,11 @@
       <!-- Result — only shown once a test has run (no idle placeholder box). -->
       <div
         v-if="state !== 'idle'"
-        class="flex flex-col gap-2 mt-4 p-3 border border-border-default rounded-default bg-surface-base text-text-secondary text-xs"
+        class="border-border-default rounded-default bg-surface-base text-text-secondary mt-4 flex flex-col gap-2 border p-3 text-xs"
         :class="{
           'border-[color-mix(in_srgb,var(--color-status-success-text)_35%,var(--color-border-default))]':
             state === 'success',
-          'border-[color-mix(in_srgb,var(--color-status-error-text)_35%,var(--color-border-default))] text-status-error-text':
+          'text-status-error-text border-[color-mix(in_srgb,var(--color-status-error-text)_35%,var(--color-border-default))]':
             state === 'error',
         }"
         data-test="scorer-test-result"
@@ -89,7 +89,7 @@
             t("onlineEvals.scorer.testPanel.successHeader")
           }}</strong>
           <dl
-            class="eval-test-panel__result-grid grid gap-x-3 gap-y-1 m-0 text-text-secondary text-xs"
+            class="eval-test-panel__result-grid text-text-secondary m-0 grid gap-x-3 gap-y-1 text-xs"
             style="grid-template-columns: max-content 1fr"
           >
             <template v-if="displayValue !== null">
@@ -97,7 +97,7 @@
                 {{ t("onlineEvals.scorer.testPanel.resultScore") }}
               </dt>
               <dd
-                class="eval-test-panel__result-score m-0 text-text-secondary font-bold text-compact font-mono"
+                class="eval-test-panel__result-score text-text-secondary text-compact m-0 font-mono font-bold"
               >
                 {{ displayValue }}
               </dd>
@@ -106,14 +106,14 @@
               <dt class="text-text-secondary font-medium">
                 {{ t("onlineEvals.scorer.testPanel.resultLatency") }}
               </dt>
-              <dd class="m-0 text-text-body">{{ latencyLabel }}</dd>
+              <dd class="text-text-body m-0">{{ latencyLabel }}</dd>
             </template>
             <template v-if="modelLabel">
               <dt class="text-text-secondary font-medium">
                 {{ t("onlineEvals.scorer.testPanel.resultModel") }}
               </dt>
               <dd
-                class="eval-test-panel__result-mono m-0 text-text-body font-medium text-xs font-mono"
+                class="eval-test-panel__result-mono text-text-body m-0 font-mono text-xs font-medium"
               >
                 {{ modelLabel }}
               </dd>
@@ -122,31 +122,31 @@
               <dt class="text-text-secondary font-medium">
                 {{ t("onlineEvals.scorer.testPanel.resultTokens") }}
               </dt>
-              <dd class="m-0 text-text-body">{{ tokensLabel }}</dd>
+              <dd class="text-text-body m-0">{{ tokensLabel }}</dd>
             </template>
           </dl>
           <details
             v-if="reasoningText"
-            class="eval-test-panel__details border-t border-border-default pt-2 text-text-secondary"
+            class="eval-test-panel__details border-border-default text-text-secondary border-t pt-2"
           >
-            <summary class="cursor-pointer text-text-heading text-xs font-semibold">
+            <summary class="text-text-heading cursor-pointer text-xs font-semibold">
               {{ t("onlineEvals.scorer.testPanel.resultReasoning") }}
             </summary>
             <p
-              class="m-0 mt-1.5 text-text-secondary font-normal text-2xs font-mono whitespace-pre-wrap break-words"
+              class="text-text-secondary text-2xs m-0 mt-1.5 font-mono font-normal break-words whitespace-pre-wrap"
             >
               {{ reasoningText }}
             </p>
           </details>
           <details
             v-if="rawResponseText"
-            class="eval-test-panel__details border-t border-border-default pt-2 text-text-secondary"
+            class="eval-test-panel__details border-border-default text-text-secondary border-t pt-2"
           >
-            <summary class="cursor-pointer text-text-heading text-xs font-semibold">
+            <summary class="text-text-heading cursor-pointer text-xs font-semibold">
               {{ t("onlineEvals.scorer.testPanel.resultRaw") }}
             </summary>
             <pre
-              class="m-0 mt-1.5 text-text-secondary font-normal text-2xs font-mono whitespace-pre-wrap break-words"
+              class="text-text-secondary text-2xs m-0 mt-1.5 font-mono font-normal break-words whitespace-pre-wrap"
               >{{ rawResponseText }}</pre
             >
           </details>
@@ -157,13 +157,13 @@
             t("onlineEvals.scorer.testPanel.errorHeader")
           }}</strong>
           <p
-            class="eval-test-panel__error-message m-0 text-status-error-text text-xs whitespace-pre-wrap break-words"
+            class="eval-test-panel__error-message text-status-error-text m-0 text-xs break-words whitespace-pre-wrap"
           >
             {{ errorText }}
           </p>
           <p
             v-if="latencyLabel"
-            class="eval-test-panel__error-meta m-0 text-text-secondary text-2xs"
+            class="eval-test-panel__error-meta text-text-secondary text-2xs m-0"
           >
             {{ t("onlineEvals.scorer.testPanel.resultLatency") }}: {{ latencyLabel }}
           </p>

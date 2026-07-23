@@ -12,7 +12,7 @@
   </div>
   <Teleport to="body">
     <div
-      class="user-guide fixed z-9999 w-125 max-h-75 p-2.5 overflow-y-auto pointer-events-auto border border-border-default rounded-default bg-surface-base [&_ul]:m-0 [&_li]:m-0 [&_p]:m-0 [&_div]:m-0 [scrollbar-width:thin] [scrollbar-color:color-mix(in_srgb,var(--color-grey-950)_25%,transparent)_color-mix(in_srgb,var(--color-grey-950)_5%,transparent)]"
+      class="user-guide border-border-default rounded-default bg-surface-base pointer-events-auto fixed z-9999 max-h-75 w-125 overflow-y-auto border p-2.5 [scrollbar-color:color-mix(in_srgb,var(--color-grey-950)_25%,transparent)_color-mix(in_srgb,var(--color-grey-950)_5%,transparent)] [scrollbar-width:thin] [&_div]:m-0 [&_li]:m-0 [&_p]:m-0 [&_ul]:m-0"
       v-show="showUserGuide"
       @mouseleave="showUserGuide = false"
       ref="userGuideDivRef"

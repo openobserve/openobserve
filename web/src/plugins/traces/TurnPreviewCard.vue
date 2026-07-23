@@ -33,11 +33,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OTooltip :side="side" :delay="delay" max-width="260px" content-class="p-0!">
       <template #content>
         <div
-          class="w-63 py-2.75 px-3 text-xs text-text-body"
+          class="text-text-body w-63 px-3 py-2.75 text-xs"
           :data-test="`turn-preview-${index + 1}`"
         >
           <!-- Header: Turn N · time · status -->
-          <div class="flex items-center gap-2 mb-2">
+          <div class="mb-2 flex items-center gap-2">
             <span class="text-compact font-bold">
               {{ t("traces.sessionDetail.turnLabel") }} {{ index + 1 }}
             </span>
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- User message preview -->
           <div class="mb-2.25 leading-[1.5]">
             <span
-              class="block text-3xs font-bold uppercase tracking-[0.05em] text-text-muted mb-0.5"
+              class="text-3xs text-text-muted mb-0.5 block font-bold tracking-[0.05em] uppercase"
             >
               {{ t("traces.sessionDetail.roles.user") }}
             </span>
@@ -67,21 +67,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Stats grid: Cost · Latency · Tokens · Cache -->
           <div
-            class="grid grid-cols-2 gap-x-3 gap-y-[7px] border-t border-card-glass-border pt-2.25"
+            class="border-card-glass-border grid grid-cols-2 gap-x-3 gap-y-[7px] border-t pt-2.25"
           >
-            <div class="flex items-center justify-between text-2xs">
+            <div class="text-2xs flex items-center justify-between">
               <span class="text-text-muted">{{ t("traces.sessionDetail.stats.cost") }}</span>
               <span class="font-[650]">{{ costLabel }}</span>
             </div>
-            <div class="flex items-center justify-between text-2xs">
+            <div class="text-2xs flex items-center justify-between">
               <span class="text-text-muted">{{ t("traces.sessionDetail.kpi.duration") }}</span>
               <span class="font-[650]">{{ latencyLabel }}</span>
             </div>
-            <div class="flex items-center justify-between text-2xs">
+            <div class="text-2xs flex items-center justify-between">
               <span class="text-text-muted">{{ t("traces.sessionDetail.kpi.tokens") }}</span>
               <span class="font-[650]">{{ tokensLabel }}</span>
             </div>
-            <div class="flex items-center justify-between text-2xs">
+            <div class="text-2xs flex items-center justify-between">
               <span class="text-text-muted">{{ t("traces.sessionDetail.stats.cache") }}</span>
               <span class="font-[650]">{{ cachePct }}%</span>
             </div>

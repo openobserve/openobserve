@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="wrap-break-word overflow-hidden whitespace-break-spaces">
+  <div class="overflow-hidden wrap-break-word whitespace-break-spaces">
     <template v-if="column.type === 'view' && column.view_loading_type === 'route_change'">
       <pre
         data-test="error-event-description-navigation"
@@ -27,12 +27,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 }</pre>
     </template>
     <template v-else-if="column.type === 'resource' && column.resource_type === 'xhr'">
-      <span class="font-bold pr-2 text-xs">{{ column.resource_method }}</span>
+      <span class="pr-2 text-xs font-bold">{{ column.resource_method }}</span>
       <a
         :href="column.resource_url"
         target="_blank"
         data-test="error-event-description-resource-url"
-        class="resource-url no-underline text-sm text-primary"
+        class="resource-url text-primary text-sm no-underline"
         >{{ column.resource_url }}</a
       >
       <span class="pl-2">[ {{ column.resource_status_code }} ]</span>

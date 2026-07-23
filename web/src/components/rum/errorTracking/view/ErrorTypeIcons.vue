@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <img :alt="column.category" :src="typeIcons" class="w-[1.375rem] h-[1.375rem]" />
+    <img :alt="column.category" :src="typeIcons" class="h-[1.375rem] w-[1.375rem]" />
   </div>
 </template>
 

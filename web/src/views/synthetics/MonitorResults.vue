@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="refresh"
       />
     </template>
-    <div class="flex-1 min-h-0 overflow-hidden">
+    <div class="min-h-0 flex-1 overflow-hidden">
       <MonitorRuns
         ref="runsRef"
         :monitor-id="monitorId"
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ drawerRunStatus.label }}
       </OBadge>
-      <OBadge v-if="drawerUrl" variant="default" size="sm" icon="link" class="truncate max-w-50">
+      <OBadge v-if="drawerUrl" variant="default" size="sm" icon="link" class="max-w-50 truncate">
         {{ drawerUrl }}
       </OBadge>
     </template>

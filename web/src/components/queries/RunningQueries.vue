@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #subnav>
       <div
         data-test="running-queries-filter-container"
-        class="flex justify-start items-center gap-3 px-page-edge py-2"
+        class="px-page-edge flex items-center justify-start gap-3 py-2"
       >
         <OToggleGroup
           :model-value="selectedQueryTypeTab"
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="searchFieldOptions"
             labelKey="label"
             valueKey="value"
-            class="p-0 w-35"
+            class="w-35 p-0"
             data-test="running-queries-search-fields-select"
             @update:model-value="filterQuery = ''"
           />
@@ -74,8 +74,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
 
-    <div class="flex-1 min-h-0">
-      <div class="w-full h-full">
+    <div class="min-h-0 flex-1">
+      <div class="h-full w-full">
         <div class="bg-card-glass-bg h-full">
           <div
             v-show="selectedQueryTypeTab === 'all'"

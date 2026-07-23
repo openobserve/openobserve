@@ -16,18 +16,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <section
-    class="grid grid-cols-2 gap-2 h-full"
+    class="grid h-full grid-cols-2 gap-2"
     data-test="rum-errors-kpi-cards"
     :aria-label="t('rum.errorKpisAria')"
   >
     <article
       v-for="card in cards"
       :key="card.key"
-      class="bg-card-glass-bg flex flex-col items-start rounded-default border border-border-default px-2.5 py-1.5 min-w-0"
+      class="bg-card-glass-bg rounded-default border-border-default flex min-w-0 flex-col items-start border px-2.5 py-1.5"
       :data-test="`rum-errors-kpi-${card.key}-card`"
     >
       <span
-        class="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-text-label"
+        class="text-text-label flex items-center gap-1.5 text-xs font-medium tracking-wide uppercase"
       >
         {{ card.label }}
         <OTag

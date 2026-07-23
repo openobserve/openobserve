@@ -7,17 +7,17 @@
             .customQuery && dashboardPanelData.data.queryType == 'sql'
         )
       "
-      class="pl-3 flex flex-row"
+      class="flex flex-row pl-3"
     >
       <div
-        class="text-sm whitespace-nowrap min-w-32.5 flex items-center"
+        class="flex min-w-32.5 items-center text-sm whitespace-nowrap"
         data-test="dashboard-filter-layout-label"
       >
         {{ t("panel.filters") }}
       </div>
-      <span class="flex items-center mx-0.5" data-test="dashboard-filter-layout-separator">:</span>
+      <span class="mx-0.5 flex items-center" data-test="dashboard-filter-layout-separator">:</span>
       <div
-        class="m-1.25 flex-wrap droppable scroll flex"
+        class="droppable scroll m-1.25 flex flex-wrap"
         data-test="dashboard-filter-layout"
         :data-condition-count="conditionCount"
       >

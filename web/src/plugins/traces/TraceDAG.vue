@@ -15,14 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="w-full h-full min-h-125">
+  <div class="h-full min-h-125 w-full">
     <div
       v-if="isLoading"
       data-test="traces-trace-dag-loading-container"
-      class="flex items-center justify-center flex-col p-6 h-125"
+      class="flex h-125 flex-col items-center justify-center p-6"
     >
       <OSpinner size="lg" />
-      <div class="mt-3 text-sm text-text-secondary">{{ t("traces.loadingTraceDag") }}</div>
+      <div class="text-text-secondary mt-3 text-sm">{{ t("traces.loadingTraceDag") }}</div>
     </div>
 
     <div v-else-if="error" data-test="traces-trace-dag-error-message" class="p-3">
@@ -36,16 +36,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-else-if="!dagData || !dagData.nodes || dagData.nodes.length === 0"
       data-test="traces-trace-dag-empty-container"
-      class="flex items-center justify-center flex-col p-6 h-125"
+      class="flex h-125 flex-col items-center justify-center p-6"
     >
       <OIcon name="info" style="width: 48px; height: 48px" />
-      <div class="mt-3 text-text-muted">{{ t("traces.traceDAG.noData") }}</div>
+      <div class="text-text-muted mt-3">{{ t("traces.traceDAG.noData") }}</div>
     </div>
 
     <div
       v-else
       data-test="traces-trace-dag-wrapper"
-      class="w-full h-full min-h-150 border border-border-default rounded-default relative"
+      class="border-border-default rounded-default relative h-full min-h-150 w-full border"
     >
       <VueFlow
         :nodes="nodes"
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :max-zoom="3"
         fit-view-on-init
         :fit-view-options="{ padding: 0.3, minZoom: 0.3, maxZoom: 0.7 }"
-        class="trace-dag-flow w-full h-full bg-surface-panel!"
+        class="trace-dag-flow bg-surface-panel! h-full w-full"
       >
         <Background pattern-color="#aaa" :gap="16" />
         <Controls />
@@ -65,10 +65,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="data.hasIncoming"
             type="target"
             :position="Position.Top"
-            class="w-2 h-2 bg-info border-2 border-surface-base rounded-full shadow-[0_1px_3px_rgba(0,0,0,0.15)]"
+            class="bg-info border-surface-base h-2 w-2 rounded-full border-2 shadow-[0_1px_3px_rgba(0,0,0,0.15)]"
           />
           <div
-            class="p-[6px_12px] rounded-default bg-surface-base border-2 border-info min-w-20 max-w-45 min-h-7 shadow-[0_2px_6px_rgba(0,0,0,0.1)] transition-all duration-200 cursor-pointer text-center flex flex-col items-center justify-center hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)] hover:[transform:translateY(-2px)]"
+            class="rounded-default bg-surface-base border-info flex min-h-7 max-w-45 min-w-20 cursor-pointer flex-col items-center justify-center border-2 p-[6px_12px] text-center shadow-[0_2px_6px_rgba(0,0,0,0.1)] transition-all duration-200 hover:[transform:translateY(-2px)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
             :class="[
               {
                 'border-status-negative! bg-status-error-bg!': data.span_status === 'ERROR',
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="handleNodeClick(data.span_id)"
           >
             <div
-              class="text-compact text-info font-semibold break-words max-w-40 leading-[1.3] whitespace-nowrap overflow-hidden text-ellipsis"
+              class="text-compact text-info max-w-40 overflow-hidden leading-[1.3] font-semibold break-words text-ellipsis whitespace-nowrap"
               :class="getObservationTypeTextClass(data.gen_ai_operation_name)"
             >
               {{ data.operation_name }}
@@ -89,14 +89,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               type="spanStatus"
               :value="data.span_status"
               label="ERR"
-              class="text-3xs h-3.5 mt-0.5 px-1"
+              class="text-3xs mt-0.5 h-3.5 px-1"
             />
           </div>
           <Handle
             v-if="data.hasOutgoing"
             type="source"
             :position="Position.Bottom"
-            class="w-2 h-2 bg-info border-2 border-surface-base rounded-full shadow-[0_1px_3px_rgba(0,0,0,0.15)]"
+            class="bg-info border-surface-base h-2 w-2 rounded-full border-2 shadow-[0_1px_3px_rgba(0,0,0,0.15)]"
           />
         </template>
       </VueFlow>

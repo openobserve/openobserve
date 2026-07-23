@@ -26,11 +26,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Error Summary: HTTP / gRPC status code -->
   <div
     v-if="hasSpanError && (spanStatusCode || spanGrpcStatusCode)"
-    class="error-summary rounded-default p-2 mb-2 border border-solid bg-status-error-bg border-status-error-text"
+    class="error-summary rounded-default bg-status-error-bg border-status-error-text mb-2 border border-solid p-2"
     data-test="trace-details-sidebar-error-summary"
   >
     <div class="flex-col items-center gap-1">
-      <div class="text-text-label! text-sm tracking-[0.03rem] pl-2 w-full pb-0.5">
+      <div class="text-text-label! w-full pb-0.5 pl-2 text-sm tracking-[0.03rem]">
         {{
           spanStatusCode
             ? t("traces.traceErrorTab.httpStatusCode")
@@ -42,10 +42,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="spanStatusCode || spanGrpcStatusCode"
           :code="spanStatusCode"
           :grpc-code="spanGrpcStatusCode"
-          class="text-sm! flex! items-center"
+          class="flex! items-center text-sm!"
         />
         <span
-          class="text-sm font-semibold text-status-error-text"
+          class="text-status-error-text text-sm font-semibold"
           data-test="trace-details-sidebar-error-summary-title"
         >
           {{ statusCodeTitle }}
@@ -57,16 +57,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- DB Response Status Code -->
   <div
     v-if="hasSpanError && spanDbResponseStatusCode"
-    class="error-summary rounded-default p-2 mb-2 border border-solid bg-status-error-bg border-status-error-text"
+    class="error-summary rounded-default bg-status-error-bg border-status-error-text mb-2 border border-solid p-2"
     data-test="trace-details-sidebar-db-response-status-code"
   >
     <div class="flex-col items-center gap-1">
-      <div class="text-text-label! text-3xs tracking-[0.03rem] pl-2 w-full pb-0.5">
+      <div class="text-text-label! text-3xs w-full pb-0.5 pl-2 tracking-[0.03rem]">
         {{ t("traces.traceErrorTab.dbResponseStatusCode") }}
       </div>
       <div class="flex items-center pl-2">
         <span
-          class="text-sm font-semibold text-status-error-text"
+          class="text-status-error-text text-sm font-semibold"
           data-test="trace-details-sidebar-db-response-status-code-value"
         >
           {{ spanDbResponseStatusCode }}
@@ -78,16 +78,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Process Exit Code -->
   <div
     v-if="hasSpanError && spanProcessExitCode"
-    class="error-summary rounded-default p-2 mb-2 border border-solid bg-status-error-bg border-status-error-text"
+    class="error-summary rounded-default bg-status-error-bg border-status-error-text mb-2 border border-solid p-2"
     data-test="trace-details-sidebar-process-exit-code"
   >
     <div class="flex-col items-center gap-1">
-      <div class="text-text-label! text-3xs tracking-[0.03rem] pl-2 w-full pb-0.5">
+      <div class="text-text-label! text-3xs w-full pb-0.5 pl-2 tracking-[0.03rem]">
         {{ t("traces.traceErrorTab.processExitCode") }}
       </div>
       <div class="flex items-center pl-2">
         <span
-          class="text-sm font-semibold text-status-error-text"
+          class="text-status-error-text text-sm font-semibold"
           data-test="trace-details-sidebar-process-exit-code-value"
         >
           {{ spanProcessExitCode }}
@@ -99,13 +99,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Generic Error Banner -->
   <div
     v-if="hasSpanError && (errorBannerTitle || errorBannerMessage || spanErrorType)"
-    class="error-summary rounded-default p-2 mb-2 border border-solid bg-status-error-bg border-status-error-text"
+    class="error-summary rounded-default bg-status-error-bg border-status-error-text mb-2 border border-solid p-2"
     data-test="trace-details-sidebar-error-summary"
   >
-    <div class="flex items-center gap-2 mb-1">
+    <div class="mb-1 flex items-center gap-2">
       <OIcon name="error" size="sm" class="text-status-error-text" />
       <span
-        class="text-base font-semibold text-status-error-text"
+        class="text-status-error-text text-base font-semibold"
         data-test="trace-details-sidebar-error-summary-title"
       >
         {{ errorBannerTitle }}
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-if="errorBannerMessage"
-      class="ml-6 text-sm mb-1 text-text-secondary"
+      class="text-text-secondary mb-1 ml-6 text-sm"
       data-test="trace-details-sidebar-error-summary-message"
     >
       {{ errorBannerMessage }}
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <!-- Exceptions Table -->
   <template v-if="hasExceptionEvents.length">
-    <div class="text-sm pt-[0.325rem]! font-semibold pb-[0.325rem] text-text-secondary!">
+    <div class="text-text-secondary! pt-[0.325rem]! pb-[0.325rem] text-sm font-semibold">
       {{ t("traces.exceptionsWithCount", { count: hasExceptionEvents.length }) }}
     </div>
     <OTable
@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       expansion="multiple"
       :expanded-ids="expandedExceptionIds"
       @update:expanded-ids="expandedExceptionIds = $event"
-      class="trace-detail-tab-table w-full border border-solid border-card-glass-border tab-content-dynamic-height"
+      class="trace-detail-tab-table border-card-glass-border tab-content-dynamic-height w-full border border-solid"
     >
       <template #cell-@timestamp="{ row }">
         <span>{{ formatTimestamp(row) }}</span>
@@ -147,26 +147,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #expansion="{ row }">
-        <div class="px-4 py-3 bg-surface-base rounded-default">
+        <div class="bg-surface-base rounded-default px-4 py-3">
           <div class="space-y-3">
             <!-- Exception Type -->
             <div class="space-y-1">
-              <span class="block font-semibold text-text-secondary text-sm mb-1">{{
+              <span class="text-text-secondary mb-1 block text-sm font-semibold">{{
                 t("traces.typeLabel")
               }}</span>
               <span
-                class="text-status-error-text font-semibold bg-status-error-bg py-1 px-2 rounded-default inline-block text-sm"
+                class="text-status-error-text bg-status-error-bg rounded-default inline-block px-2 py-1 text-sm font-semibold"
                 >{{ row["exception.type"] }}</span
               >
             </div>
 
             <!-- Exception Message -->
             <div class="space-y-1">
-              <span class="block font-semibold text-text-secondary text-sm mb-1">{{
+              <span class="text-text-secondary mb-1 block text-sm font-semibold">{{
                 t("traces.messageLabel")
               }}</span>
               <div
-                class="text-text-secondary bg-code-bg p-2 rounded-default border-l-[3px] border-l-status-warning-text whitespace-pre-wrap break-words leading-normal text-sm"
+                class="text-text-secondary bg-code-bg rounded-default border-l-status-warning-text border-l-[3px] p-2 text-sm leading-normal break-words whitespace-pre-wrap"
               >
                 {{ formatExceptionMessage(row["exception.message"]) }}
               </div>
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Exception Escaped -->
             <div class="space-y-1">
-              <span class="block font-semibold text-text-secondary text-sm mb-1">{{
+              <span class="text-text-secondary mb-1 block text-sm font-semibold">{{
                 t("traces.escapedLabel")
               }}</span>
               <span class="text-sm">{{ row["exception.escaped"] }}</span>
@@ -183,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Stacktrace -->
             <div class="space-y-2">
               <div class="flex items-center justify-between">
-                <span class="block font-semibold text-text-secondary text-sm">{{
+                <span class="text-text-secondary block text-sm font-semibold">{{
                   t("traces.stacktraceLabel")
                 }}</span>
                 <OButton
@@ -200,17 +200,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="row['exception.stacktrace'] && row['exception.stacktrace'].trim()"
-                class="bg-code-bg rounded-default border border-border-default p-3 overflow-x-auto max-h-150 overflow-y-auto"
+                class="bg-code-bg rounded-default border-border-default max-h-150 overflow-x-auto overflow-y-auto border p-3"
                 data-test="exception-stacktrace-container"
               >
                 <div
-                  class="stacktrace-content m-0 p-0 text-2xs leading-[1.6] text-code-text font-mono whitespace-pre-wrap break-words"
+                  class="stacktrace-content text-2xs text-code-text m-0 p-0 font-mono leading-[1.6] break-words whitespace-pre-wrap"
                   v-html="formatStackTrace(row['exception.stacktrace'])"
                 />
               </div>
               <div
                 v-else
-                class="flex items-center justify-center bg-code-bg text-text-muted text-xs italic py-4 px-3 border border-dashed border-border-default rounded-default"
+                class="bg-code-bg text-text-muted border-border-default rounded-default flex items-center justify-center border border-dashed px-3 py-4 text-xs italic"
                 data-test="exception-stacktrace-empty"
               >
                 <OIcon name="info" size="sm" class="mr-1" />

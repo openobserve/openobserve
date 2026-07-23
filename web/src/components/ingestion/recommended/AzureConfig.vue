@@ -17,16 +17,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="m-3 mt-1 max-w-4xl">
     <!-- Header -->
-    <div class="flex items-start gap-4 mb-6">
+    <div class="mb-6 flex items-start gap-4">
       <OIcon name="cloud" size="xl" class="flex-shrink-0" />
       <div>
         <div
           data-test="azure-config-page-title"
-          class="text-sm font-medium m-0 mb-1 text-text-heading"
+          class="text-text-heading m-0 mb-1 text-sm font-medium"
         >
           {{ t("ingestion.azureSetup.activityLogsTitle") }}
         </div>
-        <div class="text-sm m-0 text-text-secondary">
+        <div class="text-text-secondary m-0 text-sm">
           {{ t("ingestion.azureSetup.activityLogsDescription") }}
         </div>
       </div>
@@ -34,17 +34,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Step 1 -->
     <div
-      class="mb-4 p-4 rounded-default border-l-4 border-l-solid bg-surface-subtle border-l-border-strong"
+      class="rounded-default border-l-solid bg-surface-subtle border-l-border-strong mb-4 border-l-4 p-4"
     >
-      <div class="flex gap-3 items-start">
+      <div class="flex items-start gap-3">
         <div
-          class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shrink-0 bg-status-info-bg text-status-info-text"
+          class="bg-status-info-bg text-status-info-text flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold"
         >
           1
         </div>
         <div>
-          <div class="font-semibold mb-1 text-text-heading">Deploy ARM Template</div>
-          <div class="text-sm m-0 mb-3 text-text-secondary">
+          <div class="text-text-heading mb-1 font-semibold">Deploy ARM Template</div>
+          <div class="text-text-secondary m-0 mb-3 text-sm">
             Creates an Event Hub namespace, Event Hub, and all required resources in your Azure
             subscription.
           </div>
@@ -63,17 +63,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Step 2 -->
     <div
-      class="mb-4 p-4 rounded-default border-l-4 border-l-solid bg-surface-subtle border-l-border-strong"
+      class="rounded-default border-l-solid bg-surface-subtle border-l-border-strong mb-4 border-l-4 p-4"
     >
-      <div class="flex gap-3 items-start">
+      <div class="flex items-start gap-3">
         <div
-          class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shrink-0 bg-status-info-bg text-status-info-text"
+          class="bg-status-info-bg text-status-info-text flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold"
         >
           2
         </div>
         <div>
-          <div class="font-semibold mb-1 text-text-heading">Configure Diagnostic Settings</div>
-          <div class="text-sm mb-3 text-text-secondary">
+          <div class="text-text-heading mb-1 font-semibold">Configure Diagnostic Settings</div>
+          <div class="text-text-secondary mb-3 text-sm">
             After the ARM deployment completes, route Activity Logs to the Event Hub that was
             created.
           </div>
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Portal instructions -->
           <div v-if="step2Mode === 'portal'">
-            <ol class="text-sm pl-4 space-y-1 text-text-secondary">
+            <ol class="text-text-secondary space-y-1 pl-4 text-sm">
               <li>
                 Go to
                 <strong>Azure Portal → Subscriptions → your subscription</strong>
@@ -113,8 +113,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else>
             <!-- Categories -->
             <div class="mb-4">
-              <div class="flex items-center justify-between mb-2">
-                <div class="text-xs font-semibold text-text-heading">Log categories to enable</div>
+              <div class="mb-2 flex items-center justify-between">
+                <div class="text-text-heading text-xs font-semibold">Log categories to enable</div>
                 <div class="flex gap-2">
                   <OButton
                     variant="ghost-primary"
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                 </div>
               </div>
-              <div class="grid grid-cols-2 sm:grid-cols-4 gap-1 w-full">
+              <div class="grid w-full grid-cols-2 gap-1 sm:grid-cols-4">
                 <OCheckbox
                   v-for="cat in LOG_CATEGORIES"
                   :key="cat.value"
@@ -138,9 +138,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+            <div class="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <div class="text-xs mb-1 text-text-heading">Resource Group</div>
+                <div class="text-text-heading mb-1 text-xs">Resource Group</div>
                 <OInput
                   v-model="resourceGroup"
                   placeholder="rg-openobserve-activity-logs"
@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <div>
-                <div class="text-xs mb-1 text-text-heading">Deployment Name</div>
+                <div class="text-text-heading mb-1 text-xs">Deployment Name</div>
                 <OInput
                   v-model="deploymentName"
                   placeholder="o2-activity-20260420"
@@ -159,11 +159,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <div v-if="enabledCategories.length === 0" class="text-sm text-status-error-text mb-3">
+            <div v-if="enabledCategories.length === 0" class="text-status-error-text mb-3 text-sm">
               Select at least one log category above.
             </div>
             <div v-else>
-              <div class="text-xs mb-2 text-text-secondary">
+              <div class="text-text-secondary mb-2 text-xs">
                 Run this command after your ARM deployment completes:
               </div>
               <CopyContent :content="curlCommand" data-test="azure-curl-command" />
@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Manual Configuration -->
     <div class="mt-6">
-      <div class="font-semibold text-sm mb-2 text-text-heading">
+      <div class="text-text-heading mb-2 text-sm font-semibold">
         {{ t("ingestion.azureSetup.manualTitle") }}
       </div>
       <CopyContent :content="manualContent" />

@@ -20,7 +20,7 @@ withDefaults(
     role="status"
     :aria-label="t('synthetics.createBrowserTest.loading')"
     aria-live="polite"
-    class="flex-1 flex flex-col min-h-0 bg-surface-base"
+    class="bg-surface-base flex min-h-0 flex-1 flex-col"
     data-test="synthetics-createBrowserTest-skeleton"
   >
     <!--
@@ -32,9 +32,9 @@ withDefaults(
           span: flex flex-col → title(text-xs) + desc(11px)
       Connector: h-px flex-1 shrink mt-5.5 mx-1 min-w-2
     -->
-    <div class="flex items-start pt-0 px-4 pb-2 gap-1 shrink-0">
+    <div class="flex shrink-0 items-start gap-1 px-4 pt-0 pb-2">
       <!-- Step 1: Journey (active) -->
-      <div class="flex items-center gap-2 py-1.5 px-2 shrink-0">
+      <div class="flex shrink-0 items-center gap-2 px-2 py-1.5">
         <div style="width: 2rem; height: 2rem">
           <OSkeleton type="circle" animation="wave" />
         </div>
@@ -43,9 +43,9 @@ withDefaults(
         </div>
       </div>
       <!-- Connector line (mt-5.5=1.375rem) -->
-      <div class="flex-1 h-px bg-border-default mt-5.5 mx-1 mb-0 min-w-2 shrink"></div>
+      <div class="bg-border-default mx-1 mt-5.5 mb-0 h-px min-w-2 flex-1 shrink"></div>
       <!-- Step 2: Configure (inactive) -->
-      <div class="flex items-center gap-2 py-1.5 px-2 shrink-0">
+      <div class="flex shrink-0 items-center gap-2 px-2 py-1.5">
         <div style="width: 2rem; height: 2rem">
           <OSkeleton type="circle" animation="wave" />
         </div>
@@ -56,19 +56,19 @@ withDefaults(
     </div>
 
     <!-- ── Journey tab content (OStep panel) ── -->
-    <div class="flex-1 overflow-y-auto flex flex-col min-h-0">
+    <div class="flex min-h-0 flex-1 flex-col overflow-y-auto">
       <!--
         BrowserJourney Toolbar
         Real: flex items-center gap-4 mb-3 ml-5.5 px-3
         ml-5.5 = 1.375rem, px-3 = 0.75rem
       -->
-      <div class="flex items-center gap-4 py-0 px-3" style="margin: 0 0 0.75rem 1.375rem">
+      <div class="flex items-center gap-4 px-3 py-0" style="margin: 0 0 0.75rem 1.375rem">
         <!-- Select-all checkbox -->
         <div class="shrink-0" style="width: 1rem; height: 1rem">
           <OSkeleton type="rect" animation="wave" />
         </div>
         <!-- "Steps" h3 + OBadge -->
-        <div class="flex items-center gap-1 shrink-0">
+        <div class="flex shrink-0 items-center gap-1">
           <div style="width: 2.5rem; height: 1.25rem">
             <OSkeleton type="text" animation="wave" />
           </div>
@@ -81,7 +81,7 @@ withDefaults(
           <OSkeleton type="rect" animation="wave" />
         </div>
         <!-- Button cluster: Add Step | Replay | Record (OButton size="sm") -->
-        <div class="flex items-center gap-2 shrink-0">
+        <div class="flex shrink-0 items-center gap-2">
           <div style="width: 5.5rem; height: 2rem">
             <OSkeleton type="rect" animation="wave" />
           </div>
@@ -101,11 +101,11 @@ withDefaults(
         Real cell-details: step# | icon-chip(1.75rem) | badge | name(flex-1) | selector(25%)
         Real cell-actions: 3 ghost xs buttons
       -->
-      <div class="flex flex-col flex-1">
+      <div class="flex flex-1 flex-col">
         <div
           v-for="i in rows"
           :key="i"
-          class="flex items-center gap-2 py-1.5 px-3 border-b border-border-default"
+          class="border-border-default flex items-center gap-2 border-b px-3 py-1.5"
         >
           <!-- OTable expand toggle (built-in) -->
           <div class="shrink-0" style="width: 1rem; height: 1rem">
@@ -132,7 +132,7 @@ withDefaults(
             <OSkeleton type="text" animation="wave" />
           </div>
           <!-- Action buttons: insert(+) | duplicate | delete (3 x OButton ghost xs) -->
-          <div class="flex items-center gap-0.5 shrink-0">
+          <div class="flex shrink-0 items-center gap-0.5">
             <div style="width: 1.25rem; height: 1.25rem">
               <OSkeleton type="rect" animation="wave" />
             </div>
@@ -153,7 +153,7 @@ withDefaults(
       Journey tab: Cancel(ghost) | spacer | Continue(primary + chevron-right)
     -->
     <div
-      class="flex items-center py-2.5 px-3 gap-2 border-t border-border-default shrink-0 bg-surface-base"
+      class="border-border-default bg-surface-base flex shrink-0 items-center gap-2 border-t px-3 py-2.5"
     >
       <div class="flex-1"></div>
       <!-- Cancel button (ghost, sm) -->

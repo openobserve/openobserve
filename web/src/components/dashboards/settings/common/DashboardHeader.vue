@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="dashboard-header-root">
-    <div data-test="dashboard-header-row" class="flex items-center flex-nowrap my-2 mx-2">
+    <div data-test="dashboard-header-row" class="mx-2 my-2 flex flex-nowrap items-center">
       <div v-if="backButton" data-test="dashboard-header-back-button-container" class="col-auto">
         <OButton
           data-test="dashboard-header-back-button"
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         </OButton>
       </div>
-      <div data-test="dashboard-header-title-container" class="flex flex-col flex-1">
+      <div data-test="dashboard-header-title-container" class="flex flex-1 flex-col">
         <div data-test="dashboard-header-title" class="text-base font-semibold">
           {{ title }}
         </div>

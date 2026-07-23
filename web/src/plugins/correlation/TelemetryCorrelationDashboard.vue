@@ -32,8 +32,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Dimensions Display - Stable (matched) and Unstable (additional) -->
-    <div class="py-2 px-4 border-b border-solid border-card-glass-border">
-      <div class="flex items-center gap-3 flex-wrap">
+    <div class="border-card-glass-border border-b border-solid px-4 py-2">
+      <div class="flex flex-wrap items-center gap-3">
         <span class="text-xs font-semibold opacity-70"> {{ t("correlation.filters") }}: </span>
         <div v-for="(value, key) in pendingDimensions" :key="key" class="flex items-center gap-2">
           <span
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Refresh Button (dialog mode) -->
           <div
             v-if="logsDashboardData"
-            class="p-2 border-b border-solid border-card-glass-border flex justify-end"
+            class="border-card-glass-border flex justify-end border-b border-solid p-2"
           >
             <OButton variant="ghost" size="sm-action" @click="loadDashboard" :loading="loading">
               <OIcon name="refresh" size="xs" class="mr-1" />
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Loading State -->
-          <div v-if="loading" class="flex flex-col items-center justify-center h-full py-20 gap-3">
+          <div v-if="loading" class="flex h-full flex-col items-center justify-center gap-3 py-20">
             <OSpinner size="sm" />
             <div class="text-sm opacity-70">
               {{ t("correlation.loadingLogs") }}
@@ -124,8 +124,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <!-- No Logs State -->
-          <div v-else class="flex flex-col items-center justify-center h-full py-20">
-            <div class="text-base font-medium mb-2 opacity-90">
+          <div v-else class="flex h-full flex-col items-center justify-center py-20">
+            <div class="mb-2 text-base font-medium opacity-90">
               {{ t("correlation.noLogsFound") }}
             </div>
             <div class="text-sm opacity-70">
@@ -139,14 +139,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Two-column body: sidebar + charts (splitter matching TracesAnalysisDashboard style) -->
           <OSplitter
             v-model="splitterModel"
-            class="flex-1 min-h-0 h-full max-h-full overflow-hidden w-full"
+            class="h-full max-h-full min-h-0 w-full flex-1 overflow-hidden"
           >
             <!-- -- Left sidebar -- -->
             <template #before>
-              <div class="h-full min-h-0 flex flex-col bg-surface-overlay">
+              <div class="bg-surface-overlay flex h-full min-h-0 flex-col">
                 <!-- Search -->
                 <div
-                  class="dimension-sidebar-search-container px-1.5 py-2 border-b border-solid border-card-glass-border"
+                  class="dimension-sidebar-search-container border-card-glass-border border-b border-solid px-1.5 py-2"
                 >
                   <OSearchInput
                     v-model="metricSearchText"
@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Grouped metric list -->
                 <div
-                  class="dimension-list-container flex-1 min-h-0 overflow-y-auto px-1.5"
+                  class="dimension-list-container min-h-0 flex-1 overflow-y-auto px-1.5"
                   style="max-height: calc(100vh - 210px)"
                 >
                   <template
@@ -166,11 +166,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-for="group in groupedFilteredMetricStreams.groups" :key="group.id">
                       <template v-if="group.streams.length > 0">
                         <div
-                          class="flex items-center justify-between py-1.5 px-2 bg-section-header-bg border-b border-solid border-border-default sticky top-0 z-10 cursor-pointer"
+                          class="bg-section-header-bg border-border-default sticky top-0 z-10 flex cursor-pointer items-center justify-between border-b border-solid px-2 py-1.5"
                           @click="toggleGroupCollapse(group.id)"
                         >
                           <div
-                            class="flex items-center gap-1.5 text-2xs font-bold uppercase tracking-[0.05em] opacity-75"
+                            class="text-2xs flex items-center gap-1.5 font-bold tracking-[0.05em] uppercase opacity-75"
                           >
                             <OIcon
                               :name="
@@ -213,10 +213,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-show="!collapsedGroups.has(group.id)"
                           :key="stream.stream_name"
                           data-test="telemetry-correlation-metric-stream-item"
-                          class="border-none! flex items-center gap-2 px-2 py-1 cursor-pointer hover:bg-[rgba(0,0,0,0.04)] dark:hover:bg-[rgba(255,255,255,0.05)]"
+                          class="flex cursor-pointer items-center gap-2 border-none! px-2 py-1 hover:bg-[rgba(0,0,0,0.04)] dark:hover:bg-[rgba(255,255,255,0.05)]"
                           @click="toggleMetricStream(stream)"
                         >
-                          <div class="flex items-center shrink-0">
+                          <div class="flex shrink-0 items-center">
                             <OCheckbox
                               :model-value="
                                 selectedMetricStreams.some(
@@ -227,8 +227,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               @update:model-value="toggleMetricStream(stream)"
                             />
                           </div>
-                          <div class="flex flex-col flex-1 min-w-0">
-                            <span class="truncate cursor-pointer text-text-secondary! text-sm">{{
+                          <div class="flex min-w-0 flex-1 flex-col">
+                            <span class="text-text-secondary! cursor-pointer truncate text-sm">{{
                               stream.stream_name
                             }}</span>
                           </div>
@@ -236,14 +236,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                     </template>
                   </template>
-                  <div v-else class="text-center px-2 pt-3">
-                    <OIcon name="info" size="sm" class="align-middle mr-1" />
+                  <div v-else class="px-2 pt-3 text-center">
+                    <OIcon name="info" size="sm" class="mr-1 align-middle" />
                     {{ t("search.noResult") }}
                   </div>
                 </div>
 
                 <!-- Footer: selected count -->
-                <div class="p-3 border-t border-solid border-card-glass-border text-xs font-normal">
+                <div class="border-card-glass-border border-t border-solid p-3 text-xs font-normal">
                   {{ selectedMetricStreams.length }} of {{ uniqueMetricStreams.length }} selected
                 </div>
               </div>
@@ -252,23 +252,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- -- Separator -- -->
             <template #separator>
               <div
-                class="w-px h-full bg-border-default cursor-col-resize dark:bg-[rgba(255,255,255,0.12)]"
+                class="bg-border-default h-full w-px cursor-col-resize dark:bg-[rgba(255,255,255,0.12)]"
               />
             </template>
 
             <!-- -- Right area: group tabs + dashboard -- -->
             <template #after>
-              <div class="flex flex-col h-full overflow-hidden">
+              <div class="flex h-full flex-col overflow-hidden">
                 <!-- Outer Pod/Node tabs — only shown in nested K8s mode -->
                 <OTabs
                   v-if="isNestedGroupMode"
                   v-model="activeOuterTab"
                   dense
                   align="left"
-                  class="px-page-edge shrink-0 border-b border-solid border-card-glass-border"
+                  class="px-page-edge border-card-glass-border shrink-0 border-b border-solid"
                 >
                   <OTab v-for="outerGroup in groupDefs" :key="outerGroup.id" :name="outerGroup.id">
-                    <div class="flex flex-col items-start min-w-0">
+                    <div class="flex min-w-0 flex-col items-start">
                       <div class="flex items-center gap-1">
                         <OIcon
                           v-if="typeof outerGroup.icon === 'string'"
@@ -280,7 +280,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                       <span
                         v-if="outerTabResourceName[outerGroup.id]"
-                        class="text-xs leading-tight opacity-75 truncate max-w-40"
+                        class="max-w-40 truncate text-xs leading-tight opacity-75"
                         :title="outerTabResourceName[outerGroup.id]"
                         >{{ outerTabResourceName[outerGroup.id] }}</span
                       >
@@ -294,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="activeMetricGroupTab"
                   dense
                   align="left"
-                  class="px-page-edge shrink-0 bg-surface-panel border-b border-solid border-card-glass-border"
+                  class="px-page-edge bg-surface-panel border-card-glass-border shrink-0 border-b border-solid"
                 >
                   <OTab
                     v-for="group in groupedUniqueMetricStreams.groups.filter((g) =>
@@ -322,10 +322,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OTabs>
 
                 <!-- Dashboard content -->
-                <div class="flex-1 min-h-0 overflow-auto">
+                <div class="min-h-0 flex-1 overflow-auto">
                   <div
                     v-if="loading"
-                    class="flex flex-col items-center justify-center h-full py-20 gap-3"
+                    class="flex h-full flex-col items-center justify-center gap-3 py-20"
                   >
                     <OSpinner size="sm" />
                     <div class="text-sm opacity-70">
@@ -338,12 +338,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div
                     v-else-if="error"
-                    class="flex flex-col items-center justify-center h-full py-20"
+                    class="flex h-full flex-col items-center justify-center py-20"
                   >
-                    <div class="text-base font-medium mb-2 opacity-90">
+                    <div class="mb-2 text-base font-medium opacity-90">
                       {{ t("correlation.metricsError") }}
                     </div>
-                    <div class="text-sm opacity-70 mb-4">
+                    <div class="mb-4 text-sm opacity-70">
                       {{ error || t("correlation.metricsErrorDetails") }}
                     </div>
                     <OButton variant="ghost" size="sm-action" @click="loadDashboard">
@@ -363,9 +363,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <div
                     v-else
-                    class="flex flex-col items-center justify-center h-[calc(100vh-7.5rem)] py-20"
+                    class="flex h-[calc(100vh-7.5rem)] flex-col items-center justify-center py-20"
                   >
-                    <div class="text-base font-medium mb-2 opacity-90">
+                    <div class="mb-2 text-base font-medium opacity-90">
                       {{ t("correlation.noMetrics") }}
                     </div>
                     <div class="text-sm opacity-70">
@@ -385,7 +385,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Loading State -->
           <div
             v-if="tracesLoading"
-            class="flex flex-col items-center justify-center h-full py-20 gap-3"
+            class="flex h-full flex-col items-center justify-center gap-3 py-20"
           >
             <OSpinner size="sm" />
             <div class="text-sm opacity-70">
@@ -396,12 +396,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Error State -->
           <div
             v-else-if="tracesError"
-            class="flex flex-col items-center justify-center h-full py-20"
+            class="flex h-full flex-col items-center justify-center py-20"
           >
-            <div class="text-base font-medium mb-2 opacity-90">
+            <div class="mb-2 text-base font-medium opacity-90">
               {{ t("correlation.tracesError") }}
             </div>
-            <div class="text-sm opacity-70 mb-4">
+            <div class="mb-4 text-sm opacity-70">
               {{ tracesError || t("correlation.tracesErrorDetails") }}
             </div>
             <OButton variant="ghost" size="sm-action" @click="loadCorrelatedTraces">
@@ -413,7 +413,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Direct Trace Correlation - Full Span List -->
           <div
             v-else-if="traceCorrelationMode === 'direct' && traceSpanList.length > 0"
-            class="h-full overflow-hidden telemetry-correlation-traces"
+            class="telemetry-correlation-traces h-full overflow-hidden"
           >
             <TraceDetails
               mode="embedded"
@@ -440,14 +440,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="h-full"
           >
             <!-- Header -->
-            <div class="p-3 border-b border-solid border-card-glass-border bg-surface-panel">
+            <div class="border-card-glass-border bg-surface-panel border-b border-solid p-3">
               <div class="flex items-center gap-3">
                 <OIcon name="hub" size="md" />
                 <div class="flex flex-col">
                   <span class="text-sm font-semibold">{{
                     t("correlation.dimensionBasedCorrelation")
                   }}</span>
-                  <span class="text-xs text-text-secondary">{{
+                  <span class="text-text-secondary text-xs">{{
                     t("correlation.tracesFromService", { service: serviceName })
                   }}</span>
                 </div>
@@ -494,8 +494,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Initial State (waiting for tab to be shown) -->
-          <div v-else class="flex flex-col items-center justify-center h-full py-20">
-            <div class="text-base font-medium mb-2 opacity-90">
+          <div v-else class="flex h-full flex-col items-center justify-center py-20">
+            <div class="mb-2 text-base font-medium opacity-90">
               {{ t("correlation.correlatedTraces") }}
             </div>
             <div class="text-sm opacity-70">
@@ -508,7 +508,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </ODrawer>
 
   <!-- Embedded Tabs Mode -->
-  <div v-else class="flex flex-col h-full w-full bg-surface-panel">
+  <div v-else class="bg-surface-panel flex h-full w-full flex-col">
     <!-- Dimensions Display - Stable (matched) and Unstable (additional) -->
     <DimensionFiltersBar
       v-if="!props.hideDimensionFilters"
@@ -535,15 +535,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Tab Panels (no tabs in embedded mode, controlled by parent) -->
     <OCard
       :class="[
-        'flex flex-col flex-1 min-h-0',
+        'flex min-h-0 flex-1 flex-col',
         activeTab === 'metrics' ? 'overflow-hidden' : 'overflow-auto',
       ]"
     >
-      <div v-if="activeTab == 'logs'" class="flex flex-col flex-1 min-h-0">
+      <div v-if="activeTab == 'logs'" class="flex min-h-0 flex-1 flex-col">
         <!-- Refresh Button (embedded mode) -->
         <div
           v-if="logsDashboardData"
-          class="p-2 border-b border-solid border-card-glass-border flex justify-end"
+          class="border-card-glass-border flex justify-end border-b border-solid p-2"
         >
           <OButton variant="ghost" size="sm-action" @click="loadDashboard" :loading="loading">
             <OIcon name="refresh" size="xs" class="mr-1" />
@@ -554,7 +554,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Loading State -->
         <div
           v-if="loading"
-          class="flex flex-col items-center justify-center gap-3 flex-1"
+          class="flex flex-1 flex-col items-center justify-center gap-3"
           style="min-height: 300px"
         >
           <OSpinner size="sm" />
@@ -575,8 +575,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <!-- No Logs State -->
-        <div v-else class="flex flex-col items-center justify-center h-full py-20">
-          <div class="text-base font-medium mb-2 opacity-90">
+        <div v-else class="flex h-full flex-col items-center justify-center py-20">
+          <div class="mb-2 text-base font-medium opacity-90">
             {{ t("correlation.noLogsFound") }}
           </div>
           <div class="text-sm opacity-70">
@@ -587,18 +587,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div
         v-if="activeTab == 'metrics'"
-        class="h-full flex flex-col overflow-hidden min-h-0 metrics-correlation-dashboard"
+        class="metrics-correlation-dashboard flex h-full min-h-0 flex-col overflow-hidden"
       >
         <!-- Two-column body: sidebar + charts (splitter matching TracesAnalysisDashboard style) -->
         <OSplitter
           v-model="splitterModel"
-          class="flex-1 min-h-0 h-full max-h-full overflow-hidden w-full"
+          class="h-full max-h-full min-h-0 w-full flex-1 overflow-hidden"
         >
           <!-- -- Left sidebar -- -->
           <template #before>
-            <div class="h-full min-h-0 flex flex-col bg-surface-overlay">
+            <div class="bg-surface-overlay flex h-full min-h-0 flex-col">
               <div
-                class="dimension-sidebar-search-container p-2.5 border-b border-solid border-card-glass-border"
+                class="dimension-sidebar-search-container border-card-glass-border border-b border-solid p-2.5"
               >
                 <OSearchInput
                   v-model="metricSearchText"
@@ -609,7 +609,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Grouped metric list -->
               <div
-                class="dimension-list-container flex-1 min-h-0 overflow-y-auto"
+                class="dimension-list-container min-h-0 flex-1 overflow-y-auto"
                 style="max-height: calc(100vh - 210px)"
               >
                 <template
@@ -618,11 +618,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template v-for="group in groupedFilteredMetricStreams.groups" :key="group.id">
                     <template v-if="group.streams.length > 0">
                       <div
-                        class="flex items-center justify-between py-1.5 px-2 bg-section-header-bg border-b border-solid border-border-default sticky top-0 z-10 cursor-pointer"
+                        class="bg-section-header-bg border-border-default sticky top-0 z-10 flex cursor-pointer items-center justify-between border-b border-solid px-2 py-1.5"
                         @click="toggleGroupCollapse(group.id)"
                       >
                         <div
-                          class="flex items-center gap-1.5 text-2xs font-bold uppercase tracking-[0.05em] opacity-75"
+                          class="text-2xs flex items-center gap-1.5 font-bold tracking-[0.05em] uppercase opacity-75"
                         >
                           <OIcon
                             :name="collapsedGroups.has(group.id) ? 'chevron-right' : 'expand-more'"
@@ -663,10 +663,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-show="!collapsedGroups.has(group.id)"
                         :key="stream.stream_name"
                         data-test="telemetry-correlation-metric-stream-item"
-                        class="border-none! flex items-center gap-2 px-2 py-1 cursor-pointer hover:bg-[rgba(0,0,0,0.04)] dark:hover:bg-[rgba(255,255,255,0.05)]"
+                        class="flex cursor-pointer items-center gap-2 border-none! px-2 py-1 hover:bg-[rgba(0,0,0,0.04)] dark:hover:bg-[rgba(255,255,255,0.05)]"
                         @click="toggleMetricStream(stream)"
                       >
-                        <div class="flex items-center shrink-0">
+                        <div class="flex shrink-0 items-center">
                           <OCheckbox
                             :model-value="
                               selectedMetricStreams.some(
@@ -677,8 +677,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @update:model-value="toggleMetricStream(stream)"
                           />
                         </div>
-                        <div class="flex flex-col flex-1 min-w-0">
-                          <span class="truncate cursor-pointer text-text-secondary! text-sm">{{
+                        <div class="flex min-w-0 flex-1 flex-col">
+                          <span class="text-text-secondary! cursor-pointer truncate text-sm">{{
                             stream.stream_name
                           }}</span>
                         </div>
@@ -686,14 +686,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </template>
                   </template>
                 </template>
-                <div v-else class="text-center px-2 pt-3">
-                  <OIcon name="info" size="sm" class="align-middle mr-1" />
+                <div v-else class="px-2 pt-3 text-center">
+                  <OIcon name="info" size="sm" class="mr-1 align-middle" />
                   {{ t("search.noResult") }}
                 </div>
               </div>
 
               <!-- Footer: selected count -->
-              <div class="p-3 border-t border-solid border-card-glass-border text-xs font-normal">
+              <div class="border-card-glass-border border-t border-solid p-3 text-xs font-normal">
                 {{ selectedMetricStreams.length }} of {{ uniqueMetricStreams.length }} selected
               </div>
             </div>
@@ -702,23 +702,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- -- Separator -- -->
           <template #separator>
             <div
-              class="w-px h-full bg-border-default cursor-col-resize dark:bg-[rgba(255,255,255,0.12)]"
+              class="bg-border-default h-full w-px cursor-col-resize dark:bg-[rgba(255,255,255,0.12)]"
             />
           </template>
 
           <!-- -- Right area: group tabs + dashboard -- -->
           <template #after>
-            <div class="flex flex-col h-full overflow-hidden">
+            <div class="flex h-full flex-col overflow-hidden">
               <!-- Outer Pod/Node tabs — only shown in nested K8s mode -->
               <OTabs
                 v-if="isNestedGroupMode"
                 v-model="activeOuterTab"
                 dense
                 align="left"
-                class="shrink-0 border-b border-solid border-card-glass-border"
+                class="border-card-glass-border shrink-0 border-b border-solid"
               >
                 <OTab v-for="outerGroup in groupDefs" :key="outerGroup.id" :name="outerGroup.id">
-                  <div class="flex flex-col items-start min-w-0">
+                  <div class="flex min-w-0 flex-col items-start">
                     <div class="flex items-center gap-1">
                       <OIcon
                         v-if="typeof outerGroup.icon === 'string'"
@@ -726,11 +726,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="xs"
                       />
                       <component v-else :is="outerGroup.icon" />
-                      <span class="whitespace-nowrap text-xs">{{ outerGroup.label }}</span>
+                      <span class="text-xs whitespace-nowrap">{{ outerGroup.label }}</span>
                     </div>
                     <span
                       v-if="outerTabResourceName[outerGroup.id]"
-                      class="text-xs leading-tight opacity-75 truncate max-w-40"
+                      class="max-w-40 truncate text-xs leading-tight opacity-75"
                       :title="outerTabResourceName[outerGroup.id]"
                       >{{ outerTabResourceName[outerGroup.id] }}</span
                     >
@@ -744,7 +744,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="activeMetricGroupTab"
                 dense
                 align="left"
-                class="shrink-0 bg-surface-panel border-b border-solid border-card-glass-border"
+                class="bg-surface-panel border-card-glass-border shrink-0 border-b border-solid"
               >
                 <OTab
                   v-for="group in groupedUniqueMetricStreams.groups.filter((g) =>
@@ -772,10 +772,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OTabs>
 
               <!-- Dashboard content -->
-              <div class="flex-1 min-h-0 overflow-auto">
+              <div class="min-h-0 flex-1 overflow-auto">
                 <div
                   v-if="loading"
-                  class="flex flex-col items-center justify-center h-full py-20 gap-3"
+                  class="flex h-full flex-col items-center justify-center gap-3 py-20"
                 >
                   <OSpinner size="sm" />
                   <div class="text-sm opacity-70">
@@ -788,12 +788,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-else-if="error"
-                  class="flex flex-col items-center justify-center h-full py-20"
+                  class="flex h-full flex-col items-center justify-center py-20"
                 >
-                  <div class="text-base font-medium mb-2 opacity-90">
+                  <div class="mb-2 text-base font-medium opacity-90">
                     {{ t("correlation.metricsError") }}
                   </div>
-                  <div class="text-sm opacity-70 mb-4">
+                  <div class="mb-4 text-sm opacity-70">
                     {{ error || t("correlation.metricsErrorDetails") }}
                   </div>
                   <OButton variant="ghost" size="sm-action" @click="loadDashboard">
@@ -811,8 +811,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   searchType="dashboards"
                   class="border-none"
                 />
-                <div v-else class="flex flex-col items-center justify-center h-full py-20">
-                  <div class="text-base font-medium mb-2 opacity-90">
+                <div v-else class="flex h-full flex-col items-center justify-center py-20">
+                  <div class="mb-2 text-base font-medium opacity-90">
                     {{ t("correlation.noMetrics") }}
                   </div>
                   <div class="text-sm opacity-70">
@@ -827,18 +827,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div v-if="activeTab == 'traces'" class="h-full">
         <!-- Loading State -->
-        <div v-if="tracesLoading" class="flex flex-col items-center justify-center h-full py-20">
+        <div v-if="tracesLoading" class="flex h-full flex-col items-center justify-center py-20">
           <OSpinner size="xl" class="mb-4" />
           <div class="text-base">{{ t("correlation.loadingTraces") }}</div>
         </div>
 
         <!-- Error State -->
-        <div v-else-if="tracesError" class="flex flex-col items-center justify-center h-full py-20">
+        <div v-else-if="tracesError" class="flex h-full flex-col items-center justify-center py-20">
           <OIcon name="error-outline" class="mb-4" style="width: 3.75rem; height: 3.75rem" />
-          <div class="text-base mb-2">
+          <div class="mb-2 text-base">
             {{ t("correlation.tracesError") }}
           </div>
-          <div class="text-sm text-text-secondary">{{ tracesError }}</div>
+          <div class="text-text-secondary text-sm">{{ tracesError }}</div>
           <OButton variant="outline" size="sm-action" class="mt-4" @click="loadCorrelatedTraces">
             <OIcon name="refresh" size="xs" class="mr-1" />
             {{ t("correlation.retryButton") }}
@@ -848,7 +848,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Direct Trace Correlation - Full Span List -->
         <div
           v-else-if="traceCorrelationMode === 'direct' && traceSpanList.length > 0"
-          class="h-full overflow-auto telemetry-correlation-traces"
+          class="telemetry-correlation-traces h-full overflow-auto"
         >
           <TraceDetails
             mode="embedded"
@@ -872,17 +872,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Dimension-based Correlation - Traces List -->
         <div
           v-else-if="traceCorrelationMode === 'dimension-based' && tracesForDimensions.length > 0"
-          class="h-full flex flex-col"
+          class="flex h-full flex-col"
         >
           <!-- Header -->
-          <div class="p-3 border-b border-solid border-card-glass-border bg-surface-panel">
+          <div class="border-card-glass-border bg-surface-panel border-b border-solid p-3">
             <div class="flex items-center gap-3">
               <OIcon name="hub" size="md" />
               <div class="flex flex-col">
                 <span class="text-sm font-semibold">{{
                   t("correlation.dimensionBasedCorrelation")
                 }}</span>
-                <span class="text-xs text-text-secondary">{{
+                <span class="text-text-secondary text-xs">{{
                   t("correlation.tracesFromService", { service: serviceName })
                 }}</span>
               </div>
@@ -929,12 +929,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Initial State (waiting for tab to be shown) -->
-        <div v-else class="flex flex-col items-center justify-center h-full py-20">
+        <div v-else class="flex h-full flex-col items-center justify-center py-20">
           <OIcon name="account-tree" class="mb-4" style="width: 3.75rem; height: 3.75rem" />
           <div class="text-base">
             {{ t("correlation.correlatedTraces") }}
           </div>
-          <div class="text-sm text-text-secondary mt-2">
+          <div class="text-text-secondary mt-2 text-sm">
             {{ t("correlation.correlatedTracesFor", { service: serviceName }) }}
           </div>
         </div>
@@ -954,7 +954,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="metricSearchText"
       :placeholder="t('search.searchField')"
       clearable
-      class="w-full mb-3"
+      class="mb-3 w-full"
     />
 
     <div class="metric-list-container max-h-100 overflow-y-auto">
@@ -964,10 +964,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-if="group.streams.length > 0">
             <!-- Group header -->
             <div
-              class="flex items-center justify-between py-1.5 px-2 bg-section-header-bg border-b border-solid border-border-default sticky top-0 z-10"
+              class="bg-section-header-bg border-border-default sticky top-0 z-10 flex items-center justify-between border-b border-solid px-2 py-1.5"
             >
               <div
-                class="flex items-center gap-1.5 text-2xs font-bold uppercase tracking-[0.05em] opacity-75"
+                class="text-2xs flex items-center gap-1.5 font-bold tracking-[0.05em] uppercase opacity-75"
               >
                 <OIcon
                   v-if="typeof group.icon === 'string'"
@@ -1003,9 +1003,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="stream in group.streams"
               :key="stream.stream_name"
-              class="flex items-center gap-2 py-2 px-4 border-b border-solid border-border-default hover:bg-[rgba(0,0,0,0.04)] dark:border-[rgba(255,255,255,0.1)] dark:hover:bg-[rgba(255,255,255,0.05)]"
+              class="border-border-default flex items-center gap-2 border-b border-solid px-4 py-2 hover:bg-[rgba(0,0,0,0.04)] dark:border-[rgba(255,255,255,0.1)] dark:hover:bg-[rgba(255,255,255,0.05)]"
             >
-              <div class="flex items-center shrink-0">
+              <div class="flex shrink-0 items-center">
                 <OCheckbox
                   :model-value="
                     selectedMetricStreams.some((s) => s.stream_name === stream.stream_name)
@@ -1014,8 +1014,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="xs"
                 />
               </div>
-              <div class="flex flex-col flex-1 min-w-0">
-                <span class="text-sm font-mono">{{ stream.stream_name }}</span>
+              <div class="flex min-w-0 flex-1 flex-col">
+                <span class="font-mono text-sm">{{ stream.stream_name }}</span>
               </div>
             </div>
           </template>
@@ -1023,8 +1023,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- No results message -->
-      <div v-else class="text-center px-2 pt-3">
-        <OIcon name="info" size="sm" class="align-middle mr-1" />
+      <div v-else class="px-2 pt-3 text-center">
+        <OIcon name="info" size="sm" class="mr-1 align-middle" />
         {{ t("search.noResult") }}
       </div>
     </div>

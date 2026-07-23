@@ -1,6 +1,6 @@
 <template>
   <div
-    class="rich-text-input-wrapper py-1 px-2 pb-2 rounded-default transition-all duration-200 ease-in-out min-h-15 cursor-text bg-surface-base border border-border-default focus-within:border-transparent focus-within:shadow-[0_0_0_2px_var(--color-accent)]"
+    class="rich-text-input-wrapper rounded-default bg-surface-base border-border-default min-h-15 cursor-text border px-2 py-1 pb-2 transition-all duration-200 ease-in-out focus-within:border-transparent focus-within:shadow-[0_0_0_2px_var(--color-accent)]"
     :class="[
       disabled ? ['is-disabled', 'opacity-60', 'cursor-not-allowed'] : [],
       borderless
@@ -11,7 +11,7 @@
   >
     <div
       ref="editableDiv"
-      class="rich-text-input relative outline-none text-sm leading-[1.6] min-h-10 max-h-75 overflow-y-auto break-words whitespace-pre-wrap text-text-body"
+      class="rich-text-input text-text-body relative max-h-75 min-h-10 overflow-y-auto text-sm leading-[1.6] break-words whitespace-pre-wrap outline-none"
       :class="disabled ? 'cursor-not-allowed' : ''"
       contenteditable="true"
       :data-placeholder="placeholder"
@@ -25,7 +25,7 @@
     <!-- Detail Card -->
     <div
       v-if="showDetailCard"
-      class="chip-detail-card fixed max-w-75 max-h-75 border rounded-default shadow-lg z-[100000] flex flex-col overflow-hidden bg-surface-base border-border-default"
+      class="chip-detail-card rounded-default bg-surface-base border-border-default fixed z-[100000] flex max-h-75 max-w-75 flex-col overflow-hidden border shadow-lg"
       :style="{
         top: cardPosition.top + 'px',
         left: cardPosition.left + 'px',
@@ -34,7 +34,7 @@
       @click.stop
     >
       <div
-        class="card-content overflow-y-auto max-h-75 py-1 px-2 font-mono text-2xs leading-[1.5] whitespace-pre-wrap break-words text-text-body"
+        class="card-content text-2xs text-text-body max-h-75 overflow-y-auto px-2 py-1 font-mono leading-[1.5] break-words whitespace-pre-wrap"
         v-html="formatContent(detailCardContent)"
       ></div>
     </div>

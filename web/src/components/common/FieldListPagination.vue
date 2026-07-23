@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="justify-between w-full py-px px-1 border-t border-card-glass-border bg-card-glass-bg"
+    class="border-card-glass-border bg-card-glass-bg w-full justify-between border-t px-1 py-px"
     :class="showSchemaToggle || showQuickMode ? 'flex' : ''"
   >
     <!-- Schema Toggle Buttons -->
@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :model-value="useUserDefinedSchemas"
         @update:model-value="$emit('toggle-schema', $event as string)"
         :data-test="`${dataTestPrefix}-fields-list-user-defined-schema-toggle`"
-        class="schema-field-toggle p-0 mt-1"
+        class="schema-field-toggle mt-1 p-0"
       >
         <OToggleGroupItem
           v-for="opt in schemaToggleOptions"

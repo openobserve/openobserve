@@ -22,7 +22,7 @@
           name="traceIdFieldName"
           :label="t('settings.traceIdFieldName')"
           required
-          class="py-3 showLabelOnTop"
+          class="showLabelOnTop py-3"
           :help-text="t('settings.organizationSettings.fieldNameHelp')"
         />
       </div>
@@ -33,7 +33,7 @@
           name="spanIdFieldName"
           :label="t('settings.spanIdFieldName')"
           required
-          class="py-3 showLabelOnTop"
+          class="showLabelOnTop py-3"
           :help-text="t('settings.organizationSettings.fieldNameHelp')"
         />
       </div>
@@ -71,7 +71,7 @@
         />
       </template>
 
-      <div class="flex gap-2 mt-3">
+      <div class="mt-3 flex gap-2">
         <!-- <OButton
         data-test="add-alert-cancel-btn"
         variant="outline"

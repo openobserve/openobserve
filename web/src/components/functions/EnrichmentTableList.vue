@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div data-test="enrichment-tables-list-page" class="flex flex-col h-full min-h-0">
+  <div data-test="enrichment-tables-list-page" class="flex h-full min-h-0 flex-col">
     <OPageLayout
       v-if="!showAddJSTransformDialog"
       :title="t('function.enrichmentTables')"
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t(`function.addEnrichmentTable`) }}
         </OButton>
       </template>
-      <div class="w-full flex-1 min-h-0 overflow-hidden">
+      <div class="min-h-0 w-full flex-1 overflow-hidden">
         <div class="bg-card-glass-bg h-full">
           <OTable
             ref="qTable"
@@ -64,11 +64,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :selected-ids="selectedEnrichmentTableIds"
             @update:selected-ids="handleSelectedIdsUpdate"
             width="100%"
-            class="w-full h-full"
+            class="h-full w-full"
           >
             <!-- Toolbar: type filter + search -->
             <template #toolbar>
-              <div class="flex items-center gap-2 w-full">
+              <div class="flex w-full items-center gap-2">
                 <OToggleGroup
                   :model-value="selectedFilter"
                   @update:model-value="
@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template v-else>
                   <span
                     :data-test="`${row.name}-type-url-trigger`"
-                    class="cursor-pointer inline-flex items-center gap-1"
+                    class="inline-flex cursor-pointer items-center gap-1"
                     @click="showUrlJobsDialog(row)"
                   >
                     <OTag type="enrichmentType" value="url" />
@@ -287,8 +287,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #bottom>
-              <div class="flex items-center justify-between w-full py-2">
-                <div class="flex items-center text-xs font-normal mr-4">
+              <div class="flex w-full items-center justify-between py-2">
+                <div class="mr-4 flex items-center text-xs font-normal">
                   {{ resultTotal }} {{ t("function.enrichmentTables") }}
                 </div>
                 <OButton
@@ -343,21 +343,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       size="lg"
     >
       <div class="p-4">
-        <div class="flex items-center justify-between mb-4">
+        <div class="mb-4 flex items-center justify-between">
           <div class="text-xl font-semibold">URL Jobs for {{ selectedTableForUrlJobs?.name }}</div>
         </div>
         <div v-if="selectedTableForUrlJobs?.urlJobs && selectedTableForUrlJobs.urlJobs.length > 0">
-          <ul class="flex flex-col divide-y divide-border">
+          <ul class="divide-border flex flex-col divide-y">
             <li
               v-for="(job, index) in selectedTableForUrlJobs.urlJobs"
               :key="job.id"
               :data-test="`enrichment-url-jobs-item-${index}`"
               class="flex items-center gap-2 p-4"
             >
-              <div class="flex flex-col flex-1 min-w-0">
+              <div class="flex min-w-0 flex-1 flex-col">
                 <span class="text-sm font-bold">Job {{ (index as number) + 1 }}</span>
-                <span class="block text-xs text-muted-foreground">{{ job.url }}</span>
-                <span class="block text-xs text-muted-foreground mt-2">
+                <span class="text-muted-foreground block text-xs">{{ job.url }}</span>
+                <span class="text-muted-foreground mt-2 block text-xs">
                   <OTag
                     :data-test="`enrichment-url-jobs-item-${index}-status-badge`"
                     :data-test-value="job.status"
@@ -367,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <span
                   v-if="job.status === 'completed'"
-                  class="block text-xs text-muted-foreground mt-2"
+                  class="text-muted-foreground mt-2 block text-xs"
                 >
                   Records: {{ job.total_records_processed?.toLocaleString() }}<br />
                   Size:
@@ -380,7 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span
                   v-if="job.status === 'failed'"
                   :data-test="`enrichment-url-jobs-item-${index}-error`"
-                  class="block text-xs text-status-error-text mt-2"
+                  class="text-status-error-text mt-2 block text-xs"
                 >
                   Error: {{ job.error_message }}
                 </span>
@@ -388,7 +388,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </li>
           </ul>
         </div>
-        <div v-else class="text-center p-3 text-text-muted">No URL jobs found</div>
+        <div v-else class="text-text-muted p-3 text-center">No URL jobs found</div>
       </div>
     </ODrawer>
   </div>

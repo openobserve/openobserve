@@ -186,9 +186,9 @@ const triggerClasses = computed<string>(() => {
     The header (indicator circle + title) is above the indented content area.
     The connecting line is the left border on the content area.
   -->
-  <div v-if="isVertical" class="o-step flex flex-row min-w-0">
+  <div v-if="isVertical" class="o-step flex min-w-0 flex-row">
     <!-- Left column: indicator + vertical connector line -->
-    <div class="flex flex-col items-center me-3 shrink-0">
+    <div class="me-3 flex shrink-0 flex-col items-center">
       <!-- Indicator circle (the clickable trigger in vertical mode) -->
       <button
         type="button"
@@ -215,14 +215,14 @@ const triggerClasses = computed<string>(() => {
            via CSS). Turns "done" once this step is complete, so a checklist
            shows progress flowing down the rail. -->
       <div
-        class="flex-1 w-px mt-1 [.o-step:last-child_&]:hidden"
+        class="mt-1 w-px flex-1 [.o-step:last-child_&]:hidden"
         :class="done ? 'bg-stepper-connector-done' : 'bg-stepper-connector'"
         aria-hidden="true"
       />
     </div>
 
     <!-- Right column: title button + content panel -->
-    <div class="flex flex-col flex-1 min-w-0 pb-6">
+    <div class="flex min-w-0 flex-1 flex-col pb-6">
       <!-- Title row (also clickable when navigable) -->
       <button
         type="button"
@@ -231,12 +231,12 @@ const triggerClasses = computed<string>(() => {
         :aria-current="isActive ? 'step' : undefined"
         @click="handleClick"
       >
-        <span class="flex flex-col items-start min-w-0">
-          <span class="flex items-center gap-2 flex-wrap">
+        <span class="flex min-w-0 flex-col items-start">
+          <span class="flex flex-wrap items-center gap-2">
             <span :class="titleClasses">{{ title }}</span>
             <slot name="title-suffix" />
           </span>
-          <span v-if="description" class="text-xs text-text-secondary mt-0.5 leading-tight">
+          <span v-if="description" class="text-text-secondary mt-0.5 text-xs leading-tight">
             {{ description }}
           </span>
         </span>

@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="step-anomaly-config h-full">
     <div
-      class="step-content px-3 py-4 rounded-default h-full overflow-y-auto overflow-x-hidden bg-surface-overlay border border-border-default"
+      class="step-content rounded-default bg-surface-overlay border-border-default h-full overflow-x-hidden overflow-y-auto border px-3 py-4"
     >
       <OForm :form="form">
         <!-- Query Mode Tabs -->
@@ -35,8 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Filters mode -->
-        <div v-if="queryMode === 'filters'" class="flex items-start mb-4! pb-0!">
-          <div class="font-semibold flex items-center" style="width: 178px; min-height: 36px">
+        <div v-if="queryMode === 'filters'" class="mb-4! flex items-start pb-0!">
+          <div class="flex items-center font-semibold" style="width: 178px; min-height: 36px">
             {{ t("alerts.anomaly.filters") }}
           </div>
           <div style="width: calc(100% - 190px)">
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="(filter, idx) in filterRows"
               :key="idx"
-              class="flex items-center gap-2 mb-2"
+              class="mb-2 flex items-center gap-2"
             >
               <OFormSelect
                 :name="`filters[${idx}].field`"
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :loading="loadingFields"
               >
                 <template #empty>
-                  <div class="px-3 py-2 text-muted-foreground">
+                  <div class="text-muted-foreground px-3 py-2">
                     {{
                       config.stream_name
                         ? t("alerts.anomaly.noFieldsFound")
@@ -93,13 +93,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Custom SQL mode -->
-        <div v-if="queryMode === 'custom_sql'" class="flex items-start mb-4! pb-0!">
-          <div class="font-semibold flex items-center" style="width: 190px; height: 36px">
+        <div v-if="queryMode === 'custom_sql'" class="mb-4! flex items-start pb-0!">
+          <div class="flex items-center font-semibold" style="width: 190px; height: 36px">
             SQL <span class="text-status-error-text ml-1">*</span>
           </div>
           <div style="width: calc(100% - 190px)">
             <div
-              class="custom-sql-editor-wrapper h-35 rounded-default overflow-hidden border"
+              class="custom-sql-editor-wrapper rounded-default h-35 overflow-hidden border"
               :class="hasSqlError ? 'border-input-border-error' : 'border-border-default'"
             >
               <!-- Bare Monaco: value bridged into the form from the editor's
@@ -125,14 +125,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  so a whitespace-only query must light this up too. -->
             <div
               v-if="showSqlErrors && !customSql?.trim()"
-              class="text-xs text-input-error-text pt-1"
+              class="text-input-error-text pt-1 text-xs"
               data-test="anomaly-custom-sql-required-error"
             >
               {{ t("alerts.anomaly.sqlRequired") }}
             </div>
             <div
               v-if="showSqlErrors && hasTimestampAlias"
-              class="text-xs text-input-error-text pt-1"
+              class="text-input-error-text pt-1 text-xs"
               data-test="anomaly-custom-sql-timestamp-alias-error"
             >
               <!-- Can't reuse alerts.validation.timestampAliasBanned (which
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #timeBucket><code>time_bucket</code></template>
               </i18n-t>
             </div>
-            <div class="text-xs mt-1" :class="'text-text-secondary'">
+            <div class="mt-1 text-xs" :class="'text-text-secondary'">
               <i18n-t keypath="alerts.anomaly.sqlColumnsHint" tag="span">
                 <template #timeBucket><code>time_bucket</code></template>
                 <template #valueColumn><code>value</code></template>
@@ -155,11 +155,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Row: Detection Function + Detection Resolution (filters mode) -->
-        <div v-if="queryMode === 'filters'" class="grid grid-cols-2 gap-3 items-start mb-4! pb-0!">
+        <div v-if="queryMode === 'filters'" class="mb-4! grid grid-cols-2 items-start gap-3 pb-0!">
           <!-- Detection Function -->
           <div class="flex flex-row items-start gap-2">
             <div
-              class="w-42.5 min-w-42.5 min-h-8 leading-[1.4] text-[length:inherit] font-semibold"
+              class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold"
             >
               {{ t("alerts.detectionFunction") }}
               <span class="text-status-error-text ml-1">*</span>
@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="width: 140px"
               >
                 <template #empty>
-                  <div class="px-3 py-2 text-muted-foreground">
+                  <div class="text-muted-foreground px-3 py-2">
                     {{
                       config.stream_name
                         ? t("alerts.anomaly.noFieldsFound")
@@ -202,11 +202,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Detection Resolution -->
           <div class="flex flex-row items-start gap-2">
             <div
-              class="w-42.5 min-w-42.5 min-h-8 leading-[1.4] text-[length:inherit] font-semibold"
+              class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold"
             >
               {{ t("alerts.anomaly.detectionResolution") }}
               <span class="text-status-error-text ml-1">*</span>
-              <OIcon name="info" size="sm" class="ml-1 cursor-pointer text-icon-color">
+              <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
                 <OTooltip
                   side="right"
                   align="center"
@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="histogramIntervalError"
-                class="text-xs text-input-error-text pt-1"
+                class="text-input-error-text pt-1 text-xs"
                 data-test="anomaly-histogram-interval-error"
                 role="alert"
               >
@@ -251,11 +251,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Detection Resolution alone (custom_sql mode) -->
-        <div v-else class="flex items-start mb-4! pb-0!">
-          <div class="font-semibold flex items-center" style="width: 190px; height: 36px">
+        <div v-else class="mb-4! flex items-start pb-0!">
+          <div class="flex items-center font-semibold" style="width: 190px; height: 36px">
             {{ t("alerts.anomaly.detectionResolution") }}
             <span class="text-status-error-text ml-1">*</span>
-            <OIcon name="info" size="sm" class="ml-1 cursor-pointer text-icon-color">
+            <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
               <OTooltip
                 side="right"
                 align="center"
@@ -289,7 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               v-if="histogramIntervalError"
-              class="text-xs text-input-error-text pt-1"
+              class="text-input-error-text pt-1 text-xs"
               data-test="anomaly-histogram-interval-error"
               role="alert"
             >
@@ -299,15 +299,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Row: Check Every + Look Back Window -->
-        <div class="grid grid-cols-2 gap-3 items-start mb-4! pb-0!">
+        <div class="mb-4! grid grid-cols-2 items-start gap-3 pb-0!">
           <!-- Check Every -->
           <div class="flex flex-row items-start gap-2">
             <div
-              class="w-42.5 min-w-42.5 min-h-8 leading-[1.4] text-[length:inherit] font-semibold"
+              class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold"
             >
               {{ t("alerts.anomaly.checkEvery") }}
               <span class="text-status-error-text ml-1">*</span>
-              <OIcon name="info" size="sm" class="ml-1 cursor-pointer text-icon-color">
+              <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
                 <OTooltip
                   side="right"
                   align="center"
@@ -341,7 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="scheduleIntervalError"
-                class="text-xs text-input-error-text pt-1"
+                class="text-input-error-text pt-1 text-xs"
                 data-test="anomaly-schedule-interval-error"
                 role="alert"
               >
@@ -352,11 +352,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Look Back Window -->
           <div class="flex flex-row items-start gap-2">
             <div
-              class="w-42.5 min-w-42.5 min-h-8 leading-[1.4] text-[length:inherit] font-semibold"
+              class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold"
             >
               {{ t("alerts.anomaly.lookBackWindow") }}
               <span class="text-status-error-text ml-1">*</span>
-              <OIcon name="info" size="sm" class="ml-1 cursor-pointer text-icon-color">
+              <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
                 <OTooltip
                   side="right"
                   align="center"
@@ -391,7 +391,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- This is the single error message for this field. -->
               <div
                 v-if="detectionWindowError"
-                class="text-xs text-input-error-text pt-1"
+                class="text-input-error-text pt-1 text-xs"
                 data-test="anomaly-detection-window-error"
                 role="alert"
               >
@@ -402,15 +402,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Row: Training Window + Retrain Every -->
-        <div class="grid grid-cols-2 gap-3 items-start mb-4! pb-0!">
+        <div class="mb-4! grid grid-cols-2 items-start gap-3 pb-0!">
           <!-- Training Window -->
           <div class="flex flex-row items-start gap-2">
             <div
-              class="w-42.5 min-w-42.5 min-h-8 leading-[1.4] text-[length:inherit] font-semibold"
+              class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold"
             >
               {{ t("alerts.trainingWindow") }}
               <span class="text-status-error-text ml-1">*</span>
-              <OIcon name="info" size="sm" class="ml-1 cursor-pointer text-icon-color">
+              <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
                 <OTooltip side="right" align="center" max-width="300px">
                   <!-- Uses a #content slot (not :content) so the font-size
                        span survives. -->
@@ -446,10 +446,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Retrain Every -->
           <div class="flex flex-row items-start gap-2">
             <div
-              class="w-42.5 min-w-42.5 min-h-8 leading-[1.4] text-[length:inherit] font-semibold"
+              class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold"
             >
               {{ t("alerts.anomaly.retrainEvery") }}
-              <OIcon name="info" size="sm" class="ml-1 cursor-pointer text-icon-color">
+              <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
                 <OTooltip
                   side="right"
                   align="center"
@@ -471,10 +471,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Threshold / Sensitivity -->
-        <div class="flex items-start mb-4! pb-0!">
-          <div class="font-semibold flex items-center pt-1" style="width: 190px">
+        <div class="mb-4! flex items-start pb-0!">
+          <div class="flex items-center pt-1 font-semibold" style="width: 190px">
             {{ t("alerts.sensitivity") }}
-            <OIcon name="info" size="sm" class="ml-1 cursor-pointer text-icon-color">
+            <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
               <OTooltip
                 side="right"
                 align="center"
@@ -487,12 +487,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Chart + Slider container -->
             <div class="w-full">
               <!-- Header row: range labels + load button -->
-              <div class="flex items-center justify-between mb-2">
+              <div class="mb-2 flex items-center justify-between">
                 <div class="flex items-center gap-2">
-                  <span class="text-xs text-text-secondary">{{
+                  <span class="text-text-secondary text-xs">{{
                     t("alerts.anomaly.anomalyScoreRange")
                   }}</span>
-                  <span class="font-semibold text-xs" data-test="anomaly-threshold-range-label"
+                  <span class="text-xs font-semibold" data-test="anomaly-threshold-range-label"
                     >{{ thresholdRange.min ?? 0 }} – {{ thresholdRange.max }}</span
                   >
                 </div>
@@ -518,10 +518,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Chart + Vertical Slider row -->
               <div class="flex gap-3">
                 <!-- Time series chart -->
-                <div class="min-h-45 relative flex-1">
+                <div class="relative min-h-45 flex-1">
                   <div
                     v-if="!previewActive"
-                    class="w-full h-45 flex flex-col items-center justify-center rounded-default border border-dashed border-border-default"
+                    class="rounded-default border-border-default flex h-45 w-full flex-col items-center justify-center border border-dashed"
                     :class="'text-text-secondary'"
                     data-test="anomaly-sensitivity-empty"
                   >
@@ -548,7 +548,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Vertical dual-handle range slider -->
-                <div class="flex flex-col items-center w-15 shrink-0">
+                <div class="flex w-15 shrink-0 flex-col items-center">
                   <OFormRange
                     name="threshold_range"
                     :min="0"
@@ -565,7 +565,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       { value: 75, label: '75' },
                       { value: 100, label: '100' },
                     ]"
-                    class="sensitivity-range-slider mt-3.5 h-36.25! [--color-slider-track-fill:var(--color-accent)] [--color-slider-thumb:var(--color-accent)] [--color-slider-thumb-border:white] [--color-slider-value:var(--color-text-secondary)]"
+                    class="sensitivity-range-slider mt-3.5 h-36.25! [--color-slider-thumb-border:white] [--color-slider-thumb:var(--color-accent)] [--color-slider-track-fill:var(--color-accent)] [--color-slider-value:var(--color-text-secondary)]"
                     data-test="anomaly-threshold-range"
                   />
                 </div>

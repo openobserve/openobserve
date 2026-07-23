@@ -32,17 +32,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Content -->
     <div>
-      <div class="text-xs text-text-secondary mb-3" data-test="dashboard-column-order-description">
+      <div class="text-text-secondary mb-3 text-xs" data-test="dashboard-column-order-description">
         {{ t("dashboard.columnOrderDescription") }}
       </div>
 
       <!-- Empty state -->
       <div
         v-if="!editColumnOrder || editColumnOrder.length === 0"
-        class="text-center p-6 text-text-muted"
+        class="text-text-muted p-6 text-center"
         data-test="dashboard-column-order-empty-state"
       >
-        <OIcon name="view-column" class="mb-3 w-12 h-12" />
+        <OIcon name="view-column" class="mb-3 h-12 w-12" />
         <div class="text-base">{{ t("dashboard.noColumnsOrdered") }}</div>
         <div class="text-xs">
           {{ t("dashboard.columnsDefaultOrder") }}
@@ -60,12 +60,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="(column, index) in editColumnOrder"
           :key="`column-${index}`"
-          class="flex items-center px-3 py-2 mb-1 border-b border-border-default transition-colors hover:bg-surface-subtle-hover last:border-b-0"
+          class="border-border-default hover:bg-surface-subtle-hover mb-1 flex items-center border-b px-3 py-2 transition-colors last:border-b-0"
           :data-test="`column-order-row-${index}`"
         >
           <!-- Drag handle -->
           <div
-            class="cursor-move px-1 mr-2 flex items-center"
+            class="mr-2 flex cursor-move items-center px-1"
             data-test="dashboard-column-order-drag-handle"
           >
             <OIcon
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Column number -->
           <div
-            class="min-w-8 font-medium text-compact text-text-secondary"
+            class="text-compact text-text-secondary min-w-8 font-medium"
             data-test="dashboard-column-order-column-number"
           >
             {{ index + 1 }}.
@@ -85,14 +85,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Column name -->
           <div
-            class="flex-1 font-medium overflow-hidden text-ellipsis whitespace-nowrap text-compact"
+            class="text-compact flex-1 overflow-hidden font-medium text-ellipsis whitespace-nowrap"
             data-test="dashboard-column-order-column-name"
           >
             {{ column }}
           </div>
 
           <!-- Actions -->
-          <div class="flex gap-0.5 ml-2" data-test="dashboard-column-order-column-actions">
+          <div class="ml-2 flex gap-0.5" data-test="dashboard-column-order-column-actions">
             <OButton
               variant="ghost"
               size="icon"

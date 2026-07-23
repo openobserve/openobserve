@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="performance-error-dashboard" class="rounded-default relative-position">
     <div
-      class="min-h-0! max-h-[calc(100vh-200px)] overflow-y-auto"
+      class="max-h-[calc(100vh-200px)] min-h-0! overflow-y-auto"
       :class="isLoading.length ? 'invisible' : 'visible'"
     >
       <div class="performance-dashboard">
@@ -37,11 +37,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-show="isLoading.length"
-      class="pb-4 flex items-center justify-center text-center absolute w-full h-[calc(100vh-15.625rem)] top-0"
+      class="absolute top-0 flex h-[calc(100vh-15.625rem)] w-full items-center justify-center pb-4 text-center"
     >
       <div>
         <OSpinner size="md" class="mx-auto block" />
-        <div class="text-center w-full">Loading Dashboard</div>
+        <div class="w-full text-center">Loading Dashboard</div>
       </div>
     </div>
   </div>

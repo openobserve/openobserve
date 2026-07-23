@@ -46,13 +46,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >{{ t("dashboard.import") }}</OButton
       >
     </template>
-    <div class="flex w-full flex-1 min-h-0">
-      <div class="flex w-full min-w-0 min-h-0">
-        <OSplitter v-model="splitterModel" class="w-full min-w-0 h-full min-h-0">
+    <div class="flex min-h-0 w-full flex-1">
+      <div class="flex min-h-0 w-full min-w-0">
+        <OSplitter v-model="splitterModel" class="h-full min-h-0 w-full min-w-0">
           <template #before>
-            <OForm id="import-dashboard-form" :form="form" class="h-full flex flex-col min-h-0">
-              <div class="w-full h-full flex flex-col min-h-0">
-                <div class="bg-card-glass-bg py-2.5 px-page-edge mb-1 shrink-0">
+            <OForm id="import-dashboard-form" :form="form" class="flex h-full min-h-0 flex-col">
+              <div class="flex h-full min-h-0 w-full flex-col">
+                <div class="bg-card-glass-bg px-page-edge mb-1 shrink-0 py-2.5">
                   <div class="app-tabs-container h-9 w-fit">
                     <AppTabs
                       data-test="dashboard-import-type-tabs"
@@ -65,10 +65,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="activeTab == 'import_json_url'"
-                  class="editor-container-url bg-card-glass-bg py-1 flex-1 min-h-0 flex flex-col"
+                  class="editor-container-url bg-card-glass-bg flex min-h-0 flex-1 flex-col py-1"
                 >
-                  <div class="mx-2 mt-1 mb-1 flex flex-col flex-1 min-h-0">
-                    <div class="flex gap-2 w-full items-center shrink-0 w-[calc(100%_-_0.625rem)]">
+                  <div class="mx-2 mt-1 mb-1 flex min-h-0 flex-1 flex-col">
+                    <div class="flex w-[calc(100%_-_0.625rem)] w-full shrink-0 items-center gap-2">
                       <div data-test="dashboard-import-url-input" class="w-[69%]">
                         <OFormInput
                           data-test="dashboard-import-url-control"
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="dashboard-import-url-editor"
                       ref="queryEditorFileRef"
                       editor-id="dashboards-query-editor-file"
-                      class="mt-2 flex-1 min-h-0 overflow-hidden resize-none border border-card-glass-border rounded-default"
+                      class="border-card-glass-border rounded-default mt-2 min-h-0 flex-1 resize-none overflow-hidden border"
                       :debounceTime="300"
                       v-model:query="jsonStr"
                       language="json"
@@ -101,10 +101,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="activeTab == 'import_json_file'"
-                  class="dashboard-import-json-container bg-card-glass-bg py-1 flex-1 min-h-0 flex flex-col"
+                  class="dashboard-import-json-container bg-card-glass-bg flex min-h-0 flex-1 flex-col py-1"
                 >
-                  <div class="mx-2 mt-1 mb-1 flex flex-col flex-1 min-h-0">
-                    <div class="flex gap-2 w-full items-center shrink-0 w-[calc(100%_-_0.625rem)]">
+                  <div class="mx-2 mt-1 mb-1 flex min-h-0 flex-1 flex-col">
+                    <div class="flex w-[calc(100%_-_0.625rem)] w-full shrink-0 items-center gap-2">
                       <div data-test="dashboard-import-file-input" class="w-[69%]">
                         <OFormFile
                           data-test="dashboard-import-file-control"
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="dashboard-import-json-file-editor"
                       ref="queryEditorJsonRef"
                       editor-id="dashboards-query-editor-json"
-                      class="mt-2 flex-1 min-h-0 overflow-hidden resize-none border border-card-glass-border rounded-default"
+                      class="border-card-glass-border rounded-default mt-2 min-h-0 flex-1 resize-none overflow-hidden border"
                       :debounceTime="300"
                       v-model:query="jsonStr"
                       language="json"
@@ -159,14 +159,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div
               data-test="dashboard-import-error-container"
-              class="bg-card-glass-bg h-full flex flex-col min-h-0 border-l border-border-default"
+              class="bg-card-glass-bg border-border-default flex h-full min-h-0 flex-col border-l"
             >
-              <div class="text-center text-sm font-semibold text-text-heading py-3 shrink-0">
+              <div class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold">
                 {{ t("dashboard.importDashboardPage.errorValidations") }}
               </div>
               <OSeparator class="mt-1 shrink-0" />
               <div
-                class="error-section p-2.5 mb-2.5 flex-1 min-h-0 overflow-auto"
+                class="error-section mb-2.5 min-h-0 flex-1 overflow-auto p-2.5"
                 v-if="dashboardErrorsToDisplay.length > 0"
               >
                 <div class="error-reporter-container">

@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          shell's ConstrainedPage; this block adds none of its own. -->
     <div>
       <GroupHeader :title="t('settings.platformSettings')" :showIcon="false" />
-      <div class="w-full flex flex-col">
+      <div class="flex w-full flex-col">
         <OForm
           :schema="generalSettingsSchema"
           :default-values="generalSettingsDefaults"
@@ -32,9 +32,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- scape interval section -->
           <div
-            class="settings-grid-item grid grid-cols-3 gap-4 items-center py-4 border-b border-card-glass-border"
+            class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
           >
-            <span class="individual-setting-title text-sm font-medium leading-5">
+            <span class="individual-setting-title text-sm leading-5 font-medium">
               {{ t("settings.scrapintervalLabel") }}
             </span>
             <OFormInput
@@ -51,9 +51,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Max Series Per Query section -->
           <div
-            class="settings-grid-item grid grid-cols-3 gap-4 items-center py-4 border-b border-card-glass-border"
+            class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
           >
-            <span class="individual-setting-title text-sm font-medium leading-5">
+            <span class="individual-setting-title text-sm leading-5 font-medium">
               {{ t("settings.maxSeriesPerQueryLabel") }}
             </span>
             <OFormInput
@@ -78,63 +78,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Manage Theme section -->
           <div
-            class="settings-grid-item grid grid-cols-3 gap-4 items-center py-4 border-b border-card-glass-border"
+            class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
           >
-            <span class="individual-setting-title text-sm font-medium leading-5">
+            <span class="individual-setting-title text-sm leading-5 font-medium">
               {{ t("settings.manageTheme") }}
             </span>
-            <div class="flex gap-2 items-center -ml-15">
+            <div class="-ml-15 flex items-center gap-2">
               <!-- Light Mode Theme -->
               <div
-                class="group/chip inline-flex items-center gap-2 py-1.5 pr-3 pl-1.5 rounded-full cursor-pointer transition-all duration-200 bg-surface-subtle border border-border-default hover:bg-surface-subtle-hover hover:border-accent hover:-translate-y-px hover:shadow-md"
+                class="group/chip bg-surface-subtle border-border-default hover:bg-surface-subtle-hover hover:border-accent inline-flex cursor-pointer items-center gap-2 rounded-full border py-1.5 pr-3 pl-1.5 transition-all duration-200 hover:-translate-y-px hover:shadow-md"
                 @click="handleThemeChipClick('light')"
                 data-test="theme-light-chip"
               >
                 <div
-                  class="color-circle w-6 h-6 rounded-full shrink-0 flex items-center justify-center shadow-[0_1px_3px_color-mix(in_srgb,var(--color-black)_20%,transparent)] relative overflow-hidden"
+                  class="color-circle relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-[0_1px_3px_color-mix(in_srgb,var(--color-black)_20%,transparent)]"
                   :style="{ backgroundColor: customLightColor }"
                 >
                   <OIcon
                     name="palette"
                     size="xs"
-                    class="opacity-0 transition-opacity duration-200 filter-[drop-shadow(0_1px_1px_color-mix(in_srgb,var(--color-black)_30%,transparent))] group-hover/chip:opacity-90"
+                    class="opacity-0 filter-[drop-shadow(0_1px_1px_color-mix(in_srgb,var(--color-black)_30%,transparent))] transition-opacity duration-200 group-hover/chip:opacity-90"
                   />
                 </div>
-                <span class="chip-label text-2xs font-semibold opacity-50 tracking-wider">{{
+                <span class="chip-label text-2xs font-semibold tracking-wider opacity-50">{{
                   t("settings.light")
                 }}</span>
-                <span class="chip-value font-mono text-2xs font-medium opacity-70 tracking-tight">{{
+                <span class="chip-value text-2xs font-mono font-medium tracking-tight opacity-70">{{
                   customLightColor
                 }}</span>
               </div>
 
               <!-- Dark Mode Theme -->
               <div
-                class="group/chip inline-flex items-center gap-2 py-1.5 pr-3 pl-1.5 rounded-full cursor-pointer transition-all duration-200 bg-surface-subtle border border-border-default hover:bg-surface-subtle-hover hover:border-accent hover:-translate-y-px hover:shadow-md"
+                class="group/chip bg-surface-subtle border-border-default hover:bg-surface-subtle-hover hover:border-accent inline-flex cursor-pointer items-center gap-2 rounded-full border py-1.5 pr-3 pl-1.5 transition-all duration-200 hover:-translate-y-px hover:shadow-md"
                 @click="handleThemeChipClick('dark')"
                 data-test="theme-dark-chip"
               >
                 <div
-                  class="color-circle w-6 h-6 rounded-full shrink-0 flex items-center justify-center shadow-[0_1px_3px_color-mix(in_srgb,var(--color-black)_20%,transparent)] relative overflow-hidden"
+                  class="color-circle relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-[0_1px_3px_color-mix(in_srgb,var(--color-black)_20%,transparent)]"
                   :style="{ backgroundColor: customDarkColor }"
                 >
                   <OIcon
                     name="palette"
                     size="xs"
-                    class="opacity-0 transition-opacity duration-200 filter-[drop-shadow(0_1px_1px_color-mix(in_srgb,var(--color-black)_30%,transparent))] group-hover/chip:opacity-90"
+                    class="opacity-0 filter-[drop-shadow(0_1px_1px_color-mix(in_srgb,var(--color-black)_30%,transparent))] transition-opacity duration-200 group-hover/chip:opacity-90"
                   />
                 </div>
-                <span class="chip-label text-2xs font-semibold opacity-50 tracking-wider">{{
+                <span class="chip-label text-2xs font-semibold tracking-wider opacity-50">{{
                   t("settings.dark")
                 }}</span>
-                <span class="chip-value font-mono text-2xs font-medium opacity-70 tracking-tight">{{
+                <span class="chip-value text-2xs font-mono font-medium tracking-tight opacity-70">{{
                   customDarkColor
                 }}</span>
               </div>
 
               <!-- Reset Button -->
               <div
-                class="group/resetChip inline-flex items-center justify-center w-8 h-8 rounded-full cursor-pointer transition-all duration-200 bg-transparent border border-dashed border-border-default opacity-60 hover:bg-[color-mix(in_srgb,var(--color-error-500)_10%,transparent)] hover:border-error-400 hover:border-solid hover:opacity-100 hover:-translate-y-px hover:rotate-180"
+                class="group/resetChip border-border-default hover:border-error-400 inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-dashed bg-transparent opacity-60 transition-all duration-200 hover:-translate-y-px hover:rotate-180 hover:border-solid hover:bg-[color-mix(in_srgb,var(--color-error-500)_10%,transparent)] hover:opacity-100"
                 @click="resetThemeColors"
                 data-test="reset-theme-colors-btn"
               >
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip :content="t('settings.resetToDefaultColors')" side="top" />
               </div>
             </div>
-            <span class="individual-setting-description self-start text-compact opacity-70">
+            <span class="individual-setting-description text-compact self-start opacity-70">
               {{ t("settings.themeManagementDescription") }}
             </span>
           </div>
@@ -179,17 +179,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div>
         <div
-          class="settings-grid-item no-border-bottom grid grid-cols-3 gap-4 items-center py-4 border-b border-card-glass-border"
+          class="settings-grid-item no-border-bottom border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
         >
-          <span class="individual-setting-title text-sm font-medium leading-5">
+          <span class="individual-setting-title text-sm leading-5 font-medium">
             {{ t("settings.customLogoText") }}
           </span>
           <div
             v-if="editingText || store.state.zoConfig.custom_logo_text == ''"
-            class="flex gap-2 items-center"
+            class="flex items-center gap-2"
           >
             <OInput
-              class="w-62.5 mr-sm"
+              class="mr-sm w-62.5"
               data-test="settings_ent_logo_custom_text"
               v-model="customText"
             />
@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div v-else class="flex items-center">
-            <span class="w-47.5 text-center truncate"
+            <span class="w-47.5 truncate text-center"
               >{{ store.state.zoConfig.custom_logo_text || t("settings.noTextAvailable") }}
               <OTooltip
                 v-if="store.state.zoConfig.custom_logo_text.length > 20"
@@ -240,9 +240,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <!-- Light Mode Logo -->
         <div
-          class="settings-grid-item grid grid-cols-3 gap-4 items-center py-4 border-b border-card-glass-border"
+          class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
         >
-          <div class="pt-2 individual-setting-title text-sm font-medium leading-5 w-full mb-5">
+          <div class="individual-setting-title mb-5 w-full pt-2 text-sm leading-5 font-medium">
             {{ t("settings.customLogoTitle") }} ({{ t("settings.lightMode") }})
           </div>
           <div
@@ -256,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="setting_ent_custom_logo_img"
               :src="`data:image; base64, ` + store.state.zoConfig.custom_logo_img"
               :alt="t('settings.logoLabel')"
-              class="mx-3 max-w-37.5 max-h-7.75"
+              class="mx-3 max-h-7.75 max-w-37.5"
             />
             <OButton
               data-test="setting_ent_custom_logo_img_delete_btn"
@@ -277,7 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
               @rejected="onRejected"
               :help-text="t('settings.fileFormatConstraint')"
-              class="mx-0 o2-file-input"
+              class="o2-file-input mx-0"
             >
               <template v-slot:prepend>
                 <OIcon name="attach-file" size="sm" />
@@ -302,16 +302,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <span class="individual-setting-description -translate-y-1.25 text-compact opacity-70">
+          <span class="individual-setting-description text-compact -translate-y-1.25 opacity-70">
             {{ t("settings.customLogoLightDescription") }}
           </span>
         </div>
 
         <!-- Dark Mode Logo -->
         <div
-          class="settings-grid-item grid grid-cols-3 gap-4 items-center py-4 border-b border-card-glass-border"
+          class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
         >
-          <div class="pt-2 individual-setting-title text-sm font-medium leading-5 w-full mb-5">
+          <div class="individual-setting-title mb-5 w-full pt-2 text-sm leading-5 font-medium">
             {{ t("settings.customLogoTitle") }} ({{ t("settings.darkMode") }})
           </div>
           <div
@@ -325,7 +325,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="setting_ent_custom_logo_dark_img"
               :src="`data:image; base64, ` + store.state.zoConfig.custom_logo_dark_img"
               :alt="t('settings.logoLabel')"
-              class="mx-3 max-w-37.5 max-h-7.75"
+              class="mx-3 max-h-7.75 max-w-37.5"
             />
             <OButton
               data-test="setting_ent_custom_logo_dark_img_delete_btn"
@@ -346,7 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
               @rejected="onRejected"
               :help-text="t('settings.fileFormatConstraint')"
-              class="mx-0 o2-file-input"
+              class="o2-file-input mx-0"
             >
               <template v-slot:prepend>
                 <OIcon name="attach-file" size="sm" />
@@ -371,7 +371,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <span class="individual-setting-description -translate-y-1.25 text-compact opacity-70">
+          <span class="individual-setting-description text-compact -translate-y-1.25 opacity-70">
             {{ t("settings.customLogoDarkDescription") }}
           </span>
         </div>
@@ -385,32 +385,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       id="dangerZone"
       v-if="canDeleteOrg"
       data-test="general-settings-danger-zone"
-      class="mt-8 overflow-hidden rounded-default border border-banner-error-soft-border"
+      class="rounded-default border-banner-error-soft-border mt-8 overflow-hidden border"
     >
       <!-- Red-accented header signals this section is destructive. -->
       <div
-        class="flex items-center gap-2 border-b border-banner-error-soft-border bg-banner-error-soft-bg px-5 py-3"
+        class="border-banner-error-soft-border bg-banner-error-soft-bg flex items-center gap-2 border-b px-5 py-3"
       >
         <OIcon name="warning" size="sm" class="text-banner-error-soft-text" />
-        <span class="text-base font-bold text-banner-error-soft-text">
+        <span class="text-banner-error-soft-text text-base font-bold">
           {{ t("settings.dangerZone") }}
         </span>
       </div>
 
       <!-- Action row: what the action does, and the control that does it. The org
            name is interpolated so the sentence names the thing being destroyed. -->
-      <div class="flex items-start justify-between gap-6 bg-surface-base px-5 py-4">
+      <div class="bg-surface-base flex items-start justify-between gap-6 px-5 py-4">
         <div class="flex flex-col gap-1">
-          <span class="text-sm font-semibold text-text-heading">
+          <span class="text-text-heading text-sm font-semibold">
             {{ t("settings.deleteOrganizationTitle") }}
           </span>
           <i18n-t
             keypath="settings.deleteOrganizationDescription"
             tag="p"
-            class="max-w-3xl text-sm text-text-secondary"
+            class="text-text-secondary max-w-3xl text-sm"
           >
             <template #name>
-              <span class="font-semibold text-text-body">{{ deleteOrgName }}</span>
+              <span class="text-text-body font-semibold">{{ deleteOrgName }}</span>
             </template>
           </i18n-t>
         </div>
@@ -431,7 +431,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            reversibility, blast radius, who is affected, and who may do it. -->
       <div
         data-test="general-settings-delete-org-facts"
-        class="grid grid-cols-4 divide-x divide-border-default border-t border-border-default bg-surface-base"
+        class="divide-border-default border-border-default bg-surface-base grid grid-cols-4 divide-x border-t"
       >
         <div
           v-for="fact in deleteOrgFacts"
@@ -440,10 +440,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex flex-col gap-1 px-5 py-4"
         >
           <div class="flex items-center gap-2">
-            <OIcon :name="fact.icon" size="sm" class="shrink-0 text-text-muted" />
-            <span class="text-sm font-semibold text-text-heading">{{ fact.title }}</span>
+            <OIcon :name="fact.icon" size="sm" class="text-text-muted shrink-0" />
+            <span class="text-text-heading text-sm font-semibold">{{ fact.title }}</span>
           </div>
-          <span class="text-xs text-text-secondary">{{ fact.detail }}</span>
+          <span class="text-text-secondary text-xs">{{ fact.detail }}</span>
         </div>
       </div>
     </div>
@@ -494,7 +494,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="flex flex-col gap-3">
       <!-- What will happen -->
-      <p class="text-sm text-text-body">
+      <p class="text-text-body text-sm">
         {{
           t("settings.deleteOrganizationConfirm", {
             name: deleteOrgName,
@@ -505,27 +505,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Blast radius in concrete numbers. Fetched only when this dialog opens
            (see fetchOrgScope) and treated as contextual — if it fails to load the
            delete flow still works, the user just decides without the counts. -->
-      <p v-if="orgScopeLoading" class="text-xs text-text-secondary">
+      <p v-if="orgScopeLoading" class="text-text-secondary text-xs">
         {{ t("settings.deleteOrganizationScopeLoading") }}
       </p>
       <p
         v-else-if="orgScope"
         data-test="general-delete-org-scope"
-        class="text-xs font-semibold text-text-body"
+        class="text-text-body text-xs font-semibold"
       >
         {{ orgScope }}
       </p>
 
       <!-- Irreversible-action warning callout -->
       <div
-        class="flex items-start gap-2 rounded-default border border-banner-error-soft-border bg-banner-error-soft-bg px-3 py-2"
+        class="rounded-default border-banner-error-soft-border bg-banner-error-soft-bg flex items-start gap-2 border px-3 py-2"
       >
-        <OIcon name="warning" size="sm" class="mt-0.5 shrink-0 text-banner-error-soft-text" />
+        <OIcon name="warning" size="sm" class="text-banner-error-soft-text mt-0.5 shrink-0" />
         <div class="flex flex-col gap-1">
-          <p class="text-xs text-banner-error-soft-text">
+          <p class="text-banner-error-soft-text text-xs">
             {{ t("settings.deleteOrganizationWarning") }}
           </p>
-          <p class="text-xs text-banner-error-soft-text">
+          <p class="text-banner-error-soft-text text-xs">
             {{ t("settings.deleteOrganizationRecoverable") }}
           </p>
         </div>
@@ -533,10 +533,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Type-to-confirm gate -->
       <div class="flex flex-col gap-1">
-        <label class="block text-xs text-text-secondary">
+        <label class="text-text-secondary block text-xs">
           <i18n-t keypath="settings.deleteOrganizationTypeToConfirm" tag="span">
             <template #name>
-              <span class="font-semibold text-text-body">{{ deleteOrgName }}</span>
+              <span class="text-text-body font-semibold">{{ deleteOrgName }}</span>
             </template>
           </i18n-t>
         </label>

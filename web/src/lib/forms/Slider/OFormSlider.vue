@@ -50,7 +50,7 @@ if (import.meta.env.DEV && !form) {
             <slot name="label" />
           </template>
         </OSlider>
-        <div v-if="field.state.meta.errors.length > 0" class="text-xs text-slider-error-text">
+        <div v-if="field.state.meta.errors.length > 0" class="text-slider-error-text text-xs">
           {{ firstFieldError(field.state.meta.errors) }}
         </div>
       </div>

@@ -29,22 +29,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #output-content>
       <div
-        class="w-full h-full flex flex-col border-l border-border-default"
+        class="border-border-default flex h-full w-full flex-col border-l"
         style="min-width: 400px"
       >
         <div
           v-if="modelPricingErrorsToDisplay.length > 0"
-          class="text-center text-sm font-semibold text-text-heading py-3 shrink-0"
+          class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"
         >
           {{ t("modelPricing.errorValidations") }}
         </div>
-        <div v-else class="text-center text-sm font-semibold text-text-heading py-3 shrink-0">
+        <div v-else class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold">
           {{ t("modelPricing.outputMessages") }}
         </div>
         <OSeparator class="mt-1 shrink-0" />
-        <div class="flex-1 min-h-0 overflow-auto resize-none">
+        <div class="min-h-0 flex-1 resize-none overflow-auto">
           <!-- Model Pricing Errors Section -->
-          <div class="p-2.5 mb-2.5" v-if="modelPricingErrorsToDisplay.length > 0">
+          <div class="mb-2.5 p-2.5" v-if="modelPricingErrorsToDisplay.length > 0">
             <div>
               <div v-for="(errorGroup, index) in modelPricingErrorsToDisplay" :key="index">
                 <div
@@ -98,9 +98,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="p-2.5 mb-2.5" v-if="modelPricingCreators.length > 0">
+          <div class="mb-2.5 p-2.5" v-if="modelPricingCreators.length > 0">
             <div
-              class="text-base mb-2.5 uppercase text-primary"
+              class="text-primary mb-2.5 text-base uppercase"
               data-test="model-pricing-import-creation-title"
             >
               {{ t("modelPricing.modelPricingCreation") }}
@@ -114,13 +114,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 :class="{
                   'py-1.25 text-sm font-bold': true,
-                  'text-green ': val.success,
+                  'text-green': val.success,
                   'text-status-negative': !val.success,
                 }"
                 :data-test="`model-pricing-import-creation-${index}-message`"
               >
                 <pre
-                  class="creators-message whitespace-pre-wrap max-w-full"
+                  class="creators-message max-w-full whitespace-pre-wrap"
                   style="word-wrap: break-word; overflow-wrap: break-word; word-break: break-word"
                   >{{ val.message }}</pre
                 >

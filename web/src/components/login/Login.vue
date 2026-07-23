@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="bg-card-glass-bg w-[100vw] h-[100vh]">
+  <div class="bg-card-glass-bg h-[100vh] w-[100vw]">
     <div style="max-width: 400px; padding-top: 100px" class="mx-auto p-3">
       <div
         class="flex justify-center text-center"
@@ -33,10 +33,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
             store.state.zoConfig?.custom_logo_text != ''
           "
-          class="text-xl font-semibold font-bold p-0 cursor-pointer mr-2 w-full"
+          class="mr-2 w-full cursor-pointer p-0 text-xl font-bold font-semibold"
           >{{ store.state.zoConfig.custom_logo_text }}</span
         >
-        <span class="w-full flex justify-center">
+        <span class="flex w-full justify-center">
           <img
             v-if="
               store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         />
       </div>
-      <div class="flex justify-center mb-4" v-else>
+      <div class="mb-4 flex justify-center" v-else>
         <img
           class="appLogo h-auto"
           :style="store.state.zoConfig.custom_logo_text != '' ? 'width: 150px;' : 'width: 250px;'"
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div v-else>
-        <div style="font-size: var(--text-xl)" class="w-full text-center pb-3">Login</div>
+        <div style="font-size: var(--text-xl)" class="w-full pb-3 text-center">Login</div>
 
         <div v-if="showSSO" class="flex justify-center">
           <OButton
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="width: 400px"
             @click="loginWithSSo"
           >
-            <div class="flex items-center justify-center w-full text-center relative">
+            <div class="relative flex w-full items-center justify-center text-center">
               <img
                 class="absolute"
                 style="width: 30px; left: 16px"
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div v-if="showSSO && showInternalLogin" class="py-3 text-center">
           <a
-            class="cursor-pointer py-3 hover:text-text-secondary"
+            class="hover:text-text-secondary cursor-pointer py-3"
             style="text-decoration: underline"
             data-test="login-as-internal-user"
             @click="loginAsInternalUser = !loginAsInternalUser"

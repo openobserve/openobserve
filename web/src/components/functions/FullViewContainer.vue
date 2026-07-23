@@ -1,5 +1,5 @@
 <template>
-  <div class="py-0.5 bg-section-header-bg">
+  <div class="bg-section-header-bg py-0.5">
     <div
       class="flex justify-between"
       :class="{ 'items-center': minHeaderHeight }"
@@ -10,13 +10,13 @@
           v-if="showExpandIcon"
           name="keyboard-arrow-up"
           @click.stop="expanded = !expanded"
-          class="mr-1 cursor-pointer transition-all text-text-secondary"
-          :class="expanded ? 'transform rotate-180' : ''"
+          class="text-text-secondary mr-1 cursor-pointer transition-all"
+          :class="expanded ? 'rotate-180 transform' : ''"
           size="md"
         />
         <div
           @click="showExpandIcon ? (expanded = !expanded) : null"
-          class="text-sm font-bold text-text-secondary"
+          class="text-text-secondary text-sm font-bold"
           :class="labelClass"
         >
           {{ label }}

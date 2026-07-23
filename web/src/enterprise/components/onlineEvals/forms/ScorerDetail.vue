@@ -11,7 +11,7 @@
     @update:open="handleOpenChange"
   >
     <!-- Body: the KPI strip + tab bar stay pinned; only the tab content scrolls. -->
-    <div class="flex flex-col h-full min-h-0">
+    <div class="flex h-full min-h-0 flex-col">
       <!-- ── Global window control ── -->
       <!-- A single date picker drives the WHOLE detail view — the KPI strip
            and the Runs table share this one window. Placed above the cards
@@ -42,7 +42,7 @@
            consistent. Pinned band (shrink-0) with a bottom divider; the cards
            below carry their own chrome via Tailwind. -->
       <section
-        class="shrink-0 grid grid-cols-4 gap-2.5 px-5 py-4 border-b border-b-dialog-header-border"
+        class="border-b-dialog-header-border grid shrink-0 grid-cols-4 gap-2.5 border-b px-5 py-4"
       >
         <!-- While the KPI query is in flight, show skeleton tiles in place of
              the cards (matches the LLM Insights dashboard pattern). -->
@@ -51,16 +51,16 @@
           v-for="card in kpiCards"
           v-else
           :key="card.label"
-          class="rounded-default flex flex-col px-3.5 pt-2.5 pb-2.5 gap-1 bg-surface-base border border-border-default transition-shadow duration-200 hover:shadow-md"
+          class="rounded-default bg-surface-base border-border-default flex flex-col gap-1 border px-3.5 pt-2.5 pb-2.5 transition-shadow duration-200 hover:shadow-md"
         >
-          <div class="kpi-label text-2xs leading-normal font-semibold mb-1 text-text-secondary">
+          <div class="kpi-label text-2xs text-text-secondary mb-1 leading-normal font-semibold">
             {{ card.label }}
           </div>
           <div class="flex items-baseline gap-0.75">
-            <span class="text-2xl font-bold leading-none text-text-secondary">
+            <span class="text-text-secondary text-2xl leading-none font-bold">
               {{ card.value }}
             </span>
-            <span v-if="card.unit" class="text-compact font-semibold text-text-secondary">
+            <span v-if="card.unit" class="text-compact text-text-secondary font-semibold">
               {{ card.unit }}
             </span>
           </div>
@@ -95,21 +95,21 @@
 
       <!-- ── Body ── -->
       <div
-        class="flex-1 overflow-auto flex flex-col gap-4.5 min-h-0 pt-4.5"
+        class="flex min-h-0 flex-1 flex-col gap-4.5 overflow-auto pt-4.5"
         :class="{ 'pb-4.5': activeTab !== 'runs' }"
       >
         <!-- Runs filter row — agent filter, right-aligned. The date picker +
              refresh live in the global toolbar above the cards, so they're not
              duplicated here. Rendered once with v-show (not v-if) so it never
              remounts on tab switch. -->
-        <div v-show="runsEnabled" class="flex items-center justify-end gap-2 flex-wrap px-5">
+        <div v-show="runsEnabled" class="flex flex-wrap items-center justify-end gap-2 px-5">
           <div class="w-56 shrink-0">
             <OSelect
               v-model="agentKey"
               :options="agentOptions"
               labelKey="label"
               valueKey="value"
-              class="w-full rounded-default"
+              class="rounded-default w-full"
               data-test="scorer-detail-runs-agent-filter"
             />
           </div>
@@ -152,7 +152,7 @@
 
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-1.5 inline-flex items-center gap-1.5 text-compact font-semibold leading-normal text-text-heading border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-normal font-semibold"
             >
               {{ t("onlineEvals.scorer.detail.producesSection") }}
             </h4>
@@ -173,7 +173,7 @@
 
           <section v-if="row.template" class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-1.5 inline-flex items-center gap-1.5 text-compact font-semibold leading-normal text-text-heading border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-normal font-semibold"
             >
               {{
                 scorerType === "llm_judge"
@@ -190,7 +190,7 @@
 
           <section v-if="outputSchemaPretty" class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-1.5 inline-flex items-center gap-1.5 text-compact font-semibold leading-normal text-text-heading border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-normal font-semibold"
             >
               {{ t("onlineEvals.scorer.detail.outputSchemaSection") }}
             </h4>
@@ -199,7 +199,7 @@
 
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-1.5 inline-flex items-center gap-1.5 text-compact font-semibold leading-normal text-text-heading border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-normal font-semibold"
             >
               {{ t("onlineEvals.scorer.detail.metadataSection") }}
             </h4>

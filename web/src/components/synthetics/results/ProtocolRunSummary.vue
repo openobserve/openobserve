@@ -203,7 +203,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionDef
             variant="default"
             size="sm"
             icon="link"
-            class="truncate max-w-60"
+            class="max-w-60 truncate"
           >
             {{ run.target }}
           </OBadge>
@@ -211,7 +211,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionDef
       </OPageHeader>
     </template>
 
-    <div class="flex-1 min-h-0 overflow-y-auto px-page-edge py-4">
+    <div class="px-page-edge min-h-0 flex-1 overflow-y-auto py-4">
       <OSkeleton v-if="loading" class="h-80 w-full" />
 
       <OEmptyState
@@ -220,18 +220,18 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionDef
         :title="t('synthetics.protocolRun.notFound')"
       />
 
-      <div v-else class="max-w-[53.75rem] flex flex-col gap-4">
+      <div v-else class="flex max-w-[53.75rem] flex-col gap-4">
         <!-- ── Result ── -->
-        <div class="rounded-default border border-border-default">
-          <div class="flex items-center border-b border-border-default py-2 px-3">
-            <div class="w-[0.1875rem] h-4 rounded-default mr-2 shrink-0 bg-primary-600" />
-            <h3 class="text-base font-semibold text-text-heading">
+        <div class="rounded-default border-border-default border">
+          <div class="border-border-default flex items-center border-b px-3 py-2">
+            <div class="rounded-default bg-primary-600 mr-2 h-4 w-[0.1875rem] shrink-0" />
+            <h3 class="text-text-heading text-base font-semibold">
               {{ t("synthetics.protocolRun.result") }}
             </h3>
           </div>
-          <div class="px-3 py-3 grid grid-cols-2 gap-3">
-            <div class="flex flex-col gap-1.5 p-3 rounded-default bg-surface-subtle">
-              <span class="text-xs text-text-muted">{{ t("synthetics.protocolRun.status") }}</span>
+          <div class="grid grid-cols-2 gap-3 px-3 py-3">
+            <div class="rounded-default bg-surface-subtle flex flex-col gap-1.5 p-3">
+              <span class="text-text-muted text-xs">{{ t("synthetics.protocolRun.status") }}</span>
               <span class="flex items-center gap-2">
                 <OBadge :variant="statusMeta.variant" size="sm" :icon="statusMeta.icon">{{
                   statusMeta.label
@@ -243,34 +243,34 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionDef
             </div>
             <div
               v-if="run.statusCode != null"
-              class="flex flex-col gap-1.5 p-3 rounded-default bg-surface-subtle"
+              class="rounded-default bg-surface-subtle flex flex-col gap-1.5 p-3"
             >
-              <span class="text-xs text-text-muted">{{
+              <span class="text-text-muted text-xs">{{
                 t("synthetics.protocolRun.statusCode")
               }}</span>
               <span class="text-sm font-medium">{{ run.statusCode }}</span>
             </div>
-            <div class="flex flex-col gap-1.5 p-3 rounded-default bg-surface-subtle">
-              <span class="text-xs text-text-muted">{{
+            <div class="rounded-default bg-surface-subtle flex flex-col gap-1.5 p-3">
+              <span class="text-text-muted text-xs">{{
                 t("synthetics.protocolRun.responseTime")
               }}</span>
               <span class="text-sm font-medium">{{ fmtMs(run.responseTimeMs) }}</span>
             </div>
             <div
               v-if="run.responseBytes != null"
-              class="flex flex-col gap-1.5 p-3 rounded-default bg-surface-subtle"
+              class="rounded-default bg-surface-subtle flex flex-col gap-1.5 p-3"
             >
-              <span class="text-xs text-text-muted">{{
+              <span class="text-text-muted text-xs">{{
                 t("synthetics.protocolRun.responseSize")
               }}</span>
               <span class="text-sm font-medium">{{ fmtBytes(run.responseBytes) }}</span>
             </div>
             <div
               v-if="run.error"
-              class="col-span-2 flex flex-col gap-1.5 p-3 rounded-default bg-surface-subtle"
+              class="rounded-default bg-surface-subtle col-span-2 flex flex-col gap-1.5 p-3"
             >
-              <span class="text-xs text-text-muted">{{ t("synthetics.protocolRun.error") }}</span>
-              <span class="text-sm font-medium text-status-error-text break-all">{{
+              <span class="text-text-muted text-xs">{{ t("synthetics.protocolRun.error") }}</span>
+              <span class="text-status-error-text text-sm font-medium break-all">{{
                 run.error
               }}</span>
             </div>
@@ -278,34 +278,34 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionDef
         </div>
 
         <!-- ── Timing breakdown ── -->
-        <div v-if="timingBars.length" class="rounded-default border border-border-default">
-          <div class="flex items-center border-b border-border-default py-2 px-3">
-            <div class="w-[0.1875rem] h-4 rounded-default mr-2 shrink-0 bg-primary-600" />
-            <h3 class="text-base font-semibold text-text-heading">
+        <div v-if="timingBars.length" class="rounded-default border-border-default border">
+          <div class="border-border-default flex items-center border-b px-3 py-2">
+            <div class="rounded-default bg-primary-600 mr-2 h-4 w-[0.1875rem] shrink-0" />
+            <h3 class="text-text-heading text-base font-semibold">
               {{ t("synthetics.protocolRun.timings") }}
             </h3>
           </div>
-          <div class="px-3 py-3 flex flex-col gap-2">
+          <div class="flex flex-col gap-2 px-3 py-3">
             <div v-for="bar in timingBars" :key="bar.phase" class="flex items-center gap-2">
-              <span class="w-20 shrink-0 text-xs text-text-secondary">{{
+              <span class="text-text-secondary w-20 shrink-0 text-xs">{{
                 t(`synthetics.protocolRun.phase.${bar.phase}`)
               }}</span>
-              <div class="flex-1 h-3 rounded-default bg-surface-subtle overflow-hidden">
+              <div class="rounded-default bg-surface-subtle h-3 flex-1 overflow-hidden">
                 <div
-                  class="h-full rounded-default bg-primary-600"
+                  class="rounded-default bg-primary-600 h-full"
                   :style="{ width: bar.pct + '%' }"
                 />
               </div>
-              <span class="w-[4.5rem] shrink-0 text-right text-xs text-text-secondary">{{
+              <span class="text-text-secondary w-[4.5rem] shrink-0 text-right text-xs">{{
                 fmtMs(bar.ms)
               }}</span>
             </div>
-            <div class="flex items-center gap-2 pt-1 border-t border-border-default">
-              <span class="w-20 shrink-0 text-xs font-semibold text-text-body">{{
+            <div class="border-border-default flex items-center gap-2 border-t pt-1">
+              <span class="text-text-body w-20 shrink-0 text-xs font-semibold">{{
                 t("synthetics.protocolRun.phase.total")
               }}</span>
               <div class="flex-1" />
-              <span class="w-[4.5rem] shrink-0 text-right text-xs font-semibold text-text-body">{{
+              <span class="text-text-body w-[4.5rem] shrink-0 text-right text-xs font-semibold">{{
                 fmtMs(run.totalMs)
               }}</span>
             </div>
@@ -313,10 +313,10 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionDef
         </div>
 
         <!-- ── Assertions (http) ── -->
-        <div v-if="showAssertions" class="rounded-default border border-border-default">
-          <div class="flex items-center border-b border-border-default py-2 px-3">
-            <div class="w-[0.1875rem] h-4 rounded-default mr-2 shrink-0 bg-primary-600" />
-            <h3 class="text-base font-semibold text-text-heading">
+        <div v-if="showAssertions" class="rounded-default border-border-default border">
+          <div class="border-border-default flex items-center border-b px-3 py-2">
+            <div class="rounded-default bg-primary-600 mr-2 h-4 w-[0.1875rem] shrink-0" />
+            <h3 class="text-text-heading text-base font-semibold">
               {{ t("synthetics.protocolRun.assertions") }}
             </h3>
             <OBadge
@@ -331,11 +331,11 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionDef
               }}
             </OBadge>
           </div>
-          <ul class="px-3 py-2 flex flex-col gap-1">
+          <ul class="flex flex-col gap-1 px-3 py-2">
             <li
               v-for="(a, i) in assertionRows"
               :key="i"
-              class="flex items-center gap-2 text-sm py-1"
+              class="flex items-center gap-2 py-1 text-sm"
               :data-test="`synthetics-protocol-run-assertion-${i}`"
             >
               <OBadge
@@ -349,14 +349,14 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionDef
         </div>
 
         <!-- ── TLS certificate ── -->
-        <div v-if="certExpiryDate" class="rounded-default border border-border-default">
-          <div class="flex items-center border-b border-border-default py-2 px-3">
-            <div class="w-[0.1875rem] h-4 rounded-default mr-2 shrink-0 bg-primary-600" />
-            <h3 class="text-base font-semibold text-text-heading">
+        <div v-if="certExpiryDate" class="rounded-default border-border-default border">
+          <div class="border-border-default flex items-center border-b px-3 py-2">
+            <div class="rounded-default bg-primary-600 mr-2 h-4 w-[0.1875rem] shrink-0" />
+            <h3 class="text-text-heading text-base font-semibold">
               {{ t("synthetics.protocolRun.tlsCert") }}
             </h3>
           </div>
-          <div class="px-3 py-3 flex items-center gap-2 text-sm">
+          <div class="flex items-center gap-2 px-3 py-3 text-sm">
             <span>{{ t("synthetics.protocolRun.certExpires", { date: certExpiryDate }) }}</span>
             <OBadge
               v-if="certDaysRemaining != null"
@@ -369,22 +369,22 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionDef
         </div>
 
         <!-- ── Probe ── -->
-        <div class="rounded-default border border-border-default">
-          <div class="flex items-center border-b border-border-default py-2 px-3">
-            <div class="w-[0.1875rem] h-4 rounded-default mr-2 shrink-0 bg-primary-600" />
-            <h3 class="text-base font-semibold text-text-heading">
+        <div class="rounded-default border-border-default border">
+          <div class="border-border-default flex items-center border-b px-3 py-2">
+            <div class="rounded-default bg-primary-600 mr-2 h-4 w-[0.1875rem] shrink-0" />
+            <h3 class="text-text-heading text-base font-semibold">
               {{ t("synthetics.protocolRun.probe") }}
             </h3>
           </div>
-          <div class="px-3 py-3 grid grid-cols-2 gap-3 text-sm">
-            <div class="flex flex-col gap-1.5 p-3 rounded-default bg-surface-subtle">
-              <span class="text-xs text-text-muted">{{
+          <div class="grid grid-cols-2 gap-3 px-3 py-3 text-sm">
+            <div class="rounded-default bg-surface-subtle flex flex-col gap-1.5 p-3">
+              <span class="text-text-muted text-xs">{{
                 t("synthetics.protocolRun.location")
               }}</span>
               <span class="font-medium">{{ run.location || "—" }}</span>
             </div>
-            <div class="flex flex-col gap-1.5 p-3 rounded-default bg-surface-subtle">
-              <span class="text-xs text-text-muted">{{ t("synthetics.protocolRun.runtime") }}</span>
+            <div class="rounded-default bg-surface-subtle flex flex-col gap-1.5 p-3">
+              <span class="text-text-muted text-xs">{{ t("synthetics.protocolRun.runtime") }}</span>
               <span class="font-medium"
                 >{{ run.runtime || "—" }}
                 <span v-if="run.initMs" class="text-text-muted"
@@ -392,16 +392,16 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionDef
                 ></span
               >
             </div>
-            <div class="flex flex-col gap-1.5 p-3 rounded-default bg-surface-subtle">
-              <span class="text-xs text-text-muted">{{ t("synthetics.protocolRun.probeId") }}</span>
+            <div class="rounded-default bg-surface-subtle flex flex-col gap-1.5 p-3">
+              <span class="text-text-muted text-xs">{{ t("synthetics.protocolRun.probeId") }}</span>
               <span class="font-mono text-xs break-all">{{ run.probeId || "—" }}</span>
             </div>
-            <div class="flex flex-col gap-1.5 p-3 rounded-default bg-surface-subtle">
-              <span class="text-xs text-text-muted">{{ t("synthetics.protocolRun.trigger") }}</span>
+            <div class="rounded-default bg-surface-subtle flex flex-col gap-1.5 p-3">
+              <span class="text-text-muted text-xs">{{ t("synthetics.protocolRun.trigger") }}</span>
               <span class="font-medium">{{ run.triggerType }}</span>
             </div>
-            <div class="col-span-2 flex flex-col gap-1.5 p-3 rounded-default bg-surface-subtle">
-              <span class="text-xs text-text-muted">{{
+            <div class="rounded-default bg-surface-subtle col-span-2 flex flex-col gap-1.5 p-3">
+              <span class="text-text-muted text-xs">{{
                 t("synthetics.protocolRun.timeline")
               }}</span>
               <span class="text-xs">

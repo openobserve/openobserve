@@ -368,7 +368,7 @@ watch(internalOpen, (open) => {
           'bg-dialog-overlay',
           'data-[state=open]:animate-in data-[state=open]:fade-in-0',
           'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
-          'data-[state=open]:duration-110 data-[state=closed]:duration-90',
+          'data-[state=closed]:duration-90 data-[state=open]:duration-110',
         ]"
       />
 
@@ -383,7 +383,7 @@ watch(internalOpen, (open) => {
           // `transform`-based -translate utilities) so the zoom animation —
           // which drives `transform` — composes cleanly and the panel scales
           // from true center instead of sliding diagonally.
-          'fixed left-1/2 top-1/2 [translate:-50%_-50%]',
+          'fixed top-1/2 left-1/2 [translate:-50%_-50%]',
           // Layout — flex-col so header/footer stick and only body scrolls
           'flex flex-col overflow-hidden',
           // Size
@@ -391,13 +391,13 @@ watch(internalOpen, (open) => {
           // Non-full: cap height so the flex structure actually clips
           !isFullSize && 'max-h-[90vh]',
           // Surface
-          'bg-dialog-bg border border-dialog-border',
+          'bg-dialog-bg border-dialog-border border',
           !isFullSize && 'rounded-surface',
           'shadow-dialog',
           // Typography
           'text-dialog-content-text',
           // Focus ring
-          'outline-none focus-visible:ring-2 focus-visible:ring-dialog-focus-ring',
+          'focus-visible:ring-dialog-focus-ring outline-none focus-visible:ring-2',
           // Animation — single-direction rise: slides up from ~24px below while
           // fading in, soft ease-out-expo settle (150ms); fades + drops back out
           // (100ms). No scale, so nothing squishes — it just glides into place.
@@ -429,31 +429,31 @@ watch(internalOpen, (open) => {
         <div
           v-if="hasHeader"
           :class="[
-            'flex items-center gap-2 shrink-0',
+            'flex shrink-0 items-center gap-2',
             'px-dialog-header-px py-dialog-header-py',
             'bg-dialog-header-bg text-dialog-header-text',
-            'border-b border-dialog-header-border',
+            'border-dialog-header-border border-b',
             !isFullSize && 'rounded-t-surface',
           ]"
         >
           <!-- CASE 1: Full override — backward compat, sub-slots are ignored -->
-          <div v-if="slots.header" class="flex-1 min-w-0">
+          <div v-if="slots.header" class="min-w-0 flex-1">
             <slot name="header" />
           </div>
 
           <!-- CASE 2: Default / structured layout -->
           <template v-else>
             <!-- Title + subtitle block — fixed width, never grows -->
-            <div v-if="title || subTitle" class="shrink-0 min-w-0">
+            <div v-if="title || subTitle" class="min-w-0 shrink-0">
               <span
                 v-if="title"
-                class="text-base font-semibold text-dialog-header-text truncate block"
+                class="text-dialog-header-text block truncate text-base font-semibold"
               >
                 {{ title }}
               </span>
               <span
                 v-if="subTitle"
-                class="text-sm text-dialog-content-text opacity-70 truncate block mt-0.5"
+                class="text-dialog-content-text mt-0.5 block truncate text-sm opacity-70"
               >
                 {{ subTitle }}
               </span>
@@ -462,7 +462,7 @@ watch(internalOpen, (open) => {
             <!-- #header-left sub-slot — grows to fill space, content flows left-to-right after title -->
             <div
               v-if="slots['header-left']"
-              class="flex-1 min-w-0 flex items-center justify-start gap-2"
+              class="flex min-w-0 flex-1 items-center justify-start gap-2"
             >
               <slot name="header-left" />
             </div>
@@ -471,7 +471,7 @@ watch(internalOpen, (open) => {
             <div v-if="!slots['header-left']" class="flex-1" />
 
             <!-- #header-right sub-slot — shrinks to content width, anchored just before the close button -->
-            <div v-if="slots['header-right']" class="shrink-0 flex items-center gap-2">
+            <div v-if="slots['header-right']" class="flex shrink-0 items-center gap-2">
               <slot name="header-right" />
             </div>
           </template>
@@ -484,13 +484,13 @@ watch(internalOpen, (open) => {
               data-test="o-dialog-close-btn"
               @mousedown.prevent
               :class="[
-                'shrink-0 flex items-center justify-center',
-                'h-7 w-7 rounded-default',
+                'flex shrink-0 items-center justify-center',
+                'rounded-default h-7 w-7',
                 'text-dialog-close-text',
                 'hover:bg-dialog-close-hover-bg',
                 'active:bg-dialog-close-active-bg',
                 'transition-colors duration-150',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dialog-focus-ring',
+                'focus-visible:ring-dialog-focus-ring focus-visible:ring-2 focus-visible:outline-none',
                 'cursor-pointer',
               ]"
             >
@@ -543,7 +543,7 @@ watch(internalOpen, (open) => {
             'shrink-0',
             'px-dialog-footer-px py-dialog-footer-py',
             'bg-dialog-footer-bg',
-            'border-t border-dialog-footer-border',
+            'border-dialog-footer-border border-t',
             !isFullSize && 'rounded-b-surface',
           ]"
         >

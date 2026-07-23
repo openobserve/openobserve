@@ -17,10 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="bg-surface-panel h-full flex flex-col pb-1 border-r border-border-default">
+  <div class="bg-surface-panel border-border-default flex h-full flex-col border-r pb-1">
     <div class="folder-header bg-transparent">
       <div
-        class="font-semibold text-sm text-text-heading pl-page-edge pr-1.5 py-2 flex items-center justify-between gap-2"
+        class="text-text-heading pl-page-edge flex items-center justify-between gap-2 py-2 pr-1.5 text-sm font-semibold"
       >
         {{ t("dashboard.folders") }}
         <div>
@@ -62,12 +62,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="onTabClick(tab.folderId)"
         >
           <div
-            class="folder-item w-full flex items-center justify-between flex-nowrap gap-2 min-h-6 group/row"
+            class="folder-item group/row flex min-h-6 w-full flex-nowrap items-center justify-between gap-2"
             :data-test="`dashboard-folder-tab-name-${tab.name}`"
           >
-            <div class="flex items-center gap-1.5 flex-1 min-w-0">
+            <div class="flex min-w-0 flex-1 items-center gap-1.5">
               <span
-                class="folder-name min-w-0 text-left truncate"
+                class="folder-name min-w-0 truncate text-left"
                 :title="tab.name"
                 :data-test="`dashboard-folder-name-${tab.name}`"
                 >{{ tab.name }}</span
@@ -76,12 +76,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="tab.folderId === FAVORITES_FOLDER_ID"
                 name="star"
                 size="sm"
-                class="shrink-0 text-favorite"
+                class="text-favorite shrink-0"
               />
             </div>
             <div
               v-if="tab.folderId.toLowerCase() != 'default' && tab.folderId !== FAVORITES_FOLDER_ID"
-              class="hidden group-hover/row:flex has-[[data-state=open]]:flex items-center shrink-0"
+              class="hidden shrink-0 items-center group-hover/row:flex has-[[data-state=open]]:flex"
             >
               <ODropdown side="bottom" align="start">
                 <template #trigger>

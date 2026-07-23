@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="create-destination-form">
     <OForm
       :form="form"
-      class="w-full pipeline-add-remote-destination-form"
+      class="pipeline-add-remote-destination-form w-full"
       v-slot="{ isSubmitting }"
     >
       <!-- Stepper for Create New Destination.
@@ -31,15 +31,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OStepper v-model="step" ref="stepper" animated>
           <!-- Step 1: Choose Destination Type -->
           <OStep :name="1" title="Choose Type" icon="edit" :done="step > 1" :navigable="step > 1">
-            <div class="text-sm font-medium mb-3">
+            <div class="mb-3 text-sm font-medium">
               Select Destination Type <span class="text-status-error-text">*</span>
             </div>
-            <div class="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3 mb-4">
+            <div class="mb-4 grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3">
               <div
                 v-for="destType in destinationTypes"
                 :key="destType.value"
                 :data-test="`destination-type-card-${destType.value}`"
-                class="destination-type-card group relative flex flex-col items-center justify-center py-5 px-3 border-2 rounded-default cursor-pointer [transition:all_0.3s_ease] min-h-30 hover:-translate-y-0.5 hover:border-card-glass-border hover:shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-status-info-text)_15%,transparent)]"
+                class="destination-type-card group rounded-default hover:border-card-glass-border relative flex min-h-30 cursor-pointer flex-col items-center justify-center border-2 px-3 py-5 [transition:all_0.3s_ease] hover:-translate-y-0.5 hover:shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-status-info-text)_15%,transparent)]"
                 :class="
                   destinationType === destType.value
                     ? 'selected border-card-glass-border bg-status-info-bg shadow-[0_0.25rem_1rem_color-mix(in_srgb,var(--color-status-info-text)_20%,transparent)]'
@@ -51,22 +51,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="destType.image"
                   :src="destType.image"
                   :alt="destType.label"
-                  class="w-12 h-12 mb-2 object-contain [transition:all_0.3s_ease]"
+                  class="mb-2 h-12 w-12 object-contain [transition:all_0.3s_ease]"
                 />
                 <OIcon
                   v-else
                   :name="destType.icon"
                   size="lg"
-                  class="card-icon mb-2 text-icon-color [transition:color_0.3s_ease] group-[.selected]:text-card-glass-border"
+                  class="card-icon text-icon-color group-[.selected]:text-card-glass-border mb-2 [transition:color_0.3s_ease]"
                 />
                 <div
-                  class="card-label text-compact font-medium text-center leading-[1.3] mt-1 text-text-body group-[.selected]:text-text-body"
+                  class="card-label text-compact text-text-body group-[.selected]:text-text-body mt-1 text-center leading-[1.3] font-medium"
                 >
                   {{ destType.label }}
                 </div>
                 <div
                   v-if="destinationType === destType.value"
-                  class="absolute top-1.5 right-1.5 w-5 h-5 rounded-full overflow-hidden bg-status-positive text-text-inverse flex items-center justify-center z-[1]"
+                  class="bg-status-positive text-text-inverse absolute top-1.5 right-1.5 z-[1] flex h-5 w-5 items-center justify-center overflow-hidden rounded-full"
                 >
                   <!-- eslint-disable-next-line vue/max-attributes-per-line -->
                   <OIcon name="check" size="xs" />
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :done="step > 2"
             :navigable="step > 2"
           >
-            <div class="text-sm font-medium mb-4">Connection Details</div>
+            <div class="mb-4 text-sm font-medium">Connection Details</div>
 
             <div class="flex flex-col gap-4">
               <!-- Name is the destination's identifier — it can't be changed once
@@ -192,8 +192,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Destination-specific Metadata Section -->
-            <div v-if="showMetadataFields" class="flex flex-col gap-4 mt-4">
-              <div class="w-full text-sm font-bold text-input-label">Metadata Configuration</div>
+            <div v-if="showMetadataFields" class="mt-4 flex flex-col gap-4">
+              <div class="text-input-label w-full text-sm font-bold">Metadata Configuration</div>
 
               <!-- Splunk Metadata Fields -->
               <template v-if="destinationType === 'splunk'">
@@ -267,9 +267,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </div>
 
-            <div class="flex flex-col gap-1 mt-4">
+            <div class="mt-4 flex flex-col gap-1">
               <div
-                class="o-input-label text-compact font-medium leading-tight text-input-label-text flex items-center"
+                class="o-input-label text-compact text-input-label-text flex items-center leading-tight font-medium"
               >
                 Headers
               </div>
@@ -291,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       tabindex="0"
                     />
                   </div>
-                  <div class="w-1/6 headers-btns">
+                  <div class="headers-btns w-1/6">
                     <OButton
                       :data-test="`add-destination-header-${header['key']}-delete-btn`"
                       variant="ghost-destructive"
@@ -314,7 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <div class="w-full mt-3 inline-flex">
+            <div class="mt-3 inline-flex w-full">
               <OFormSwitch
                 data-test="add-destination-skip-tls-verify-toggle"
                 name="skip_tls_verify"
@@ -324,17 +324,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Connection Notes Card -->
             <OCard
-              class="connection-notes-card rounded-default border border-banner-info-border mb-6 mt-4 bg-banner-info-bg!"
+              class="connection-notes-card rounded-default border-banner-info-border bg-banner-info-bg! mt-4 mb-6 border"
             >
               <OCardSection role="body">
-                <div class="flex items-center mb-2">
+                <div class="mb-2 flex items-center">
                   <OIcon name="info" size="md" class="mr-2" />
                   <div class="text-sm font-medium">
                     {{ connectionNotes.title }}
                   </div>
                 </div>
                 <div class="text-sm">
-                  <ol class="leading-[1.8] pl-3 mb-0">
+                  <ol class="mb-0 pl-3 leading-[1.8]">
                     <li
                       v-for="(stepText, index) in connectionNotes.steps"
                       :key="index"
@@ -345,10 +345,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </ol>
                   <div
                     v-if="connectionNotes.example"
-                    class="mt-2 p-2 rounded-default text-compact bg-surface-base"
+                    class="rounded-default text-compact bg-surface-base mt-2 p-2"
                   >
                     <strong>Example:</strong>
-                    <code class="ml-1 bg-transparent p-0 font-mono text-text-link">{{
+                    <code class="text-text-link ml-1 bg-transparent p-0 font-mono">{{
                       connectionNotes.example
                     }}</code>
                   </div>
@@ -360,7 +360,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Form buttons -->
-      <div class="flex justify-start mb-3 pt-4 border-t border-border-default">
+      <div class="border-border-default mb-3 flex justify-start border-t pt-4">
         <div v-if="step === 1" class="flex gap-2">
           <OButton
             data-test="step1-cancel-btn"

@@ -16,10 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <div data-test="error-tags-title" class="text-base font-bold ml-1">{{ t("rum.tags") }}</div>
+    <div data-test="error-tags-title" class="ml-1 text-base font-bold">{{ t("rum.tags") }}</div>
     <div class="flex items-center">
       <div class="mr-4 items-center">
-        <img :src="ip" :alt="t('rum.ipLabel')" class="mr-2 inline-block w-[1.875rem]! h-auto!" />
+        <img :src="ip" :alt="t('rum.ipLabel')" class="mr-2 inline-block h-auto! w-[1.875rem]!" />
         <div class="inline-block">
           <div class="pl-1">{{ t("rum.ipLabel") }}</div>
           <span class="pl-1"> {{ error.ip }} </span>
@@ -46,11 +46,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div class="inline-block">
           <div class="pl-1">{{ error.user_agent_os_family }}</div>
-          <div class="pl-1 flex">{{ getOsVersion }}</div>
+          <div class="flex pl-1">{{ getOsVersion }}</div>
         </div>
       </div>
     </div>
-    <div class="flex items-center flex-wrap mt-3">
+    <div class="mt-3 flex flex-wrap items-center">
       <template v-for="(value, tag) in getTags" :key="tag">
         <ErrorTag :tag="{ key: tag, value }" />
       </template>

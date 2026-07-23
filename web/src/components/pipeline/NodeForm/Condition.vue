@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="o-drawer-close-btn"
         @mousedown.prevent
         @click="openCancelDialog"
-        class="shrink-0 flex items-center justify-center h-7 w-7 rounded-default text-dialog-close-text hover:bg-dialog-close-hover-bg active:bg-dialog-close-active-bg transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-dialog-focus-ring cursor-pointer"
+        class="rounded-default text-dialog-close-text hover:bg-dialog-close-hover-bg active:bg-dialog-close-active-bg focus-visible:ring-dialog-focus-ring flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center transition-colors duration-150 focus-visible:ring-2 focus-visible:outline-none"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -61,11 +61,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <div
       data-test="add-condition-section"
-      class="stream-routing-section w-full min-h-full bg-surface-base"
+      class="stream-routing-section bg-surface-base min-h-full w-full"
     >
-      <div class="w-full rounded-default stream-routing-container">
+      <div class="rounded-default stream-routing-container w-full">
         <div>
-          <div class="showLabelOnTop font-bold text-h7" data-test="add-condition-query-input-title">
+          <div class="showLabelOnTop text-h7 font-bold" data-test="add-condition-query-input-title">
             <div></div>
             <!-- SHARED body: the same ConditionBuilder the workflow Condition node
                renders. It owns the FilterGroup, the V0/V1→V2 conversion, the zod
@@ -81,30 +81,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #guidelines>
                 <div
-                  class="note-container bg-banner-warning-bg text-banner-warning-text w-full rounded-default p-3 my-3 flex flex-col gap-2"
+                  class="note-container bg-banner-warning-bg text-banner-warning-text rounded-default my-3 flex w-full flex-col gap-2 p-3"
                   data-test="add-condition-note-container"
                 >
                   <div
-                    class="text-sm text-banner-warning-text"
+                    class="text-banner-warning-text text-sm"
                     data-test="add-condition-note-heading"
                   >
                     Condition value Guidelines:
                   </div>
                   <div
-                    class="flex flex-col gap-1 text-sm text-banner-warning-text"
+                    class="text-banner-warning-text flex flex-col gap-1 text-sm"
                     data-test="add-condition-note-info"
                   >
                     <div class="flex items-start gap-2">
                       <OIcon
                         name="info"
                         size="sm"
-                        class="shrink-0 mt-0.5 text-status-warning-text"
+                        class="text-status-warning-text mt-0.5 shrink-0"
                       />
                       <span>
                         To check for an empty value, use
-                        <span class="highlight font-bold text-text-link">""</span>. Example:
+                        <span class="highlight text-text-link font-bold">""</span>. Example:
                         <span
-                          class="code font-mono py-px px-1 rounded-default bg-code-bg text-code-text"
+                          class="code rounded-default bg-code-bg text-code-text px-1 py-px font-mono"
                           >app_name != ""</span
                         >
                       </span>
@@ -113,13 +113,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OIcon
                         name="info"
                         size="sm"
-                        class="shrink-0 mt-0.5 text-status-warning-text"
+                        class="text-status-warning-text mt-0.5 shrink-0"
                       />
                       <span>
                         To check for an Null value, use
-                        <span class="highlight font-bold text-text-link">null</span>. Example:
+                        <span class="highlight text-text-link font-bold">null</span>. Example:
                         <span
-                          class="code font-mono py-px px-1 rounded-default bg-code-bg text-code-text"
+                          class="code rounded-default bg-code-bg text-code-text px-1 py-px font-mono"
                           >app_name != null</span
                         >
                       </span>
@@ -128,18 +128,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OIcon
                         name="info"
                         size="sm"
-                        class="shrink-0 mt-0.5 text-status-warning-text"
+                        class="text-status-warning-text mt-0.5 shrink-0"
                       />
                       <span>
                         To add a custom column, type column name and press
-                        <span class="highlight font-bold text-text-link">Enter</span>.
+                        <span class="highlight text-text-link font-bold">Enter</span>.
                       </span>
                     </div>
                     <div class="flex items-start gap-2">
                       <OIcon
                         name="warning"
                         size="sm"
-                        class="shrink-0 mt-0.5 text-status-error-text"
+                        class="text-status-error-text mt-0.5 shrink-0"
                       />
                       <span>If conditions are not met, the record will be dropped.</span>
                     </div>
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OIcon
                         name="warning"
                         size="sm"
-                        class="shrink-0 mt-0.5 text-status-error-text"
+                        class="text-status-error-text mt-0.5 shrink-0"
                       />
                       <span
                         >If the record does not have the specified field, it will be dropped.</span

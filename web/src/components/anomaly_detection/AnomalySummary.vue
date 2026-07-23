@@ -15,25 +15,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="h-full flex flex-col relative">
+  <div class="relative flex h-full flex-col">
     <div
-      class="text-compact leading-[2.2] flex-1 overflow-y-auto p-4"
+      class="text-compact flex-1 overflow-y-auto p-4 leading-[2.2]"
       ref="summaryContainer"
       @scroll="checkScrollState"
     >
       <p
         v-if="summaryText"
-        class="summary-text m-0 whitespace-pre-line tracking-[0.03em]"
+        class="summary-text m-0 tracking-[0.03em] whitespace-pre-line"
         v-html="summaryText"
       />
       <p v-else class="m-0 italic opacity-60">Fill in the setup step to see a summary.</p>
     </div>
 
-    <div v-show="showScrollToBottom" class="absolute bottom-5 right-5 z-1000 pointer-events-none">
+    <div v-show="showScrollToBottom" class="pointer-events-none absolute right-5 bottom-5 z-1000">
       <OButton
         variant="ghost"
         size="icon-sm"
-        class="pointer-events-auto backdrop-blur-sm shadow-[0_2px_8px_rgba(0,0,0,0.2)] !border-2 !border-accent !text-accent !bg-surface-overlay"
+        class="!border-accent !text-accent !bg-surface-overlay pointer-events-auto !border-2 shadow-[0_2px_8px_rgba(0,0,0,0.2)] backdrop-blur-sm"
         data-test="anomaly-summary-scroll-btn"
         @click="scrollToBottom"
       >

@@ -54,9 +54,9 @@
           <div
             v-for="(series, index) in editColorBySeries"
             :key="index"
-            class="flex items-center justify-between mb-2"
+            class="mb-2 flex items-center justify-between"
           >
-            <div class="cursor-move p-2 self-center">
+            <div class="cursor-move self-center p-2">
               <OIcon
                 name="drag-indicator"
                 size="sm"
@@ -64,8 +64,8 @@
                 :data-test="`dashboard-addpanel-config-color-by-series-drag-handle-${index}`"
               />
             </div>
-            <div class="flex items-center justify-between flex-1 gap-x-3">
-              <div class="flex-1 min-w-0">
+            <div class="flex flex-1 items-center justify-between gap-x-3">
+              <div class="min-w-0 flex-1">
                 <OFormCombobox
                   :name="`series[${index}].value`"
                   :items="seriesDataItems"
@@ -80,10 +80,10 @@
 
               <!-- Color Picker -->
               <div
-                class="flex items-center shrink-0"
+                class="flex shrink-0 items-center"
                 :data-test="`dashboard-addpanel-config-color-by-series-color-section-${index}`"
               >
-                <div v-if="series.color !== null" class="items-center flex gap-1">
+                <div v-if="series.color !== null" class="flex items-center gap-1">
                   <OFormColor
                     :name="`series[${index}].color`"
                     class="flex-1"

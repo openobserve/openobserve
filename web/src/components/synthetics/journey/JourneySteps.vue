@@ -204,7 +204,7 @@ function handleUpdateExpanded(ids: string[]) {
 
 <template>
   <OTable
-    class="border-t border-table-row-divider"
+    class="border-table-row-divider border-t"
     :data="data"
     :columns="columns"
     row-key="id"
@@ -242,7 +242,7 @@ function handleUpdateExpanded(ids: string[]) {
     <!-- ── cell-screenshot: Thumbnail (results mode) ───────────── -->
     <template v-if="mode === 'results'" #cell-screenshot="{ row }">
       <div
-        class="w-18 h-12 shrink-0 rounded-default border border-border-default bg-surface-subtle flex items-center justify-center overflow-hidden"
+        class="rounded-default border-border-default bg-surface-subtle flex h-12 w-18 shrink-0 items-center justify-center overflow-hidden border"
       >
         <slot name="screenshot-thumb" :row="row">
           <OIcon name="image" size="xs" class="text-text-secondary" />
@@ -252,14 +252,14 @@ function handleUpdateExpanded(ids: string[]) {
 
     <!-- ── cell-details: Step content (both modes) ─────────────── -->
     <template #cell-details="{ row }">
-      <div class="flex items-center gap-2 min-w-0">
+      <div class="flex min-w-0 items-center gap-2">
         <!-- Step number (editor mode — circle during replay, plain text otherwise) -->
         <span
           v-if="mode === 'editor'"
           :class="[
             getDotState(row) ? dotClass(getDotState(row)) : '',
             'shrink-0 tabular-nums',
-            getDotState(row) ? '' : 'text-sm text-text-muted w-6 text-center',
+            getDotState(row) ? '' : 'text-text-muted w-6 text-center text-sm',
           ]"
         >
           <OSpinner
@@ -274,7 +274,7 @@ function handleUpdateExpanded(ids: string[]) {
         <!-- Selection is handled by OTable's built-in checkbox column when selection="multiple" -->
 
         <!-- Action icon chip -->
-        <span class="bg-primary-50 rounded-default p-1 shrink-0 flex items-center">
+        <span class="bg-primary-50 rounded-default flex shrink-0 items-center p-1">
           <OIcon :name="actionIcon(row)" size="sm" class="text-primary-500" aria-hidden="true" />
         </span>
 
@@ -284,14 +284,14 @@ function handleUpdateExpanded(ids: string[]) {
         </div>
 
         <!-- Step display name -->
-        <span class="text-sm text-text-body flex-1 truncate min-w-0">
+        <span class="text-text-body min-w-0 flex-1 truncate text-sm">
           {{ stepName(row) }}
         </span>
 
         <!-- Selector/value preview (editor mode only) -->
         <span
           v-if="mode === 'editor' && stepDetail(row)"
-          class="font-mono text-xs text-text-secondary truncate max-w-[25%] shrink-0"
+          class="text-text-secondary max-w-[25%] shrink-0 truncate font-mono text-xs"
         >
           {{ stepDetail(row) }}
         </span>
@@ -304,20 +304,20 @@ function handleUpdateExpanded(ids: string[]) {
         :value="((row as any).duration ?? 0) / Math.max((row as any)._totalDuration ?? 1, 1)"
         :variant="(row as any).status === 'fail' ? 'danger' : 'default'"
         size="xs"
-        class="w-20! shrink-0 h-2!"
+        class="h-2! w-20! shrink-0"
       />
     </template>
 
     <!-- ── cell-duration: Duration text (results mode) ─────────── -->
     <template v-if="mode === 'results'" #cell-duration="{ row }">
-      <span class="text-xs text-text-secondary shrink-0 font-mono tabular-nums">
+      <span class="text-text-secondary shrink-0 font-mono text-xs tabular-nums">
         {{ (row as any).durStr ?? "" }}
       </span>
     </template>
 
     <!-- ── cell-actions: Row action buttons (editor mode) ──────── -->
     <template v-if="mode === 'editor'" #cell-actions="{ row }">
-      <div class="flex items-center gap-0.5 shrink-0" :class="{ invisible: isLocked }">
+      <div class="flex shrink-0 items-center gap-0.5" :class="{ invisible: isLocked }">
         <!-- Expand/collapse is handled by OTable's built-in expand button when expansion="multiple" -->
 
         <OButton

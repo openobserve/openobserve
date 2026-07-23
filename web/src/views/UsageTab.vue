@@ -18,12 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Main content when data exists -->
     <div
       v-if="!no_data_ingest && !isLoadingSummary"
-      class="w-full h-full flex flex-col overflow-y-auto px-page-edge pt-2 pb-1"
+      class="px-page-edge flex h-full w-full flex-col overflow-y-auto pt-2 pb-1"
     >
       <!-- Banners — each component renders nothing when inactive, so this whole
            block collapses to zero height (no reserved margin) when idle; the
            gap below only appears when a banner is actually shown. -->
-      <div class="shrink-0 flex flex-col gap-2 empty:hidden not-empty:mb-3">
+      <div class="flex shrink-0 flex-col gap-2 not-empty:mb-3 empty:hidden">
         <TrialPeriod></TrialPeriod>
         <LicensePeriod
           v-if="!showUsageReportBanner"
@@ -35,15 +35,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Streams — data-volume metrics. Uniform, non-clickable stat tiles; the
            list is reached from the section header so the row stays consistent. -->
-      <div class="flex items-center justify-between mb-2">
+      <div class="mb-2 flex items-center justify-between">
         <div class="flex items-center gap-2">
           <span
-            class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text"
+            class="rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
             aria-hidden="true"
           >
             <OIcon name="window" size="sm" />
           </span>
-          <span class="text-base font-semibold text-text-heading">{{ t("home.streams") }}</span>
+          <span class="text-text-heading text-base font-semibold">{{ t("home.streams") }}</span>
         </div>
         <OButton
           v-if="canView('logstreams')"
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ></router-link>
         </OButton>
       </div>
-      <KpiCardRow class="shrink-0 mb-4" min-width="12rem">
+      <KpiCardRow class="mb-4 shrink-0" min-width="12rem">
         <!-- Streams -->
         <KpiCard
           :label="t('home.streams')"
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #value>
             <span
-              class="text-2xl font-semibold text-text-heading tabular-nums leading-tight"
+              class="text-text-heading text-2xl leading-tight font-semibold tabular-nums"
               aria-live="polite"
               data-test="home-usage-tab-streams-count"
               >{{ animatedStreamsCount || summary.streams_count }}</span
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #value>
             <span
-              class="text-2xl font-semibold text-text-heading tabular-nums leading-tight"
+              class="text-text-heading text-2xl leading-tight font-semibold tabular-nums"
               aria-live="polite"
               data-test="home-usage-tab-events-count"
               >{{ formattedAnimatedEventsCount }}</span
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #value>
             <span
-              class="text-2xl font-semibold text-text-heading tabular-nums leading-tight"
+              class="text-text-heading text-2xl leading-tight font-semibold tabular-nums"
               aria-live="polite"
               data-test="home-usage-tab-ingested-size"
               >{{ formattedAnimatedIngestedSize }}</span
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #value>
             <span
-              class="text-2xl font-semibold text-text-heading tabular-nums leading-tight"
+              class="text-text-heading text-2xl leading-tight font-semibold tabular-nums"
               aria-live="polite"
               data-test="home-usage-tab-compressed-size"
               >{{ formattedAnimatedCompressedSize }}</span
@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #value>
             <span
-              class="text-2xl font-semibold text-text-heading tabular-nums leading-tight"
+              class="text-text-heading text-2xl leading-tight font-semibold tabular-nums"
               aria-live="polite"
               data-test="home-usage-tab-index-size"
               >{{ formattedAnimatedIndexSize }}</span
@@ -164,23 +164,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            Functions/Dashboards live somewhere purposeful and the vertical space
            is actually used. Rail carries counts + one-click access to every area. -->
       <div
-        class="grid grid-cols-1 lg:grid-cols-[16rem_minmax(0,1fr)_minmax(0,1fr)] gap-3 flex-1 min-h-0"
+        class="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[16rem_minmax(0,1fr)_minmax(0,1fr)]"
       >
         <!-- Resources rail -->
         <aside
-          class="rounded-default p-4 bg-card-glass-bg border border-card-glass-border flex flex-col min-h-0 overflow-y-auto"
+          class="rounded-default bg-card-glass-bg border-card-glass-border flex min-h-0 flex-col overflow-y-auto border p-4"
           aria-label="Resources"
         >
           <!-- Resources — owned assets with live counts. Each row is gated to the
                same route the left nav uses, so it hides when access is missing. -->
           <template v-if="showResources">
-            <div class="text-sm font-semibold text-text-heading mb-1">
+            <div class="text-text-heading mb-1 text-sm font-semibold">
               {{ t("home.resources") }}
             </div>
             <nav class="flex flex-col">
               <router-link
                 v-if="canView('functionList')"
-                class="group flex items-center gap-2.5 rounded-default -mx-2 px-2 py-2 no-underline text-inherit transition-colors hover:bg-table-row-hover-bg"
+                class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors"
                 :to="{
                   name: 'functionList',
                   query: { org_identifier: store.state.selectedOrganization?.identifier },
@@ -188,28 +188,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="home-usage-tab-functions-card"
               >
                 <span
-                  class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text"
+                  class="rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
                   aria-hidden="true"
                 >
                   <OIcon name="function" size="sm" />
                 </span>
-                <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{
+                <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">{{
                   t("home.functionTitle")
                 }}</span>
                 <span
-                  class="text-sm font-semibold text-text-heading tabular-nums"
+                  class="text-text-heading text-sm font-semibold tabular-nums"
                   data-test="home-usage-tab-functions-count"
                   >{{ animatedFunctionCount || summary.function_count }}</span
                 >
                 <OIcon
                   name="chevron-right"
                   size="sm"
-                  class="shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-text-secondary"
+                  class="text-text-disabled group-hover:text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
                 />
               </router-link>
               <router-link
                 v-if="canView('dashboards')"
-                class="group flex items-center gap-2.5 rounded-default -mx-2 px-2 py-2 no-underline text-inherit transition-colors hover:bg-table-row-hover-bg"
+                class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors"
                 :to="{
                   name: 'dashboards',
                   query: { org_identifier: store.state.selectedOrganization?.identifier },
@@ -217,23 +217,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="home-usage-tab-dashboards-card"
               >
                 <span
-                  class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text"
+                  class="rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
                   aria-hidden="true"
                 >
                   <OIcon name="dashboard" size="sm" />
                 </span>
-                <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{
+                <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">{{
                   t("home.dashboardTitle")
                 }}</span>
                 <span
-                  class="text-sm font-semibold text-text-heading tabular-nums"
+                  class="text-text-heading text-sm font-semibold tabular-nums"
                   data-test="home-usage-tab-dashboards-count"
                   >{{ animatedDashboardCount || summary.dashboard_count }}</span
                 >
                 <OIcon
                   name="chevron-right"
                   size="sm"
-                  class="shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-text-secondary"
+                  class="text-text-disabled group-hover:text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
                 />
               </router-link>
             </nav>
@@ -241,19 +241,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div
             v-if="showResources && showExplore"
-            class="h-px bg-border-default my-3"
+            class="bg-border-default my-3 h-px"
             role="separator"
           ></div>
 
           <!-- Explore — data surfaces. Same per-route gating as above. -->
           <template v-if="showExplore">
-            <div class="text-xs font-semibold text-text-secondary mb-1">
+            <div class="text-text-secondary mb-1 text-xs font-semibold">
               {{ t("home.explore") }}
             </div>
             <nav class="flex flex-col">
               <router-link
                 v-if="canView('logs')"
-                class="group flex items-center gap-2.5 rounded-default -mx-2 px-2 py-2 no-underline text-inherit transition-colors hover:bg-table-row-hover-bg"
+                class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors"
                 :to="{
                   name: 'logs',
                   query: { org_identifier: store.state.selectedOrganization?.identifier },
@@ -261,23 +261,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="home-usage-tab-explore-logs"
               >
                 <span
-                  class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-success-bg text-icon-chip-success-text"
+                  class="rounded-default bg-icon-chip-success-bg text-icon-chip-success-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
                   aria-hidden="true"
                 >
                   <OIcon name="search" size="sm" />
                 </span>
-                <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{
+                <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">{{
                   t("menu.search")
                 }}</span>
                 <OIcon
                   name="chevron-right"
                   size="sm"
-                  class="shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-text-secondary"
+                  class="text-text-disabled group-hover:text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
                 />
               </router-link>
               <router-link
                 v-if="canView('traces')"
-                class="group flex items-center gap-2.5 rounded-default -mx-2 px-2 py-2 no-underline text-inherit transition-colors hover:bg-table-row-hover-bg"
+                class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors"
                 :to="{
                   name: 'traces',
                   query: { org_identifier: store.state.selectedOrganization?.identifier },
@@ -285,23 +285,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="home-usage-tab-explore-traces"
               >
                 <span
-                  class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text"
+                  class="rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
                   aria-hidden="true"
                 >
                   <OIcon name="account-tree" size="sm" />
                 </span>
-                <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{
+                <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">{{
                   t("menu.traces")
                 }}</span>
                 <OIcon
                   name="chevron-right"
                   size="sm"
-                  class="shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-text-secondary"
+                  class="text-text-disabled group-hover:text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
                 />
               </router-link>
               <router-link
                 v-if="canView('metrics')"
-                class="group flex items-center gap-2.5 rounded-default -mx-2 px-2 py-2 no-underline text-inherit transition-colors hover:bg-table-row-hover-bg"
+                class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors"
                 :to="{
                   name: 'metrics',
                   query: { org_identifier: store.state.selectedOrganization?.identifier },
@@ -309,23 +309,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="home-usage-tab-explore-metrics"
               >
                 <span
-                  class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-success-bg text-icon-chip-success-text"
+                  class="rounded-default bg-icon-chip-success-bg text-icon-chip-success-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
                   aria-hidden="true"
                 >
                   <OIcon name="bar-chart" size="sm" />
                 </span>
-                <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{
+                <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">{{
                   t("menu.metrics")
                 }}</span>
                 <OIcon
                   name="chevron-right"
                   size="sm"
-                  class="shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-text-secondary"
+                  class="text-text-disabled group-hover:text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
                 />
               </router-link>
               <router-link
                 v-if="canView('RUM')"
-                class="group flex items-center gap-2.5 rounded-default -mx-2 px-2 py-2 no-underline text-inherit transition-colors hover:bg-table-row-hover-bg"
+                class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors"
                 :to="{
                   name: 'RUM',
                   query: { org_identifier: store.state.selectedOrganization?.identifier },
@@ -333,23 +333,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="home-usage-tab-explore-rum"
               >
                 <span
-                  class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text"
+                  class="rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
                   aria-hidden="true"
                 >
                   <OIcon name="devices" size="sm" />
                 </span>
-                <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{
+                <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">{{
                   t("menu.rum")
                 }}</span>
                 <OIcon
                   name="chevron-right"
                   size="sm"
-                  class="shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-text-secondary"
+                  class="text-text-disabled group-hover:text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
                 />
               </router-link>
               <router-link
                 v-if="canView('incidentList')"
-                class="group flex items-center gap-2.5 rounded-default -mx-2 px-2 py-2 no-underline text-inherit transition-colors hover:bg-table-row-hover-bg"
+                class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors"
                 :to="{
                   name: 'incidentList',
                   query: { org_identifier: store.state.selectedOrganization?.identifier },
@@ -357,23 +357,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="home-usage-tab-explore-incidents"
               >
                 <span
-                  class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text"
+                  class="rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
                   aria-hidden="true"
                 >
                   <OIcon name="notifications-active" size="sm" />
                 </span>
-                <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{
+                <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">{{
                   t("menu.incidents")
                 }}</span>
                 <OIcon
                   name="chevron-right"
                   size="sm"
-                  class="shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-text-secondary"
+                  class="text-text-disabled group-hover:text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
                 />
               </router-link>
               <router-link
                 v-if="canView('reports')"
-                class="group flex items-center gap-2.5 rounded-default -mx-2 px-2 py-2 no-underline text-inherit transition-colors hover:bg-table-row-hover-bg"
+                class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors"
                 :to="{
                   name: 'reports',
                   query: { org_identifier: store.state.selectedOrganization?.identifier },
@@ -381,18 +381,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="home-usage-tab-explore-reports"
               >
                 <span
-                  class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text"
+                  class="rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
                   aria-hidden="true"
                 >
                   <OIcon name="description" size="sm" />
                 </span>
-                <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{
+                <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">{{
                   t("menu.report")
                 }}</span>
                 <OIcon
                   name="chevron-right"
                   size="sm"
-                  class="shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-text-secondary"
+                  class="text-text-disabled group-hover:text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
                 />
               </router-link>
             </nav>
@@ -401,13 +401,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Alerts -->
         <section
-          class="rounded-default p-4 bg-card-glass-bg border border-card-glass-border flex flex-col min-h-0"
+          class="rounded-default bg-card-glass-bg border-card-glass-border flex min-h-0 flex-col border p-4"
           aria-label="Alerts overview section"
         >
-          <div class="flex justify-between items-center gap-2">
-            <span class="text-sm font-semibold text-text-heading flex items-center gap-2">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-text-heading flex items-center gap-2 text-sm font-semibold">
               <span
-                class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text"
+                class="rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text inline-flex h-10 w-10 shrink-0 items-center justify-center"
                 aria-hidden="true"
               >
                 <OIcon name="shield-alert-outline" size="md" />
@@ -435,11 +435,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ></router-link>
             </OButton>
           </div>
-          <div class="flex pt-3 gap-4">
+          <div class="flex gap-4 pt-3">
             <div class="flex flex-col gap-0.5">
-              <span class="text-xs text-text-secondary">{{ t("home.scheduledAlert") }}</span>
+              <span class="text-text-secondary text-xs">{{ t("home.scheduledAlert") }}</span>
               <span
-                class="text-lg font-semibold text-text-heading tabular-nums leading-tight"
+                class="text-text-heading text-lg leading-tight font-semibold tabular-nums"
                 aria-live="polite"
                 data-test="home-usage-tab-scheduled-alerts-count"
                 >{{ animatedScheduledAlerts || summary.scheduled_alerts }}</span
@@ -447,33 +447,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <OSeparator :vertical="true" />
             <div class="flex flex-col gap-0.5">
-              <span class="text-xs text-text-secondary">{{ t("home.rtAlert") }}</span>
+              <span class="text-text-secondary text-xs">{{ t("home.rtAlert") }}</span>
               <span
-                class="text-lg font-semibold text-text-heading tabular-nums leading-tight"
+                class="text-text-heading text-lg leading-tight font-semibold tabular-nums"
                 aria-live="polite"
                 data-test="home-usage-tab-rt-alerts-count"
                 >{{ animatedRtAlerts || summary.rt_alerts }}</span
               >
             </div>
           </div>
-          <div class="flex-1 min-h-50 w-full mt-3">
+          <div class="mt-3 min-h-50 w-full flex-1">
             <CustomChartRenderer
               :key="alertsPanelDataKey"
               :data="alertsPanelData"
-              class="w-full h-full"
+              class="h-full w-full"
             />
           </div>
         </section>
 
         <!-- Pipelines -->
         <section
-          class="rounded-default p-4 bg-card-glass-bg border border-card-glass-border flex flex-col min-h-0"
+          class="rounded-default bg-card-glass-bg border-card-glass-border flex min-h-0 flex-col border p-4"
           aria-label="Pipelines overview section"
         >
-          <div class="flex justify-between items-center gap-2">
-            <span class="text-sm font-semibold text-text-heading flex items-center gap-2">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-text-heading flex items-center gap-2 text-sm font-semibold">
               <span
-                class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text"
+                class="rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text inline-flex h-10 w-10 shrink-0 items-center justify-center"
                 aria-hidden="true"
               >
                 <OIcon name="lan" size="md" />
@@ -501,11 +501,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ></router-link>
             </OButton>
           </div>
-          <div class="flex pt-3 gap-4">
+          <div class="flex gap-4 pt-3">
             <div class="flex flex-col gap-0.5">
-              <span class="text-xs text-text-secondary">{{ t("home.schedulePipelineTitle") }}</span>
+              <span class="text-text-secondary text-xs">{{ t("home.schedulePipelineTitle") }}</span>
               <span
-                class="text-lg font-semibold text-text-heading tabular-nums leading-tight"
+                class="text-text-heading text-lg leading-tight font-semibold tabular-nums"
                 aria-live="polite"
                 data-test="home-usage-tab-scheduled-pipelines-count"
                 >{{ animatedScheduledPipelines || summary.scheduled_pipelines }}</span
@@ -513,20 +513,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <OSeparator :vertical="true" />
             <div class="flex flex-col gap-0.5">
-              <span class="text-xs text-text-secondary">{{ t("home.rtPipelineTitle") }}</span>
+              <span class="text-text-secondary text-xs">{{ t("home.rtPipelineTitle") }}</span>
               <span
-                class="text-lg font-semibold text-text-heading tabular-nums leading-tight"
+                class="text-text-heading text-lg leading-tight font-semibold tabular-nums"
                 aria-live="polite"
                 data-test="home-usage-tab-rt-pipelines-count"
                 >{{ animatedRtPipelines || summary.rt_pipelines }}</span
               >
             </div>
           </div>
-          <div class="flex-1 min-h-50 w-full mt-3">
+          <div class="mt-3 min-h-50 w-full flex-1">
             <CustomChartRenderer
               :key="pipelinesPanelDataKey"
               :data="pipelinesPanelData"
-              class="w-full h-full"
+              class="h-full w-full"
             />
           </div>
         </section>
@@ -536,7 +536,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Empty state when no data ingested -->
     <div
       v-if="no_data_ingest && !isLoadingSummary"
-      class="flex flex-col h-full"
+      class="flex h-full flex-col"
       data-test="home-usage-tab-no-data"
     >
       <TrialPeriod />

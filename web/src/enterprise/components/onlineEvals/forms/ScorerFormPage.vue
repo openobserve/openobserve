@@ -1,6 +1,6 @@
 <template>
   <OForm
-    class="scorer-form flex flex-col flex-1 min-h-0 gap-2.5"
+    class="scorer-form flex min-h-0 flex-1 flex-col gap-2.5"
     :form="form"
     v-slot="{ isSubmitting }"
   >
@@ -34,7 +34,7 @@
       </template>
 
       <div
-        class="flex-1 min-h-0 overflow-hidden grid grid-cols-[minmax(0,1.6fr)_minmax(20rem,0.9fr)] max-[68.75rem]:grid-cols-1 gap-2.5"
+        class="grid min-h-0 flex-1 grid-cols-[minmax(0,1.6fr)_minmax(20rem,0.9fr)] gap-2.5 overflow-hidden max-[68.75rem]:grid-cols-1"
       >
         <!-- Plain scroll column, no card chrome: the sections inside are the
            cards now, so a bordered wrapper would frame them twice. Matches
@@ -42,16 +42,16 @@
         <div class="scorer-form__main flex min-h-0 min-w-0 flex-col gap-2 overflow-auto p-2">
           <!-- Identity -->
           <section
-            class="card-container shrink-0 overflow-hidden rounded-default border border-border-default bg-surface-base"
+            class="card-container rounded-default border-border-default bg-surface-base shrink-0 overflow-hidden border"
             data-test="scorer-form-identity-section"
           >
-            <div class="flex items-center border-b border-border-default px-3 py-2.5">
-              <div class="mr-2 h-4 w-[0.1875rem] shrink-0 rounded-default bg-theme-accent" />
-              <span class="text-compact font-semibold tracking-[0.01em] text-text-heading">{{
+            <div class="border-border-default flex items-center border-b px-3 py-2.5">
+              <div class="rounded-default bg-theme-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+              <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.identitySection")
               }}</span>
             </div>
-            <div class="flex flex-col gap-3 py-3.5 px-4">
+            <div class="flex flex-col gap-3 px-4 py-3.5">
               <div>
                 <OFormInput
                   name="name"
@@ -89,9 +89,9 @@
 
                 <div
                   v-if="selectedScoreConfig"
-                  class="flex items-center flex-wrap gap-x-2.5 gap-y-1.5 px-3 py-2 mt-2 border border-[color-mix(in_srgb,var(--color-status-info-text)_25%,transparent)] rounded-default bg-[color-mix(in_srgb,var(--color-status-info-text)_8%,transparent)] text-xs text-text-body"
+                  class="rounded-default text-text-body mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 border border-[color-mix(in_srgb,var(--color-status-info-text)_25%,transparent)] bg-[color-mix(in_srgb,var(--color-status-info-text)_8%,transparent)] px-3 py-2 text-xs"
                 >
-                  <span class="w-2 h-2 rounded-full bg-status-info-text shrink-0" />
+                  <span class="bg-status-info-text h-2 w-2 shrink-0 rounded-full" />
                   <span class="font-medium">
                     {{ t("onlineEvals.scorer.selectedPrefix") }}
                     <strong class="font-mono">{{ selectedScoreConfig.name }}</strong>
@@ -121,16 +121,16 @@
           <!-- LLM Judge configuration -->
           <section
             v-if="formValues.scorerType === 'llm_judge'"
-            class="card-container shrink-0 overflow-hidden rounded-default border border-border-default bg-surface-base"
+            class="card-container rounded-default border-border-default bg-surface-base shrink-0 overflow-hidden border"
             data-test="scorer-form-judge-section"
           >
-            <div class="flex items-center border-b border-border-default px-3 py-2.5">
-              <div class="mr-2 h-4 w-[0.1875rem] shrink-0 rounded-default bg-theme-accent" />
-              <span class="text-compact font-semibold tracking-[0.01em] text-text-heading">{{
+            <div class="border-border-default flex items-center border-b px-3 py-2.5">
+              <div class="rounded-default bg-theme-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+              <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.judgeSection")
               }}</span>
             </div>
-            <div class="flex flex-col gap-3 py-3.5 px-4">
+            <div class="flex flex-col gap-3 px-4 py-3.5">
               <div>
                 <div class="flex items-end gap-2">
                   <OFormSelect
@@ -140,7 +140,7 @@
                     :placeholder="t('onlineEvals.scorer.providerPlaceholder')"
                     size="md"
                     required
-                    class="flex-1 min-w-0"
+                    class="min-w-0 flex-1"
                     data-test="scorer-form-provider-select"
                   />
                   <OButton
@@ -156,9 +156,9 @@
 
                 <div
                   v-if="selectedProvider"
-                  class="flex items-center flex-wrap gap-x-2.5 gap-y-1.5 px-3 py-2 mt-2 border border-[color-mix(in_srgb,var(--color-status-info-text)_25%,transparent)] rounded-default bg-[color-mix(in_srgb,var(--color-status-info-text)_8%,transparent)] text-xs text-text-body"
+                  class="rounded-default text-text-body mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 border border-[color-mix(in_srgb,var(--color-status-info-text)_25%,transparent)] bg-[color-mix(in_srgb,var(--color-status-info-text)_8%,transparent)] px-3 py-2 text-xs"
                 >
-                  <span class="w-2 h-2 rounded-full bg-status-info-text shrink-0" />
+                  <span class="bg-status-info-text h-2 w-2 shrink-0 rounded-full" />
                   <span class="text-text-secondary">
                     {{ t("onlineEvals.scorer.endpointLabel") }}
                     <span class="font-mono">{{ providerEndpoint(selectedProvider) }}</span>
@@ -223,10 +223,10 @@
                 >
                   <template #label>
                     <span>
-                      <strong class="block text-xs text-text-heading">{{
+                      <strong class="text-text-heading block text-xs">{{
                         t("onlineEvals.scorer.includeReasoningLabel")
                       }}</strong>
-                      <small class="block text-2xs text-text-secondary">{{
+                      <small class="text-2xs text-text-secondary block">{{
                         t("onlineEvals.scorer.includeReasoningHint")
                       }}</small>
                     </span>
@@ -240,18 +240,18 @@
                   <strong class="text-xs font-semibold">{{
                     t("onlineEvals.scorer.extraFieldsLabel")
                   }}</strong>
-                  <small class="block text-2xs text-text-secondary">{{
+                  <small class="text-2xs text-text-secondary block">{{
                     t("onlineEvals.scorer.extraFieldsHint")
                   }}</small>
                 </div>
 
                 <div
                   v-if="formValues.extraMetadataFields.length"
-                  class="flex flex-col gap-1.5 border border-border-default rounded-default px-2.5 py-2 bg-card-bg"
+                  class="border-border-default rounded-default bg-card-bg flex flex-col gap-1.5 border px-2.5 py-2"
                   data-test="scorer-form-extra-fields"
                 >
                   <div
-                    class="grid grid-cols-[minmax(7.5rem,1fr)_6.875rem_minmax(8.75rem,2fr)_1.75rem] gap-2 items-center text-2xs font-semibold text-text-secondary"
+                    class="text-2xs text-text-secondary grid grid-cols-[minmax(7.5rem,1fr)_6.875rem_minmax(8.75rem,2fr)_1.75rem] items-center gap-2 font-semibold"
                   >
                     <span>{{ t("onlineEvals.scorer.extraFields.colName") }}</span>
                     <span>{{ t("onlineEvals.scorer.extraFields.colType") }}</span>
@@ -261,7 +261,7 @@
                   <div
                     v-for="(field, idx) in formValues.extraMetadataFields"
                     :key="idx"
-                    class="grid grid-cols-[minmax(7.5rem,1fr)_6.875rem_minmax(8.75rem,2fr)_1.75rem] gap-2 items-center"
+                    class="grid grid-cols-[minmax(7.5rem,1fr)_6.875rem_minmax(8.75rem,2fr)_1.75rem] items-center gap-2"
                   >
                     <OFormInput
                       :name="`extraMetadataFields[${idx}].name`"
@@ -304,7 +304,7 @@
                     @click="addExtraField"
                   >
                     {{ t("onlineEvals.scorer.extraFields.addButton") }}
-                    <span class="font-normal text-text-secondary ml-1">
+                    <span class="text-text-secondary ml-1 font-normal">
                       ({{ formValues.extraMetadataFields.length }} / {{ MAX_EXTRA_FIELDS }})
                     </span>
                   </OButton>
@@ -326,18 +326,18 @@
           <!-- Endpoint -->
           <section
             v-else
-            class="card-container shrink-0 overflow-hidden rounded-default border border-border-default bg-surface-base"
+            class="card-container rounded-default border-border-default bg-surface-base shrink-0 overflow-hidden border"
             data-test="scorer-form-endpoint-section"
           >
-            <div class="flex items-center border-b border-border-default px-3 py-2.5">
-              <div class="mr-2 h-4 w-[0.1875rem] shrink-0 rounded-default bg-theme-accent" />
-              <span class="text-compact font-semibold tracking-[0.01em] text-text-heading">{{
+            <div class="border-border-default flex items-center border-b px-3 py-2.5">
+              <div class="rounded-default bg-theme-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+              <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.endpointSection")
               }}</span>
             </div>
-            <div class="flex flex-col gap-3 py-3.5 px-4">
+            <div class="flex flex-col gap-3 px-4 py-3.5">
               <div>
-                <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
+                <label class="text-text-heading mb-1 flex items-center text-xs font-semibold">
                   {{ t("onlineEvals.scorer.remoteUrlLabel") }}
                   <span class="text-status-error-text ml-0.5">*</span>
                 </label>
@@ -396,16 +396,16 @@
           <!-- Authentication -->
           <section
             v-if="formValues.scorerType === 'remote'"
-            class="card-container shrink-0 overflow-hidden rounded-default border border-border-default bg-surface-base"
+            class="card-container rounded-default border-border-default bg-surface-base shrink-0 overflow-hidden border"
             data-test="scorer-form-auth-section"
           >
-            <div class="flex items-center border-b border-border-default px-3 py-2.5">
-              <div class="mr-2 h-4 w-[0.1875rem] shrink-0 rounded-default bg-theme-accent" />
-              <span class="text-compact font-semibold tracking-[0.01em] text-text-heading">{{
+            <div class="border-border-default flex items-center border-b px-3 py-2.5">
+              <div class="rounded-default bg-theme-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+              <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.authSection")
               }}</span>
             </div>
-            <div class="flex flex-col gap-3 py-3.5 px-4">
+            <div class="flex flex-col gap-3 px-4 py-3.5">
               <div>
                 <!-- Clearable so a user can return to "no auth": the auth-type
                  options list only bearer/basic/api_key (a "" option can't be
@@ -499,27 +499,27 @@
           <!-- Custom headers -->
           <section
             v-if="formValues.scorerType === 'remote'"
-            class="card-container shrink-0 overflow-hidden rounded-default border border-border-default bg-surface-base"
+            class="card-container rounded-default border-border-default bg-surface-base shrink-0 overflow-hidden border"
             data-test="scorer-form-headers-section"
           >
-            <div class="flex items-center border-b border-border-default px-3 py-2.5">
-              <div class="mr-2 h-4 w-[0.1875rem] shrink-0 rounded-default bg-theme-accent" />
-              <span class="text-compact font-semibold tracking-[0.01em] text-text-heading">{{
+            <div class="border-border-default flex items-center border-b px-3 py-2.5">
+              <div class="rounded-default bg-theme-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+              <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.headersSection")
               }}</span>
-              <span class="ml-auto text-2xs text-text-secondary italic">
+              <span class="text-2xs text-text-secondary ml-auto italic">
                 {{ t("onlineEvals.scorer.remoteHeaders.subtitle") }}
               </span>
             </div>
-            <div class="flex flex-col gap-3 py-3.5 px-4">
+            <div class="flex flex-col gap-3 px-4 py-3.5">
               <div>
                 <div
                   v-if="formValues.customHeaders.length"
-                  class="flex flex-col gap-1.5 border border-border-default rounded-default px-2.5 py-2 bg-card-bg"
+                  class="border-border-default rounded-default bg-card-bg flex flex-col gap-1.5 border px-2.5 py-2"
                   data-test="scorer-form-remote-headers"
                 >
                   <div
-                    class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_1.75rem] gap-1.5 items-center text-2xs font-semibold text-text-secondary"
+                    class="text-2xs text-text-secondary grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_1.75rem] items-center gap-1.5 font-semibold"
                   >
                     <span>{{ t("onlineEvals.scorer.remoteHeaders.colName") }}</span>
                     <span>{{ t("onlineEvals.scorer.remoteHeaders.colValue") }}</span>
@@ -528,7 +528,7 @@
                   <div
                     v-for="(header, idx) in formValues.customHeaders"
                     :key="idx"
-                    class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_1.75rem] gap-1.5 items-center"
+                    class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_1.75rem] items-center gap-1.5"
                   >
                     <OFormInput
                       :name="`customHeaders[${idx}].key`"
@@ -570,16 +570,16 @@
           <!-- Request body template -->
           <section
             v-if="formValues.scorerType === 'remote'"
-            class="card-container shrink-0 overflow-hidden rounded-default border border-border-default bg-surface-base"
+            class="card-container rounded-default border-border-default bg-surface-base shrink-0 overflow-hidden border"
             data-test="scorer-form-body-section"
           >
-            <div class="flex items-center border-b border-border-default px-3 py-2.5">
-              <div class="mr-2 h-4 w-[0.1875rem] shrink-0 rounded-default bg-theme-accent" />
-              <span class="text-compact font-semibold tracking-[0.01em] text-text-heading">{{
+            <div class="border-border-default flex items-center border-b px-3 py-2.5">
+              <div class="rounded-default bg-theme-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+              <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.requestBodySection")
               }}</span>
             </div>
-            <div class="flex flex-col gap-3 py-3.5 px-4">
+            <div class="flex flex-col gap-3 px-4 py-3.5">
               <div>
                 <OFormTextarea
                   name="template"
@@ -589,14 +589,14 @@
                   :rows="10"
                   data-test="scorer-form-request-body-input"
                 />
-                <div class="flex items-center flex-wrap gap-1.5 mt-1.5 text-2xs">
+                <div class="text-2xs mt-1.5 flex flex-wrap items-center gap-1.5">
                   <span class="text-text-secondary">
                     {{ t("onlineEvals.scorer.promptVariablesLabel") }}
                   </span>
                   <span
                     v-for="v in promptVariables"
                     :key="v"
-                    class="py-px px-1.5 rounded-default text-2xs font-mono bg-[color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] text-text-body"
+                    class="rounded-default text-2xs text-text-body bg-[color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] px-1.5 py-px font-mono"
                     >{{ formatTemplateVariable(v) }}</span
                   >
                 </div>
@@ -618,7 +618,7 @@
       </div>
 
       <footer
-        class="sticky bottom-0 flex items-center justify-end gap-2 px-5.5 py-3 bg-surface-base border-t border-border-default shrink-0 z-1"
+        class="bg-surface-base border-border-default sticky bottom-0 z-1 flex shrink-0 items-center justify-end gap-2 border-t px-5.5 py-3"
       >
         <OButton
           data-test="scorer-form-cancel-btn"
@@ -647,20 +647,20 @@
         size="md"
         :title="t('onlineEvals.scorer.extraFields.schemaTitle')"
       >
-        <p v-if="isLoadingSchemaPreview" class="m-0 p-3 text-xs text-text-secondary">
+        <p v-if="isLoadingSchemaPreview" class="text-text-secondary m-0 p-3 text-xs">
           {{ t("onlineEvals.scorer.extraFields.schemaLoading") }}
         </p>
-        <p v-else-if="schemaPreviewError" class="m-0 p-3 text-xs text-status-error-text">
+        <p v-else-if="schemaPreviewError" class="text-status-error-text m-0 p-3 text-xs">
           {{ schemaPreviewError }}
         </p>
         <pre
-          class="m-0 max-h-[60vh] overflow-auto p-3 rounded-default bg-card-bg border border-border-default font-normal text-xs font-(family-name:--font-mono) text-text-body whitespace-pre [tab-size:2]"
+          class="rounded-default bg-card-bg border-border-default text-text-body m-0 max-h-[60vh] overflow-auto border p-3 font-(family-name:--font-mono) text-xs font-normal whitespace-pre [tab-size:2]"
           v-else
           >{{ schemaPreview }}</pre
         >
 
         <template #footer>
-          <div class="flex items-center justify-between gap-2 w-full">
+          <div class="flex w-full items-center justify-between gap-2">
             <OButton
               data-test="scorer-form-schema-copy-btn"
               variant="outline"

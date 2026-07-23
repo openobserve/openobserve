@@ -22,35 +22,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
+    class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
     data-test="monitor-status-timeline"
   >
     <div class="flex items-center gap-2 px-3.5 pt-2.5 pb-2">
-      <span class="font-bold text-xs text-text-heading">
+      <span class="text-text-heading text-xs font-bold">
         {{ t("synthetics.timeline.title") }}
       </span>
       <span class="flex-1" />
-      <span class="inline-flex items-center gap-1.5 text-xs text-text-secondary">
+      <span class="text-text-secondary inline-flex items-center gap-1.5 text-xs">
         <span
-          class="w-[0.4375rem] h-[0.4375rem] rounded-full bg-[var(--color-badge-error-solid-bg)]"
+          class="h-[0.4375rem] w-[0.4375rem] rounded-full bg-[var(--color-badge-error-solid-bg)]"
         />
         {{ failCount }} {{ t("synthetics.timeline.failed") }}
       </span>
-      <span class="inline-flex items-center gap-1.5 text-xs text-text-secondary">
+      <span class="text-text-secondary inline-flex items-center gap-1.5 text-xs">
         <span
-          class="w-[0.4375rem] h-[0.4375rem] rounded-full bg-[var(--color-badge-orange-solid-bg)]"
+          class="h-[0.4375rem] w-[0.4375rem] rounded-full bg-[var(--color-badge-orange-solid-bg)]"
         />
         {{ mixedCount }} {{ t("synthetics.timeline.warning") }}
       </span>
-      <span class="inline-flex items-center gap-1.5 text-xs text-text-secondary">
+      <span class="text-text-secondary inline-flex items-center gap-1.5 text-xs">
         <span
-          class="w-[0.4375rem] h-[0.4375rem] rounded-full bg-[var(--color-badge-success-solid-bg)]"
+          class="h-[0.4375rem] w-[0.4375rem] rounded-full bg-[var(--color-badge-success-solid-bg)]"
         />
         {{ passCount }} {{ t("synthetics.timeline.passed") }}
       </span>
     </div>
-    <div class="border-t border-border-default" />
-    <div class="flex flex-col gap-1 py-2 px-3.5">
+    <div class="border-border-default border-t" />
+    <div class="flex flex-col gap-1 px-3.5 py-2">
       <div class="flex items-center gap-1">
         <OButton
           variant="ghost"
@@ -64,24 +64,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <div
           ref="scrollRef"
-          class="flex-1 overflow-hidden flex rounded-default h-6.5 gap-0.5"
+          class="rounded-default flex h-6.5 flex-1 gap-0.5 overflow-hidden"
           @scroll="onScroll"
         >
           <div
             v-for="seg in segments"
             :key="seg.runId"
-            class="shrink-0 h-full min-w-[0.1875rem] cursor-pointer transition-all duration-100 hover:scale-y-[1.35]"
+            class="h-full min-w-[0.1875rem] shrink-0 cursor-pointer transition-all duration-100 hover:scale-y-[1.35]"
             :style="{ width: segmentWidthPct }"
             :class="seg.color"
           >
             <OTooltip side="top" :delay="0" :max-width="'auto'">
               <template #content>
-                <div class="py-0.5 min-w-50">
+                <div class="min-w-50 py-0.5">
                   <div
-                    class="px-1 font-semibold text-text-secondary mb-1.5 text-xs flex items-center gap-1.5 flex-wrap border-b pb-1"
+                    class="text-text-secondary mb-1.5 flex flex-wrap items-center gap-1.5 border-b px-1 pb-1 text-xs font-semibold"
                   >
                     <span
-                      class="w-2 h-2 rounded-full shrink-0 bg-[var(--color-badge-success-solid-bg)]"
+                      class="h-2 w-2 shrink-0 rounded-full bg-[var(--color-badge-success-solid-bg)]"
                     />
                     <span class="text-text-secondary">{{
                       t("synthetics.timeline.tooltipPassed", {
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       })
                     }}</span>
                     <span
-                      class="w-2 h-2 rounded-full shrink-0 bg-[var(--color-badge-error-solid-bg)]"
+                      class="h-2 w-2 shrink-0 rounded-full bg-[var(--color-badge-error-solid-bg)]"
                     />
                     <span class="text-text-secondary">{{
                       t("synthetics.timeline.tooltipFailed", {
@@ -98,9 +98,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     }}</span>
                   </div>
                   <template v-for="(group, gIdx) in groupedByLocation(seg.executions)" :key="gIdx">
-                    <div class="px-1 flex items-center gap-1.5 mb-0.5 mt-1 first:mt-0">
+                    <div class="mt-1 mb-0.5 flex items-center gap-1.5 px-1 first:mt-0">
                       <span
-                        class="w-2 h-2 rounded-full shrink-0"
+                        class="h-2 w-2 shrink-0 rounded-full"
                         :class="{
                           'bg-badge-success-solid-bg': group.status === 'all-pass',
                           'bg-color-badge-orange-solid-bg': group.status === 'mixed',
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="flex items-center gap-1.5 py-0.5 pl-4"
                     >
                       <span
-                        class="w-2 h-2 rounded-full shrink-0"
+                        class="h-2 w-2 shrink-0 rounded-full"
                         :class="
                           exec.status === 'pass'
                             ? 'bg-[var(--color-badge-success-solid-bg)]'
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <img
                         v-if="browserIconUrl(exec.browserEngine)"
                         :src="browserIconUrl(exec.browserEngine)"
-                        class="w-3.5 h-3.5"
+                        class="h-3.5 w-3.5"
                         alt=""
                       />
                       <span class="text-text-secondary text-xs">{{ exec.device }}</span>
@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="chevron-right" size="xs" />
         </OButton>
       </div>
-      <div class="flex justify-between text-3xs font-mono tabular-nums text-text-secondary">
+      <div class="text-3xs text-text-secondary flex justify-between font-mono tabular-nums">
         <span>{{ endLabel }}</span>
         <span>{{ rangeLabel }}</span>
         <span>{{ startLabel }}</span>

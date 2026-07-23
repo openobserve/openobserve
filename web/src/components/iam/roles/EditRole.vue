@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- TODO OK : Add button to delete role in toolbar -->
     <div data-test="edit-role-title" class="shrink-0">
-      <div class="bg-card-glass-bg py-2 flex flex-col">
+      <div class="bg-card-glass-bg flex flex-col py-2">
         <AppTabs
           data-test="edit-role-tabs"
           :tabs="tabs"
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div class="flex-1 min-h-0 overflow-hidden">
+    <div class="min-h-0 flex-1 overflow-hidden">
       <GroupUsers
         data-test="edit-role-users-section"
         v-show="activeTab === 'users'"
@@ -58,13 +58,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-show="activeTab === 'permissions'"
         data-test="edit-role-permissions-section"
-        class="bg-card-glass-bg flex flex-col h-full"
+        class="bg-card-glass-bg flex h-full flex-col"
       >
-        <div class="flex justify-between items-center flex-shrink-0 bg-surface-base">
+        <div class="bg-surface-base flex flex-shrink-0 items-center justify-between">
           <div
             v-show="permissionsUiType === 'table'"
             data-test="edit-role-permissions-filters"
-            class="flex items-start px-3 py-2 justify-start gap-3 sticky"
+            class="sticky flex items-start justify-start gap-3 px-3 py-2"
             style="top: 0px; z-index: 2"
           >
             <div data-test="edit-role-permissions-show-toggle" class="flex items-center">
@@ -114,12 +114,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div></div>
           <div class="flex items-center gap-2">
-            <span data-test="edit-role-permissions-count" class="font-bold text-sm">
+            <span data-test="edit-role-permissions-count" class="text-sm font-bold">
               {{ t("iam.editRole.permissionsCount", { count: selectedPermissionsHash.size }) }}
             </span>
             <OToggleGroup
               data-test="edit-role-permissions-ui-type-toggle"
-              class="mr-3 my-1"
+              class="my-1 mr-3"
               :model-value="permissionsUiType"
               @update:model-value="(v) => updatePermissionsUi(v as string)"
             >
@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div
           data-test="edit-role-permissions-table-section"
-          class="rounded-default flex-1 min-h-0 overflow-y-auto"
+          class="rounded-default min-h-0 flex-1 overflow-y-auto"
         >
           <div v-show="permissionsUiType === 'table'">
             <PermissionsTable
@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }}
               </div>
               <div
-                class="flex items-center cursor-pointer"
+                class="flex cursor-pointer items-center"
                 :title="t('menu.help')"
                 @click="toggleHelpSection"
               >
@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <div v-if="isHelpOpen" style="width: 350px" class="p-2">
-                <div class="flex justify-between items-center px-2">
+                <div class="flex items-center justify-between px-2">
                   <div style="font-size: var(--text-base)">
                     {{ t("iam.editRole.quickReference") }}
                   </div>
@@ -220,9 +220,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <div class="flex justify-end w-full flex-shrink-0 mt-2.5" style="z-index: 2">
+    <div class="mt-2.5 flex w-full flex-shrink-0 justify-end" style="z-index: 2">
       <div
-        class="bg-card-glass-bg w-full py-2 px-3 justify-end flex gap-2 border-t border-border-default"
+        class="bg-card-glass-bg border-border-default flex w-full justify-end gap-2 border-t px-3 py-2"
       >
         <OButton
           data-test="edit-role-cancel-btn"

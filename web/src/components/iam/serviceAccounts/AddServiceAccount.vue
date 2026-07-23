@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="iam-add-service-account-roles-select"
             class="showLabelOnTop mt-2"
           />
-          <div class="flex justify-end mt-1">
+          <div class="mt-1 flex justify-end">
             <OButton
               variant="ghost"
               size="sm"

@@ -15,40 +15,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="p-3 w-full" style="height: calc(100vh - 130px)">
+  <div class="w-full p-3" style="height: calc(100vh - 130px)">
     <!-- Billing usage tiles (always shown). When self-usage reporting is
            enabled, the calendar in the toolbar drives the range and a daily
            chart is appended below. -->
     <div>
       <div v-if="Object.keys(usageData).length === 0">
-        <div class="text-xl font-semibold font-medium text-center">
+        <div class="text-center text-xl font-medium font-semibold">
           {{ t("billing.messageDataNotFound") }}
         </div>
       </div>
     </div>
     <!-- usage section new -->
-    <div class="flex flex-col gap-4 w-full">
+    <div class="flex w-full flex-col gap-4">
       <div
         v-if="showContractCreditMessage"
         data-test="contract-ai-credits-exhausted"
         role="status"
-        class="border border-status-warning-text bg-status-warning-bg text-status-warning-text rounded-default px-4 py-3 text-sm"
+        class="border-status-warning-text bg-status-warning-bg text-status-warning-text rounded-default border px-4 py-3 text-sm"
       >
         {{ t("billing.aiContractExhaustedMessage") }}
       </div>
       <!-- tab-info-section -->
       <!-- this will be unlocked when we get the actionscripts , rum sessions , error tracking from BE -->
-      <div v-if="false" class="grid grid-cols-3 gap-4 w-full">
+      <div v-if="false" class="grid w-full grid-cols-3 gap-4">
         <div
-          class="bg-card-glass-bg border border-card-glass-border rounded-default p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out"
+          class="bg-card-glass-bg border-card-glass-border rounded-default flex min-h-32 flex-col justify-between border p-4 transition-shadow duration-200 ease-in-out"
         >
-          <div class="flex flex-col justify-between rounded-default h-full gap-4">
+          <div class="rounded-default flex h-full flex-col justify-between gap-4">
             <!-- Top Section (60%) -->
             <div class="flex flex-col justify-between">
               <!-- Title row -->
-              <div class="flex justify-between items-center">
+              <div class="flex items-center justify-between">
                 <div
-                  class="text-(length:--text-sm) font-semibold leading-(--leading-base) tracking-normal text-text-heading text-left"
+                  class="text-text-heading text-left text-(length:--text-sm) leading-(--leading-base) font-semibold tracking-normal"
                 >
                   Action Scripts
                 </div>
@@ -60,22 +60,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Bottom Section (40%) -->
             <div
-              class="text-(length:--text-2xl) font-semibold leading-(--leading-xl) tracking-normal text-text-body text-left flex items-end"
+              class="text-text-body flex items-end text-left text-(length:--text-2xl) leading-(--leading-xl) font-semibold tracking-normal"
             >
               2
             </div>
           </div>
         </div>
         <div
-          class="bg-card-glass-bg border border-card-glass-border rounded-default p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out"
+          class="bg-card-glass-bg border-card-glass-border rounded-default flex min-h-32 flex-col justify-between border p-4 transition-shadow duration-200 ease-in-out"
         >
-          <div class="flex flex-col justify-between rounded-default h-full gap-4">
+          <div class="rounded-default flex h-full flex-col justify-between gap-4">
             <!-- Top Section (60%) -->
             <div class="flex flex-col justify-between">
               <!-- Title row -->
-              <div class="flex justify-between items-center">
+              <div class="flex items-center justify-between">
                 <div
-                  class="text-(length:--text-sm) font-semibold leading-(--leading-base) tracking-normal text-text-heading text-left"
+                  class="text-text-heading text-left text-(length:--text-sm) leading-(--leading-base) font-semibold tracking-normal"
                 >
                   Error Tracking
                 </div>
@@ -87,22 +87,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Bottom Section (40%) -->
             <div
-              class="text-(length:--text-2xl) font-semibold leading-(--leading-xl) tracking-normal text-text-body text-left flex items-end"
+              class="text-text-body flex items-end text-left text-(length:--text-2xl) leading-(--leading-xl) font-semibold tracking-normal"
             >
               300
             </div>
           </div>
         </div>
         <div
-          class="bg-card-glass-bg border border-card-glass-border rounded-default p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out"
+          class="bg-card-glass-bg border-card-glass-border rounded-default flex min-h-32 flex-col justify-between border p-4 transition-shadow duration-200 ease-in-out"
         >
-          <div class="flex flex-col justify-between rounded-default h-full gap-4">
+          <div class="rounded-default flex h-full flex-col justify-between gap-4">
             <!-- Top Section (60%) -->
             <div class="flex flex-col justify-between">
               <!-- Title row -->
-              <div class="flex justify-between items-center">
+              <div class="flex items-center justify-between">
                 <div
-                  class="text-(length:--text-sm) font-semibold leading-(--leading-base) tracking-normal text-text-heading text-left"
+                  class="text-text-heading text-left text-(length:--text-sm) leading-(--leading-base) font-semibold tracking-normal"
                   data-test="billings-usage-tile-title"
                 >
                   RUM Session
@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Bottom Section (40%) -->
             <div
-              class="text-(length:--text-2xl) font-semibold leading-(--leading-xl) tracking-normal text-text-body text-left flex items-end"
+              class="text-text-body flex items-end text-left text-(length:--text-2xl) leading-(--leading-xl) font-semibold tracking-normal"
             >
               20
             </div>
@@ -127,39 +127,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              base so large numbers stay readable. -->
       <div
         v-if="!dataLoading && Object.keys(usageData).length > 0"
-        class="grid grid-cols-3 xl:grid-cols-6 gap-3 w-full"
+        class="grid w-full grid-cols-3 gap-3 xl:grid-cols-6"
       >
         <div
           v-for="tile in usageTiles"
           :key="tile.key"
           data-test="billings-usage-tile"
-          class="usage-tile bg-card-glass-bg border border-card-glass-border rounded-default px-3 py-3 flex flex-col gap-2 transition-shadow duration-200 ease-in-out"
+          class="usage-tile bg-card-glass-bg border-card-glass-border rounded-default flex flex-col gap-2 border px-3 py-3 transition-shadow duration-200 ease-in-out"
         >
           <div class="flex items-center justify-between gap-2">
             <div
-              class="text-(length:--text-xs) font-medium text-text-secondary truncate"
+              class="text-text-secondary truncate text-(length:--text-xs) font-medium"
               data-test="billings-usage-tile-title"
               :title="tile.label"
             >
               {{ tile.label }}
             </div>
             <div
-              class="h-7 w-7 bg-bg-gray shrink-0 flex items-center justify-center rounded-default"
+              class="bg-bg-gray rounded-default flex h-7 w-7 shrink-0 items-center justify-center"
             >
               <img :src="tile.icon" class="h-4 w-4" />
             </div>
           </div>
           <div class="flex items-baseline gap-1 whitespace-nowrap">
-            <span class="text-(length:--text-xl) font-bold text-text-body leading-none">
+            <span class="text-text-body text-(length:--text-xl) leading-none font-bold">
               {{ tile.value }}
             </span>
-            <span class="text-(length:--text-xs) font-medium text-text-secondary">
+            <span class="text-text-secondary text-(length:--text-xs) font-medium">
               {{ tile.unit }}
             </span>
           </div>
           <div
             v-if="usageCost[tile.key]"
-            class="text-(length:--text-xs) font-medium text-text-secondary"
+            class="text-text-secondary text-(length:--text-xs) font-medium"
           >
             ${{ usageCost[tile.key] }}
           </div>
@@ -168,8 +168,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- charts section -->
       <div></div>
     </div>
-    <div v-if="dataLoading" class="text-xl font-semibold font-medium text-center">
-      <OSpinner size="md" class="mx-auto block text-center mt-3" />
+    <div v-if="dataLoading" class="text-center text-xl font-medium font-semibold">
+      <OSpinner size="md" class="mx-auto mt-3 block text-center" />
     </div>
 
     <!-- Self-usage reporting ON → append a daily line chart (Ingestion +
@@ -177,12 +177,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="usageStreamEnabled"
       data-test="usage-daily-chart"
-      class="bg-card-glass-bg border border-card-glass-border rounded-default p-4 mt-4"
+      class="bg-card-glass-bg border-card-glass-border rounded-default mt-4 border p-4"
     >
-      <div class="text-(length:--text-sm) font-semibold text-text-heading mb-2">
+      <div class="text-text-heading mb-2 text-(length:--text-sm) font-semibold">
         {{ t("billing.usageTrends.dailyUsage") }}
       </div>
-      <div class="h-90 relative w-full">
+      <div class="relative h-90 w-full">
         <PanelSchemaRenderer
           v-if="combinedSchema && dailyTimeObj"
           :key="'chart-r-' + dailyChartKey"
@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-if="usageStreamMissing"
           data-test="usage-waiting-for-data"
-          class="flex items-center justify-center z-2 absolute inset-0 bg-card-glass-bg"
+          class="bg-card-glass-bg absolute inset-0 z-2 flex items-center justify-center"
         >
           <OEmptyState
             size="block"
@@ -220,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OEmptyState
       v-else
       data-test="usage-enable-cta"
-      class="mt-4 border border-card-glass-border rounded-default bg-card-glass-bg"
+      class="border-card-glass-border rounded-default bg-card-glass-bg mt-4 border"
       size="block"
       illustration="wave-bars"
       :title="t('billing.usageTrends.enableTitle')"

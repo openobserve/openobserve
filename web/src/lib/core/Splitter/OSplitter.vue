@@ -6,7 +6,7 @@
     :class="[
       'o-splitter',
       horizontal ? 'o-splitter--horizontal' : 'o-splitter--vertical',
-      'flex relative',
+      'relative flex',
       horizontal ? 'flex-col' : 'flex-row',
     ]"
   >
@@ -14,7 +14,7 @@
     <div
       :class="[
         'o-splitter__before',
-        'overflow-hidden shrink-0 relative',
+        'relative shrink-0 overflow-hidden',
         horizontal ? 'w-full' : 'h-full',
         beforeClass,
       ]"
@@ -31,8 +31,8 @@
         'select-none',
         'relative',
         'z-10',
-        'focus:outline-2 focus:outline-accent focus:-outline-offset-2',
-        disable ? 'cursor-default! opacity-50 pointer-events-none' : '',
+        'focus:outline-accent focus:outline-2 focus:-outline-offset-2',
+        disable ? 'pointer-events-none cursor-default! opacity-50' : '',
         horizontal ? 'h-px w-full cursor-row-resize' : 'h-full cursor-col-resize',
         separatorClass,
       ]"
@@ -54,7 +54,7 @@
     <div
       :class="[
         'o-splitter__after',
-        'overflow-hidden flex-1 relative z-0 shrink-0',
+        'relative z-0 flex-1 shrink-0 overflow-hidden',
         horizontal ? 'w-full' : 'h-full',
       ]"
     >

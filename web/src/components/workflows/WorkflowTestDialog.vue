@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="run"
     @click:secondary="close"
   >
-    <div class="flex flex-col gap-4 text-left h-full p-4">
+    <div class="flex h-full flex-col gap-4 p-4 text-left">
       <!-- Run-from selector -->
       <div class="flex flex-col gap-1">
         <OText as="label" class="text-xs font-medium">
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Sample input editor — fills the remaining drawer height -->
-      <div class="flex flex-col gap-1 flex-1 min-h-0">
+      <div class="flex min-h-0 flex-1 flex-col gap-1">
         <div class="flex items-center justify-between">
           <OText as="label" class="text-xs font-medium">
             {{ t("workflow.test.inputLabel") }}
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("common.reset") }}
           </OButton>
         </div>
-        <div class="flex-1 min-h-0 rounded-default border border-border-default overflow-hidden">
+        <div class="rounded-default border-border-default min-h-0 flex-1 overflow-hidden border">
           <CodeQueryEditor
             editor-id="workflow-test-input"
             language="json"

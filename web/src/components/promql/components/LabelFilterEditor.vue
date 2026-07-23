@@ -1,14 +1,14 @@
 <template>
   <div data-test="promql-labelfilter-editor">
-    <div class="pl-2 flex flex-row">
+    <div class="flex flex-row pl-2">
       <div
         data-test="promql-labelfilter-editor-label"
-        class="text-sm whitespace-nowrap flex items-center min-w-21.5"
+        class="flex min-w-21.5 items-center text-sm whitespace-nowrap"
       >
         {{ t("panel.labelFilters") }}
       </div>
-      <span class="flex items-center ml-0.5 mr-0.5">:</span>
-      <div class="m-0.5 flex gap-2 flex-wrap items-center scroll">
+      <span class="mr-0.5 ml-0.5 flex items-center">:</span>
+      <div class="scroll m-0.5 flex flex-wrap items-center gap-2">
         <!-- Label Filter Items -->
         <div
           v-for="(label, index) in props.labels"
@@ -36,7 +36,7 @@
                     v-model="label.label"
                     :options="availableLabelOptions"
                     :label="t('metrics.labelFilterEditor.label')"
-                    class="label-filter-label-select showLabelOnTop normal-case! mb-1.5"
+                    class="label-filter-label-select showLabelOnTop mb-1.5 normal-case!"
                     searchable
                     clearable
                     data-test="promql-label-select"

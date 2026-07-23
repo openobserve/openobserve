@@ -1,12 +1,12 @@
 <template>
-  <div class="h-[calc(100vh-3.75rem)] flex min-h-0 dark:bg-surface-base">
-    <div class="flex flex-col flex-1 min-h-0 min-w-0">
-      <div class="flex flex-col flex-1 min-h-0">
+  <div class="dark:bg-surface-base flex h-[calc(100vh-3.75rem)] min-h-0">
+    <div class="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div class="flex min-h-0 flex-1 flex-col">
         <QueryEditor
           data-test="common-json-editor"
           ref="queryEditorRef"
           editor-id="common-json-editor"
-          class="flex-1 min-h-0 h-full"
+          class="h-full min-h-0 flex-1"
           :debounceTime="300"
           v-model:query="jsonContent"
           language="json"
@@ -18,9 +18,9 @@
       <div
         v-if="localValidationErrors.length > 0"
         data-test="common-json-editor-validation-errors"
-        class="p-3 text-status-error-text shrink-0 max-h-50 overflow-y-auto"
+        class="text-status-error-text max-h-50 shrink-0 overflow-y-auto p-3"
       >
-        <div class="font-bold mb-2">Please fix the following issues:</div>
+        <div class="mb-2 font-bold">Please fix the following issues:</div>
         <ul class="ml-3">
           <li v-for="(error, index) in localValidationErrors" :key="index">
             {{ error }}
@@ -28,7 +28,7 @@
         </ul>
       </div>
 
-      <div class="flex justify-end gap-2 p-3 shrink-0">
+      <div class="flex shrink-0 justify-end gap-2 p-3">
         <OButton
           variant="outline"
           size="sm-action"
@@ -46,7 +46,7 @@
       </div>
     </div>
     <!-- o2aichat enabled -->
-    <div v-if="store.state.isAiChatEnabled" class="ml-2 w-[25vw] h-full">
+    <div v-if="store.state.isAiChatEnabled" class="ml-2 h-full w-[25vw]">
       <O2AIChat
         class="h-full"
         :is-open="store.state.isAiChatEnabled"

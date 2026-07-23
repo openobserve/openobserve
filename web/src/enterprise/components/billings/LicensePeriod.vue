@@ -2,15 +2,15 @@
   <div
     v-if="showLicenseExpiryWarning && config.isEnterprise == 'true' && config.isCloud === 'false'"
     data-test="license-period-container"
-    class="w-full p-3 border border-border-default rounded-default [background:var(--color-usage-banner-success-bg)]"
+    class="border-border-default rounded-default w-full border p-3 [background:var(--color-usage-banner-success-bg)]"
   >
     <div class="flex">
       <div class="flex flex-col">
-        <span data-test="license-period-message" class="text-lg font-semibold leading-8">{{
+        <span data-test="license-period-message" class="text-lg leading-8 font-semibold">{{
           getLicenseExpiryMessage()
         }}</span>
         <br />
-        <span data-test="license-period-subtitle" class="text-base font-normal leading-5.5"
+        <span data-test="license-period-subtitle" class="text-base leading-5.5 font-normal"
           >Please update your license by contacting your administrator.</span
         >
       </div>

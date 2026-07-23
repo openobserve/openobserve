@@ -22,9 +22,9 @@
     <!-- Body -->
     <div
       v-if="queryData.length === 0"
-      class="flex flex-col items-center justify-center h-64 text-text-muted"
+      class="text-text-muted flex h-64 flex-col items-center justify-center"
     >
-      <OIcon class="w-12 h-12" name="info" />
+      <OIcon class="h-12 w-12" name="info" />
       <p class="mt-2">{{ t("dashboard.queryInspector.noQueries") }}</p>
     </div>
 
@@ -32,27 +32,27 @@
       <div
         v-for="(query, index) in queryData"
         :key="query?.originalQuery + index"
-        class="bg-card-glass-bg rounded-default border border-card-glass-border overflow-hidden"
+        class="bg-card-glass-bg rounded-default border-card-glass-border overflow-hidden border"
       >
         <!-- Query Header -->
         <div
-          class="p-2 gap-3 bg-theme-body-bg-primary border-b border-card-glass-border flex items-start justify-start"
+          class="bg-theme-body-bg-primary border-card-glass-border flex items-start justify-start gap-3 border-b p-2"
         >
           <span
-            class="text-sm font-bold rounded-default"
+            class="rounded-default text-sm font-bold"
             :data-test="`query-inspector-query-name-${index}`"
           >
             {{ query.tabName || t("dashboard.queryInspector.queryN", { n: index + 1 }) }}
           </span>
           <span
-            class="bg-theme-body-bg-primary border border-card-glass-border text-text-secondary text-3xs font-bold px-2 py-0.5 rounded-default"
+            class="bg-theme-body-bg-primary border-card-glass-border text-text-secondary text-3xs rounded-default border px-2 py-0.5 font-bold"
           >
             {{ getQueryTypeDisplay(query.queryType) }}
           </span>
         </div>
 
         <!-- Query Content -->
-        <div class="p-3 space-y-4">
+        <div class="space-y-4 p-3">
           <!-- Original Query -->
           <div v-if="query.originalQuery">
             <div class="flex items-center justify-between">
@@ -68,9 +68,9 @@
                 {{ t("dashboard.queryInspector.copy") }}
               </OButton>
             </div>
-            <div class="relative group mt-1">
+            <div class="group relative mt-1">
               <div
-                class="p-2 rounded-default bg-theme-body-bg-primary border border-card-glass-border font-mono text-sm max-h-40 overflow-y-auto whitespace-pre-wrap break-all [scrollbar-width:thin] [scrollbar-color:color-mix(in_srgb,var(--color-grey-500)_20%,transparent)_transparent] inspector-query-editor"
+                class="rounded-default bg-theme-body-bg-primary border-card-glass-border inspector-query-editor max-h-40 overflow-y-auto border p-2 font-mono text-sm break-all whitespace-pre-wrap [scrollbar-color:color-mix(in_srgb,var(--color-grey-500)_20%,transparent)_transparent] [scrollbar-width:thin]"
                 :data-test="`query-inspector-original-query-${index}`"
                 v-html="
                   highlightSearch(
@@ -97,9 +97,9 @@
                 {{ t("dashboard.queryInspector.copy") }}
               </OButton>
             </div>
-            <div class="relative group mt-1">
+            <div class="group relative mt-1">
               <div
-                class="p-2 rounded-default bg-theme-body-bg-primary border border-card-glass-border font-mono text-sm max-h-40 overflow-y-auto whitespace-pre-wrap break-all [scrollbar-width:thin] [scrollbar-color:color-mix(in_srgb,var(--color-grey-500)_20%,transparent)_transparent] inspector-query-editor"
+                class="rounded-default bg-theme-body-bg-primary border-card-glass-border inspector-query-editor max-h-40 overflow-y-auto border p-2 font-mono text-sm break-all whitespace-pre-wrap [scrollbar-color:color-mix(in_srgb,var(--color-grey-500)_20%,transparent)_transparent] [scrollbar-width:thin]"
                 :data-test="`query-inspector-executed-query-${index}`"
                 v-html="
                   highlightSearch(
@@ -112,12 +112,12 @@
           </div>
 
           <!-- Time Metadata -->
-          <div class="grid grid-cols-2 gap-4 border-t border-card-glass-border pt-2">
+          <div class="border-card-glass-border grid grid-cols-2 gap-4 border-t pt-2">
             <div class="space-y-1" :data-test="`dashboard-query-inspector-start-time-${index}`">
               <label class="text-xs font-bold tracking-wider">{{
                 t("dashboard.queryInspector.startTime")
               }}</label>
-              <div class="text-xs text-text-secondary font-medium flex items-center gap-2">
+              <div class="text-text-secondary flex items-center gap-2 text-xs font-medium">
                 <OIcon name="login" size="xs" class="text-text-muted" />
                 {{ formatTimestamp(query.startTime) }}
               </div>
@@ -126,7 +126,7 @@
               <label class="text-xs font-bold tracking-wider">{{
                 t("dashboard.queryInspector.endTime")
               }}</label>
-              <div class="text-xs text-text-secondary font-medium flex items-center gap-2">
+              <div class="text-text-secondary flex items-center gap-2 text-xs font-medium">
                 <OIcon name="logout" size="xs" class="text-text-muted" />
                 {{ formatTimestamp(query.endTime) }}
               </div>
@@ -134,25 +134,25 @@
           </div>
 
           <!-- Variables List (Row by Row) -->
-          <div class="space-y-3 border-t border-card-glass-border">
+          <div class="border-card-glass-border space-y-3 border-t">
             <!-- Standard Variables -->
             <div class="pt-2">
               <label class="text-xs font-bold tracking-wider">{{
                 t("dashboard.queryInspector.variables")
               }}</label>
-              <div class="flex flex-wrap gap-2 mt-1">
+              <div class="mt-1 flex flex-wrap gap-2">
                 <template v-if="getVariablesByType(query, 'variable').length">
                   <div
                     v-for="v in getVariablesByType(query, 'variable')"
                     :key="v.name"
-                    class="flex items-center gap-2 p-1 rounded-default border border-card-glass-border bg-card-glass-bg text-xs"
+                    class="rounded-default border-card-glass-border bg-card-glass-bg flex items-center gap-2 border p-1 text-xs"
                   >
-                    <span class="font-bold text-text-label">{{ v.name }}</span>
+                    <span class="text-text-label font-bold">{{ v.name }}</span>
                     <span class="text-text-muted">:</span>
                     <span class="text-text-secondary italic">{{ v.value }}</span>
                   </div>
                 </template>
-                <span v-else class="text-xs text-text-muted">-</span>
+                <span v-else class="text-text-muted text-xs">-</span>
               </div>
             </div>
 
@@ -161,19 +161,19 @@
               <label class="text-xs font-bold tracking-wider">{{
                 t("dashboard.queryInspector.fixedVariables")
               }}</label>
-              <div class="flex flex-wrap gap-2 mt-1">
+              <div class="mt-1 flex flex-wrap gap-2">
                 <template v-if="getVariablesByType(query, 'fixed').length">
                   <div
                     v-for="v in getVariablesByType(query, 'fixed')"
                     :key="v.name"
-                    class="flex items-center gap-2 p-1 rounded-default border border-card-glass-border bg-card-glass-bg text-xs"
+                    class="rounded-default border-card-glass-border bg-card-glass-bg flex items-center gap-2 border p-1 text-xs"
                   >
-                    <span class="font-bold text-text-label">{{ v.name }}</span>
+                    <span class="text-text-label font-bold">{{ v.name }}</span>
                     <span class="text-text-muted">:</span>
                     <span class="text-text-secondary italic">{{ v.value }}</span>
                   </div>
                 </template>
-                <span v-else class="text-xs text-text-muted">-</span>
+                <span v-else class="text-text-muted text-xs">-</span>
               </div>
             </div>
 
@@ -182,19 +182,19 @@
               <label class="text-xs font-bold tracking-wider">{{
                 t("dashboard.queryInspector.dynamicVariables")
               }}</label>
-              <div class="flex flex-wrap gap-2 mt-1">
+              <div class="mt-1 flex flex-wrap gap-2">
                 <template v-if="getVariablesByType(query, 'dynamicVariable').length">
                   <div
                     v-for="v in getVariablesByType(query, 'dynamicVariable')"
                     :key="v.name"
-                    class="flex items-center gap-2 p-1 rounded-default border border-card-glass-border bg-card-glass-bg text-xs"
+                    class="rounded-default border-card-glass-border bg-card-glass-bg flex items-center gap-2 border p-1 text-xs"
                   >
-                    <span class="font-bold text-text-label">{{ v.name }}</span>
+                    <span class="text-text-label font-bold">{{ v.name }}</span>
                     <span class="text-text-muted">{{ v.operator }}</span>
                     <span class="text-text-secondary italic">{{ v.value }}</span>
                   </div>
                 </template>
-                <span v-else class="text-xs text-text-muted">-</span>
+                <span v-else class="text-text-muted text-xs">-</span>
               </div>
             </div>
           </div>

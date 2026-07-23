@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #header-left>
       <span
-        class="font-semibold px-2 py-1 rounded-default inline-block text-badge-blue-soft-text bg-badge-blue-soft-bg"
+        class="rounded-default text-badge-blue-soft-text bg-badge-blue-soft-bg inline-block px-2 py-1 font-semibold"
       >
         {{ pipelineName }}
         <OTooltip v-if="pipelineName && pipelineName.length > 25" :content="pipelineName" />
@@ -56,18 +56,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="time-range-picker"
             />
           </div>
-          <div v-if="timerangeError" class="text-xs text-status-error-text mt-1">
+          <div v-if="timerangeError" class="text-status-error-text mt-1 text-xs">
             {{ timerangeError }}
           </div>
         </div>
 
         <!-- Advanced Options -->
         <div
-          class="collapsible-section flex flex-col transition-all overflow-hidden bg-card-glass-bg rounded-default shadow-[0_0_5px_1px_var(--color-hover-shadow)] border border-card-glass-border"
+          class="collapsible-section bg-card-glass-bg rounded-default border-card-glass-border flex flex-col overflow-hidden border shadow-[0_0_5px_1px_var(--color-hover-shadow)] transition-all"
           data-test="advanced-options-section"
         >
           <div
-            class="section-header flex items-center justify-between px-4 py-3 cursor-pointer shrink-0 border-b border-border-default transition-all rounded-t-default select-none hover:bg-interactive-hover-bg active:bg-interactive-hover-bg"
+            class="section-header border-border-default rounded-t-default hover:bg-interactive-hover-bg active:bg-interactive-hover-bg flex shrink-0 cursor-pointer items-center justify-between border-b px-4 py-3 transition-all select-none"
             @click="showAdvanced = !showAdvanced"
           >
             <div class="flex items-center gap-2">
@@ -83,13 +83,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="opacity-50 transition-all duration-200 hover:opacity-100"
             />
           </div>
-          <div v-show="showAdvanced" class="flex flex-col flex-1 overflow-hidden p-4">
+          <div v-show="showAdvanced" class="flex flex-1 flex-col overflow-hidden p-4">
             <div class="space-y-4">
               <!-- Chunk Period -->
-              <div class="grid grid-cols-12 gap-4 items-start">
+              <div class="grid grid-cols-12 items-start gap-4">
                 <div class="col-span-5">
-                  <div class="text-sm font-medium mb-1">Chunk Period (minutes)</div>
-                  <div class="text-xs text-text-secondary">Size of each processing chunk</div>
+                  <div class="mb-1 text-sm font-medium">Chunk Period (minutes)</div>
+                  <div class="text-text-secondary text-xs">Size of each processing chunk</div>
                 </div>
                 <div class="col-span-7">
                   <OFormInput
@@ -107,10 +107,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Delay Between Chunks -->
-              <div class="grid grid-cols-12 gap-4 items-start">
+              <div class="grid grid-cols-12 items-start gap-4">
                 <div class="col-span-5">
-                  <div class="text-sm font-medium mb-1">Delay Between Chunks (seconds)</div>
-                  <div class="text-xs text-text-secondary">Wait time between processing chunks</div>
+                  <div class="mb-1 text-sm font-medium">Delay Between Chunks (seconds)</div>
+                  <div class="text-text-secondary text-xs">Wait time between processing chunks</div>
                 </div>
                 <div class="col-span-7">
                   <OFormInput
@@ -137,23 +137,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <div
                   v-if="deleteBeforeBackfill"
-                  class="mt-3 p-4 rounded-default border bg-banner-warning-bg border-banner-warning-border"
+                  class="rounded-default bg-banner-warning-bg border-banner-warning-border mt-3 border p-4"
                 >
                   <div class="flex items-start gap-3">
-                    <OIcon name="warning" size="md" class="mt-0.5 text-banner-warning-text" />
+                    <OIcon name="warning" size="md" class="text-banner-warning-text mt-0.5" />
                     <div>
-                      <div class="font-semibold mb-2 text-banner-warning-text">
+                      <div class="text-banner-warning-text mb-2 font-semibold">
                         Warning: Irreversible Data Deletion
                       </div>
-                      <div class="text-xs mb-3 text-banner-warning-text">
+                      <div class="text-banner-warning-text mb-3 text-xs">
                         This will permanently delete all data in the destination stream for the
                         specified time range before running the backfill. This action cannot be
                         undone.
                       </div>
-                      <div class="font-semibold text-sm mb-1 text-banner-warning-text">
+                      <div class="text-banner-warning-text mb-1 text-sm font-semibold">
                         Time Alignment Requirements (UTC):
                       </div>
-                      <ul class="text-xs ml-5 space-y-1 list-disc text-banner-warning-text">
+                      <ul class="text-banner-warning-text ml-5 list-disc space-y-1 text-xs">
                         <li>
                           <strong>Logs</strong> streams: Times must align to hour boundaries in UTC
                           (e.g., 10:00:00, not 10:15:00)
@@ -174,14 +174,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Estimated Info -->
         <div
           v-if="estimatedInfo"
-          class="p-3 rounded-default border bg-banner-info-bg border-banner-info-border"
+          class="rounded-default bg-banner-info-bg border-banner-info-border border p-3"
         >
           <div class="text-banner-info-text">
-            <div class="flex items-center gap-2 font-medium mb-1">
+            <div class="mb-1 flex items-center gap-2 font-medium">
               <OIcon name="schedule" size="sm" />
               <span>Estimated Processing Time: {{ estimatedInfo.time }}</span>
             </div>
-            <div v-if="estimatedInfo.chunks" class="text-xs ml-6">
+            <div v-if="estimatedInfo.chunks" class="ml-6 text-xs">
               Estimated Chunks: {{ estimatedInfo.chunks }}
             </div>
           </div>
@@ -214,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       You have selected to delete existing data before backfill. This will permanently delete all
       data in the destination stream for the specified time range.
     </p>
-    <p class="font-semibold text-status-error-text">
+    <p class="text-status-error-text font-semibold">
       This action CANNOT be undone or cancelled once the job is created.
     </p>
     <p class="mt-4">Are you sure you want to proceed?</p>

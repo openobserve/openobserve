@@ -17,8 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div data-test="traces-search-result" class="overflow-hidden h-full">
-    <div class="bg-card-glass-bg h-full flex flex-col overflow-hidden">
+  <div data-test="traces-search-result" class="h-full overflow-hidden">
+    <div class="bg-card-glass-bg flex h-full flex-col overflow-hidden">
       <!-- Section header: title + count badge + insights + pagination -->
       <div
         v-if="
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         ref="sectionHeaderRef"
         data-test="traces-section-header"
-        class="flex items-center px-[0.4rem]! h-9 shrink-0 border-b border-border-default"
+        class="border-border-default flex h-9 shrink-0 items-center border-b px-[0.4rem]!"
       >
         <!-- Field panel toggle — same style as logs page -->
         <OButton
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="traces-error-count-badge"
           variant="error"
           :clickable="true"
-          class="text-xs rounded-default! py-[0.4rem]! px-2.5! text-xs!"
+          class="rounded-default! px-2.5! py-[0.4rem]! text-xs text-xs!"
           :class="
             showErrorOnly
               ? 'bg-badge-error-solid-bg! text-badge-error-solid-text!'
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Right: Refresh → Insights → rows per page → pagination (same sequence as logs) -->
         <div
-          class="inline-flex items-center border border-card-glass-border rounded-default px-1 h-6 mr-1 overflow-hidden"
+          class="border-card-glass-border rounded-default mr-1 inline-flex h-6 items-center overflow-hidden border px-1"
         >
           <ORefreshButton
             :last-run-at="searchObj.meta.lastRunAt"
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSelect
             :model-value="searchObj.meta.resultGrid.rowsPerPage"
             :options="rowsPerPageOptions"
-            class="select-pagination mr-1 mt-0! ml-1"
+            class="select-pagination mt-0! mr-1 ml-1"
             size="sm"
             data-test="traces-search-result-records-per-page"
             @update:model-value="changeRowsPerPage"
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disable="searchObj.loading"
             :model-value="searchObj.data.resultGrid.currentPage + 1"
             :max="totalPages"
-            class="float-right paginator-section mt-0!"
+            class="paginator-section float-right mt-0!"
             data-test="traces-search-result-pagination"
             @update:model-value="changePage"
           />
@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Combined scroll area: RED metrics + trace list scroll together.
            This is the single vertical scroller — the trace table delegates its
            virtualizer here (via :scroll-el) so it doesn't add a nested one. -->
-      <div ref="scrollContainerRef" class="flex-1 overflow-auto bg-card-glass-solid">
+      <div ref="scrollContainerRef" class="bg-card-glass-solid flex-1 overflow-auto">
         <!-- ════════════════════ RED Metrics Section ════════════════════ -->
         <transition
           enter-active-class="transition-all duration-300 ease-in-out"

@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="time-range-picker"
             />
           </div>
-          <div v-if="timerangeError" class="text-xs text-status-error-text mt-1">
+          <div v-if="timerangeError" class="text-status-error-text mt-1 text-xs">
             {{ timerangeError }}
           </div>
         </div>
@@ -57,10 +57,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           label="Advanced Options"
           data-test="advanced-options-expansion"
         >
-          <div class="p-3 space-y-2 mt-2">
+          <div class="mt-2 space-y-2 p-3">
             <!-- Chunk Period -->
             <div>
-              <div class="text-xs mb-1">
+              <div class="mb-1 text-xs">
                 Chunk Period (minutes)
                 <OIcon name="info-outline" size="sm" />
                 <OTooltip content="Size of each processing chunk in minutes. Default: 60" />
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Delay Between Chunks -->
             <div>
-              <div class="text-xs mb-1">
+              <div class="mb-1 text-xs">
                 Delay Between Chunks (seconds)
                 <OIcon name="info-outline" size="sm" />
                 <OTooltip content="Delay between processing chunks in seconds. Default: 5" />
@@ -97,19 +97,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <div
                 v-if="deleteBeforeBackfill"
-                class="mt-2 p-3 rounded-default border bg-banner-warning-bg border-banner-warning-border"
+                class="rounded-default bg-banner-warning-bg border-banner-warning-border mt-2 border p-3"
               >
                 <div class="flex items-start">
-                  <OIcon name="warning" size="sm" class="mr-2 mt-0.5" />
-                  <div class="text-xs text-banner-warning-text">
-                    <div class="font-semibold mb-1">Warning: Irreversible Data Deletion</div>
+                  <OIcon name="warning" size="sm" class="mt-0.5 mr-2" />
+                  <div class="text-banner-warning-text text-xs">
+                    <div class="mb-1 font-semibold">Warning: Irreversible Data Deletion</div>
                     <div class="mb-2">
                       This will permanently delete all data in the destination stream for the
                       specified time range before running the backfill. This action cannot be
                       undone.
                     </div>
-                    <div class="font-semibold text-xs mb-1">Time Alignment Requirements (UTC):</div>
-                    <ul class="ml-5 space-y-0.5 list-disc text-xs">
+                    <div class="mb-1 text-xs font-semibold">Time Alignment Requirements (UTC):</div>
+                    <ul class="ml-5 list-disc space-y-0.5 text-xs">
                       <li>
                         <strong>Logs</strong> streams: Times must align to hour boundaries in UTC
                         (e.g., 10:00:00, not 10:15:00)

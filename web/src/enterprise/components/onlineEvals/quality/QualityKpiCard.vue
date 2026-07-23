@@ -1,39 +1,39 @@
 <template>
   <div
-    class="bg-card-glass-bg rounded-default flex flex-col px-3.5 pt-2.5 pb-2.5 gap-1 border border-border-default transition-shadow duration-200 ease-in-out hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
+    class="bg-card-glass-bg rounded-default border-border-default flex flex-col gap-1 border px-3.5 pt-2.5 pb-2.5 transition-shadow duration-200 ease-in-out hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
     :data-test="`quality-kpi-${kpi.id}`"
   >
     <div class="flex flex-col gap-1">
       <!-- Label + a metric icon in a soft corner tile — same KPI-card pattern
            as LLM Insights / Session Detail so every card reads the same. -->
-      <div class="flex items-center justify-between gap-2 mb-1">
+      <div class="mb-1 flex items-center justify-between gap-2">
         <div
-          class="kpi-label text-2xs font-semibold leading-normal text-text-secondary min-w-0 truncate"
+          class="kpi-label text-2xs text-text-secondary min-w-0 truncate leading-normal font-semibold"
         >
           {{ t(`onlineEvals.quality.kpis.${kpi.id}.title`) }}
         </div>
         <span
-          class="inline-flex items-center justify-center shrink-0 w-6 h-6 rounded-default bg-surface-subtle text-text-secondary"
+          class="rounded-default bg-surface-subtle text-text-secondary inline-flex h-6 w-6 shrink-0 items-center justify-center"
         >
           <OIcon :name="cardIcon" size="sm" />
         </span>
       </div>
       <div class="flex items-baseline gap-[0.2rem]">
         <template v-if="kpi.value != null">
-          <span class="text-2xl font-bold leading-none text-text-secondary">
+          <span class="text-text-secondary text-2xl leading-none font-bold">
             {{ bigNumber }}
           </span>
-          <span v-if="unitLabel" class="text-compact font-semibold text-text-secondary">
+          <span v-if="unitLabel" class="text-compact text-text-secondary font-semibold">
             {{ unitLabel }}
           </span>
         </template>
-        <span v-else class="text-base font-medium leading-none text-text-muted">
+        <span v-else class="text-text-muted text-base leading-none font-medium">
           {{ t("onlineEvals.quality.kpis.noData") }}
         </span>
       </div>
       <div
         v-if="kpi.id === 'scoreResults' && kpi.scopeCounts"
-        class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-3xs font-medium text-text-tertiary"
+        class="text-3xs text-text-tertiary flex flex-wrap items-center gap-x-2 gap-y-0.5 font-medium"
         data-test="quality-kpi-scope-breakdown"
       >
         <span
@@ -43,7 +43,7 @@
           :data-test="`quality-kpi-scope-${scope}`"
         >
           <span>{{ t(`onlineEvals.quality.scopes.${scope}`) }}</span>
-          <span class="font-semibold text-text-secondary">
+          <span class="text-text-secondary font-semibold">
             {{ compactCount(kpi.scopeCounts[scope]) }}
           </span>
         </span>
@@ -55,7 +55,7 @@
            short history) rather than zero. -->
       <div
         v-if="kpi.value != null"
-        class="text-3xs font-medium flex items-center gap-1"
+        class="text-3xs flex items-center gap-1 font-medium"
         :class="{
           'text-status-success-text': (delta != null ? trendSentiment : 'neutral') === 'good',
           'text-error-600': (delta != null ? trendSentiment : 'neutral') === 'bad',

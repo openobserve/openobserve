@@ -27,11 +27,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:model-value="(v: number) => (splitterModel = v)"
       :limits="[0, 250]"
       unit="px"
-      class="flex-1 min-h-0 overflow-hidden"
+      class="min-h-0 flex-1 overflow-hidden"
     >
       <template #before>
-        <div class="flex flex-col border-r4 border-r border-border-default h-full">
-          <div class="sticky top-0 px-2 shrink-0">
+        <div class="border-r4 border-border-default flex h-full flex-col border-r">
+          <div class="sticky top-0 shrink-0 px-2">
             <div class="flex items-center justify-between p-2" style="font-size: var(--text-lg)">
               <span class="flex items-center gap-1">
                 {{ t("nodes.filter_header") }}
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="min-h-0 overflow-y-auto">
-            <div class="flex flex-col pb-2 px-2">
+            <div class="flex flex-col px-2 pb-2">
               <OCollapsible
                 v-if="regionRows.length > 0 && store.state.zoConfig.super_cluster_enabled"
                 variant="sidebar"
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     clearable
                     :debounce="1"
                     :placeholder="t('nodes.searchRegion')"
-                    class="w-full filter-input"
+                    class="filter-input w-full"
                   />
                   <OTable
                     data-test="nodes-region-table"
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     clearable
                     :debounce="1"
                     :placeholder="t('nodes.searchCluster')"
-                    class="w-full filter-input"
+                    class="filter-input w-full"
                   />
                   <OTable
                     data-test="nodes-cluster-table"
@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template #cell-name="{ row }">
                       <span
                         :class="`status-${row.name.toLowerCase()}`"
-                        class="self-stretch mr-1"
+                        class="mr-1 self-stretch"
                       ></span
                       >{{ row.name }}
                     </template>
@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :label="t('nodes.cpuusage')"
               >
                 <div class="px-1 pb-2">
-                  <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2 ml-1">
+                  <div class="ml-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2">
                     <OInput
                       data-test="nodes-filter-cpuusage-min"
                       type="number"
@@ -225,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :min="0"
                     :max="maxCPUUsage"
-                    class="w-[85%] mt-3 ml-3"
+                    class="mt-3 ml-3 w-[85%]"
                   />
                 </div>
               </OCollapsible>
@@ -238,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :label="t('nodes.memoryusage')"
               >
                 <div class="px-1 pb-2">
-                  <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2 ml-1">
+                  <div class="ml-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2">
                     <OInput
                       data-test="nodes-filter-memoryusage-min"
                       type="number"
@@ -267,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :min="0"
                     :max="maxMemoryUsage"
-                    class="w-[85%] mt-3 ml-3"
+                    class="mt-3 ml-3 w-[85%]"
                   />
                 </div>
               </OCollapsible>
@@ -285,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-model="establishedToggle"
                     :label="t('nodes.establishedLabel')"
                   />
-                  <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2 ml-1">
+                  <div class="ml-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2">
                     <OInput
                       :disable="!establishedToggle"
                       data-test="nodes-filter-established-min"
@@ -317,7 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :min="0"
                     :max="maxEstablished"
-                    class="w-[85%] mt-3 ml-3"
+                    class="mt-3 ml-3 w-[85%]"
                   />
 
                   <OCheckbox
@@ -326,7 +326,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-model="closewaitToggle"
                     :label="t('nodes.closewaitLabel')"
                   />
-                  <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2 ml-1">
+                  <div class="ml-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2">
                     <OInput
                       :disable="!closewaitToggle"
                       data-test="nodes-filter-closewait-min"
@@ -358,7 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :min="0"
                     :max="maxClosewait"
-                    class="w-[85%] mt-3 ml-3"
+                    class="mt-3 ml-3 w-[85%]"
                   />
 
                   <OCheckbox
@@ -367,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-model="waittimeToggle"
                     :label="t('nodes.waittimeLabel')"
                   />
-                  <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2 ml-1">
+                  <div class="ml-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2">
                     <OInput
                       :disable="!waittimeToggle"
                       data-test="nodes-filter-waittime-min"
@@ -399,13 +399,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :min="0"
                     :max="maxWaittime"
-                    class="w-[85%] mt-3 ml-3"
+                    class="mt-3 ml-3 w-[85%]"
                   />
                 </div>
               </OCollapsible>
             </div>
           </div>
-          <div class="flex justify-end px-2 py-2 shrink-0 border-t">
+          <div class="flex shrink-0 justify-end border-t px-2 py-2">
             <OButton variant="primary" size="sm-action" @click="applyFilter()">
               {{ t("nodes.applyFilter") }}
             </OButton>
@@ -413,9 +413,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <template #after>
-        <div class="flex flex-col h-full min-h-0">
+        <div class="flex h-full min-h-0 flex-col">
           <OTable
-            class="flex-1 min-h-0"
+            class="min-h-0 flex-1"
             ref="qTable"
             data-test="nodes-main-table"
             :data="visibleRows"
@@ -493,7 +493,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-cpu="{ row }">
               <OProgressBar
                 size="sm"
-                class="bg-[lightgrey] w-[80%]! max-w-[80%] inline-block"
+                class="inline-block w-[80%]! max-w-[80%] bg-[lightgrey]"
                 :value="row.cpu_usage / 100"
                 :variant="row.cpu_usage > 85 ? 'danger' : 'default'"
               />
@@ -503,7 +503,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-memory="{ row }">
               <OProgressBar
                 size="sm"
-                class="bg-[lightgrey] w-[80%]! max-w-[80%] inline-block"
+                class="inline-block w-[80%]! max-w-[80%] bg-[lightgrey]"
                 :value="row.percentage_memory_usage / 100"
                 :variant="row.percentage_memory_usage > 85 ? 'danger' : 'default'"
               />

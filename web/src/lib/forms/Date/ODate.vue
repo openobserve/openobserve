@@ -132,11 +132,11 @@ const wrapperClasses = computed(() => [
 </script>
 
 <template>
-  <div v-bind="wrapperAttrs" class="flex flex-col gap-1 w-full">
+  <div v-bind="wrapperAttrs" class="flex w-full flex-col gap-1">
     <label
       v-if="$slots.label || label || $slots.tooltip"
       :for="inputId"
-      class="o-input-label text-sm font-semibold leading-tight flex items-center gap-1"
+      class="o-input-label flex items-center gap-1 text-sm leading-tight font-semibold"
     >
       <slot name="label">{{ label }}</slot
       ><span v-if="required" aria-hidden="true" class="select-none">*</span>
@@ -145,7 +145,7 @@ const wrapperClasses = computed(() => [
         name="info-outline"
         size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
-        class="cursor-help text-datepicker-label"
+        class="text-datepicker-label cursor-help"
         ><slot name="tooltip"
       /></OIcon>
     </label>
@@ -170,7 +170,7 @@ const wrapperClasses = computed(() => [
       >
         <!-- Calendar trigger (calendar icon) -->
         <DatePickerTrigger
-          class="flex items-center ps-3 text-datepicker-icon shrink-0 outline-none cursor-pointer disabled:cursor-not-allowed"
+          class="text-datepicker-icon flex shrink-0 cursor-pointer items-center ps-3 outline-none disabled:cursor-not-allowed"
           aria-label="Open calendar"
         >
           <OIcon name="calendar-month" size="sm" aria-hidden="true" />
@@ -181,7 +181,7 @@ const wrapperClasses = computed(() => [
           :id="inputId"
           :tabindex="inputTabindex"
           :class="[
-            'flex items-center flex-1 min-w-0 ps-2 gap-px outline-none',
+            'flex min-w-0 flex-1 items-center gap-px ps-2 outline-none',
             clearable ? 'pe-2' : 'pe-3',
             heightClasses[size ?? 'md'],
           ]"
@@ -193,8 +193,8 @@ const wrapperClasses = computed(() => [
                 :class="[
                   'text-datepicker-text',
                   seg.part !== 'literal'
-                    ? 'rounded-default px-px outline-none tabular-nums data-placeholder:text-datepicker-placeholder focus:bg-datepicker-segment-focus-bg focus:text-datepicker-segment-focus-text focus:data-placeholder:text-datepicker-segment-focus-text'
-                    : 'select-none text-datepicker-placeholder',
+                    ? 'rounded-default data-placeholder:text-datepicker-placeholder focus:bg-datepicker-segment-focus-bg focus:text-datepicker-segment-focus-text focus:data-placeholder:text-datepicker-segment-focus-text px-px tabular-nums outline-none'
+                    : 'text-datepicker-placeholder select-none',
                 ]"
                 >{{ seg.value }}</DatePickerInput
               >
@@ -208,7 +208,7 @@ const wrapperClasses = computed(() => [
           type="button"
           tabindex="-1"
           aria-label="Clear"
-          class="flex items-center pe-2 text-datepicker-icon hover:opacity-80 transition-colors"
+          class="text-datepicker-icon flex items-center pe-2 transition-colors hover:opacity-80"
           @click="handleClear"
         >
           <svg
@@ -229,12 +229,12 @@ const wrapperClasses = computed(() => [
       <DatePickerContent
         :side-offset="4"
         align="start"
-        class="z-50 rounded-default border shadow-md p-3 bg-datepicker-popup-bg border-datepicker-popup-border"
+        class="rounded-default bg-datepicker-popup-bg border-datepicker-popup-border z-50 border p-3 shadow-md"
       >
         <DatePickerCalendar v-slot="{ weekDays, grid }">
-          <DatePickerHeader class="flex items-center justify-between mb-3">
+          <DatePickerHeader class="mb-3 flex items-center justify-between">
             <DatePickerPrev
-              class="flex items-center justify-center size-7 rounded-default transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base text-datepicker-icon hover:bg-datepicker-nav-hover-bg focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring"
+              class="rounded-default ring-offset-surface-base text-datepicker-icon hover:bg-datepicker-nav-hover-bg focus-visible:ring-datepicker-focus-ring flex size-7 items-center justify-center ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -251,10 +251,10 @@ const wrapperClasses = computed(() => [
               </svg>
             </DatePickerPrev>
 
-            <DatePickerHeading class="text-sm font-medium text-datepicker-heading-text" />
+            <DatePickerHeading class="text-datepicker-heading-text text-sm font-medium" />
 
             <DatePickerNext
-              class="flex items-center justify-center size-7 rounded-default transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base text-datepicker-icon hover:bg-datepicker-nav-hover-bg focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring"
+              class="rounded-default ring-offset-surface-base text-datepicker-icon hover:bg-datepicker-nav-hover-bg focus-visible:ring-datepicker-focus-ring flex size-7 items-center justify-center ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -274,11 +274,11 @@ const wrapperClasses = computed(() => [
 
           <DatePickerGrid v-for="month in grid" :key="month.value.toString()">
             <DatePickerGridHead>
-              <DatePickerGridRow class="flex gap-1 mb-1">
+              <DatePickerGridRow class="mb-1 flex gap-1">
                 <DatePickerHeadCell
                   v-for="day in weekDays"
                   :key="day"
-                  class="w-8 h-6 flex items-center justify-center text-xs font-medium text-datepicker-weekday-text"
+                  class="text-datepicker-weekday-text flex h-6 w-8 items-center justify-center text-xs font-medium"
                 >
                   {{ day }}
                 </DatePickerHeadCell>
@@ -289,13 +289,13 @@ const wrapperClasses = computed(() => [
               <DatePickerGridRow
                 v-for="(weekDates, idx) in month.rows"
                 :key="idx"
-                class="flex gap-1 mb-1"
+                class="mb-1 flex gap-1"
               >
                 <DatePickerCell v-for="date in weekDates" :key="date.toString()" :date="date">
                   <DatePickerCellTrigger
                     :day="date"
                     :month="month.value"
-                    class="flex items-center justify-center size-8 rounded-default text-xs cursor-pointer outline-none transition-[color,background-color,border-color,box-shadow] duration-150 ring-offset-1 ring-offset-surface-base text-datepicker-day-text hover:bg-datepicker-day-hover-bg focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring data-selected:bg-datepicker-day-selected-bg data-selected:text-datepicker-day-selected-text data-today:border data-today:border-datepicker-day-today-border data-outside-view:text-datepicker-day-outside-text data-unavailable:text-datepicker-day-disabled-text data-unavailable:cursor-not-allowed data-unavailable:hover:bg-transparent"
+                    class="rounded-default ring-offset-surface-base text-datepicker-day-text hover:bg-datepicker-day-hover-bg focus-visible:ring-datepicker-focus-ring data-selected:bg-datepicker-day-selected-bg data-selected:text-datepicker-day-selected-text data-today:border-datepicker-day-today-border data-outside-view:text-datepicker-day-outside-text data-unavailable:text-datepicker-day-disabled-text flex size-8 cursor-pointer items-center justify-center text-xs ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2 data-today:border data-unavailable:cursor-not-allowed data-unavailable:hover:bg-transparent"
                   >
                     {{ date.day }}
                   </DatePickerCellTrigger>
@@ -308,12 +308,12 @@ const wrapperClasses = computed(() => [
         <!-- Apply button (only when autoApply=false) -->
         <div
           v-if="autoApply === false"
-          class="flex justify-end mt-2 pt-2 border-t border-datepicker-popup-border"
+          class="border-datepicker-popup-border mt-2 flex justify-end border-t pt-2"
         >
           <button
             type="button"
             :disabled="disabled"
-            class="px-4 py-1.5 rounded-default text-xs font-medium bg-datepicker-day-selected-bg text-datepicker-day-selected-text outline-none ring-offset-1 ring-offset-surface-base hover:opacity-90 transition-[box-shadow] duration-150 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring disabled:opacity-50 disabled:cursor-not-allowed"
+            class="rounded-default bg-datepicker-day-selected-bg text-datepicker-day-selected-text ring-offset-surface-base focus-visible:ring-datepicker-focus-ring px-4 py-1.5 text-xs font-medium ring-offset-1 transition-[box-shadow] duration-150 outline-none hover:opacity-90 focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
             @click="handleApply"
           >
             Apply
@@ -325,12 +325,12 @@ const wrapperClasses = computed(() => [
     <div v-if="effectiveError || helpText" class="flex items-center gap-2">
       <span
         v-if="effectiveError && effectiveError.trim()"
-        class="text-xs text-datepicker-error-text leading-none"
+        class="text-datepicker-error-text text-xs leading-none"
         role="alert"
       >
         {{ effectiveError }}
       </span>
-      <span v-else-if="helpText" class="text-xs text-datepicker-label leading-none">
+      <span v-else-if="helpText" class="text-datepicker-label text-xs leading-none">
         {{ helpText }}
       </span>
     </div>

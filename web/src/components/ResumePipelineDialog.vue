@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="onCancel"
     @click:primary="onConfirm"
   >
-    <div class="flex flex-col gap-1.75 w-78">
+    <div class="flex w-78 flex-col gap-1.75">
       <ORadioGroup v-model="resumeFromStart">
         <ORadio class="items-center" :value="false">
           <template #label>
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="lastPausedAt"
-                class="resume-radio-sub-text text-xs leading-4.5 font-normal h-4.5"
+                class="resume-radio-sub-text h-4.5 text-xs leading-4.5 font-normal"
               >
                 {{ convertUnixToDateFormat(lastPausedAt) }}.
               </div>

@@ -25,20 +25,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   GET /workflows/{id}/history, mirroring AlertHistory's presentation.
 -->
 <template>
-  <div class="flex flex-col h-full min-h-0" data-test="workflow-runs-panel">
+  <div class="flex h-full min-h-0 flex-col" data-test="workflow-runs-panel">
     <!-- Compact header: title + datetime range picker + refresh -->
     <div
-      class="flex items-center justify-between gap-2 px-3 py-2 border-b border-border-default shrink-0"
+      class="border-border-default flex shrink-0 items-center justify-between gap-2 border-b px-3 py-2"
     >
       <div class="min-w-0">
-        <div class="text-sm font-semibold text-text-body leading-tight">
+        <div class="text-text-body text-sm leading-tight font-semibold">
           {{ t("workflow.history.title") }}
         </div>
-        <div v-if="workflowName" class="text-xs text-text-secondary truncate leading-tight">
+        <div v-if="workflowName" class="text-text-secondary truncate text-xs leading-tight">
           {{ workflowName }}
         </div>
       </div>
-      <div class="flex items-center gap-2 shrink-0">
+      <div class="flex shrink-0 items-center gap-2">
         <DateTime
           ref="dateTimeRef"
           auto-apply
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div class="flex-1 min-h-0 flex flex-col gap-2 p-2">
+    <div class="flex min-h-0 flex-1 flex-col gap-2 p-2">
       <!-- Run-frequency timeline (reused from AlertHistory for consistency). -->
       <WorkflowExecutionTimeline
         v-if="rows.length > 0"
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="shrink-0"
       />
 
-      <div class="alert-history-table flex-1 min-h-0">
+      <div class="alert-history-table min-h-0 flex-1">
         <OTable
           data-test="workflow-runs-table"
           :data="rows"
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           sort-by="start_time"
           sort-order="desc"
           width="100%"
-          class="w-full h-full"
+          class="h-full w-full"
           @row-click="openRun"
         >
           <!-- A failed fetch used to fall through to <NoData />, so "request

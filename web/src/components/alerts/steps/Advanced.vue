@@ -22,22 +22,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          description, row_template, row_template_type); the composed schema in
          AddAlert.schema.ts validates on save. -->
     <div>
-      <div class="step-content rounded-default bg-surface-overlay border border-border-default">
+      <div class="step-content rounded-default bg-surface-overlay border-border-default border">
         <!-- Section header -->
-        <div class="section-header flex items-center py-2.5 px-3 border-b border-border-default">
+        <div class="section-header border-border-default flex items-center border-b px-3 py-2.5">
           <div
-            class="section-header-accent w-0.75 h-4 rounded-default mr-2 shrink-0 bg-theme-accent"
+            class="section-header-accent rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0"
           />
-          <span class="section-header-title text-compact font-semibold text-text-heading">{{
+          <span class="section-header-title text-compact text-text-heading font-semibold">{{
             t("alerts.additional_settings")
           }}</span>
         </div>
 
-        <div class="px-3 py-3 flex flex-col gap-4">
+        <div class="flex flex-col gap-4 px-3 py-3">
           <!-- Template Override -->
           <div>
             <div
-              class="subsection-label flex items-center text-xs font-semibold mb-2 text-text-secondary"
+              class="subsection-label text-text-secondary mb-2 flex items-center text-xs font-semibold"
             >
               <span>{{ t("alerts.template") }}</span>
               <OButton
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="formattedTemplates"
                 clearable
                 :placeholder="t('alerts.advanced.selectTemplate')"
-                class="min-w-60 max-w-75"
+                class="max-w-75 min-w-60"
                 data-test="advanced-template-override-select"
               >
                 <template #empty>{{ t("alerts.advanced.noTemplatesAvailable") }}</template>
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Context Variables -->
           <div>
             <div
-              class="subsection-label flex items-center text-xs font-semibold mb-2 text-text-secondary"
+              class="subsection-label text-text-secondary mb-2 flex items-center text-xs font-semibold"
             >
               <span>{{ t("alerts.additionalVariables") }}</span>
               <OButton
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="(variable, index) in variableRows"
                 :key="index"
-                class="flex items-center gap-2 mb-2"
+                class="mb-2 flex items-center gap-2"
                 :data-test="`alert-variables-${index + 1}`"
               >
                 <OFormInput
@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Description -->
           <div>
             <div
-              class="subsection-label flex items-center text-xs font-semibold mb-2 text-text-secondary"
+              class="subsection-label text-text-secondary mb-2 flex items-center text-xs font-semibold"
             >
               <span>{{ t("alerts.description") }}</span>
             </div>
@@ -162,9 +162,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Row Template -->
           <div>
-            <div class="flex items-center justify-between mb-2">
+            <div class="mb-2 flex items-center justify-between">
               <div
-                class="subsection-label flex items-center text-xs font-semibold text-text-secondary"
+                class="subsection-label text-text-secondary flex items-center text-xs font-semibold"
               >
                 <span>{{ t("alerts.row") }}</span>
                 <OButton

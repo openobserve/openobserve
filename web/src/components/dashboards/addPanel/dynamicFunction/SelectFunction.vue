@@ -11,19 +11,19 @@
         @search="onFunctionSearch"
       />
     </div>
-    <div class="w-full mt-2">
+    <div class="mt-2 w-full">
       <!-- Loop through the args for the first n-1 arguments -->
       <div class="w-full">
         <div
           v-for="(arg, argIndex) in argRows"
           :key="argIndex + '-' + arg.type"
-          class="w-full flex flex-col"
+          class="flex w-full flex-col"
         >
           <div class="flex" :style="{ marginLeft: isChild ? '-48px' : '0px' }">
-            <div class="mr-2 relative w-3 min-h-12.5">
+            <div class="relative mr-2 min-h-12.5 w-3">
               <!-- Vertical Line using top & bottom instead of height -->
               <div
-                class="absolute top-0 w-px bg-accent opacity-50"
+                class="bg-accent absolute top-0 w-px opacity-50"
                 :style="{
                   bottom: argIndex === fields.args.length - 1 ? 'calc(100% - 32px)' : '0',
                   left: '6px',
@@ -31,12 +31,12 @@
               ></div>
 
               <!-- SubTask Arrow -->
-              <div class="absolute top-7.5 left-1.25 text-text-secondary">
+              <div class="text-text-secondary absolute top-7.5 left-1.25">
                 <SubTaskArrow />
               </div>
             </div>
 
-            <div class="flex flex-col flex-1 min-w-0">
+            <div class="flex min-w-0 flex-1 flex-col">
               <div class="flex items-center gap-x-2">
                 <label :for="'arg-' + argIndex">{{
                   getParameterLabel(fields.functionName, argIndex)

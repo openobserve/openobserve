@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="h-full max-h-full overflow-hidden">
-    <div v-if="isAddVariable" class="flex flex-col h-full max-h-full overflow-hidden">
+    <div v-if="isAddVariable" class="flex h-full max-h-full flex-col overflow-hidden">
       <AddSettingVariable
         v-if="isAddVariable"
         @save="handleSaveVariable"
@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :dashboardVariablesList="dashboardVariablesList"
       />
     </div>
-    <div v-else class="flex flex-col h-full max-h-full overflow-hidden">
+    <div v-else class="flex h-full max-h-full flex-col overflow-hidden">
       <DashboardHeader :title="t('dashboard.variableSettingsPage.variables')">
         <template #right>
           <div class="flex gap-2">
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #cell-drag>
             <div
-              class="variable-drag-handle flex items-center justify-center cursor-move"
+              class="variable-drag-handle flex cursor-move items-center justify-center"
               data-test="dashboard-variable-settings-drag-handle"
             >
               <OIcon name="drag-indicator" size="sm" />

@@ -19,14 +19,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        setup() via useAlertForm's useOForm and handed to <OForm :form> so the
        topbar OForm* fields and the already-migrated descendant steps
        (QueryConfig / AlertSettings) bind by nested `name=` into it. -->
-  <OForm :form="form" v-slot="{ isSubmitting }" class="w-full h-full">
+  <OForm :form="form" v-slot="{ isSubmitting }" class="h-full w-full">
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- V3 "Single Pane of Glass" Layout (All alert types)                -->
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <OPageLayout bleed>
       <template #header>
         <OPageHeader
-          class="alert-v3-topbar [container-type:inline-size] [container-name:topbar] shrink-0 border-b border-border-default"
+          class="alert-v3-topbar border-border-default [container-type:inline-size] shrink-0 border-b [container-name:topbar]"
           :back="{
             label: activeFolderName || t('alerts.header'),
             onClick: goBackToAlertsList,
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <span
                 v-if="anomalyConfig.last_detection_run && anomalyConfig.last_detection_run > 0"
-                class="text-2xs whitespace-nowrap text-text-secondary"
+                class="text-2xs text-text-secondary whitespace-nowrap"
               >
                 {{
                   t("alerts.lastRun", { time: anomalyFormatTs(anomalyConfig.last_detection_run) })
@@ -87,10 +87,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #tabs>
             <div
               v-if="!(beingUpdated || anomalyEditMode)"
-              class="flex items-center gap-1.5 min-w-0"
+              class="flex min-w-0 items-center gap-1.5"
             >
-              <div class="flex items-center gap-1.5 shrink-0">
-                <div class="text-xs font-semibold whitespace-nowrap text-text-heading">
+              <div class="flex shrink-0 items-center gap-1.5">
+                <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
                   {{ isAnomalyMode ? t("alerts.anomalyName") : t("alerts.incidents.alertName") }}
                   <span class="text-text-body">*</span>
                 </div>
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   name="name"
                   data-test="add-alert-name-input"
                   :placeholder="t('alerts.alertNamePlaceholder')"
-                  class="topbar-name-input text-sm h-7! min-h-7! min-w-30 max-w-37.5 @max-[1300px]/topbar:min-w-25 @max-[850px]/topbar:min-w-22.5 @max-[680px]/topbar:min-w-17.5"
+                  class="topbar-name-input h-7! min-h-7! max-w-37.5 min-w-30 text-sm @max-[1300px]/topbar:min-w-25 @max-[850px]/topbar:min-w-22.5 @max-[680px]/topbar:min-w-17.5"
                 />
                 <!-- Anomaly name binds the SAME `name` field as the alert name, not
                    `anomalyConfig.name`: a bare OInput has no field for the schema
@@ -114,19 +114,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   name="name"
                   data-test="add-anomaly-name-input"
                   :placeholder="t('alerts.anomalyNamePlaceholder')"
-                  class="topbar-name-input text-sm h-7! min-h-7! min-w-30 max-w-37.5 @max-[1300px]/topbar:min-w-25 @max-[850px]/topbar:min-w-22.5 @max-[680px]/topbar:min-w-17.5"
+                  class="topbar-name-input h-7! min-h-7! max-w-37.5 min-w-30 text-sm @max-[1300px]/topbar:min-w-25 @max-[850px]/topbar:min-w-22.5 @max-[680px]/topbar:min-w-17.5"
                 />
               </div>
 
               <!-- Folder -->
-              <div class="flex items-center gap-1.5 shrink-0">
-                <div class="text-xs font-semibold whitespace-nowrap text-text-heading">
+              <div class="flex shrink-0 items-center gap-1.5">
+                <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
                   {{ t("alerts.folder") }}
                 </div>
                 <InlineSelectFolderDropdown
                   :model-value="activeFolderId as string"
                   type="alerts"
-                  class="topbar-folder-select min-w-15 max-w-35"
+                  class="topbar-folder-select max-w-35 min-w-15"
                   @update:model-value="updateActiveFolderId({ value: $event })"
                 />
               </div>
@@ -135,15 +135,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OPageHeader>
       </template>
 
-      <div class="flex flex-1 min-h-0">
+      <div class="flex min-h-0 flex-1">
         <!-- LEFT column wrapper (flex: 6.5) -->
-        <div class="flex-[6.5] min-w-0 min-h-0 flex flex-col gap-2 py-2">
+        <div class="flex min-h-0 min-w-0 flex-[6.5] flex-col gap-2 py-2">
           <!-- Stream Name & Stream Type -->
           <div
-            class="bg-card-glass-bg shrink-0 stream-config-card [container-type:inline-size] [container-name:stream-config]"
+            class="bg-card-glass-bg stream-config-card [container-type:inline-size] shrink-0 [container-name:stream-config]"
           >
-            <div class="flex items-center gap-0 py-2.5 px-3 border-b border-border-default">
-              <div class="w-0.75 h-4 rounded-default mr-2 shrink-0 bg-theme-accent" />
+            <div class="border-border-default flex items-center gap-0 border-b px-3 py-2.5">
+              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact font-semibold tracking-[0.01em]"
                 >{{ t("alerts.streamConfig") }} <span class="text-text-body">*</span></span
               >
@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex items-center gap-4 px-3 py-2">
               <!-- Stream Type -->
               <div class="flex items-center gap-1.5">
-                <div class="text-xs font-semibold whitespace-nowrap text-text-heading">
+                <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
                   {{ t("alerts.streamType") }} <span class="text-text-body">*</span>
                 </div>
                 <OFormSelect
@@ -168,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Stream Name -->
               <div class="flex items-center gap-1.5">
-                <div class="text-xs font-semibold whitespace-nowrap text-text-heading">
+                <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
                   {{ t("alerts.stream_name") }} <span class="text-text-body">*</span>
                 </div>
                 <OFormSelect
@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Alert Type -->
               <div class="flex items-center gap-1.5">
-                <div class="text-xs font-semibold whitespace-nowrap text-text-heading">
+                <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
                   {{ t("alerts.alertType") }}
                 </div>
                 <OFormSelect
@@ -205,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- TIER 3: Configuration Tabs -->
-          <div class="alert-v3-tabs bg-card-glass-bg flex-1 min-h-0 flex flex-col mx-2">
+          <div class="alert-v3-tabs bg-card-glass-bg mx-2 flex min-h-0 flex-1 flex-col">
             <!-- Tab Headers -->
             <OToggleGroup
               :model-value="activeTab"
@@ -373,7 +373,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Footer: Cancel / Save (left column, separate card) -->
           <div
-            class="bg-card-glass-bg flex items-center justify-end px-3 py-2.5 shrink-0 gap-2 border-t border-border-default"
+            class="bg-card-glass-bg border-border-default flex shrink-0 items-center justify-end gap-2 border-t px-3 py-2.5"
           >
             <OButton
               data-test="add-alert-cancel-btn"
@@ -400,18 +400,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- TIER 2: Preview + Summary (RIGHT 30%) -->
         <!-- border-l: full-height vertical divider flush against the Preview/Summary pane -->
         <div
-          class="flex flex-col gap-2 border-l border-border-default pt-2 pb-2 flex-[3.5] min-w-0 min-h-0 overflow-hidden"
+          class="border-border-default flex min-h-0 min-w-0 flex-[3.5] flex-col gap-2 overflow-hidden border-l pt-2 pb-2"
         >
           <!-- Preview Card -->
-          <div class="bg-card-glass-bg overflow-hidden flex flex-col flex-1 min-h-0">
+          <div class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden">
             <div
-              class="flex items-center px-3 py-2.5 select-none border-b border-border-default shrink-0 gap-2"
+              class="border-border-default flex shrink-0 items-center gap-2 border-b px-3 py-2.5 select-none"
             >
               <span class="text-sm font-medium">{{
                 isAnomalyMode ? t("alerts.sqlPreview") : t("alerts.preview")
               }}</span>
               <template v-if="!isAnomalyMode && activeEvaluationStatus">
-                <div class="w-px h-4 bg-border-default" />
+                <div class="bg-border-default h-4 w-px" />
                 <OIcon
                   :name="activeEvaluationStatus.wouldTrigger ? 'check-circle' : 'cancel'"
                   :class="
@@ -434,7 +434,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="text-xs opacity-60">{{ activeEvaluationStatus.reason }}</span>
               </template>
             </div>
-            <div class="flex-1 min-h-0 overflow-hidden">
+            <div class="min-h-0 flex-1 overflow-hidden">
               <template v-if="isAnomalyMode">
                 <!-- editor-height is QueryEditor's own API for this; a class cannot
                    win against the inline height its rootStyle always sets. -->
@@ -451,15 +451,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-else>
                 <div
                   v-if="!formData.stream_name"
-                  class="flex flex-col items-center justify-center h-full gap-2"
+                  class="flex h-full flex-col items-center justify-center gap-2"
                 >
                   <OIcon name="query-stats" size="lg" class="opacity-20" />
-                  <span class="text-sm font-medium text-text-secondary">
+                  <span class="text-text-secondary text-sm font-medium">
                     {{ t("alerts.previewEmptyState") }}
                   </span>
                 </div>
                 <PreviewAlert
-                  class="w-full h-full"
+                  class="h-full w-full"
                   v-else
                   ref="previewAlertRef"
                   :formData="formData"
@@ -475,13 +475,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Summary Card -->
-          <div class="bg-card-glass-bg overflow-hidden flex flex-col flex-1 min-h-0">
+          <div class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden">
             <div
-              class="flex items-center px-3 py-2.5 select-none border-b border-border-default shrink-0"
+              class="border-border-default flex shrink-0 items-center border-b px-3 py-2.5 select-none"
             >
               <span class="text-sm font-medium">{{ t("alerts.summary.title") }}</span>
             </div>
-            <div class="flex-1 min-h-0 overflow-auto">
+            <div class="min-h-0 flex-1 overflow-auto">
               <AnomalySummary
                 class="h-full overflow-auto"
                 v-if="isAnomalyMode"

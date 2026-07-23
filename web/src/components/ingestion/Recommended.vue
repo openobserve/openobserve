@@ -25,9 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     panel-data-test="data-sources-recommended-tabs"
     tab-data-test-prefix="ingestion-recommended-tab-"
   >
-    <div class="w-full h-full">
+    <div class="h-full w-full">
       <div class="bg-card-glass-bg h-full">
-        <div class="overflow-auto h-full pt-1.5">
+        <div class="h-full overflow-auto pt-1.5">
           <router-view
             :title="tabs"
             :currOrgIdentifier="currOrgIdentifier"

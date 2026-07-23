@@ -257,7 +257,7 @@ function handleKeydown(e: KeyboardEvent): void {
     <span
       v-if="dot"
       :class="[
-        'inline-block shrink-0 rounded-full size-1.75 bg-current',
+        'inline-block size-1.75 shrink-0 rounded-full bg-current',
         size === 'sm' ? 'me-0' : 'me-0',
       ]"
       aria-hidden="true"
@@ -274,7 +274,7 @@ function handleKeydown(e: KeyboardEvent): void {
         <!-- Fallback: Material icon font glyph (legacy underscore names) -->
         <span
           v-else
-          class="material-icons-outlined text-[1em] leading-none shrink-0"
+          class="material-icons-outlined shrink-0 text-[1em] leading-none"
           aria-hidden="true"
           >{{ icon }}</span
         >
@@ -290,7 +290,7 @@ function handleKeydown(e: KeyboardEvent): void {
     -->
     <span
       v-if="hasTrailing"
-      :class="['border-s border-current/25 opacity-75 leading-none shrink-0', trailingSizeClasses]"
+      :class="['shrink-0 border-s border-current/25 leading-none opacity-75', trailingSizeClasses]"
     >
       <slot name="trailing">{{ count }}</slot>
     </span>

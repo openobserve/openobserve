@@ -85,13 +85,13 @@ function handleClick(e: MouseEvent) {
   <div class="inline-flex items-center gap-1.5">
     <!-- staleness dot -->
     <span
-      :class="['size-2 rounded-full shrink-0 transition-colors duration-700', dotColor]"
+      :class="['size-2 shrink-0 rounded-full transition-colors duration-700', dotColor]"
       :title="dotTitle"
     />
     <!-- relative timestamp -->
     <span
       v-if="lastRunAt"
-      class="text-xs text-text-secondary tabular-nums whitespace-nowrap select-none"
+      class="text-text-secondary text-xs whitespace-nowrap tabular-nums select-none"
       :title="exactTime"
     >
       {{ relativeTime || t("refreshButton.justNow") }}

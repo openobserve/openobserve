@@ -66,7 +66,7 @@
       />
 
       <!-- RIGHT MAIN: filter bar + table -->
-      <div v-if="activeSection === 'checks'" class="flex-1 flex flex-col overflow-hidden min-w-0">
+      <div v-if="activeSection === 'checks'" class="flex min-w-0 flex-1 flex-col overflow-hidden">
         <!-- ── CHECKS TABLE ── -->
         <MonitorTable
           :mode="monitorTableMode"
@@ -104,7 +104,7 @@
         >
           <!-- Toolbar content rendered inside OTable's toolbar bar -->
           <template #toolbar>
-            <div class="flex items-center gap-2 flex-1 min-w-0">
+            <div class="flex min-w-0 flex-1 items-center gap-2">
               <!-- Type tabs -->
               <OToggleGroup :model-value="activeTab" @update:model-value="onTabChange">
                 <OToggleGroupItem
@@ -119,7 +119,7 @@
               </OToggleGroup>
 
               <!-- Search -->
-              <div class="flex-1 min-w-0">
+              <div class="min-w-0 flex-1">
                 <OInput
                   v-model="search"
                   :placeholder="

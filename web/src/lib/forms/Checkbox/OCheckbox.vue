@@ -130,7 +130,7 @@ const boxSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
       :data-state="dataState"
       :disabled="isDisabled"
       :class="[
-        'shrink-0 rounded-checkbox border cursor-[inherit]',
+        'rounded-checkbox shrink-0 cursor-[inherit] border',
         boxSizeClasses[size ?? 'md'],
         // Base / unchecked
         'bg-checkbox-bg border-checkbox-border',
@@ -150,7 +150,7 @@ const boxSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
         'disabled:bg-checkbox-disabled-bg',
         'disabled:border-checkbox-disabled-border',
         // Focus
-        'outline-none ring-offset-1 ring-offset-surface-base focus-visible:ring-2 focus-visible:ring-checkbox-focus-ring',
+        'ring-offset-surface-base focus-visible:ring-checkbox-focus-ring ring-offset-1 outline-none focus-visible:ring-2',
         // Transition
         'transition-[color,background-color,border-color,box-shadow] duration-150',
         // Centering for indicator
@@ -160,7 +160,7 @@ const boxSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
     >
       <span
         v-if="checked === true"
-        class="flex items-center justify-center text-checkbox-checked-fg size-full"
+        class="text-checkbox-checked-fg flex size-full items-center justify-center"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -178,7 +178,7 @@ const boxSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
       </span>
       <span
         v-else-if="checked === 'indeterminate'"
-        class="flex items-center justify-center text-checkbox-checked-fg size-full"
+        class="text-checkbox-checked-fg flex size-full items-center justify-center"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -198,10 +198,10 @@ const boxSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
     <span
       v-if="$slots.label || label"
       :class="[
-        'o-input-label text-compact select-none leading-tight',
+        'o-input-label text-compact leading-tight select-none',
         isDisabled
-          ? 'font-normal text-input-label-text-disabled'
-          : 'font-medium text-input-label-text',
+          ? 'text-input-label-text-disabled font-normal'
+          : 'text-input-label-text font-medium',
       ]"
     >
       <slot name="label">{{ label }}</slot

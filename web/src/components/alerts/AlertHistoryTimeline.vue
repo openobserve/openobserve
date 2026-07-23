@@ -15,67 +15,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col gap-1.5 w-full shrink-0 px-1 py-2">
+  <div class="flex w-full shrink-0 flex-col gap-1.5 px-1 py-2">
     <!-- Header row: oldest … legend … newest -->
     <div class="flex items-center justify-between px-1">
-      <span class="text-2xs tabular-nums text-text-secondary">
+      <span class="text-2xs text-text-secondary tabular-nums">
         {{ oldestLabel }}
       </span>
 
       <div class="flex items-center gap-3">
-        <span v-if="firingCount > 0" class="flex items-center gap-1 text-2xs">
-          <span class="inline-block w-2 h-2 rounded-default bg-badge-error-solid-bg" />
-          <span class="font-medium text-badge-error-soft-text"
+        <span v-if="firingCount > 0" class="text-2xs flex items-center gap-1">
+          <span class="rounded-default bg-badge-error-solid-bg inline-block h-2 w-2" />
+          <span class="text-badge-error-soft-text font-medium"
             >{{ firingCount }} {{ firingLabel }}</span
           >
         </span>
-        <span class="flex items-center gap-1 text-2xs text-text-secondary">
-          <span class="inline-block w-2 h-2 rounded-default bg-badge-success-solid-bg" />
+        <span class="text-2xs text-text-secondary flex items-center gap-1">
+          <span class="rounded-default bg-badge-success-solid-bg inline-block h-2 w-2" />
           {{ okCount }} {{ okLabel }}
         </span>
-        <span v-if="skippedCount > 0" class="flex items-center gap-1 text-2xs text-text-muted">
-          <span class="inline-block w-2 h-2 rounded-default bg-border-default" />
+        <span v-if="skippedCount > 0" class="text-2xs text-text-muted flex items-center gap-1">
+          <span class="rounded-default bg-border-default inline-block h-2 w-2" />
           {{ skippedCount }} Skipped
         </span>
         <span
           v-if="hasFlappingZone"
-          class="flex items-center gap-1 text-2xs font-semibold text-badge-purple-ol-text brightness-90"
+          class="text-2xs text-badge-purple-ol-text flex items-center gap-1 font-semibold brightness-90"
         >
-          <span class="inline-block w-2 h-2 rounded-default o2-flap-swatch" />
+          <span class="rounded-default o2-flap-swatch inline-block h-2 w-2" />
           Flapping
         </span>
       </div>
 
-      <span class="text-2xs tabular-nums text-text-secondary">
+      <span class="text-2xs text-text-secondary tabular-nums">
         {{ newestLabel }}
       </span>
     </div>
 
     <!-- Timeline strip + transition labels -->
-    <div class="flex flex-col gap-0.75 w-full px-1">
+    <div class="flex w-full flex-col gap-0.75 px-1">
       <!-- Strip -->
-      <div class="flex gap-0.5 w-full h-6 items-stretch overflow-visible">
+      <div class="flex h-6 w-full items-stretch gap-0.5 overflow-visible">
         <template v-for="(seg, i) in segments" :key="i">
           <!-- Flapping zone — alternating hatched red/green cells + callout pill -->
           <div
             v-if="seg.type === 'flapping'"
-            class="flex gap-0.5 items-stretch relative min-w-3"
+            class="relative flex min-w-3 items-stretch gap-0.5"
             :style="{ flex: seg.weight }"
             @mouseenter="hoveredIndex = i"
             @mouseleave="hoveredIndex = null"
           >
             <!-- Persistent callout pill above the zone -->
             <div
-              class="o2-flap-pill absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.25 whitespace-nowrap px-3 py-1 rounded-full text-xs font-semibold pointer-events-none shadow-md text-badge-purple-solid-text bg-badge-purple-solid-bg"
+              class="o2-flap-pill text-badge-purple-solid-text bg-badge-purple-solid-bg pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 flex -translate-x-1/2 items-center gap-1.25 rounded-full px-3 py-1 text-xs font-semibold whitespace-nowrap shadow-md"
             >
               <span class="font-semibold">⚡ Flapping</span>
-              <span class="opacity-60 font-normal">•</span>{{ seg.flips }} flips
-              <span class="opacity-60 font-normal">•</span>{{ seg.durationLabel }}
+              <span class="font-normal opacity-60">•</span>{{ seg.flips }} flips
+              <span class="font-normal opacity-60">•</span>{{ seg.durationLabel }}
             </div>
             <div
               v-for="(cell, c) in seg.cells"
               :key="c"
-              class="flex-1 rounded-default min-w-1.5 o2-flap-cell"
+              class="rounded-default o2-flap-cell min-w-1.5 flex-1"
               :style="{ backgroundColor: blockColor(cell.status) }"
             />
           </div>
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Normal block -->
           <div
             v-else
-            class="flex-1 rounded-default min-w-1 cursor-default relative transition-opacity duration-100 hover:opacity-75"
+            class="rounded-default relative min-w-1 flex-1 cursor-default transition-opacity duration-100 hover:opacity-75"
             :style="{ flex: seg.weight, background: blockColor(seg.status) }"
             @mouseenter="hoveredIndex = i"
             @mouseleave="hoveredIndex = null"
@@ -93,17 +93,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                sits directly below the timeline. -->
             <div
               v-if="hoveredIndex === i"
-              class="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 whitespace-nowrap rounded-default px-2.5 py-1.5 text-2xs leading-[1.4] pointer-events-none shadow-md bg-surface-overlay border border-border-default text-text-body"
+              class="rounded-default text-2xs bg-surface-overlay border-border-default text-text-body pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 border px-2.5 py-1.5 leading-[1.4] whitespace-nowrap shadow-md"
             >
-              <div class="font-semibold capitalize flex items-center gap-1.5">
+              <div class="flex items-center gap-1.5 font-semibold capitalize">
                 <span
-                  class="inline-block w-2 h-2 rounded-default shrink-0"
+                  class="rounded-default inline-block h-2 w-2 shrink-0"
                   :style="{ background: blockColor(seg.status) }"
                 />
                 {{ normalizeStatus(seg.status) }}
               </div>
-              <div class="opacity-60 mt-0.5">{{ seg.startLabel }}</div>
-              <div v-if="seg.count > 1" class="opacity-50 text-3xs">
+              <div class="mt-0.5 opacity-60">{{ seg.startLabel }}</div>
+              <div v-if="seg.count > 1" class="text-3xs opacity-50">
                 {{ seg.count }} evaluations
               </div>
             </div>
@@ -114,11 +114,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Transition tick labels — placed by cumulative width; labels that would
          overlap the previously shown one are skipped to keep them readable. -->
-      <div class="w-full relative h-3.5">
+      <div class="relative h-3.5 w-full">
         <span
           v-for="(tick, i) in tickLabels"
           :key="i"
-          class="absolute top-0 text-3xs tabular-nums whitespace-nowrap -translate-x-1/2 text-text-secondary"
+          class="text-3xs text-text-secondary absolute top-0 -translate-x-1/2 whitespace-nowrap tabular-nums"
           :style="{ left: tick.leftPct + '%' }"
         >
           {{ tick.label }}

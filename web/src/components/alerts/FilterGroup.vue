@@ -2,13 +2,13 @@
   <!-- Preview Section (only for root level) -->
   <div
     v-if="depth === 0 && showSqlPreview && previewString"
-    class="mb-2 p-2 rounded-default border w-full max-h-[3.2em] overflow-y-auto bg-surface-panel border-border-default"
+    class="rounded-default bg-surface-panel border-border-default mb-2 max-h-[3.2em] w-full overflow-y-auto border p-2"
   >
-    <div class="flex items-start gap-1 min-w-0">
-      <span class="font-medium text-xs flex-shrink-0 leading-[1.3] text-text-body">
+    <div class="flex min-w-0 items-start gap-1">
+      <span class="text-text-body flex-shrink-0 text-xs leading-[1.3] font-medium">
         {{ t("alerts.filters.previewLabel") }}
       </span>
-      <span class="text-3xs font-mono leading-[1.3] min-w-0 break-words text-text-secondary">
+      <span class="text-3xs text-text-secondary min-w-0 font-mono leading-[1.3] break-words">
         {{ previewString }}
       </span>
     </div>
@@ -16,7 +16,7 @@
 
   <div
     :class="[
-      `  px-2 mb-2 filter-group-box border border-card-glass-border rounded-default `,
+      `filter-group-box border-card-glass-border rounded-default mb-2 border px-2`,
       'mt-4',
       store.state.isAiChatEnabled ? 'w-full' : 'xl:w-fit',
     ]"
@@ -28,7 +28,7 @@
   >
     <!-- V2: Group-level toggle only for nested groups (depth > 0) -->
     <!-- Root group (depth 0) doesn't need toggle - its logicalOperator is dummy -->
-    <div v-if="depth > 0" class="w-fit relative bottom-3.5">
+    <div v-if="depth > 0" class="relative bottom-3.5 w-fit">
       <OToggleGroup :model-value="label" @update:model-value="toggleLabel($event as string)">
         <OToggleGroupItem v-for="tab in tabOptions" :key="tab.value" :value="tab.value" size="sm">
           <template #icon-left>
@@ -44,7 +44,7 @@
 
     <!-- Group content -->
 
-    <div v-if="isOpen" class="overflow-x-auto group-container">
+    <div v-if="isOpen" class="group-container overflow-x-auto">
       <!-- Items in group (V2 uses 'conditions' array) -->
       <div
         class="ml-2 whitespace-nowrap"
@@ -69,7 +69,7 @@
         />
         <div
           v-else
-          class="flex items-center gap-2 mb-2"
+          class="mb-2 flex items-center gap-2"
           :class="store.state.isAiChatEnabled ? 'pl-0' : 'pl-4'"
         >
           <FilterCondition
@@ -97,7 +97,7 @@
       </div>
       <!-- Action buttons -->
 
-      <div class="flex justify-start items-center ml-4">
+      <div class="ml-4 flex items-center justify-start">
         <OButton
           data-test="alert-conditions-add-condition-btn"
           class="ml-3"
@@ -105,7 +105,7 @@
           variant="ghost-primary"
           @click="addCondition(props.group.groupId)"
         >
-          <OIcon class="mr-1 font-bold rounded-full border" size="xs" name="add" />
+          <OIcon class="mr-1 rounded-full border font-bold" size="xs" name="add" />
           <span class="text-xs font-bold">{{ t("alerts.conditions.condition") }}</span>
           <OTooltip :delay="300" :content="t('alerts.conditions.addConditionTooltip')" />
         </OButton>
@@ -117,7 +117,7 @@
           @click="addGroup(props.group.groupId)"
           :disabled="depth >= 2"
         >
-          <OIcon class="mr-1 font-bold rounded-full border" size="xs" name="add" />
+          <OIcon class="mr-1 rounded-full border font-bold" size="xs" name="add" />
           <span class="text-xs font-bold">{{ t("alerts.conditions.conditionGroup") }}</span>
           <OTooltip
             v-if="depth < 2"

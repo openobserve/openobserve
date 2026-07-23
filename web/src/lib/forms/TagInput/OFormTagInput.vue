@@ -42,7 +42,7 @@ if (import.meta.env.DEV && !form) {
         :model-value="field.state.value ?? []"
         @update:model-value="field.handleChange"
       />
-      <div v-if="field.state.meta.errors.length > 0" class="text-xs text-input-error-text mt-1">
+      <div v-if="field.state.meta.errors.length > 0" class="text-input-error-text mt-1 text-xs">
         {{ firstFieldError(field.state.meta.errors) }}
       </div>
     </template>

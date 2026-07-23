@@ -128,11 +128,11 @@ function triggerClasses(step: StepRegistration): string {
       v-if="isHorizontal"
       role="list"
       aria-label="Steps"
-      class="sticky top-0 z-10 flex items-start w-full pb-2 bg-surface-base!"
+      class="bg-surface-base! sticky top-0 z-10 flex w-full items-start pb-2"
     >
       <template v-for="(step, index) in sortedSteps" :key="step.name">
         <!-- Step trigger (indicator circle + title) -->
-        <div role="listitem" class="flex flex-col items-center shrink-0">
+        <div role="listitem" class="flex shrink-0 flex-col items-center">
           <button
             type="button"
             :class="triggerClasses(step)"
@@ -166,7 +166,7 @@ function triggerClasses(step: StepRegistration): string {
               <span v-else>{{ step.name }}</span>
             </span>
             <!-- Title + Description (stacked vertically, right of indicator) -->
-            <span class="flex flex-col items-start min-w-0">
+            <span class="flex min-w-0 flex-col items-start">
               <span :class="titleClasses(step)">{{ step.title }}</span>
               <span
                 v-if="step.description"
@@ -181,7 +181,7 @@ function triggerClasses(step: StepRegistration): string {
         <!-- Connector line between consecutive steps -->
         <div
           v-if="index < sortedSteps.length - 1"
-          class="h-px flex-1 shrink mt-5.5 mx-1 min-w-2"
+          class="mx-1 mt-5.5 h-px min-w-2 flex-1 shrink"
           :class="step.done ? 'bg-stepper-connector-done' : 'bg-stepper-connector'"
           aria-hidden="true"
         />
@@ -189,7 +189,7 @@ function triggerClasses(step: StepRegistration): string {
     </div>
 
     <!-- Step content panels (OStep children render here for both orientations) -->
-    <div :class="isHorizontal ? 'flex-1 min-w-0' : 'flex flex-col gap-0'">
+    <div :class="isHorizontal ? 'min-w-0 flex-1' : 'flex flex-col gap-0'">
       <slot />
     </div>
   </div>

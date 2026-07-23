@@ -74,9 +74,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Filters Section -->
     <div
       v-if="show"
-      class="flex items-center gap-2 flex-wrap px-page-edge py-3 border-b border-border-default shrink-0"
+      class="px-page-edge border-border-default flex shrink-0 flex-wrap items-center gap-2 border-b py-3"
     >
-      <span class="text-sm font-semibold relative top-1">{{ t("common.filters") }}:</span>
+      <span class="relative top-1 text-sm font-semibold">{{ t("common.filters") }}:</span>
 
       <!-- Failed Only Toggle -->
       <OSwitch
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="[panelId, filter] in rangeFilters"
         :key="panelId"
-        class="inline-flex items-center rounded-default py-1 px-3 text-sm cursor-default bg-status-info-bg text-status-info-text"
+        class="rounded-default bg-status-info-bg text-status-info-text inline-flex cursor-default items-center px-3 py-1 text-sm"
         data-test="range-filter-chip"
       >
         <span class="chip-label">
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon
           name="close"
           size="sm"
-          class="cursor-pointer text-sm ml-2 opacity-70 transition-opacity duration-200 hover:opacity-100"
+          class="ml-2 cursor-pointer text-sm opacity-70 transition-opacity duration-200 hover:opacity-100"
           @click="removeRangeFilter(panelId)"
         />
       </div>
@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Action Buttons Row -->
     <div
       v-if="selectedAlertForAction"
-      class="bg-primary bg-opacity-10 flex items-center px-4 py-3 gap-3 border-b border-border-default shrink-0"
+      class="bg-primary bg-opacity-10 border-border-default flex shrink-0 items-center gap-3 border-b px-4 py-3"
       data-test="action-buttons-row"
     >
       <OIcon name="campaign" size="sm" />
@@ -197,19 +197,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Dashboard Content -->
-    <div class="flex-1 min-h-0 px-2.5 pb-2.5">
+    <div class="min-h-0 flex-1 px-2.5 pb-2.5">
       <div class="bg-card-glass-bg mb-2.5 h-[calc(100vh-13rem)]">
         <div @contextmenu="handleNativeContextMenu">
-          <div v-show="isLoading" class="flex items-center justify-center h-100">
+          <div v-show="isLoading" class="flex h-100 items-center justify-center">
             <OSpinner size="md" />
             <div class="ml-3">Loading insights...</div>
           </div>
 
           <div :class="isLoading ? 'invisible' : 'visible'">
-            <div v-if="!dashboardData" class="p-5 text-center text-text-muted">
+            <div v-if="!dashboardData" class="text-text-muted p-5 text-center">
               {{ t("alerts.insights.loading.dashboardConfig") }}
             </div>
-            <div v-else-if="!show" class="p-5 text-center text-text-muted">
+            <div v-else-if="!show" class="text-text-muted p-5 text-center">
               {{ t("alerts.insights.loading.refreshing") }}
             </div>
             <RenderDashboardCharts

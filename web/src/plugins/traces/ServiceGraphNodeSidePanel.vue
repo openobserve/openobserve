@@ -63,25 +63,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- No horizontal padding here: sections that need an inset (charts, chip row, tab labels)
            add px-page-edge themselves, so dividers and tables can bleed to the edges naturally. -->
     <div
-      class="panel-content flex-1 overflow-y-auto overflow-x-hidden bg-surface-base dark:bg-[color-mix(in_srgb,var(--color-grey-950)_85%,var(--color-indigo-900))] py-2.5"
+      class="panel-content bg-surface-base flex-1 overflow-x-hidden overflow-y-auto py-2.5 dark:bg-[color-mix(in_srgb,var(--color-grey-950)_85%,var(--color-indigo-900))]"
     >
       <!-- RED Charts Section -->
       <div
         v-if="streamFilter !== 'all' && dashboardData"
-        class="panel-section red-charts-section flex flex-col p-0 mb-0!"
+        class="panel-section red-charts-section mb-0! flex flex-col p-0"
         data-test="service-graph-side-panel-red-charts"
       >
         <!-- DataZoom filter chips + View in Traces button -->
         <div
           v-if="filterChips.length"
-          class="flex items-center gap-2 px-page-edge py-[0.3rem] flex-wrap"
+          class="px-page-edge flex flex-wrap items-center gap-2 py-[0.3rem]"
           data-test="service-graph-side-panel-filter-chips"
         >
           <!-- Filter chip pills -->
           <div
             v-for="chip in filterChips"
             :key="chip.key"
-            class="inline-flex items-center gap-1 rounded-default border border-border-default px-2 py-[0.325rem] text-2xs leading-none text-text-body"
+            class="rounded-default border-border-default text-2xs text-text-body inline-flex items-center gap-1 border px-2 py-[0.325rem] leading-none"
             :data-test="`service-graph-filter-chip-${chip.key}`"
             :class="chip.type === 'duration' ? 'text-latency-p95' : 'text-status-error-text'"
           >
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("traces.serviceGraphNodeSidePanel.viewTraces") }}
           </OButton>
         </div>
-        <div class="charts-wrapper py-0! min-h-[10.875rem] w-full">
+        <div class="charts-wrapper min-h-[10.875rem] w-full py-0!">
           <div class="charts-container w-full">
             <RenderDashboardCharts
               ref="dashboardChartsRef"
@@ -152,14 +152,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-if="streamFilter !== 'all'">
         <!-- Row spans full width so the bottom border bleeds; px-page-edge keeps the tab labels inset -->
         <div
-          class="flex items-end border-b border-b-card-glass-border mb-0 px-page-edge"
+          class="border-b-card-glass-border px-page-edge mb-0 flex items-end border-b"
           data-test="service-graph-node-panel-tabs-row"
         >
           <OTabs
             v-model="activeTab"
             dense
             align="left"
-            class="font-bold flex-1 w-[calc(100%-2rem)]!"
+            class="w-[calc(100%-2rem)]! flex-1 font-bold"
             data-test="service-graph-node-panel-tabs"
           >
             <OTab
@@ -214,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="min-w-48!" data-test="service-graph-node-panel-workload-fields-menu">
               <template v-for="env in detectedEnvironments" :key="env.key">
                 <div
-                  class="text-xs px-3 pb-0 py-1.5! uppercase tracking-wide text-muted-foreground"
+                  class="text-muted-foreground px-3 py-1.5! pb-0 text-xs tracking-wide uppercase"
                 >
                   {{ env.label }}
                 </div>
@@ -224,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   )"
                   :key="cfg.id"
                   :data-test="`service-graph-node-panel-workload-field-${cfg.id}`"
-                  class="px-[0.325rem]! h-7.5! min-h-7.5!"
+                  class="h-7.5! min-h-7.5! px-[0.325rem]!"
                   @select="
                     (e) => {
                       e.preventDefault();
@@ -250,18 +250,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Operations Tab -->
           <OTabPanel
             name="operations"
-            class="p-0! panel-section mb-0!"
+            class="panel-section mb-0! p-0!"
             data-test="service-graph-side-panel-recent-operations"
           >
             <div
               v-if="recentOperations.length === 0 && !loadingOperations"
-              class="flex flex-col items-center justify-center py-16 text-sm text-center text-text-secondary"
+              class="text-text-secondary flex flex-col items-center justify-center py-16 text-center text-sm"
             >
               {{ t("traces.serviceGraphNodeSidePanel.noOperationsFound") }}
             </div>
             <div
               v-else-if="recentOperations.length > 0 || loadingOperations"
-              class="overflow-hidden svc-panel-table"
+              class="svc-panel-table overflow-hidden"
               data-test="service-graph-side-panel-operations-table"
             >
               <TenstackTable
@@ -289,7 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #cell-errors="{ item }">
                   <span
                     :class="
-                      item.errors > 0 ? 'text-[var(--color-status-negative)] font-semibold' : ''
+                      item.errors > 0 ? 'font-semibold text-[var(--color-status-negative)]' : ''
                     "
                     >{{ item.errors }}</span
                   >
@@ -327,7 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="active"
                     variant="ghost"
                     size="icon"
-                    class="ml-1 absolute! right-1!"
+                    class="absolute! right-1! ml-1"
                     data-test="service-graph-side-panel-view-traces-btn"
                     @click.stop="
                       navigateToTraces({
@@ -344,7 +344,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <template #empty>
                   <div
-                    class="flex flex-col items-center justify-center py-16 text-sm text-center text-text-secondary"
+                    class="text-text-secondary flex flex-col items-center justify-center py-16 text-center text-sm"
                   >
                     {{ t("traces.serviceGraphNodeSidePanel.noOperationsFound") }}
                   </div>
@@ -357,7 +357,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTabPanel
             v-if="showBehaviorTab"
             name="behavior"
-            class="p-0! panel-section mb-0!"
+            class="panel-section mb-0! p-0!"
             data-test="service-graph-side-panel-behavior"
           >
             <AgentNodeBehaviorTab
@@ -374,12 +374,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="cfg in activeResourceTabConfigs"
             :key="cfg.id"
             :name="cfg.id"
-            class="p-0! panel-section mb-3"
+            class="panel-section mb-3 p-0!"
             :data-test="`service-graph-side-panel-${cfg.id}`"
           >
             <div
               v-if="!resourceTabData[cfg.id]?.length && !resourceTabLoading[cfg.id]"
-              class="flex flex-col items-center justify-center py-16 text-sm text-center text-text-secondary"
+              class="text-text-secondary flex flex-col items-center justify-center py-16 text-center text-sm"
             >
               {{
                 t("traces.serviceGraphNodeSidePanel.noResourceDataFound", {
@@ -389,7 +389,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               v-else-if="resourceTabData[cfg.id]?.length > 0 || resourceTabLoading[cfg.id]"
-              class="overflow-hidden svc-panel-table"
+              class="svc-panel-table overflow-hidden"
               :data-test="`service-graph-side-panel-${cfg.id}-table`"
             >
               <TenstackTable
@@ -420,7 +420,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="active"
                     variant="ghost"
                     size="icon"
-                    class="ml-1 absolute! right-1! bg-table-row-hover-bg! rounded-default shadow-[-0.5rem_0_0.5rem_var(--color-table-row-hover-bg)]"
+                    class="bg-table-row-hover-bg! rounded-default absolute! right-1! ml-1 shadow-[-0.5rem_0_0.5rem_var(--color-table-row-hover-bg)]"
                     :data-test="`service-graph-side-panel-${cfg.id}-view-traces-btn`"
                     @click.stop="
                       navigateToTraces({
@@ -439,7 +439,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #cell-errors="{ item }">
                   <span
                     :class="
-                      item.errors > 0 ? 'text-[var(--color-status-negative)] font-semibold' : ''
+                      item.errors > 0 ? 'font-semibold text-[var(--color-status-negative)]' : ''
                     "
                     >{{ item.errors }}</span
                   >
@@ -474,7 +474,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <template #empty>
                   <div
-                    class="flex flex-col items-center justify-center py-16 text-sm text-center text-text-secondary"
+                    class="text-text-secondary flex flex-col items-center justify-center py-16 text-center text-sm"
                   >
                     {{
                       t("traces.serviceGraphNodeSidePanel.noResourceDataFound", {
@@ -491,24 +491,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTabPanel
             v-if="!isInferred"
             name="metrics"
-            class="p-0! panel-section mb-0! h-full!"
+            class="panel-section mb-0! h-full! p-0!"
             data-test="service-graph-side-panel-metrics"
           >
             <!-- Loading state — shimmer skeletons standing in for the metric charts -->
             <div
               v-if="metricsCorrelationLoading"
-              class="flex flex-col gap-3 px-page-edge py-4"
+              class="px-page-edge flex flex-col gap-3 py-4"
               data-test="service-graph-side-panel-metrics-loading"
             >
-              <OSkeleton type="text" class="w-40! h-4" />
-              <OSkeleton type="rect" class="w-full! h-40" />
-              <OSkeleton type="rect" class="w-full! h-40" />
+              <OSkeleton type="text" class="h-4 w-40!" />
+              <OSkeleton type="rect" class="h-40 w-full!" />
+              <OSkeleton type="rect" class="h-40 w-full!" />
             </div>
 
             <!-- Error state -->
             <div
               v-else-if="metricsCorrelationError"
-              class="flex flex-col items-center gap-3 py-6 text-center text-sm text-text-secondary"
+              class="text-text-secondary flex flex-col items-center gap-3 py-6 text-center text-sm"
               data-test="service-graph-side-panel-metrics-error"
             >
               <span>{{ metricsCorrelationError }}</span>

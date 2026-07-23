@@ -15,13 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="sessions_page flex flex-col flex-1 min-h-0 overflow-hidden">
+  <div class="sessions_page flex min-h-0 flex-1 flex-col overflow-hidden">
     <template v-if="isSessionReplayEnabled">
       <div>
-        <div class="bg-card-glass-bg border-b border-border-default py-1.5 px-page-edge">
+        <div class="bg-card-glass-bg border-border-default px-page-edge border-b py-1.5">
           <div class="flex items-start gap-1">
             <!-- Query editor (flex-grow to fill available space) -->
-            <div class="flex-1 min-w-0 relative">
+            <div class="relative min-w-0 flex-1">
               <QueryEditor
                 ref="sessionQueryEditorRef"
                 editor-id="session-replay-query-editor"
@@ -44,14 +44,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <div
                 v-if="!sessionState.data.editorValue && !editorFocused"
-                class="query-editor-placeholder-overlay absolute top-0 left-0 right-0 bottom-0 flex items-start pt-0.75 pr-2 pb-0 pl-[2.15rem] pointer-events-none z-1 select-none"
+                class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start pt-0.75 pr-2 pb-0 pl-[2.15rem] select-none"
               >
                 <span class="query-editor-placeholder-typewriter">{{ editorPlaceholder }}</span>
               </div>
             </div>
 
             <!-- Controls on the right -->
-            <div class="flex items-start gap-1 shrink-0">
+            <div class="flex shrink-0 items-start gap-1">
               <SyntaxGuide />
               <DateTime
                 auto-apply
@@ -107,13 +107,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- end toolbar wrapper -->
 
       <OSplitter
-        class="logs-horizontal-splitter flex-1 min-h-0"
+        class="logs-horizontal-splitter min-h-0 flex-1"
         v-model="splitterModel"
         unit="px"
         :horizontal="false"
       >
         <template #before>
-          <div class="bg-surface-panel py-1 h-full overflow-auto border-r border-border-default">
+          <div class="bg-surface-panel border-border-default h-full overflow-auto border-r py-1">
             <SearchFieldList
               :fields="streamFields"
               :time-stamp="{
@@ -130,9 +130,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #after>
-          <div class="h-full flex flex-col min-h-0">
+          <div class="flex h-full min-h-0 flex-col">
             <!-- KPI summary strip -->
-            <div class="bg-card-glass-bg border-b border-border-default">
+            <div class="bg-card-glass-bg border-border-default border-b">
               <SessionsMetricsStrip
                 :total="kpiMetrics.total"
                 :error-sessions="kpiMetrics.errorSessions"
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Segment filters -->
               <div
-                class="flex flex-wrap items-center gap-4 px-page-edge pb-2"
+                class="px-page-edge flex flex-wrap items-center gap-4 pb-2"
                 data-test="rum-app-sessions-segment-filters"
               >
                 <OToggleGroup
@@ -256,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <div class="bg-card-glass-bg flex-1 min-h-0">
+            <div class="bg-card-glass-bg min-h-0 flex-1">
               <OTable
                 :data="tableRows"
                 :columns="tableColumns"
@@ -298,13 +298,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon
                     name="play-circle-filled"
                     size="md"
-                    class="cursor-pointer session-play-icon text-icon-color hover:text-button-primary"
+                    class="session-play-icon text-icon-color hover:text-button-primary cursor-pointer"
                   />
                 </template>
                 <template #cell-session="{ row }">
-                  <div class="flex flex-col justify-center gap-0.5 min-w-0">
-                    <OUserCell :value="row.user_email || 'Unknown'" class="font-medium truncate" />
-                    <div class="flex items-center gap-1.5 text-xs text-text-secondary">
+                  <div class="flex min-w-0 flex-col justify-center gap-0.5">
+                    <OUserCell :value="row.user_email || 'Unknown'" class="truncate font-medium" />
+                    <div class="text-text-secondary flex items-center gap-1.5 text-xs">
                       <span
                         class="font-mono"
                         :title="row.session_id"
@@ -340,7 +340,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <template #cell-duration="{ row }">
                   <div class="flex flex-col items-end gap-0.5">
-                    <span class="tabular-nums font-medium">{{
+                    <span class="font-medium tabular-nums">{{
                       formatSessionDuration(row.time_spent)
                     }}</span>
                     <small
@@ -365,9 +365,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template v-else>
       <div class="bg-card-glass-bg">
-        <div class="p-4 enable-rum max-w-[64rem]">
+        <div class="enable-rum max-w-[64rem] p-4">
           <div class="pb-4">
-            <div class="text-left text-xl font-semibold font-bold pb-3">
+            <div class="pb-3 text-left text-xl font-bold font-semibold">
               {{ t("rum.discoverSessionTitle") }}
             </div>
             <div class="text-base font-medium">

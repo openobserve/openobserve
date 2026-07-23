@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ODropdownItem @select="importDashboard" data-test="dashboard-import-custom">
           <div class="flex flex-col">
             <span>{{ t("dashboard.importCustom") }}</span>
-            <span class="text-xs text-dropdown-item-text opacity-60">{{
+            <span class="text-dropdown-item-text text-xs opacity-60">{{
               t("dashboard.importCustomDesc")
             }}</span>
           </div>
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="flex flex-col">
             <span>{{ t("dashboard.importTemplates") }}</span>
-            <span class="text-xs text-dropdown-item-text opacity-60">{{
+            <span class="text-dropdown-item-text text-xs opacity-60">{{
               t("dashboard.importTemplatesDesc")
             }}</span>
           </div>
@@ -79,17 +79,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`dashboard-migrate-${migration.key}`"
           @select="openMigration(migration.url)"
         >
-          <div class="flex items-center gap-2 w-full">
-            <div class="flex flex-col flex-1 min-w-0">
+          <div class="flex w-full items-center gap-2">
+            <div class="flex min-w-0 flex-1 flex-col">
               <span>{{ t(`dashboard.${migration.labelKey}`) }}</span>
-              <span class="text-xs text-dropdown-item-text opacity-60">{{
+              <span class="text-dropdown-item-text text-xs opacity-60">{{
                 t(`dashboard.${migration.descKey}`)
               }}</span>
             </div>
             <OIcon
               name="open-in-new"
               size="xs"
-              class="shrink-0 text-dropdown-item-text opacity-60"
+              class="text-dropdown-item-text shrink-0 opacity-60"
             />
           </div>
         </ODropdownItem>
@@ -107,9 +107,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Folder rail + table — matches the Alerts/Reports layout. -->
-    <div class="flex-1 flex min-h-0">
+    <div class="flex min-h-0 flex-1">
       <!-- Left: shared folder list (same component as Alerts/Reports) -->
-      <div class="shrink-0 h-full w-rail">
+      <div class="w-rail h-full shrink-0">
         <div class="h-full">
           <FolderList
             type="dashboards"
@@ -119,10 +119,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <!-- Right: dashboards table -->
-      <div class="flex-1 min-w-0 h-full">
-        <div class="h-full bg-card-glass-bg">
+      <div class="h-full min-w-0 flex-1">
+        <div class="bg-card-glass-bg h-full">
           <OTable
-            class="w-full h-full"
+            class="h-full w-full"
             ref="oTableRef"
             :data="dashboards"
             :columns="columns"
@@ -146,8 +146,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Toolbar inside the table frame: scoped search (fills the bar) + refresh -->
             <template #toolbar>
-              <div class="flex items-center gap-2 w-full">
-                <div class="flex-1 min-w-0">
+              <div class="flex w-full items-center gap-2">
+                <div class="min-w-0 flex-1">
                   <OInput
                     v-model="dynamicQueryModel"
                     :placeholder="
@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OToggleGroup
                         :model-value="searchAcrossFolders ? 'all' : 'this'"
                         type="single"
-                        class="self-center mr-1"
+                        class="mr-1 self-center"
                         @update:model-value="(v) => (searchAcrossFolders = v === 'all')"
                       >
                         <OToggleGroupItem
@@ -246,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
             </template>
             <template #cell-identifier="{ value }">
-              <span class="font-mono text-xs text-text-body" :title="value">{{ value }}</span>
+              <span class="text-text-body font-mono text-xs" :title="value">{{ value }}</span>
             </template>
             <template #cell-description="{ value }">
               <span class="text-text-body" :title="value">{{ value || "—" }}</span>
@@ -264,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-folder="{ row }">
               <button
                 type="button"
-                class="inline-flex items-center gap-1 max-w-full px-2 py-0.5 rounded-full bg-surface-subtle text-text-body text-xs leading-5 transition-colors outline-none hover:bg-surface-subtle-hover hover:text-text-body focus-visible:ring-4 focus-visible:ring-primary-500/25 focus-visible:ring-inset"
+                class="bg-surface-subtle text-text-body hover:bg-surface-subtle-hover hover:text-text-body focus-visible:ring-primary-500/25 inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-xs leading-5 transition-colors outline-none focus-visible:ring-4 focus-visible:ring-inset"
                 @click.stop="updateActiveFolderId(row.folder_id)"
               >
                 <OIcon name="folder-outline" size="xs" />
@@ -352,12 +352,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <template #bottom>
-              <div class="flex w-full justify-between items-center py-1">
-                <div class="text-xs font-normal flex items-center shrink-0">
+              <div class="flex w-full items-center justify-between py-1">
+                <div class="flex shrink-0 items-center text-xs font-normal">
                   {{ resultTotal || 0 }} {{ t("dashboard.header") }}
                 </div>
                 <div v-if="selectedIds.length > 0" class="bulk-action-bar flex items-center gap-2">
-                  <span class="text-sm text-text-body mr-1">{{
+                  <span class="text-text-body mr-1 text-sm">{{
                     t("dashboard.dashboards.selected", { count: selectedIds.length })
                   }}</span>
                   <OButton

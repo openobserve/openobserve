@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="[
       props.scrollEl
         ? 'relative'
-        : 'o2-scroll-container overflow-auto rounded-none! overflow-x-auto table-container relative',
+        : 'o2-scroll-container table-container relative overflow-auto overflow-x-auto rounded-none!',
     ]"
     class="text-text-body"
   >
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <table
       v-if="table"
       data-test="logs-search-result-logs-table"
-      class="w-full table-auto logs-table"
+      class="logs-table w-full table-auto"
       :style="{
         minWidth: '100%',
         ...columnSizeVars,
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             { 'cursor-move': table.getState().columnOrder.length > 1 },
             // Header-row chrome via centralized token utilities (same tokens
             // OTable uses): background band + full-width underline on the row.
-            'bg-table-header-bg border-b border-table-header-border',
+            'bg-table-header-bg border-table-header-border border-b',
           ]"
           :style="{
             width:
@@ -74,13 +74,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           tag="tr"
           @start="(event) => handleDragStart(event)"
           @end="() => handleDragEnd()"
-          class="flex items-center h-8"
+          class="flex h-8 items-center"
         >
           <th
             v-for="(header, headerIndex) in headerGroup.headers"
             :key="header.id"
             :id="header.id"
-            class="px-2 relative table-head text-ellipsis"
+            class="table-head relative px-2 text-ellipsis"
             :style="
               !defaultColumns && headerIndex === headerGroup.headers.length - 1
                 ? {
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 header.column.getCanResize() && header.getResizeHandler()?.($event)
               "
               :class="[
-                'absolute right-0 top-0 h-full flex items-center justify-end select-none touch-none z-10 group/resizer',
+                'group/resizer absolute top-0 right-0 z-10 flex h-full touch-none items-center justify-end select-none',
                 header.column.getCanResize() ? 'resizer w-1.25 cursor-col-resize' : 'w-2',
               ]"
             >
@@ -119,8 +119,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="[
                   'rounded-full transition-all duration-150',
                   header.column.getIsResizing()
-                    ? 'w-0.5 h-full bg-table-resize-handle'
-                    : 'w-px h-4 bg-border-default group-hover/resizer:w-0.5 group-hover/resizer:h-full group-hover/resizer:bg-[var(--color-table-resize-handle)]',
+                    ? 'bg-table-resize-handle h-full w-0.5'
+                    : 'bg-border-default h-4 w-px group-hover/resizer:h-full group-hover/resizer:w-0.5 group-hover/resizer:bg-[var(--color-table-resize-handle)]',
                 ]"
               />
             </div>
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="!header.isPlaceholder"
               :class="['text-left', header.column.getCanSort() ? 'cursor-pointer select-none' : '']"
               @click="getSortingHandler($event, header.column.getToggleSortingHandler())"
-              class="overflow-hidden text-ellipsis text-table-header-text text-xs font-medium"
+              class="text-table-header-text overflow-hidden text-xs font-medium text-ellipsis"
             >
               <FlexRender :render="header.column.columnDef.header" :props="header.getContext()" />
             </div>
@@ -141,13 +141,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   (header.column.columnDef.meta as any).showWrap)
               "
               :data-test="`log-add-data-from-column-${header.column.columnDef.header}`"
-              class="invisible flex items-center absolute right-2 top-0 h-full pl-3 bg-table-header-bg column-actions"
+              class="bg-table-header-bg column-actions invisible absolute top-0 right-2 flex h-full items-center pl-3"
             >
               <OIcon
                 v-if="(header.column.columnDef.meta as any).closable"
                 :data-test="`logs-search-result-table-th-remove-${header.column.columnDef.header}-btn`"
                 name="close"
-                class="close-icon cursor-pointer text-icon-color hover:text-text-heading transition-colors"
+                class="close-icon text-icon-color hover:text-text-heading cursor-pointer transition-colors"
                 :title="t('common.close')"
                 size="xs"
                 @click.stop="closeColumn(header.column.columnDef)"
@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <tr v-if="!loading && errMsg != ''" class="w-full">
           <td :colspan="columnOrder.length" class="font-bold opacity-70">
-            <div class="text-sm font-medium font-bold bg-warning">
+            <div class="bg-warning text-sm font-bold font-medium">
               <OIcon size="xs" name="warning" class="mr-1" />
               {{ errMsg }}
             </div>
@@ -166,11 +166,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </tr>
         <tr data-test="log-search-result-function-error" v-if="functionErrorMsg != ''">
           <td :colspan="columnOrder.length" class="font-bold opacity-60">
-            <div class="text-sm font-medium font-bold pl-2 bg-status-warning-bg">
+            <div class="bg-status-warning-bg pl-2 text-sm font-bold font-medium">
               <OButton
                 variant="ghost"
                 size="icon-xs"
-                class="mr-1 log-row-expand-btn"
+                class="log-row-expand-btn mr-1"
                 data-test="table-row-expand-menu"
                 @click.capture.stop="expandFunctionError"
                 ><OIcon
@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </td>
         </tr>
         <tr v-if="functionErrorMsg != '' && isFunctionErrorOpen">
-          <td :colspan="columnOrder.length" class="opacity-70 px-2 bg-status-warning-bg">
+          <td :colspan="columnOrder.length" class="bg-status-warning-bg px-2 opacity-70">
             <pre>{{ functionErrorMsg }}</pre>
           </td>
         </tr>
@@ -203,13 +203,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <tr
           v-for="r in SKEL_ROW_COUNT"
           :key="`skel-${r}`"
-          class="logs-skel-row flex items-center w-full opacity-0 h-[1.8125rem] bg-log-table-row-bg border-b border-log-table-row-border"
+          class="logs-skel-row bg-log-table-row-bg border-log-table-row-border flex h-[1.8125rem] w-full items-center border-b opacity-0"
           :style="{ animationDelay: `${(r - 1) * 40}ms` }"
         >
           <!-- No columns loaded yet (first page load) — full-width shimmer bar -->
-          <td v-if="!headers?.length" class="w-full px-4 overflow-hidden">
+          <td v-if="!headers?.length" class="w-full overflow-hidden px-4">
             <span
-              class="logs-skel-pill inline-block h-3 rounded-default"
+              class="logs-skel-pill rounded-default inline-block h-3"
               :style="{ width: `${skelCellWidth(r - 1, 0)}%` }"
               aria-hidden="true"
             />
@@ -219,12 +219,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <td
               v-for="(header, c) in headers"
               :key="header.id"
-              class="px-2 overflow-hidden"
+              class="overflow-hidden px-2"
               :class="c === 0 ? 'pl-4' : ''"
               :style="skelTdStyle(header, c)"
             >
               <span
-                class="logs-skel-pill inline-block h-3 rounded-default"
+                class="logs-skel-pill rounded-default inline-block h-3"
                 :style="{
                   width: c === 0 ? `${SKEL_TIMESTAMP_PX}px` : `${skelCellWidth(r - 1, c)}%`,
                 }"
@@ -287,7 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? 'log-row-base bg-log-table-row-bg'
                   : '',
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
-                ? 'table-row-hover table-row-focus focus-visible:outline-none transition-[background-color,box-shadow] duration-120 [transition-timing-function:ease-in-out] border-b-log-table-row-border!'
+                ? 'table-row-hover table-row-focus border-b-log-table-row-border! transition-[background-color,box-shadow] duration-120 [transition-timing-function:ease-in-out] focus-visible:outline-none'
                 : '',
             ]"
             @click="
@@ -302,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Status color line for entire row -->
             <div
               v-if="!(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow"
-              class="absolute left-0 inset-y-0 w-1 z-10"
+              class="absolute inset-y-0 left-0 z-10 w-1"
               data-test="log-table-row-status-color"
               :data-test-status-level="getRowStatusLevel(tableRows[virtualRow.index])"
               :style="{
@@ -313,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow"
               :colspan="columnOrder.length"
               :data-test="`log-search-result-expanded-row-${virtualRow.index}`"
-              class="w-full relative"
+              class="relative w-full"
             >
               <JsonPreview
                 :value="tableRows[virtualRow.index - 1] as any"
@@ -338,7 +338,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-for="(cell, cellIndex) in formattedRows[virtualRow.index].getVisibleCells()"
                 :key="cell.id"
                 :data-test="'log-table-column-' + virtualRow.index + '-' + cell.column.columnDef.id"
-                class="py-none px-2 flex items-center justify-start relative table-cell"
+                class="py-none relative flex table-cell items-center justify-start px-2"
                 :class="[...tableCellClass, { 'pl-4': cellIndex === 0 }]"
                 :style="
                   !defaultColumns &&
@@ -374,7 +374,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="cellIndex == 0"
                   variant="ghost"
                   size="icon-xs"
-                  class="mr-1 log-row-expand-btn"
+                  class="log-row-expand-btn mr-1"
                   data-test="table-row-expand-menu"
                   @click.capture.stop="handleExpandRow(virtualRow.index)"
                   ><OIcon
@@ -418,7 +418,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <div
                   v-if="cell.column.columnDef.id === store.state.zoConfig.timestamp_column"
-                  class="absolute right-0 top-1/2 -translate-y-1/2 invisible"
+                  class="invisible absolute top-1/2 right-0 -translate-y-1/2"
                 >
                   <O2AIContextAddBtn
                     class="ai-btn"

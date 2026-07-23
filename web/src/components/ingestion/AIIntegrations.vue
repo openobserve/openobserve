@@ -17,9 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OSplitter v-model="categorySplitterModel" unit="px" class="h-full">
     <template v-slot:before>
-      <div class="w-full h-full">
-        <div class="h-full bg-surface-panel border-r border-border-default">
-          <div class="overflow-y-auto h-full pt-1.5">
+      <div class="h-full w-full">
+        <div class="bg-surface-panel border-border-default h-full border-r">
+          <div class="h-full overflow-y-auto pt-1.5">
             <OTabs v-model="selectedCategory" orientation="vertical" dense class="px-1">
               <OTab
                 v-for="cat in aiCategories"
@@ -37,19 +37,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-slot:after>
       <OSplitter v-model="integrationSplitterModel" unit="px" class="h-full">
         <template v-slot:before>
-          <div class="w-full h-full">
-            <div class="h-full bg-surface-panel border-r border-border-default">
-              <div class="flex flex-col h-full">
-                <div class="pt-2 pl-2 pr-4">
+          <div class="h-full w-full">
+            <div class="bg-surface-panel border-border-default h-full border-r">
+              <div class="flex h-full flex-col">
+                <div class="pt-2 pr-4 pl-2">
                   <OSearchInput
                     data-test="ai-integrations-search-input"
                     v-model="integrationFilter"
                     clearable
-                    class="w-full indexlist-search-input"
+                    class="indexlist-search-input w-full"
                     :placeholder="t('common.search')"
                   />
                 </div>
-                <div class="overflow-y-auto flex-1 min-h-0">
+                <div class="min-h-0 flex-1 overflow-y-auto">
                   <OTabs
                     v-model="selectedIntegration"
                     orientation="vertical"
@@ -72,14 +72,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           "
                           :src="(isDark && integration.logoDark) || integration.logo"
                           :alt="`${integration.name} logo`"
-                          class="w-4.5 h-4.5 rounded-default flex-none object-contain"
+                          class="rounded-default h-4.5 w-4.5 flex-none object-contain"
                           loading="lazy"
                           referrerpolicy="no-referrer"
                           @error="onLogoError(integration.slug)"
                         />
                         <span
                           v-else
-                          class="w-4.5 h-4.5 rounded-default flex-none grid place-items-center bg-theme-accent text-text-inverse text-3xs font-bold leading-none"
+                          class="rounded-default bg-theme-accent text-text-inverse text-3xs grid h-4.5 w-4.5 flex-none place-items-center leading-none font-bold"
                           aria-hidden="true"
                           >{{ integration.name.charAt(0) }}</span
                         >
@@ -93,9 +93,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template v-slot:after>
-          <div class="w-full h-full">
+          <div class="h-full w-full">
             <div class="bg-card-glass-bg h-full" data-test="ai-integrations-detail-pane">
-              <div class="overflow-auto h-full pt-0.5">
+              <div class="h-full overflow-auto pt-0.5">
                 <router-view />
               </div>
             </div>

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <section
-    class="grid grid-cols-2 lg:grid-cols-5 gap-2 p-2"
+    class="grid grid-cols-2 gap-2 p-2 lg:grid-cols-5"
     data-test="rum-sessions-metrics-strip"
     aria-label="Session metrics summary"
   >
@@ -24,14 +24,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-for="card in cards"
       :key="card.key"
       type="button"
-      class="metric-card flex flex-col items-start gap-0.5 text-left rounded-default border p-3 transition-colors bg-card-glass-bg enabled:cursor-pointer enabled:hover:border-accent disabled:cursor-default"
+      class="metric-card rounded-default bg-card-glass-bg enabled:hover:border-accent flex flex-col items-start gap-0.5 border p-3 text-left transition-colors enabled:cursor-pointer disabled:cursor-default"
       :class="card.key === activeCard ? 'border-accent' : 'border-border-default'"
       :aria-pressed="card.key === activeCard"
       :disabled="!card.selectable"
       :data-test="`rum-sessions-metric-${card.key}-card`"
       @click="card.selectable && emit('select', card.key)"
     >
-      <span class="text-xs font-medium uppercase tracking-wide text-text-label">{{
+      <span class="text-text-label text-xs font-medium tracking-wide uppercase">{{
         card.label
       }}</span>
       <span class="flex items-baseline gap-1.5">
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`rum-sessions-metric-${card.key}-value`"
           >{{ card.value }}</span
         >
-        <span v-if="card.rate" class="text-sm text-text-secondary tabular-nums"
+        <span v-if="card.rate" class="text-text-secondary text-sm tabular-nums"
           >· {{ card.rate }}</span
         >
       </span>

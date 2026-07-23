@@ -82,8 +82,8 @@ const sizeClasses: Record<NonNullable<ShortcutProps["size"]>, string> = {
       :key="i"
       :class="[
         'inline-flex items-center justify-center',
-        'rounded-default border border-kbd-border bg-kbd-bg text-kbd-text',
-        'font-medium leading-none whitespace-nowrap shadow-md',
+        'rounded-default border-kbd-border bg-kbd-bg text-kbd-text border',
+        'leading-none font-medium whitespace-nowrap shadow-md',
         sizeClasses[size],
       ]"
       >{{ cap }}</kbd

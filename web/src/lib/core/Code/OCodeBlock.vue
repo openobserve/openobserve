@@ -83,23 +83,23 @@ const onCopy = () => {
 
 <template>
   <div
-    class="o2-code-block my-3 overflow-hidden rounded-default border border-border-default"
+    class="o2-code-block rounded-default border-border-default my-3 overflow-hidden border"
     :class="chrome ? `o2-chrome-${chrome}` : ''"
     :data-test="dataTest"
   >
     <div
-      class="o2-code-toolbar flex items-center justify-between border-b border-border-default py-1 pl-3 pr-1.5"
+      class="o2-code-toolbar border-border-default flex items-center justify-between border-b py-1 pr-1.5 pl-3"
     >
       <span
         v-if="chrome === 'terminal'"
         class="o2-code-head inline-flex min-w-0 items-center gap-2"
       >
         <span class="inline-flex gap-1.5" aria-hidden="true">
-          <i class="block size-2.5 rounded-full bg-status-negative" />
-          <i class="block size-2.5 rounded-full bg-warning" />
-          <i class="block size-2.5 rounded-full bg-status-positive" />
+          <i class="bg-status-negative block size-2.5 rounded-full" />
+          <i class="bg-warning block size-2.5 rounded-full" />
+          <i class="bg-status-positive block size-2.5 rounded-full" />
         </span>
-        <span class="o2-code-lang font-mono text-2xs uppercase tracking-wider opacity-55"
+        <span class="o2-code-lang text-2xs font-mono tracking-wider uppercase opacity-55"
           >Terminal</span
         >
       </span>
@@ -112,7 +112,7 @@ const onCopy = () => {
           filename || lang || "text"
         }}</span>
       </span>
-      <span v-else class="o2-code-lang font-mono text-2xs uppercase tracking-wider opacity-55">{{
+      <span v-else class="o2-code-lang text-2xs font-mono tracking-wider uppercase opacity-55">{{
         lang || "text"
       }}</span>
       <div class="flex items-center gap-1">

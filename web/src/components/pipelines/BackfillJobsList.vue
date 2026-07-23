@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="backfill-jobs-list-page" class="flex flex-col h-full min-h-0">
+  <div data-test="backfill-jobs-list-page" class="flex h-full min-h-0 flex-col">
     <!-- Filters live in the shell header (Functions.vue #o2-page-actions),
          next to the "Pipelines › Backfill Jobs" breadcrumb.
          `defer` (Vue 3.5+) waits for the target to be rendered in the same
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </Teleport>
 
     <!-- Jobs Table -->
-    <div class="flex-1 min-h-0 overflow-hidden">
+    <div class="min-h-0 flex-1 overflow-hidden">
       <div class="rounded-default h-full">
         <OTable
           ref="qTableRef"
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           filter-mode="client"
           :show-global-filter="false"
           width="100%"
-          class="w-full h-full"
+          class="h-full w-full"
           data-test="backfill-jobs-table"
         >
           <!-- Empty State -->
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Bottom footer -->
           <template #bottom="{ totalRows }">
-            <div class="flex items-center text-xs font-normal mr-4 py-2">
+            <div class="mr-4 flex items-center py-2 text-xs font-normal">
               {{ totalRows }} Backfill Job{{ totalRows === 1 ? "" : "s" }}
             </div>
           </template>
@@ -125,8 +125,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Progress Column -->
           <template #cell-progress_percent="{ row }">
-            <div class="flex items-center gap-2 w-full">
-              <div class="flex-1 relative">
+            <div class="flex w-full items-center gap-2">
+              <div class="relative flex-1">
                 <OProgressBar
                   :value="row.progress_percent / 100"
                   variant="default"
@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ row.progress_percent }}%
                 </OProgressBar>
               </div>
-              <div class="text-xs text-text-body whitespace-nowrap pr-2 w-24 shrink-0">
+              <div class="text-text-body w-24 shrink-0 pr-2 text-xs whitespace-nowrap">
                 <template v-if="row.chunks_total">
                   {{ row.chunks_completed || 0 }}/{{ row.chunks_total }}
                   chunks
@@ -268,23 +268,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div v-if="errorDialogData">
         <div class="mb-3">
-          <div class="text-xs text-text-label">Job ID</div>
+          <div class="text-text-label text-xs">Job ID</div>
           <div class="text-sm font-medium">
             {{ errorDialogData.job_id }}
           </div>
         </div>
 
         <div class="mb-3">
-          <div class="text-xs text-text-label">Pipeline</div>
+          <div class="text-text-label text-xs">Pipeline</div>
           <div class="text-sm">
             {{ errorDialogData.pipeline_name || errorDialogData.pipeline_id }}
           </div>
         </div>
 
         <div>
-          <div class="text-xs text-text-label mb-2">Error Message</div>
+          <div class="text-text-label mb-2 text-xs">Error Message</div>
           <div
-            class="p-3 rounded-default bg-banner-error-soft-bg border-l-[3px] border-l-status-negative font-mono text-compact leading-[1.6] whitespace-pre-wrap wrap-break-word text-banner-error-soft-text"
+            class="rounded-default bg-banner-error-soft-bg border-l-status-negative text-compact text-banner-error-soft-text border-l-[3px] p-3 font-mono leading-[1.6] wrap-break-word whitespace-pre-wrap"
           >
             {{ errorDialogData.error }}
           </div>

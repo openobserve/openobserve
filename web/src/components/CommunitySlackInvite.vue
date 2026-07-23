@@ -143,7 +143,7 @@ const joinSlack = () => {
       <!-- Header: Slack badge, title to its right, close button on the far right -->
       <div class="flex items-start gap-3">
         <div
-          class="flex h-12 w-12 shrink-0 items-center justify-center rounded-default bg-primary-50"
+          class="rounded-default bg-primary-50 flex h-12 w-12 shrink-0 items-center justify-center"
           aria-hidden="true"
         >
           <svg viewBox="0 0 122.8 122.8" class="h-6 w-6" xmlns="http://www.w3.org/2000/svg">
@@ -201,7 +201,7 @@ const joinSlack = () => {
             stroke-width="2.5"
             stroke-linecap="round"
             stroke-linejoin="round"
-            class="mt-0.5 h-4 w-4 shrink-0 text-primary-600"
+            class="text-primary-600 mt-0.5 h-4 w-4 shrink-0"
             aria-hidden="true"
           >
             <path d="M20 6 9 17l-5-5" />
@@ -213,14 +213,14 @@ const joinSlack = () => {
       <!-- Social proof — generic avatar stack, no fabricated counts -->
       <div
         data-test="community-slack-invite-members"
-        class="flex items-center gap-3 rounded-default bg-surface-panel px-3 py-2.5"
+        class="rounded-default bg-surface-panel flex items-center gap-3 px-3 py-2.5"
       >
         <div class="flex items-center" aria-hidden="true">
           <span
             v-for="(bg, i) in avatarBgClasses"
             :key="i"
             :class="[
-              'flex h-7 w-7 items-center justify-center rounded-full text-text-inverse ring-2 ring-surface-panel',
+              'text-text-inverse ring-surface-panel flex h-7 w-7 items-center justify-center rounded-full ring-2',
               bg,
               i > 0 ? '-ml-2' : '',
             ]"

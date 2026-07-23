@@ -9,7 +9,7 @@
       (isPartialData && !isPanelLoading) ||
       (lastTriggeredAt && !viewOnly && !simplifiedPanelView)
     "
-    class="flex items-center flex-nowrap"
+    class="flex flex-nowrap items-center"
   >
     <OButton
       v-if="error"
@@ -98,10 +98,10 @@
     <!-- Universal Last Refreshed Clock Icon and Time -->
     <span
       v-if="lastTriggeredAt && !viewOnly && !simplifiedPanelView"
-      class="lastRefreshedAt text-[smaller] ml-1.25 whitespace-nowrap overflow-hidden text-ellipsis"
+      class="lastRefreshedAt ml-1.25 overflow-hidden text-[smaller] text-ellipsis whitespace-nowrap"
       data-test="panel-last-refreshed-at"
     >
-      <span class="lastRefreshedAtIcon text-[smaller] mr-0.5">
+      <span class="lastRefreshedAtIcon mr-0.5 text-[smaller]">
         🕑
         <OTooltip side="bottom" align="end">
           <template #content

@@ -85,7 +85,7 @@ const onDateChange = (field: any, dt: any) => {
   <component v-if="form" :is="form.Field" :name="props.name">
     <template #default="{ field }">
       <div v-if="props.label || props.description" class="mb-2">
-        <div v-if="props.label" class="text-sm font-bold text-input-label-text">
+        <div v-if="props.label" class="text-input-label-text text-sm font-bold">
           {{ props.label }}<span v-if="props.required" class="text-input-error-text"> *</span>
         </div>
         <div v-if="props.description" class="text-xs">

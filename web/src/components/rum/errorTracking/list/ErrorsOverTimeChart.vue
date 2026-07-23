@@ -16,14 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <section
-    class="bg-card-glass-bg flex flex-col h-full px-2.5 py-1.5 min-w-0"
+    class="bg-card-glass-bg flex h-full min-w-0 flex-col px-2.5 py-1.5"
     data-test="rum-errors-over-time-chart"
   >
     <h4>{{ t("rum.errorsOverTime") }}</h4>
 
     <div
       v-if="loading"
-      class="flex-1 flex items-end gap-1 p-2"
+      class="flex flex-1 items-end gap-1 p-2"
       data-test="rum-errors-over-time-chart-loading"
     >
       <OSkeleton
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       v-else-if="!hasData"
-      class="flex-1 flex items-center justify-center"
+      class="flex flex-1 items-center justify-center"
       data-test="rum-errors-over-time-chart-empty"
     >
       <p class="text-text-muted">
@@ -46,12 +46,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <template v-else>
-      <div class="flex-1 min-h-0">
+      <div class="min-h-0 flex-1">
         <ChartRenderer :data="{ options: chartOptions }" />
       </div>
       <small
         v-if="spikeCaption"
-        class="text-right font-semibold text-severity-error-color"
+        class="text-severity-error-color text-right font-semibold"
         data-test="rum-errors-over-time-chart-spike-caption"
         >{{ spikeCaption }}</small
       >

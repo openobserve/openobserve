@@ -83,14 +83,14 @@ function removeAssertion(index: number) {
 </script>
 
 <template>
-  <div class="rounded-default border border-border-default mb-4">
-    <div class="flex items-center border-b border-border-default py-2.5 px-3">
-      <div class="w-[0.1875rem] h-4 rounded-default mr-2 shrink-0 bg-primary-600" />
-      <h3 class="text-base font-semibold text-text-heading">
+  <div class="rounded-default border-border-default mb-4 border">
+    <div class="border-border-default flex items-center border-b px-3 py-2.5">
+      <div class="rounded-default bg-primary-600 mr-2 h-4 w-[0.1875rem] shrink-0" />
+      <h3 class="text-text-heading text-base font-semibold">
         {{ t("synthetics.protocolConfig.http.title") }}
       </h3>
     </div>
-    <div class="px-3 py-2 flex flex-col gap-4">
+    <div class="flex flex-col gap-4 px-3 py-2">
       <div class="flex items-end gap-2">
         <OSelect
           v-model="method"
@@ -116,11 +116,11 @@ function removeAssertion(index: number) {
 
       <!-- Headers -->
       <div>
-        <label class="text-sm font-medium text-text-body mb-1 block">{{
+        <label class="text-text-body mb-1 block text-sm font-medium">{{
           t("synthetics.protocolConfig.http.headers")
         }}</label>
-        <div v-for="(h, i) in cfg.headers" :key="i" class="flex items-center gap-2 mb-2">
-          <div class="flex-1 min-w-0">
+        <div v-for="(h, i) in cfg.headers" :key="i" class="mb-2 flex items-center gap-2">
+          <div class="min-w-0 flex-1">
             <OInput
               :model-value="h.name"
               :placeholder="t('synthetics.protocolConfig.http.headerName')"
@@ -131,7 +131,7 @@ function removeAssertion(index: number) {
               "
             />
           </div>
-          <div class="flex-1 min-w-0">
+          <div class="min-w-0 flex-1">
             <OInput
               :model-value="h.value"
               :placeholder="t('synthetics.protocolConfig.http.headerValue')"
@@ -176,10 +176,10 @@ function removeAssertion(index: number) {
 
       <!-- Assertions -->
       <div>
-        <label class="text-sm font-medium text-text-body mb-1 block">{{
+        <label class="text-text-body mb-1 block text-sm font-medium">{{
           t("synthetics.protocolConfig.http.assertions")
         }}</label>
-        <div v-for="(a, i) in cfg.assertions" :key="i" class="flex items-center gap-2 mb-2">
+        <div v-for="(a, i) in cfg.assertions" :key="i" class="mb-2 flex items-center gap-2">
           <OSelect
             :model-value="a.field"
             :options="fieldOptions"
@@ -194,7 +194,7 @@ function removeAssertion(index: number) {
             :data-test="`synthetics-check-http-assertion-operator-${i}`"
             @update:model-value="(v) => patchAssertion(i, { operator: String(v ?? 'eq') })"
           />
-          <div class="flex-1 min-w-0">
+          <div class="min-w-0 flex-1">
             <OInput
               :model-value="a.value"
               :placeholder="t('synthetics.protocolConfig.http.assertionValue')"

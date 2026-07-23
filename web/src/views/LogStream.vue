@@ -61,11 +61,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="streams-log-stream-list"
-          class="w-full h-full"
+          class="h-full w-full"
         >
           <!-- Toolbar inside the table frame: stream-type filter + search. -->
           <template #toolbar>
-            <div class="flex items-center justify-between gap-2 w-full">
+            <div class="flex w-full items-center justify-between gap-2">
               <OToggleGroup
                 :model-value="streamActiveTab"
                 @update:model-value="(v) => filterLogStreamByTab(v as string)"
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSearchInput
                 data-test="streams-search-stream-input"
                 v-model="filterQuery"
-                class="w-64 no-border o2-search-input"
+                class="no-border o2-search-input w-64"
                 :placeholder="t('logStream.search')"
                 :debounce="300"
               />
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }}</span>
           </template>
           <template #cell-actions="{ row }">
-            <div class="flex items-center actions-container">
+            <div class="actions-container flex items-center">
               <OButton
                 icon-left="search"
                 :title="t('logStream.explore')"
@@ -166,8 +166,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @action="onStreamsEmptyStateAction"
               >
                 <template v-if="!filterQuery" #extra>
-                  <div class="flex items-center justify-center gap-2 flex-wrap">
-                    <span class="text-sm font-semibold text-text-secondary mr-1">
+                  <div class="flex flex-wrap items-center justify-center gap-2">
+                    <span class="text-text-secondary mr-1 text-sm font-semibold">
                       {{ t("logStream.emptyOr") }}
                     </span>
                     <EmptyStateIngestionChip
@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <img
                         :src="getImageURL('images/common/kubernetes.svg')"
-                        class="w-3.5 h-3.5 shrink-0 object-contain"
+                        class="h-3.5 w-3.5 shrink-0 object-contain"
                         alt=""
                       />
                       {{ t("logStream.emptyKubernetes") }}
@@ -197,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <img
                         :src="getImageURL('images/ingestion/aws.svg')"
-                        class="w-3.5 h-3.5 shrink-0 object-contain"
+                        class="h-3.5 w-3.5 shrink-0 object-contain"
                         alt=""
                       />
                       {{ t("logStream.emptyAws") }}
@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <img
                         :src="getImageURL('images/common/linux.svg')"
-                        class="w-3.5 h-3.5 shrink-0 object-contain"
+                        class="h-3.5 w-3.5 shrink-0 object-contain"
                         alt=""
                       />
                       {{ t("logStream.emptyLinux") }}
@@ -229,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <img
                         :src="getImageURL('images/common/windows.svg')"
-                        class="w-3.5 h-3.5 shrink-0 object-contain"
+                        class="h-3.5 w-3.5 shrink-0 object-contain"
                         alt=""
                       />
                       {{ t("logStream.emptyWindows") }}
@@ -240,8 +240,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #bottom="scope">
-            <div class="flex items-center justify-between w-full py-2">
-              <div class="flex items-center w-full text-xs font-normal">
+            <div class="flex w-full items-center justify-between py-2">
+              <div class="flex w-full items-center text-xs font-normal">
                 {{ scope.totalRows }} Stream(s)
                 <OButton
                   v-if="selectedIds.length > 0"
@@ -293,7 +293,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="flex flex-col gap-3 py-1">
         <p class="text-sm">{{ t("logStream.confirmDeleteMsg") }}</p>
-        <div class="w-full flex items-center gap-2 text-sm text-text-secondary">
+        <div class="text-text-secondary flex w-full items-center gap-2 text-sm">
           <OCheckbox v-model="deleteAssociatedAlertsPipelines" />
           <span class="text-text-secondary text-xs font-medium">
             {{ t("logStream.deleteAssociatedAlertsPipelines") }}
@@ -320,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="flex flex-col gap-3 py-1">
         <p class="text-sm">{{ t("logStream.confirmBatchDeleteMsg") }}</p>
-        <div class="w-full flex items-center gap-2 text-sm text-text-secondary">
+        <div class="text-text-secondary flex w-full items-center gap-2 text-sm">
           <OCheckbox v-model="deleteAssociatedAlertsPipelines" />
           <span class="text-text-secondary text-xs font-medium">
             Delete all Pipelines and Alerts associated with the selected streams

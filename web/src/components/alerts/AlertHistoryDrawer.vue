@@ -29,12 +29,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          the other detail headers); the type badge + History/Condition toggle
          trail in header-left, the datetime picker sits in header-right. -->
     <template #header-left>
-      <div class="flex items-center gap-2 flex-1 min-w-0" data-test="alert-details-title">
+      <div class="flex min-w-0 flex-1 items-center gap-2" data-test="alert-details-title">
         <!-- Alert Type Badge -->
         <div
           v-if="alertDetails"
           :class="[
-            'flex items-center gap-1 px-2 py-1 rounded-default border shrink-0',
+            'rounded-default flex shrink-0 items-center gap-1 border px-2 py-1',
             'bg-surface-subtle border-border-default',
           ]"
         >
@@ -93,16 +93,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Content -->
-    <div class="flex flex-col h-full min-h-0" v-if="alertDetails">
+    <div class="flex h-full min-h-0 flex-col" v-if="alertDetails">
       <!-- Tab Panels -->
       <OTabPanels
         v-model="activeTab"
         animated
-        class="flex-1 overflow-hidden bg-transparent flex flex-col"
+        class="flex flex-1 flex-col overflow-hidden bg-transparent"
       >
         <!-- History Panel -->
         <OTabPanel name="history" layout="flex-col" stretch class="flex-1">
-          <div class="flex h-full flex-col flex-1 overflow-hidden px-2 py-2">
+          <div class="flex h-full flex-1 flex-col overflow-hidden px-2 py-2">
             <!-- Empty state -->
             <OEmptyState
               v-if="!isLoadingHistory && alertHistory.length === 0"
@@ -115,12 +115,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
 
             <!-- History Table -->
-            <div v-else class="flex flex-col flex-1 overflow-hidden gap-2">
+            <div v-else class="flex flex-1 flex-col gap-2 overflow-hidden">
               <!-- Firing frequency timeline -->
               <AlertHistoryTimeline v-if="alertHistory.length > 0" :history="alertHistory" />
 
               <div
-                class="rounded-default overflow-hidden border flex flex-col flex-1"
+                class="rounded-default flex flex-1 flex-col overflow-hidden border"
                 :class="'border-border-default bg-surface-panel'"
               >
                 <OTable
@@ -151,16 +151,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OIcon
                         :name="expandedGroups.has(row.timestamp) ? 'expand-less' : 'expand-more'"
                         size="sm"
-                        class="cursor-pointer opacity-50 shrink-0"
+                        class="shrink-0 cursor-pointer opacity-50"
                         @click="toggleFlappingGroup(row.timestamp)"
                       />
                       <OTag
                         type="alertState"
                         value="flapping"
-                        class="cursor-pointer shrink-0"
+                        class="shrink-0 cursor-pointer"
                         @click="toggleFlappingGroup(row.timestamp)"
                       />
-                      <span class="text-2xs truncate text-text-secondary">
+                      <span class="text-2xs text-text-secondary truncate">
                         {{ row._children.length }} rows · {{ row._duration }}
                       </span>
                     </div>
@@ -177,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <template #cell-timestamp="{ row }">
                     <span
-                      class="text-compact tabular-nums whitespace-nowrap"
+                      class="text-compact whitespace-nowrap tabular-nums"
                       :class="row._child ? 'pl-5 opacity-70' : ''"
                     >
                       {{ formatTimestampFull(row.timestamp) }}
@@ -214,8 +214,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
 
                   <template #bottom>
-                    <div class="flex items-center w-full h-12">
-                      <div class="text-xs font-normal flex items-center w-55">
+                    <div class="flex h-12 w-full items-center">
+                      <div class="flex w-55 items-center text-xs font-normal">
                         {{ resultTotal }} {{ t("alerts.alertDetails.results") }}
                       </div>
                     </div>
@@ -228,15 +228,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Condition Panel -->
         <OTabPanel name="condition" layout="flex-col" stretch class="flex-1">
-          <div class="flex flex-col flex-1 overflow-hidden px-2 py-2">
+          <div class="flex flex-1 flex-col overflow-hidden px-2 py-2">
             <!-- Anomaly detection condition view — mirrors the alert SQL code block -->
             <template v-if="isAnomaly">
               <div
-                class="rounded-default overflow-hidden border flex flex-col flex-1"
+                class="rounded-default flex flex-1 flex-col overflow-hidden border"
                 :class="'border-border-default bg-surface-panel'"
               >
                 <div
-                  class="flex items-center justify-between py-1.5 px-2.5 border-b shrink-0"
+                  class="flex shrink-0 items-center justify-between border-b px-2.5 py-1.5"
                   :class="'bg-surface-subtle border-border-default'"
                 >
                   <div class="flex items-center gap-1.5">
@@ -259,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                 </div>
                 <pre
-                  class="p-[10px_14px] font-mono whitespace-pre-wrap overflow-x-auto text-compact m-0 leading-relaxed flex-1 overflow-y-auto"
+                  class="text-compact m-0 flex-1 overflow-x-auto overflow-y-auto p-[10px_14px] font-mono leading-relaxed whitespace-pre-wrap"
                   >{{ anomalySql || t("alerts.alertDetails.noCondition") }}</pre
                 >
               </div>
@@ -268,12 +268,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Regular alert condition view -->
             <template v-else>
               <div
-                class="rounded-default overflow-hidden border flex flex-col flex-1"
+                class="rounded-default flex flex-1 flex-col overflow-hidden border"
                 :class="'border-border-default bg-surface-panel'"
               >
                 <!-- Code block header bar — stays fixed -->
                 <div
-                  class="flex items-center justify-between py-1.5 px-2.5 border-b shrink-0"
+                  class="flex shrink-0 items-center justify-between border-b px-2.5 py-1.5"
                   :class="'bg-surface-subtle border-border-default'"
                 >
                   <div class="flex items-center gap-1.5">
@@ -313,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <!-- Code content — scrolls internally -->
                 <pre
-                  class="p-[10px_14px] font-mono whitespace-pre-wrap overflow-x-auto text-compact m-0 leading-relaxed flex-1 overflow-y-auto"
+                  class="text-compact m-0 flex-1 overflow-x-auto overflow-y-auto p-[10px_14px] font-mono leading-relaxed whitespace-pre-wrap"
                   >{{
                     alertDetails.conditions !== "" && alertDetails.conditions !== "--"
                       ? alertDetails.type === "sql" || alertDetails.type === "promql"
@@ -330,14 +330,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Description (only show if exists) -->
             <div v-if="alertDetails.description" class="mt-3 shrink-0">
               <div
-                class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider mb-1"
+                class="mb-1 flex items-center gap-1.5 text-xs font-semibold tracking-wider uppercase"
                 :class="'text-text-secondary'"
               >
                 <OIcon name="info-outline" size="xs" />
                 {{ t("common.description") }}
               </div>
               <div
-                class="text-compact px-3 py-2 rounded-default leading-relaxed"
+                class="text-compact rounded-default px-3 py-2 leading-relaxed"
                 :class="'bg-surface-panel text-text-body'"
               >
                 {{ alertDetails.description }}

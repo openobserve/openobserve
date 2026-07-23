@@ -4,7 +4,7 @@
       <!-- No "View Component" badge: that is internal architecture vocabulary
            and told the reader nothing about what the table is for. -->
       <div class="flex flex-wrap items-center gap-2">
-        <strong class="text-xs font-semibold text-text-heading">
+        <strong class="text-text-heading text-xs font-semibold">
           {{ t("onlineEvals.scorer.promptVariableGuide.title") }}
         </strong>
         <!-- Same affordance as the Eval Job form: a Learn more that opens the
@@ -47,8 +47,8 @@
       <!-- `bleed` drops ODrawer's body inset so the table runs edge to edge;
            the prose keeps the inset via the same tokens the drawer would have
            applied. Mirrors the Eval Job variables drawer. -->
-      <div class="flex flex-col gap-3 py-dialog-content-py">
-        <span class="px-dialog-content-px text-xs leading-relaxed text-text-secondary">
+      <div class="py-dialog-content-py flex flex-col gap-3">
+        <span class="px-dialog-content-px text-text-secondary text-xs leading-relaxed">
           {{ t("onlineEvals.scorer.promptVariableGuide.description") }}
         </span>
 

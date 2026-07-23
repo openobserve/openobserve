@@ -14,17 +14,17 @@
       <div class="flex flex-col gap-2">
         <div class="flex items-center gap-2">
           <OTag variant="primary-soft" size="sm" shape="pill">1</OTag>
-          <span class="font-medium text-text-heading">
+          <span class="text-text-heading font-medium">
             {{ t("synthetics.privateLocations.setup.step1Title") }}
           </span>
         </div>
-        <p class="text-sm text-text-secondary">
+        <p class="text-text-secondary text-sm">
           {{ t("synthetics.privateLocations.setup.step1Body") }}
         </p>
 
         <!-- Composer: location inputs + platform tabs + composed command -->
         <template v-if="canCompose">
-          <div class="flex flex-col gap-3 rounded-default border border-border-default p-3">
+          <div class="rounded-default border-border-default flex flex-col gap-3 border p-3">
             <div class="flex flex-col gap-1">
               <OInput
                 v-model="draftAgentName"
@@ -33,7 +33,7 @@
                 size="sm"
                 data-test="synthetics-agent-setup-agent-name-input"
               />
-              <p class="text-xs text-text-muted">
+              <p class="text-text-muted text-xs">
                 {{ t("synthetics.privateLocations.setup.agentNameHint") }}
               </p>
             </div>
@@ -62,7 +62,7 @@
 
           <div class="relative">
             <pre
-              class="bg-surface-subtle border border-border-default rounded-default p-3 text-xs font-mono overflow-x-auto whitespace-pre"
+              class="bg-surface-subtle border-border-default rounded-default overflow-x-auto border p-3 font-mono text-xs whitespace-pre"
               data-test="synthetics-agent-setup-install-cmd"
               >{{ composedCommand }}</pre
             >
@@ -81,7 +81,7 @@
         <!-- Legacy fallback: server-composed docker one-liner -->
         <div v-else-if="install" class="relative">
           <pre
-            class="bg-surface-subtle border border-border-default rounded-default p-3 text-xs font-mono overflow-x-auto whitespace-pre"
+            class="bg-surface-subtle border-border-default rounded-default overflow-x-auto border p-3 font-mono text-xs whitespace-pre"
             data-test="synthetics-agent-setup-install-cmd"
             >{{ install }}</pre
           >
@@ -95,10 +95,10 @@
             @click="copyCommand"
           />
         </div>
-        <p v-else class="text-sm text-text-muted">
+        <p v-else class="text-text-muted text-sm">
           {{ t("synthetics.privateLocations.setup.noToken") }}
         </p>
-        <p class="text-xs text-text-muted">
+        <p class="text-text-muted text-xs">
           {{ t("synthetics.privateLocations.setup.imagePlaceholderNote") }}
         </p>
       </div>
@@ -107,11 +107,11 @@
       <div class="flex flex-col gap-2">
         <div class="flex items-center gap-2">
           <OTag variant="primary-soft" size="sm" shape="pill">2</OTag>
-          <span class="font-medium text-text-heading">
+          <span class="text-text-heading font-medium">
             {{ t("synthetics.privateLocations.setup.step2Title") }}
           </span>
         </div>
-        <p class="text-sm text-text-secondary">
+        <p class="text-text-secondary text-sm">
           {{ t("synthetics.privateLocations.setup.step2Body") }}
         </p>
       </div>
@@ -120,16 +120,16 @@
       <div class="flex flex-col gap-2">
         <div class="flex items-center gap-2">
           <OTag variant="primary-soft" size="sm" shape="pill">3</OTag>
-          <span class="font-medium text-text-heading">
+          <span class="text-text-heading font-medium">
             {{ t("synthetics.privateLocations.setup.step3Title") }}
           </span>
         </div>
-        <p class="text-sm text-text-secondary">
+        <p class="text-text-secondary text-sm">
           {{ t("synthetics.privateLocations.setup.step3Body") }}
         </p>
       </div>
 
-      <p class="text-xs text-text-muted border-t border-border-default pt-3">
+      <p class="text-text-muted border-border-default border-t pt-3 text-xs">
         {{ t("synthetics.privateLocations.setup.browserNote") }}
       </p>
     </div>

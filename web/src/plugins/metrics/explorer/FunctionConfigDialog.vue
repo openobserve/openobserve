@@ -37,9 +37,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="$emit('update:modelValue', $event)"
   >
     <template #header>
-      <div class="flex items-center gap-2 min-w-0">
+      <div class="flex min-w-0 items-center gap-2">
         <span
-          class="font-mono text-sm font-semibold truncate"
+          class="truncate font-mono text-sm font-semibold"
           :title="card.name"
           data-test="metrics-fn-metric"
           >{{ card.name }}</span
@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="shrink-0"
           data-test="metrics-fn-badge"
         />
-        <span class="truncate text-xs text-text-secondary">
+        <span class="text-text-secondary truncate text-xs">
           {{ t("metrics.explorer.fn.subtitle") }}
         </span>
       </div>
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          defensive branch for one that is somehow opened anyway. -->
     <div
       v-if="!variants.length"
-      class="flex flex-col items-center gap-2 py-8 text-xs text-text-secondary"
+      class="text-text-secondary flex flex-col items-center gap-2 py-8 text-xs"
       data-test="metrics-fn-empty"
     >
       <OIcon name="settings" size="md" />
@@ -79,10 +79,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="variant in variants"
         :key="variant.id"
-        class="flex grow basis-[17.5rem] max-w-full min-w-0 cursor-pointer flex-col gap-1 rounded-default border p-2"
+        class="rounded-default flex max-w-full min-w-0 grow basis-[17.5rem] cursor-pointer flex-col gap-1 border p-2"
         :class="
           variant.id === selectedId
-            ? 'border-primary-600 ring-1 ring-primary-600'
+            ? 'border-primary-600 ring-primary-600 ring-1'
             : 'border-border-default hover:border-border-default'
         "
         :data-test="`metrics-fn-variant-${variant.id}`"
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <div
-          class="truncate font-mono text-3xs text-text-secondary"
+          class="text-3xs text-text-secondary truncate font-mono"
           :title="exprOf(variant)"
           :data-test="`metrics-fn-expr-${variant.id}`"
         >
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="relative h-30">
           <div
             v-if="previewOf(variant).status === 'error'"
-            class="flex h-full flex-col items-center justify-center gap-1 text-xs text-text-secondary"
+            class="text-text-secondary flex h-full flex-col items-center justify-center gap-1 text-xs"
             :title="previewOf(variant).error"
             :data-test="`metrics-fn-error-${variant.id}`"
           >
@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div
             v-else-if="previewOf(variant).status === 'unavailable'"
-            class="flex h-full items-center justify-center text-xs text-text-secondary"
+            class="text-text-secondary flex h-full items-center justify-center text-xs"
             :data-test="`metrics-fn-nopreview-${variant.id}`"
           >
             {{ t("metrics.explorer.fn.noPreview") }}
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div
             v-else-if="previewOf(variant).status === 'done' && isEmpty(variant)"
-            class="flex h-full items-center justify-center rounded-default text-xs text-text-secondary"
+            class="rounded-default text-text-secondary flex h-full items-center justify-center text-xs"
             :data-test="`metrics-fn-nodata-${variant.id}`"
           >
             {{ t("metrics.explorer.noData") }}

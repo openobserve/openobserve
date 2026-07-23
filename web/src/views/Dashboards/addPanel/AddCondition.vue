@@ -20,7 +20,7 @@
             {{ computedLabel(condition) }}
           </OButton>
         </template>
-        <div class="p-4 w-72">
+        <div class="w-72 p-4">
           <div class="flex items-center gap-1">
             <StreamFieldSelect
               class="w-full"

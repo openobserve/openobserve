@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="py-2 px-4 border-b border-solid border-card-glass-border">
-    <div class="flex items-center gap-3 flex-wrap">
+  <div class="border-card-glass-border border-b border-solid px-4 py-2">
+    <div class="flex flex-wrap items-center gap-3">
       <span class="text-xs font-semibold opacity-70"> {{ filterLabelComputed }}: </span>
       <div v-for="(value, key) in dimensions" :key="key" class="flex items-center gap-2">
         <span

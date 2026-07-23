@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #top>
-        <div class="flex items-center w-full border-b border-border-default pb-2 mb-1">
+        <div class="border-border-default mb-1 flex w-full items-center border-b pb-2">
           <div class="text-sm font-[600]" data-test="log-stream-title-text">
             {{ t("logStream.header") }}
           </div>
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <OButton
             data-test="log-stream-refresh-stats-btn"
-            class="ml-3 mb-1"
+            class="mb-1 ml-3"
             variant="outline"
             size="sm-action"
             @click="getLogStream"
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #expansion>
-        <div v-show="loadingFunctions" class="pl-3 py-1" style="height: 60px">
+        <div v-show="loadingFunctions" class="py-1 pl-3" style="height: 60px">
           <OInnerLoading :showing="loadingFunctions" label="Fetching functions..." size="sm" />
         </div>
         <div v-show="!loadingFunctions">
@@ -77,15 +77,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :default-columns="false"
           >
             <template #top>
-              <div class="flex flex-row w-full justify-between">
-                <div class="text-sm font-[600] flex items-center" data-test="log-stream-title-text">
+              <div class="flex w-full flex-row justify-between">
+                <div class="flex items-center text-sm font-[600]" data-test="log-stream-title-text">
                   {{ t("function.associatedFunctionHeader") }}
                 </div>
                 <OButton
                   data-test="stream-association-associate-function-btn"
                   variant="outline"
                   size="sm-action"
-                  class="ml-3 mb-1"
+                  class="mb-1 ml-3"
                   @click="addFunctionInProgress = true"
                 >
                   Associate Function

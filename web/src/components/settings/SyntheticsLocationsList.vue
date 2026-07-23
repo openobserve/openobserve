@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col h-full p-0">
+  <div class="flex h-full flex-col p-0">
     <template v-if="!showImportDialog">
       <OPageLayout
         :title="t('synthetics.locations.title')"
@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </template>
 
-        <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
+        <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
           <OTable
             :frame="false"
             data-test="synthetics-locations-list-table"
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Enable / Disable toggle with per-row spinner -->
                 <div
                   v-if="toggleLoadingMap[row.id]"
-                  class="flex items-center justify-center w-7 h-8"
+                  class="flex h-8 w-7 items-center justify-center"
                   :data-test="`synthetics-locations-${row.id}-toggle-spinner`"
                 >
                   <OSpinner size="xs" />
@@ -162,8 +162,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
             <template #bottom>
-              <div class="flex w-full justify-between items-center h-12 gap-1">
-                <span class="text-xs text-secondary min-w-25">
+              <div class="flex h-12 w-full items-center justify-between gap-1">
+                <span class="text-secondary min-w-25 text-xs">
                   <template v-if="selectedLocations.length > 0">
                     {{
                       t("synthetics.locations.selectedCount", {

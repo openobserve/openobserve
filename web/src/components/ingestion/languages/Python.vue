@@ -31,7 +31,7 @@ const docURLFastAPI = languagesDocURLs["fastapi"];
     <CopyContent :content="content" />
     <div>
       <div class="font-medium">Check further documentation at:</div>
-      <ol class="list-decimal pl-5 mt-1">
+      <ol class="mt-1 list-decimal pl-5">
         <li class="py-0.5">
           <a
             :href="docURL"

@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="relative-position">
     <div
-      class="min-h-0! max-h-[calc(100vh-200px)] overflow-y-auto"
+      class="max-h-[calc(100vh-200px)] min-h-0! overflow-y-auto"
       :class="isLoading.length ? 'invisible' : 'visible'"
     >
       <RenderDashboardCharts
@@ -32,14 +32,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @variablesManagerReady="onVariablesManagerReady"
       >
         <template v-slot:before_panels>
-          <div class="flex items-center pt-3 text-base font-medium font-bold">
-            <div class="text-center w-[25%]">
+          <div class="flex items-center pt-3 text-base font-bold font-medium">
+            <div class="w-[25%] text-center">
               {{ t("rum.webVitalsLabel") }}
             </div>
-            <div class="text-center w-[25%]">
+            <div class="w-[25%] text-center">
               {{ t("rum.errorLabel") }}
             </div>
-            <div class="text-center w-[25%]">
+            <div class="w-[25%] text-center">
               {{ t("rum.sessionLabel") }}
             </div>
           </div>
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-show="isLoading.length"
-      class="pb-4 flex items-center justify-center text-center absolute w-full h-[calc(100vh-15.625rem)] top-0"
+      class="absolute top-0 flex h-[calc(100vh-15.625rem)] w-full items-center justify-center pb-4 text-center"
     >
       <div>
         <OSpinner
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="mx-auto block"
           data-test="performance-summary-loading-indicator"
         />
-        <div class="text-center w-full">Loading Dashboard</div>
+        <div class="w-full text-center">Loading Dashboard</div>
       </div>
     </div>
   </div>

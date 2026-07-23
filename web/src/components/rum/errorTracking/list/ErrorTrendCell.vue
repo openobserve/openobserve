@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="rum-error-trend-cell"
     >
       <div
-        class="flex items-end gap-[0.0938rem] h-7"
+        class="flex h-7 items-end gap-[0.0938rem]"
         role="img"
         :aria-label="ariaLabel"
         :title="ariaLabel"
@@ -52,14 +52,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          em-dash would read as "no data" for rows not yet fetched. -->
     <div
       v-else-if="buckets === null || buckets === undefined"
-      class="flex items-end gap-[0.0938rem] h-7 animate-pulse"
+      class="flex h-7 animate-pulse items-end gap-[0.0938rem]"
       data-test="rum-error-trend-cell-loading"
       :aria-label="t('rum.loadingMsg')"
     >
       <span
         v-for="index in 12"
         :key="index"
-        class="trend-bar rounded-default bg-card-glass-border opacity-60 w-1.5"
+        class="trend-bar rounded-default bg-card-glass-border w-1.5 opacity-60"
         :style="{ height: `${20 + ((index * 11) % 60)}%` }"
       />
     </div>

@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          submit natively (no form-id). -->
     <OForm id="add-ai-toolset-form" :form="form" v-slot="{ isSubmitting }">
       <div style="height: calc(100vh - 120px)" class="overflow-auto">
-        <div class="max-w-2xl mx-4 mt-4">
+        <div class="mx-4 mt-4 max-w-2xl">
           <!-- Name -->
           <div class="o2-input mb-4">
             <OFormInput
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- MCP fields -->
           <template v-if="selectedKind === 'mcp'">
-            <div class="text-base font-medium font-semibold mb-3">
+            <div class="mb-3 text-base font-medium font-semibold">
               {{ t("aiToolset.mcpConfig") }}
             </div>
             <div class="o2-input mb-4">
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <!-- Headers — form-owned dynamic array-field (mcp.headers[i].*) -->
             <div class="mb-2 text-sm font-medium">{{ t("aiToolset.headers") }}</div>
-            <div v-for="(header, idx) in mcpHeaders" :key="idx" class="flex items-end gap-2 mb-2">
+            <div v-for="(header, idx) in mcpHeaders" :key="idx" class="mb-2 flex items-end gap-2">
               <OFormInput
                 :name="`mcp.headers[${idx}].key`"
                 :label="t('aiToolset.headerKey')"
@@ -129,12 +129,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- CLI fields -->
           <template v-if="selectedKind === 'cli'">
-            <div class="flex items-center gap-3 mb-4">
+            <div class="mb-4 flex items-center gap-3">
               <div class="text-base font-medium font-semibold">
                 {{ t("aiToolset.cliConfig") }}
               </div>
               <div class="flex items-center gap-1">
-                <span class="text-xs text-text-muted">{{ t("aiToolset.presets") }}:</span>
+                <span class="text-text-muted text-xs">{{ t("aiToolset.presets") }}:</span>
                 <OTag
                   v-for="preset in CLI_PRESETS"
                   :key="preset.id"
@@ -168,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 placeholder="get, describe, logs"
               />
             </div>
-            <div class="flex gap-4 mb-4">
+            <div class="mb-4 flex gap-4">
               <div class="o2-input flex-1">
                 <OFormInput
                   name="cli.timeout_seconds"
@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="(env, idx) in cliEnvVars"
               :key="'env-' + idx"
-              class="flex items-end gap-2 mb-2"
+              class="mb-2 flex items-end gap-2"
             >
               <OFormInput
                 :name="`cli.env[${idx}].key`"
@@ -236,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("aiToolset.credentialFiles") }}
             </div>
             <div v-for="(cred, idx) in cliCredFiles" :key="'cred-' + idx" class="mb-4">
-              <div class="flex items-center gap-2 mb-1">
+              <div class="mb-1 flex items-center gap-2">
                 <OFormInput
                   :name="`cli.credFiles[${idx}].key`"
                   :label="t('aiToolset.credEnvVar')"
@@ -252,12 +252,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon name="delete" size="xs" />
                 </OButton>
               </div>
-              <div class="text-xs text-text-secondary mb-1">
+              <div class="text-text-secondary mb-1 text-xs">
                 {{ t("aiToolset.credContentHint") }}
               </div>
               <QueryEditor
                 :editor-id="`cred-file-editor-${idx}`"
-                class="w-full min-h-50! rounded-default border border-card-glass-border resize-y overflow-auto"
+                class="rounded-default border-card-glass-border min-h-50! w-full resize-y overflow-auto border"
                 language="yaml"
                 :query="cred.value"
                 @update:query="(v: string) => setCredValue(idx, v)"
@@ -272,19 +272,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                into the form (skill.content); its required rule lives in the
                schema and the error shows after the first submit (R3). -->
           <template v-if="selectedKind === 'skill'">
-            <div class="text-base font-medium font-semibold mb-2">
+            <div class="mb-2 text-base font-medium font-semibold">
               {{ t("aiToolset.skillConfig") }}
             </div>
-            <div class="mb-1 text-xs text-text-muted">{{ t("aiToolset.skillContent") }} *</div>
+            <div class="text-text-muted mb-1 text-xs">{{ t("aiToolset.skillContent") }} *</div>
             <QueryEditor
               data-test="ai-toolset-skill-content"
               editor-id="skill-content-editor"
-              class="w-full min-h-100! rounded-default border border-card-glass-border resize-y overflow-auto mb-3"
+              class="rounded-default border-card-glass-border mb-3 min-h-100! w-full resize-y overflow-auto border"
               language="markdown"
               :query="skillContent"
               @update:query="(v: string) => setSkillContent(v)"
             />
-            <div v-if="skillContentError" class="text-error-500 text-xs -mt-3 mb-4">
+            <div v-if="skillContentError" class="text-error-500 -mt-3 mb-4 text-xs">
               {{ t("aiToolset.skillContentRequired") }}
             </div>
           </template>
@@ -292,7 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Footer -->
         <div
-          class="flex items-center gap-2 px-4 py-3 border-t border-border-default sticky bottom-0"
+          class="border-border-default sticky bottom-0 flex items-center gap-2 border-t px-4 py-3"
           :class="'bg-surface-base'"
         >
           <OButton

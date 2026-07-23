@@ -309,7 +309,7 @@ const openDocs = () => {
     <div class="flex flex-col gap-1">
       <h2 class="text-lg font-semibold">{{ t("ingestion.mcp.name") }}</h2>
       <p class="text-text-secondary">{{ t("ingestion.mcp.tagline") }}</p>
-      <div class="flex items-center gap-1 text-text-secondary">
+      <div class="text-text-secondary flex items-center gap-1">
         <OIcon name="workspace-premium" size="sm" />
         <span>{{ t("ingestion.mcp.enterpriseNote") }}</span>
       </div>
@@ -344,7 +344,7 @@ const openDocs = () => {
     <!-- Token mode: credential management -->
     <div
       v-if="authMode === 'token'"
-      class="rounded-surface border border-border-default bg-surface-panel p-3 flex flex-col gap-3"
+      class="rounded-surface border-border-default bg-surface-panel flex flex-col gap-3 border p-3"
       data-test="ai-integrations-mcp-credential"
     >
       <!-- Before generation: quick-start note + generate button -->
@@ -457,7 +457,7 @@ const openDocs = () => {
     <!-- Security note (token mode only) -->
     <div
       v-if="authMode === 'token'"
-      class="rounded-surface border border-border-default bg-surface-panel p-3 flex gap-2"
+      class="rounded-surface border-border-default bg-surface-panel flex gap-2 border p-3"
       data-test="ai-integrations-mcp-security"
     >
       <OIcon name="shield" size="sm" class="mt-0.5 shrink-0" />

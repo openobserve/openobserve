@@ -91,7 +91,7 @@
         />
 
         <div v-if="formValues.fieldMode === 'default'" class="flex flex-col gap-1.5">
-          <span class="text-xs text-input-help-text leading-none">
+          <span class="text-input-help-text text-xs leading-none">
             {{ t("onlineEvals.job.spanSelector.defaultSchemaHelp") }}
           </span>
           <!-- These are the actual field names that reach the scorer, so they

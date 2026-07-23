@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       multiple
       :error="error"
       :collapsible-groups="workflowsEnabled"
-      class="min-w-[11.25rem] max-w-[18.75rem]"
+      class="max-w-[18.75rem] min-w-[11.25rem]"
       data-test="alert-destinations-select"
       @update:model-value="onUpdate"
     >

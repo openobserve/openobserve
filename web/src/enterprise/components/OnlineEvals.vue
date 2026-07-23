@@ -7,8 +7,8 @@ the Free Software Foundation, either version 3 of the License, or
 
 <template>
   <div
-    class="flex flex-col gap-2.5 h-[calc(100vh-var(--navbar-height))] min-h-0 pt-1 px-2.5 pb-2.5 text-text-body"
-    :class="{ 'h-full! p-0! gap-0!': hideTabBar }"
+    class="text-text-body flex h-[calc(100vh-var(--navbar-height))] min-h-0 flex-col gap-2.5 px-2.5 pt-1 pb-2.5"
+    :class="{ 'h-full! gap-0! p-0!': hideTabBar }"
     data-test="online-evals-page"
   >
     <!-- Full-page forms (jobs / scorers) -->
@@ -56,10 +56,10 @@ the Free Software Foundation, either version 3 of the License, or
     <template v-else>
       <div
         v-if="!hideTabBar"
-        class="online-evals__header flex items-center justify-between gap-4 min-h-17 py-2.5 px-4 shrink-0 bg-card-glass-bg"
+        class="online-evals__header bg-card-glass-bg flex min-h-17 shrink-0 items-center justify-between gap-4 px-4 py-2.5"
       >
         <div>
-          <h1 class="m-0 text-[var(--text-lg)] font-semibold text-text-heading [letter-spacing:0]">
+          <h1 class="text-text-heading m-0 font-semibold [letter-spacing:0] text-[var(--text-lg)]">
             {{ t("onlineEvals.title") }}
           </h1>
         </div>
@@ -70,7 +70,7 @@ the Free Software Foundation, either version 3 of the License, or
         :title="embeddedHeader.title"
         :subtitle="embeddedHeader.subtitle"
         :icon="embeddedHeader.icon"
-        class="shrink-0 border-b border-border-default"
+        class="border-border-default shrink-0 border-b"
       >
         <template v-if="activeTab === 'scorers' || activeTab === 'scoreConfigs'" #actions>
           <ODropdown side="bottom" align="end">
@@ -92,7 +92,7 @@ the Free Software Foundation, either version 3 of the License, or
                 <span>
                   {{ t(`onlineEvals.${importI18nKey}.import.customLabel`) }}
                 </span>
-                <span class="text-xs text-dropdown-item-text opacity-60">
+                <span class="text-dropdown-item-text text-xs opacity-60">
                   {{ t(`onlineEvals.${importI18nKey}.import.customSubtitle`) }}
                 </span>
               </div>
@@ -105,7 +105,7 @@ the Free Software Foundation, either version 3 of the License, or
                 <span>
                   {{ t(`onlineEvals.${importI18nKey}.import.libraryLabel`) }}
                 </span>
-                <span class="text-xs text-dropdown-item-text opacity-60">
+                <span class="text-dropdown-item-text text-xs opacity-60">
                   {{ t(`onlineEvals.${importI18nKey}.import.librarySubtitle`) }}
                 </span>
               </div>
@@ -145,7 +145,7 @@ the Free Software Foundation, either version 3 of the License, or
           <!-- Bordered wrapper matches the Sessions / LLM Insights headers —
                ORefreshButton renders no border of its own. -->
           <div
-            class="inline-flex items-center border border-border-default rounded-default px-1 h-8 overflow-hidden"
+            class="border-border-default rounded-default inline-flex h-8 items-center overflow-hidden border px-1"
           >
             <ORefreshButton
               :last-run-at="qualityLastRunAt"
@@ -159,16 +159,16 @@ the Free Software Foundation, either version 3 of the License, or
       </OPageHeader>
 
       <section
-        class="online-evals__content flex flex-1 flex-col min-h-0 overflow-hidden bg-card-glass-bg"
+        class="online-evals__content bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden"
       >
         <div
           v-if="!hideTabBar"
-          class="online-evals__tabs flex items-center gap-2 shrink-0 py-0 px-3.5 bg-transparent border-b border-border-default"
+          class="online-evals__tabs border-border-default flex shrink-0 items-center gap-2 border-b bg-transparent px-3.5 py-0"
         >
           <button
             v-for="tab in tabs"
             :key="tab.value"
-            class="online-evals__tab inline-flex items-center gap-1.75 h-9.5 py-0 px-3.5 bg-transparent border-0 border-b-2 border-b-transparent text-text-muted cursor-pointer font-semibold text-compact"
+            class="online-evals__tab text-text-muted text-compact inline-flex h-9.5 cursor-pointer items-center gap-1.75 border-0 border-b-2 border-b-transparent bg-transparent px-3.5 py-0 font-semibold"
             :class="
               activeTab === tab.value ? 'is-active text-text-body border-b-accent -mb-px' : ''
             "
@@ -179,7 +179,7 @@ the Free Software Foundation, either version 3 of the License, or
           </button>
         </div>
 
-        <div class="online-evals__body flex flex-1 min-h-0">
+        <div class="online-evals__body flex min-h-0 flex-1">
           <QualityPage
             v-if="activeTab === 'quality'"
             ref="qualityPageRef"

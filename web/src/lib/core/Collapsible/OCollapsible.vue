@@ -83,11 +83,11 @@ watch(
     <!-- Trigger -->
     <CollapsibleTrigger
       :class="[
-        'w-full flex items-center gap-2 text-start cursor-pointer select-none',
+        'flex w-full cursor-pointer items-center gap-2 text-start select-none',
         'transition-colors duration-150 outline-none',
         'hover:bg-collapsible-trigger-hover-bg active:bg-collapsible-trigger-active-bg',
-        'focus-visible:ring-2 focus-visible:ring-collapsible-trigger-focus-ring focus-visible:ring-offset-1',
-        variant === 'sidebar' ? 'px-3 py-0 min-h-9 rounded-none' : 'px-2 py-2 rounded-default',
+        'focus-visible:ring-collapsible-trigger-focus-ring focus-visible:ring-2 focus-visible:ring-offset-1',
+        variant === 'sidebar' ? 'min-h-9 rounded-none px-3 py-0' : 'rounded-default px-2 py-2',
         triggerClass,
       ]"
     >
@@ -122,15 +122,15 @@ watch(
           >{{ icon }}</span
         >
 
-        <span class="flex flex-col flex-1 min-w-0">
+        <span class="flex min-w-0 flex-1 flex-col">
           <span
             :class="[
-              'font-medium text-collapsible-label truncate',
+              'text-collapsible-label truncate font-medium',
               variant === 'sidebar' ? 'text-compact' : 'text-sm',
             ]"
             >{{ label }}</span
           >
-          <span v-if="caption" class="text-xs text-collapsible-caption truncate">{{
+          <span v-if="caption" class="text-collapsible-caption truncate text-xs">{{
             caption
           }}</span>
         </span>

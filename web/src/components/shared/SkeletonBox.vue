@@ -1,6 +1,6 @@
 <template>
   <div
-    class="skeleton-box relative overflow-hidden inline-block [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)] [background-size:200%_100%] [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite]"
+    class="skeleton-box relative inline-block [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite] overflow-hidden [background-size:200%_100%] [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)]"
     :class="shapeClass"
     :style="{
       width: width,

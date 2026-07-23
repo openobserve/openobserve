@@ -499,10 +499,10 @@ function openChromeExtensions() {
 </script>
 
 <template>
-  <div class="flex flex-col min-h-0 w-full py-4">
+  <div class="flex min-h-0 w-full flex-col py-4">
     <!-- Toolbar — pl-4 mirrors the expand column (w-4) so the select-all checkbox
          aligns with the row checkboxes in the OTable below. -->
-    <div class="flex items-center gap-4 mb-3 ml-5.5 px-3">
+    <div class="mb-3 ml-5.5 flex items-center gap-4 px-3">
       <!-- Select-all — visibility:hidden during replay to preserve layout -->
       <OCheckbox
         :model-value="allSelected || undefined"
@@ -512,7 +512,7 @@ function openChromeExtensions() {
         @update:model-value="toggleSelectAll()"
       />
       <div class="flex">
-        <h3 class="text-base font-semibold text-text-heading mr-0">
+        <h3 class="text-text-heading mr-0 text-base font-semibold">
           {{ t("synthetics.journey.steps") }}
         </h3>
         <OBadge variant="default" size="sm" class="ml-1">{{ modelValue.length }}</OBadge>
@@ -520,11 +520,11 @@ function openChromeExtensions() {
       <OInput
         v-model="filterQuery"
         :placeholder="t('synthetics.journey.filterSteps')"
-        class="flex-1 min-w-32!"
+        class="min-w-32! flex-1"
         data-test="synthetics-journey-filter-input"
       />
       <!-- Fixed-width action area — buttons right-aligned, widest set (Add Step + Record + Replay/Stop) fits in 320px -->
-      <div class="w-100 flex items-center gap-2 justify-end">
+      <div class="flex w-100 items-center justify-end gap-2">
         <OButton
           v-if="!isRecording && !isReplayRunning"
           variant="outline"
@@ -611,20 +611,20 @@ function openChromeExtensions() {
     <!-- Incognito blocked warning card (pre-flight failure) -->
     <div
       v-if="blockedReason === 'incognito'"
-      class="flex flex-col gap-3 px-3 py-3 mb-3 rounded-default border border-[var(--color-warning-300)] bg-warning-50"
+      class="rounded-default bg-warning-50 mb-3 flex flex-col gap-3 border border-[var(--color-warning-300)] px-3 py-3"
       role="alert"
       data-test="synthetics-journey-incognito-warning"
     >
       <div class="flex items-center gap-2">
         <OIcon name="visibility-off" size="sm" class="text-warning-600" aria-hidden="true" />
-        <span class="text-sm font-semibold text-text-heading">{{
+        <span class="text-text-heading text-sm font-semibold">{{
           t("synthetics.journey.incognitoTitle")
         }}</span>
       </div>
-      <p class="text-xs text-text-secondary m-0">
+      <p class="text-text-secondary m-0 text-xs">
         {{ t("synthetics.journey.incognitoDescription") }}
       </p>
-      <ol class="list-decimal pl-4 text-xs text-text-body flex flex-col gap-1 m-0">
+      <ol class="text-text-body m-0 flex list-decimal flex-col gap-1 pl-4 text-xs">
         <li>{{ t("synthetics.journey.incognitoStep1Full") }}</li>
         <li>{{ t("synthetics.journey.incognitoStep2Full", { name: CHROME_UI.recorderName }) }}</li>
         <li>{{ t("synthetics.journey.incognitoStep3Full", { button: CHROME_UI.details }) }}</li>
@@ -669,15 +669,15 @@ function openChromeExtensions() {
     <!-- Replay running banner -->
     <div
       v-if="replayPhase === 'running'"
-      class="flex items-center gap-2 mx-2 px-3 py-2 mb-3 rounded-default bg-[var(--color-badge-primary-soft-bg)] border border-border-default"
+      class="rounded-default border-border-default mx-2 mb-3 flex items-center gap-2 border bg-[var(--color-badge-primary-soft-bg)] px-3 py-2"
       role="status"
       data-test="synthetics-journey-replay-banner"
     >
-      <OIcon name="sync" size="sm" class="animate-spin text-primary-500" aria-hidden="true" />
-      <span class="text-sm text-text-body" data-test="synthetics-journey-replay-banner-text">
+      <OIcon name="sync" size="sm" class="text-primary-500 animate-spin" aria-hidden="true" />
+      <span class="text-text-body text-sm" data-test="synthetics-journey-replay-banner-text">
         {{ t("synthetics.journey.replaying") }}
       </span>
-      <span class="text-sm text-text-secondary">
+      <span class="text-text-secondary text-sm">
         {{
           t("synthetics.journey.replayProgress", {
             current: stepResults?.size ?? 0,
@@ -690,7 +690,7 @@ function openChromeExtensions() {
     <!-- Replay passed banner -->
     <div
       v-else-if="replayPhase === 'passed'"
-      class="flex items-center gap-2 mx-2 px-3 py-2 mb-3 rounded-default bg-[var(--color-badge-success-soft-bg)] border border-badge-success-ol-border/50"
+      class="rounded-default border-badge-success-ol-border/50 mx-2 mb-3 flex items-center gap-2 border bg-[var(--color-badge-success-soft-bg)] px-3 py-2"
       role="status"
       data-test="synthetics-journey-passed-banner"
     >
@@ -700,7 +700,7 @@ function openChromeExtensions() {
         class="text-[var(--color-timeline-dot-success)]"
         aria-hidden="true"
       />
-      <span class="text-sm text-badge-success-ol-text font-semi-bold">{{
+      <span class="text-badge-success-ol-text font-semi-bold text-sm">{{
         t("synthetics.journey.replayPassed", { count: modelValue.length })
       }}</span>
       <span class="flex-1" />
@@ -717,13 +717,13 @@ function openChromeExtensions() {
     <!-- Replay failed banner -->
     <div
       v-else-if="replayPhase === 'failed'"
-      class="flex items-start gap-2 px-3 py-2 mb-3 rounded-default bg-[var(--color-badge-error-soft-bg)] border border-badge-error-ol-border/30"
+      class="rounded-default border-badge-error-ol-border/30 mb-3 flex items-start gap-2 border bg-[var(--color-badge-error-soft-bg)] px-3 py-2"
       role="alert"
       data-test="synthetics-journey-failed-banner"
     >
-      <OIcon name="error" size="sm" class="mt-0.5 text-badge-error-ol-text" aria-hidden="true" />
-      <div class="flex flex-col gap-0.5 flex-1 min-w-0">
-        <span class="text-sm text-badge-error-ol-text font-semibold">{{
+      <OIcon name="error" size="sm" class="text-badge-error-ol-text mt-0.5" aria-hidden="true" />
+      <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span class="text-badge-error-ol-text text-sm font-semibold">{{
           t("synthetics.journey.replayFailed", {
             failed: firstFailedIndex + 1,
             total: modelValue.length,
@@ -731,7 +731,7 @@ function openChromeExtensions() {
         }}</span>
         <span
           v-if="failedStepResult?.stepName"
-          class="text-xs truncate text-badge-error-ol-text pt-1"
+          class="text-badge-error-ol-text truncate pt-1 text-xs"
           >{{ failedStepResult.stepName }}</span
         >
       </div>
@@ -748,12 +748,12 @@ function openChromeExtensions() {
     <!-- Replay stopped banner -->
     <div
       v-else-if="replayPhase === 'stopped'"
-      class="flex items-center gap-2 px-3 py-2 mb-3 rounded-default bg-surface-subtle border border-border-default"
+      class="rounded-default bg-surface-subtle border-border-default mb-3 flex items-center gap-2 border px-3 py-2"
       role="status"
       data-test="synthetics-journey-stopped-banner"
     >
       <OIcon name="stop" size="sm" class="text-text-secondary" aria-hidden="true" />
-      <span class="text-sm text-text-body">{{
+      <span class="text-text-body text-sm">{{
         t("synthetics.journey.replayStopped", {
           completed: stepResults?.size ?? 0,
           total: modelValue.length,
@@ -781,7 +781,7 @@ function openChromeExtensions() {
     <!-- Recorder error (extension missing / failed to start) -->
     <div
       v-if="recordingError && !isRecording"
-      class="flex items-center gap-2 px-3 py-2 mb-3 rounded-default bg-status-error-bg text-status-error-text text-sm"
+      class="rounded-default bg-status-error-bg text-status-error-text mb-3 flex items-center gap-2 px-3 py-2 text-sm"
       role="alert"
       data-test="synthetics-journey-record-error"
     >
@@ -793,26 +793,26 @@ function openChromeExtensions() {
     <template v-if="isRecording">
       <!-- Recording banner with current URL + controls -->
       <div
-        class="flex items-center gap-3 px-3 py-2 mb-3 rounded-default bg-status-error-bg border border-border-default"
+        class="rounded-default bg-status-error-bg border-border-default mb-3 flex items-center gap-3 border px-3 py-2"
       >
         <span class="flex items-center gap-1.5">
           <span
-            class="relative inline-flex items-center justify-center w-[0.7rem] h-[0.7rem]"
+            class="relative inline-flex h-[0.7rem] w-[0.7rem] items-center justify-center"
             aria-hidden="true"
           >
-            <span class="absolute w-[0.7rem] h-[0.7rem] rounded-full bg-status-error-text z-1" />
+            <span class="bg-status-error-text absolute z-1 h-[0.7rem] w-[0.7rem] rounded-full" />
             <span
-              class="recording-pulse-ring absolute w-[0.7rem] h-[0.7rem] rounded-full bg-status-error-text opacity-0"
+              class="recording-pulse-ring bg-status-error-text absolute h-[0.7rem] w-[0.7rem] rounded-full opacity-0"
             />
           </span>
-          <span class="text-sm font-semibold text-status-error-text pl-1.5">{{
+          <span class="text-status-error-text pl-1.5 text-sm font-semibold">{{
             t("synthetics.journey.recording")
           }}</span>
         </span>
-        <span class="flex items-center gap-1 text-xs text-text-secondary truncate flex-1 min-w-0">
+        <span class="text-text-secondary flex min-w-0 flex-1 items-center gap-1 truncate text-xs">
           <span class="truncate">{{ currentUrl }}</span>
         </span>
-        <span class="text-xs text-text-muted">{{ capturedSteps.length }} steps</span>
+        <span class="text-text-muted text-xs">{{ capturedSteps.length }} steps</span>
       </div>
 
       <JourneySteps
@@ -847,7 +847,7 @@ function openChromeExtensions() {
           class="text-text-muted animate-pulse"
           aria-hidden="true"
         />
-        <p class="text-sm text-text-secondary m-0">
+        <p class="text-text-secondary m-0 text-sm">
           {{ t("synthetics.journey.waitingForActions") }}
         </p>
       </div>
@@ -860,7 +860,7 @@ function openChromeExtensions() {
       class="flex flex-col items-center justify-center gap-4 py-16 text-center"
     >
       <OIcon name="open-in-browser" size="xl" class="text-text-muted" aria-hidden="true" />
-      <h3 class="text-base font-semibold text-text-heading m-0">
+      <h3 class="text-text-heading m-0 text-base font-semibold">
         {{ t("synthetics.journey.noSteps") }}
       </h3>
       <div class="flex items-center gap-3">
@@ -902,7 +902,7 @@ function openChromeExtensions() {
     >
       <!-- Inline editor (expanded content) -->
       <template #expansion="{ row }">
-        <div class="pt-3 pb-3 px-8 flex flex-col gap-3">
+        <div class="flex flex-col gap-3 px-8 pt-3 pb-3">
           <!-- Action + Step name in one row -->
           <div class="flex gap-2">
             <OSelect
@@ -935,7 +935,7 @@ function openChromeExtensions() {
           </div>
           <!-- Selector type + selector (when applicable) -->
           <template v-if="selectorActions.includes(row.action)">
-            <div class="flex gap-2 w-fit!">
+            <div class="flex w-fit! gap-2">
               <OSelect
                 :model-value="row.selectorType ?? 'CSS'"
                 :label="t('synthetics.journey.selectorTypeLabel')"

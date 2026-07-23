@@ -33,8 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Inline (full-page) form. The footer Save lives INSIDE the <OForm>, so it
          is `type="submit"` and Enter submits natively — no `form-id` needed. -->
-    <OForm :form="form" v-slot="{ isSubmitting }" class="w-full flex-1 min-h-0 flex flex-col">
-      <div class="w-full flex-1 min-h-0 px-2.5 pb-2.5 pt-1">
+    <OForm :form="form" v-slot="{ isSubmitting }" class="flex min-h-0 w-full flex-1 flex-col">
+      <div class="min-h-0 w-full flex-1 px-2.5 pt-1 pb-2.5">
         <div
           class="bg-card-glass-bg overflow-auto"
           style="max-height: calc(100vh - var(--navbar-height) - 157px)"
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <div
                       v-if="isEditingActionScript && formData.fileNameToShow == ''"
-                      class="pt-3 mt-1 pl-3"
+                      class="mt-1 pt-3 pl-3"
                     >
                       <OButton
                         data-test="cancel-upload-new-btn-file"
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                     </div>
                   </div>
-                  <div class="flex gap-2 mt-8">
+                  <div class="mt-8 flex gap-2">
                     <OButton
                       data-test="add-action-script-step1-continue-btn"
                       variant="primary"
@@ -146,12 +146,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="my-2 px-2">
                     <div
                       style="font-size: var(--text-sm)"
-                      class="font-bold text-text-secondary mb-2"
+                      class="text-text-secondary mb-2 font-bold"
                       data-test="add-action-script-frequency-title"
                     >
                       {{ t("actions.frequency") }} *
                     </div>
-                    <div class="p-1 rounded-default border border-card-glass-border w-fit">
+                    <div class="rounded-default border-card-glass-border w-fit border p-1">
                       <template v-for="visual in frequencyTabs" :key="visual.value">
                         <OButton
                           :data-test="`add-action-script-schedule-frequency-${visual.value}-btn`"
@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <div
                       v-if="frequency.type === 'once'"
-                      class="flex justify-start items-center mt-3"
+                      class="mt-3 flex items-center justify-start"
                       data-test="add-action-script-frequency-info"
                     >
                       <OIcon name="event" size="sm" class="mr-2" />
@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           style="width: 320px"
                         >
                           <div
-                            class="mb-1 font-bold text-text-secondary"
+                            class="text-text-secondary mb-1 font-bold"
                             data-test="add-action-script-cron-expression-title"
                           >
                             {{ t("reports.cronExpression") + " *" }}
@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               data-test="add-action-script-cron-info"
                               name="info"
                               size="sm"
-                              class="ml-1 cursor-pointer text-text-muted"
+                              class="text-text-muted ml-1 cursor-pointer"
                             >
                               <OTooltip side="right" align="center">
                                 <template #content>
@@ -238,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </template>
                   </div>
-                  <div class="flex gap-2 mt-4">
+                  <div class="mt-4 flex gap-2">
                     <OButton
                       data-test="add-action-script-step2-back-btn"
                       variant="outline"
@@ -268,10 +268,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div>
                       <div
                         data-test="add-action-script-service-account-title"
-                        class="mb-1 font-bold text-text-secondary"
+                        class="text-text-secondary mb-1 font-bold"
                       >
                         {{ t("actions.serviceAccount") + " *" }}
-                        <OIcon name="info" size="sm" class="ml-1 cursor-pointer text-text-muted">
+                        <OIcon name="info" size="sm" class="text-text-muted ml-1 cursor-pointer">
                           <OTooltip side="right" align="center">
                             <template #content>
                               <span style="font-size: var(--text-sm)">
@@ -287,14 +287,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         required
                         :options="filteredServiceAccounts"
                         :loading="isFetchingServiceAccounts"
-                        class="py-2 no-case"
+                        class="no-case py-2"
                         labelKey="label"
                         valueKey="value"
                         style="min-width: 250px !important; width: 250px !important"
                       />
                     </div>
                   </div>
-                  <div class="flex gap-2 mt-4">
+                  <div class="mt-4 flex gap-2">
                     <OButton
                       data-test="add-action-script-step3-back-btn"
                       variant="outline"
@@ -328,7 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="flex gap-2"
                     data-test="add-action-script-env-variable"
                   >
-                    <div class="w-5/12 ml-0">
+                    <div class="ml-0 w-5/12">
                       <OInput
                         :data-test="`add-action-script-header-${header['key']}-key-input`"
                         v-model="header.key"
@@ -336,7 +336,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         tabindex="0"
                       />
                     </div>
-                    <div class="w-5/12 ml-0 mb-2">
+                    <div class="mb-2 ml-0 w-5/12">
                       <OInput
                         :data-test="`add-action-script-header-${header['key']}-value-input`"
                         v-model="header.value"
@@ -344,7 +344,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         tabindex="0"
                       />
                     </div>
-                    <div class="w-1/6 ml-0">
+                    <div class="ml-0 w-1/6">
                       <OButton
                         :data-test="`add-action-script-header-${header['key']}-delete-btn`"
                         variant="ghost"
@@ -364,7 +364,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       /></OButton>
                     </div>
                   </div>
-                  <div class="flex gap-2 mt-4">
+                  <div class="mt-4 flex gap-2">
                     <OButton
                       data-test="add-action-script-step4-back-btn"
                       variant="outline"
@@ -381,7 +381,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="mx-2">
         <div
-          class="flex justify-end gap-2 px-3 w-full py-2.5 bg-card-glass-bg sticky"
+          class="bg-card-glass-bg sticky flex w-full justify-end gap-2 px-3 py-2.5"
           style="bottom: 0px; z-index: 2"
         >
           <OButton

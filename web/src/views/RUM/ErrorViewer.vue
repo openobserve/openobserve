@@ -17,10 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="error-viewer-container" class="bg-card-glass-bg h-full overflow-y-auto">
     <template v-if="isLoading.length">
-      <div class="pb-4 flex items-center justify-center text-center h-[calc(100vh-12.5rem)]">
+      <div class="flex h-[calc(100vh-12.5rem)] items-center justify-center pb-4 text-center">
         <div>
           <OSpinner size="md" class="mx-auto block" data-test="error-viewer-loading-indicator" />
-          <div class="text-center w-full">
+          <div class="w-full text-center">
             {{ t("rum.loadingErrorDetails") }}
           </div>
         </div>

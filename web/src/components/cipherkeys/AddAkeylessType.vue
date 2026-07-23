@@ -47,10 +47,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
     </div>
     <div v-else>
-      <label class="flex mb-3">
+      <label class="mb-3 flex">
         <b>{{ t("cipherKey.accessId") }}</b>
       </label>
-      <pre class="[text-wrap:auto] break-words border border-input-border p-1.25 mb-1.25">{{
+      <pre class="border-input-border mb-1.25 border p-1.25 [text-wrap:auto] break-words">{{
         accessId
       }}</pre>
       <OButton
@@ -72,10 +72,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       valueKey="value"
     />
     <fieldset
-      class="p-3 w-full border border-[lightgray] rounded-default relative"
+      class="rounded-default relative w-full border border-[lightgray] p-3"
       v-if="authType != ''"
     >
-      <legend class="px-2 text-xs text-text-heading ml-2 py-0 px-1">
+      <legend class="text-text-heading ml-2 px-1 px-2 py-0 text-xs">
         {{ getAuthenticationTypeLabel(authType) }}
         Configuration
       </legend>
@@ -99,10 +99,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </div>
         <div v-else>
-          <label class="flex mb-3">
+          <label class="mb-3 flex">
             <b>{{ t("cipherKey.accessKey") }}</b>
           </label>
-          <pre class="[text-wrap:auto] break-words border border-input-border p-1.25 mb-1.25">{{
+          <pre class="border-input-border mb-1.25 border p-1.25 [text-wrap:auto] break-words">{{
             accessKey
           }}</pre>
           <OButton
@@ -134,10 +134,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </div>
         <div v-else>
-          <label class="flex mb-3">
+          <label class="mb-3 flex">
             <b>{{ t("cipherKey.ldapUsername") }}</b>
           </label>
-          <pre class="[text-wrap:auto] break-words border border-input-border p-1.25 mb-1.25">{{
+          <pre class="border-input-border mb-1.25 border p-1.25 [text-wrap:auto] break-words">{{
             ldapUsername
           }}</pre>
           <OButton
@@ -169,10 +169,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </div>
         <div v-else>
-          <label class="flex mb-3">
+          <label class="mb-3 flex">
             <b>{{ t("cipherKey.ldapPassword") }}</b>
           </label>
-          <pre class="[text-wrap:auto] break-words border border-input-border p-1.25 mb-1.25">{{
+          <pre class="border-input-border mb-1.25 border p-1.25 [text-wrap:auto] break-words">{{
             ldapPassword
           }}</pre>
           <OButton
@@ -196,10 +196,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       valueKey="value"
     />
     <fieldset
-      class="p-3 w-full border border-[lightgray] rounded-default relative"
+      class="rounded-default relative w-full border border-[lightgray] p-3"
       v-if="secretType != ''"
     >
-      <legend class="px-2 text-xs text-text-heading ml-2 py-0 px-1">
+      <legend class="text-text-heading ml-2 px-1 px-2 py-0 text-xs">
         {{ getSecretOptionLabel(secretType) }}
         Configuration
       </legend>

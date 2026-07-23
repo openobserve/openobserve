@@ -27,10 +27,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       data-test="add-report-section"
-      class="w-full flex flex-col flex-1 min-h-0 create-report-page"
+      class="create-report-page flex min-h-0 w-full flex-1 flex-col"
     >
-      <div class="flex bg-card-glass-bg flex-1 min-h-0 overflow-auto">
-        <div ref="addAlertFormRef" class="px-4 my-3" style="width: 1024px">
+      <div class="bg-card-glass-bg flex min-h-0 flex-1 overflow-auto">
+        <div ref="addAlertFormRef" class="my-3 px-4" style="width: 1024px">
           <OForm :id="formId" :form="form" class="create-report-form">
             <div class="flex items-start gap-4 px-2 pt-3">
               <div data-test="add-report-name-input" class="o2-input">
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="lg"
                 :label="t('reports.cachedReport')"
               />
-              <OIcon name="info-outline" class="cursor-pointer ml-2" size="sm">
+              <OIcon name="info-outline" class="ml-2 cursor-pointer" size="sm">
                 <OTooltip side="right" align="center">
                   <template #content
                     >Note: Cached reports are stored for quick access to dashboards; sharing is
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      (folder + dashboard) would remount the row on folder/dashboard
                      change, wiping each field's TanStack error meta. -->
                 <template v-for="(dashboard, index) in dashboardRows" :key="index">
-                  <div :data-test="`add-report-dashboard-${index}`" class="my-2 px-2 flex flex-col">
+                  <div :data-test="`add-report-dashboard-${index}`" class="my-2 flex flex-col px-2">
                     <!-- items-start (not items-center): keeps all selects
                          top-aligned when a validation error appears under one and
                          grows its cell taller. -->
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </div>
 
-                    <div data-test="add-report-timerange-select" class="w-full mt-2">
+                    <div data-test="add-report-timerange-select" class="mt-2 w-full">
                       <OFormDateTimeRange
                         :name="`dashboards[${index}].timerange`"
                         label="Time Range"
@@ -172,21 +172,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </div>
 
-                    <div data-test="add-report-variable-select" class="w-full mt-3 o2-input">
+                    <div data-test="add-report-variable-select" class="o2-input mt-3 w-full">
                       <VariablesInput name-prefix="variables" />
                     </div>
 
                     <!-- Report Format -->
-                    <div class="w-full mt-3" data-test="add-report-format-section">
+                    <div class="mt-3 w-full" data-test="add-report-format-section">
                       <div
                         style="font-size: var(--text-sm)"
-                        class="font-bold text-text-secondary mb-2"
+                        class="text-text-secondary mb-2 font-bold"
                       >
                         {{ t("reports.reportFormat") }}
                       </div>
                       <div class="flex gap-3">
                         <!-- Report Type -->
-                        <div class="col-auto o2-input" data-test="add-report-type-select">
+                        <div class="o2-input col-auto" data-test="add-report-type-select">
                           <OFormSelect
                             :name="`dashboards[${index}].report_type`"
                             :options="[
@@ -204,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <!-- Email Attachment Type -->
                         <div
                           v-if="dashboard.report_type !== 'csv'"
-                          class="col-auto o2-input"
+                          class="o2-input col-auto"
                           data-test="add-report-attachment-type-select"
                         >
                           <OFormSelect
@@ -237,7 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="add-report-custom-dimensions-section"
                       >
                         <div
-                          class="flex items-center cursor-pointer"
+                          class="flex cursor-pointer items-center"
                           style="font-size: var(--text-sm); color: inherit"
                           @click="showCustomDimensions = !showCustomDimensions"
                         >
@@ -246,12 +246,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             size="sm"
                             class="mr-1"
                           />
-                          <span class="font-bold text-text-secondary">{{
+                          <span class="text-text-secondary font-bold">{{
                             t("reports.customDimensions")
                           }}</span>
                         </div>
                         <div v-if="showCustomDimensions" class="flex gap-3 pt-2">
-                          <div class="col-auto o2-input">
+                          <div class="o2-input col-auto">
                             <OFormInput
                               :name="`dashboards[${index}].attachmentWidth`"
                               type="number"
@@ -264,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               data-test="add-report-dimension-width"
                             />
                           </div>
-                          <div class="col-auto o2-input">
+                          <div class="o2-input col-auto">
                             <OFormInput
                               :name="`dashboards[${index}].attachmentHeight`"
                               type="number"
@@ -278,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             />
                           </div>
                           <div class="col-auto flex items-end">
-                            <div class="text-xs text-text-muted pb-1">
+                            <div class="text-text-muted pb-1 text-xs">
                               Leave blank to use server defaults
                             </div>
                           </div>
@@ -287,7 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                 </template>
-                <div class="flex gap-2 mt-4">
+                <div class="mt-4 flex gap-2">
                   <OButton
                     data-test="add-report-step1-continue-btn"
                     variant="primary"
@@ -318,7 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="mt-3"
               >
                 <div class="my-2 px-2">
-                  <div style="font-size: var(--text-sm)" class="font-bold text-text-secondary mb-2">
+                  <div style="font-size: var(--text-sm)" class="text-text-secondary mb-2 font-bold">
                     Frequency
                   </div>
                   <OFormToggleGroup
@@ -339,15 +339,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template v-if="frequencyType === 'cron'">
                     <!-- items-start: keep the Timezone select aligned with the
                          Cron input when the cron error text wraps below it. -->
-                    <div class="flex items-start justify-start mt-3">
+                    <div class="mt-3 flex items-start justify-start">
                       <div
                         data-test="add-report-schedule-custom-interval-input"
                         class="o2-input mr-2 pt-0"
                         style="width: 320px"
                       >
-                        <div class="mb-1 font-bold text-text-secondary">
+                        <div class="text-text-secondary mb-1 font-bold">
                           {{ t("reports.cronExpression") + " *" }}
-                          <OIcon name="info" size="sm" class="ml-1 cursor-pointer text-text-muted">
+                          <OIcon name="info" size="sm" class="text-text-muted ml-1 cursor-pointer">
                             <OTooltip side="right" align="center">
                               <template #content
                                 ><span style="font-size: var(--text-sm)">
@@ -390,7 +390,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </template>
                   <template v-else>
-                    <div class="mt-3 flex justify-start items-center">
+                    <div class="mt-3 flex items-center justify-start">
                       <OFormToggleGroup name="selectedTimeTab">
                         <OToggleGroupItem
                           v-for="visual in timeTabs"
@@ -402,7 +402,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ visual.label }}
                         </OToggleGroupItem>
                       </OFormToggleGroup>
-                      <OIcon name="info-outline" class="cursor-pointer ml-2" size="sm">
+                      <OIcon name="info-outline" class="ml-2 cursor-pointer" size="sm">
                         <OTooltip side="right" align="center">
                           <template #content
                             >"Schedule Now" will schedule the report using the current date, time,
@@ -416,7 +416,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <div
                       v-if="frequencyType === 'custom'"
-                      class="flex items-start justify-start mt-3"
+                      class="mt-3 flex items-start justify-start"
                     >
                       <div
                         data-test="add-report-schedule-custom-interval-input"
@@ -455,7 +455,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       data-test="add-report-schedule-send-later-section"
                       v-if="selectedTimeTab === 'scheduleLater'"
-                      class="flex items-start justify-start mt-3"
+                      class="mt-3 flex items-start justify-start"
                     >
                       <div data-test="add-report-schedule-start-date-input" class="o2-input mr-2">
                         <OFormDate
@@ -487,7 +487,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </template>
                 </div>
-                <div class="flex gap-2 mt-4">
+                <div class="mt-4 flex gap-2">
                   <OButton
                     data-test="add-report-step2-back-btn"
                     variant="outline"
@@ -548,7 +548,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
                   <div data-test="add-report-share-message-section" class="pt-3">
-                    <div style="font-size: var(--text-sm)" class="font-bold text-text-secondary">
+                    <div style="font-size: var(--text-sm)" class="text-text-secondary font-bold">
                       Message
                     </div>
 
@@ -569,7 +569,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :label="t('reports.imagePreview')"
                       data-test="add-report-image-preview-toggle"
                     />
-                    <OIcon name="info-outline" class="cursor-pointer ml-2" size="sm">
+                    <OIcon name="info-outline" class="ml-2 cursor-pointer" size="sm">
                       <OTooltip max-width="320px">
                         <template #content
                           >Captures a PNG screenshot of the dashboard and embeds it inline in the
@@ -580,7 +580,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OIcon>
                   </div>
                 </div>
-                <div class="flex gap-2 mt-4">
+                <div class="mt-4 flex gap-2">
                   <OButton
                     data-test="add-report-step3-back-btn"
                     variant="outline"
@@ -597,7 +597,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      class="flex justify-end px-3 w-full py-3 bg-card-glass-bg sticky! bottom-0 border-t border-card-glass-border"
+      class="bg-card-glass-bg border-card-glass-border sticky! bottom-0 flex w-full justify-end border-t px-3 py-3"
       style="z-index: 2"
     >
       <OButton

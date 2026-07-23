@@ -15,12 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="sessions_page flex flex-col flex-1 min-h-0 overflow-hidden">
+  <div class="sessions_page flex min-h-0 flex-1 flex-col overflow-hidden">
     <div>
-      <div class="bg-card-glass-bg border-b border-border-default py-1.5 px-page-edge">
+      <div class="bg-card-glass-bg border-border-default px-page-edge border-b py-1.5">
         <div class="flex items-start gap-1">
           <!-- Query editor (flex-grow to fill available space) -->
-          <div class="flex-1 min-w-0 relative">
+          <div class="relative min-w-0 flex-1">
             <QueryEditor
               ref="errorQueryEditorRef"
               editor-id="rum-errors-query-editor"
@@ -43,14 +43,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <div
               v-if="!errorTrackingState.data.editorValue && !editorFocused"
-              class="query-editor-placeholder-overlay absolute top-0 left-0 right-0 bottom-0 flex items-start py-0.75 pr-2 pb-0 pl-[2.15rem] pointer-events-none z-1 select-none"
+              class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start py-0.75 pr-2 pb-0 pl-[2.15rem] select-none"
             >
               <span class="query-editor-placeholder-typewriter">{{ editorPlaceholder }}</span>
             </div>
           </div>
 
           <!-- Controls on the right -->
-          <div class="flex items-start gap-1 shrink-0">
+          <div class="flex shrink-0 items-start gap-1">
             <SyntaxGuide />
             <DateTime
               auto-apply
@@ -94,13 +94,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <!-- end toolbar wrapper -->
     <OSplitter
-      class="logs-horizontal-splitter flex-1 min-h-0"
+      class="logs-horizontal-splitter min-h-0 flex-1"
       v-model="splitterModel"
       unit="px"
       :horizontal="false"
     >
       <template #before>
-        <div class="bg-surface-panel py-1 h-full overflow-auto border-r border-border-default">
+        <div class="bg-surface-panel border-border-default h-full overflow-auto border-r py-1">
           <SearchFieldList
             :fields="streamFields"
             :time-stamp="{
@@ -116,9 +116,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
       <template #after>
-        <div class="h-full flex flex-col min-h-0">
+        <div class="flex h-full min-h-0 flex-col">
           <!-- Errors-over-time chart + KPI summary -->
-          <div class="grid grid-cols-1 lg:grid-cols-5 gap-2 px-page-edge pt-1.5 h-44 shrink-0">
+          <div class="px-page-edge grid h-44 shrink-0 grid-cols-1 gap-2 pt-1.5 lg:grid-cols-5">
             <ErrorsOverTimeChart
               class="lg:col-span-3"
               :buckets="chartSeries"
@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
 
-          <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
+          <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
             <OTable
               :data="visibleIssues"
               :columns="tableColumns"

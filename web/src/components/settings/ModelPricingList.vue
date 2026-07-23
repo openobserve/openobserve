@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col h-full p-0">
+  <div class="flex h-full flex-col p-0">
     <!-- Full-page Import View -->
     <ImportModelPricing
       v-if="showImportModelPricingPage"
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- List Table -->
-      <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
+      <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
         <OTable
           ref="qTableRef"
           :frame="false"
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Toolbar: Built-in/Custom tabs + search -->
           <template #toolbar>
-            <div class="flex items-center gap-2 w-full">
+            <div class="flex w-full items-center gap-2">
               <div class="app-tabs-container h-9">
                 <AppTabs
                   class="tabs-selection-container"
@@ -149,12 +149,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #cell-name="{ row }">
-            <div class="flex items-center flex-nowrap relative z-[2] min-h-6">
+            <div class="relative z-[2] flex min-h-6 flex-nowrap items-center">
               <span
                 v-if="getSource(row) === 'built_in'"
-                class="shrink-0 cursor-default inline-flex mr-1"
+                class="mr-1 inline-flex shrink-0 cursor-default"
               >
-                <img :src="ooLogo" class="w-4 h-4" alt="OpenObserve" />
+                <img :src="ooLogo" class="h-4 w-4" alt="OpenObserve" />
                 <OTooltip side="top" align="center" :content="t('modelPricing.sourceBuiltIn')" />
               </span>
               <span
@@ -162,24 +162,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   getSource(row) === 'meta_org' ||
                   (getSource(row) === 'org' && row.org_id !== orgIdentifier)
                 "
-                class="shrink-0 cursor-default inline-flex mr-1"
+                class="mr-1 inline-flex shrink-0 cursor-default"
               >
                 <OIcon name="corporate-fare" size="sm" class="text-text-secondary" />
                 <OTooltip side="top" align="center" :content="t('modelPricing.sourceInherited')" />
               </span>
-              <span v-else class="shrink-0 cursor-default inline-flex mr-1">
+              <span v-else class="mr-1 inline-flex shrink-0 cursor-default">
                 <OIcon name="person" size="sm" class="text-text-secondary" />
                 <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
               </span>
-              <div class="truncate w-full block">{{ row.name }}</div>
+              <div class="block w-full truncate">{{ row.name }}</div>
             </div>
           </template>
           <template #cell-match_pattern="{ row }">
-            <div class="flex items-center gap-1 min-w-0">
+            <div class="flex min-w-0 items-center gap-1">
               <code
-                class="text-xs block max-w-full bg-surface-subtle border border-card-glass-border py-0.5 px-1.5 rounded-default text-inherit"
+                class="bg-surface-subtle border-card-glass-border rounded-default block max-w-full border px-1.5 py-0.5 text-xs text-inherit"
                 :class="{
-                  'opacity-50 [text-decoration:line-through] [text-decoration-color:currentColor]':
+                  '[text-decoration-color:currentColor] opacity-50 [text-decoration:line-through]':
                     isChildRow(row),
                 }"
                 >{{ row.match_pattern }}</code
@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="isChildRow(row)"
                 name="warning-amber"
                 size="xs"
-                class="shrink-0 text-status-warning-text opacity-85"
+                class="text-status-warning-text shrink-0 opacity-85"
               >
                 <OTooltip
                   side="top"
@@ -222,19 +222,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTooltip>
                     <template #content>
                       <div class="min-w-60">
-                        <div class="font-bold text-compact mb-0.75">
+                        <div class="text-compact mb-0.75 font-bold">
                           {{ row.name }}
                         </div>
                         <table class="w-full border-collapse">
                           <thead>
                             <tr>
                               <th
-                                class="text-2xs font-semibold text-table-header-text bg-table-header-bg text-left pt-0 pb-1 pl-0 pr-4 border-b border-table-header-border"
+                                class="text-2xs text-table-header-text bg-table-header-bg border-table-header-border border-b pt-0 pr-4 pb-1 pl-0 text-left font-semibold"
                               >
                                 {{ t("modelPricing.usageType") }}
                               </th>
                               <th
-                                class="text-2xs font-semibold text-table-header-text bg-table-header-bg text-right pt-0 pb-1 pl-0 pr-0 border-b border-table-header-border"
+                                class="text-2xs text-table-header-text bg-table-header-bg border-table-header-border border-b pt-0 pr-0 pb-1 pl-0 text-right font-semibold"
                               >
                                 {{ t("modelPricing.colPricingSimple") }}
                               </th>
@@ -247,8 +247,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               )"
                               :key="key"
                             >
-                              <td class="text-xs py-0.5 pl-0 pr-4">{{ formatPriceKey(key) }}</td>
-                              <td class="text-xs py-0.5 pl-0 pr-0 text-right font-medium">
+                              <td class="py-0.5 pr-4 pl-0 text-xs">{{ formatPriceKey(key) }}</td>
+                              <td class="py-0.5 pr-0 pl-0 text-right text-xs font-medium">
                                 {{ formatPerMillion(price) }}
                               </td>
                             </tr>
@@ -263,7 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #cell-actions="{ row }">
-            <div class="flex items-center gap-1 justify-end">
+            <div class="flex items-center justify-end gap-1">
               <template v-if="!isReadOnly(row)">
                 <OButton
                   :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
@@ -329,8 +329,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #bottom>
-            <div class="flex items-center w-full h-12 gap-x-2">
-              <div class="text-xs font-normal flex items-center w-25">
+            <div class="flex h-12 w-full items-center gap-x-2">
+              <div class="flex w-25 items-center text-xs font-normal">
                 {{ t("modelPricing.modelsCount", { count: resultTotal }) }}
               </div>
               <OButton
@@ -374,9 +374,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #header-right>
         <span
           v-if="getSource(pricingDialogRow) === 'built_in'"
-          class="shrink-0 cursor-default inline-flex"
+          class="inline-flex shrink-0 cursor-default"
         >
-          <img :src="ooLogo" class="w-4.5 h-4.5" alt="OpenObserve" />
+          <img :src="ooLogo" class="h-4.5 w-4.5" alt="OpenObserve" />
           <OTooltip side="top" align="center" :content="t('modelPricing.sourceBuiltIn')" />
         </span>
         <span
@@ -385,12 +385,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             (getSource(pricingDialogRow) === 'meta_org' ||
               (getSource(pricingDialogRow) === 'org' && pricingDialogRow.org_id !== orgIdentifier))
           "
-          class="shrink-0 cursor-default inline-flex"
+          class="inline-flex shrink-0 cursor-default"
         >
           <OIcon name="corporate-fare" size="sm" class="text-text-secondary" />
           <OTooltip side="top" align="center" :content="t('modelPricing.sourceInherited')" />
         </span>
-        <span v-else class="shrink-0 cursor-default inline-flex">
+        <span v-else class="inline-flex shrink-0 cursor-default">
           <OIcon name="person" size="sm" class="text-text-secondary" />
           <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
         </span>
@@ -399,11 +399,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex-1 overflow-y-auto">
         <div v-if="pricingDialogRow">
           <div class="mb-4">
-            <div class="text-xs font-semibold mb-1.5 text-text-secondary">
+            <div class="text-text-secondary mb-1.5 text-xs font-semibold">
               {{ t("modelPricing.colPattern") }}
             </div>
             <code
-              class="text-xs block bg-surface-subtle border border-card-glass-border py-0.5 px-1.5 rounded-default text-inherit text-compact px-2.5 py-1.5 whitespace-pre-wrap break-all max-h-75 overflow-y-auto"
+              class="bg-surface-subtle border-card-glass-border rounded-default text-compact block max-h-75 overflow-y-auto border px-1.5 px-2.5 py-0.5 py-1.5 text-xs break-all whitespace-pre-wrap text-inherit"
               >{{ pricingDialogRow.match_pattern }}</code
             >
           </div>
@@ -411,24 +411,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div>
             <div
-              class="text-xs font-semibold mb-1.5 text-text-secondary mt-2 pricing-section-label"
+              class="text-text-secondary pricing-section-label mt-2 mb-1.5 text-xs font-semibold"
             >
               {{ t("modelPricing.colPricing") }}
             </div>
             <div
               v-if="sortedPriceEntries(getDefaultTier(pricingDialogRow)?.prices || {}).length"
-              class="mt-2 border border-card-glass-border rounded-default overflow-hidden"
+              class="border-card-glass-border rounded-default mt-2 overflow-hidden border"
             >
               <table class="w-full border-collapse">
                 <thead>
                   <tr>
                     <th
-                      class="text-2xs font-semibold text-table-header-text text-left py-1.5 px-3.5 bg-table-header-bg border-b border-table-header-border"
+                      class="text-2xs text-table-header-text bg-table-header-bg border-table-header-border border-b px-3.5 py-1.5 text-left font-semibold"
                     >
                       {{ t("modelPricing.usageType") }}
                     </th>
                     <th
-                      class="text-2xs font-semibold text-table-header-text text-right py-1.5 px-3.5 bg-table-header-bg border-b border-table-header-border"
+                      class="text-2xs text-table-header-text bg-table-header-bg border-table-header-border border-b px-3.5 py-1.5 text-right font-semibold"
                     >
                       {{ t("modelPricing.colPricing") }}
                     </th>
@@ -442,11 +442,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :key="key"
                     class="last:[&>td]:border-b-0"
                   >
-                    <td class="text-compact py-2 px-3.5 border-b border-table-row-divider">
+                    <td class="text-compact border-table-row-divider border-b px-3.5 py-2">
                       {{ formatPriceKey(key) }}
                     </td>
                     <td
-                      class="text-compact py-2 px-3.5 border-b border-table-row-divider text-right font-semibold"
+                      class="text-compact border-table-row-divider border-b px-3.5 py-2 text-right font-semibold"
                     >
                       {{ formatPerMillion(price) }}
                     </td>

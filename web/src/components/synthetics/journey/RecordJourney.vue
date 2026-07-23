@@ -92,31 +92,31 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="flex flex-col min-h-screen">
+  <div class="flex min-h-screen flex-col">
     <!-- Recording banner -->
     <div
-      class="flex items-center gap-3 px-4 py-2 bg-status-error-bg border-b border-border-default"
+      class="bg-status-error-bg border-border-default flex items-center gap-3 border-b px-4 py-2"
     >
       <!-- Red dot + timer -->
       <span class="flex items-center gap-1.5">
         <span
-          class="w-2 h-2 rounded-full bg-[var(--color-status-error-text)] animate-pulse inline-block"
+          class="inline-block h-2 w-2 animate-pulse rounded-full bg-[var(--color-status-error-text)]"
           aria-hidden="true"
         />
-        <span class="text-sm font-semibold text-status-error-text">{{
+        <span class="text-status-error-text text-sm font-semibold">{{
           t("synthetics.journey.recording")
         }}</span>
-        <span class="font-mono text-sm text-text-body">{{ formatTime(recordingSeconds) }}</span>
+        <span class="text-text-body font-mono text-sm">{{ formatTime(recordingSeconds) }}</span>
       </span>
 
       <!-- Current URL -->
-      <span class="flex items-center gap-1 text-xs text-text-secondary truncate flex-1 min-w-0">
+      <span class="text-text-secondary flex min-w-0 flex-1 items-center gap-1 truncate text-xs">
         <OIcon name="shield" size="sm" class="shrink-0" aria-hidden="true" />
         <span class="truncate">{{ currentUrl }}</span>
       </span>
 
       <!-- Actions -->
-      <div class="flex items-center gap-2 shrink-0">
+      <div class="flex shrink-0 items-center gap-2">
         <OButton variant="ghost" size="sm" @click="emit('cancel')">{{
           t("synthetics.journey.cancel")
         }}</OButton>
@@ -132,9 +132,9 @@ onUnmounted(() => {
     </div>
 
     <!-- Info banner -->
-    <div class="flex items-center gap-2 px-4 py-2 border-b border-border-default bg-surface-base">
+    <div class="border-border-default bg-surface-base flex items-center gap-2 border-b px-4 py-2">
       <OIcon name="open-in-new" size="sm" class="text-text-muted" aria-hidden="true" />
-      <span class="text-xs text-text-secondary flex-1">{{
+      <span class="text-text-secondary flex-1 text-xs">{{
         t("synthetics.journey.recordingIncognitoInfo")
       }}</span>
       <OButton variant="outline" size="sm">{{ t("synthetics.journey.showWindow") }}</OButton>
@@ -142,20 +142,20 @@ onUnmounted(() => {
 
     <!-- Captured steps -->
     <div class="flex-1 overflow-y-auto p-4">
-      <div class="flex items-center gap-2 mb-3">
-        <h3 class="text-base font-semibold text-text-heading m-0">
+      <div class="mb-3 flex items-center gap-2">
+        <h3 class="text-text-heading m-0 text-base font-semibold">
           {{ t("synthetics.journey.journeyHeading") }}
         </h3>
         <span
-          class="text-xs font-medium bg-status-error-bg text-status-error-text rounded-full px-2 py-0.5 flex items-center gap-1"
+          class="bg-status-error-bg text-status-error-text flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
         >
           <span
-            class="w-1.5 h-1.5 rounded-full bg-[var(--color-status-error-text)] animate-pulse inline-block"
+            class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--color-status-error-text)]"
             aria-hidden="true"
           />
           {{ t("synthetics.journey.capturingLive") }}
         </span>
-        <span class="text-sm text-text-muted">{{
+        <span class="text-text-muted text-sm">{{
           t("synthetics.journey.stepCount", { count: capturedSteps.length })
         }}</span>
       </div>
@@ -184,7 +184,7 @@ onUnmounted(() => {
           class="text-text-muted animate-pulse"
           aria-hidden="true"
         />
-        <p class="text-sm text-text-secondary m-0">
+        <p class="text-text-secondary m-0 text-sm">
           {{ t("synthetics.journey.waitingForActions") }}
         </p>
       </div>

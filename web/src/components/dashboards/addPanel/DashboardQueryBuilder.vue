@@ -25,21 +25,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     "
   >
     <!-- x axis container -->
-    <div class="pl-3 flex flex-row w-full" v-if="dashboardPanelData.data.type != 'metric'">
+    <div class="flex w-full flex-row pl-3" v-if="dashboardPanelData.data.type != 'metric'">
       <div class="flex-1">
         <div class="flex flex-row">
-          <div class="layout-name whitespace-nowrap min-w-32.5 flex items-center">
+          <div class="layout-name flex min-w-32.5 items-center whitespace-nowrap">
             {{ currentXLabel }}
             <OIcon name="info-outline" size="sm" class="ml-1" />
             <OTooltip :content="xAxisHint" />
           </div>
-          <span class="layout-separator flex items-center mx-0.5">:</span>
+          <span class="layout-separator mx-0.5 flex items-center">:</span>
           <div
-            class="axis-container droppable scroll flex flex-1 w-full text-center flex-wrap border-2 border-dashed border-transparent"
+            class="axis-container droppable scroll flex w-full flex-1 flex-wrap border-2 border-dashed border-transparent text-center"
             :class="{
-              'bg-[rgba(0,0,0,0.042)] [border-style:dotted] border-white':
+              '[border-style:dotted] border-white bg-[rgba(0,0,0,0.042)]':
                 dashboardPanelData.meta.dragAndDrop.dragging,
-              'transition-all duration-200 bg-field-list-row-hover-bg':
+              'bg-field-list-row-hover-bg transition-all duration-200':
                 dashboardPanelData.meta.dragAndDrop.dragging &&
                 dashboardPanelData.meta.dragAndDrop.currentDragArea == 'x',
             }"
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-x-layout"
           >
             <div
-              class="flex mr-2 my-1"
+              class="my-1 mr-2 flex"
               v-for="(itemX, index) in dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields?.x"
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dashboardPanelData.meta.dragAndDrop.targetDragIndex == index &&
                   dashboardPanelData.meta.dragAndDrop.currentDragArea == 'x'
                 "
-                class="dragItem bg-theme-accent w-5 h-full rounded-default opacity-70"
+                class="dragItem bg-theme-accent rounded-default h-full w-5 opacity-70"
                 data-test="dashboard-query-builder-drag-item"
               >
                 &nbsp;
@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButtonGroup>
             </div>
             <div
-              class="text-xs font-bold text-center py-1 w-full flex justify-center items-center"
+              class="flex w-full items-center justify-center py-1 text-center text-xs font-bold"
               v-if="
                 dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
                   ?.x?.length < 1
@@ -166,10 +166,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.type == 'stacked'
         "
       >
-        <div class="pl-3 h-full flex flex-row">
+        <div class="flex h-full flex-row pl-3">
           <!-- Separator between X and Breakdown/Pivot -->
           <OSeparator vertical class="mr-4" />
-          <div class="layout-name whitespace-nowrap min-w-0 flex items-center">
+          <div class="layout-name flex min-w-0 items-center whitespace-nowrap">
             {{
               dashboardPanelData.data.type == "table" ? t("panel.pivotField") : t("panel.breakdown")
             }}
@@ -190,13 +190,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </OTooltip>
           </div>
-          <span class="layout-separator flex items-center mx-0.5">:</span>
+          <span class="layout-separator mx-0.5 flex items-center">:</span>
           <div
-            class="axis-container droppable scroll flex flex-1 w-full text-center flex-wrap border-2 border-dashed border-transparent"
+            class="axis-container droppable scroll flex w-full flex-1 flex-wrap border-2 border-dashed border-transparent text-center"
             :class="{
-              'bg-[rgba(0,0,0,0.042)] [border-style:dotted] border-white':
+              '[border-style:dotted] border-white bg-[rgba(0,0,0,0.042)]':
                 dashboardPanelData.meta.dragAndDrop.dragging,
-              'transition-all duration-200 bg-field-list-row-hover-bg':
+              'bg-field-list-row-hover-bg transition-all duration-200':
                 dashboardPanelData.meta.dragAndDrop.dragging &&
                 dashboardPanelData.meta.dragAndDrop.currentDragArea == 'breakdown',
             }"
@@ -214,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-b-layout"
           >
             <div
-              class="flex mr-2 my-1"
+              class="my-1 mr-2 flex"
               v-for="(itemB, index) in dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields?.breakdown"
@@ -225,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dashboardPanelData.meta.dragAndDrop.targetDragIndex == index &&
                   dashboardPanelData.meta.dragAndDrop.currentDragArea == 'breakdown'
                 "
-                class="dragItem bg-theme-accent w-5 h-full rounded-default opacity-70"
+                class="dragItem bg-theme-accent rounded-default h-full w-5 opacity-70"
                 data-test="dashboard-query-builder-drag-item"
               >
                 &nbsp;
@@ -297,7 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButtonGroup>
             </div>
             <div
-              class="text-xs font-bold text-center py-1 w-full flex justify-center items-center"
+              class="flex w-full items-center justify-center py-1 text-center text-xs font-bold"
               v-if="
                 !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
                   ?.breakdown?.length
@@ -311,19 +311,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <OSeparator v-if="dashboardPanelData.data.type != 'metric'" />
     <!-- y axis container -->
-    <div class="pl-3 flex flex-row">
-      <div class="layout-name whitespace-nowrap min-w-32.5 flex items-center">
+    <div class="flex flex-row pl-3">
+      <div class="layout-name flex min-w-32.5 items-center whitespace-nowrap">
         {{ currentYLabel }}
         <OIcon name="info-outline" size="sm" class="ml-1" />
         <OTooltip :content="yAxisHint" />
       </div>
-      <span class="layout-separator flex items-center mx-0.5">:</span>
+      <span class="layout-separator mx-0.5 flex items-center">:</span>
       <div
-        class="axis-container droppable scroll flex flex-1 w-full text-center flex-wrap border-2 border-dashed border-transparent"
+        class="axis-container droppable scroll flex w-full flex-1 flex-wrap border-2 border-dashed border-transparent text-center"
         :class="{
-          'bg-[rgba(0,0,0,0.042)] [border-style:dotted] border-white':
+          '[border-style:dotted] border-white bg-[rgba(0,0,0,0.042)]':
             dashboardPanelData.meta.dragAndDrop.dragging,
-          'transition-all duration-200 bg-field-list-row-hover-bg':
+          'bg-field-list-row-hover-bg transition-all duration-200':
             dashboardPanelData.meta.dragAndDrop.dragging &&
             dashboardPanelData.meta.dragAndDrop.currentDragArea == 'y',
         }"
@@ -341,7 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-y-layout"
       >
         <div
-          class="flex mr-2 my-1"
+          class="my-1 mr-2 flex"
           v-for="(itemY, index) in dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].fields?.y"
@@ -352,7 +352,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.meta.dragAndDrop.targetDragIndex == index &&
               dashboardPanelData.meta.dragAndDrop.currentDragArea == 'y'
             "
-            class="dragItem bg-theme-accent w-5 h-full rounded-default opacity-70"
+            class="dragItem bg-theme-accent rounded-default h-full w-5 opacity-70"
             data-test="dashboard-query-builder-drag-item"
           >
             &nbsp;
@@ -424,7 +424,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButtonGroup>
         </div>
         <div
-          class="text-xs font-bold text-center py-1 w-full flex justify-center items-center"
+          class="flex w-full items-center justify-center py-1 text-center text-xs font-bold"
           v-if="
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.y
               ?.length < 1
@@ -437,19 +437,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- z axis container -->
     <span v-if="dashboardPanelData.data.type === 'heatmap'">
       <OSeparator />
-      <div class="pl-3 flex flex-row">
-        <div class="layout-name whitespace-nowrap min-w-32.5 flex items-center">
+      <div class="flex flex-row pl-3">
+        <div class="layout-name flex min-w-32.5 items-center whitespace-nowrap">
           {{ dashboardPanelData.data.type == "heatmap" ? t("panel.zAxis") : "" }}
           <OIcon name="info-outline" size="sm" class="ml-1" />
           <OTooltip :content="zAxisHint" />
         </div>
-        <span class="layout-separator flex items-center mx-0.5">:</span>
+        <span class="layout-separator mx-0.5 flex items-center">:</span>
         <div
-          class="axis-container droppable scroll flex flex-1 w-full text-center flex-wrap border-2 border-dashed border-transparent"
+          class="axis-container droppable scroll flex w-full flex-1 flex-wrap border-2 border-dashed border-transparent text-center"
           :class="{
-            'bg-[rgba(0,0,0,0.042)] [border-style:dotted] border-white':
+            '[border-style:dotted] border-white bg-[rgba(0,0,0,0.042)]':
               dashboardPanelData.meta.dragAndDrop.dragging,
-            'transition-all duration-200 bg-field-list-row-hover-bg':
+            'bg-field-list-row-hover-bg transition-all duration-200':
               dashboardPanelData.meta.dragAndDrop.dragging &&
               dashboardPanelData.meta.dragAndDrop.currentDragArea == 'z',
           }"
@@ -467,7 +467,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-z-layout"
         >
           <div
-            class="flex mr-2 my-1"
+            class="my-1 mr-2 flex"
             v-for="(itemZ, index) in dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields?.z"
@@ -478,7 +478,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dashboardPanelData.meta.dragAndDrop.targetDragIndex == index &&
                 dashboardPanelData.meta.dragAndDrop.currentDragArea == 'z'
               "
-              class="dragItem bg-theme-accent w-5 h-full rounded-default opacity-70"
+              class="dragItem bg-theme-accent rounded-default h-full w-5 opacity-70"
               data-test="dashboard-query-builder-drag-item"
             >
               &nbsp;
@@ -550,7 +550,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButtonGroup>
           </div>
           <div
-            class="text-xs font-bold text-center py-1 w-full flex justify-center items-center"
+            class="flex w-full items-center justify-center py-1 text-center text-xs font-bold"
             v-if="
               dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.z
                 ?.length < 1

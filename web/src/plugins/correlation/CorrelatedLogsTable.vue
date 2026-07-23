@@ -16,13 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="correlated-logs-table flex flex-col h-full w-full relative overflow-hidden"
+    class="correlated-logs-table relative flex h-full w-full flex-col overflow-hidden"
     data-test="correlated-logs-table"
   >
     <!-- Header with Inline Filters -->
     <div
       v-if="!props.hideDimensionFilters"
-      class="correlation-controls p-0 max-md:p-2 border-b border-solid border-card-glass-border bg-card-glass-bg"
+      class="correlation-controls border-card-glass-border bg-card-glass-bg border-b border-solid p-0 max-md:p-2"
     >
       <!-- Dimension Filters Bar with Pending/Apply Pattern -->
       <template v-if="!isLoading || hasResults">
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="icon"
-            :class="{ 'text-white! bg-theme-accent!': wrapTableCells }"
+            :class="{ 'bg-theme-accent! text-white!': wrapTableCells }"
             data-test="correlated-logs-table-wrap-content-btn"
             @click="wrapTableCells = !wrapTableCells"
           >
@@ -64,10 +64,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                 </OButton>
               </template>
-              <div class="column-visibility-list min-w-62.5 max-h-100 overflow-y-auto">
+              <div class="column-visibility-list max-h-100 min-w-62.5 overflow-y-auto">
                 <!-- Select All / Deselect All -->
                 <ODropdownItem
-                  class="border-b border-solid border-card-glass-border"
+                  class="border-card-glass-border border-b border-solid"
                   data-test="select-all-columns"
                   @select="
                     (e) => {
@@ -100,8 +100,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @dragover.prevent
                   @drop="handleDrop($event, index)"
                   :class="[
-                    'group cursor-grab transition-colors duration-200 hover:bg-interactive-hover-bg',
-                    { 'opacity-50 cursor-grabbing!': draggedIndex === index },
+                    'group hover:bg-interactive-hover-bg cursor-grab transition-colors duration-200',
+                    { 'cursor-grabbing! opacity-50': draggedIndex === index },
                   ]"
                   :data-test="`column-item-${field}`"
                   @select="
@@ -136,10 +136,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- Show skeleton while loading -->
-      <div v-else class="flex items-center gap-3 flex-wrap p-3 max-md:flex-col max-md:items-start">
-        <OSkeleton class="w-50 h-8" />
-        <OSkeleton class="w-50 h-8" />
-        <OSkeleton class="w-50 h-8" />
+      <div v-else class="flex flex-wrap items-center gap-3 p-3 max-md:flex-col max-md:items-start">
+        <OSkeleton class="h-8 w-50" />
+        <OSkeleton class="h-8 w-50" />
+        <OSkeleton class="h-8 w-50" />
       </div>
 
       <!-- Results Summary Row -->
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon"
           class="h-5!"
-          :class="{ 'text-white! bg-theme-accent! hover:opacity-80': wrapTableCells }"
+          :class="{ 'bg-theme-accent! text-white! hover:opacity-80': wrapTableCells }"
           data-test="correlated-logs-table-wrap-content-btn"
           @click="wrapTableCells = !wrapTableCells"
         >
@@ -185,10 +185,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </CorrelationEventHeader>
 
     <!-- Main Content Area -->
-    <div class="flex-1 overflow-hidden relative">
+    <div class="relative flex-1 overflow-hidden">
       <!-- Logs Table or Skeleton -->
-      <div class="flex flex-col h-full">
-        <div class="flex-1 w-full overflow-auto logs-table-container">
+      <div class="flex h-full flex-col">
+        <div class="logs-table-container w-full flex-1 overflow-auto">
           <!-- Actual Table (when data is loaded) -->
           <TenstackTable
             v-if="hasResults"
@@ -225,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Table Skeleton (initial load) -->
           <div
             v-else-if="isLoading && !hasError"
-            class="h-full flex flex-col items-center justify-center"
+            class="flex h-full flex-col items-center justify-center"
             data-test="table-skeleton"
           >
             <!-- Loading indicator -->
@@ -240,10 +240,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Error State -->
           <div
             v-else-if="hasError"
-            class="flex flex-col items-center justify-center h-full py-20"
+            class="flex h-full flex-col items-center justify-center py-20"
             data-test="error-state"
           >
-            <p class="text-base opacity-70 max-w-md text-center">
+            <p class="max-w-md text-center text-base opacity-70">
               {{ error || t("correlation.logs.errorDetails") }}
             </p>
           </div>
@@ -251,13 +251,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Empty State -->
           <div
             v-else-if="isEmpty"
-            class="flex flex-col items-center justify-center h-full py-20"
+            class="flex h-full flex-col items-center justify-center py-20"
             data-test="empty-state"
           >
-            <p class="text-base font-medium mb-2 opacity-90">
+            <p class="mb-2 text-base font-medium opacity-90">
               {{ t("correlation.logs.noData") }}
             </p>
-            <p class="text-sm opacity-70 mb-4">
+            <p class="mb-4 text-sm opacity-70">
               {{ t("correlation.logs.noDataDetails") }}
             </p>
           </div>
@@ -266,7 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Pagination bar -->
         <div
           v-if="hasResults && totalPages > 1"
-          class="flex items-center justify-between px-4 py-2 border-t border-solid border-card-glass-border bg-card-glass-bg text-xs shrink-0"
+          class="border-card-glass-border bg-card-glass-bg flex shrink-0 items-center justify-between border-t border-solid px-4 py-2 text-xs"
           data-test="correlated-logs-pagination"
         >
           <span class="opacity-60">

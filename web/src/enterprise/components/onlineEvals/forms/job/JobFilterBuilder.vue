@@ -3,20 +3,20 @@
        mb-* here stacked on top of that and left an oversized hole beneath the
        filter (worst in the Span Selector drawer, gap-5 + mb-4). -->
   <div>
-    <div class="flex flex-col gap-0.5 mb-2">
+    <div class="mb-2 flex flex-col gap-0.5">
       <span
-        class="text-compact leading-tight font-medium text-input-label-text"
+        class="text-compact text-input-label-text leading-tight font-medium"
         data-test="job-condition-builder-title"
         >{{ t(`onlineEvals.job.${purpose}.title`) }}</span
       >
       <span
-        class="text-xs text-input-help-text leading-none"
+        class="text-input-help-text text-xs leading-none"
         data-test="job-condition-builder-hint"
         >{{ t(`onlineEvals.job.${purpose}.hint.${targetScope}`) }}</span
       >
     </div>
     <div
-      class="min-w-0 [&_.el-border]:ml-0! [&_.el-border]:w-full [&_.el-border]:max-w-full [&_.el-border]:border-border-default [&_.group-container]:w-full [&>.el-border]:mt-0!"
+      class="[&_.el-border]:border-border-default min-w-0 [&_.el-border]:ml-0! [&_.el-border]:w-full [&_.el-border]:max-w-full [&_.group-container]:w-full [&>.el-border]:mt-0!"
     >
       <FilterGroup
         :group="group"

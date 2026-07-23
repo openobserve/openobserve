@@ -15,21 +15,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="tag-input-container" class="w-full h-full">
+  <div data-test="tag-input-container" class="h-full w-full">
     <div
       data-test="tag-input-wrapper"
-      class="group relative flex flex-col px-1.25 py-0 border border-card-glass-border rounded-default bg-card-glass-bg min-h-14 h-full w-full max-w-full cursor-text transition-colors duration-300 overflow-hidden focus-within:border-theme-accent"
+      class="group border-card-glass-border rounded-default bg-card-glass-bg focus-within:border-theme-accent relative flex h-full min-h-14 w-full max-w-full cursor-text flex-col overflow-hidden border px-1.25 py-0 transition-colors duration-300"
     >
       <label
         v-if="label"
         data-test="tag-input-label"
-        class="absolute top-4 left-3 text-base pointer-events-none transition-all duration-300 bg-transparent px-1 -ml-1 group-focus-within:text-theme-accent ease-[cubic-bezier(0.25,0.8,0.5,1)] origin-top-left"
-        :class="hasContent ? '-translate-y-2 scale-75 text-theme-accent' : 'text-text-secondary'"
+        class="group-focus-within:text-theme-accent pointer-events-none absolute top-4 left-3 -ml-1 origin-top-left bg-transparent px-1 text-base transition-all duration-300 ease-[cubic-bezier(0.25,0.8,0.5,1)]"
+        :class="hasContent ? 'text-theme-accent -translate-y-2 scale-75' : 'text-text-secondary'"
         >{{ label }}</label
       >
       <div
         data-test="tags-and-input"
-        class="flex flex-wrap items-start gap-1 mt-1.25 w-full overflow-hidden"
+        class="mt-1.25 flex w-full flex-wrap items-start gap-1 overflow-hidden"
       >
         <OTag
           v-for="(tag, index) in modelValue"
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <button
               type="button"
               :aria-label="`Remove ${tag}`"
-              class="inline-flex items-center justify-center cursor-pointer hover:opacity-70"
+              class="inline-flex cursor-pointer items-center justify-center hover:opacity-70"
               @click="removeTag(index)"
             >
               <OIcon name="close" size="xs" />
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="inputValue"
           type="text"
           :placeholder="modelValue.length > 0 ? '' : placeholder"
-          class="[flex:1_1_100px] min-w-25 border-0 outline-none bg-transparent p-1 text-sm text-text-body placeholder:text-text-secondary"
+          class="text-text-body placeholder:text-text-secondary min-w-25 [flex:1_1_100px] border-0 bg-transparent p-1 text-sm outline-none"
           @keydown.enter.prevent="addTag"
           @input="handleInput"
           @keydown.delete="handleBackspace"

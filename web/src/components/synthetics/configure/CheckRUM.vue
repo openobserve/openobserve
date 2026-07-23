@@ -33,8 +33,8 @@ const sessionReplay = computed({
 </script>
 
 <template>
-  <div class="rounded-default border border-border-default bg-surface-base p-6 mb-4">
-    <h3 class="text-base font-semibold text-text-heading pb-4">{{ t("synthetics.rum.title") }}</h3>
+  <div class="rounded-default border-border-default bg-surface-base mb-4 border p-6">
+    <h3 class="text-text-heading pb-4 text-base font-semibold">{{ t("synthetics.rum.title") }}</h3>
     <div class="flex flex-col gap-4">
       <div>
         <OSwitch
@@ -42,7 +42,7 @@ const sessionReplay = computed({
           :label="t('synthetics.rum.collectRUM')"
           data-test="synthetics-check-rum-collect-switch"
         />
-        <p class="mt-1 text-xs! text-text-secondary pl-9">
+        <p class="text-text-secondary mt-1 pl-9 text-xs!">
           {{ t("synthetics.rum.collectRUMDesc") }}
         </p>
       </div>

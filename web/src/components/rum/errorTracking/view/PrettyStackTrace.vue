@@ -20,14 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="isLoadingTranslation"
       data-test="rum-pretty-stack-trace-loading"
-      class="loading-container p-6 text-center min-h-50 flex flex-col items-center justify-center rounded-default"
+      class="loading-container rounded-default flex min-h-50 flex-col items-center justify-center p-6 text-center"
       :style="{ 'background-color': backgroundColor, border: `1px solid ${borderColor}` }"
     >
       <OSpinner variant="dots" size="lg" />
-      <div class="mt-3 text-text-secondary font-medium" style="font-size: var(--text-sm)">
+      <div class="text-text-secondary mt-3 font-medium" style="font-size: var(--text-sm)">
         {{ t("rum.translatingStackTrace") }}
       </div>
-      <div class="mt-1 text-text-secondary" style="font-size: var(--text-xs)">
+      <div class="text-text-secondary mt-1" style="font-size: var(--text-xs)">
         {{ t("rum.translatingStackTraceHint") }}
       </div>
     </div>
@@ -36,33 +36,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-else-if="allSourceInfoNull"
       data-test="rum-pretty-stack-trace-unavailable"
-      class="no-source-maps-container p-3 text-center flex flex-col items-center justify-center rounded-default py-5 px-6"
+      class="no-source-maps-container rounded-default flex flex-col items-center justify-center p-3 px-6 py-5 text-center"
       :style="{ 'background-color': backgroundColor, border: `1px solid ${borderColor}` }"
     >
       <OIcon name="code-off" size="lg" class="mb-2" />
-      <div class="text-base font-medium text-text-secondary mb-1">
+      <div class="text-text-secondary mb-1 text-base font-medium">
         {{ t("rum.sourceMapsNotAvailable") }}
       </div>
       <div
-        class="text-sm text-text-secondary"
+        class="text-text-secondary text-sm"
         style="max-width: 500px; margin: 0 auto; font-size: var(--text-compact)"
       >
         {{ t("rum.sourceMapsNotAvailableBody") }}
       </div>
       <div
         v-if="props.error.service || props.error.version"
-        class="flex items-center justify-center gap-2 mt-2 mb-2"
+        class="mt-2 mb-2 flex items-center justify-center gap-2"
       >
         <span
           v-if="props.error.service"
-          class="service-version-badge service-badge inline-flex items-center gap-1 py-1 px-2.5 rounded-default text-xs font-medium bg-badge-purple-soft-bg text-badge-purple-soft-text"
+          class="service-version-badge service-badge rounded-default bg-badge-purple-soft-bg text-badge-purple-soft-text inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium"
         >
           <span class="badge-label opacity-80">{{ t("rum.serviceBadge") }}</span>
           <span class="badge-value font-semibold">{{ props.error.service }}</span>
         </span>
         <span
           v-if="props.error.version"
-          class="service-version-badge version-badge inline-flex items-center gap-1 py-1 px-2.5 rounded-default text-xs font-medium bg-badge-blue-soft-bg text-badge-blue-soft-text"
+          class="service-version-badge version-badge rounded-default bg-badge-blue-soft-bg text-badge-blue-soft-text inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium"
         >
           <span class="badge-label opacity-80">{{ t("rum.versionBadge") }}</span>
           <span class="badge-value font-semibold">{{ props.error.version }}</span>
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Error message -->
         <div
           v-if="stackTrace.error"
-          class="error-header px-3 py-2 font-bold border border-solid rounded-t-default text-sm font-semibold [letter-spacing:0.01em] !px-4 !py-2.5 [box-shadow:0_1px_2px_rgba(0,0,0,0.05)] -mb-px"
+          class="error-header rounded-t-default -mb-px border border-solid !px-4 px-3 !py-2.5 py-2 text-sm font-bold font-semibold [letter-spacing:0.01em] [box-shadow:0_1px_2px_rgba(0,0,0,0.05)]"
           :style="{
             'background-color': errorHeaderBackground,
             color: errorHeaderColor,
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- First stack frame - expandable/collapsible -->
         <div
           v-if="stackTrace.stack.length > 0"
-          class="stack-frame-wrapper rounded-b-default [box-shadow:0_1px_3px_rgba(0,0,0,0.08)] overflow-hidden mt-0"
+          class="stack-frame-wrapper rounded-b-default mt-0 overflow-hidden [box-shadow:0_1px_3px_rgba(0,0,0,0.08)]"
           :style="{
             'border-top': `1px solid ${borderColor}`,
             'border-bottom': `1px solid ${borderColor}`,
@@ -114,19 +114,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Frame header - clickable -->
           <div
-            class="frame-header px-3 py-2 cursor-pointer transition-all duration-200 ease-in-out !px-4 !py-3 hover:bg-surface-subtle"
+            class="frame-header hover:bg-surface-subtle cursor-pointer !px-4 px-3 !py-3 py-2 transition-all duration-200 ease-in-out"
             @click="toggleFrame(traceIndex, 0)"
           >
             <div class="frame-header-content flex items-center gap-2">
               <OIcon
                 :name="isFrameExpanded(traceIndex, 0) ? 'expand-more' : 'chevron-right'"
                 size="xs"
-                class="mr-1 text-icon-color"
+                class="text-icon-color mr-1"
               />
               <div
                 v-if="stackTrace.stack[0].line"
                 data-test="rum-pretty-stack-trace-frame-line"
-                class="stack-line-header font-mono text-compact font-medium break-all flex-1 [line-height:1.5]"
+                class="stack-line-header text-compact flex-1 font-mono [line-height:1.5] font-medium break-all"
                 :style="{ color: textColor }"
               >
                 {{ stackTrace.stack[0].line }}
@@ -138,11 +138,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-if="isFrameExpanded(traceIndex, 0) && stackTrace.stack[0].source_info"
             data-test="rum-pretty-stack-trace-source-context"
-            class="source-context !px-4 !pb-4 !pt-0 bg-code-block-bg"
+            class="source-context bg-code-block-bg !px-4 !pt-0 !pb-4"
           >
             <!-- File location -->
             <div
-              class="source-location-header text-text-secondary text-xs !mb-2.5 text-2xs font-semibold [letter-spacing:0.02em] opacity-80"
+              class="source-location-header text-text-secondary text-2xs !mb-2.5 text-xs font-semibold [letter-spacing:0.02em] opacity-80"
             >
               {{ t("rum.stackLine") }} {{ stackTrace.stack[0].source_info.stack_line }}:{{
                 stackTrace.stack[0].source_info.stack_col
@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Source code snippet with syntax highlighting -->
             <div
-              class="source-code-box border border-solid rounded-default h-50 overflow-hidden [box-shadow:0_2px_6px_rgba(0,0,0,0.1)]"
+              class="source-code-box rounded-default h-50 overflow-hidden border border-solid [box-shadow:0_2px_6px_rgba(0,0,0,0.1)]"
               :style="{ 'border-color': borderColor }"
             >
               <CodeQueryEditor
@@ -187,12 +187,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Show more button - only visible when frames are hidden -->
           <div
             v-if="!expandedTraces[traceIndex]"
-            class="show-more-button px-3 py-2 cursor-pointer flex items-center gap-1.5 transition-all duration-200 ease-in-out !px-4 !py-2.5 text-xs font-medium hover:bg-surface-subtle"
+            class="show-more-button hover:bg-surface-subtle flex cursor-pointer items-center gap-1.5 !px-4 px-3 !py-2.5 py-2 text-xs font-medium transition-all duration-200 ease-in-out"
             :style="{ 'border-top': `1px solid ${borderColor}` }"
             @click="showFrames(traceIndex)"
           >
             <OIcon name="expand-more" size="xs" class="mr-1" />
-            <span class="text-xs text-text-secondary">
+            <span class="text-text-secondary text-xs">
               {{
                 stackTrace.stack.length - 1 > 1
                   ? t("rum.showMoreFrames", { count: stackTrace.stack.length - 1 })
@@ -211,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <!-- Frame header - clickable -->
               <div
-                class="collapsed-frame-header px-3 py-1 cursor-pointer transition-all duration-200 ease-in-out !px-4 !py-2.5 hover:bg-surface-subtle"
+                class="collapsed-frame-header hover:bg-surface-subtle cursor-pointer !px-4 px-3 !py-2.5 py-1 transition-all duration-200 ease-in-out"
                 :style="{ 'background-color': backgroundColor }"
                 @click="toggleFrame(traceIndex, frameIndex + 1)"
               >
@@ -221,12 +221,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       isFrameExpanded(traceIndex, frameIndex + 1) ? 'expand-more' : 'chevron-right'
                     "
                     size="xs"
-                    class="mr-1 text-icon-color"
+                    class="text-icon-color mr-1"
                   />
                   <div
                     v-if="frame.line"
                     data-test="rum-pretty-stack-trace-frame-line"
-                    class="stack-line-collapsed font-mono text-2xs [line-height:1.5] break-all flex-1 opacity-85"
+                    class="stack-line-collapsed text-2xs flex-1 font-mono [line-height:1.5] break-all opacity-85"
                     :style="{ color: mutedTextColor }"
                   >
                     {{ frame.line }}
@@ -237,10 +237,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Expandable source code context -->
               <div
                 v-if="isFrameExpanded(traceIndex, frameIndex + 1) && frame.source_info"
-                class="source-context !px-4 !pb-4 !pt-0 bg-code-block-bg"
+                class="source-context bg-code-block-bg !px-4 !pt-0 !pb-4"
               >
                 <div
-                  class="source-location-header text-text-secondary text-xs !mb-2.5 ml-4 text-2xs font-semibold [letter-spacing:0.02em] opacity-80"
+                  class="source-location-header text-text-secondary text-2xs !mb-2.5 ml-4 text-xs font-semibold [letter-spacing:0.02em] opacity-80"
                 >
                   {{ t("rum.stackLine") }} {{ frame.source_info.stack_line }}:{{
                     frame.source_info.stack_col
@@ -253,7 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <div
-                  class="source-code-box ml-4 border border-solid rounded-default h-50 overflow-hidden [box-shadow:0_2px_6px_rgba(0,0,0,0.1)]"
+                  class="source-code-box rounded-default ml-4 h-50 overflow-hidden border border-solid [box-shadow:0_2px_6px_rgba(0,0,0,0.1)]"
                   :style="{ 'border-color': borderColor }"
                 >
                   <CodeQueryEditor
@@ -273,7 +273,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Error state -->
-    <div v-else data-test="rum-pretty-stack-trace-error" class="p-3 text-center text-text-muted">
+    <div v-else data-test="rum-pretty-stack-trace-error" class="text-text-muted p-3 text-center">
       <div v-if="translationError" class="text-status-error-text">
         {{ translationError }}
       </div>

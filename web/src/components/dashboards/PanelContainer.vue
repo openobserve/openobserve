@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="h-full flex flex-col rounded-default overflow-hidden"
+    class="rounded-default flex h-full flex-col overflow-hidden"
     @mouseover="() => (isCurrentlyHoveredPanel = true)"
     @mouseleave="() => (isCurrentlyHoveredPanel = false)"
     :data-test="`dashboard-panel-container`"
@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }"
     >
       <div
-        class="flex flex-nowrap items-center w-full min-h-7 py-1 px-2 border-b border-border-default rounded-t-default"
+        class="border-border-default rounded-t-default flex min-h-7 w-full flex-nowrap items-center border-b px-2 py-1"
         :class="{ 'border-b-transparent': isPanelLoading }"
         data-test="dashboard-panel-bar"
       >
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           :title="props.data.title"
-          class="whitespace-nowrap overflow-hidden text-ellipsis text-compact font-medium text-text-heading tracking-[0.02em]"
+          class="text-compact text-text-heading overflow-hidden font-medium tracking-[0.02em] text-ellipsis whitespace-nowrap"
           data-test="dashboard-panel-header"
         >
           {{ props.data.title }}
@@ -314,7 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <slot name="panel-variables"></slot>
     </div>
 
-    <div class="flex-1 min-h-0">
+    <div class="min-h-0 flex-1">
       <PanelSchemaRenderer
         :panelSchema="props.data"
         :selectedTimeObj="props.selectedTimeDate"

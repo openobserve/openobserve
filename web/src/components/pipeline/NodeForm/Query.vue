@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="store.state.isAiChatEnabled ? 'opacity-100!' : ''"
         />
       </OButton>
-      <div class="flex items-center app-tabs-container">
+      <div class="app-tabs-container flex items-center">
         <AppTabs
           data-test="scheduled-pipeline-tabs"
           :tabs="scheduledPipelineRef?.tabOptions ?? []"
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <div
       data-test="add-stream-query-routing-section"
-      class="w-full h-full stream-routing-section bg-surface-base"
+      class="stream-routing-section bg-surface-base h-full w-full"
       :class="{ 'fullscreen-mode': isFullscreenMode }"
     >
       <!-- ── OWNER pattern ──────────────────────────────────────────────
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          form is the SINGLE source of truth — no v-model:trigger/sql/… mirror.
          The SQL editor stays bare so validateSqlQuery() remains a pre-submit
          guard inside saveQueryData (the form's onSubmit). -->
-      <OForm :form="form" class="w-full h-full rounded-default stream-routing-container">
+      <OForm :form="form" class="rounded-default stream-routing-container h-full w-full">
         <ScheduledPipeline
           ref="scheduledPipelineRef"
           :columns="filteredColumns"

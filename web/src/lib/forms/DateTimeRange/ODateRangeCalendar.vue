@@ -143,9 +143,9 @@ function handleRangeChange(value: DateRange | undefined) {
     @update:model-value="handleRangeChange"
   >
     <template #default="{ weekDays, grid }">
-      <RangeCalendarHeader class="flex items-center justify-between mb-3">
+      <RangeCalendarHeader class="mb-3 flex items-center justify-between">
         <RangeCalendarPrev
-          class="flex items-center justify-center size-7 rounded-default transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base text-datepicker-icon hover:bg-datepicker-nav-hover-bg focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring data-[disabled]:opacity-40 data-[disabled]:cursor-not-allowed data-[disabled]:pointer-events-none"
+          class="rounded-default ring-offset-surface-base text-datepicker-icon hover:bg-datepicker-nav-hover-bg focus-visible:ring-datepicker-focus-ring flex size-7 items-center justify-center ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2 data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40"
           data-test="daterangecalendar-prev"
         >
           <svg
@@ -163,11 +163,11 @@ function handleRangeChange(value: DateRange | undefined) {
           </svg>
         </RangeCalendarPrev>
         <RangeCalendarHeading
-          class="text-sm font-medium text-datepicker-heading-text"
+          class="text-datepicker-heading-text text-sm font-medium"
           data-test="daterangecalendar-heading"
         />
         <RangeCalendarNext
-          class="flex items-center justify-center size-7 rounded-default transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base text-datepicker-icon hover:bg-datepicker-nav-hover-bg focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring data-[disabled]:opacity-40 data-[disabled]:cursor-not-allowed data-[disabled]:pointer-events-none"
+          class="rounded-default ring-offset-surface-base text-datepicker-icon hover:bg-datepicker-nav-hover-bg focus-visible:ring-datepicker-focus-ring flex size-7 items-center justify-center ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2 data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40"
           data-test="daterangecalendar-next"
         >
           <svg
@@ -188,11 +188,11 @@ function handleRangeChange(value: DateRange | undefined) {
 
       <RangeCalendarGrid v-for="month in grid" :key="month.value.toString()">
         <RangeCalendarGridHead>
-          <RangeCalendarGridRow class="flex gap-1 mb-1">
+          <RangeCalendarGridRow class="mb-1 flex gap-1">
             <RangeCalendarHeadCell
               v-for="day in weekDays"
               :key="day"
-              class="w-8 h-6 flex items-center justify-center text-xs font-medium text-datepicker-weekday-text"
+              class="text-datepicker-weekday-text flex h-6 w-8 items-center justify-center text-xs font-medium"
               >{{ day }}</RangeCalendarHeadCell
             >
           </RangeCalendarGridRow>
@@ -201,7 +201,7 @@ function handleRangeChange(value: DateRange | undefined) {
           <RangeCalendarGridRow
             v-for="(weekDates, idx) in month.rows"
             :key="idx"
-            class="flex gap-1 mb-1"
+            class="mb-1 flex gap-1"
           >
             <RangeCalendarCell v-for="d in weekDates" :key="d.toString()" :date="d">
               <RangeCalendarCellTrigger
@@ -210,7 +210,7 @@ function handleRangeChange(value: DateRange | undefined) {
                 :data-test="`daterangecalendar-cell-${d.toString()}`"
                 :data-preview="isCellInPreview(d) ? '' : undefined"
                 @mouseenter="handleCellMouseEnter(d)"
-                class="flex items-center justify-center size-8 rounded-default text-xs cursor-pointer outline-none transition-[color,background-color,border-color,box-shadow] duration-150 ring-offset-1 ring-offset-surface-base text-datepicker-day-text hover:bg-datepicker-day-hover-bg focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring data-selected:bg-datepicker-day-selected-bg data-selected:text-datepicker-day-selected-text data-today:border data-today:border-datepicker-day-today-border data-outside-view:text-datepicker-day-outside-text data-unavailable:text-datepicker-day-disabled-text data-unavailable:cursor-not-allowed data-unavailable:pointer-events-none data-disabled:text-datepicker-day-disabled-text data-disabled:cursor-not-allowed data-disabled:pointer-events-none data-highlighted:bg-datepicker-day-range-bg data-highlighted:text-datepicker-day-range-text data-selection-start:bg-datepicker-day-selected-bg data-selection-start:text-datepicker-day-selected-text data-selection-end:bg-datepicker-day-selected-bg data-selection-end:text-datepicker-day-selected-text"
+                class="rounded-default ring-offset-surface-base text-datepicker-day-text hover:bg-datepicker-day-hover-bg focus-visible:ring-datepicker-focus-ring data-selected:bg-datepicker-day-selected-bg data-selected:text-datepicker-day-selected-text data-today:border-datepicker-day-today-border data-outside-view:text-datepicker-day-outside-text data-unavailable:text-datepicker-day-disabled-text data-disabled:text-datepicker-day-disabled-text data-highlighted:bg-datepicker-day-range-bg data-highlighted:text-datepicker-day-range-text data-selection-start:bg-datepicker-day-selected-bg data-selection-start:text-datepicker-day-selected-text data-selection-end:bg-datepicker-day-selected-bg data-selection-end:text-datepicker-day-selected-text flex size-8 cursor-pointer items-center justify-center text-xs ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2 data-disabled:pointer-events-none data-disabled:cursor-not-allowed data-today:border data-unavailable:pointer-events-none data-unavailable:cursor-not-allowed"
                 >{{ d.day }}</RangeCalendarCellTrigger
               >
             </RangeCalendarCell>

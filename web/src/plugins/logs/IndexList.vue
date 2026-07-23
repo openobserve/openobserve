@@ -15,25 +15,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col logs-index-menu w-full h-full bg-surface-panel!">
+  <div class="logs-index-menu bg-surface-panel! flex h-full w-full flex-col">
     <!-- Stream type + stream selector. Shares the same page-edge gutter as the
          field search input and the field rows below it (baked into OFieldList),
          so all three form controls line up on one left/right edge. The scrolling
          list itself deliberately runs flush to the divider so its scrollbar lands
          on the panel edge — only the rows inside it carry the gutter. -->
-    <div class="flex items-center gap-2 px-page-edge max-w-full">
+    <div class="px-page-edge flex max-w-full items-center gap-2">
       <OButton
         v-if="searchObj.data.stream.streamType && searchObj.data.stream.streamType !== 'logs'"
         data-test="log-search-index-list-back-to-logs-btn"
         variant="outline"
         size="icon-sm"
-        class="shrink-0 h-8 w-8 border border-border-default rounded-default p-0"
+        class="border-border-default rounded-default h-8 w-8 shrink-0 border p-0"
         @click="onStreamTypeChange('logs')"
       >
         <OIcon name="swap-horiz" size="sm" />
         <OTooltip :content="t('search.switchToLogs')" side="bottom" align="center" />
       </OButton>
-      <div class="flex-1 min-w-0">
+      <div class="min-w-0 flex-1">
         <OSelect
           ref="streamSelect"
           data-test="log-search-index-list-select-stream"
@@ -69,8 +69,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         icon="database"
       >
         <template v-if="quickPickStreams.length" #extra>
-          <div data-test="logs-search-stream-quick-pick" class="flex flex-col gap-1 w-full">
-            <span class="text-text-secondary text-xs font-medium text-center mb-0.5">
+          <div data-test="logs-search-stream-quick-pick" class="flex w-full flex-col gap-1">
+            <span class="text-text-secondary mb-0.5 text-center text-xs font-medium">
               {{ t("search.quickPickStreamsLabel") }}
             </span>
             <OButton
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span
               v-if="streamList.length > quickPickStreams.length"
               data-test="logs-search-stream-quick-pick-more"
-              class="text-text-secondary text-xs text-center mt-0.5"
+              class="text-text-secondary mt-0.5 text-center text-xs"
             >
               {{
                 t("search.quickPickMoreStreams", {
@@ -176,70 +176,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #empty>
-          <div data-test="logs-search-no-field-found-text" class="text-center w-5/6 mx-0 pt-3">
-            <OIcon name="info" size="sm" class="align-middle mr-1" />
+          <div data-test="logs-search-no-field-found-text" class="mx-0 w-5/6 pt-3 text-center">
+            <OIcon name="info" size="sm" class="mr-1 align-middle" />
             {{ t("search.noFieldFoundInStream") }}
           </div>
         </template>
 
         <template #loading>
-          <div data-test="logs-indexlist-fieldlist-loading-skeleton" class="w-full flex flex-col">
+          <div data-test="logs-indexlist-fieldlist-loading-skeleton" class="flex w-full flex-col">
             <!-- Group 1 header -->
-            <div class="h-7 flex items-center justify-between px-2">
-              <OSkeleton type="rect" class="h-3 w-24 rounded-default" />
-              <OSkeleton type="rect" class="h-3 w-3 rounded-default" />
+            <div class="flex h-7 items-center justify-between px-2">
+              <OSkeleton type="rect" class="rounded-default h-3 w-24" />
+              <OSkeleton type="rect" class="rounded-default h-3 w-3" />
             </div>
             <!-- Group 1 fields -->
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
+              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
+              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
               <OSkeleton type="text" class="w-3/4" />
             </div>
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
+              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
+              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
               <OSkeleton type="text" class="w-4/5" />
             </div>
             <!-- Group 2 header -->
-            <div class="h-7 flex items-center justify-between px-2 mt-2">
-              <OSkeleton type="rect" class="h-3 w-16 rounded-default" />
-              <OSkeleton type="rect" class="h-3 w-3 rounded-default" />
+            <div class="mt-2 flex h-7 items-center justify-between px-2">
+              <OSkeleton type="rect" class="rounded-default h-3 w-16" />
+              <OSkeleton type="rect" class="rounded-default h-3 w-3" />
             </div>
             <!-- Group 2 field -->
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
+              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
               <OSkeleton type="text" class="w-2/3" />
             </div>
             <!-- Group 3 header -->
-            <div class="h-7 flex items-center justify-between px-2 mt-2">
-              <OSkeleton type="rect" class="h-3 w-32 rounded-default" />
-              <OSkeleton type="rect" class="h-3 w-3 rounded-default" />
+            <div class="mt-2 flex h-7 items-center justify-between px-2">
+              <OSkeleton type="rect" class="rounded-default h-3 w-32" />
+              <OSkeleton type="rect" class="rounded-default h-3 w-3" />
             </div>
             <!-- Group 3 fields -->
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
+              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
+              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
               <OSkeleton type="text" class="w-4/5" />
             </div>
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
+              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
+              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
               <OSkeleton type="text" class="w-3/4" />
             </div>
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
+              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
           </div>

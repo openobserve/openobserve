@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="rounded-default overflow-hidden min-h-0 h-full flex flex-col" data-test="home-page">
+  <div class="rounded-default flex h-full min-h-0 flex-col overflow-hidden" data-test="home-page">
     <!-- No card-container here: the page already renders inside MainLayout's
          bordered content card, so an inner panel border would double-frame the
          home page. Keep only the layout classes.
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <button
               v-if="tab.id.startsWith('dash:')"
               type="button"
-              class="ml-1 inline-flex items-center justify-center w-4 h-4 leading-none border-none bg-transparent rounded-default cursor-pointer opacity-60 text-sm text-text-secondary transition-all duration-200 ease-[ease] hover:opacity-100 hover:bg-surface-subtle-hover hover:text-text-body"
+              class="rounded-default text-text-secondary hover:bg-surface-subtle-hover hover:text-text-body ml-1 inline-flex h-4 w-4 cursor-pointer items-center justify-center border-none bg-transparent text-sm leading-none opacity-60 transition-all duration-200 ease-[ease] hover:opacity-100"
               :data-test="`home-tab-close-${tab.id}`"
               :aria-label="t('home.removeHomeDashboard')"
               @mousedown.stop.prevent
@@ -77,13 +77,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            pinned dashboard tab opts out: its actions row draws a full-bleed
            divider (like the header's) and the dashboard grid pads itself. -->
       <div
-        class="flex-1 min-h-0 flex flex-col"
-        :class="activeHomeTab.startsWith('dash:') ? '' : 'pt-px px-2.5 pb-2.5'"
+        class="flex min-h-0 flex-1 flex-col"
+        :class="activeHomeTab.startsWith('dash:') ? '' : 'px-2.5 pt-px pb-2.5'"
       >
         <!-- O2 AI Assistant tab -->
         <div
           v-if="activeHomeTab === 'ai'"
-          class="home-ai-panel flex-1 min-h-0 flex flex-row overflow-hidden"
+          class="home-ai-panel flex min-h-0 flex-1 flex-row overflow-hidden"
         >
           <HomeChatHistory @load-chat="onLoadChat" @new-chat="onNewChat" />
           <O2AIChat ref="homeChat" :is-open="true" :header-height="0" :centered-start="true" />
@@ -91,17 +91,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Overview tab (no inner card-container — the outer section panel
              already provides the border; avoids a double-bordered card). -->
-        <div v-if="activeHomeTab === 'overview'" class="flex-1 min-h-0 overflow-hidden">
+        <div v-if="activeHomeTab === 'overview'" class="min-h-0 flex-1 overflow-hidden">
           <OverviewTab />
         </div>
 
         <!-- Usage tab -->
-        <div v-if="activeHomeTab === 'usage'" class="flex-1 min-h-0 overflow-hidden -mx-2.5">
+        <div v-if="activeHomeTab === 'usage'" class="-mx-2.5 min-h-0 flex-1 overflow-hidden">
           <UsageTab />
         </div>
 
         <!-- Pinned dashboard tab -->
-        <div v-else-if="activeHomeTab.startsWith('dash:')" class="flex-1 min-h-0 overflow-hidden">
+        <div v-else-if="activeHomeTab.startsWith('dash:')" class="min-h-0 flex-1 overflow-hidden">
           <PinnedDashboardTab
             :key="activeHomeTab"
             :dashboard-id="parsePinnedTabId(activeHomeTab).dashboardId"

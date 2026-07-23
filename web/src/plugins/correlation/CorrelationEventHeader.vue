@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Source Event Banner -->
   <div
     v-if="sourceEvent && (sourceEvent.timestamp || sourceEvent.message)"
-    class="flex items-start gap-3 px-page-edge py-2 border-b border-solid border-card-glass-border bg-card-glass-bg"
+    class="px-page-edge border-card-glass-border bg-card-glass-bg flex items-start gap-3 border-b border-solid py-2"
   >
     <OTag
       v-if="sourceEvent.severity"
@@ -26,13 +26,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :value="sourceEvent.severity"
       class="shrink-0"
     />
-    <span class="text-xs font-mono text-typography-meta shrink-0">
+    <span class="text-typography-meta shrink-0 font-mono text-xs">
       {{ formatEventTimestamp(sourceEvent.timestamp) }}
     </span>
     <OSeparator v-if="sourceEvent.message" vertical class="mx-0" />
     <span
       v-if="sourceEvent.message"
-      class="text-xs flex-1 font-mono text-typography-meta line-clamp-2 text-ellipsis whitespace-normal wrap-break-word leading-[1.4]"
+      class="text-typography-meta line-clamp-2 flex-1 font-mono text-xs leading-[1.4] wrap-break-word text-ellipsis whitespace-normal"
       :title="sourceEvent.message"
     >
       {{ sourceEvent.message }}
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Chips Row -->
   <div
     v-if="hasChips || $slots['chip-actions']"
-    class="flex items-center gap-6 px-page-edge border-b border-solid border-card-glass-border"
+    class="px-page-edge border-card-glass-border flex items-center gap-6 border-b border-solid"
   >
     <!-- Context chips (Correlated by) — flex-1 so it occupies exactly the space
          left after the shrink-0 subject section (toggles + dynamic badge). Its
@@ -50,10 +50,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="contextChips && contextChips.length > 0"
       ref="containerRef"
-      class="flex items-center gap-3 py-2 flex-1 min-w-0"
+      class="flex min-w-0 flex-1 items-center gap-3 py-2"
     >
-      <span class="text-2! m-0 text-typography-meta shrink-0">Correlated by:</span>
-      <div class="flex items-center gap-2 min-w-0 overflow-hidden">
+      <span class="text-2! text-typography-meta m-0 shrink-0">Correlated by:</span>
+      <div class="flex min-w-0 items-center gap-2 overflow-hidden">
         <ODimensionChip
           v-for="chip in displayedChips"
           :key="chip.key"
@@ -95,9 +95,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Subject chips (View by) — shown when subjectChips are provided -->
-    <div v-if="showSubjectSection" class="flex items-center gap-3 shrink-0">
+    <div v-if="showSubjectSection" class="flex shrink-0 items-center gap-3">
       <OSeparator vertical class="my-2" />
-      <span class="text-2! m-0 text-typography-meta">View by:</span>
+      <span class="text-2! text-typography-meta m-0">View by:</span>
       <OToggleGroup
         :model-value="activeSubject ?? undefined"
         type="single"

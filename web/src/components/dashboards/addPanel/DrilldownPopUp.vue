@@ -84,13 +84,13 @@
           <template #default="{ field }">
             <div class="mt-2.5">
               <label
-                class="o-input-label text-compact font-medium leading-tight text-input-label-text"
+                class="o-input-label text-compact text-input-label-text leading-tight font-medium"
                 >{{ t("dashboard.enterCustomQuery") }}</label
               >
               <!-- Fixed-height wrapper: CodeQueryEditor's root is h-full, so it
                  fills this box. Putting h-20 on the editor itself collides with
                  that h-full and collapses the editor. -->
-              <div class="h-20 mt-1">
+              <div class="mt-1 h-20">
                 <QueryEditor
                   class="h-full"
                   data-test="scheduled-alert-sql-editor"
@@ -103,7 +103,7 @@
               </div>
               <span
                 v-if="field.state.meta.errors.length > 0"
-                class="text-xs text-input-error-text leading-none mt-1 block"
+                class="text-input-error-text mt-1 block text-xs leading-none"
                 role="alert"
                 data-test="dashboard-drilldown-logs-query-error"
               >
@@ -126,7 +126,7 @@
 
       <div v-if="drilldownData.type == 'byDashboard'">
         <div class="mt-2.5">
-          <div class="flex items-center my-2.5 w-full">
+          <div class="my-2.5 flex w-full items-center">
             <OFormSelect
               name="data.folder"
               :options="folderList"
@@ -137,7 +137,7 @@
               data-test="dashboard-drilldown-folder-select"
             />
           </div>
-          <div class="flex items-center my-2.5 w-full" v-if="drilldownData.data.folder">
+          <div class="my-2.5 flex w-full items-center" v-if="drilldownData.data.folder">
             <OFormSelect
               name="data.dashboard"
               :options="dashboardList"
@@ -148,7 +148,7 @@
               data-test="dashboard-drilldown-dashboard-select"
             />
           </div>
-          <div class="flex items-center my-2.5 w-full" v-if="drilldownData.data.dashboard">
+          <div class="my-2.5 flex w-full items-center" v-if="drilldownData.data.dashboard">
             <OFormSelect
               name="data.tab"
               :options="tabList"
@@ -162,9 +162,9 @@
 
           <!-- array of variables name and its values -->
           <div class="mt-7.5">
-            <div class="flex justify-between mb-2.5 items-center">
+            <div class="mb-2.5 flex items-center justify-between">
               <span
-                class="o-input-label text-compact font-medium leading-tight text-input-label-text"
+                class="o-input-label text-compact text-input-label-text leading-tight font-medium"
                 >{{ t("dashboard.variables") }}</span
               >
               <OButton
@@ -179,7 +179,7 @@
             </div>
             <div v-for="(variable, index) in drilldownData.data.variables" :key="index">
               <div
-                class="flex gap-2.5 mb-2.5 items-center"
+                class="mb-2.5 flex items-center gap-2.5"
                 :key="JSON.stringify(variableNamesFn ?? {})"
               >
                 <OFormCombobox
@@ -196,7 +196,7 @@
                 />
 
                 <OIcon
-                  class="cursor-pointer shrink-0"
+                  class="shrink-0 cursor-pointer"
                   size="sm"
                   name="close"
                   @click="() => removeVariableRow(index)"

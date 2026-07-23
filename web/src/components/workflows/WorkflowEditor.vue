@@ -25,19 +25,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   buttons toast until then.
 -->
 <template>
-  <div data-test="workflow-editor-page" class="flex flex-col h-full min-h-0">
+  <div data-test="workflow-editor-page" class="flex h-full min-h-0 flex-col">
     <!-- Toolbar — the shared OPageHeader (same as the pipeline editor): a
          back chevron in the module-icon slot, the workflow name input inline
          after the title, and the Test / Cancel / Save actions right-aligned. -->
     <OPageHeader
       :title="headerTitle"
       :back="{ label: t('workflow.header'), onClick: goBack, dataTest: 'workflow-editor-back' }"
-      class="px-4 border-b border-border-default"
+      class="border-border-default border-b px-4"
     >
       <!-- Beta tag inside the title line (see WorkflowsList: #title-trail sits
            after the title+subtitle column, stranding it far from the title). -->
       <template #title>
-        <span class="inline-flex items-center gap-2 min-w-0">
+        <span class="inline-flex min-w-0 items-center gap-2">
           <span class="truncate">{{ headerTitle }}</span>
           <BetaBadge />
         </span>
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- workspace: docked palette + canvas (+ drawer region for node forms). The
          history drawer portals in here (below the toolbar) so it can sit
          side-by-side with the canvas. -->
-    <div id="workflow-workspace" class="flex-1 flex min-h-0 relative pt-3 px-2">
+    <div id="workflow-workspace" class="relative flex min-h-0 flex-1 px-2 pt-3">
       <!-- Docked node palette — same shared component as Pipelines, so the two
            palettes can never drift apart. Workflows add click-to-append. -->
       <NodePalette
@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <!-- Canvas drop area — gray rounded-default inset card, matching the pipeline
            editor's `#pipelineChartContainer` so both look identical. -->
-      <div class="flex-1 relative min-w-0 rounded-surface overflow-hidden mb-3 bg-surface-subtle">
+      <div class="rounded-surface bg-surface-subtle relative mb-3 min-w-0 flex-1 overflow-hidden">
         <WorkflowCanvas />
       </div>
     </div>

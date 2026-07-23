@@ -25,69 +25,69 @@ limitations under the License.
       <div
         v-if="type === 'slack'"
         data-test="slack-preview"
-        class="slack-message max-w-150 mx-auto bg-white border border-border-default rounded-default p-4 shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
+        class="slack-message border-border-default rounded-default mx-auto max-w-150 border bg-white p-4 shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
       >
         <div class="slack-message-container flex gap-3">
           <div class="slack-avatar">
             <div
-              class="avatar-circle w-9 h-9 bg-[var(--color-brand-slack-aubergine)] text-white rounded-default flex items-center justify-center font-bold text-sm"
+              class="avatar-circle rounded-default flex h-9 w-9 items-center justify-center bg-[var(--color-brand-slack-aubergine)] text-sm font-bold text-white"
             >
               OO
             </div>
           </div>
           <div class="slack-content flex-1">
-            <div class="slack-header flex items-center gap-2 mb-2">
+            <div class="slack-header mb-2 flex items-center gap-2">
               <strong
                 data-test="slack-bot-name"
-                class="bot-name text-[var(--color-brand-slack-link)] text-sm"
+                class="bot-name text-sm text-[var(--color-brand-slack-link)]"
                 >OpenObserve Bot</strong
               >
-              <span class="slack-timestamp text-[var(--color-brand-slack-meta)] text-xs">{{
+              <span class="slack-timestamp text-xs text-[var(--color-brand-slack-meta)]">{{
                 getCurrentTime()
               }}</span>
             </div>
             <div data-test="slack-message-body" class="slack-body">
               <div
-                class="slack-block-header text-lg font-bold mb-3 text-[var(--color-brand-slack-text)]"
+                class="slack-block-header mb-3 text-lg font-bold text-[var(--color-brand-slack-text)]"
               >
                 🚨 High CPU Usage
               </div>
-              <div class="slack-fields grid grid-cols-2 gap-2 mb-3">
+              <div class="slack-fields mb-3 grid grid-cols-2 gap-2">
                 <div class="slack-field">
-                  <div class="field-label font-bold text-[var(--color-brand-slack-text)] text-sm">
+                  <div class="field-label text-sm font-bold text-[var(--color-brand-slack-text)]">
                     Stream:
                   </div>
-                  <div class="field-value text-[var(--color-brand-slack-meta)] text-sm">
+                  <div class="field-value text-sm text-[var(--color-brand-slack-meta)]">
                     system-metrics
                   </div>
                 </div>
                 <div class="slack-field">
-                  <div class="field-label font-bold text-[var(--color-brand-slack-text)] text-sm">
+                  <div class="field-label text-sm font-bold text-[var(--color-brand-slack-text)]">
                     Type:
                   </div>
-                  <div class="field-value text-[var(--color-brand-slack-meta)] text-sm">
+                  <div class="field-value text-sm text-[var(--color-brand-slack-meta)]">
                     metrics
                   </div>
                 </div>
                 <div class="slack-field">
-                  <div class="field-label font-bold text-[var(--color-brand-slack-text)] text-sm">
+                  <div class="field-label text-sm font-bold text-[var(--color-brand-slack-text)]">
                     Status:
                   </div>
-                  <div class="field-value text-[var(--color-brand-slack-meta)] text-sm">
+                  <div class="field-value text-sm text-[var(--color-brand-slack-meta)]">
                     🔴 Firing
                   </div>
                 </div>
                 <div class="slack-field">
-                  <div class="field-label font-bold text-[var(--color-brand-slack-text)] text-sm">
+                  <div class="field-label text-sm font-bold text-[var(--color-brand-slack-text)]">
                     Count:
                   </div>
-                  <div class="field-value text-[var(--color-brand-slack-meta)] text-sm">15</div>
+                  <div class="field-value text-sm text-[var(--color-brand-slack-meta)]">15</div>
                 </div>
               </div>
-              <div class="slack-threshold mb-3 text-[var(--color-brand-slack-text)] text-sm">
+              <div class="slack-threshold mb-3 text-sm text-[var(--color-brand-slack-text)]">
                 <strong>Threshold Exceeded:</strong> greater than 80%
               </div>
-              <div class="slack-actions flex justify-center mt-4">
+              <div class="slack-actions mt-4 flex justify-center">
                 <OButton variant="preview-slack">View in OpenObserve</OButton>
               </div>
             </div>
@@ -99,46 +99,46 @@ limitations under the License.
       <div
         v-if="type === 'msteams'"
         data-test="msteams-preview"
-        class="teams-card max-w-150 mx-auto bg-white border border-[var(--color-brand-msg-border-2)] rounded-default overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
+        class="teams-card rounded-default mx-auto max-w-150 overflow-hidden border border-[var(--color-brand-msg-border-2)] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
       >
         <div data-test="msteams-card-content" class="teams-card-content">
-          <div class="teams-header bg-brand-teams-hover text-white p-4">
-            <div class="teams-title text-lg font-bold mb-1">🚨 Alert: High CPU Usage</div>
+          <div class="teams-header bg-brand-teams-hover p-4 text-white">
+            <div class="teams-title mb-1 text-lg font-bold">🚨 Alert: High CPU Usage</div>
             <div class="teams-subtitle text-sm opacity-90">OpenObserve Alert Notification</div>
           </div>
-          <div class="teams-facts p-4 grid gap-2">
+          <div class="teams-facts grid gap-2 p-4">
             <div
-              class="teams-fact flex justify-between py-1 border-b border-[var(--color-brand-teams-bg)]"
+              class="teams-fact flex justify-between border-b border-[var(--color-brand-teams-bg)] py-1"
             >
               <div class="fact-name font-bold text-[var(--color-brand-teams-ink)]">Stream</div>
               <div class="fact-value text-[var(--color-brand-teams-text)]">system-metrics</div>
             </div>
             <div
-              class="teams-fact flex justify-between py-1 border-b border-[var(--color-brand-teams-bg)]"
+              class="teams-fact flex justify-between border-b border-[var(--color-brand-teams-bg)] py-1"
             >
               <div class="fact-name font-bold text-[var(--color-brand-teams-ink)]">Type</div>
               <div class="fact-value text-[var(--color-brand-teams-text)]">metrics</div>
             </div>
             <div
-              class="teams-fact flex justify-between py-1 border-b border-[var(--color-brand-teams-bg)]"
+              class="teams-fact flex justify-between border-b border-[var(--color-brand-teams-bg)] py-1"
             >
               <div class="fact-name font-bold text-[var(--color-brand-teams-ink)]">Status</div>
               <div class="fact-value text-[var(--color-brand-teams-text)]">🔴 Firing</div>
             </div>
             <div
-              class="teams-fact flex justify-between py-1 border-b border-[var(--color-brand-teams-bg)]"
+              class="teams-fact flex justify-between border-b border-[var(--color-brand-teams-bg)] py-1"
             >
               <div class="fact-name font-bold text-[var(--color-brand-teams-ink)]">Count</div>
               <div class="fact-value text-[var(--color-brand-teams-text)]">15</div>
             </div>
             <div
-              class="teams-fact flex justify-between py-1 border-b border-[var(--color-brand-teams-bg)]"
+              class="teams-fact flex justify-between border-b border-[var(--color-brand-teams-bg)] py-1"
             >
               <div class="fact-name font-bold text-[var(--color-brand-teams-ink)]">Threshold</div>
               <div class="fact-value text-[var(--color-brand-teams-text)]">greater than 80%</div>
             </div>
             <div
-              class="teams-fact flex justify-between py-1 border-b border-[var(--color-brand-teams-bg)]"
+              class="teams-fact flex justify-between border-b border-[var(--color-brand-teams-bg)] py-1"
             >
               <div class="fact-name font-bold text-[var(--color-brand-teams-ink)]">Time</div>
               <div class="fact-value text-[var(--color-brand-teams-text)]">
@@ -156,37 +156,37 @@ limitations under the License.
       <div
         v-if="type === 'email'"
         data-test="email-preview"
-        class="email-client max-w-150 mx-auto bg-white border border-[var(--color-brand-msg-divider)] rounded-default overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
+        class="email-client rounded-default mx-auto max-w-150 overflow-hidden border border-[var(--color-brand-msg-divider)] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
       >
         <div
-          class="email-header bg-[var(--color-brand-msg-bg)] p-4 border-b border-[var(--color-brand-msg-border)]"
+          class="email-header border-b border-[var(--color-brand-msg-border)] bg-[var(--color-brand-msg-bg)] p-4"
         >
-          <div data-test="email-subject" class="email-subject font-bold text-base mb-2">
+          <div data-test="email-subject" class="email-subject mb-2 text-base font-bold">
             Subject: 🚨 OpenObserve Alert Notification
           </div>
           <div
             data-test="email-from"
-            class="email-from text-[var(--color-brand-msg-meta)] text-sm mb-1"
+            class="email-from mb-1 text-sm text-[var(--color-brand-msg-meta)]"
           >
             From: alerts@openobserve.ai
           </div>
-          <div class="email-to text-[var(--color-brand-msg-meta)] text-sm mb-1">
+          <div class="email-to mb-1 text-sm text-[var(--color-brand-msg-meta)]">
             To: admin@example.com
           </div>
-          <div class="email-time text-[var(--color-brand-msg-meta)] text-sm mb-1">
+          <div class="email-time mb-1 text-sm text-[var(--color-brand-msg-meta)]">
             {{ getCurrentTime() }}
           </div>
         </div>
         <div data-test="email-body" class="email-body p-6">
           <div class="email-alert-header">
-            <div class="text-[var(--color-brand-msg-error)] text-center mb-4 text-2xl font-bold">
+            <div class="mb-4 text-center text-2xl font-bold text-[var(--color-brand-msg-error)]">
               🚨 Alert Notification
             </div>
           </div>
           <div
-            class="email-alert-info bg-[var(--color-brand-msg-bg)] border-l-4 border-[var(--color-brand-msg-error)] p-4 my-4"
+            class="email-alert-info my-4 border-l-4 border-[var(--color-brand-msg-error)] bg-[var(--color-brand-msg-bg)] p-4"
           >
-            <div class="text-[var(--color-brand-msg-error)] m-0 mb-2 text-lg font-bold">
+            <div class="m-0 mb-2 text-lg font-bold text-[var(--color-brand-msg-error)]">
               High CPU Usage
             </div>
             <p class="m-0 text-[var(--color-brand-msg-meta)]">
@@ -195,7 +195,7 @@ limitations under the License.
           </div>
           <div class="email-details my-4">
             <div
-              class="email-detail-row flex justify-between py-2 border-b border-[var(--color-brand-msg-border)]"
+              class="email-detail-row flex justify-between border-b border-[var(--color-brand-msg-border)] py-2"
             >
               <span class="detail-label font-bold text-[var(--color-brand-msg-text-strong)]"
                 >Stream:</span
@@ -203,7 +203,7 @@ limitations under the License.
               <span class="detail-value text-[var(--color-brand-msg-meta)]">system-metrics</span>
             </div>
             <div
-              class="email-detail-row flex justify-between py-2 border-b border-[var(--color-brand-msg-border)]"
+              class="email-detail-row flex justify-between border-b border-[var(--color-brand-msg-border)] py-2"
             >
               <span class="detail-label font-bold text-[var(--color-brand-msg-text-strong)]"
                 >Type:</span
@@ -211,7 +211,7 @@ limitations under the License.
               <span class="detail-value text-[var(--color-brand-msg-meta)]">metrics</span>
             </div>
             <div
-              class="email-detail-row flex justify-between py-2 border-b border-[var(--color-brand-msg-border)]"
+              class="email-detail-row flex justify-between border-b border-[var(--color-brand-msg-border)] py-2"
             >
               <span class="detail-label font-bold text-[var(--color-brand-msg-text-strong)]"
                 >Status:</span
@@ -219,7 +219,7 @@ limitations under the License.
               <span class="detail-value text-[var(--color-brand-msg-meta)]">🔴 Firing</span>
             </div>
             <div
-              class="email-detail-row flex justify-between py-2 border-b border-[var(--color-brand-msg-border)]"
+              class="email-detail-row flex justify-between border-b border-[var(--color-brand-msg-border)] py-2"
             >
               <span class="detail-label font-bold text-[var(--color-brand-msg-text-strong)]"
                 >Count:</span
@@ -227,7 +227,7 @@ limitations under the License.
               <span class="detail-value text-[var(--color-brand-msg-meta)]">15</span>
             </div>
             <div
-              class="email-detail-row flex justify-between py-2 border-b border-[var(--color-brand-msg-border)]"
+              class="email-detail-row flex justify-between border-b border-[var(--color-brand-msg-border)] py-2"
             >
               <span class="detail-label font-bold text-[var(--color-brand-msg-text-strong)]"
                 >Threshold:</span
@@ -235,7 +235,7 @@ limitations under the License.
               <span class="detail-value text-[var(--color-brand-msg-meta)]">greater than 80%</span>
             </div>
             <div
-              class="email-detail-row flex justify-between py-2 border-b border-[var(--color-brand-msg-border)]"
+              class="email-detail-row flex justify-between border-b border-[var(--color-brand-msg-border)] py-2"
             >
               <span class="detail-label font-bold text-[var(--color-brand-msg-text-strong)]"
                 >Time:</span
@@ -253,20 +253,20 @@ limitations under the License.
       <div
         v-if="type === 'pagerduty'"
         data-test="pagerduty-preview"
-        class="pagerduty-incident max-w-150 mx-auto bg-white border border-[var(--color-brand-msg-divider)] rounded-default overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
+        class="pagerduty-incident rounded-default mx-auto max-w-150 overflow-hidden border border-[var(--color-brand-msg-divider)] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
       >
         <div
-          class="pagerduty-header bg-[var(--color-brand-slack-green)] text-white p-4 flex justify-between items-center"
+          class="pagerduty-header flex items-center justify-between bg-[var(--color-brand-slack-green)] p-4 text-white"
         >
-          <div class="pagerduty-title font-bold text-lg">PagerDuty Incident</div>
+          <div class="pagerduty-title text-lg font-bold">PagerDuty Incident</div>
           <div
-            class="pagerduty-status bg-[var(--color-brand-email-accent)] py-1 px-2 rounded-default text-xs font-bold"
+            class="pagerduty-status rounded-default bg-[var(--color-brand-email-accent)] px-2 py-1 text-xs font-bold"
           >
             Triggered
           </div>
         </div>
         <div class="pagerduty-content p-6">
-          <div class="m-0 mb-4 text-[var(--color-brand-msg-text-dark)] font-bold text-lg">
+          <div class="m-0 mb-4 text-lg font-bold text-[var(--color-brand-msg-text-dark)]">
             OpenObserve Alert: High CPU Usage
           </div>
           <div class="pagerduty-details">
@@ -283,8 +283,8 @@ limitations under the License.
               <strong>Time:</strong> {{ getCurrentTime() }}
             </div>
           </div>
-          <div class="pagerduty-link text-center mt-4">
-            <a href="#" class="text-[var(--color-brand-slack-green)] no-underline font-bold"
+          <div class="pagerduty-link mt-4 text-center">
+            <a href="#" class="font-bold text-[var(--color-brand-slack-green)] no-underline"
               >View in OpenObserve</a
             >
           </div>
@@ -295,12 +295,12 @@ limitations under the License.
       <div
         v-if="type === 'servicenow'"
         data-test="servicenow-preview"
-        class="servicenow-incident max-w-150 mx-auto bg-white border border-[var(--color-brand-msg-divider)] rounded-default overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
+        class="servicenow-incident rounded-default mx-auto max-w-150 overflow-hidden border border-[var(--color-brand-msg-divider)] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
       >
         <div
-          class="servicenow-header bg-[var(--color-brand-slack-avatar)] text-white p-4 flex justify-between items-center"
+          class="servicenow-header flex items-center justify-between bg-[var(--color-brand-slack-avatar)] p-4 text-white"
         >
-          <div class="servicenow-title font-bold text-lg">ServiceNow Incident</div>
+          <div class="servicenow-title text-lg font-bold">ServiceNow Incident</div>
           <div class="servicenow-number font-mono font-bold">INC0000123</div>
         </div>
         <div class="servicenow-content p-6">
@@ -317,7 +317,7 @@ limitations under the License.
             <strong>State:</strong> New
           </div>
           <div
-            class="servicenow-description bg-[var(--color-brand-msg-bg)] p-4 rounded-default text-[var(--color-brand-msg-text)] [white-space:pre-line] mt-4"
+            class="servicenow-description rounded-default mt-4 bg-[var(--color-brand-msg-bg)] p-4 [white-space:pre-line] text-[var(--color-brand-msg-text)]"
           >
             <strong>Description:</strong><br />
             Alert Details:<br /><br />
@@ -335,20 +335,20 @@ limitations under the License.
       <div
         v-if="type === 'opsgenie'"
         data-test="opsgenie-preview"
-        class="opsgenie-alert max-w-150 mx-auto bg-white border border-[var(--color-brand-msg-divider)] rounded-default overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
+        class="opsgenie-alert rounded-default mx-auto max-w-150 overflow-hidden border border-[var(--color-brand-msg-divider)] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
       >
         <div
-          class="opsgenie-header bg-[var(--color-brand-email-ink)] text-white p-4 flex justify-between items-center"
+          class="opsgenie-header flex items-center justify-between bg-[var(--color-brand-email-ink)] p-4 text-white"
         >
-          <div class="opsgenie-title font-bold text-lg">Opsgenie Alert</div>
+          <div class="opsgenie-title text-lg font-bold">Opsgenie Alert</div>
           <div
-            class="opsgenie-priority bg-[var(--color-brand-email-warning)] text-[var(--color-brand-email-ink)] py-1 px-2 rounded-default font-bold"
+            class="opsgenie-priority rounded-default bg-[var(--color-brand-email-warning)] px-2 py-1 font-bold text-[var(--color-brand-email-ink)]"
           >
             P3
           </div>
         </div>
         <div class="opsgenie-content p-6">
-          <div class="m-0 mb-4 text-[var(--color-brand-msg-text-dark)] font-bold text-lg">
+          <div class="m-0 mb-4 text-lg font-bold text-[var(--color-brand-msg-text-dark)]">
             OpenObserve Alert: High CPU Usage
           </div>
           <div class="opsgenie-details">
@@ -365,7 +365,7 @@ limitations under the License.
               <strong>Time:</strong> {{ getCurrentTime() }}
             </div>
           </div>
-          <div class="opsgenie-actions flex justify-center mt-4">
+          <div class="opsgenie-actions mt-4 flex justify-center">
             <OButton variant="preview-action">View in OpenObserve</OButton>
           </div>
         </div>
@@ -373,7 +373,7 @@ limitations under the License.
     </div>
 
     <template #footer>
-      <div class="flex items-center justify-center gap-2 w-full">
+      <div class="flex w-full items-center justify-center gap-2">
         <OButton
           data-test="preview-copy-button"
           variant="outline"

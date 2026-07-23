@@ -51,7 +51,7 @@ if (import.meta.env.DEV && !form) {
           </template>
           <slot />
         </OToggleGroup>
-        <div v-if="field.state.meta.errors.length > 0" class="text-xs text-input-error-text">
+        <div v-if="field.state.meta.errors.length > 0" class="text-input-error-text text-xs">
           {{ firstFieldError(field.state.meta.errors) }}
         </div>
       </div>

@@ -19,14 +19,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        panels each carry their own `bg-card-glass-bg`. Wrapping them in
        another bg-card-glass-bg would render same-bg-on-same-bg and the
        inner cards would visually disappear (no border contrast). -->
-  <div class="bg-transparent h-full flex flex-col">
+  <div class="flex h-full flex-col bg-transparent">
     <!-- Toolbar: Stream/Agent mode tab (left) + the matching picker (right) —
          hidden when no streams are available. Padding lives on the toolbar +
          scroll area (not the root) so the scrollbar hugs the content-area edge
          instead of floating inside a padded box. -->
     <div
       v-if="availableStreams.length > 0"
-      class="flex items-center gap-3 px-page-edge py-2 border-b border-border-default"
+      class="px-page-edge border-border-default flex items-center gap-3 border-b py-2"
     >
       <!-- Scope control — left-aligned Stream/Agent bar directly under the
            header, matching Agent Graph / Agent Behavior / Sessions so every AI
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="availableStreams.map((s) => ({ label: s, value: s }))"
           labelKey="label"
           valueKey="value"
-          class="w-full rounded-default"
+          class="rounded-default w-full"
           @update:model-value="onStreamChange"
         />
       </div>
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Hold a picker-shaped skeleton until the agents list lands the first
              time, so the dropdown doesn't flash an empty "Agent" picker before
              its options exist. -->
-        <OSkeleton type="text" v-if="!agentsLoaded" class="w-full h-8.5" />
+        <OSkeleton type="text" v-if="!agentsLoaded" class="h-8.5 w-full" />
         <OSelect
           v-else
           v-model="activeAgent"
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="agentSelectOptions"
           labelKey="label"
           valueKey="value"
-          class="w-full rounded-default"
+          class="rounded-default w-full"
           @update:model-value="onAgentChange"
         />
       </div>
@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <LLMInsightsSkeleton
       v-if="!streamsLoaded || switching"
       :hide-toolbar="streamsLoaded"
-      class="flex-1 px-page-edge"
+      class="px-page-edge flex-1"
     />
 
     <!-- Generic error state — kept separate because a failed request is a
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          the preset's "Instrument with OpenTelemetry" call to action. -->
     <div
       v-else-if="isEmpty"
-      class="flex-1 min-h-0 flex items-center justify-center px-page-edge"
+      class="px-page-edge flex min-h-0 flex-1 items-center justify-center"
       data-test="llm-insights-empty"
     >
       <OEmptyState size="hero" preset="no-llm-insights" @action="onEmptyAction" />
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          back to the Stream tab. -->
     <div
       v-else-if="agentEmpty"
-      class="flex-1 min-h-0 flex items-center justify-center px-page-edge"
+      class="px-page-edge flex min-h-0 flex-1 items-center justify-center"
       data-test="llm-insights-agent-empty"
     >
       <OEmptyState
@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Dashboard content — scrollable panel area. Horizontal padding lives
          here (inside the scroll container) so the scrollbar sits at the
          content-area edge with content padded away from it. -->
-    <div v-else class="flex-1 overflow-y-auto px-page-edge pb-3">
+    <div v-else class="px-page-edge flex-1 overflow-y-auto pb-3">
       <!-- KPI strip: keep a skeleton until the first KPI result lands so the
            cards never flash zeros. The panels below render regardless, so
            their queries fire in parallel with the KPI fetch. -->
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="card in kpiCards"
           :key="card.label"
-          class="bg-card-glass-bg rounded-default flex flex-col px-3.5 py-2.5 gap-1 min-h-32.5 border border-border-default transition-colors duration-200 hover:border-border-strong"
+          class="bg-card-glass-bg rounded-default border-border-default hover:border-border-strong flex min-h-32.5 flex-col gap-1 border px-3.5 py-2.5 transition-colors duration-200"
         >
           <!-- P95 rides its own (slower) query — skeleton the WHOLE card while
                it loads, matching the initial strip skeleton tile (see
@@ -162,10 +162,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                showing a chart before the number reads as ready, so we hold both. -->
           <template v-if="card.loading">
             <div class="flex flex-col gap-1">
-              <OSkeleton type="text" class="w-[60%] h-3" />
-              <OSkeleton type="text" class="w-[55%] h-5.5" />
+              <OSkeleton type="text" class="h-3 w-[60%]" />
+              <OSkeleton type="text" class="h-5.5 w-[55%]" />
             </div>
-            <div class="flex items-end gap-[0.15rem] h-8 mt-auto">
+            <div class="mt-auto flex h-8 items-end gap-[0.15rem]">
               <OSkeleton
                 type="text"
                 v-for="bar in 16"
@@ -177,23 +177,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template v-else>
             <div class="flex flex-col gap-1">
-              <div class="flex items-center justify-between gap-2 mb-1">
+              <div class="mb-1 flex items-center justify-between gap-2">
                 <div
-                  class="text-2xs leading-normal font-semibold text-text-secondary min-w-0 truncate"
+                  class="text-2xs text-text-secondary min-w-0 truncate leading-normal font-semibold"
                 >
                   {{ card.label }}
                 </div>
                 <span
-                  class="inline-flex items-center justify-center shrink-0 w-6 h-6 rounded-default bg-surface-subtle text-text-secondary"
+                  class="rounded-default bg-surface-subtle text-text-secondary inline-flex h-6 w-6 shrink-0 items-center justify-center"
                 >
                   <OIcon :name="card.icon" size="sm" />
                 </span>
               </div>
               <div class="flex items-baseline gap-[0.2rem]">
-                <span class="text-2xl font-bold leading-none text-text-secondary">
+                <span class="text-text-secondary text-2xl leading-none font-bold">
                   {{ card.value }}
                 </span>
-                <span v-if="card.unit" class="text-compact font-semibold text-text-secondary">
+                <span v-if="card.unit" class="text-compact text-text-secondary font-semibold">
                   {{ card.unit }}
                 </span>
               </div>

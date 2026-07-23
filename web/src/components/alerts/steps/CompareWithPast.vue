@@ -17,43 +17,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     ref="multiWindowContainerRef"
-    class="step-compare-with-past w-full h-full flex flex-col mx-auto"
+    class="step-compare-with-past mx-auto flex h-full w-full flex-col"
   >
     <div
-      class="step-content rounded-default flex-1 min-h-0 overflow-auto bg-surface-overlay border border-border-default"
+      class="step-content rounded-default bg-surface-overlay border-border-default min-h-0 flex-1 overflow-auto border"
     >
       <div
-        class="section-header flex items-center gap-0 py-2.5 px-3 border-b border-border-default"
+        class="section-header border-border-default flex items-center gap-0 border-b px-3 py-2.5"
       >
         <div
-          class="section-header-accent w-0.75 h-4 rounded-default mr-2 shrink-0 bg-theme-accent"
+          class="section-header-accent rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0"
         />
-        <span class="section-header-title text-compact font-semibold text-text-heading">{{
+        <span class="section-header-title text-compact text-text-heading font-semibold">{{
           t("alerts.steps.compareWithPast")
         }}</span>
       </div>
       <div class="px-3 pb-2">
         <!-- Alert set for header -->
         <div
-          class="multi-window-text flex items-center gap-2 py-2 mt-3 font-bold text-sm leading-6 align-middle text-text-body"
+          class="multi-window-text text-text-body mt-3 flex items-center gap-2 py-2 align-middle text-sm leading-6 font-bold"
         >
           <span>{{ t("alerts.compareWithPast.alertSetFor") }}</span>
-          <div class="h-px border-line flex-1"></div>
+          <div class="border-line h-px flex-1"></div>
         </div>
 
         <!-- Current Window -->
         <div
-          class="flex flex-row justify-between items-start min-h-27.5 px-3 py-2 bg-card-glass-bg border border-border-default"
+          class="bg-card-glass-bg border-border-default flex min-h-27.5 flex-row items-start justify-between border px-3 py-2"
         >
           <div
-            class="multi-window-text w-auto text-left font-bold text-sm leading-6 align-middle text-text-body"
+            class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-bold"
           >
             {{ t("alerts.compareWithPast.currentWindow") }}
           </div>
 
           <div class="flex flex-col items-start gap-2">
             <div
-              class="multi-window-text w-auto text-left font-bold text-sm leading-6 align-middle text-text-body"
+              class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-bold"
             >
               {{ t("alerts.compareWithPast.cycle") }}
               <span class="cursor-pointer">
@@ -71,8 +71,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </span>
             </div>
-            <div class="flex justify-between items-start gap-4">
-              <div class="w-75 font-normal leading-5 text-sm">
+            <div class="flex items-start justify-between gap-4">
+              <div class="w-75 text-sm leading-5 font-normal">
                 {{
                   t("alerts.compareWithPast.runningFor", {
                     period: convertMinutesToDisplayValue(period),
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div>
                 <span class="inline-block">
                   <OButton
-                    class="min-w-auto opacity-30 pointer-events-none"
+                    class="pointer-events-none min-w-auto opacity-30"
                     variant="ghost"
                     size="icon-circle-sm"
                     disable
@@ -105,10 +105,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Comparing with header -->
         <div
           v-if="localMultiTimeRange.length > 0"
-          class="multi-window-text flex items-center gap-2 py-2 mt-2 font-bold text-sm leading-6 align-middle text-text-body"
+          class="multi-window-text text-text-body mt-2 flex items-center gap-2 py-2 align-middle text-sm leading-6 font-bold"
         >
           <span>{{ t("alerts.compareWithPast.comparingWith") }}</span>
-          <div class="h-px border-line flex-1"></div>
+          <div class="border-line h-px flex-1"></div>
         </div>
 
         <!-- Reference Windows List -->
@@ -120,16 +120,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="(picker, index) in localMultiTimeRange"
           :key="picker.uuid"
-          class="reference-window-container flex flex-row justify-between items-start min-h-27.5 mt-2 px-3 py-2 bg-card-glass-bg border border-border-default"
+          class="reference-window-container bg-card-glass-bg border-border-default mt-2 flex min-h-27.5 flex-row items-start justify-between border px-3 py-2"
         >
           <div
-            class="multi-window-text w-auto text-left font-bold text-sm leading-6 align-middle text-text-body"
+            class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-bold"
           >
             {{ t("alerts.compareWithPast.referenceWindow") }} {{ index + 1 }}
           </div>
 
           <!-- Time Frame -->
-          <div class="flex flex-col gap-2 items-start">
+          <div class="flex flex-col items-start gap-2">
             <div class="flex items-center">
               <span class="mr-1"><OIcon name="schedule" size="sm" /></span>
               {{ t("alerts.compareWithPast.timeFrame") }}
@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </span>
             </div>
-            <div class="datetime-picker-wrapper mt-2 border rounded-default !border-border-default">
+            <div class="datetime-picker-wrapper rounded-default !border-border-default mt-2 border">
               <CustomDateTimePicker
                 v-model="picker.offSet"
                 :picker="picker"
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Cycle Info -->
           <div class="flex flex-col items-start gap-2">
             <div
-              class="multi-window-text w-auto text-left font-bold text-sm leading-6 align-middle text-text-body"
+              class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-bold"
             >
               {{ t("alerts.compareWithPast.cycle") }}
               <span class="cursor-pointer">
@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </span>
             </div>
-            <div class="flex justify-between items-start gap-4">
+            <div class="flex items-start justify-between gap-4">
               <div class="w-75 text-sm font-normal">
                 {{
                   t("alerts.compareWithPast.comparingText", {
@@ -203,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Action Buttons Section -->
-        <div class="w-full flex justify-center items-center gap-3 mt-2">
+        <div class="mt-2 flex w-full items-center justify-center gap-3">
           <OButton
             data-test="multi-time-range-alerts-add-btn"
             variant="outline"

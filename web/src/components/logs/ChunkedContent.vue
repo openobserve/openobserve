@@ -44,7 +44,7 @@ Usage:
     <!-- Load more button and info -->
     <div
       v-if="shouldShowLoadMore"
-      class="pt-2 [border-top:1px_solid_var(--color-card-glass-border)] mt-2 flex items-center gap-3"
+      class="mt-2 flex items-center gap-3 pt-2 [border-top:1px_solid_var(--color-card-glass-border)]"
     >
       <OButton
         :data-test="`load-more-btn-${fieldKey}`"
@@ -60,7 +60,7 @@ Usage:
           })
         }}
       </OButton>
-      <span class="text-sm font-medium text-theme-accent">
+      <span class="text-theme-accent text-sm font-medium">
         {{
           t("logs.chunkedContent.showingChunk", {
             current: chunkInfo.currentChunk,

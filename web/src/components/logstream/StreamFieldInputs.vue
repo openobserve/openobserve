@@ -3,7 +3,7 @@
     <div
       v-if="showHeader"
       data-test="alert-conditions-text"
-      class="o-input-label text-compact font-medium leading-tight text-input-label-text"
+      class="o-input-label text-compact text-input-label-text leading-tight font-medium"
     >
       {{ t("logStream.fields") }}
     </div>
@@ -30,10 +30,10 @@
       <div
         v-for="(row, index) in formRows as any[]"
         :key="index"
-        class="flex flex-wrap items-start gap-2 mt-2"
+        class="mt-2 flex flex-wrap items-start gap-2"
         :data-test="`add-stream-field-row-${index}`"
       >
-        <div data-test="add-stream-field-name-input" class="flex-1 min-w-40">
+        <div data-test="add-stream-field-name-input" class="min-w-40 flex-1">
           <OFormInput
             :data-test="`add-stream-field-name-input-${index}`"
             :name="`${formFieldName}[${index}].name`"
@@ -73,11 +73,11 @@
              invisible, label-height spacer pushes the buttons down past the
              header labels — no magic pixel offset (same typography as the real
              OInput/OSelect labels). -->
-        <div class="flex flex-col gap-1 shrink-0">
+        <div class="flex shrink-0 flex-col gap-1">
           <span
             v-if="index === 0"
             aria-hidden="true"
-            class="text-sm font-semibold leading-tight select-none invisible"
+            class="invisible text-sm leading-tight font-semibold select-none"
             >&nbsp;</span
           >
           <div class="flex items-center gap-1">

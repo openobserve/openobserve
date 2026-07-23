@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div ref="chartPanelRef" class="h-full relative">
+  <div ref="chartPanelRef" class="relative h-full">
     <div class="w-full" style="height: calc(100vh - 220px)" data-test="alert-preview-chart">
       <PanelSchemaRenderer
         :panelSchema="chartData"

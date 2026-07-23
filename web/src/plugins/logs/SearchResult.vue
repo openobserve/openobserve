@@ -17,11 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="flex flex-col h-full max-h-full overflow-hidden">
-    <div class="h-full max-h-full overflow-hidden w-full flex flex-col" ref="searchListContainer">
+  <div class="flex h-full max-h-full flex-col overflow-hidden">
+    <div class="flex h-full max-h-full w-full flex-col overflow-hidden" ref="searchListContainer">
       <!-- Section header: static at top -->
       <div
-        class="flex items-center h-9 shrink-0 border-b border-card-glass-border bg-card-glass-bg"
+        class="border-card-glass-border bg-card-glass-bg flex h-9 shrink-0 items-center border-b"
       >
         <!-- Field panel toggle — same style as add-panel config sidebar -->
         <OButton
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </OButton>
         <div
-          class="flex-1 min-w-0 text-left pl-2 bg-warning text-text-inverse rounded-default"
+          class="bg-warning text-text-inverse rounded-default min-w-0 flex-1 pl-2 text-left"
           v-if="searchObj.data.countErrorMsg != ''"
         >
           <SanitizedHtmlRenderer
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-else
-          class="flex-1 min-w-0 text-left pl-2 text-warning flex items-center flex-wrap gap-1.5"
+          class="text-warning flex min-w-0 flex-1 flex-wrap items-center gap-1.5 pl-2 text-left"
           data-test="logs-search-result-title"
           :data-search-state="
             searchObj.loading || searchObj.loadingCounter ? 'loading' : 'complete'
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ recordsChips.scan }}</OTag
               >
             </template>
-            <span v-else class="truncate min-w-0">{{ noOfRecordsTitle }}</span>
+            <span v-else class="min-w-0 truncate">{{ noOfRecordsTitle }}</span>
           </template>
           <!-- Patterns mode: structured chips -->
           <template v-else>
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ patternChips.time }} ms</OTag
               >
             </template>
-            <span v-else class="truncate min-w-0">{{ patternSummaryText }}</span>
+            <span v-else class="min-w-0 truncate">{{ patternSummaryText }}</span>
           </template>
           <span v-if="searchObj.loadingCounter" class="shrink-0">
             <OSpinner size="xs" class="mx-auto block" />
@@ -114,14 +114,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               !searchObj.loadingCounter &&
               searchObj.meta.showHistogram
             "
-            class="shrink-0 cursor-pointer text-warning"
+            class="text-warning shrink-0 cursor-pointer"
           >
             <OIcon name="info-outline" size="sm"> </OIcon>
             <OTooltip :content="searchObj.data.histogram.errorMsg" side="top" align="center" />
           </div>
         </div>
 
-        <div class="flex-none pr-2 flex items-center justify-end gap-1">
+        <div class="flex flex-none items-center justify-end gap-1 pr-2">
           <!-- OVERFLOW MENU (narrow): refresh + all action buttons collapse here -->
           <ODropdown v-if="shouldMoveActionsToMenu" side="bottom" align="end">
             <template #trigger>
@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-else>
             <!-- Refresh in bordered wrapper -->
             <div
-              class="inline-flex items-center border border-card-glass-border rounded-default px-1 h-6 overflow-hidden"
+              class="border-card-glass-border rounded-default inline-flex h-6 items-center overflow-hidden border px-1"
             >
               <ORefreshButton
                 :last-run-at="searchObj.meta.lastRunAt"
@@ -300,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="histogramChart"
               data-test="logs-search-result-bar-chart"
               :data="plotChart"
-              class="w-full h-full"
+              class="h-full w-full"
               @updated:dataZoom="onChartUpdate"
             />
           </div>
@@ -374,7 +374,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <h6
-            class="text-center histogram-error"
+            class="histogram-error text-center"
             v-if="
               searchObj.data.histogram.errorCode != 0 && searchObj.data.histogram.errorCode != -1
             "
@@ -485,7 +485,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Patterns View -->
         <div
           v-if="searchObj.meta.logsVisualizeToggle === 'patterns'"
-          class="flex flex-col h-full"
+          class="flex h-full flex-col"
           :class="[
             !searchObj.meta.showHistogram ||
             (searchObj.meta.showHistogram && searchObj.data.histogram.errorCode == -1)

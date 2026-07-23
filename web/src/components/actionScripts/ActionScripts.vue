@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #toolbar>
             <OSearchInput
               v-model="filterQuery"
-              class="w-64 no-border o2-search-input"
+              class="no-border o2-search-input w-64"
               :placeholder="t('actions.search')"
               data-test="action-list-search-input"
             />
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="action-scripts-loading"
               v-if="alertStateLoadingMap[row.uuid]"
               style="display: inline-block; width: 33.14px"
-              class="flex justify-center items-center ml-1 h-auto"
+              class="ml-1 flex h-auto items-center justify-center"
               :title="`Turning ${row.enabled ? 'Off' : 'On'}`"
             >
               <OSpinner size="xs" />
@@ -142,9 +142,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #bottom>
-            <div class="flex items-center justify-between w-full h-12">
+            <div class="flex h-12 w-full items-center justify-between">
               <div class="flex items-center gap-2">
-                <div class="text-xs font-normal flex items-center w-20 mr-md">
+                <div class="mr-md flex w-20 items-center text-xs font-normal">
                   {{ resultTotal }} {{ t("actions.header") }}
                 </div>
                 <OButton
@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #header-left>
         <div
           data-test="add-action-back-btn"
-          class="flex justify-center items-center cursor-pointer"
+          class="flex cursor-pointer items-center justify-center"
           style="border: 1.5px solid; border-radius: 50%; width: 22px; height: 22px"
           title="Go Back"
           @click="showForm = false"

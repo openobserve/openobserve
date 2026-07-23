@@ -19,13 +19,13 @@
         :persist-columns="true"
         table-id="score-config-list"
         width="100%"
-        class="w-full h-full"
+        class="h-full w-full"
         @row-click="(row: any) => $emit('view', row)"
       >
         <template #toolbar>
           <OSearchInput
             :model-value="search"
-            class="flex-1 min-w-0"
+            class="min-w-0 flex-1"
             :placeholder="t('onlineEvals.scoreConfig.searchPlaceholder')"
             data-test="score-config-list-search-input"
             clearable
@@ -99,7 +99,7 @@
 
         <template #cell-version="{ row }">
           <span class="inline-flex items-center gap-1.5 tabular-nums">
-            <span class="w-1.5 h-1.5 rounded-full bg-status-positive inline-block" />v{{
+            <span class="bg-status-positive inline-block h-1.5 w-1.5 rounded-full" />v{{
               row.version
             }}
           </span>
@@ -131,7 +131,7 @@
         </template>
 
         <template #cell-actions="{ row }">
-          <div class="flex items-center actions-container">
+          <div class="actions-container flex items-center">
             <OButton
               :data-test="`score-config-list-${row.name}-edit-btn`"
               data-row-action="edit"

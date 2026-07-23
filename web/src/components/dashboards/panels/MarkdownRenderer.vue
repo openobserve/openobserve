@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="scroll w-full h-full overflow-auto" data-test="markdown-renderer-scroll-container">
+  <div class="scroll h-full w-full overflow-auto" data-test="markdown-renderer-scroll-container">
     <div
       :class="['prose prose-sm max-w-none px-2 py-1', isDark && 'prose-invert']"
       v-html="DOMPurify.sanitize(marked(processedContent))"

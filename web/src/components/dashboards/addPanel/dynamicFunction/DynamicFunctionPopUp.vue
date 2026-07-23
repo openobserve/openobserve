@@ -5,7 +5,7 @@
   >
     <div class="w-auto shrink-0">
       <div
-        class="font-semibold text-compact pb-3"
+        class="text-compact pb-3 font-semibold"
         data-test="dynamic-function-popup-property-label"
       >
         {{ t("dashboard.dynamicFunctionPopUp.property") }}
@@ -13,7 +13,7 @@
       <div class="flex flex-col gap-3.5">
         <div>
           <div
-            class="text-compact font-normal leading-[70%] pb-0.75"
+            class="text-compact pb-0.75 leading-[70%] font-normal"
             data-test="dynamic-function-popup-label-text"
           >
             {{ t("dashboard.dynamicFunctionPopUp.label") }}
@@ -26,7 +26,7 @@
           />
         </div>
         <div>
-          <div class="text-compact font-normal leading-[70%] pb-0.75">
+          <div class="text-compact pb-0.75 leading-[70%] font-normal">
             {{ t("dashboard.dynamicFunctionPopUp.alias") }}
           </div>
           <OInput
@@ -76,8 +76,8 @@
 
       <OTabPanels v-if="!customQuery && !fields.isDerived" v-model="fields.type" animated>
         <OTabPanel name="build">
-          <div class="pt-2 max-h-105 overflow-auto">
-            <div class="font-semibold text-compact pb-3">
+          <div class="max-h-105 overflow-auto pt-2">
+            <div class="text-compact pb-3 font-semibold">
               {{ t("dashboard.dynamicFunctionPopUp.configuration") }}
             </div>
             <SelectFunction
@@ -102,7 +102,7 @@
       </OTabPanels>
 
       <div class="pt-2 pr-3" v-if="!customQuery && !fields.isDerived && allowAggregation">
-        <div class="flex items-center gap-2 mb-2">
+        <div class="mb-2 flex items-center gap-2">
           <span class="font-bold">{{ t("dashboard.dynamicFunctionPopUp.having") }}</span>
 
           <OButton
@@ -117,7 +117,7 @@
           </OButton>
         </div>
 
-        <div class="flex space-x-2 items-center" v-if="isHavingFilterVisible()">
+        <div class="flex items-center space-x-2" v-if="isHavingFilterVisible()">
           <OSelect
             v-model="getHavingCondition().operator"
             :options="havingOperators"

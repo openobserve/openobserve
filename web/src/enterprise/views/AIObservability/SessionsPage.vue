@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Last-refresh + refresh control (logs-style), consistent with the
              LLM Insights page header. -->
       <div
-        class="inline-flex items-center border border-border-default rounded-default px-1 h-8 overflow-hidden"
+        class="border-border-default rounded-default inline-flex h-8 items-center overflow-hidden border px-1"
       >
         <ORefreshButton
           :last-run-at="sessionsLastRunAt"
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :start-time="timeRange.startTime"
       :end-time="timeRange.endTime"
       detail-route-name="aiSessionDetails"
-      class="flex-1 min-h-0"
+      class="min-h-0 flex-1"
     />
   </OPageLayout>
 </template>

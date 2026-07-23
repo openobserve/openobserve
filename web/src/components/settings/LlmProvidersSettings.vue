@@ -1,5 +1,5 @@
 ﻿<template>
-  <div data-test="llm-providers-settings" class="flex flex-col h-full min-h-0">
+  <div data-test="llm-providers-settings" class="flex h-full min-h-0 flex-col">
     <ProviderFormPage
       v-if="formPage"
       :org-id="orgId"
@@ -44,7 +44,7 @@
         />
       </div>
 
-      <div v-else class="flex-1 min-h-0">
+      <div v-else class="min-h-0 flex-1">
         <OTable
           data-test="llm-providers-table"
           :data="filteredProviders"
@@ -62,7 +62,7 @@
           :page-size="20"
           :page-size-options="[20, 50, 100]"
           width="100%"
-          class="w-full h-full"
+          class="h-full w-full"
           @row-click="(row: any) => openEdit(row)"
         >
           <template #toolbar>
@@ -120,7 +120,7 @@
           </template>
 
           <template #cell-actions="{ row }">
-            <div class="flex items-center actions-container">
+            <div class="actions-container flex items-center">
               <OButton
                 :data-test="`llm-providers-${row.name}-edit-btn`"
                 data-row-action="edit"

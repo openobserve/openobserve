@@ -35,17 +35,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- Folder rail (fixed width) + table — matches the Alerts layout. -->
-      <div data-test="report-list-splitter" class="report-list-table flex-1 flex min-h-0">
+      <div data-test="report-list-splitter" class="report-list-table flex min-h-0 flex-1">
         <!-- Left: folder list -->
-        <div class="shrink-0 h-full w-rail">
+        <div class="w-rail h-full shrink-0">
           <div class="h-full">
             <FolderList type="reports" @update:activeFolderId="updateActiveFolderId" />
           </div>
         </div>
 
         <!-- Right: report table -->
-        <div class="flex-1 min-w-0 h-full">
-          <div class="h-full bg-card-glass-bg">
+        <div class="h-full min-w-0 flex-1">
+          <div class="bg-card-glass-bg h-full">
             <OTable
               data-test="report-list-table"
               :data="visibleRows"
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               pagination="client"
               selection="multiple"
               v-model:selected-ids="selectedReportIds"
-              class="w-full h-full"
+              class="h-full w-full"
               :show-global-filter="false"
               :enable-column-resize="true"
               :persist-columns="true"
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <!-- Toolbar: Scheduled/Cached tabs + search (inline folder scope) + refresh -->
               <template #toolbar>
-                <div class="flex items-center gap-2 w-full">
+                <div class="flex w-full items-center gap-2">
                   <div class="app-tabs-container">
                     <AppTabs
                       class="tabs-selection-container"
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                     />
                   </div>
-                  <div class="flex-1 min-w-0">
+                  <div class="min-w-0 flex-1">
                     <OInput
                       v-model="dynamicQueryModel"
                       :placeholder="
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OToggleGroup
                           :model-value="searchAcrossFolders ? 'all' : 'this'"
                           type="single"
-                          class="self-center mr-1"
+                          class="mr-1 self-center"
                           @update:model-value="(v) => (searchAcrossFolders = v === 'all')"
                         >
                           <OToggleGroupItem
@@ -198,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="reportsStateLoadingMap[row.report_id]"
                   data-test="report-list-toggle-report-state-loader"
                   style="display: inline-block; width: 33.14px"
-                  class="flex justify-center items-center h-auto"
+                  class="flex h-auto items-center justify-center"
                 >
                   <OSpinner size="xs" />
                 </div>
@@ -248,10 +248,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Table footer: pagination + bulk actions -->
               <template #bottom>
-                <div class="flex items-center justify-between w-full h-12">
+                <div class="flex h-12 w-full items-center justify-between">
                   <!-- Left: count + action buttons grouped together -->
                   <div class="flex items-center gap-2">
-                    <div class="text-xs font-normal flex items-center whitespace-nowrap">
+                    <div class="flex items-center text-xs font-normal whitespace-nowrap">
                       {{ resultTotal }} {{ t("reports.header") }}
                     </div>
                     <OButton

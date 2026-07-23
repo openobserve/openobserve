@@ -31,12 +31,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OForm
       id="add-enrichment-table-form"
       :form="addEnrichmentTableForm"
-      class="flex flex-col flex-1 min-h-0"
+      class="flex min-h-0 flex-1 flex-col"
       v-slot="{ isSubmitting }"
     >
       <!-- Form content -->
-      <div class="bg-card-glass-bg flex-1 min-h-0 mb-2 flex flex-col overflow-y-auto p-4">
-        <div class="flex flex-col gap-4 max-w-[40rem]">
+      <div class="bg-card-glass-bg mb-2 flex min-h-0 flex-1 flex-col overflow-y-auto p-4">
+        <div class="flex max-w-[40rem] flex-col gap-4">
           <OFormInput
             name="name"
             data-test="add-enrichment-table-name"
@@ -95,15 +95,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             class="flex flex-col gap-2"
           >
-            <div class="text-text-label font-bold text-compact">
+            <div class="text-text-label text-compact font-bold">
               Existing URLs ({{ formData.urlJobs.length }})
             </div>
             <div
-              class="rounded-default border border-card-glass-border bg-surface-panel p-2 flex flex-col gap-1"
+              class="rounded-default border-card-glass-border bg-surface-panel flex flex-col gap-1 border p-2"
             >
               <div v-for="(job, index) in formData.urlJobs" :key="job.id">
                 <div class="flex items-center gap-2">
-                  <span class="font-medium text-text-secondary text-xs"
+                  <span class="text-text-secondary text-xs font-medium"
                     >{{ Number(index) + 1 }}.</span
                   >
                   <OIcon
@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Mode explanation (always show for URL-based tables in edit mode) -->
           <div
             v-if="isUpdating && formData.source === 'url'"
-            class="text-sm text-text-secondary p-3 rounded-default"
+            class="text-text-secondary rounded-default p-3 text-sm"
             :class="{
               'bg-status-info-bg': formData.updateMode === 'reload',
               'bg-status-success-bg': formData.updateMode === 'append',
@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-else-if="formData.updateMode === 'append'">
               <strong>Append Mode:</strong> Add a new URL to existing ones. Data from all URLs will
               be combined.
-              <div class="mt-2 text-status-warning-text">
+              <div class="text-status-warning-text mt-2">
                 <strong>Important:</strong> The new CSV file must have the same columns as the
                 existing data. The enrichment table schema cannot be changed.
               </div>
@@ -205,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <pre
             v-if="compilationErr"
-            class="font-bold text-sm text-status-error-text whitespace-pre-wrap"
+            class="text-status-error-text text-sm font-bold whitespace-pre-wrap"
             >{{ compilationErr }}</pre
           >
         </div>
@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Footer -->
       <div
-        class="bg-card-glass-bg flex items-center justify-end -mx-2.5 px-3 py-2.5 shrink-0 gap-2 border-t border-border-default"
+        class="bg-card-glass-bg border-border-default -mx-2.5 flex shrink-0 items-center justify-end gap-2 border-t px-3 py-2.5"
       >
         <OButton
           data-test="add-enrichment-table-cancel-btn"

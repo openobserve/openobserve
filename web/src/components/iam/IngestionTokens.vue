@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <!-- Short summary subtitle; the full explanation is in the title info tooltip. -->
     <template #subtitle>
-      <span class="truncate min-w-0 leading-normal">{{ t("ingestion.orgLevelSummary") }}</span>
+      <span class="min-w-0 truncate leading-normal">{{ t("ingestion.orgLevelSummary") }}</span>
     </template>
     <template #actions>
       <OButton
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </template>
 
-    <div class="w-full flex-1 min-h-0 overflow-hidden">
+    <div class="min-h-0 w-full flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <OTable
           :frame="false"
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           filter-mode="client"
         >
           <template #toolbar>
-            <div class="flex items-center gap-2 w-full">
+            <div class="flex w-full items-center gap-2">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('ingestion.searchToken', 'Search tokens')"
@@ -175,15 +175,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="showRevealedDialog = false"
     >
       <!-- Primary: the ready-to-paste Authorization credential. -->
-      <div class="mb-1 text-xs font-medium text-text-label">
+      <div class="text-text-label mb-1 text-xs font-medium">
         {{ t("ingestion.authHeaderLabel") }}
       </div>
       <div
-        class="p-2.5 border border-dashed rounded-default border-border-default mb-1 bg-surface-subtle"
+        class="rounded-default border-border-default bg-surface-subtle mb-1 border border-dashed p-2.5"
       >
-        <code class="break-all font-mono text-sm">{{ revealedBasicAuth }}</code>
+        <code class="font-mono text-sm break-all">{{ revealedBasicAuth }}</code>
       </div>
-      <div class="mb-3 text-xs text-text-secondary">
+      <div class="text-text-secondary mb-3 text-xs">
         {{ t("ingestion.authHeaderHelp") }}
       </div>
       <div class="flex justify-end gap-2">

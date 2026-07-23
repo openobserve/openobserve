@@ -1,8 +1,8 @@
 ﻿<template>
-  <div class="flex items-start gap-1 flex-no-wrap">
+  <div class="flex-no-wrap flex items-start gap-1">
     <!-- Fixed-width left column for alignment -->
     <!-- All conditions have the same width for the operator/label section -->
-    <div class="flex items-center justify-center mt-1 min-w-15">
+    <div class="mt-1 flex min-w-15 items-center justify-center">
       <!-- First condition in root group -->
       <template v-if="index === 0 && depth === 0">
         <span class="text-sm">{{ t("alerts.filters.if") }}</span>
@@ -16,7 +16,7 @@
       <!-- Other conditions: show operator + toggle button -->
       <template v-else>
         <span
-          class="text-sm font-medium min-w-7.5 lowercase"
+          class="min-w-7.5 text-sm font-medium lowercase"
           data-test="alert-conditions-operator-label"
           :data-test-label="computedLabel"
         >
@@ -27,7 +27,7 @@
           data-test="alert-conditions-toggle-operator-btn"
           variant="ghost"
           size="icon-circle-sm"
-          class="h-6.5 flex-shrink-0 text-button-primary! hover:bg-[color-mix(in_srgb,var(--color-button-primary)_10%,transparent)]!"
+          class="text-button-primary! h-6.5 flex-shrink-0 hover:bg-[color-mix(in_srgb,var(--color-button-primary)_10%,transparent)]!"
           @click="toggleOperator"
         >
           <OIcon name="restart-alt" size="sm" />

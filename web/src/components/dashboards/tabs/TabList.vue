@@ -37,9 +37,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click.stop
         :data-test="`dashboard-tab-${tab.tabId}`"
       >
-        <div class="w-full flex justify-between flex-nowrap">
+        <div class="flex w-full flex-nowrap justify-between">
           <span
-            class="whitespace-nowrap overflow-hidden text-ellipsis w-full"
+            class="w-full overflow-hidden text-ellipsis whitespace-nowrap"
             :title="tab?.name"
             :data-test="`dashboard-tab-${tab.tabId}-name`"
             :data-test-tab-name="tab?.name"

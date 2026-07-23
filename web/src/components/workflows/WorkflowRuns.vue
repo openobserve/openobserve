@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   editor — the two surfaces never blur together, and nothing resizes mid-flow.
 -->
 <template>
-  <div data-test="workflow-runs-page" class="flex flex-col h-full min-h-0">
+  <div data-test="workflow-runs-page" class="flex h-full min-h-0 flex-col">
     <OPageHeader
       :title="workflowName || t('workflow.runs.title')"
       :back="{
@@ -39,12 +39,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         onClick: goBack,
         dataTest: 'workflow-runs-back',
       }"
-      class="px-4 border-b border-border-default"
+      class="border-border-default border-b px-4"
     >
       <!-- Beta tag inside the title line (see WorkflowsList: #title-trail sits
            after the title+subtitle column, stranding it far from the title). -->
       <template #title>
-        <span class="inline-flex items-center gap-2 min-w-0">
+        <span class="inline-flex min-w-0 items-center gap-2">
           <span class="truncate">{{ workflowName || t("workflow.runs.title") }}</span>
           <BetaBadge />
         </span>
@@ -56,15 +56,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OPageHeader>
 
-    <div class="flex-1 flex min-h-0 pt-3 px-2 gap-2">
+    <div class="flex min-h-0 flex-1 gap-2 px-2 pt-3">
       <!-- Read-only canvas (per-node run status overlay). -->
-      <div class="flex-1 relative min-w-0 rounded-surface overflow-hidden mb-3 bg-surface-subtle">
+      <div class="rounded-surface bg-surface-subtle relative mb-3 min-w-0 flex-1 overflow-hidden">
         <WorkflowCanvas />
       </div>
 
       <!-- Persistent runs list (master-detail). -->
       <div
-        class="w-[27.5rem] max-w-[46%] shrink-0 mb-3 rounded-surface overflow-hidden border border-border-default bg-surface-base flex flex-col min-h-0"
+        class="rounded-surface border-border-default bg-surface-base mb-3 flex min-h-0 w-[27.5rem] max-w-[46%] shrink-0 flex-col overflow-hidden border"
       >
         <WorkflowRunsPanel
           :org-id="orgId"

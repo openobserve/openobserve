@@ -395,19 +395,19 @@ function onChildMouseenter(event: MouseEvent) {
         :data-test="`nav-group-flyout-${groupKey}`"
         role="menu"
         :aria-label="title"
-        class="nav-group-flyout min-w-52 p-1 rounded-default border border-dropdown-border bg-dropdown-bg shadow-md"
+        class="nav-group-flyout rounded-default border-dropdown-border bg-dropdown-bg min-w-52 border p-1 shadow-md"
         :style="flyoutStyle"
         @mouseenter="clearTimers"
         @mouseleave="scheduleClose"
         @keydown="onFlyoutKeydown"
       >
-        <div class="px-3 pt-1.5 pb-1 text-2xs font-semibold" :class="flyoutTextClass">
+        <div class="text-2xs px-3 pt-1.5 pb-1 font-semibold" :class="flyoutTextClass">
           {{ title }}
         </div>
         <template v-for="(row, rowIndex) in flyoutRows" :key="row.key">
           <div
             v-if="row.kind === 'header'"
-            class="px-3 pb-1 text-2xs font-medium text-tabs-inactive-text"
+            class="text-2xs text-tabs-inactive-text px-3 pb-1 font-medium"
             :class="rowIndex === 0 ? 'pt-2' : 'pt-4'"
           >
             {{ row.label }}
@@ -417,7 +417,7 @@ function onChildMouseenter(event: MouseEvent) {
             :data-test="`nav-group-item-${row.child.name}`"
             role="menuitem"
             :to="childTo(row.child)"
-            class="nav-group-item flex items-center gap-2.5 px-3 py-1.5 rounded-default text-sm [text-decoration:none]! cursor-pointer select-none outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-primary-500"
+            class="nav-group-item rounded-default focus-visible:ring-primary-500 flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-150 outline-none select-none [text-decoration:none]! focus-visible:ring-2"
             :class="[
               flyoutTextClass,
               isChildActive(row.child)

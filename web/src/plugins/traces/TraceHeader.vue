@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="flex justify-start items-center bg-[color-mix(in_srgb,currentColor_5%,transparent)] h-7.5 top-0 z-1999 sticky rounded-t-default"
+    class="rounded-t-default sticky top-0 z-1999 flex h-7.5 items-center justify-start bg-[color-mix(in_srgb,currentColor_5%,transparent)]"
     data-test="trace-header"
     :style="
       isSidebarOpen && {
@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     "
   >
     <div
-      class="relative flex justify-start items-center flex-nowrap flex px-2"
+      class="relative flex flex-nowrap items-center justify-start px-2"
       :style="{
         width: splitterWidth + 'px',
       }"
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       {{ t("traces.traceHeader.operationName") }}
       <div
-        class="bg-accent inline-flex items-center justify-center w-5 h-5 rounded-full absolute -right-2.5 -top-0.5 z-10 cursor-col-resize"
+        class="bg-accent absolute -top-0.5 -right-2.5 z-10 inline-flex h-5 w-5 cursor-col-resize items-center justify-center rounded-full"
         @mousedown="handleMouseDown"
         data-test="trace-header-resize-btn"
       >
@@ -41,24 +41,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      class="flex justify-start items-center flex-nowrap flex relative"
+      class="relative flex flex-nowrap items-center justify-start"
       :style="{
         width: `calc(100% - ${splitterWidth}px)`,
       }"
       data-test="trace-header-tics"
       v-if="!isSidebarOpen && baseTracePosition && baseTracePosition.tics?.length"
     >
-      <div class="w-1/4 text-xs pl-3" data-test="trace-header-tic-label-0">
+      <div class="w-1/4 pl-3 text-xs" data-test="trace-header-tic-label-0">
         {{ baseTracePosition.tics?.[0]?.label || "" }}
       </div>
-      <div class="w-1/4 text-xs pl-1" data-test="trace-header-tic-label-1">
+      <div class="w-1/4 pl-1 text-xs" data-test="trace-header-tic-label-1">
         {{ baseTracePosition.tics?.[1]?.label || "" }}
       </div>
-      <div class="w-1/4 text-xs pl-1" data-test="trace-header-tic-label-2">
+      <div class="w-1/4 pl-1 text-xs" data-test="trace-header-tic-label-2">
         {{ baseTracePosition.tics?.[2]?.label || "" }}
       </div>
       <div
-        class="w-1/4 text-xs flex justify-between items-center px-1"
+        class="flex w-1/4 items-center justify-between px-1 text-xs"
         data-test="trace-header-tic-label-3"
       >
         <div>{{ baseTracePosition.tics?.[3]?.label || "" }}</div>
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-for="(tick, index) in baseTracePosition['tics']"
-        class="trace-tic absolute -top-0.75 w-px bg-border-default z-1 h-6.5"
+        class="trace-tic bg-border-default absolute -top-0.75 z-1 h-6.5 w-px"
         :class="{
           'z-5 hidden': index === 0,
         }"

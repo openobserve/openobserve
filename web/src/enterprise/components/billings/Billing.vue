@@ -35,11 +35,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       unit="px"
       :horizontal="false"
       before-class="border-r border-border-default"
-      class="flex-1 min-h-0"
+      class="min-h-0 flex-1"
     >
       <template v-slot:before>
-        <div class="w-full h-full pl-2.5 pt-2 pb-2.5">
-          <div class="overflow-y-auto h-full">
+        <div class="h-full w-full pt-2 pb-2.5 pl-2.5">
+          <div class="h-full overflow-y-auto">
             <OTabs v-model="billingtab" orientation="vertical">
               <ORouteTab
                 exact
@@ -102,10 +102,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template v-slot:after>
-        <div class="w-full h-full flex flex-col pt-2">
+        <div class="flex h-full w-full flex-col pt-2">
           <div
             v-if="isUsageRoute"
-            class="flex gap-2 items-center justify-end overflow-y-auto shrink-0 mb-2 ml-2 mr-3 px-3 py-2"
+            class="mr-3 mb-2 ml-2 flex shrink-0 items-center justify-end gap-2 overflow-y-auto px-3 py-2"
           >
             <!-- The billing-cycle range dropdown only applies to the totals
                  view. When self-usage reporting is on, the daily view renders
@@ -117,10 +117,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 labelKey="label"
                 valueKey="value"
                 @update:model-value="selectUsageDate"
-                class="p-0 mx-0 h-10 mt-1"
+                class="mx-0 mt-1 h-10 p-0"
               >
                 <template v-slot:prepend>
-                  <OIcon name="schedule" size="xs" class="mr-2 mt-1" @click.stop.prevent />
+                  <OIcon name="schedule" size="xs" class="mt-1 mr-2" @click.stop.prevent />
                 </template>
               </OSelect>
             </div>
@@ -144,15 +144,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
           </div>
-          <div class="flex-1 min-h-0 pr-2.5 pb-2.5 flex gap-2.5">
+          <div class="flex min-h-0 flex-1 gap-2.5 pr-2.5 pb-2.5">
             <div
               v-if="isUsageRoute && billingMembers.length > 0"
-              class="w-65 shrink-0 h-full"
+              class="h-full w-65 shrink-0"
               data-test="usage-member-list"
             >
               <UsageMemberList v-model="usageMember.selected" :members="billingMembers" />
             </div>
-            <div class="overflow-y-auto pb-3 flex-1 min-w-0 h-full">
+            <div class="h-full min-w-0 flex-1 overflow-y-auto pb-3">
               <router-view title=""> </router-view>
             </div>
           </div>

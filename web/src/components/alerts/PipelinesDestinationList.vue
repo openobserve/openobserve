@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col h-full p-0">
+  <div class="flex h-full flex-col p-0">
     <OPageLayout
       bleed
       v-if="!showDestinationEditor"
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t(`alert_destinations.add`) }}</OButton
         >
       </template>
-      <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
+      <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
         <OTable
           :frame="false"
           data-test="alert-destinations-list-table"
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template v-if="selectedDestinations.length > 0" #bottom>
-            <span class="text-xs text-text-secondary font-medium">
+            <span class="text-text-secondary text-xs font-medium">
               {{ selectedDestinations.length }} selected
             </span>
             <OButton

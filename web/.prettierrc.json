@@ -5,5 +5,8 @@
   "printWidth": 100,
   "tabWidth": 2,
   "endOfLine": "lf",
-  "vueIndentScriptAndStyle": false
+  "bracketSpacing": true,
+  "arrowParens": "always",
+  "vueIndentScriptAndStyle": false,
+  "plugins": ["prettier-plugin-tailwindcss"]
 }

@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="org-make-billed-member"
         />
 
-        <div class="flex justify-center mt-4" v-if="proPlanRequired">
+        <div class="mt-4 flex justify-center" v-if="proPlanRequired">
           <OButton
             variant="secondary"
             size="md"

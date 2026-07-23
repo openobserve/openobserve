@@ -7,19 +7,19 @@
       <div class="flex flex-row items-center pl-2">
         <div
           data-test="promql-builder-options-label"
-          class="whitespace-nowrap min-w-21.5 text-sm flex items-center"
+          class="flex min-w-21.5 items-center text-sm whitespace-nowrap"
         >
           {{ t("panel.options") }}
         </div>
-        <span class="flex items-center ml-0.5 mr-0.5">:</span>
+        <span class="mr-0.5 ml-0.5 flex items-center">:</span>
         <div
           data-test="promql-builder-options-axis-container"
-          class="my-0.5 mx-1.25 flex gap-2 flex-wrap items-center"
+          class="mx-1.25 my-0.5 flex flex-wrap items-center gap-2"
         >
           <!-- Legend -->
           <div
             data-test="promql-builder-options-field-wrapper"
-            class="flex flex-row items-center gap-2 ml-2.5"
+            class="ml-2.5 flex flex-row items-center gap-2"
           >
             <span
               data-test="promql-builder-options-field-label"
@@ -46,7 +46,7 @@
                 name="info"
                 size="sm"
                 data-test="promql-builder-options-field-info-icon"
-                class="cursor-pointer absolute right-2 top-1/2 -translate-y-1/2 z-10 opacity-60 hover:opacity-100 pointer-events-auto"
+                class="pointer-events-auto absolute top-1/2 right-2 z-10 -translate-y-1/2 cursor-pointer opacity-60 hover:opacity-100"
               >
                 <OTooltip side="top" max-width="250px">
                   <template #content>
@@ -64,7 +64,7 @@
           <!-- Step Value -->
           <div
             data-test="promql-builder-options-field-wrapper"
-            class="flex flex-row items-center gap-2 ml-2.5"
+            class="ml-2.5 flex flex-row items-center gap-2"
           >
             <span
               data-test="promql-builder-options-field-label"
@@ -103,7 +103,7 @@
           <!-- Query Type Select (Range/Instant) -->
           <div
             data-test="promql-builder-options-field-wrapper"
-            class="flex flex-row items-center gap-2 ml-2.5"
+            class="ml-2.5 flex flex-row items-center gap-2"
           >
             <span
               data-test="promql-builder-options-field-label"

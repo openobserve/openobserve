@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="alert-triggers-table"
-    class="alert-triggers-table flex flex-col h-full overflow-hidden"
+    class="alert-triggers-table flex h-full flex-col overflow-hidden"
   >
     <OTable
       data-test="triggers-qtable"
@@ -36,13 +36,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @row-click="onRowClick"
     >
       <template #empty>
-        <div data-test="no-triggers-message" class="text-center py-8">
-          <span class="text-sm text-text-secondary"> No triggers loaded </span>
+        <div data-test="no-triggers-message" class="py-8 text-center">
+          <span class="text-text-secondary text-sm"> No triggers loaded </span>
         </div>
       </template>
 
       <template #cell-alert_name="{ row }">
-        <span data-test="alert-name-text" class="text-xs font-medium text-text-body">
+        <span data-test="alert-name-text" class="text-text-body text-xs font-medium">
           {{ row.alert_name }}
         </span>
       </template>

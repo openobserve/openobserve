@@ -362,18 +362,18 @@ function onHorizCancel() {
 </script>
 
 <template>
-  <div v-bind="wrapperAttrs" :class="vertical ? 'flex flex-row h-full' : 'flex flex-col gap-1'">
+  <div v-bind="wrapperAttrs" :class="vertical ? 'flex h-full flex-row' : 'flex flex-col gap-1'">
     <!-- ── Vertical mode ──────────────────────────────────────────────────── -->
     <template v-if="vertical">
       <!-- Value labels on left (labelAlways) -->
-      <div v-if="labelAlways" class="relative h-full shrink-0 w-6" aria-hidden="true">
+      <div v-if="labelAlways" class="relative h-full w-6 shrink-0" aria-hidden="true">
         <span
-          class="absolute right-0.5 text-xs tabular-nums leading-none -translate-y-1/2 whitespace-nowrap text-slider-value"
+          class="text-slider-value absolute right-0.5 -translate-y-1/2 text-xs leading-none whitespace-nowrap tabular-nums"
           :style="{ top: vertMinTop + '%' }"
           >{{ displayMin }}</span
         >
         <span
-          class="absolute right-0.5 text-xs tabular-nums leading-none -translate-y-1/2 whitespace-nowrap text-slider-value"
+          class="text-slider-value absolute right-0.5 -translate-y-1/2 text-xs leading-none whitespace-nowrap tabular-nums"
           :style="{ top: vertMaxTop + '%' }"
           >{{ displayMax }}</span
         >
@@ -382,7 +382,7 @@ function onHorizCancel() {
       <!-- Track column -->
       <div
         ref="vertTrackRef"
-        class="relative h-full flex justify-center shrink-0"
+        class="relative flex h-full shrink-0 justify-center"
         :class="
           disabled
             ? 'cursor-not-allowed opacity-60'
@@ -420,7 +420,7 @@ function onHorizCancel() {
           <div
             v-for="ml in markerLabels"
             :key="ml.value"
-            class="absolute left-0 right-0 h-px opacity-50"
+            class="absolute right-0 left-0 h-px opacity-50"
             :class="disabled ? 'bg-slider-disabled-track' : 'bg-slider-track'"
             :style="{ top: valueToTop(ml.value) + '%' }"
             aria-hidden="true"
@@ -430,7 +430,7 @@ function onHorizCancel() {
         <span
           data-thumb="min"
           :class="[
-            'absolute rounded-full border-2 border-slider-thumb-border',
+            'border-slider-thumb-border absolute rounded-full border-2',
             'left-1/2 -translate-x-1/2 touch-none select-none',
             thumbSize[resolvedSize],
             vertMinZClass,
@@ -452,7 +452,7 @@ function onHorizCancel() {
         <span
           data-thumb="max"
           :class="[
-            'absolute rounded-full border-2 border-slider-thumb-border',
+            'border-slider-thumb-border absolute rounded-full border-2',
             'left-1/2 -translate-x-1/2 touch-none select-none',
             thumbSize[resolvedSize],
             vertMaxZClass,
@@ -473,11 +473,11 @@ function onHorizCancel() {
       </div>
 
       <!-- Marker labels on right -->
-      <div v-if="markerLabels?.length" class="relative h-full pl-1 shrink-0 w-6" aria-hidden="true">
+      <div v-if="markerLabels?.length" class="relative h-full w-6 shrink-0 pl-1" aria-hidden="true">
         <span
           v-for="ml in markerLabels"
           :key="ml.value"
-          class="absolute left-1 text-xs leading-none -translate-y-1/2 whitespace-nowrap text-slider-value"
+          class="text-slider-value absolute left-1 -translate-y-1/2 text-xs leading-none whitespace-nowrap"
           :style="{ top: valueToTop(ml.value) + '%' }"
           >{{ ml.label }}</span
         >
@@ -494,7 +494,7 @@ function onHorizCancel() {
           v-if="$slots.label || label || $slots.tooltip"
           :class="[
             labelSize[resolvedSize],
-            'font-medium text-slider-label leading-none flex items-center gap-1',
+            'text-slider-label flex items-center gap-1 leading-none font-medium',
           ]"
         >
           <slot name="label">{{ label }}</slot
@@ -504,13 +504,13 @@ function onHorizCancel() {
             name="info-outline"
             size="sm"
             :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
-            class="cursor-help text-slider-label"
+            class="text-slider-label cursor-help"
             ><slot name="tooltip"
           /></OIcon>
         </label>
         <span
           v-if="showValue"
-          :class="[labelSize[resolvedSize], 'tabular-nums text-slider-value leading-none']"
+          :class="[labelSize[resolvedSize], 'text-slider-value leading-none tabular-nums']"
         >
           {{ displayValue }}
         </span>
@@ -519,7 +519,7 @@ function onHorizCancel() {
       <div
         ref="hTrackRef"
         :class="[
-          'relative flex items-center w-full',
+          'relative flex w-full items-center',
           disabled
             ? 'cursor-not-allowed opacity-60'
             : hasRange
@@ -534,7 +534,7 @@ function onHorizCancel() {
         <!-- Background track -->
         <div
           :class="[
-            'absolute left-0 right-0 rounded-full',
+            'absolute right-0 left-0 rounded-full',
             trackHeight[resolvedSize],
             disabled ? 'bg-slider-disabled-track' : 'bg-slider-track',
           ]"
@@ -567,9 +567,9 @@ function onHorizCancel() {
           :aria-invalid="hasError || undefined"
           :class="[
             'o2-range-input',
-            'absolute left-0 right-0 w-full bg-transparent appearance-none m-0 pointer-events-none',
+            'pointer-events-none absolute right-0 left-0 m-0 w-full appearance-none bg-transparent',
             minZClass,
-            'outline-none focus-visible:ring-2 focus-visible:ring-slider-focus-ring rounded-full',
+            'focus-visible:ring-slider-focus-ring rounded-full outline-none focus-visible:ring-2',
             trackHeight[resolvedSize],
             disabled ? 'cursor-not-allowed' : hasRange ? 'cursor-pointer' : 'cursor-default',
           ]"
@@ -591,9 +591,9 @@ function onHorizCancel() {
           :aria-invalid="hasError || undefined"
           :class="[
             'o2-range-input',
-            'absolute left-0 right-0 w-full bg-transparent appearance-none m-0 pointer-events-none',
+            'pointer-events-none absolute right-0 left-0 m-0 w-full appearance-none bg-transparent',
             maxZClass,
-            'outline-none focus-visible:ring-2 focus-visible:ring-slider-focus-ring rounded-full',
+            'focus-visible:ring-slider-focus-ring rounded-full outline-none focus-visible:ring-2',
             trackHeight[resolvedSize],
             disabled ? 'cursor-not-allowed' : hasRange ? 'cursor-pointer' : 'cursor-default',
           ]"
@@ -610,7 +610,7 @@ function onHorizCancel() {
            overflow-y:auto ancestor containers. -->
         <span
           :class="[
-            'absolute rounded-full pointer-events-none border-2 border-slider-thumb-border z-30',
+            'border-slider-thumb-border pointer-events-none absolute z-30 rounded-full border-2',
             thumbSize[resolvedSize],
             disabled ? 'bg-slider-disabled-thumb' : 'bg-slider-thumb',
           ]"
@@ -621,7 +621,7 @@ function onHorizCancel() {
         />
         <span
           :class="[
-            'absolute rounded-full pointer-events-none border-2 border-slider-thumb-border z-30',
+            'border-slider-thumb-border pointer-events-none absolute z-30 rounded-full border-2',
             thumbSize[resolvedSize],
             disabled ? 'bg-slider-disabled-thumb' : 'bg-slider-thumb',
           ]"
@@ -638,12 +638,12 @@ function onHorizCancel() {
       <div v-if="effectiveError || helpText" class="flex items-center justify-between gap-2">
         <span
           v-if="effectiveError && effectiveError.trim()"
-          class="text-xs text-slider-error-text leading-none"
+          class="text-slider-error-text text-xs leading-none"
           role="alert"
         >
           {{ effectiveError }}
         </span>
-        <span v-else-if="helpText" class="text-xs text-slider-value leading-none">
+        <span v-else-if="helpText" class="text-slider-value text-xs leading-none">
           {{ helpText }}
         </span>
       </div>

@@ -16,17 +16,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="h-full">
-    <div class="p-0 w-25">
-      <ul class="flex flex-wrap list-none p-0 m-0">
+    <div class="w-25 p-0">
+      <ul class="m-0 flex list-none flex-wrap p-0">
         <li
           class="w-12.5"
           v-for="(item, index) in ChartsArray"
           :key="index"
           :class="[
-            'border-r border-b border-card-glass-border',
-            'transition-colors duration-150 ease-in-out hover:bg-surface-subtle',
+            'border-card-glass-border border-r border-b',
+            'hover:bg-surface-subtle transition-colors duration-150 ease-in-out',
             selectedChartType === item.id ? 'bg-label-chip-url-bg' : '',
-            isChartDisabled(item) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
+            isChartDisabled(item) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
           ]"
           @click="!isChartDisabled(item) && $emit('update:selectedChartType', item.id)"
           data-test="dashboard-addpanel-chart-selection-item"
@@ -35,12 +35,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             :data-test="`selected-chart-${item.id}-item`"
             :data-selected="selectedChartType === item.id ? 'true' : 'false'"
-            class="flex flex-col items-center relative"
+            class="relative flex flex-col items-center"
           >
             <img
               :src="item.image.replace('img:', '')"
               :alt="item.title"
-              class="mx-auto my-2 w-6 h-6"
+              class="mx-auto my-2 h-6 w-6"
               data-test="dashboard-addpanel-chart-selection-icon"
             />
             <OTooltip class="text-center" :content="item.title" />

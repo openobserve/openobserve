@@ -17,9 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <Login v-if="user.email == '' && !showInvitations" />
   <div v-if="showInvitations && config.isCloud == 'true'">
-    <div class="flex relative-position px-3 pt-2">
+    <div class="relative-position flex px-3 pt-2">
       <img
-        class="w-auto max-w-50 h-10 max-h-10 cursor-pointer"
+        class="h-10 max-h-10 w-auto max-w-50 cursor-pointer"
         loading="lazy"
         :src="
           isDark

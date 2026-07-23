@@ -26,8 +26,8 @@ const variantClasses: Record<NonNullable<DropdownItemProps["variant"]>, string> 
     :text-value="textValue"
     :class="[
       'relative flex items-center gap-2',
-      'w-full px-3 py-1.5 rounded-default',
-      'cursor-pointer select-none outline-none',
+      'rounded-default w-full px-3 py-1.5',
+      'cursor-pointer outline-none select-none',
       'transition-colors duration-150',
       variantClasses[variant],
       'data-[disabled]:text-dropdown-item-disabled data-[disabled]:cursor-not-allowed',

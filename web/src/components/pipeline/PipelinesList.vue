@@ -17,10 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="pipeline-list-page"
-    class="flex flex-col h-full min-h-0"
+    class="flex h-full min-h-0 flex-col"
     v-if="currentRouteName === 'pipelines'"
   >
-    <div class="w-full flex-1 min-h-0 overflow-hidden">
+    <div class="min-h-0 w-full flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <OTable
           :frame="false"
@@ -48,10 +48,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           v-model:expanded-ids="expandedId"
           width="100%"
-          class="w-full h-full"
+          class="h-full w-full"
         >
           <template #toolbar>
-            <div class="flex items-center gap-2 w-full">
+            <div class="flex w-full items-center gap-2">
               <OToggleGroup
                 :model-value="activeTab"
                 @update:model-value="
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("pipeline_list.tab_realtime") }}
                 </OToggleGroupItem>
               </OToggleGroup>
-              <div class="flex-1 min-w-0">
+              <div class="min-w-0 flex-1">
                 <OInput
                   data-test="pipeline-list-search-input"
                   v-model="filterQuery"
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-actions="{ row }">
-            <div class="flex items-center actions-container">
+            <div class="actions-container flex items-center">
               <OButton
                 :data-test="`pipeline-list-${row.name}-pause-start-action`"
                 :data-row-action="row.enabled ? 'pause' : 'resume'"
@@ -225,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <div class="flex flex-col">
                     <div>View Error</div>
-                    <div class="text-xs text-text-secondary">
+                    <div class="text-text-secondary text-xs">
                       {{ new Date(row.last_error.last_error_timestamp / 1000).toLocaleString() }}
                     </div>
                   </div>
@@ -238,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-if="row?.sql_query"
               data-test="scheduled-pipeline-expanded-content"
-              class="text-left px-12 py-0 mb-2 max-h-screen overflow-hidden"
+              class="mb-2 max-h-screen overflow-hidden px-12 py-0 text-left"
             >
               <div class="flex items-center py-2">
                 <strong>{{ t("pipeline_list.sql_query") }} : <span></span></strong>
@@ -246,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex items-start justify-center">
                 <div
                   data-test="scheduled-pipeline-expanded-sql"
-                  class="w-full overflow-y-auto p-2.5 border border-border-default border-l-[3px] border-l-accent h-full max-h-50 whitespace-normal bg-surface-subtle text-text-body"
+                  class="border-border-default border-l-accent bg-surface-subtle text-text-body h-full max-h-50 w-full overflow-y-auto border border-l-[3px] p-2.5 whitespace-normal"
                 >
                   <pre style="text-wrap: wrap">{{ row?.sql_query }} </pre>
                 </div>
@@ -271,8 +271,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #bottom="bottomProps">
-            <div class="flex items-center justify-between w-full py-1">
-              <div class="flex items-center text-xs font-normal mr-4">
+            <div class="flex w-full items-center justify-between py-1">
+              <div class="mr-4 flex items-center text-xs font-normal">
                 {{ bottomProps.totalRows }} {{ t("pipeline.header") }}
               </div>
               <div v-if="selectedPipelineIds.length > 0" class="flex items-center gap-2">
@@ -377,15 +377,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       v-if="errorDialog.data"
-      class="pipeline-error-content px-6 py-5 max-h-[60vh] overflow-y-auto"
+      class="pipeline-error-content max-h-[60vh] overflow-y-auto px-6 py-5"
     >
       <!-- Error Summary -->
       <div v-if="errorDialog.data.last_error.error_summary" class="mb-4">
-        <div class="section-label mb-2 text-compact font-semibold tracking-[0.02em] opacity-80">
+        <div class="section-label text-compact mb-2 font-semibold tracking-[0.02em] opacity-80">
           {{ t("pipeline_list.error_summary") }}
         </div>
         <div
-          class="error-summary-box p-4 rounded-default font-mono text-compact leading-[1.6] whitespace-pre-wrap wrap-break-word bg-banner-error-soft-bg border border-banner-error-soft-border text-banner-error-soft-text"
+          class="error-summary-box rounded-default text-compact bg-banner-error-soft-bg border-banner-error-soft-border text-banner-error-soft-text border p-4 font-mono leading-[1.6] wrap-break-word whitespace-pre-wrap"
         >
           {{ errorDialog.data.last_error.error_summary }}
         </div>
@@ -398,21 +398,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           Object.keys(errorDialog.data.last_error.node_errors).length > 0
         "
       >
-        <div class="section-label mb-3 text-compact font-semibold tracking-[0.02em] opacity-80">
+        <div class="section-label text-compact mb-3 font-semibold tracking-[0.02em] opacity-80">
           {{ t("pipeline_list.node_errors") }}
         </div>
         <div class="node-errors-container flex flex-col gap-3">
           <div
             v-for="(nodeError, nodeId) in errorDialog.data.last_error.node_errors"
             :key="nodeId"
-            class="node-error-item p-4 rounded-default bg-surface-subtle border border-border-default transition-all hover:bg-interactive-hover-bg"
+            class="node-error-item rounded-default bg-surface-subtle border-border-default hover:bg-interactive-hover-bg border p-4 transition-all"
           >
-            <div class="node-error-header flex items-center justify-between mb-2.5">
-              <span class="node-name font-semibold text-sm">{{
+            <div class="node-error-header mb-2.5 flex items-center justify-between">
+              <span class="node-name text-sm font-semibold">{{
                 nodeError.node_name || nodeId
               }}</span>
               <span
-                class="node-type text-xs px-2.5 py-1 rounded-default bg-badge-indigo-soft-bg text-badge-indigo-soft-text font-medium"
+                class="node-type rounded-default bg-badge-indigo-soft-bg text-badge-indigo-soft-text px-2.5 py-1 text-xs font-medium"
                 >{{ nodeError.node_type }}</span
               >
             </div>
@@ -428,7 +428,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="(msg, idx) in nodeErrorMessages(nodeError)"
                 :key="idx"
-                class="error-message p-3 rounded-default bg-banner-error-soft-bg border-l-[3px] border-l-status-negative font-mono text-xs leading-[1.5] whitespace-pre-wrap wrap-break-word text-banner-error-soft-text"
+                class="error-message rounded-default bg-banner-error-soft-bg border-l-status-negative text-banner-error-soft-text border-l-[3px] p-3 font-mono text-xs leading-[1.5] wrap-break-word whitespace-pre-wrap"
               >
                 {{ msg }}
               </div>

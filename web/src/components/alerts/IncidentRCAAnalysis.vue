@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="rca-analysis-container" class="flex flex-col flex-1 overflow-hidden">
+  <div data-test="rca-analysis-container" class="flex flex-1 flex-col overflow-hidden">
     <!-- Trigger button when no analysis exists and not loading and not in-flight -->
     <div
       v-if="!hasExistingRca && !rcaLoading && !analysisInFlight"
@@ -37,18 +37,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="analysisInFlight || rcaLoading"
       data-test="rca-inflight-container"
-      class="flex items-center gap-3 rounded-default px-4 py-3 mb-2 flex-shrink-0 bg-status-info-bg border border-banner-info-border"
+      class="rounded-default bg-status-info-bg border-banner-info-border mb-2 flex flex-shrink-0 items-center gap-3 border px-4 py-3"
     >
       <OSpinner variant="dots" size="xs" />
       <div>
-        <p class="text-sm font-medium mb-0 text-status-info-text">
+        <p class="text-status-info-text mb-0 text-sm font-medium">
           {{
             hasExistingRca
               ? "AI SRE Agent is seeing what changed since the last analysis…"
               : "AI SRE Agent is analyzing this incident, please wait…"
           }}
         </p>
-        <p class="text-xs mt-0.5 mb-0 text-status-info-text opacity-70">
+        <p class="text-status-info-text mt-0.5 mb-0 text-xs opacity-70">
           {{
             hasExistingRca
               ? "The report will be updated once the analysis is complete."
@@ -62,11 +62,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="rcaLoading && rcaStreamContent"
       data-test="rca-stream-container"
-      class="rca-container rounded-default p-3 flex-1 overflow-auto border bg-surface-base border-border-default"
+      class="rca-container rounded-default bg-surface-base border-border-default flex-1 overflow-auto border p-3"
     >
       <div
         data-test="rca-stream-content"
-        class="text-sm whitespace-pre-wrap rca-content"
+        class="rca-content text-sm whitespace-pre-wrap"
         v-html="sanitize(formattedRcaContent)"
       />
     </div>
@@ -75,11 +75,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-else-if="hasExistingRca && !rcaLoading"
       data-test="rca-existing-container"
-      class="rca-container rounded-default p-3 flex-1 overflow-auto border bg-surface-base border-border-default"
+      class="rca-container rounded-default bg-surface-base border-border-default flex-1 overflow-auto border p-3"
     >
       <div
         data-test="rca-existing-content"
-        class="text-sm whitespace-pre-wrap rca-content"
+        class="rca-content text-sm whitespace-pre-wrap"
         v-html="sanitize(formattedRcaContent)"
       />
     </div>

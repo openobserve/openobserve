@@ -15,12 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="sessions-list h-full! flex flex-col bg-card-glass-bg">
+  <div class="sessions-list bg-card-glass-bg flex h-full! flex-col">
     <!-- No LLM streams exist in the org at all — nothing to select, so show
          the rich first-run empty state on its own (no table chrome). -->
     <div
       v-if="streamsLoaded && availableStreams.length === 0"
-      class="flex-1 min-h-0 flex items-center justify-center"
+      class="flex min-h-0 flex-1 items-center justify-center"
       data-test="sessions-empty-no-streams"
     >
       <OEmptyState size="hero" preset="no-llm-sessions" @action="onEmptyAction" />
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          rather than inside the OTable toolbar. -->
     <div
       v-if="!(streamsLoaded && availableStreams.length === 0)"
-      class="flex items-center gap-3 px-page-edge py-2 border-b border-border-default"
+      class="px-page-edge border-border-default flex items-center gap-3 border-b py-2"
     >
       <OToggleGroup
         :model-value="filterMode"
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="sessions-list-stream-selector"
         class="w-56 flex-shrink-0"
       >
-        <OSkeleton type="text" v-if="!streamsLoaded" class="w-full h-8.5" />
+        <OSkeleton type="text" v-if="!streamsLoaded" class="h-8.5 w-full" />
         <OSelect
           v-else
           v-model="activeStream"
@@ -62,12 +62,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="availableStreams.map((s) => ({ label: s, value: s }))"
           labelKey="label"
           valueKey="value"
-          class="w-full rounded-default"
+          class="rounded-default w-full"
           @update:model-value="onStreamChange"
         />
       </div>
       <div v-else data-test="sessions-list-agent-selector" class="w-56 flex-shrink-0">
-        <OSkeleton type="text" v-if="!agentsLoaded" class="w-full h-8.5" />
+        <OSkeleton type="text" v-if="!agentsLoaded" class="h-8.5 w-full" />
         <OSelect
           v-else
           v-model="activeAgent"
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="agentSelectOptions"
           labelKey="label"
           valueKey="value"
-          class="w-full rounded-default"
+          class="rounded-default w-full"
           @update:model-value="onAgentChange"
         />
       </div>
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :show-global-filter="false"
       :frame="false"
       width="100%"
-      class="w-full h-full"
+      class="h-full w-full"
       data-test="sessions-list-table"
       @row-click="(row: any) => handleRowClick(row)"
       @pagination-change="onPaginationChange"
@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Session ID -->
       <template #cell-sessionId="{ row }">
-        <div class="text-xs truncate w-full">
+        <div class="w-full truncate text-xs">
           {{ row.sessionId }}
           <OTooltip :content="row.sessionId" />
         </div>
@@ -164,11 +164,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- First user message -->
       <template #cell-firstUserMessage="{ row }">
-        <div v-if="row.firstUserMessage" class="text-xs text-text-secondary truncate w-full">
+        <div v-if="row.firstUserMessage" class="text-text-secondary w-full truncate text-xs">
           {{ row.firstUserMessage }}
           <OTooltip :content="row.firstUserMessage" />
         </div>
-        <span v-else class="text-xs text-text-muted">—</span>
+        <span v-else class="text-text-muted text-xs">—</span>
       </template>
 
       <!-- Turns -->

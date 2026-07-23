@@ -29,22 +29,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Output Section with Pipeline-specific Error Display -->
     <template #output-content>
       <div
-        class="w-full h-full flex flex-col border-l border-border-default"
+        class="border-border-default flex h-full w-full flex-col border-l"
         style="min-width: 400px"
       >
         <div
           v-if="pipelineErrorsToDisplay.length > 0"
-          class="text-center text-sm font-semibold text-text-heading py-3 shrink-0"
+          class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"
         >
           Error Validations
         </div>
-        <div v-else class="text-center text-sm font-semibold text-text-heading py-3 shrink-0">
+        <div v-else class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold">
           Output Messages
         </div>
         <OSeparator class="mt-1 shrink-0" />
-        <div class="error-report-container flex-1 min-h-0">
+        <div class="error-report-container min-h-0 flex-1">
           <!-- Pipeline Errors Section -->
-          <div class="p-2.5 mb-2.5" v-if="pipelineErrorsToDisplay.length > 0">
+          <div class="mb-2.5 p-2.5" v-if="pipelineErrorsToDisplay.length > 0">
             <div>
               <!-- Iterate through the outer array -->
               <div
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :model-value="userSelectedStreamName[index] || ''"
                         :options="streamList"
                         :label="t('alerts.stream_name') + ' *'"
-                        class="py-2 showLabelOnTop no-case"
+                        class="showLabelOnTop no-case py-2"
                         @update:model-value="
                           (val) => {
                             userSelectedStreamName[index] = val as string;
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :model-value="userSelectedStreamType[index] || ''"
                         :options="streamTypes"
                         :label="t('alerts.streamType') + ' *'"
-                        class="py-2 showLabelOnTop no-case"
+                        class="showLabelOnTop no-case py-2"
                         style="width: 300px"
                         :error="touchedStreamType[index] && !userSelectedStreamType[index]"
                         :error-message="
@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :model-value="userSelectedDestinationStreamType[index] || ''"
                         :options="destinationStreamTypes"
                         :label="t('alerts.streamType') + ' *'"
-                        class="py-2 showLabelOnTop no-case"
+                        class="showLabelOnTop no-case py-2"
                         style="width: 300px"
                         :error="
                           touchedDestinationStreamType[index] &&
@@ -224,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         labelKey="label"
                         valueKey="value"
                         searchable
-                        class="py-2 showLabelOnTop no-case"
+                        class="showLabelOnTop no-case py-2"
                         @update:model-value="
                           (val: any) => {
                             userSelectedOrgId[index] = val;
@@ -249,7 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :model-value="userSelectedFunctionName[errorMessage.nodeIndex] || ''"
                         :options="existingFunctions"
                         :label="'Function Name'"
-                        class="py-2 showLabelOnTop no-case"
+                        class="showLabelOnTop no-case py-2"
                         style="width: 300px"
                         :error="
                           touchedFunctionName[errorMessage.nodeIndex] &&
@@ -285,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :model-value="userSelectedRemoteDestination[index] || ''"
                         :options="pipelineDestinations"
                         :label="'Remote Destination'"
-                        class="py-2 showLabelOnTop no-case"
+                        class="showLabelOnTop no-case py-2"
                         style="width: 300px"
                         :error="
                           touchedRemoteDestination[index] && !userSelectedRemoteDestination[index]
@@ -319,7 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :options="timezoneOptions"
                         :label="'Timezone'"
                         searchable
-                        class="py-2 showLabelOnTop no-case"
+                        class="showLabelOnTop no-case py-2"
                         style="width: 300px"
                         :error="touchedTimezone[index] && !userSelectedTimezone[index]"
                         :error-message="
@@ -343,9 +343,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="p-2.5 mb-2.5" v-if="pipelineCreators.length > 0">
+          <div class="mb-2.5 p-2.5" v-if="pipelineCreators.length > 0">
             <div
-              class="text-base mb-2.5 uppercase text-primary"
+              class="text-primary mb-2.5 text-base uppercase"
               data-test="pipeline-import-creation-title"
             >
               Pipeline Creation

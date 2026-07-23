@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col h-full p-0">
+  <div class="flex h-full flex-col p-0">
     <OPageLayout
       bleed
       v-if="!showImportTemplate && !showTemplateEditor"
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t(`alert_templates.add`) }}</OButton
         >
       </template>
-      <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
+      <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
         <OTable
           :frame="false"
           data-test="alert-templates-list-table"
@@ -208,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
           <template v-if="selectedTemplates.length > 0" #bottom>
-            <span class="text-xs text-text-secondary">
+            <span class="text-text-secondary text-xs">
               {{ selectedTemplates.length }} selected
             </span>
             <OButton
@@ -225,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTable>
       </div>
     </OPageLayout>
-    <div v-else-if="!showImportTemplate && showTemplateEditor" class="flex-1 min-h-0">
+    <div v-else-if="!showImportTemplate && showTemplateEditor" class="min-h-0 flex-1">
       <AddTemplate
         :template="editingTemplate"
         :is-clone="cloningTemplate"
@@ -233,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @get:templates="getTemplates"
       />
     </div>
-    <div v-else class="flex-1 min-h-0">
+    <div v-else class="min-h-0 flex-1">
       <ImportTemplate :templates="templates" @update:templates="getTemplates" />
     </div>
 

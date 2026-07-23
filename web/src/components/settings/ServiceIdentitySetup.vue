@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="w-full service-identity-setup mt-2">
+  <div class="service-identity-setup mt-2 w-full">
     <!-- Loading skeleton while fetching recommendations -->
     <div v-if="loading" class="flex flex-col gap-4 py-4">
       <OSkeleton class="rounded-default h-14 w-full" />
@@ -25,12 +25,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div v-else>
       <!-- Section 1: Service Configuration -->
-      <div class="mb-3 rounded-default overflow-hidden border border-card-glass-border">
-        <div class="p-3 flex flex-col gap-3">
+      <div class="rounded-default border-card-glass-border mb-3 overflow-hidden border">
+        <div class="flex flex-col gap-3 p-3">
           <!-- Service name source banner -->
           <div
             v-if="!serviceOptional"
-            class="rounded-default border overflow-hidden transition-all"
+            class="rounded-default overflow-hidden border transition-all"
             :class="
               serviceNameDetected
                 ? 'bg-banner-info-bg border-banner-info-border'
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Collapsed row -->
             <div
               data-test="service-identity-service-name-header"
-              class="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:opacity-80 transition-opacity"
+              class="flex cursor-pointer items-center gap-2.5 px-3 py-2 transition-opacity hover:opacity-80"
               @click="serviceNameExpanded = !serviceNameExpanded"
             >
               <OIcon
@@ -48,10 +48,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm"
                 :class="serviceNameDetected ? 'text-status-positive' : 'text-status-warning-text'"
               />
-              <div class="flex-1 min-w-0 text-compact leading-tight">
+              <div class="text-compact min-w-0 flex-1 leading-tight">
                 <template v-if="serviceNameDetected">
                   {{ t("settings.serviceIdentitySetup.serviceNameDetectedFrom") }}
-                  <span class="font-bold text-primary">Service</span>
+                  <span class="text-primary font-bold">Service</span>
                   {{ t("settings.serviceIdentitySetup.fieldAlias") }}
                   <span class="text-xs opacity-60"
                     >({{ detectedServiceFields.length + unseenServiceFields.length }})</span
@@ -66,38 +66,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 :name="serviceNameExpanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'"
                 size="sm"
-                class="opacity-40 shrink-0"
+                class="shrink-0 opacity-40"
               />
             </div>
 
             <!-- Expanded detail -->
             <div
               v-if="serviceNameExpanded"
-              class="px-3 pb-3 pt-2 border-t"
+              class="border-t px-3 pt-2 pb-3"
               :class="
                 serviceNameDetected ? 'border-banner-info-border' : 'border-banner-warning-border'
               "
             >
               <!-- Inner card -->
               <div class="rounded-default p-2.5" :class="'bg-surface-subtle'">
-                <div class="text-xs font-medium mb-2" :class="'text-text-secondary'">
+                <div class="mb-2 text-xs font-medium" :class="'text-text-secondary'">
                   {{ t("settings.correlation.serviceNameExpandedHelp") }}
                 </div>
 
                 <!-- Field pills -->
-                <div class="flex flex-wrap gap-1.5 mb-3">
+                <div class="mb-3 flex flex-wrap gap-1.5">
                   <!-- Detected fields (with stream type dots) -->
                   <div
                     v-for="field in detectedServiceFields"
                     :key="field.name"
-                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-default font-mono text-xs font-medium border border-card-glass-border"
+                    class="rounded-default border-card-glass-border inline-flex items-center gap-1.5 border px-2.5 py-1 font-mono text-xs font-medium"
                     :class="'bg-surface-base text-text-secondary'"
                   >
-                    <div class="flex items-center gap-0.5 mr-0.5">
+                    <div class="mr-0.5 flex items-center gap-0.5">
                       <span
                         v-for="st in field.streamTypes"
                         :key="st"
-                        class="w-1.5 h-1.5 rounded-full"
+                        class="h-1.5 w-1.5 rounded-full"
                         :class="{
                           'bg-badge-blue-solid-bg': st === 'logs',
                           'bg-badge-orange-solid-bg': st === 'traces',
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     v-for="field in unseenServiceFields"
                     :key="field"
-                    class="inline-flex items-center px-2.5 py-1 rounded-default border-dashed font-mono text-xs border border-dashed border-card-glass-border"
+                    class="rounded-default border-card-glass-border inline-flex items-center border border-dashed px-2.5 py-1 font-mono text-xs"
                     :class="'text-text-secondary'"
                     :title="t('settings.correlation.serviceNameConfiguredNotSeen')"
                   >
@@ -124,30 +124,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Legend row -->
                 <div class="flex flex-wrap items-center justify-between gap-2">
                   <div
-                    class="flex flex-wrap items-center gap-3 text-3xs"
+                    class="text-3xs flex flex-wrap items-center gap-3"
                     :class="'text-text-secondary'"
                   >
                     <div class="flex items-center gap-1">
-                      <span class="w-1.5 h-1.5 rounded-full bg-badge-blue-solid-bg" />
+                      <span class="bg-badge-blue-solid-bg h-1.5 w-1.5 rounded-full" />
                       {{ t("settings.correlation.foundInLogs") }}
                     </div>
                     <div class="flex items-center gap-1">
-                      <span class="w-1.5 h-1.5 rounded-full bg-badge-orange-solid-bg" />
+                      <span class="bg-badge-orange-solid-bg h-1.5 w-1.5 rounded-full" />
                       {{ t("settings.correlation.foundInTraces") }}
                     </div>
                     <div class="flex items-center gap-1">
-                      <span class="w-1.5 h-1.5 rounded-full bg-badge-success-solid-bg" />
+                      <span class="bg-badge-success-solid-bg h-1.5 w-1.5 rounded-full" />
                       {{ t("settings.correlation.foundInMetrics") }}
                     </div>
                     <div v-if="unseenServiceFields.length > 0" class="flex items-center gap-1">
-                      <span class="w-1.5 h-1.5 rounded-full border border-dashed border-grey-4" />
+                      <span class="border-grey-4 h-1.5 w-1.5 rounded-full border border-dashed" />
                       {{ t("settings.correlation.serviceNameConfiguredNotSeen") }}
                     </div>
                   </div>
 
                   <!-- Customize link -->
                   <a
-                    class="config-link-btn cursor-pointer inline-flex items-center gap-1 px-2 py-0.5 rounded-default text-xs font-semibold no-underline border border-text-link text-text-link bg-badge-blue-soft-bg transition-[background] hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
+                    class="config-link-btn rounded-default border-text-link text-text-link bg-badge-blue-soft-bg inline-flex cursor-pointer items-center gap-1 border px-2 py-0.5 text-xs font-semibold no-underline transition-[background] hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
                     @click.prevent="emit('navigate-to-aliases', 'service')"
                   >
                     {{ t("settings.correlation.customizeFieldMappings") }}
@@ -186,27 +186,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('settings.correlation.serviceOptionalLabel')"
               size="md"
             />
-            <div class="text-xs mt-1 leading-snug ml-9" :class="'text-text-secondary'">
+            <div class="mt-1 ml-9 text-xs leading-snug" :class="'text-text-secondary'">
               {{ t("settings.correlation.serviceOptionalHelp") }}
             </div>
           </div>
 
           <!-- Disambiguation Fields -->
           <div>
-            <div class="flex items-center gap-2 mb-1">
-              <span class="font-bold text-sm">{{
+            <div class="mb-1 flex items-center gap-2">
+              <span class="text-sm font-bold">{{
                 t("settings.correlation.distinguishByLabel")
               }}</span>
               <span class="flex-1"><OSeparator /></span>
             </div>
-            <div class="text-xs mb-3" :class="'text-text-secondary'">
+            <div class="mb-3 text-xs" :class="'text-text-secondary'">
               {{ t("settings.correlation.distinguishByHelp") }}
             </div>
 
             <!-- Empty state: nothing configured anywhere -->
             <div
               v-if="allConfiguredEnvs.length === 0 && !addingToEnv"
-              class="flex flex-col items-center gap-2 py-3 px-4 rounded-default border border-dashed"
+              class="rounded-default flex flex-col items-center gap-2 border border-dashed px-4 py-3"
               :class="'border-border-default bg-surface-subtle'"
             >
               <OIcon name="tune" size="lg" class="text-icon-color mb-1" />
@@ -230,10 +230,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Auto-suggested banner (only when fields came from suggestion, not saved config) -->
               <div
                 v-if="isAutoSuggested"
-                class="flex items-start gap-2 px-3 py-2 rounded-default text-xs"
+                class="rounded-default flex items-start gap-2 px-3 py-2 text-xs"
                 :class="'bg-status-info-bg text-status-info-text'"
               >
-                <OIcon name="auto-awesome" size="xs" class="shrink-0 mt-0.5" />
+                <OIcon name="auto-awesome" size="xs" class="mt-0.5 shrink-0" />
                 <span>{{ t("settings.correlation.autoSuggestedBanner") }}</span>
               </div>
 
@@ -242,8 +242,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Environment label -->
                 <div
                   v-if="allConfiguredEnvs.length > 1"
-                  class="flex items-center gap-2 mt-1"
-                  :class="{ 'pt-2 border-t': envIdx > 0 }"
+                  class="mt-1 flex items-center gap-2"
+                  :class="{ 'border-t pt-2': envIdx > 0 }"
                 >
                   <span class="text-3xs font-bold" :class="'text-text-secondary'">
                     {{ getIdentitySetLabel(envKey) }}
@@ -255,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     v-for="fieldId in (setDistinguishBy[envKey] ?? []).filter(Boolean)"
                     :key="fieldId"
-                    class="flex items-center gap-1 pl-3 pr-1 py-1 rounded-default text-xs font-medium transition-colors border border-card-glass-border"
+                    class="rounded-default border-card-glass-border flex items-center gap-1 border py-1 pr-1 pl-3 text-xs font-medium transition-colors"
                     :class="'bg-surface-base text-text-secondary'"
                   >
                     <span>{{ getGroupByValue(fieldId)?.display ?? fieldId }}</span>
@@ -349,7 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Adding to a new env (not yet in the list) -->
               <template v-if="addingToEnv && !allConfiguredEnvs.includes(addingToEnv)">
                 <div
-                  class="flex flex-wrap items-center gap-2 pt-2 border-t border-card-glass-border"
+                  class="border-card-glass-border flex flex-wrap items-center gap-2 border-t pt-2"
                 >
                   <OSelect
                     ref="addFieldSelectRef"
@@ -392,7 +392,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <!-- Add group + Save — bottom row -->
-              <div v-if="!addingToEnv" class="flex items-center justify-between mt-2">
+              <div v-if="!addingToEnv" class="mt-2 flex items-center justify-between">
                 <OButton
                   variant="outline"
                   size="sm"
@@ -427,47 +427,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Section 3: Workload Detection -->
       <div
         v-if="workloadDetectedGroups.length > 0"
-        class="mb-3 rounded-default overflow-hidden border border-card-glass-border"
+        class="rounded-default border-card-glass-border mb-3 overflow-hidden border"
       >
         <!-- Section header -->
-        <div class="px-4 py-3 flex items-center gap-2 border-b border-card-glass-border">
+        <div class="border-card-glass-border flex items-center gap-2 border-b px-4 py-3">
           <OIcon name="radar" size="sm" class="text-teal-6" />
-          <span class="font-bold text-sm">{{
+          <span class="text-sm font-bold">{{
             t("settings.serviceIdentitySetup.workloadDetection")
           }}</span>
         </div>
 
         <!-- Collapsible: Workload detected using fields (N) -->
         <div
-          class="mx-3 mt-3 rounded-default border overflow-hidden transition-all"
+          class="rounded-default mx-3 mt-3 overflow-hidden border transition-all"
           :class="'bg-banner-info-bg border-banner-info-border'"
         >
           <div
-            class="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:opacity-80 transition-opacity"
+            class="flex cursor-pointer items-center gap-2.5 px-3 py-2 transition-opacity hover:opacity-80"
             @click="trackedAliasExpanded = !trackedAliasExpanded"
           >
             <OIcon name="check-circle" size="sm" />
-            <div class="flex-1 min-w-0 text-compact leading-tight">
+            <div class="text-compact min-w-0 flex-1 leading-tight">
               {{ t("settings.serviceIdentitySetup.workloadDetectedUsingFields") }}
               <span class="text-xs opacity-60">({{ trackedAliasIds.length }})</span>
             </div>
             <OIcon
               :name="trackedAliasExpanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'"
               size="sm"
-              class="opacity-40 shrink-0"
+              class="shrink-0 opacity-40"
             />
           </div>
 
           <div
             v-if="trackedAliasExpanded"
-            class="px-3 pb-3 pt-2 border-t"
+            class="border-t px-3 pt-2 pb-3"
             :class="'border-banner-info-border'"
           >
             <div class="rounded-default p-2.5" :class="'bg-surface-subtle'">
-              <div class="text-xs mb-3" :class="'text-text-secondary'">
+              <div class="mb-3 text-xs" :class="'text-text-secondary'">
                 {{ t("settings.serviceIdentitySetup.workloadTrackedHelp") }}
                 <a
-                  class="config-link-btn cursor-pointer inline-block mx-1 px-2 py-0.5 rounded-default text-xs font-semibold no-underline align-middle border border-text-link text-text-link bg-badge-blue-soft-bg transition-[background] hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
+                  class="config-link-btn rounded-default border-text-link text-text-link bg-badge-blue-soft-bg mx-1 inline-block cursor-pointer border px-2 py-0.5 align-middle text-xs font-semibold no-underline transition-[background] hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
                   @click.prevent="emit('navigate-to-aliases', 'service')"
                   >{{ t("settings.serviceIdentitySetup.goToFieldAliases") }}</a
                 >
@@ -478,7 +478,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="alias in resolvedTrackedAliases"
                   :key="alias.id"
-                  class="flex items-center gap-1 pl-3 pr-1 py-1 rounded-default text-xs font-medium transition-colors border border-card-glass-border"
+                  class="rounded-default border-card-glass-border flex items-center gap-1 border py-1 pr-1 pl-3 text-xs font-medium transition-colors"
                   :class="'bg-surface-base text-text-secondary'"
                 >
                   <span>{{ alias.label }}</span>
@@ -554,7 +554,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("settings.correlation.addField") }}
                 </OButton>
               </div>
-              <div class="flex justify-end mt-3">
+              <div class="mt-3 flex justify-end">
                 <OButton
                   variant="primary"
                   size="sm-action"
@@ -573,7 +573,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-xs" :class="'text-text-secondary'">
             {{ t("settings.serviceIdentitySetup.discoveredPatternsHelp") }}
             <a
-              class="config-link-btn cursor-pointer inline-block mx-1 px-2 py-0.5 rounded-default text-xs font-semibold no-underline align-middle border border-text-link text-text-link bg-badge-blue-soft-bg transition-[background] hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
+              class="config-link-btn rounded-default border-text-link text-text-link bg-badge-blue-soft-bg mx-1 inline-block cursor-pointer border px-2 py-0.5 align-middle text-xs font-semibold no-underline transition-[background] hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
               @click.prevent="emit('navigate-to-services')"
               >{{ t("settings.serviceIdentitySetup.goToServices") }}</a
             >
@@ -582,15 +582,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Environment Tabs (Chrome-style) -->
-        <div class="flex items-end gap-0 px-4 border-b border-card-glass-border">
+        <div class="border-card-glass-border flex items-end gap-0 border-b px-4">
           <div
             v-for="env in detectedEnvironments"
             :key="env.key"
-            class="relative px-4 py-2 cursor-pointer transition-all text-xs font-medium min-w-17.5 text-center rounded-t-default border border-b-0"
+            class="rounded-t-default relative min-w-17.5 cursor-pointer border border-b-0 px-4 py-2 text-center text-xs font-medium transition-all"
             :class="
               activeEnvironment === env.key
                 ? 'text-text-body'
-                : 'bg-transparent text-text-muted border-transparent hover:text-text-secondary'
+                : 'text-text-muted hover:text-text-secondary border-transparent bg-transparent'
             "
             :style="
               activeEnvironment === env.key
@@ -602,7 +602,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ env.label }}
             <span
               v-if="(setDistinguishBy[env.key] ?? []).filter(Boolean).length > 0"
-              class="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-badge-success-solid-bg"
+              class="bg-badge-success-solid-bg absolute top-1 right-1 h-1.5 w-1.5 rounded-full"
               :title="
                 t('settings.serviceIdentitySetup.fieldsConfigured', {
                   n: (setDistinguishBy[env.key] ?? []).filter(Boolean).length,
@@ -618,21 +618,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex items-stretch gap-3">
             <template v-for="(card, idx) in dimCards" :key="card.dim.group_id">
               <!-- Plus connector between cards -->
-              <div v-if="idx > 0" class="flex items-center shrink-0">
+              <div v-if="idx > 0" class="flex shrink-0 items-center">
                 <OIcon name="add" size="sm" class="text-icon-color" />
               </div>
 
               <!-- Dim card -->
               <div
-                class="dim-stat-card flex-1 min-w-0 rounded-default p-3 flex flex-col"
+                class="dim-stat-card rounded-default flex min-w-0 flex-1 flex-col p-3"
                 :style="card.theme.border"
               >
-                <div class="flex items-center gap-2 mb-2">
+                <div class="mb-2 flex items-center gap-2">
                   <OIcon :name="card.theme.icon" size="sm" :class="card.theme.iconClass" />
                   <span class="text-2xs font-medium" :class="'text-text-secondary'">{{
                     card.label
                   }}</span>
-                  <span class="text-lg font-bold ml-auto" :class="card.theme.countClass">{{
+                  <span class="ml-auto text-lg font-bold" :class="card.theme.countClass">{{
                     card.count
                   }}</span>
                 </div>
@@ -640,16 +640,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span
                     v-for="val in card.values.slice(0, 5)"
                     :key="val"
-                    class="max-w-[calc(50%-4px)] h-5.5 box-border text-2xs py-0.5 px-2 rounded-full border cursor-pointer hover:opacity-70 transition-opacity inline-flex items-center gap-1"
+                    class="text-2xs box-border inline-flex h-5.5 max-w-[calc(50%-4px)] cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 transition-opacity hover:opacity-70"
                     :class="card.theme.pill"
                     :title="val"
                     @click.stop="openInsightDialogByIdx(val, idx)"
                     ><span class="truncate">{{ val }}</span
-                    ><span v-if="card.dim" class="inline-flex gap-0.5 ml-0.5 shrink-0"
+                    ><span v-if="card.dim" class="ml-0.5 inline-flex shrink-0 gap-0.5"
                       ><span
                         v-for="st in getValueStreamTypes(card.dim.group_id, val)"
                         :key="st"
-                        class="w-1.5 h-1.5 rounded-full inline-block"
+                        class="inline-block h-1.5 w-1.5 rounded-full"
                         :class="{
                           'bg-badge-blue-solid-bg': st === 'logs',
                           'bg-badge-orange-solid-bg': st === 'traces',
@@ -664,19 +664,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <template #trigger>
                       <span
-                        class="max-w-[calc(50%-4px)] h-5.5 box-border text-2xs py-0.5 px-2 rounded-full cursor-pointer hover:opacity-70 transition-opacity"
+                        class="text-2xs box-border h-5.5 max-w-[calc(50%-4px)] cursor-pointer rounded-full px-2 py-0.5 transition-opacity hover:opacity-70"
                         :class="'text-text-secondary'"
                         >+{{ card.values.length - 5 }}</span
                       >
                     </template>
                     <div
-                      class="p-2 flex flex-wrap gap-1 max-w-70 max-h-50 overflow-y-auto"
+                      class="flex max-h-50 max-w-70 flex-wrap gap-1 overflow-y-auto p-2"
                       :class="'bg-surface-overlay'"
                     >
                       <span
                         v-for="val in card.values.slice(5)"
                         :key="val"
-                        class="text-2xs py-0.5 px-2 rounded-full border cursor-pointer hover:opacity-70 transition-opacity inline-flex items-center gap-1"
+                        class="text-2xs inline-flex cursor-pointer items-center gap-1 rounded-full border px-2 py-0.5 transition-opacity hover:opacity-70"
                         :class="card.theme.pill"
                         :title="val"
                         @click.stop="
@@ -684,11 +684,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           dimCardMoreMenuOpen[idx] = false;
                         "
                         ><span class="truncate">{{ val }}</span
-                        ><span v-if="card.dim" class="inline-flex gap-0.5 ml-0.5 shrink-0"
+                        ><span v-if="card.dim" class="ml-0.5 inline-flex shrink-0 gap-0.5"
                           ><span
                             v-for="st in getValueStreamTypes(card.dim.group_id, val)"
                             :key="st"
-                            class="w-1.5 h-1.5 rounded-full inline-block"
+                            class="inline-block h-1.5 w-1.5 rounded-full"
                             :class="{
                               'bg-badge-blue-solid-bg': st === 'logs',
                               'bg-badge-orange-solid-bg': st === 'traces',
@@ -703,17 +703,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Stream type legend -->
-          <div class="flex items-center gap-3 mt-2 ml-1">
-            <div class="flex items-center gap-1 text-3xs" :class="'text-text-secondary'">
-              <span class="w-1.5 h-1.5 rounded-full inline-block bg-badge-blue-solid-bg" />
+          <div class="mt-2 ml-1 flex items-center gap-3">
+            <div class="text-3xs flex items-center gap-1" :class="'text-text-secondary'">
+              <span class="bg-badge-blue-solid-bg inline-block h-1.5 w-1.5 rounded-full" />
               <span>{{ t("settings.correlation.foundInLogs") }}</span>
             </div>
-            <div class="flex items-center gap-1 text-3xs" :class="'text-text-secondary'">
-              <span class="w-1.5 h-1.5 rounded-full inline-block bg-badge-orange-solid-bg" />
+            <div class="text-3xs flex items-center gap-1" :class="'text-text-secondary'">
+              <span class="bg-badge-orange-solid-bg inline-block h-1.5 w-1.5 rounded-full" />
               <span>{{ t("settings.correlation.foundInTraces") }}</span>
             </div>
-            <div class="flex items-center gap-1 text-3xs" :class="'text-text-secondary'">
-              <span class="w-1.5 h-1.5 rounded-full inline-block bg-badge-success-solid-bg" />
+            <div class="text-3xs flex items-center gap-1" :class="'text-text-secondary'">
+              <span class="bg-badge-success-solid-bg inline-block h-1.5 w-1.5 rounded-full" />
               <span>{{ t("settings.correlation.foundInMetrics") }}</span>
             </div>
           </div>
@@ -730,7 +730,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex items-center gap-3 px-4 py-2.5"
           :class="'bg-surface-subtle'"
         >
-          <div class="flex-1 min-w-0 text-xs truncate" :class="'text-text-secondary'">
+          <div class="min-w-0 flex-1 truncate text-xs" :class="'text-text-secondary'">
             <span class="font-bold" :class="'text-text-body'">{{
               t("settings.serviceIdentitySetup.recommended")
             }}</span>
@@ -746,7 +746,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               })
             }}
           </div>
-          <div class="shrink-0 flex items-center gap-1">
+          <div class="flex shrink-0 items-center gap-1">
             <OButton variant="outline" size="sm" @click="applySuggestion">
               {{ t("settings.serviceIdentitySetup.apply") }}
             </OButton>
@@ -771,12 +771,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                containing the title + tooltip; second line is a conditional coverage flex with icon.
                Cannot be expressed cleanly with title + sub-title props alone. -->
           <template #header>
-            <div class="flex-1 min-w-0">
-              <div class="text-base flex items-center">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center text-base">
                 {{ insightData.subtitle }}
                 <span
                   :class="[
-                    'font-semibold px-2 py-0.5 rounded-default ml-2 inline-block',
+                    'rounded-default ml-2 inline-block px-2 py-0.5 font-semibold',
                     'text-status-info-text bg-status-info-bg',
                   ]"
                 >
@@ -790,7 +790,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="!(insightData as any).isCardLevel && insightData.coverage !== null"
-                class="flex items-center gap-1.5 text-xs mt-1"
+                class="mt-1 flex items-center gap-1.5 text-xs"
                 :class="'text-text-secondary'"
               >
                 <OIcon name="verified" size="xs" class="text-status-positive" />
@@ -808,29 +808,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <!-- Stream contribution chart (single-value only) -->
-          <div class="flex flex-col h-full">
+          <div class="flex h-full flex-col">
             <template
               v-if="
                 !(insightData as any).isCardLevel && (insightData as any).streamDetails?.length > 0
               "
             >
               <div class="mb-3 shrink-0">
-                <div class="text-2xs tracking-wide font-medium mb-2 text-text-label">
+                <div class="text-2xs text-text-label mb-2 font-medium tracking-wide">
                   {{ t("settings.serviceIdentitySetup.streamSources") }}
                 </div>
                 <div style="height: 40vh; min-height: 180px">
                   <CustomChartRenderer :data="insightChartData.options" />
                 </div>
                 <!-- Legend -->
-                <div class="flex items-center justify-center gap-4 mt-2">
+                <div class="mt-2 flex items-center justify-center gap-4">
                   <div
                     v-for="sd in (insightData as any).streamDetails"
                     :key="sd.streamType"
-                    class="flex items-center gap-1.5 text-2xs"
+                    class="text-2xs flex items-center gap-1.5"
                     :class="'text-text-secondary'"
                   >
                     <span
-                      class="w-2 h-2 rounded-full"
+                      class="h-2 w-2 rounded-full"
                       :class="{
                         'bg-badge-blue-solid-bg': sd.streamType === 'logs',
                         'bg-badge-orange-solid-bg': sd.streamType === 'traces',
@@ -848,7 +848,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Card-level: all values with bars -->
             <template v-if="(insightData as any).isCardLevel && insightData.children.length > 0">
-              <div class="text-2xs font-medium mb-3" :class="'text-text-secondary'">
+              <div class="text-2xs mb-3 font-medium" :class="'text-text-secondary'">
                 {{
                   t("settings.serviceIdentitySetup.allValues", {
                     count: insightData.children.length,
@@ -862,12 +862,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="flex flex-col gap-1"
                 >
                   <div class="flex items-center justify-between text-xs">
-                    <span class="truncate min-w-0 font-medium">{{ child.name }}</span>
-                    <span class="shrink-0 ml-2 tabular-nums" :class="'text-text-secondary'"
+                    <span class="min-w-0 truncate font-medium">{{ child.name }}</span>
+                    <span class="ml-2 shrink-0 tabular-nums" :class="'text-text-secondary'"
                       >{{ child.count }} {{ insightData.childCountLabel }}</span
                     >
                   </div>
-                  <div class="w-full h-2 rounded-full overflow-hidden" :class="'bg-surface-subtle'">
+                  <div class="h-2 w-full overflow-hidden rounded-full" :class="'bg-surface-subtle'">
                     <div
                       class="h-full rounded-full transition-all"
                       :class="
@@ -895,7 +895,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <!-- Explanation -->
               <div
-                class="flex items-center gap-1.5 text-2xs mb-2 shrink-0 py-1.5 px-2.5 rounded-default"
+                class="text-2xs rounded-default mb-2 flex shrink-0 items-center gap-1.5 px-2.5 py-1.5"
                 :class="'bg-status-info-bg text-text-secondary'"
               >
                 <OIcon name="info" size="xs" />
@@ -907,24 +907,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >.</span
                 >
               </div>
-              <div class="flex flex-1 min-h-0 py-3">
+              <div class="flex min-h-0 flex-1 py-3">
                 <div
                   v-for="(dim, dimIdx) in insightRelatedDimensions"
                   :key="dim.label + dimIdx"
-                  class="flex-1 min-w-0 flex flex-col px-3"
-                  :class="[dimIdx > 0 ? 'border-l border-border-default' : '']"
+                  class="flex min-w-0 flex-1 flex-col px-3"
+                  :class="[dimIdx > 0 ? 'border-border-default border-l' : '']"
                 >
-                  <div class="text-compact font-bold mb-2" :class="'text-text-body'">
+                  <div class="text-compact mb-2 font-bold" :class="'text-text-body'">
                     {{ dim.label }}
                     <span class="font-normal" :class="'text-text-secondary'"
                       >({{ dim.values.length }})</span
                     >
                   </div>
-                  <div class="flex flex-col gap-1 flex-1 overflow-y-auto min-h-0">
+                  <div class="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
                     <span
                       v-for="dVal in dim.values"
                       :key="dVal"
-                      class="text-compact py-1 px-2.5 rounded-default border truncate shrink-0"
+                      class="text-compact rounded-default shrink-0 truncate border px-2.5 py-1"
                       :class="{
                         'bg-badge-teal-soft-bg border-badge-teal-ol-border text-badge-teal-soft-text':
                           dim.color === 'teal',
@@ -978,9 +978,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="primaryDim?.display"
         :sub-title="popupPrimaryValue ? `: ${popupPrimaryValue}` : undefined"
       >
-        <OCardSection class="flex flex-col gap-4 p-0 border-t">
+        <OCardSection class="flex flex-col gap-4 border-t p-0">
           <!-- Header section with cardinality details -->
-          <div class="flex items-center gap-3 p-4 border-b">
+          <div class="flex items-center gap-3 border-b p-4">
             <span class="font-medium">{{ t("settings.serviceIdentitySetup.cardinality") }}</span>
             <OTag
               type="cardinalityClass"
@@ -1011,10 +1011,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex h-75"
           >
             <!-- Left Pane: Streams List -->
-            <div class="w-1/3 border-r bg-surface-subtle flex flex-col">
+            <div class="bg-surface-subtle flex w-1/3 flex-col border-r">
               <!-- Static column header — never scrolls, never gets covered -->
               <div
-                class="px-4 py-2 font-medium text-xs uppercase text-text-label border-b flex items-center justify-between shrink-0 bg-surface-subtle"
+                class="text-text-label bg-surface-subtle flex shrink-0 items-center justify-between border-b px-4 py-2 text-xs font-medium uppercase"
               >
                 <span>{{
                   selectedStreamType ||
@@ -1028,7 +1028,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Scrollable content -->
-              <div class="overflow-y-auto flex-1">
+              <div class="flex-1 overflow-y-auto">
                 <!-- Filtered to one type: no section header needed -->
                 <template
                   v-if="
@@ -1040,7 +1040,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       selectedFieldAnalytics.sample_values[selectedStreamType],
                     )"
                     :key="streamName"
-                    class="px-4 py-3 cursor-pointer transition-colors text-sm font-mono truncate hover:bg-primary/10"
+                    class="hover:bg-primary/10 cursor-pointer truncate px-4 py-3 font-mono text-sm transition-colors"
                     :class="{
                       'bg-primary/20 text-primary font-medium': activeStreamId === streamName,
                     }"
@@ -1060,7 +1060,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <div
                       v-if="typeIdx > 0"
-                      class="px-4 py-1 text-3xs font-bold uppercase text-text-label sticky top-0 z-10 border-b border-t bg-surface-subtle"
+                      class="text-3xs text-text-label bg-surface-subtle sticky top-0 z-10 border-t border-b px-4 py-1 font-bold uppercase"
                     >
                       {{ typeName }}
                     </div>
@@ -1069,7 +1069,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         selectedFieldAnalytics.sample_values[typeName],
                       )"
                       :key="typeName + '-' + streamName"
-                      class="px-4 py-3 cursor-pointer transition-colors text-sm font-mono truncate hover:bg-primary/10"
+                      class="hover:bg-primary/10 cursor-pointer truncate px-4 py-3 font-mono text-sm transition-colors"
                       :class="{
                         'bg-primary/20 text-primary font-medium':
                           activeStreamId === streamName && activeStreamType === typeName,
@@ -1087,7 +1087,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Right Pane: N-1 hierarchy columns -->
-            <div class="flex-1 flex overflow-x-auto bg-surface-base">
+            <div class="bg-surface-base flex flex-1 overflow-x-auto">
               <div
                 v-for="(col, colIdx) in popupColumns"
                 :key="col.group_id"
@@ -1095,18 +1095,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="{ 'border-l': colIdx > 0 }"
               >
                 <div
-                  class="px-4 py-2 font-medium text-xs uppercase text-text-label sticky top-0 z-10 border-b bg-surface-subtle"
+                  class="text-text-label bg-surface-subtle sticky top-0 z-10 border-b px-4 py-2 text-xs font-medium uppercase"
                 >
                   {{ col.display }}
                 </div>
-                <div class="p-4 flex flex-col gap-2">
+                <div class="flex flex-col gap-2 p-4">
                   <div
                     v-for="val in getPopupColumnValues(colIdx)"
                     :key="val"
-                    class="px-3 py-2 rounded-default border transition-colors cursor-pointer font-mono truncate"
+                    class="rounded-default cursor-pointer truncate border px-3 py-2 font-mono transition-colors"
                     :class="
                       popupColumnSelections[colIdx] === val
-                        ? 'bg-primary/15 border-primary/40 text-primary ring-1 ring-primary/30'
+                        ? 'bg-primary/15 border-primary/40 text-primary ring-primary/30 ring-1'
                         : 'bg-surface-subtle border-border-default'
                     "
                     @click="selectPopupColumnValue(colIdx, val)"
@@ -1115,7 +1115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div
                     v-if="getPopupColumnValues(colIdx).length === 0"
-                    class="text-text-muted text-xs italic p-2"
+                    class="text-text-muted p-2 text-xs italic"
                   >
                     {{ t("settings.serviceIdentitySetup.noValues") }}
                   </div>
@@ -1124,14 +1124,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Fallback when no ranked dims beyond the selected field -->
               <div
                 v-if="popupColumns.length === 0"
-                class="flex items-center justify-center flex-1 text-text-muted text-sm italic"
+                class="text-text-muted flex flex-1 items-center justify-center text-sm italic"
               >
                 {{ t("settings.serviceIdentitySetup.noAdditionalDimensions") }}
               </div>
             </div>
           </div>
 
-          <div v-else class="text-text-muted italic p-4 text-center">
+          <div v-else class="text-text-muted p-4 text-center italic">
             {{ t("settings.serviceIdentitySetup.noSampleData") }}
           </div>
         </OCardSection>

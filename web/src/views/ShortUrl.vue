@@ -1,7 +1,7 @@
 <template>
-  <div data-test="loading-container" class="h-[100vh] flex flex-col items-center justify-center">
+  <div data-test="loading-container" class="flex h-[100vh] flex-col items-center justify-center">
     <OSpinner size="lg" data-test="spinner" />
-    <div data-test="message" class="text-base text-text-secondary">Redirecting...</div>
+    <div data-test="message" class="text-text-secondary text-base">Redirecting...</div>
   </div>
 </template>
 

@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     aria-label="Main navigation"
     data-test="navbar-main-nav"
     data-o2-navbar
-    class="left-drawer o2-navbar-scroll flex flex-col bg-surface-chrome-deeper shrink-0 min-h-0 overflow-y-auto w-[5.5rem] pb-1"
+    class="left-drawer o2-navbar-scroll bg-surface-chrome-deeper flex min-h-0 w-[5.5rem] shrink-0 flex-col overflow-y-auto pb-1"
     @keydown="handleKeydown"
   >
     <!-- Three rail-entry shapes (see navGroups.ts):
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          - group:     a pure flyout group with no page of its own (click toggles);
                       supported here but not currently emitted by groupNavLinks.
          `pinBottom` groups float to the foot of the rail via the flex spacer. -->
-    <div class="relative flex flex-col flex-1 min-h-0 gap-y-1">
+    <div class="relative flex min-h-0 flex-1 flex-col gap-y-1">
       <!-- Single sliding-selection pill: tracks the active rail tile and slides to
            it on navigation. Active MenuLinks defer their fill to this (see
            RailIndicatorActiveKey). Snaps (no slide) on mount/reflow/reveal. -->
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- Spacer floats any pinned-bottom groups to the foot of the rail -->
-      <div v-if="bottomEntries.length" class="nav-rail-spacer flex-1 min-h-2" aria-hidden="true" />
+      <div v-if="bottomEntries.length" class="nav-rail-spacer min-h-2 flex-1" aria-hidden="true" />
 
       <ONavGroup
         v-for="entry in bottomEntries"

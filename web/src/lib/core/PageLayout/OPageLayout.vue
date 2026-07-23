@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   v-model:sidebarWidth — bidirectional bind for the rail width (resizable mode).
 -->
 <template>
-  <div class="flex flex-col h-full">
+  <div class="flex h-full flex-col">
     <!-- ── Header (props → OPageHeader, or #header escape hatch) ── -->
     <!-- Just a shrink-0 slot: OPageHeader draws its OWN border-b (so the header
          is a consistent 60px). Don't add a border here — it would double the
@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- ── Sub-nav strip (tab/toolbar) under the header ──────────── -->
-    <div v-if="!!slots.subnav" class="shrink-0 border-b border-border-default">
+    <div v-if="!!slots.subnav" class="border-border-default shrink-0 border-b">
       <slot name="subnav" />
     </div>
 
@@ -93,12 +93,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       unit="px"
       :limits="splitterLimits"
       :horizontal="false"
-      class="flex-1 min-h-0 overflow-hidden"
+      class="min-h-0 flex-1 overflow-hidden"
     >
       <template #before>
         <div
           v-if="sidebarVisible"
-          class="w-full h-full flex flex-col overflow-hidden border-r border-border-default"
+          class="border-border-default flex h-full w-full flex-col overflow-hidden border-r"
         >
           <slot name="sidebar" />
         </div>
@@ -106,32 +106,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #separator>
         <slot name="separator">
           <div
-            class="w-1 h-full bg-transparent transition-colors duration-300 hover:bg-[var(--color-orange-500)]"
+            class="h-full w-1 bg-transparent transition-colors duration-300 hover:bg-[var(--color-orange-500)]"
           ></div>
         </slot>
       </template>
       <template #after>
-        <OContent :bleed="bleed" :y="padY" class="w-full h-full flex flex-col overflow-hidden">
+        <OContent :bleed="bleed" :y="padY" class="flex h-full w-full flex-col overflow-hidden">
           <slot />
         </OContent>
       </template>
     </OSplitter>
 
     <!-- ── Body: fixed-width sidebar + main ─────────────────────── -->
-    <div v-else-if="!!slots.sidebar" class="flex-1 flex min-h-0">
+    <div v-else-if="!!slots.sidebar" class="flex min-h-0 flex-1">
       <aside
-        class="shrink-0 h-full flex flex-col overflow-hidden border-r border-border-default"
+        class="border-border-default flex h-full shrink-0 flex-col overflow-hidden border-r"
         :style="{ width: (sidebarWidth ?? 200) + 'px' }"
       >
         <slot name="sidebar" />
       </aside>
-      <OContent as="section" :bleed="bleed" :y="padY" class="flex-1 min-w-0 h-full overflow-hidden">
+      <OContent as="section" :bleed="bleed" :y="padY" class="h-full min-w-0 flex-1 overflow-hidden">
         <slot />
       </OContent>
     </div>
 
     <!-- ── Body: constrained reading column (no sidebar) ────────── -->
-    <ConstrainedPage v-else-if="constrained" :size="contentSize" class="flex-1 min-h-0">
+    <ConstrainedPage v-else-if="constrained" :size="contentSize" class="min-h-0 flex-1">
       <slot />
     </ConstrainedPage>
 
@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :bleed="bleed"
       :y="padY"
       :class="
-        scroll ? 'flex-1 min-h-0 overflow-auto' : 'flex-1 min-h-0 flex flex-col overflow-hidden'
+        scroll ? 'min-h-0 flex-1 overflow-auto' : 'flex min-h-0 flex-1 flex-col overflow-hidden'
       "
     >
       <slot />

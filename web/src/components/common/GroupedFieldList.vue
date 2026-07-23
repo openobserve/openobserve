@@ -20,10 +20,10 @@
     <template #group-header="{ row, groupName }">
       <slot name="group-header" :row="row" :group-name="groupName">
         <div
-          class="h-full w-[calc(100%+2*var(--spacing-page-edge))] shrink-0 -ml-page-edge px-page-edge flex justify-between items-center font-semibold text-xs cursor-pointer bg-surface-subtle text-field-list-group-text"
+          class="-ml-page-edge px-page-edge bg-surface-subtle text-field-list-group-text flex h-full w-[calc(100%+2*var(--spacing-page-edge))] shrink-0 cursor-pointer items-center justify-between text-xs font-semibold"
           @click="toggleGroup(row.group)"
         >
-          <div class="flex-1 min-w-0">{{ groupName }} ({{ groupFieldCount[row.group] ?? 0 }})</div>
+          <div class="min-w-0 flex-1">{{ groupName }} ({{ groupFieldCount[row.group] ?? 0 }})</div>
           <OButton
             v-if="(groupFieldCount[row.group] ?? 0) > 0"
             variant="ghost"
@@ -47,7 +47,7 @@
     <!-- Empty state -->
     <template #empty>
       <slot name="empty">
-        <div class="text-center py-[0.725rem] flex items-center justify-center">
+        <div class="flex items-center justify-center py-[0.725rem] text-center">
           <OIcon name="info" size="xs" />
           <span class="pl-1.5">{{ t("search.noFieldFound") }}</span>
         </div>

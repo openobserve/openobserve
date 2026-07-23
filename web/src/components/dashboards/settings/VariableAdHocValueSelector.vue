@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-wrap items-center">
     <div
-      class="flex flex-nowrap items-center mb-2 mr-4 gap-x-1"
+      class="mr-4 mb-2 flex flex-nowrap items-center gap-x-1"
       v-for="(item, index) in adhocVariables"
       :key="index"
     >
@@ -41,7 +41,7 @@
     <OButton
       variant="ghost"
       size="sm"
-      class="ml-1 mb-2 hideOnPrintMode"
+      class="hideOnPrintMode mb-2 ml-1"
       @click="addFields"
       data-test="dashboard-variable-adhoc-add-selector"
     >

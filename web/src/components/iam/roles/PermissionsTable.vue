@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         data-test="edit-role-permissions-table-no-permissions-title"
         v-if="!level && !rows.length && !loading"
-        class="w-full text-center mt-4 font-bold text-text-secondary"
+        class="text-text-secondary mt-4 w-full text-center font-bold"
         style="margin-top: 64px; font-size: var(--text-lg)"
       >
         <span> {{ t("iam.permissionsTable.noPermissionsSelected") }} </span>
@@ -40,12 +40,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : '',
         }"
       >
-        <OSpinner size="xs" class="my-2 mx-0 mr-2" />
+        <OSpinner size="xs" class="mx-0 my-2 mr-2" />
         <div>{{ t("iam.permissionsTable.loadingResources") }}</div>
       </div>
       <div
         v-if="level && getFilteredRows.length === 50"
-        class="py-2 text-left text-text-body bg-surface-base relative"
+        class="text-text-body bg-surface-base relative py-2 text-left"
         :style="{
           paddingLeft: level
             ? parent.has_entities
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         :data-test="`edit-role-${parent ? parent.name : 'main'}-permissions-table`"
         :id="`permissions-table-${parent.resourceName}`"
-        :class="level > 0 ? 'overflow-y-auto overflow-x-hidden' : ''"
+        :class="level > 0 ? 'overflow-x-hidden overflow-y-auto' : ''"
         :style="{
           maxHeight: level > 0 ? '400px' : undefined,
         }"
@@ -117,13 +117,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </template>
           <template #empty>
-            <div v-if="level === 0" class="py-16 flex justify-center items-center">
+            <div v-if="level === 0" class="flex items-center justify-center py-16">
               <NoData :filtered="!!filter" @action="emits('update:filter', '')" />
             </div>
             <div
               v-else
               data-test="edit-role-permissions-table-no-resources-title"
-              class="py-2 px-4 text-sm text-text-secondary"
+              class="text-text-secondary px-4 py-2 text-sm"
             >
               {{ t("iam.permissionsTable.noResourcesPresent") }}
             </div>

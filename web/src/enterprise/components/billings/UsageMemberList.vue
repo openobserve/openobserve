@@ -15,27 +15,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="bg-card-glass-bg h-full flex flex-col pb-[0.3rem]">
+  <div class="bg-card-glass-bg flex h-full flex-col pb-[0.3rem]">
     <!-- Current org section (if super org, not a member) -->
     <div v-if="currentOrgToShow" class="mb-3">
       <div class="rounded-default bg-card-glass-bg dark:bg-surface-base">
-        <div class="font-semibold px-2 py-2">
+        <div class="px-2 py-2 font-semibold">
           {{ t("billing.billingGroup.currentOrgTitle") }}
         </div>
-        <OSeparator class="mb-1 mt-0.75" />
+        <OSeparator class="mt-0.75 mb-1" />
 
         <OTabs orientation="vertical" v-model="activeMember" data-test="usage-member-tab-current">
           <OTab name="" :data-test="`usage-member-tab-current-item`">
-            <div class="member-item flex flex-col items-start w-full min-w-0">
+            <div class="member-item flex w-full min-w-0 flex-col items-start">
               <div
-                class="member-name font-semibold truncate max-w-full normal-case"
+                class="member-name max-w-full truncate font-semibold normal-case"
                 :title="currentOrgToShow.title"
               >
                 {{ currentOrgToShow.primary }}
               </div>
               <div
                 v-if="currentOrgToShow.secondary"
-                class="member-id text-xs opacity-60 truncate max-w-full normal-case"
+                class="member-id max-w-full truncate text-xs normal-case opacity-60"
                 :title="currentOrgToShow.secondary"
               >
                 {{ currentOrgToShow.secondary }}
@@ -47,14 +47,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Member organizations section -->
-    <div class="flex-1 flex flex-col min-h-0">
+    <div class="flex min-h-0 flex-1 flex-col">
       <div class="rounded-default bg-card-glass-bg dark:bg-surface-base">
-        <div class="font-semibold px-2 py-2">
+        <div class="px-2 py-2 font-semibold">
           {{ t("billing.billingGroup.memberOrgsTitle") }}
         </div>
-        <OSeparator class="mb-1 mt-0.75" />
+        <OSeparator class="mt-0.75 mb-1" />
 
-        <div class="flex items-center py-1 w-full">
+        <div class="flex w-full items-center py-1">
           <OInput
             v-model="searchQuery"
             data-test="usage-member-search"
@@ -76,16 +76,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :name="opt.value"
             :data-test="`usage-member-tab-${opt.value}`"
           >
-            <div class="member-item flex flex-col items-start w-full min-w-0">
+            <div class="member-item flex w-full min-w-0 flex-col items-start">
               <div
-                class="member-name font-semibold truncate max-w-full normal-case"
+                class="member-name max-w-full truncate font-semibold normal-case"
                 :title="opt.title"
               >
                 {{ opt.primary }}
               </div>
               <div
                 v-if="opt.secondary"
-                class="member-id text-xs opacity-60 truncate max-w-full normal-case"
+                class="member-id max-w-full truncate text-xs normal-case opacity-60"
                 :title="opt.secondary"
               >
                 {{ opt.secondary }}
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div
           v-if="filteredOptions.length === 0"
-          class="o2-page-subtitle text-center py-4 px-2"
+          class="o2-page-subtitle px-2 py-4 text-center"
           data-test="usage-member-no-results"
         >
           {{ t("billing.billingGroup.noMemberMatch") }}

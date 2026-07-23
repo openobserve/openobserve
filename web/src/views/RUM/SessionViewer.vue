@@ -26,53 +26,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
   >
     <template #subtitle>
-      <div class="flex items-center flex-wrap gap-x-3 gap-y-1 min-w-0">
-        <div class="text-xs truncate flex items-center gap-1.5">
+      <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+        <div class="flex items-center gap-1.5 truncate text-xs">
           <OIcon name="language" size="sm" />
           {{ sessionDetails.ip }}
         </div>
-        <div class="text-xs truncate flex items-center gap-1.5">
+        <div class="flex items-center gap-1.5 truncate text-xs">
           <OIcon name="calendar-month" size="sm" />
           {{ sessionDetails.date }}
         </div>
-        <div class="text-xs truncate flex items-center gap-1.5">
+        <div class="flex items-center gap-1.5 truncate text-xs">
           <OIcon name="person" size="sm" />
           {{ sessionDetails.user_email || "Unknown User" }}
         </div>
-        <div class="text-xs truncate flex items-center gap-1.5">
+        <div class="flex items-center gap-1.5 truncate text-xs">
           <OIcon name="location-on" size="sm" />
           {{ sessionDetails.city }}, {{ sessionDetails.country }}
         </div>
-        <div class="text-xs truncate flex items-center gap-1.5">
+        <div class="flex items-center gap-1.5 truncate text-xs">
           <OIcon name="settings" size="sm" />
           {{ sessionDetails.browser }}, {{ sessionDetails.os }}
         </div>
         <div
           v-if="frustrationCount > 0"
-          class="text-xs truncate flex items-center"
+          class="flex items-center truncate text-xs"
           :title="`${frustrationCount} frustration signal${frustrationCount > 1 ? 's' : ''} detected`"
           data-test="session-viewer-frustration-summary"
         >
           <OIcon
             name="sentiment-very-dissatisfied"
             size="sm"
-            class="pr-1 text-severity-warning-color"
+            class="text-severity-warning-color pr-1"
             data-test="frustration-summary-icon"
           />
           <span
-            class="font-semibold text-severity-warning-color"
+            class="text-severity-warning-color font-semibold"
             data-test="frustration-summary-text"
             >{{ frustrationCount }} Frustration{{ frustrationCount > 1 ? "s" : "" }}</span
           >
         </div>
       </div>
     </template>
-    <div class="w-full flex bg-card-glass-bg overflow-hidden h-[calc(100%-3.125)]! flex-1 min-h-0">
+    <div class="bg-card-glass-bg flex h-[calc(100%-3.125)]! min-h-0 w-full flex-1 overflow-hidden">
       <OSplitter
         v-model="splitterSize"
         :limits="[200, 1400]"
         unit="px"
-        class="w-full h-full"
+        class="h-full w-full"
         separatorClass="bg-card-glass-border w-px! hover:bg-theme-accent"
       >
         <template #before>

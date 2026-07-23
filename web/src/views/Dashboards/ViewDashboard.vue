@@ -216,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-show="store.state.printMode !== true"
             :variant="isHome(dashboardId) ? 'secondary' : 'outline'"
             size="icon-toolbar"
-            :class="isHome(dashboardId) ? 'text-primary border border-button-outline-border' : ''"
+            :class="isHome(dashboardId) ? 'text-primary border-button-outline-border border' : ''"
             @click="toggleHomeDashboard"
             data-test="dashboard-view-set-home-btn"
             :icon-left="isHome(dashboardId) ? 'keep' : 'keep-outline'"
@@ -231,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <RenderDashboardCharts
           :frame="false"
-          :class="store.state.printMode ? '' : 'flex-1 min-h-0'"
+          :class="store.state.printMode ? '' : 'min-h-0 flex-1'"
           :key="currentDashboardData.data?.dashboardId + '-' + dashboardRemountKey"
           v-if="selectedDate"
           ref="renderDashboardChartsRef"

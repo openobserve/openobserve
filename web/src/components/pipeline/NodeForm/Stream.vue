@@ -82,38 +82,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <div
                 v-if="selectedNodeType == 'output'"
-                class="note-message bg-banner-warning-bg text-banner-warning-text w-full rounded-default p-3 flex flex-col gap-2"
+                class="note-message bg-banner-warning-bg text-banner-warning-text rounded-default flex w-full flex-col gap-2 p-3"
               >
-                <div class="text-sm text-banner-warning-text">Guidelines:</div>
-                <div class="flex flex-col gap-1 text-sm text-banner-warning-text">
+                <div class="text-banner-warning-text text-sm">Guidelines:</div>
+                <div class="text-banner-warning-text flex flex-col gap-1 text-sm">
                   <div class="flex items-start gap-2">
-                    <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-status-warning-text" />
+                    <OIcon name="info" size="sm" class="text-status-warning-text mt-0.5 shrink-0" />
                     <span>
                       Select an existing stream from the list or enter the name to create a new one
                     </span>
                   </div>
                   <div class="flex items-start gap-2">
-                    <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-status-warning-text" />
+                    <OIcon name="info" size="sm" class="text-status-warning-text mt-0.5 shrink-0" />
                     <span>
-                      <span class="highlight font-bold text-text-link">Enrichment_tables</span> as
+                      <span class="highlight text-text-link font-bold">Enrichment_tables</span> as
                       destination stream is only available for scheduled pipelines
                     </span>
                   </div>
                   <div class="flex items-start gap-2">
-                    <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-status-warning-text" />
+                    <OIcon name="info" size="sm" class="text-status-warning-text mt-0.5 shrink-0" />
                     <span>
                       Use curly braces
                       <span
-                        class="code font-mono py-px px-1 rounded-default bg-code-bg text-code-text"
+                        class="code rounded-default bg-code-bg text-code-text px-1 py-px font-mono"
                         >{}</span
                       >
                       to configure stream name dynamically. e.g.
                       <span
-                        class="code font-mono py-px px-1 rounded-default bg-code-bg text-code-text"
+                        class="code rounded-default bg-code-bg text-code-text px-1 py-px font-mono"
                         >static_text_{fieldname}_postfix</span
                       >. Static text before/after
                       <span
-                        class="code font-mono py-px px-1 rounded-default bg-code-bg text-code-text"
+                        class="code rounded-default bg-code-bg text-code-text px-1 py-px font-mono"
                         >{}</span
                       >
                       is optional

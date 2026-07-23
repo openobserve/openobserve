@@ -17,27 +17,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <!-- ── Header ──────────────────────────────────────────────────────── -->
-    <div class="flex items-start gap-3 mb-2">
+    <div class="mb-2 flex items-start gap-3">
       <div
         data-test="feature-comparison-table-icon-wrapper"
-        class="w-12 h-12 rounded-default flex items-center justify-center shrink-0 bg-[color-mix(in_srgb,var(--color-accent)_12%,var(--color-card-glass-bg))] text-accent"
+        class="rounded-default text-accent flex h-12 w-12 shrink-0 items-center justify-center bg-[color-mix(in_srgb,var(--color-accent)_12%,var(--color-card-glass-bg))]"
       >
         <OIcon name="compare-arrows" size="md" />
       </div>
       <div>
         <div
-          class="text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.1em] text-accent m-0 mb-0.5"
+          class="text-accent m-0 mb-0.5 text-[length:var(--text-xs)] font-semibold tracking-[0.1em] uppercase"
         >
           EDITIONS
         </div>
         <div
-          class="text-[length:var(--text-xl)] font-semibold text-text-heading m-0 tracking-[-0.015em]"
+          class="text-text-heading m-0 text-[length:var(--text-xl)] font-semibold tracking-[-0.015em]"
         >
           {{ t("about.feature_comparison_lbl") }}
         </div>
       </div>
     </div>
-    <div class="text-sm font-normal leading-relaxed text-typography-body mt-2">
+    <div class="text-typography-body mt-2 text-sm leading-relaxed font-normal">
       <template v-if="buildType === 'opensource'">{{
         t("about.feature_comparision_os_msg")
       }}</template>
@@ -54,14 +54,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="ed.id"
         data-test="feature-comparison-table-edition-card"
         :data-test-active="buildType === ed.id ? 'true' : undefined"
-        class="relative flex flex-col bg-card-glass-bg rounded-default p-6 max-[1024px]:p-4 border border-card-glass-border"
-        :class="{ 'border-2 border-accent pt-7 max-[1024px]:pt-5': buildType === ed.id }"
+        class="bg-card-glass-bg rounded-default border-card-glass-border relative flex flex-col border p-6 max-[1024px]:p-4"
+        :class="{ 'border-accent border-2 pt-7 max-[1024px]:pt-5': buildType === ed.id }"
       >
         <!-- Your Plan badge (floats above the card top border) -->
         <div
           v-if="buildType === ed.id"
           data-test="feature-comparison-table-your-plan-badge"
-          class="absolute top-[-14px] left-1/2 -translate-x-1/2 inline-flex items-center py-1 px-3.5 rounded-full text-3xs font-bold uppercase tracking-[0.08em] whitespace-nowrap bg-accent text-button-primary-foreground"
+          class="text-3xs bg-accent text-button-primary-foreground absolute top-[-14px] left-1/2 inline-flex -translate-x-1/2 items-center rounded-full px-3.5 py-1 font-bold tracking-[0.08em] whitespace-nowrap uppercase"
         >
           <OIcon name="arrow-upward" size="sm" class="mr-1" />
           Your Plan
@@ -69,9 +69,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Edition name + hosting + price ────────────────────────────── -->
         <div class="mb-5">
-          <div class="text-base font-bold text-text-heading m-0 mb-0.5">{{ ed.shortName }}</div>
+          <div class="text-text-heading m-0 mb-0.5 text-base font-bold">{{ ed.shortName }}</div>
           <div class="text-compact text-text-muted m-0 mb-3.5">{{ ed.hosting }}</div>
-          <div class="text-3xl font-bold text-accent m-0 mb-1 tracking-[-0.03em] leading-[1.1]">
+          <div class="text-accent m-0 mb-1 text-3xl leading-[1.1] font-bold tracking-[-0.03em]">
             {{ ed.price }}
           </div>
           <div class="text-compact text-text-muted m-0 leading-[1.4]">{{ ed.priceSub }}</div>
@@ -79,41 +79,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- All Five Pillars chips ────────────────────────────────────── -->
         <div
-          class="bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-glass-bg))] border border-[color-mix(in_srgb,var(--color-accent)_15%,transparent)] rounded-default p-3 mb-4"
+          class="rounded-default mb-4 border border-[color-mix(in_srgb,var(--color-accent)_15%,transparent)] bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-glass-bg))] p-3"
         >
-          <div class="text-3xs font-bold uppercase tracking-[0.12em] text-text-label m-0 mb-2">
+          <div class="text-3xs text-text-label m-0 mb-2 font-bold tracking-[0.12em] uppercase">
             ALL FIVE PILLARS
           </div>
-          <div class="flex flex-wrap gap-1.5 mb-1.5">
+          <div class="mb-1.5 flex flex-wrap gap-1.5">
             <span
               v-for="pillarId in PILLAR_IDS"
               :key="pillarId"
               data-test="feature-comparison-table-pillar-chip"
-              class="inline-flex items-center py-[0.1875rem] px-2 rounded-default text-2xs font-medium bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] text-accent border border-[color-mix(in_srgb,var(--color-accent)_20%,transparent)] mr-1.5 mb-1.5"
+              class="rounded-default text-2xs text-accent mr-1.5 mb-1.5 inline-flex items-center border border-[color-mix(in_srgb,var(--color-accent)_20%,transparent)] bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] px-2 py-[0.1875rem] font-medium"
             >
               {{ t(`about.feature_${pillarId}`) }}
             </span>
           </div>
           <span
-            class="inline-flex items-center py-[0.1875rem] px-2 rounded-default text-2xs font-medium bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] text-accent border border-[color-mix(in_srgb,var(--color-accent)_20%,transparent)] mr-1.5 mb-1.5"
+            class="rounded-default text-2xs text-accent mr-1.5 mb-1.5 inline-flex items-center border border-[color-mix(in_srgb,var(--color-accent)_20%,transparent)] bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] px-2 py-[0.1875rem] font-medium"
             >{{ t("about.feature_dashboards") }}</span
           >
         </div>
 
         <!-- Feature list ───────────────────────────────────────────────── -->
-        <ul class="list-none p-0 m-0 flex-1">
+        <ul class="m-0 flex-1 list-none p-0">
           <li
             v-for="feature in listFeatures"
             :key="feature.id"
             data-test="feature-comparison-table-feature-item"
-            class="flex items-start gap-2 py-[0.4375rem] text-compact border-b border-card-glass-border last:border-b-0"
+            class="text-compact border-card-glass-border flex items-start gap-2 border-b py-[0.4375rem] last:border-b-0"
             :class="{
               'text-text-body': getFeatureStatus(feature, ed.id) !== 'unavailable',
               'text-text-muted': getFeatureStatus(feature, ed.id) === 'unavailable',
             }"
           >
             <span
-              class="shrink-0 mt-0.5 leading-none"
+              class="mt-0.5 shrink-0 leading-none"
               :class="{
                 'text-status-positive': getFeatureStatus(feature, ed.id) !== 'unavailable',
                 'text-text-muted': getFeatureStatus(feature, ed.id) === 'unavailable',
@@ -137,18 +137,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Footer: license + support + CTA ──────────────────────────── -->
         <div class="mt-4">
-          <div class="h-px bg-card-glass-border mb-3"></div>
+          <div class="bg-card-glass-border mb-3 h-px"></div>
           <div class="mb-3.5">
             <div
               data-test="feature-comparison-table-footer-row"
-              class="flex justify-between items-baseline text-compact py-0.5"
+              class="text-compact flex items-baseline justify-between py-0.5"
             >
               <span class="text-text-muted font-medium">{{ t("about.feature_license") }}</span>
               <span class="text-text-body font-semibold">{{ ed.license }}</span>
             </div>
             <div
               data-test="feature-comparison-table-footer-row"
-              class="flex justify-between items-baseline text-compact py-0.5"
+              class="text-compact flex items-baseline justify-between py-0.5"
             >
               <span class="text-text-muted font-medium">{{ t("about.feature_support") }}</span>
               <span class="text-text-body font-semibold">{{ ed.support }}</span>
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             target="_blank"
             data-test="feature-comparison-table-cta-btn"
             data-test-cta="action"
-            class="block w-full py-2 px-4 rounded-default text-sm font-semibold text-center no-underline cursor-pointer transition-all duration-200 border-[1.5px] border-solid bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] text-accent border-[color-mix(in_srgb,var(--color-accent)_30%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-accent)_18%,var(--color-card-glass-bg))] hover:border-accent"
+            class="rounded-default text-accent hover:border-accent block w-full cursor-pointer border-[1.5px] border-solid border-[color-mix(in_srgb,var(--color-accent)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] px-4 py-2 text-center text-sm font-semibold no-underline transition-all duration-200 hover:bg-[color-mix(in_srgb,var(--color-accent)_18%,var(--color-card-glass-bg))]"
           >
             {{ ed.ctaLabel }}
           </a>
@@ -168,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else
             data-test="feature-comparison-table-cta-btn"
             data-test-cta="current"
-            class="block w-full py-2 px-4 rounded-default text-sm font-semibold text-center no-underline cursor-default transition-all duration-200 border-[1.5px] border-solid bg-transparent text-text-muted border-card-glass-border"
+            class="rounded-default text-text-muted border-card-glass-border block w-full cursor-default border-[1.5px] border-solid bg-transparent px-4 py-2 text-center text-sm font-semibold no-underline transition-all duration-200"
             disabled
           >
             {{ ed.ctaLabel }}

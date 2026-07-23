@@ -16,14 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <div class="setup-card max-w-225 mx-auto">
+    <div class="setup-card mx-auto max-w-225">
       <!-- Header -->
-      <div class="mb-6 p-4 rounded-default" :class="quickInstallBgClass">
+      <div class="rounded-default mb-6 p-4" :class="quickInstallBgClass">
         <div class="flex items-start gap-3">
           <OIcon name="rocket-launch" size="xl" class="text-text-link" />
           <div>
-            <h6 class="text-xl! font-bold m-0 mb-2!">Complete AWS Integration</h6>
-            <p class="text-sm mt-0 mb-0" :class="descriptionClass">
+            <h6 class="m-0 mb-2! text-xl! font-bold">Complete AWS Integration</h6>
+            <p class="mt-0 mb-0 text-sm" :class="descriptionClass">
               Deploy all selected AWS services in one click using a single CloudFormation stack.
             </p>
           </div>
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Deployment Mode Toggle -->
       <div class="mb-6">
-        <div class="mb-3 font-semibold text-sm" :class="stepLabelClass">Deployment mode</div>
+        <div class="mb-3 text-sm font-semibold" :class="stepLabelClass">Deployment mode</div>
         <OToggleGroup v-model="deploymentMode" data-test="aws-deployment-mode-toggle">
           <OToggleGroupItem value="single">Single Region</OToggleGroupItem>
           <OToggleGroupItem value="stackset">Multi-Region (StackSets)</OToggleGroupItem>
@@ -53,13 +53,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Step: Services -->
       <div class="mb-6">
         <div
-          class="flex items-center justify-between cursor-pointer py-2 px-3 rounded-default"
+          class="rounded-default flex cursor-pointer items-center justify-between px-3 py-2"
           :class="collapsibleHeaderClass"
           @click="showServices = !showServices"
         >
           <div class="flex items-center gap-2">
             <OIcon :name="showServices ? 'expand-less' : 'expand-more'" size="sm" color="primary" />
-            <div class="font-semibold text-sm" :class="stepLabelClass">
+            <div class="text-sm font-semibold" :class="stepLabelClass">
               Select services to monitor
             </div>
             <OTag type="countChip" value="accent">
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="grid transition-[grid-template-rows] duration-300 ease-in-out"
           :class="showServices ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
         >
-          <div class="overflow-hidden min-h-0">
+          <div class="min-h-0 overflow-hidden">
             <div class="mt-3">
               <div class="grid grid-cols-4 gap-x-4 gap-y-2">
                 <div v-for="service in QUICK_SETUP_SERVICES" :key="service.flag">
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Single Region: region picker -->
       <div v-if="deploymentMode === 'single'" class="mb-6">
-        <div class="mb-3 font-semibold text-sm" :class="stepLabelClass">Deployment region</div>
+        <div class="mb-3 text-sm font-semibold" :class="stepLabelClass">Deployment region</div>
         <OSelect
           v-model="selectedRegion"
           :options="AWS_REGIONS"
@@ -108,9 +108,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- StackSets: admin + target regions -->
       <template v-else>
         <div class="mb-6">
-          <div class="mb-3 font-semibold text-sm" :class="stepLabelClass">
+          <div class="mb-3 text-sm font-semibold" :class="stepLabelClass">
             Admin region
-            <span class="font-normal text-xs text-text-muted">(where the StackSet is managed)</span>
+            <span class="text-text-muted text-xs font-normal">(where the StackSet is managed)</span>
           </div>
           <OSelect
             v-model="selectedRegion"
@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="mb-6">
           <div
-            class="flex items-center justify-between cursor-pointer py-2 px-3 rounded-default"
+            class="rounded-default flex cursor-pointer items-center justify-between px-3 py-2"
             :class="collapsibleHeaderClass"
             @click="showTargetRegions = !showTargetRegions"
           >
@@ -134,9 +134,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm"
                 color="primary"
               />
-              <div class="font-semibold text-sm" :class="stepLabelClass">
+              <div class="text-sm font-semibold" :class="stepLabelClass">
                 Target regions
-                <span class="font-normal text-xs text-text-muted"
+                <span class="text-text-muted text-xs font-normal"
                   >(where stacks will be deployed)</span
                 >
               </div>
@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="grid transition-[grid-template-rows] duration-300 ease-in-out"
             :class="showTargetRegions ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
           >
-            <div class="overflow-hidden min-h-0">
+            <div class="min-h-0 overflow-hidden">
               <div class="mt-3">
                 <div class="grid grid-cols-3 gap-x-4 gap-y-2">
                   <div v-for="region in AWS_REGIONS" :key="region.value">
@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="mb-6">
-          <div class="mb-3 font-semibold text-sm" :class="stepLabelClass">Deployment model</div>
+          <div class="mb-3 text-sm font-semibold" :class="stepLabelClass">Deployment model</div>
           <OToggleGroup v-model="stackSetModel" data-test="aws-stackset-model-toggle">
             <OToggleGroupItem value="self">Self-managed</OToggleGroupItem>
             <OToggleGroupItem value="service">Service-managed (AWS Organizations)</OToggleGroupItem>
@@ -193,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- Launch -->
-      <div class="flex items-center gap-3 mb-6">
+      <div class="mb-6 flex items-center gap-3">
         <OButton
           variant="primary"
           size="sm"
@@ -211,12 +211,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             deploymentMode === "single" ? "Launch CloudFormation Stack" : "Open StackSets Console"
           }}
         </OButton>
-        <span v-if="enabledServices.length === 0" class="text-sm text-status-error-text">
+        <span v-if="enabledServices.length === 0" class="text-status-error-text text-sm">
           Select at least one service
         </span>
         <span
           v-else-if="deploymentMode === 'stackset' && targetRegions.length === 0"
-          class="text-sm text-status-error-text"
+          class="text-status-error-text text-sm"
         >
           Select at least one target region
         </span>
@@ -236,19 +236,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           showParamHelper && deploymentMode === 'stackset' ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
         "
       >
-        <div class="overflow-hidden min-h-0">
+        <div class="min-h-0 overflow-hidden">
           <div>
             <OSeparator class="mb-4" />
             <div class="rounded-default p-4" :class="paramHelperClass">
-              <div class="flex items-center justify-between mb-3">
-                <div class="font-semibold text-sm" :class="stepLabelClass">
+              <div class="mb-3 flex items-center justify-between">
+                <div class="text-sm font-semibold" :class="stepLabelClass">
                   Parameters to enter in the AWS wizard
                 </div>
                 <OButton variant="ghost" size="icon-circle-sm" @click="showParamHelper = false">
                   <OIcon name="close" size="sm" />
                 </OButton>
               </div>
-              <p class="text-xs mb-3" :class="hintTextClass">
+              <p class="mb-3 text-xs" :class="hintTextClass">
                 The StackSets console doesn't support URL pre-fill. Enter these values as you go
                 through the wizard.
               </p>
@@ -256,15 +256,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="param in stackSetParams"
                   :key="param.key"
-                  class="flex items-center gap-3 py-1.5 px-2.5 rounded-default text-compact font-mono"
+                  class="rounded-default text-compact flex items-center gap-3 px-2.5 py-1.5 font-mono"
                   :class="paramRowClass"
                 >
-                  <div class="min-w-60 font-semibold shrink-0" :class="paramKeyClass">
+                  <div class="min-w-60 shrink-0 font-semibold" :class="paramKeyClass">
                     {{ param.key }}
                   </div>
-                  <div class="flex items-center gap-1 flex-1 overflow-hidden">
+                  <div class="flex flex-1 items-center gap-1 overflow-hidden">
                     <span
-                      class="overflow-hidden text-ellipsis whitespace-nowrap flex-1"
+                      class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
                       :class="paramValTextClass"
                       >{{ param.value }}</span
                     >
@@ -276,10 +276,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div class="mt-3">
-                <div class="font-semibold text-xs mb-1" :class="stepLabelClass">
+                <div class="mb-1 text-xs font-semibold" :class="stepLabelClass">
                   Target regions to enter in "Deployment targets":
                 </div>
-                <div class="flex flex-wrap gap-1 mt-1">
+                <div class="mt-1 flex flex-wrap gap-1">
                   <OTag v-for="r in targetRegions" :key="r" type="fieldTag" value="primarysm">{{
                     r
                   }}</OTag>

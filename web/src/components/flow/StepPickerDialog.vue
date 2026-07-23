@@ -51,28 +51,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-for="item in filtered"
         :key="item.key"
         type="button"
-        class="flow-step-card flex items-start gap-3 p-3 border border-border-default rounded-default bg-card-bg text-left cursor-pointer transition-[border-color,background,box-shadow] duration-[120ms] hover:border-accent hover:bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))] hover:shadow-[0_0_0_0.1875rem_color-mix(in_srgb,var(--color-primary-600)_12%,transparent)]"
+        class="flow-step-card border-border-default rounded-default bg-card-bg hover:border-accent flex cursor-pointer items-start gap-3 border p-3 text-left transition-[border-color,background,box-shadow] duration-[120ms] hover:bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))] hover:shadow-[0_0_0_0.1875rem_color-mix(in_srgb,var(--color-primary-600)_12%,transparent)]"
         :data-test="`${testPrefix}-${item.key}`"
         @click="emit('pick', item)"
       >
         <div
-          class="inline-flex items-center justify-center w-8 h-8 shrink-0 rounded-default"
+          class="rounded-default inline-flex h-8 w-8 shrink-0 items-center justify-center"
           :class="item.iconTint"
         >
           <OIcon :name="item.icon || 'help'" size="md" />
         </div>
         <div class="min-w-0">
-          <div class="text-sm font-semibold text-text-body">
+          <div class="text-text-body text-sm font-semibold">
             {{ item.title }}
           </div>
-          <div v-if="item.description" class="text-xs text-text-secondary leading-snug">
+          <div v-if="item.description" class="text-text-secondary text-xs leading-snug">
             {{ item.description }}
           </div>
         </div>
       </button>
     </div>
 
-    <div v-else class="py-8 text-center text-sm text-text-secondary">
+    <div v-else class="text-text-secondary py-8 text-center text-sm">
       {{ emptyText }}
     </div>
   </ODialog>

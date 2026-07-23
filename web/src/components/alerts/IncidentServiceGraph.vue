@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="incident-service-graph relative h-[calc(100vh-12.625rem)] min-h-100 flex flex-col m-3 p-5 rounded-default overflow-hidden transition-all duration-200 bg-[linear-gradient(135deg,#f9fafb_0%,#ffffff_100%)] border border-border-default shadow-[0_1px_3px_0_rgba(0,0,0,0.08),0_1px_2px_0_rgba(0,0,0,0.04),inset_0_0_0_1px_rgba(255,255,255,0.5)] hover:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1),0_2px_4px_-1px_rgba(0,0,0,0.06),inset_0_0_0_1px_rgba(255,255,255,0.5)] dark:bg-[linear-gradient(135deg,var(--color-grey-800)_0%,var(--color-grey-900)_100%)] dark:border-grey-700 dark:shadow-[0_1px_3px_0_color-mix(in_srgb,var(--color-black)_30%,transparent),0_1px_2px_0_color-mix(in_srgb,var(--color-black)_20%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--color-grey-700)_30%,transparent)] dark:hover:shadow-[0_4px_6px_-1px_color-mix(in_srgb,var(--color-black)_40%,transparent),0_2px_4px_-1px_color-mix(in_srgb,var(--color-black)_30%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--color-grey-700)_30%,transparent)]"
+    class="incident-service-graph rounded-default border-border-default dark:border-grey-700 relative m-3 flex h-[calc(100vh-12.625rem)] min-h-100 flex-col overflow-hidden border bg-[linear-gradient(135deg,#f9fafb_0%,#ffffff_100%)] p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.08),0_1px_2px_0_rgba(0,0,0,0.04),inset_0_0_0_1px_rgba(255,255,255,0.5)] transition-all duration-200 hover:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1),0_2px_4px_-1px_rgba(0,0,0,0.06),inset_0_0_0_1px_rgba(255,255,255,0.5)] dark:bg-[linear-gradient(135deg,var(--color-grey-800)_0%,var(--color-grey-900)_100%)] dark:shadow-[0_1px_3px_0_color-mix(in_srgb,var(--color-black)_30%,transparent),0_1px_2px_0_color-mix(in_srgb,var(--color-black)_20%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--color-grey-700)_30%,transparent)] dark:hover:shadow-[0_4px_6px_-1px_color-mix(in_srgb,var(--color-black)_40%,transparent),0_2px_4px_-1px_color-mix(in_srgb,var(--color-black)_30%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--color-grey-700)_30%,transparent)]"
   >
     <!-- Info Icon → Graph Legend popover (hover to show) -->
     <span
@@ -27,37 +27,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="info-outline" size="sm" />
       </OButton>
       <div
-        class="graph-legend absolute top-[calc(100%+8px)] right-0 min-w-60 py-3.5 px-4 text-compact leading-normal text-text-body bg-surface-overlay border border-border-default rounded-default shadow-[0_10px_20px_rgba(0,0,0,0.12),0_3px_6px_rgba(0,0,0,0.06)] opacity-0 invisible -translate-y-1 transition-all duration-150 pointer-events-none whitespace-nowrap group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:pointer-events-auto dark:text-grey-200 dark:bg-grey-800 dark:border-[color-mix(in_srgb,var(--color-white)_12%,transparent)] dark:shadow-[0_10px_20px_color-mix(in_srgb,var(--color-black)_60%,transparent),0_3px_6px_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
+        class="graph-legend text-compact text-text-body bg-surface-overlay border-border-default rounded-default dark:text-grey-200 dark:bg-grey-800 pointer-events-none invisible absolute top-[calc(100%+8px)] right-0 min-w-60 -translate-y-1 border px-4 py-3.5 leading-normal whitespace-nowrap opacity-0 shadow-[0_10px_20px_rgba(0,0,0,0.12),0_3px_6px_rgba(0,0,0,0.06)] transition-all duration-150 group-focus-within:pointer-events-auto group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 dark:border-[color-mix(in_srgb,var(--color-white)_12%,transparent)] dark:shadow-[0_10px_20px_color-mix(in_srgb,var(--color-black)_60%,transparent),0_3px_6px_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
         role="tooltip"
       >
-        <div class="font-semibold text-sm mb-2.5">Graph Legend</div>
+        <div class="mb-2.5 text-sm font-semibold">Graph Legend</div>
         <div class="graph-legend__row flex items-center gap-2 py-1">
           <span
-            class="graph-legend__dot text-sm leading-none w-3.5 text-center shrink-0 text-status-negative"
+            class="graph-legend__dot text-status-negative w-3.5 shrink-0 text-center text-sm leading-none"
             >●</span
           >
           Red = Potential Root Cause
         </div>
         <div class="graph-legend__row flex items-center gap-2 py-1">
           <span
-            class="graph-legend__dot text-sm leading-none w-3.5 text-center shrink-0 text-status-warning-text"
+            class="graph-legend__dot text-status-warning-text w-3.5 shrink-0 text-center text-sm leading-none"
             >●</span
           >
           Orange = High Frequency
         </div>
         <div class="graph-legend__row flex items-center gap-2 py-1">
           <span
-            class="graph-legend__dot text-sm leading-none w-3.5 text-center shrink-0 text-text-link"
+            class="graph-legend__dot text-text-link w-3.5 shrink-0 text-center text-sm leading-none"
             >●</span
           >
           Blue = Normal
         </div>
         <div
-          class="graph-legend__divider h-px bg-border-default my-2 dark:bg-[color-mix(in_srgb,var(--color-white)_15%,transparent)]"
+          class="graph-legend__divider bg-border-default my-2 h-px dark:bg-[color-mix(in_srgb,var(--color-white)_15%,transparent)]"
         />
         <div class="graph-legend__row flex items-center gap-2 py-1">
           <span
-            class="graph-legend__dot text-sm leading-none w-3.5 text-center shrink-0 text-badge-purple-ol-text"
+            class="graph-legend__dot text-badge-purple-ol-text w-3.5 shrink-0 text-center text-sm leading-none"
             >→</span
           >
           Purple arrows show temporal flow
@@ -66,21 +66,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </span>
 
     <!-- Loading State -->
-    <div v-if="loading" class="flex items-center justify-center h-full bg-surface-base/50">
+    <div v-if="loading" class="bg-surface-base/50 flex h-full items-center justify-center">
       <OSpinner size="md" />
     </div>
 
     <!-- Empty State -->
     <div
       v-else-if="!graphData || !graphData.nodes || graphData.nodes.length === 0"
-      class="flex flex-col items-center justify-center gap-3 h-full"
+      class="flex h-full flex-col items-center justify-center gap-3"
     >
       <!-- size-12! (48px) exceeds OIcon's largest `size` prop (xl = 40px); the `!`
            is required because OIcon's own `size-6` default sits in the same layer. -->
       <OIcon name="hub" class="text-text-muted size-12!" />
       <div class="text-center">
-        <div class="text-sm font-medium text-text-secondary">Service Graph Unavailable</div>
-        <div class="text-xs mt-1 text-text-secondary">
+        <div class="text-text-secondary text-sm font-medium">Service Graph Unavailable</div>
+        <div class="text-text-secondary mt-1 text-xs">
           No topology data available for this incident.
         </div>
       </div>
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Graph Canvas using ECharts -->
     <div
       v-if="!loading && graphData && graphData.nodes && graphData.nodes.length > 0"
-      class="w-full h-full"
+      class="h-full w-full"
     >
       <ChartRenderer ref="chartRendererRef" :data="chartData" :key="chartKey" />
     </div>

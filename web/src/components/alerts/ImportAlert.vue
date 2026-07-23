@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ref="baseImportRef"
     title="Import Alert"
     test-prefix="alert"
-    class="flex-1 min-h-0"
+    class="min-h-0 flex-1"
     :is-importing="isAlertImporting"
     @back="router.back()"
     @cancel="router.back()"
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Custom URL Input Section with Folder Dropdown -->
     <template #url-input-section="{ url, updateUrl }">
-      <div class="flex items-end gap-2 my-[0.725rem]">
+      <div class="my-[0.725rem] flex items-end gap-2">
         <div class="w-[69%]">
           <OInput
             data-test="alert-import-url-input"
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Custom File Input Section with Folder Dropdown -->
     <template #file-input-section="{ jsonFiles, updateFiles }">
-      <div class="mb-1 flex items-start gap-2 w-[calc(100%-0.625rem)]">
+      <div class="mb-1 flex w-[calc(100%-0.625rem)] items-start gap-2">
         <div class="w-[69%]">
           <OFile
             data-test="alert-import-json-file-input"
@@ -76,20 +76,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Output Section with Alert-specific Error Display -->
     <template #output-content>
-      <div class="w-full h-full flex flex-col border-l border-border-default min-w-100">
+      <div class="border-border-default flex h-full w-full min-w-100 flex-col border-l">
         <div
           v-if="alertErrorsToDisplay.length > 0"
-          class="text-center text-sm font-semibold text-text-heading py-3 shrink-0"
+          class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"
         >
           Error Validations
         </div>
-        <div v-else class="text-center text-sm font-semibold text-text-heading py-3 shrink-0">
+        <div v-else class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold">
           Output Messages
         </div>
         <OSeparator class="mt-1 shrink-0" />
-        <div class="error-report-container flex-1 min-h-0">
+        <div class="error-report-container min-h-0 flex-1">
           <!-- Alert Errors Section -->
-          <div class="p-2.5 mb-2.5" v-if="alertErrorsToDisplay.length > 0">
+          <div class="mb-2.5 p-2.5" v-if="alertErrorsToDisplay.length > 0">
             <div class="error-list">
               <!-- Iterate through the outer array -->
               <div
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="(errorMessage, errorIndex) in errorGroup"
                   :key="errorIndex"
-                  class="py-1.25 px-0 text-sm"
+                  class="px-0 py-1.25 text-sm"
                   :data-test="`alert-import-error-${index}-${errorIndex}`"
                 >
                   <span
@@ -262,9 +262,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="p-2.5 mb-2.5" v-if="alertCreators.length > 0">
+          <div class="mb-2.5 p-2.5" v-if="alertCreators.length > 0">
             <div
-              class="text-base mb-2.5 uppercase text-primary"
+              class="text-primary mb-2.5 text-base uppercase"
               data-test="alert-import-creation-title"
             >
               Alert Creation
@@ -277,8 +277,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div
                 :class="{
-                  'py-1.25 px-0 text-sm font-bold': true,
-                  'text-green ': val.success,
+                  'px-0 py-1.25 text-sm font-bold': true,
+                  'text-green': val.success,
                   'text-status-negative': !val.success,
                 }"
                 :data-test="`alert-import-creation-${index}-message`"

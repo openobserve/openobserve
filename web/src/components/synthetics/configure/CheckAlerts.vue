@@ -61,27 +61,27 @@ const silenceMinutes = computed({
 
 <template>
   <div
-    class="rounded-default border border-border-default mb-4"
+    class="rounded-default border-border-default mb-4 border"
     data-test="synthetics-check-alerts"
   >
-    <div class="flex items-center border-b border-border-default py-2.5 px-3">
-      <div class="w-[0.1875rem] h-4 rounded-default mr-2 shrink-0 bg-primary-600" />
-      <h3 class="text-base font-semibold text-text-heading">
+    <div class="border-border-default flex items-center border-b px-3 py-2.5">
+      <div class="rounded-default bg-primary-600 mr-2 h-4 w-[0.1875rem] shrink-0" />
+      <h3 class="text-text-heading text-base font-semibold">
         {{ t("synthetics.scheduleAlert.alerts") }}
       </h3>
     </div>
-    <div class="px-3 py-2 flex flex-col gap-4">
+    <div class="flex flex-col gap-4 px-3 py-2">
       <!-- ── Destinations (optional) ────────────────────────────────────── -->
       <div>
         <div class="flex items-center gap-2">
-          <label class="text-sm font-medium text-text-body mb-1 block w-32">
+          <label class="text-text-body mb-1 block w-32 text-sm font-medium">
             {{ t("synthetics.scheduleAlert.destinations") }}
           </label>
           <OSelect
             v-model="localDestinations"
             :options="destinations"
             multiple
-            class="min-w-45 max-w-75"
+            class="max-w-75 min-w-45"
             data-test="synthetics-check-alerts-destinations-select"
           >
             <template #empty>{{ t("synthetics.scheduleAlert.noDestinations") }}</template>
@@ -107,8 +107,8 @@ const silenceMinutes = computed({
       </div>
 
       <!-- ── Alert threshold ──────────────────────────────────────────── -->
-      <div class="flex items-center gap-2 flex-nowrap">
-        <label class="text-sm font-medium text-text-body whitespace-nowrap w-32">{{
+      <div class="flex flex-nowrap items-center gap-2">
+        <label class="text-text-body w-32 text-sm font-medium whitespace-nowrap">{{
           t("synthetics.scheduleAlert.alertedIfFails")
         }}</label>
         <OInput
@@ -118,14 +118,14 @@ const silenceMinutes = computed({
           placeholder="1"
           data-test="synthetics-check-alerts-threshold-input"
         />
-        <span class="text-sm text-text-body whitespace-nowrap">{{
+        <span class="text-text-body text-sm whitespace-nowrap">{{
           t("synthetics.scheduleAlert.alertedIfFailsSuffix")
         }}</span>
       </div>
 
       <!-- ── Cooldown Period ────────────────────────────────────────────── -->
       <div class="flex items-center gap-2">
-        <label class="w-32 text-sm font-medium text-text-body flex items-center">
+        <label class="text-text-body flex w-32 items-center text-sm font-medium">
           {{ t("synthetics.scheduleAlert.cooldownPeriod") }} *
         </label>
         <div class="flex items-center">
@@ -137,7 +137,7 @@ const silenceMinutes = computed({
               data-test="synthetics-check-alerts-cooldown-input"
             />
           </div>
-          <div class="flex justify-center items-center text-text-body pl-2 h-7 text-sm">
+          <div class="text-text-body flex h-7 items-center justify-center pl-2 text-sm">
             {{ t("synthetics.scheduleAlert.minutes") }}
           </div>
         </div>
@@ -146,7 +146,7 @@ const silenceMinutes = computed({
       <!-- Validation error -->
       <p
         v-if="props.validationErrors?.alerts"
-        class="text-xs text-status-error-text"
+        class="text-status-error-text text-xs"
         data-test="synthetics-check-alerts-error"
       >
         {{ props.validationErrors.alerts }}

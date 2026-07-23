@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
   <div
-    class="rounded-default h-full min-h-full! max-h-full! overflow-hidden! logPage"
+    class="rounded-default logPage h-full max-h-full! min-h-full! overflow-hidden!"
     id="logPage"
     data-test="logs-page-container"
   >
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                a 6px internal inset (toolbar p-1.5 + editor ml-1.5), so 4+6=10px
                lines the toolbar/editor up with the 10px field-list & results
                panels below. -->
-          <div class="w-full h-full">
+          <div class="h-full w-full">
             <SearchBar
               data-test="logs-search-bar"
               ref="searchBarRef"
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:after>
           <div
             id="thirdLevel"
-            class="flex scroll relative-position thirdlevel h-full max-h-full overflow-hidden p-0 m-0 box-border logsPageMainSection w-full border-t border-border-default"
+            class="scroll relative-position thirdlevel logsPageMainSection border-border-default m-0 box-border flex h-full max-h-full w-full overflow-hidden border-t p-0"
             v-show="
               searchObj.meta.logsVisualizeToggle == 'logs' ||
               searchObj.meta.logsVisualizeToggle == 'patterns'
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSplitter
               v-model="searchObj.config.splitterModel"
               :limits="searchObj.config.splitterLimit"
-              class="h-full max-h-full overflow-hidden w-full logs-splitter-smooth"
+              class="logs-splitter-smooth h-full max-h-full w-full overflow-hidden"
               separatorClass="field-list-separator"
               :separatorStyle="{
                 width: '10px',
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      OFieldList) so they line up — they're controls, not scrolling
                      surfaces. -->
                 <div
-                  class="relative-position h-full pt-2.5 border-r border-border-default bg-surface-panel"
+                  class="relative-position border-border-default bg-surface-panel h-full border-r pt-2.5"
                 >
                   <IndexList
                     v-if="searchObj.meta.showFields"
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <template #after>
                 <div class="h-full">
-                  <div class="bg-card-glass-bg h-full w-full relative-position">
+                  <div class="bg-card-glass-bg relative-position h-full w-full">
                     <div
                       v-if="
                         !searchObj.loadingStream &&
@@ -254,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-show="searchObj.meta.logsVisualizeToggle == 'visualize'"
-            class="h-full border-t border-border-default"
+            class="border-border-default h-full border-t"
             :style="{ '--splitter-width': `${100 - splitterModel}vw` }"
           >
             <VisualizeLogsQuery
@@ -299,19 +299,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <div
         v-else-if="showSearchHistory && !store.state.zoConfig.usage_enabled"
-        class="h-50 rounded-default"
+        class="rounded-default h-50"
       >
-        <div class="h-[80vh] rounded-default text-center p-3 flex items-center justify-center">
+        <div class="rounded-default flex h-[80vh] items-center justify-center p-3 text-center">
           <div>
             <div>
-              <OIcon name="history" class="w-25 h-25 [font-size: var(--text-4xl)] opacity-10" />
+              <OIcon name="history" class="[font-size: var(--text-4xl)] h-25 w-25 opacity-10" />
             </div>
             <div class="text-3xl font-semibold opacity-80">
               {{ t("logs.index.searchHistoryNotEnabled") }}
             </div>
-            <div class="opacity-80 mt-2 flex items-center justify-center">
+            <div class="mt-2 flex items-center justify-center opacity-80">
               <OIcon name="info" class="mr-1" size="md" />
-              <span class="text-xl font-semibold text-center">
+              <span class="text-center text-xl font-semibold">
                 {{ t("logs.index.enableUsageReporting") }}</span
               >
             </div>

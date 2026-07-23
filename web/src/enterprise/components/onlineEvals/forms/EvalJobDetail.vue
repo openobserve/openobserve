@@ -11,7 +11,7 @@
     @update:open="handleOpenChange"
   >
     <!-- Body: the KPI strip + tab bar stay pinned; only the tab content scrolls. -->
-    <div class="flex flex-col h-full min-h-0">
+    <div class="flex h-full min-h-0 flex-col">
       <!-- ── Global window control ── -->
       <!-- A single date picker drives the WHOLE detail view — the KPI strip
            and both the Runs and Failures tables share this one window. Placed
@@ -42,7 +42,7 @@
            consistent. Pinned band (shrink-0) with a bottom divider; the cards
            below carry their own chrome via Tailwind. -->
       <section
-        class="flex-shrink-0 grid grid-cols-4 gap-2.5 px-5 py-4 border-b border-b-dialog-header-border"
+        class="border-b-dialog-header-border grid flex-shrink-0 grid-cols-4 gap-2.5 border-b px-5 py-4"
       >
         <!-- While the KPI query is in flight, show skeleton tiles in place of
              the cards (matches the LLM Insights dashboard pattern). -->
@@ -51,16 +51,16 @@
           v-for="card in kpiCards"
           v-else
           :key="card.label"
-          class="rounded-default flex flex-col px-3.5 pt-2.5 pb-2.5 gap-1 bg-surface-base border border-border-default transition-shadow duration-200 hover:shadow-[0_0.0625rem_0.375rem_color-mix(in_srgb,var(--color-black)_8%,transparent)]"
+          class="rounded-default bg-surface-base border-border-default flex flex-col gap-1 border px-3.5 pt-2.5 pb-2.5 transition-shadow duration-200 hover:shadow-[0_0.0625rem_0.375rem_color-mix(in_srgb,var(--color-black)_8%,transparent)]"
         >
-          <div class="kpi-label text-2xs leading-normal font-semibold mb-1 text-text-secondary">
+          <div class="kpi-label text-2xs text-text-secondary mb-1 leading-normal font-semibold">
             {{ card.label }}
           </div>
           <div class="flex items-baseline gap-[0.2rem]">
-            <span class="text-2xl font-bold leading-none text-text-secondary">
+            <span class="text-text-secondary text-2xl leading-none font-bold">
               {{ card.value }}
             </span>
-            <span v-if="card.unit" class="text-compact font-semibold text-text-secondary">
+            <span v-if="card.unit" class="text-compact text-text-secondary font-semibold">
               {{ card.unit }}
             </span>
           </div>
@@ -90,21 +90,21 @@
            edge-to-edge column headers. Bottom padding is opt-in for the
            Configuration (form) tab; the table tabs stay flush to the bottom. -->
       <div
-        class="flex-1 overflow-auto flex flex-col gap-[1.125rem] min-h-0 pt-[1.125rem]"
+        class="flex min-h-0 flex-1 flex-col gap-[1.125rem] overflow-auto pt-[1.125rem]"
         :class="{ 'pb-[1.125rem]': activeTab === 'configuration' }"
       >
         <!-- Shared Runs/Failures filter row — agent filter (both tabs),
              right-aligned. The date picker + refresh live in the global
              toolbar above the cards, so they're not duplicated here. Rendered
              once with v-show (not v-if) so it never remounts on tab switch. -->
-        <div v-show="tableEnabled" class="flex items-center justify-end gap-2 flex-wrap px-5">
+        <div v-show="tableEnabled" class="flex flex-wrap items-center justify-end gap-2 px-5">
           <div class="w-56 flex-shrink-0">
             <OSelect
               v-model="agentKey"
               :options="agentOptions"
               labelKey="label"
               valueKey="value"
-              class="w-full rounded-default"
+              class="rounded-default w-full"
               data-test="eval-job-detail-runs-agent-filter"
             />
           </div>
@@ -115,40 +115,40 @@
           <!-- Target -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-1.5 inline-flex items-center gap-1.5 text-compact font-semibold leading-[1.5] text-text-heading border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-[1.5] font-semibold"
             >
               {{ t("onlineEvals.job.detail.targetSection") }}
             </h4>
-            <dl class="grid grid-cols-[8.125rem_1fr] gap-x-3.5 gap-y-1.5 m-0">
-              <dt class="text-xs font-semibold text-text-secondary">
+            <dl class="m-0 grid grid-cols-[8.125rem_1fr] gap-x-3.5 gap-y-1.5">
+              <dt class="text-text-secondary text-xs font-semibold">
                 {{ t("onlineEvals.job.detail.streamLabel") }}
               </dt>
-              <dd class="m-0 text-compact text-text-body wrap-break-word">{{ row.stream }}</dd>
+              <dd class="text-compact text-text-body m-0 wrap-break-word">{{ row.stream }}</dd>
 
-              <dt class="text-xs font-semibold text-text-secondary">
+              <dt class="text-text-secondary text-xs font-semibold">
                 {{ t("onlineEvals.job.detail.streamTypeLabel") }}
               </dt>
-              <dd class="m-0 text-compact text-text-body wrap-break-word">{{ streamType }}</dd>
+              <dd class="text-compact text-text-body m-0 wrap-break-word">{{ streamType }}</dd>
 
-              <dt class="text-xs font-semibold text-text-secondary">
+              <dt class="text-text-secondary text-xs font-semibold">
                 {{ t("onlineEvals.job.detail.targetScopeLabel") }}
               </dt>
-              <dd class="m-0 text-compact text-text-body wrap-break-word">
+              <dd class="text-compact text-text-body m-0 wrap-break-word">
                 {{ targetScopeLabel }}
               </dd>
 
               <template v-if="completionWindow">
-                <dt class="text-xs font-semibold text-text-secondary">
+                <dt class="text-text-secondary text-xs font-semibold">
                   {{ t("onlineEvals.job.detail.idleWindowLabel") }}
                 </dt>
-                <dd class="m-0 text-compact text-text-body wrap-break-word">
+                <dd class="text-compact text-text-body m-0 wrap-break-word">
                   {{ completionWindow.idleWindowSecs }}s
                 </dd>
 
-                <dt class="text-xs font-semibold text-text-secondary">
+                <dt class="text-text-secondary text-xs font-semibold">
                   {{ t("onlineEvals.job.detail.maxAgeLabel") }}
                 </dt>
-                <dd class="m-0 text-compact text-text-body wrap-break-word">
+                <dd class="text-compact text-text-body m-0 wrap-break-word">
                   {{ completionWindow.maxAgeSecs }}s
                 </dd>
               </template>
@@ -157,13 +157,13 @@
             <!-- Filter rendered as a code block with a header bar + copy action,
                  matching the Alert History condition view. -->
             <div
-              class="border border-dialog-header-border rounded-default overflow-hidden bg-[color-mix(in_srgb,var(--color-text-secondary)_4%,var(--color-card-bg))]"
+              class="border-dialog-header-border rounded-default overflow-hidden border bg-[color-mix(in_srgb,var(--color-text-secondary)_4%,var(--color-card-bg))]"
               data-test="eval-job-detail-filter"
             >
               <div
-                class="flex items-center justify-between px-2.5 py-1.5 border-b border-b-dialog-header-border bg-[color-mix(in_srgb,var(--color-text-secondary)_6%,var(--color-card-bg))]"
+                class="border-b-dialog-header-border flex items-center justify-between border-b bg-[color-mix(in_srgb,var(--color-text-secondary)_6%,var(--color-card-bg))] px-2.5 py-1.5"
               >
-                <span class="text-2xs font-medium text-text-secondary">{{
+                <span class="text-2xs text-text-secondary font-medium">{{
                   t("onlineEvals.job.detail.filterLabel")
                 }}</span>
                 <OButton
@@ -183,7 +183,7 @@
               </div>
               <!-- Hard cap the filter condition height; longer conditions scroll. -->
               <pre
-                class="m-0 px-3.5 py-2.5 font-mono text-compact leading-[1.6] text-text-body whitespace-pre-wrap overflow-x-auto max-h-50 overflow-y-auto"
+                class="text-compact text-text-body m-0 max-h-50 overflow-x-auto overflow-y-auto px-3.5 py-2.5 font-mono leading-[1.6] whitespace-pre-wrap"
                 >{{ filterText || t("onlineEvals.job.detail.filterEmpty") }}</pre
               >
             </div>
@@ -192,7 +192,7 @@
           <!-- Scorers -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-1.5 inline-flex items-center gap-1.5 text-compact font-semibold leading-[1.5] text-text-heading border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-[1.5] font-semibold"
             >
               {{ t("onlineEvals.job.detail.scorersSection") }}
               <OTag type="fieldTag" value="soft">{{ resolvedScorers.length }}</OTag>
@@ -208,7 +208,7 @@
                  scrollbar off the card edges. -->
             <ul
               v-else
-              class="list-none m-0 p-0 flex flex-col gap-2.5 max-h-100 overflow-y-auto pr-1 pt-2.5"
+              class="m-0 flex max-h-100 list-none flex-col gap-2.5 overflow-y-auto p-0 pt-2.5 pr-1"
             >
               <li v-for="item in resolvedScorers" :key="item.id">
                 <!-- `group` drives the card's hover affordances on the CTA /
@@ -217,27 +217,27 @@
                      must not light up on hover. -->
                 <button
                   type="button"
-                  class="group w-full flex items-center gap-3.5 px-4 py-3.5 bg-card-bg border border-[color-mix(in_srgb,var(--color-text-secondary)_16%,transparent)] rounded-default text-left cursor-pointer transition-[border-color,background,box-shadow,transform] duration-150 enabled:hover:border-[color-mix(in_srgb,var(--color-primary-600)_45%,transparent)] enabled:hover:bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))] enabled:hover:shadow-[0_0.0625rem_0.1875rem_color-mix(in_srgb,var(--color-primary-600)_12%,transparent)] enabled:hover:-translate-y-px disabled:opacity-55 disabled:cursor-not-allowed"
+                  class="group bg-card-bg rounded-default flex w-full cursor-pointer items-center gap-3.5 border border-[color-mix(in_srgb,var(--color-text-secondary)_16%,transparent)] px-4 py-3.5 text-left transition-[border-color,background,box-shadow,transform] duration-150 enabled:hover:-translate-y-px enabled:hover:border-[color-mix(in_srgb,var(--color-primary-600)_45%,transparent)] enabled:hover:bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))] enabled:hover:shadow-[0_0.0625rem_0.1875rem_color-mix(in_srgb,var(--color-primary-600)_12%,transparent)] disabled:cursor-not-allowed disabled:opacity-55"
                   :data-test="`eval-job-detail-scorer-item-${item.name}`"
                   :disabled="!findScorerById(item.id)"
                   @click="onScorerClick(item.id)"
                 >
                   <span
-                    class="shrink-0 inline-flex items-center justify-center size-8.5 rounded-default"
+                    class="rounded-default inline-flex size-8.5 shrink-0 items-center justify-center"
                     :class="{
                       'bg-badge-indigo-soft-bg text-badge-indigo-soft-text':
                         item.scorerType === 'llm_judge',
                       'bg-badge-orange-soft-bg text-badge-orange-soft-text':
                         item.scorerType === 'remote',
-                      'bg-[color-mix(in_srgb,var(--color-text-secondary)_14%,transparent)] text-text-secondary':
+                      'text-text-secondary bg-[color-mix(in_srgb,var(--color-text-secondary)_14%,transparent)]':
                         item.scorerType === 'unknown',
                     }"
                   >
                     <OIcon :name="item.scorerType === 'remote' ? 'cloud' : 'smart-toy'" size="sm" />
                   </span>
-                  <div class="flex-1 min-w-0 flex flex-col gap-1.25">
-                    <div class="flex items-center gap-2 flex-wrap">
-                      <span class="font-bold text-sm text-text-heading">{{ item.name }}</span>
+                  <div class="flex min-w-0 flex-1 flex-col gap-1.25">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="text-text-heading text-sm font-bold">{{ item.name }}</span>
                       <OTag
                         v-if="item.scorerTypeLabel"
                         type="scorerType"
@@ -247,12 +247,12 @@
                     </div>
                     <div
                       v-if="item.scoreConfigName"
-                      class="flex items-center gap-1.5 text-xs text-text-secondary flex-wrap"
+                      class="text-text-secondary flex flex-wrap items-center gap-1.5 text-xs"
                     >
                       <OIcon
                         name="rule"
                         size="xs"
-                        class="shrink-0 text-text-secondary opacity-70"
+                        class="text-text-secondary shrink-0 opacity-70"
                       />
                       <span class="font-medium">
                         {{ t("onlineEvals.job.detail.producesPrefix") }}
@@ -273,7 +273,7 @@
                     </div>
                   </div>
                   <span
-                    class="shrink-0 inline-flex items-center gap-1 text-text-secondary text-2xs font-semibold group-[:hover:not(:disabled)]:text-primary-600"
+                    class="text-text-secondary text-2xs group-[:hover:not(:disabled)]:text-primary-600 inline-flex shrink-0 items-center gap-1 font-semibold"
                   >
                     <span
                       class="opacity-0 transition-opacity duration-150 group-[:hover:not(:disabled)]:opacity-100"
@@ -283,7 +283,7 @@
                     <OIcon
                       name="chevron-right"
                       size="sm"
-                      class="shrink-0 opacity-50 transition-[opacity,transform] duration-150 group-[:hover:not(:disabled)]:opacity-100 group-[:hover:not(:disabled)]:translate-x-0.5"
+                      class="shrink-0 opacity-50 transition-[opacity,transform] duration-150 group-[:hover:not(:disabled)]:translate-x-0.5 group-[:hover:not(:disabled)]:opacity-100"
                     />
                   </span>
                 </button>
@@ -294,24 +294,24 @@
           <!-- Sampling -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-1.5 inline-flex items-center gap-1.5 text-compact font-semibold leading-[1.5] text-text-heading border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-[1.5] font-semibold"
             >
               {{ t("onlineEvals.job.detail.samplingSection") }}
             </h4>
-            <dl class="grid grid-cols-[8.125rem_1fr] gap-x-3.5 gap-y-1.5 m-0">
-              <dt class="text-xs font-semibold text-text-secondary">
+            <dl class="m-0 grid grid-cols-[8.125rem_1fr] gap-x-3.5 gap-y-1.5">
+              <dt class="text-text-secondary text-xs font-semibold">
                 {{ t("onlineEvals.job.detail.samplingModeLabel") }}
               </dt>
-              <dd class="m-0 text-compact text-text-body wrap-break-word">
+              <dd class="text-compact text-text-body m-0 wrap-break-word">
                 {{ samplingModeLabel }}
               </dd>
 
-              <dt v-if="samplingValue != null" class="text-xs font-semibold text-text-secondary">
+              <dt v-if="samplingValue != null" class="text-text-secondary text-xs font-semibold">
                 {{ t("onlineEvals.job.detail.samplingValueLabel") }}
               </dt>
               <dd
                 v-if="samplingValue != null"
-                class="m-0 text-compact text-text-body wrap-break-word"
+                class="text-compact text-text-body m-0 wrap-break-word"
               >
                 {{ samplingValue }}
               </dd>
@@ -321,11 +321,11 @@
           <!-- Manual evaluation -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-compact font-semibold leading-[1.5] text-text-heading border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="text-compact text-text-heading m-0 inline-flex items-center gap-[0.375rem] border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-[0.375rem] leading-[1.5] font-semibold"
             >
               {{ t("onlineEvals.job.detail.manualSection") }}
             </h4>
-            <p class="m-0 text-xs text-text-secondary">
+            <p class="text-text-secondary m-0 text-xs">
               {{ t("onlineEvals.job.detail.manualHelp") }}
             </p>
             <OForm :form="manualEvalForm" class="flex flex-col gap-3" v-slot="{ isSubmitting }">
@@ -407,31 +407,31 @@
           <!-- Metadata -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-1.5 inline-flex items-center gap-1.5 text-compact font-semibold leading-[1.5] text-text-heading border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-[1.5] font-semibold"
             >
               {{ t("onlineEvals.job.detail.metadataSection") }}
             </h4>
-            <dl class="grid grid-cols-[8.125rem_1fr] gap-x-3.5 gap-y-1.5 m-0">
-              <dt class="text-xs font-semibold text-text-secondary">
+            <dl class="m-0 grid grid-cols-[8.125rem_1fr] gap-x-3.5 gap-y-1.5">
+              <dt class="text-text-secondary text-xs font-semibold">
                 {{ t("onlineEvals.job.detail.versionLabel") }}
               </dt>
-              <dd class="m-0 text-compact text-text-body wrap-break-word">v{{ row.version }}</dd>
-              <dt v-if="pipelineId" class="text-xs font-semibold text-text-secondary">
+              <dd class="text-compact text-text-body m-0 wrap-break-word">v{{ row.version }}</dd>
+              <dt v-if="pipelineId" class="text-text-secondary text-xs font-semibold">
                 {{ t("onlineEvals.job.detail.pipelineLabel") }}
               </dt>
-              <dd v-if="pipelineId" class="m-0 text-compact text-text-body wrap-break-word">
+              <dd v-if="pipelineId" class="text-compact text-text-body m-0 wrap-break-word">
                 {{ pipelineId }}
               </dd>
-              <dt v-if="createdAt" class="text-xs font-semibold text-text-secondary">
+              <dt v-if="createdAt" class="text-text-secondary text-xs font-semibold">
                 {{ t("onlineEvals.job.detail.createdLabel") }}
               </dt>
-              <dd v-if="createdAt" class="m-0 text-compact text-text-body wrap-break-word">
+              <dd v-if="createdAt" class="text-compact text-text-body m-0 wrap-break-word">
                 {{ formatTimestamp(createdAt) }}
               </dd>
-              <dt v-if="updatedAt" class="text-xs font-semibold text-text-secondary">
+              <dt v-if="updatedAt" class="text-text-secondary text-xs font-semibold">
                 {{ t("onlineEvals.job.detail.updatedLabel") }}
               </dt>
-              <dd v-if="updatedAt" class="m-0 text-compact text-text-body wrap-break-word">
+              <dd v-if="updatedAt" class="text-compact text-text-body m-0 wrap-break-word">
                 {{ formatTimestamp(updatedAt) }}
               </dd>
             </dl>

@@ -119,20 +119,20 @@ const hasLabel = computed(
       :tabindex="inputTabindex"
       :class="[
         'relative inline-flex shrink-0 rounded-full',
-        'p-0.5 items-center border-2',
+        'items-center border-2 p-0.5',
         currentSizes.track,
         /* Three visually distinct states:
            ON       → primary FILLED track + white thumb (high contrast)
            OFF      → transparent track + primary outline + primary thumb
            DISABLED → transparent + grey dashed outline + grey thumb */
         props.disabled
-          ? 'bg-transparent border-switch-disabled-border border-dashed'
+          ? 'border-switch-disabled-border border-dashed bg-transparent'
           : isChecked
             ? 'bg-primary-500 border-switch-border'
-            : 'bg-transparent border-switch-border-off',
+            : 'border-switch-border-off bg-transparent',
         props.disabled ? 'cursor-not-allowed' : 'cursor-pointer',
         'outline-none',
-        'focus-visible:ring-4 focus-visible:ring-primary-500/25',
+        'focus-visible:ring-primary-500/25 focus-visible:ring-4',
         'transition-[color,background-color,border-color,box-shadow] duration-200',
       ]"
     >
@@ -155,10 +155,10 @@ const hasLabel = computed(
       v-if="hasLabel || $slots.tooltip"
       :id="labelId"
       :class="[
-        'o-input-label text-compact select-none leading-tight flex items-center gap-1',
+        'o-input-label text-compact flex items-center gap-1 leading-tight select-none',
         disabled
-          ? 'font-normal text-input-label-text-disabled'
-          : 'font-medium text-input-label-text',
+          ? 'text-input-label-text-disabled font-normal'
+          : 'text-input-label-text font-medium',
       ]"
     >
       <slot name="label">{{ label }}</slot

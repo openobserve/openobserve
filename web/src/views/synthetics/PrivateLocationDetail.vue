@@ -33,44 +33,44 @@
       />
     </template>
 
-    <div class="flex-1 min-h-0 overflow-y-auto">
+    <div class="min-h-0 flex-1 overflow-y-auto">
       <div v-if="detail" class="flex flex-col gap-6 p-6">
         <!-- Summary strip -->
         <div
-          class="flex flex-wrap items-center gap-6 rounded-default border border-border-default bg-surface-subtle px-4 py-3 text-sm"
+          class="rounded-default border-border-default bg-surface-subtle flex flex-wrap items-center gap-6 border px-4 py-3 text-sm"
         >
           <div class="flex flex-col">
-            <span class="text-xs text-text-muted">{{
+            <span class="text-text-muted text-xs">{{
               t("synthetics.privateLocations.table.agents")
             }}</span>
             <span class="font-medium">{{ detail.live_agents }}/{{ detail.agents_total }}</span>
           </div>
           <div class="flex flex-col">
-            <span class="text-xs text-text-muted">{{
+            <span class="text-text-muted text-xs">{{
               t("synthetics.privateLocations.table.checks")
             }}</span>
             <span class="font-medium">{{ detail.monitors_count }}</span>
           </div>
           <div class="flex flex-col">
-            <span class="text-xs text-text-muted">{{
+            <span class="text-text-muted text-xs">{{
               t("synthetics.privateLocations.table.checksPerMin")
             }}</span>
             <span class="font-medium">~{{ detail.checks_per_min }}</span>
           </div>
           <div v-if="detail.version" class="flex flex-col">
-            <span class="text-xs text-text-muted">{{
+            <span class="text-text-muted text-xs">{{
               t("synthetics.privateLocations.detail.version")
             }}</span>
             <span class="font-medium">v{{ detail.version }}</span>
           </div>
           <div class="flex flex-col">
-            <span class="text-xs text-text-muted">{{
+            <span class="text-text-muted text-xs">{{
               t("synthetics.privateLocations.detail.pool")
             }}</span>
             <span class="font-mono text-xs">{{ detail.pool }}</span>
           </div>
           <div v-if="detail.last_seen_at" class="flex flex-col">
-            <span class="text-xs text-text-muted">{{
+            <span class="text-text-muted text-xs">{{
               t("synthetics.privateLocations.table.lastSeen")
             }}</span>
             <span class="font-medium">{{ formatTimeAgoUs(detail.last_seen_at) }}</span>
@@ -79,10 +79,10 @@
 
         <!-- Agents (read-only, self-registered) -->
         <div class="flex flex-col gap-2">
-          <h3 class="text-sm font-medium text-text-heading">
+          <h3 class="text-text-heading text-sm font-medium">
             {{ t("synthetics.privateLocations.detail.agentsTitle") }}
           </h3>
-          <p class="text-xs text-text-muted">
+          <p class="text-text-muted text-xs">
             {{ t("synthetics.privateLocations.detail.agentsSubtitle") }}
           </p>
           <OTable
@@ -125,7 +125,7 @@
 
         <!-- Assigned checks -->
         <div class="flex flex-col gap-2">
-          <h3 class="text-sm font-medium text-text-heading">
+          <h3 class="text-text-heading text-sm font-medium">
             {{ t("synthetics.privateLocations.detail.checksTitle") }}
           </h3>
           <OTable

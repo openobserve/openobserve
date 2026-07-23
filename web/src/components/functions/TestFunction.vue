@@ -1,5 +1,5 @@
 <template>
-  <div data-test="test-function-section" class="flex items-center flex-wrap pb-2">
+  <div data-test="test-function-section" class="flex flex-wrap items-center pb-2">
     <div data-test="test-function-query-section" class="test-function-query-container w-full">
       <FullViewContainer
         data-test="test-function-query-title-section"
@@ -30,12 +30,12 @@
         </template>
       </FullViewContainer>
       <div
-        class="flex items-center flex-wrap gap-x-3 py-2 w-full bg-surface-base"
+        class="bg-surface-base flex w-full flex-wrap items-center gap-x-3 py-2"
         v-show="expandState.query"
         data-test="test-function-query-editor-section"
       >
         <div class="function-stream-select-input w-25">
-          <div class="text-xs text-text-label">
+          <div class="text-text-label text-xs">
             {{ t("alerts.streamType") + " *" }}
           </div>
 
@@ -49,7 +49,7 @@
           />
         </div>
         <div class="function-stream-select-input w-75">
-          <div class="text-xs text-text-label">
+          <div class="text-text-label text-xs">
             {{ t("alerts.stream_name") + " *" }}
           </div>
           <OSelect
@@ -64,13 +64,13 @@
           />
         </div>
         <div class="functions-duration-input w-82.5">
-          <div class="text-xs text-text-label">
+          <div class="text-text-label text-xs">
             {{ t("common.duration") + " *" }}
           </div>
 
           <DateTime
             label="Start Time"
-            class="py-1 w-full"
+            class="w-full py-1"
             auto-apply
             :default-type="dateTime.type"
             :default-absolute-time="{
@@ -83,7 +83,7 @@
           />
         </div>
 
-        <div class="text-xs w-full mt-1 text-text-label">
+        <div class="text-text-label mt-1 w-full text-xs">
           {{ t("common.query") + " *" }}
         </div>
         <div class="relative w-full">
@@ -91,7 +91,7 @@
             data-test="vrl-function-test-sql-editor"
             ref="queryEditorRef"
             editor-id="test-function-query-input-editor"
-            class="w-full min-h-40"
+            class="min-h-40 w-full"
             v-model:query="inputQuery"
             language="sql"
             :keywords="effectiveKeywords"
@@ -101,14 +101,14 @@
           />
           <div
             v-if="!inputQuery && queryEditorPlaceholderFlag"
-            class="query-editor-placeholder-overlay absolute top-0 left-0 right-0 bottom-0 flex items-start p-[0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-1 select-none"
+            class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start p-[0.1875rem_0.5rem_0_2.15rem] select-none"
           >
             <span
-              class="query-editor-placeholder-typewriter font-mono text-[var(--text-sm)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden text-ellipsis"
+              class="query-editor-placeholder-typewriter text-text-placeholder overflow-hidden font-mono [line-height:1.3125rem] text-ellipsis whitespace-nowrap text-[var(--text-sm)]"
               >{{ queryEditorPlaceholder }}</span
             >
           </div>
-          <div class="text-status-error-text p-1 invalid-sql-error min-h-5.5">
+          <div class="text-status-error-text invalid-sql-error min-h-5.5 p-1">
             <span v-show="!!sqlQueryErrorMsg" class="text-compact">
               Error: {{ sqlQueryErrorMsg }}</span
             >
@@ -129,7 +129,7 @@
         <template #left>
           <div
             v-if="loading.events"
-            class="font-bold flex items-center text-text-secondary ml-2 text-compact"
+            class="text-text-secondary text-compact ml-2 flex items-center font-bold"
           >
             <OSpinner size="xs" />
             <div class="relative top-0.5">
@@ -151,7 +151,7 @@
             @send-to-ai-chat="sendToAiChat(JSON.stringify(inputEvents))"
             imageHeight="24px"
             imageWidth="24px"
-            :class="'px-2 mr-4'"
+            :class="'mr-4 px-2'"
             style="
               width: 32px !important;
               height: 32px !important;
@@ -170,7 +170,7 @@
           data-test="vrl-function-test-events-editor"
           ref="eventsEditorRef"
           editor-id="test-function-events-input-editor"
-          class="test-function-input-editor w-full min-h-40"
+          class="test-function-input-editor min-h-40 w-full"
           :style="{ height: `calc((100vh - (260px + ${heightOffset}px)) / 2)` }"
           v-model:query="inputEvents"
           language="json"
@@ -188,7 +188,7 @@
         <template #left>
           <div
             v-if="loading.output"
-            class="text-sm font-medium font-bold flex items-center text-text-secondary ml-2 text-compact"
+            class="text-text-secondary text-compact ml-2 flex items-center text-sm font-bold font-medium"
           >
             <OSpinner size="xs" />
             <div class="relative top-0.5">
@@ -219,10 +219,10 @@
       >
         <div
           v-if="!outputEvents"
-          class="absolute z-10 flex flex-col justify-center items-center w-full h-full opacity-90"
+          class="absolute z-10 flex h-full w-full flex-col items-center justify-center opacity-90"
         >
           <OIcon name="lightbulb" size="xl" class="text-status-warning-text" />
-          <div class="text-sm text-text-secondary">
+          <div class="text-text-secondary text-sm">
             {{ outputMessage }}
           </div>
         </div>
@@ -230,7 +230,7 @@
           data-test="vrl-function-test-events-output-editor"
           ref="outputEventsEditorRef"
           editor-id="test-function-events-output-editor"
-          class="test-function-output-editor w-full min-h-40"
+          class="test-function-output-editor min-h-40 w-full"
           :style="{ height: `calc((100vh - (260px + ${heightOffset}px)) / 2)` }"
           v-model:query="outputEvents"
           language="json"

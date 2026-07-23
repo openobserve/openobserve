@@ -2,18 +2,18 @@
   <div class="flex h-screen">
     <!-- Left Banner Section -->
     <div
-      class="hidden lg:flex lg:w-[40%] bg-[url('@/assets/images/common/openobserve_banner_compreesed.png')] bg-cover bg-center bg-no-repeat"
+      class="hidden bg-[url('@/assets/images/common/openobserve_banner_compreesed.png')] bg-cover bg-center bg-no-repeat lg:flex lg:w-[40%]"
     >
-      <div class="flex justify-start items-end h-full">
+      <div class="flex h-full items-end justify-start">
         <div class="mb-8.5 ml-8">
           <span class="mb-3">
             <img
-              class="h-10 -ml-px"
+              class="-ml-px h-10"
               src="@/assets/images/common/openobserve_logo_light.svg"
               alt="OpenObserve Logo"
             />
           </span>
-          <div class="text-2xl font-semibold text-text-inverse leading-8.25 mt-1.25">
+          <div class="text-text-inverse mt-1.25 text-2xl leading-8.25 font-semibold">
             Try OpenObserve today for more efficient and performant observability.
           </div>
         </div>
@@ -22,27 +22,27 @@
 
     <!-- Right Form Section -->
     <div
-      class="bg-surface-base w-full lg:w-[60%] h-full flex flex-col justify-center items-center relative"
+      class="bg-surface-base relative flex h-full w-full flex-col items-center justify-center lg:w-[60%]"
     >
       <!-- Top Section: Logo and Heading -->
-      <div class="flex flex-col items-center mb-4">
+      <div class="mb-4 flex flex-col items-center">
         <img class="h-16" src="@/assets/images/common/o2_logo.svg" alt="Get Started Banner" />
-        <div class="text-2xl md:text-3xl font-semibold text-center text-text-heading">
+        <div class="text-text-heading text-center text-2xl font-semibold md:text-3xl">
           One last thing before we begin
         </div>
       </div>
 
       <!-- Form Section -->
       <!-- Form Section -->
-      <div class="w-full flex justify-center">
-        <div class="w-full max-w-125 flex flex-col items-center gap-y-2 px-4">
+      <div class="flex w-full justify-center">
+        <div class="flex w-full max-w-125 flex-col items-center gap-y-2 px-4">
           <OForm
             ref="formRef"
             :schema="getStartedSchema"
             :default-values="getStartedDefaults()"
             @submit="doSubmit"
             v-slot="{ isSubmitting }"
-            class="w-full flex flex-col gap-y-2"
+            class="flex w-full flex-col gap-y-2"
           >
             <OFormInput
               name="hearAboutUs"
@@ -71,7 +71,7 @@
                 </template>
               </OFormCheckbox>
             </div>
-            <div class="w-full mt-4">
+            <div class="mt-4 w-full">
               <OButton
                 data-test="onboarding-get-started-submit-btn"
                 variant="primary"
@@ -89,7 +89,7 @@
       </div>
 
       <!-- Footer -->
-      <div class="absolute bottom-5 text-sm mb-4 text-text-secondary">
+      <div class="text-text-secondary absolute bottom-5 mb-4 text-sm">
         &copy; OpenObserve <span id="year">{{ new Date().getFullYear() }}</span>
       </div>
     </div>

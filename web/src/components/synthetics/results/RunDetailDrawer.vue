@@ -147,23 +147,23 @@ function toggleSteps(executionId: string) {
       </OBadge>
     </template>
 
-    <div class="flex flex-col h-full">
+    <div class="flex h-full flex-col">
       <!-- ── Loading skeleton ── -->
       <div v-if="loading" class="flex flex-col gap-3 p-5">
-        <div class="flex gap-6 mb-2">
-          <div class="bg-[var(--color-border-default)] animate-pulse h-10 w-28 rounded-default" />
-          <div class="bg-[var(--color-border-default)] animate-pulse h-10 w-20 rounded-default" />
-          <div class="bg-[var(--color-border-default)] animate-pulse h-10 w-40 rounded-default" />
+        <div class="mb-2 flex gap-6">
+          <div class="rounded-default h-10 w-28 animate-pulse bg-[var(--color-border-default)]" />
+          <div class="rounded-default h-10 w-20 animate-pulse bg-[var(--color-border-default)]" />
+          <div class="rounded-default h-10 w-40 animate-pulse bg-[var(--color-border-default)]" />
         </div>
         <div
           v-for="i in 2"
           :key="i"
-          class="rounded-default border border-border-default overflow-hidden"
+          class="rounded-default border-border-default overflow-hidden border"
         >
-          <div class="bg-[var(--color-border-default)] animate-pulse h-11 w-full" />
-          <div class="p-4 flex flex-col gap-2">
-            <div class="bg-[var(--color-border-default)] animate-pulse h-4 w-2/3 rounded-default" />
-            <div class="bg-[var(--color-border-default)] animate-pulse h-4 w-1/2 rounded-default" />
+          <div class="h-11 w-full animate-pulse bg-[var(--color-border-default)]" />
+          <div class="flex flex-col gap-2 p-4">
+            <div class="rounded-default h-4 w-2/3 animate-pulse bg-[var(--color-border-default)]" />
+            <div class="rounded-default h-4 w-1/2 animate-pulse bg-[var(--color-border-default)]" />
           </div>
         </div>
       </div>
@@ -171,23 +171,23 @@ function toggleSteps(executionId: string) {
       <!-- ── Query error ── -->
       <div
         v-else-if="queryError"
-        class="flex flex-col items-center gap-3 py-16 text-text-muted px-5"
+        class="text-text-muted flex flex-col items-center gap-3 px-5 py-16"
       >
         <OIcon name="error_outline" size="xl" class="text-status-error-text" />
-        <p class="text-sm font-medium text-status-error-text">
+        <p class="text-status-error-text text-sm font-medium">
           {{ t("synthetics.runDetail.loadFailed") }}
         </p>
-        <p class="text-xs font-mono text-text-secondary text-center max-w-sm">{{ queryError }}</p>
+        <p class="text-text-secondary max-w-sm text-center font-mono text-xs">{{ queryError }}</p>
       </div>
 
       <!-- ── No data ── -->
       <div
         v-else-if="!locations.length"
-        class="flex flex-col items-center gap-3 py-16 text-text-muted px-5"
+        class="text-text-muted flex flex-col items-center gap-3 px-5 py-16"
       >
         <OIcon name="hourglass_empty" size="xl" />
         <p class="text-sm font-medium">{{ t("synthetics.runDetail.noExecutionData") }}</p>
-        <p class="text-xs text-text-secondary text-center">
+        <p class="text-text-secondary text-center text-xs">
           {{ t("synthetics.runDetail.noExecutionDataDesc", { runId: runId }) }}
         </p>
       </div>
@@ -196,74 +196,74 @@ function toggleSteps(executionId: string) {
       <template v-else>
         <!-- Summary strip -->
         <div
-          class="grid grid-cols-3 gap-x-6 px-5 py-4 border-b border-border-default bg-surface-panel shrink-0"
+          class="border-border-default bg-surface-panel grid shrink-0 grid-cols-3 gap-x-6 border-b px-5 py-4"
         >
           <div>
             <p
-              class="text-3xs font-semibold uppercase tracking-[0.06em] text-text-muted mb-[0.2rem]"
+              class="text-3xs text-text-muted mb-[0.2rem] font-semibold tracking-[0.06em] uppercase"
             >
               {{ t("synthetics.runDetail.maxDuration") }}
             </p>
-            <p class="text-sm font-semibold text-text-body">{{ fmtDuration(overallDurationMs) }}</p>
+            <p class="text-text-body text-sm font-semibold">{{ fmtDuration(overallDurationMs) }}</p>
           </div>
           <div>
             <p
-              class="text-3xs font-semibold uppercase tracking-[0.06em] text-text-muted mb-[0.2rem]"
+              class="text-3xs text-text-muted mb-[0.2rem] font-semibold tracking-[0.06em] uppercase"
             >
               {{ t("synthetics.runDetail.locations") }}
             </p>
-            <p class="text-sm font-semibold text-text-body">{{ locations.length }}</p>
+            <p class="text-text-body text-sm font-semibold">{{ locations.length }}</p>
           </div>
           <div>
             <p
-              class="text-3xs font-semibold uppercase tracking-[0.06em] text-text-muted mb-[0.2rem]"
+              class="text-3xs text-text-muted mb-[0.2rem] font-semibold tracking-[0.06em] uppercase"
             >
               {{ t("synthetics.runDetail.runId") }}
             </p>
-            <p class="text-xs font-mono text-text-secondary truncate mt-0.5" :title="runId">
+            <p class="text-text-secondary mt-0.5 truncate font-mono text-xs" :title="runId">
               {{ runId }}
             </p>
           </div>
         </div>
 
         <!-- Per-location cards -->
-        <div class="flex-1 overflow-y-auto p-5 flex flex-col gap-4">
+        <div class="flex flex-1 flex-col gap-4 overflow-y-auto p-5">
           <div
             v-for="loc in locations"
             :key="loc.executionId"
-            class="bg-surface-base rounded-default border border-border-default overflow-hidden"
+            class="bg-surface-base rounded-default border-border-default overflow-hidden border"
           >
             <!-- Card header -->
             <div
-              class="flex items-center gap-2.5 px-4 py-3 bg-surface-panel border-b border-border-default"
+              class="bg-surface-panel border-border-default flex items-center gap-2.5 border-b px-4 py-3"
             >
               <OBadge :variant="statusVariant(loc.status)" size="sm">{{
                 statusLabel(loc.status)
               }}</OBadge>
-              <span class="text-sm font-semibold text-text-heading truncate">{{
+              <span class="text-text-heading truncate text-sm font-semibold">{{
                 loc.location || "—"
               }}</span>
-              <div class="ml-auto flex items-center gap-3 shrink-0">
-                <span class="text-xs text-text-muted">{{
+              <div class="ml-auto flex shrink-0 items-center gap-3">
+                <span class="text-text-muted text-xs">{{
                   [loc.browserEngine, loc.device].filter(Boolean).join(" · ")
                 }}</span>
-                <span class="text-sm font-medium tabular-nums text-text-body">{{
+                <span class="text-text-body text-sm font-medium tabular-nums">{{
                   fmtDuration(loc.durationMs)
                 }}</span>
               </div>
             </div>
 
-            <div class="divide-y divide-border-default">
+            <div class="divide-border-default divide-y">
               <!-- Error -->
               <div v-if="loc.error" class="px-4 py-3">
                 <p
-                  class="text-xs font-semibold text-status-error-text flex items-center gap-1.5 mb-1.5"
+                  class="text-status-error-text mb-1.5 flex items-center gap-1.5 text-xs font-semibold"
                 >
                   <OIcon name="cancel" size="xs" />
                   {{ t("synthetics.results.error") }}
                 </p>
                 <pre
-                  class="whitespace-pre-wrap font-mono text-xs text-text-secondary leading-relaxed bg-status-error-bg rounded-default px-3 py-2 border border-[var(--color-status-error-text)]"
+                  class="text-text-secondary bg-status-error-bg rounded-default border border-[var(--color-status-error-text)] px-3 py-2 font-mono text-xs leading-relaxed whitespace-pre-wrap"
                   >{{ loc.error }}</pre
                 >
               </div>
@@ -273,7 +273,7 @@ function toggleSteps(executionId: string) {
                 <OButton
                   variant="ghost"
                   size="xs"
-                  class="flex items-center gap-1.5 font-semibold text-text-body mb-2"
+                  class="text-text-body mb-2 flex items-center gap-1.5 font-semibold"
                   :data-test="`synthetics-run-detail-toggle-steps-${loc.executionId}-btn`"
                   @click="toggleSteps(loc.executionId)"
                 >
@@ -284,7 +284,7 @@ function toggleSteps(executionId: string) {
                   {{ t("synthetics.runDetail.stepsCount", { count: loc.steps.length }) }}
                   <span
                     v-if="loc.steps.some((s) => s.status === 'fail')"
-                    class="ml-1 text-status-error-text"
+                    class="text-status-error-text ml-1"
                   >
                     ·
                     {{
@@ -302,7 +302,7 @@ function toggleSteps(executionId: string) {
                     class="flex items-start gap-2.5 py-1.5 text-xs"
                   >
                     <span
-                      class="shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-white text-3xs font-bold mt-px"
+                      class="text-3xs mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full font-bold text-white"
                       :class="
                         step.status === 'ok'
                           ? 'bg-[var(--color-success-600)]'
@@ -310,18 +310,18 @@ function toggleSteps(executionId: string) {
                       "
                       >{{ idx + 1 }}</span
                     >
-                    <div class="flex-1 min-w-0">
+                    <div class="min-w-0 flex-1">
                       <div class="flex items-center gap-2">
-                        <span class="font-mono text-text-secondary truncate">{{
+                        <span class="text-text-secondary truncate font-mono">{{
                           step.stepId
                         }}</span>
-                        <span class="ml-auto tabular-nums text-text-muted shrink-0">{{
+                        <span class="text-text-muted ml-auto shrink-0 tabular-nums">{{
                           fmtDuration(step.durationMs)
                         }}</span>
                       </div>
                       <p
                         v-if="step.error"
-                        class="text-status-error-text truncate mt-0.5"
+                        class="text-status-error-text mt-0.5 truncate"
                         :title="step.error"
                       >
                         {{ step.error }}
@@ -333,25 +333,25 @@ function toggleSteps(executionId: string) {
 
               <!-- Screenshots -->
               <div v-if="loc.steps.some((s) => s.screenshotKey)" class="px-4 py-3">
-                <p class="text-xs font-semibold text-text-heading mb-2">
+                <p class="text-text-heading mb-2 text-xs font-semibold">
                   {{ t("synthetics.runDetail.screenshots") }}
                 </p>
                 <div class="grid grid-cols-2 gap-2">
                   <div
                     v-for="step in loc.steps.filter((s) => s.screenshotKey)"
                     :key="step.stepId"
-                    class="rounded-default border border-border-default overflow-hidden bg-surface-panel"
+                    class="rounded-default border-border-default bg-surface-panel overflow-hidden border"
                   >
-                    <div class="flex items-center gap-1.5 px-2 py-1 border-b border-border-default">
+                    <div class="border-border-default flex items-center gap-1.5 border-b px-2 py-1">
                       <span
-                        class="w-2 h-2 rounded-full shrink-0"
+                        class="h-2 w-2 shrink-0 rounded-full"
                         :class="
                           step.status === 'ok'
                             ? 'bg-[var(--color-success-500)]'
                             : 'bg-[var(--color-error-500)]'
                         "
                       />
-                      <span class="text-3xs font-mono text-text-muted truncate">{{
+                      <span class="text-3xs text-text-muted truncate font-mono">{{
                         step.stepId
                       }}</span>
                     </div>
@@ -359,7 +359,7 @@ function toggleSteps(executionId: string) {
                       <img
                         :src="artifactUrl(step.screenshotKey!)"
                         :alt="`Screenshot ${step.stepId}`"
-                        class="w-full block object-contain max-h-48 hover:opacity-90 transition-opacity"
+                        class="block max-h-48 w-full object-contain transition-opacity hover:opacity-90"
                         loading="lazy"
                       />
                     </a>
@@ -372,7 +372,7 @@ function toggleSteps(executionId: string) {
                 <a
                   :href="artifactUrl(loc.traceKey)"
                   target="_blank"
-                  class="inline-flex items-center gap-2 text-xs font-medium text-text-link hover:text-text-link-hover bg-surface-panel border border-border-default rounded-default px-3 py-1.5 transition-colors"
+                  class="text-text-link hover:text-text-link-hover bg-surface-panel border-border-default rounded-default inline-flex items-center gap-2 border px-3 py-1.5 text-xs font-medium transition-colors"
                 >
                   <OIcon name="download" size="xs" />
                   {{ t("synthetics.runDetail.downloadTrace", { filename: "trace.zip" }) }}

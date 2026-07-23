@@ -15,14 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col h-full p-0">
+  <div class="flex h-full flex-col p-0">
     <OPageLayout
       :title="t('settings.organizationManagement')"
       icon="lan"
       :subtitle="t('settings.organizationManagementPage.subtitle')"
       bleed
     >
-      <div class="bg-card-glass-bg flex-1 min-h-0 mt-2.5 overflow-hidden">
+      <div class="bg-card-glass-bg mt-2.5 min-h-0 flex-1 overflow-hidden">
         <OTable
           :frame="false"
           data-test="org-management-list-table"
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSearchInput
               data-test="org-management-search-input"
               v-model="filterQuery"
-              class="w-64 no-border o2-search-input"
+              class="no-border o2-search-input w-64"
               :placeholder="t('settings.searchOrgs')"
             />
           </template>
@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ formatCredits(row.credits_limit) }}
           </template>
           <template #cell-actions="{ row }">
-            <div class="flex items-center gap-1 justify-center">
+            <div class="flex items-center justify-center gap-1">
               <OButton
                 variant="ghost"
                 size="icon-xs-circle"
@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="page"
               @click="extendedTrial = page"
               :class="[
-                'cursor-pointer px-2 py-1 border border-border-default',
+                'border-border-default cursor-pointer border px-2 py-1',
                 extendedTrial === page
                   ? 'bg-button-primary text-button-primary-foreground border-button-primary'
                   : 'bg-surface-base text-text-body border-border-default',
@@ -231,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             label="Total AI Credits"
             required
           />
-          <div class="text-xs text-text-secondary">
+          <div class="text-text-secondary text-xs">
             Currently used: {{ formatCredits(aiCreditsDataRow?.credits_used) }} credits
           </div>
         </div>
@@ -282,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-if="contractMode === 'extend' && contractDataRow?.contract_end_date"
-          class="text-xs text-text-secondary"
+          class="text-text-secondary text-xs"
         >
           {{
             t("settings.organizationManagementPage.currentEndDate", {

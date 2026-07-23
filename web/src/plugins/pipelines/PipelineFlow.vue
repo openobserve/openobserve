@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       data-test="pipeline-flow-unsaved-changes-warning-text"
       v-show="pipelineObj.dirtyFlag"
-      class="text-status-warning-text border border-status-warning-text rounded-default flex items-center px-2 mr-3"
+      class="text-status-warning-text border-status-warning-text rounded-default mr-3 flex items-center border px-2"
     >
       <OIcon name="info" class="mr-1" size="sm" />
       Unsaved changes detected. Click "Save" to preserve your updates.
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Edge deletion help notification -->
     <div
       v-if="showEdgeHelpNotification"
-      class="edge-help-notification absolute top-5 left-1/2 -translate-x-1/2 z-[1000] bg-surface-base text-text-body py-2.5 px-4 rounded-default text-sm shadow-[0_4px_20px_rgba(0,0,0,0.15)] border border-border-default flex items-center dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
+      class="edge-help-notification bg-surface-base text-text-body rounded-default border-border-default absolute top-5 left-1/2 z-[1000] flex -translate-x-1/2 items-center border px-4 py-2.5 text-sm shadow-[0_4px_20px_rgba(0,0,0,0.15)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
     >
       <OIcon name="info" class="mr-1" size="sm" />
       Press Backspace/Delete to remove the edge
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-if="isCanvasEmpty"
     data-test="pipeline-flow-empty-text"
-    class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-text-muted text-[1.5em] text-center pointer-events-none z-10"
+    class="text-text-muted pointer-events-none absolute top-1/2 left-1/2 z-10 -translate-x-1/2 -translate-y-1/2 text-center text-[1.5em]"
   >
     {{ t("pipeline.dragDropNodesHere") }}
   </div>

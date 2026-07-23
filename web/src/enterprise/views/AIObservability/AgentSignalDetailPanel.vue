@@ -26,23 +26,23 @@
     <!-- Signal-type icon in the drawer header, so the drawer's subject reads at
          a glance (⟳ loop / ⚠ failure / $ cost). -->
     <template #header-left>
-      <div class="flex items-center justify-center h-7 w-7 rounded-default" :class="signalIconWrap">
+      <div class="rounded-default flex h-7 w-7 items-center justify-center" :class="signalIconWrap">
         <OIcon :name="signalIcon" size="sm" />
       </div>
     </template>
 
     <section
-      class="flex flex-col gap-3 px-5 pt-4 pb-6 min-h-full overflow-auto"
+      class="flex min-h-full flex-col gap-3 overflow-auto px-5 pt-4 pb-6"
       data-test="agent-signal-detail-body"
     >
       <!-- Headline: the finding, stated plainly -->
       <div class="flex items-start gap-2" data-test="agent-signal-detail-headline">
         <OIcon :name="signalIcon" size="sm" class="mt-0.5 shrink-0" :class="signalIconColor" />
         <div class="flex flex-col gap-1">
-          <p class="m-0 text-compact leading-normal text-text-heading">
+          <p class="text-compact text-text-heading m-0 leading-normal">
             {{ headline }}
           </p>
-          <p class="m-0 text-2xs leading-normal text-text-secondary">
+          <p class="text-2xs text-text-secondary m-0 leading-normal">
             {{ explanation }}
           </p>
         </div>
@@ -51,11 +51,11 @@
       <!-- FAILURE: the real error messages (the "read it, know the fix" section) -->
       <section
         v-if="signalType === 'failure'"
-        class="card-container py-3 px-3.5 pb-3.5 bg-surface-base border border-border-default rounded-surface"
+        class="card-container bg-surface-base border-border-default rounded-surface border px-3.5 py-3 pb-3.5"
       >
         <header class="mb-1.5 flex items-center gap-1.5">
           <OIcon name="error-outline" size="xs" class="text-badge-error-soft-text" />
-          <h4 class="m-0 text-compact font-semibold text-text-heading">
+          <h4 class="text-compact text-text-heading m-0 font-semibold">
             {{ t("aiObservability.behavior.detail.errorsTitle") }}
           </h4>
         </header>
@@ -72,7 +72,7 @@
           <template #cell-message="{ row }">
             <div class="flex flex-col gap-1 py-0.5">
               <span
-                class="text-xs leading-normal text-text-heading whitespace-pre-wrap break-words"
+                class="text-text-heading text-xs leading-normal break-words whitespace-pre-wrap"
               >
                 {{ expandedErrors.has(row.full) ? row.full : row.message }}
               </span>
@@ -102,10 +102,10 @@
 
       <!-- LOOP / COST: the worst traces, ranked by what makes them bad -->
       <section
-        class="card-container py-3 px-3.5 pb-3.5 bg-surface-base border border-border-default rounded-surface"
+        class="card-container bg-surface-base border-border-default rounded-surface border px-3.5 py-3 pb-3.5"
       >
         <header class="mb-1.5 flex items-center justify-between gap-2">
-          <h4 class="m-0 text-compact font-semibold text-text-heading">
+          <h4 class="text-compact text-text-heading m-0 font-semibold">
             {{ tracesTitle }}
           </h4>
           <span class="text-2xs text-text-secondary">
@@ -126,11 +126,11 @@
                row opens the trace in a new browser tab, not in place. -->
           <template #cell-trace_id="{ row }">
             <span
-              class="inline-flex items-center gap-1 text-text-link hover:underline"
+              class="text-text-link inline-flex items-center gap-1 hover:underline"
               :title="t('aiObservability.behavior.detail.openInNewTab')"
             >
               <OIcon name="open-in-new" size="xs" class="opacity-70" />
-              <span class="font-mono truncate">{{ row.trace_id }}</span>
+              <span class="truncate font-mono">{{ row.trace_id }}</span>
             </span>
           </template>
         </OTable>

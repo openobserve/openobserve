@@ -189,7 +189,7 @@ function handleClick() {
         : meta?.compactPadding
           ? 'px-1 align-middle'
           : 'px-2 align-middle',
-      bordered ? 'border-b border-table-row-divider' : '',
+      bordered ? 'border-table-row-divider border-b' : '',
       alignClass,
       isAction ? 'w-0 whitespace-nowrap' : '',
       isPinned
@@ -202,8 +202,8 @@ function handleClick() {
         : horizontalScroll?.value
           ? 'whitespace-nowrap'
           : isAction
-            ? 'whitespace-nowrap overflow-hidden'
-            : 'whitespace-nowrap overflow-hidden text-ellipsis',
+            ? 'overflow-hidden whitespace-nowrap'
+            : 'overflow-hidden text-ellipsis whitespace-nowrap',
       meta?.cellClass ?? '',
       isTreeColumn ? 'relative' : '',
       isTreeColumn && treeMeta?.isParent && treeMeta?.isExpanded ? 'o2-tree-parent-expanded' : '',
@@ -227,17 +227,17 @@ function handleClick() {
     <!-- Tree-mode wrapper: indent + chevron + cell content -->
     <div
       v-if="isTreeColumn"
-      class="flex items-center gap-1 min-w-0"
+      class="flex min-w-0 items-center gap-1"
       :style="{ paddingLeft: `${treeIndentPx}px` }"
     >
       <span
         v-if="treeMeta?.hasChildren || (treeMeta && treeMeta.parentId !== null)"
-        class="inline-flex items-center justify-center w-4.5 h-4.5 shrink-0"
+        class="inline-flex h-4.5 w-4.5 shrink-0 items-center justify-center"
       >
         <button
           v-if="treeMeta?.hasChildren"
           type="button"
-          class="inline-flex items-center justify-center w-4.5 h-4.5 p-0 bg-transparent border-0 rounded-default cursor-pointer text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body"
+          class="rounded-default text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body inline-flex h-4.5 w-4.5 cursor-pointer items-center justify-center border-0 bg-transparent p-0"
           :data-test="`o2-table-tree-toggle-${cell.column.id}`"
           :aria-expanded="treeMeta?.isExpanded ? 'true' : 'false'"
           @click="onTreeToggle"
@@ -246,13 +246,13 @@ function handleClick() {
         </button>
         <span
           v-else
-          class="size-1.75 bg-theme-accent opacity-75 rounded-default ring-2 ring-table-cell-bg z-3 relative"
+          class="bg-theme-accent rounded-default ring-table-cell-bg relative z-3 size-1.75 opacity-75 ring-2"
           aria-hidden="true"
         />
       </span>
-      <div class="flex-1 min-w-0">
+      <div class="min-w-0 flex-1">
         <div v-if="$slots.default" :class="slotAlignClass">
-          <div v-if="!isAction" class="truncate min-w-0 flex-1"><slot /></div>
+          <div v-if="!isAction" class="min-w-0 flex-1 truncate"><slot /></div>
           <slot v-else />
         </div>
         <FlexRender
@@ -270,7 +270,7 @@ function handleClick() {
     <template v-else>
       <div v-if="$slots.default" :class="slotAlignClass">
         <!-- Non-action slot content truncates with an ellipsis by default. -->
-        <div v-if="!isAction" class="truncate min-w-0 flex-1"><slot /></div>
+        <div v-if="!isAction" class="min-w-0 flex-1 truncate"><slot /></div>
         <slot v-else />
       </div>
       <!-- Custom cell render via TanStack FlexRender -->
@@ -292,7 +292,7 @@ function handleClick() {
       v-if="enableCellCopy && !$slots.default"
       type="button"
       :data-test="`o2-table-cell-copy-${cell.column.id}`"
-      class="absolute right-1 opacity-0 group-hover:opacity-100 bg-surface-base border border-border-default rounded-default cursor-pointer p-0.5 text-text-muted hover:text-text-body leading-none transition-opacity"
+      class="bg-surface-base border-border-default rounded-default text-text-muted hover:text-text-body absolute right-1 cursor-pointer border p-0.5 leading-none opacity-0 transition-opacity group-hover:opacity-100"
       :title="copied ? 'Copied!' : 'Copy'"
       @click="handleCopy"
     >

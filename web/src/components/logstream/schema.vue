@@ -30,16 +30,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header-right>
       <div
         v-if="indexData.name"
-        class="flex items-center gap-1.5 px-2 py-1 rounded-default border bg-surface-panel border-border-default"
+        class="rounded-default bg-surface-panel border-border-default flex items-center gap-1.5 border px-2 py-1"
       >
-        <img :src="getTimelineIcon" alt="Timeline Icon" class="w-3.5 h-3.5 opacity-70" />
+        <img :src="getTimelineIcon" alt="Timeline Icon" class="h-3.5 w-3.5 opacity-70" />
         <div class="flex items-center gap-1.5">
           <span
-            class="text-3xs font-medium px-1.5 py-0.5 rounded-default text-text-secondary bg-surface-subtle"
+            class="text-3xs rounded-default text-text-secondary bg-surface-subtle px-1.5 py-0.5 font-medium"
           >
             UTC
           </span>
-          <div class="text-xs font-semibold text-text-body">
+          <div class="text-text-body text-xs font-semibold">
             {{ indexData.stats.doc_time_min }}
             <span class="text-base leading-none">→</span>
             {{ indexData.stats.doc_time_max }}
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- we will show loading state here -->
           <div
             v-if="loadingState"
-            class="flex items-center justify-center w-full h-full"
+            class="flex h-full w-full items-center justify-center"
             style="min-height: calc(100vh - 3.75rem)"
           >
             <OSpinner size="md" />
@@ -62,11 +62,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- if we have data and no loading then we will show the data otherwise we will show the loading state -->
           <div
             v-else
-            class="indexDetailsContainer w-full flex flex-col min-h-0"
+            class="indexDetailsContainer flex min-h-0 w-full flex-col"
             style="height: calc(100vh - 3.75rem)"
           >
             <!-- this the grid section the tiles section -->
-            <div class="stats-grid grid grid-cols-4 gap-2 mb-2">
+            <div class="stats-grid mb-2 grid grid-cols-4 gap-2">
               <!-- Docs Count Tile -->
               <div
                 v-if="store.state.zoConfig.show_stream_stats_doc_num"
@@ -74,10 +74,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="docs-count-tile"
               >
                 <div
-                  class="tile-content rounded-default p-3 text-center border h-20 flex flex-col justify-between bg-surface-base border-border-default"
+                  class="tile-content rounded-default bg-surface-base border-border-default flex h-20 flex-col justify-between border p-3 text-center"
                 >
-                  <div class="tile-header flex justify-between items-start">
-                    <div class="tile-title text-xs font-bold text-left text-text-secondary">
+                  <div class="tile-header flex items-start justify-between">
+                    <div class="tile-title text-text-secondary text-left text-xs font-bold">
                       Events
                     </div>
                     <div class="tile-icon opacity-80">
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </div>
                   </div>
-                  <div class="tile-value text-lg flex items-end justify-start text-text-body">
+                  <div class="tile-value text-text-body flex items-end justify-start text-lg">
                     {{ parseInt(indexData.stats.doc_num).toLocaleString("en-US") }}
                   </div>
                 </div>
@@ -96,10 +96,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Storage Size Tile -->
               <div class="tile" data-test="storage-size-tile">
                 <div
-                  class="tile-content rounded-default p-3 text-center border h-20 flex flex-col justify-between bg-surface-base border-border-default"
+                  class="tile-content rounded-default bg-surface-base border-border-default flex h-20 flex-col justify-between border p-3 text-center"
                 >
-                  <div class="tile-header flex justify-between items-start">
-                    <div class="tile-title text-xs font-bold text-left text-text-secondary">
+                  <div class="tile-header flex items-start justify-between">
+                    <div class="tile-title text-text-secondary text-left text-xs font-bold">
                       {{ t("logStream.storageSize") }}
                     </div>
                     <div class="tile-icon opacity-80">
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </div>
                   </div>
-                  <div class="tile-value text-lg flex items-end justify-start text-text-body">
+                  <div class="tile-value text-text-body flex items-end justify-start text-lg">
                     {{ formatSizeFromMB(indexData.stats.storage_size) }}
                   </div>
                 </div>
@@ -118,10 +118,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Compressed Size Tile -->
               <div v-if="isCloud !== 'true'" class="tile" data-test="compressed-size-tile">
                 <div
-                  class="tile-content rounded-default p-3 text-center border h-20 flex flex-col justify-between bg-surface-base border-border-default"
+                  class="tile-content rounded-default bg-surface-base border-border-default flex h-20 flex-col justify-between border p-3 text-center"
                 >
-                  <div class="tile-header flex justify-between items-start">
-                    <div class="tile-title text-xs font-bold text-left text-text-secondary">
+                  <div class="tile-header flex items-start justify-between">
+                    <div class="tile-title text-text-secondary text-left text-xs font-bold">
                       {{ t("logStream.compressedSize") }}
                     </div>
                     <div class="tile-icon opacity-80">
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </div>
                   </div>
-                  <div class="tile-value text-lg flex items-end justify-start text-text-body">
+                  <div class="tile-value text-text-body flex items-end justify-start text-lg">
                     {{ formatSizeFromMB(indexData.stats.compressed_size) }}
                   </div>
                 </div>
@@ -140,10 +140,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Index Size Tile -->
               <div v-if="isCloud !== 'true'" class="tile" data-test="index-size-tile">
                 <div
-                  class="tile-content rounded-default p-3 text-center border h-20 flex flex-col justify-between bg-surface-base border-border-default"
+                  class="tile-content rounded-default bg-surface-base border-border-default flex h-20 flex-col justify-between border p-3 text-center"
                 >
-                  <div class="tile-header flex justify-between items-start">
-                    <div class="tile-title text-xs font-bold text-left text-text-secondary">
+                  <div class="tile-header flex items-start justify-between">
+                    <div class="tile-title text-text-secondary text-left text-xs font-bold">
                       {{ t("logStream.indexSize") }}
                     </div>
                     <div class="tile-icon opacity-80">
@@ -154,16 +154,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </div>
                   </div>
-                  <div class="tile-value text-lg flex items-end justify-start text-text-body">
+                  <div class="tile-value text-text-body flex items-end justify-start text-lg">
                     {{ formatSizeFromMB(indexData.stats.index_size) }}
                   </div>
                 </div>
               </div>
             </div>
-            <div class="w-full flex flex-1 min-h-0 gap-2">
+            <div class="flex min-h-0 w-full flex-1 gap-2">
               <!--  left section(includes tabs and schema settings) -->
               <div
-                class="w-full h-full min-h-0 rounded-default border p-2 flex flex-col overflow-hidden bg-surface-base border-border-default"
+                class="rounded-default bg-surface-base border-border-default flex h-full min-h-0 w-full flex-col overflow-hidden border p-2"
               >
                 <div>
                   <div class="flex justify-start">
@@ -208,26 +208,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
                 <!-- Tab content wrapper — fills remaining height, pushes the footer to the bottom -->
-                <div class="flex-1 min-h-0 flex flex-col overflow-hidden">
+                <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
                   <!-- schema settings tab -->
                   <div
                     v-if="activeMainTab == 'schemaSettings'"
-                    class="flex flex-col h-full min-h-0 overflow-hidden"
+                    class="flex h-full min-h-0 flex-col overflow-hidden"
                   >
                     <div
-                      class="flex justify-between items-center"
+                      class="flex items-center justify-between"
                       data-test="schema-log-stream-mapping-title-text"
                     >
                       <div v-if="indexData.defaultFts" class="mt-3 font-normal">
                         <label
-                          class="bg-banner-warning-bg py-1 px-4 rounded-default border border-banner-warning-border text-banner-warning-text font-semibold"
+                          class="bg-banner-warning-bg rounded-default border-banner-warning-border text-banner-warning-text border px-4 py-1 font-semibold"
                         >
                           {{ t("logStream.mapping") }} Default FTS keys used (no custom keys
                           set).</label
                         >
                       </div>
                     </div>
-                    <div class="flex justify-between items-center w-full">
+                    <div class="flex w-full items-center justify-between">
                       <div class="flex items-center">
                         <div class="app-tabs-container">
                           <OToggleGroup
@@ -273,7 +273,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           data-test="schema-field-search-input"
                           v-model="filterField"
                           data-cy="schema-index-field-search-input"
-                          class="ml-auto no-border o2-search-input"
+                          class="no-border o2-search-input ml-auto"
                           :placeholder="t('search.searchField')"
                         />
                         <OButton
@@ -291,10 +291,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
 
                     <div class="mb-3" v-if="isDialogOpen">
-                      <OCard class="w-screen max-w-full flex flex-col">
+                      <OCard class="flex w-screen max-w-full flex-col">
                         <!-- Header Section -->
                         <OCardSection class="p-0" style="padding: 4px 16px 4px 16px">
-                          <div class="flex justify-between items-center">
+                          <div class="flex items-center justify-between">
                             <div class="text-xl font-semibold">Add Field(s)</div>
                             <div>
                               <OButton
@@ -309,7 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </OCardSection>
                         <!-- Main Content (Scrollable if necessary) -->
                         <OCardSection
-                          class="p-0 flex-1 overflow-y-auto mb-0.5"
+                          class="mb-0.5 flex-1 overflow-y-auto p-0"
                           style="padding: 0px 16px 0px 16px"
                         >
                           <OForm :form="newSchemaFieldsForm" @keyup="onAddFieldsKeyup">
@@ -328,7 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
 
                     <!-- OTable fills the remaining height inside the schemaSettings flex column -->
-                    <div class="flex-1 min-h-0 flex flex-col overflow-hidden">
+                    <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
                       <OTable
                         data-test="schema-log-stream-field-mapping-table"
                         :data="filteredSchemaData"
@@ -358,14 +358,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </span>
                             <span
                               v-if="isEnvQuickModeField(row.name)"
-                              class="flex items-center ml-1"
+                              class="ml-1 flex items-center"
                             >
                               <img
                                 :src="quickModeIcon"
                                 :alt="t('logStream.envQuickModeMsg')"
-                                class="w-5 h-5"
+                                class="h-5 w-5"
                               />
-                              <OTooltip class="text-xs w-50">
+                              <OTooltip class="w-50 text-xs">
                                 {{ t("logStream.envQuickModeMsg") }}
                               </OTooltip>
                             </span>
@@ -395,7 +395,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :options="indexTypeOptionsForRow(row)"
                               label-key="label"
                               value-key="value"
-                              class="min-h-6! max-h-6! h-6! text-compact"
+                              class="text-compact h-6! max-h-6! min-h-6!"
                               multiple
                               clearable
                               size="sm"
@@ -444,14 +444,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Configuration tab -->
                   <div v-if="activeMainTab == 'configuration'">
-                    <div class="w-full h-full overflow-y-auto p-4 flex flex-col gap-4">
+                    <div class="flex h-full w-full flex-col gap-4 overflow-y-auto p-4">
                       <!-- Configuration Settings Card -->
                       <div
-                        class="rounded-default border border-card-glass-border divide-y divide-card-glass-border"
+                        class="rounded-default border-card-glass-border divide-card-glass-border divide-y border"
                       >
                         <!-- Data Retention -->
                         <div v-if="showDataRetention" class="flex flex-col gap-1 p-3">
-                          <label class="text-compact font-[500] text-text-heading">
+                          <label class="text-compact text-text-heading font-[500]">
                             Data Retention (days)
                           </label>
                           <OInput
@@ -476,7 +476,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                         <!-- Max Query Range -->
                         <div class="flex flex-col gap-1 p-3">
-                          <label class="text-compact font-[500] text-text-heading">
+                          <label class="text-compact text-text-heading font-[500]">
                             Max Query Range (hours)
                           </label>
                           <OInput
@@ -495,7 +495,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                         <!-- Flatten Level -->
                         <div class="flex flex-col gap-1 p-3">
-                          <label class="text-compact font-[500] text-text-heading">
+                          <label class="text-compact text-text-heading font-[500]">
                             {{ t("logStream.flattenLevel") }}
                           </label>
                           <OInput
@@ -512,7 +512,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
 
                         <!-- Toggles -->
-                        <div class="flex items-center justify-between px-3 py-2.5 text-compact">
+                        <div class="text-compact flex items-center justify-between px-3 py-2.5">
                           <span>Use Stream Stats for Partitioning</span>
                           <OSwitch
                             data-test="log-stream-use_approx-toggle-btn"
@@ -523,7 +523,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                         <div
                           v-if="showStoreOriginalDataToggle"
-                          class="flex items-center justify-between px-3 py-2.5 text-compact"
+                          class="text-compact flex items-center justify-between px-3 py-2.5"
                         >
                           <span>Store Original Data</span>
                           <OSwitch
@@ -533,7 +533,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           />
                         </div>
 
-                        <div class="flex items-center justify-between px-3 py-2.5 text-compact">
+                        <div class="text-compact flex items-center justify-between px-3 py-2.5">
                           <span>Enable Distinct Values</span>
                           <OSwitch
                             data-test="log-stream-enabled-distinct-values-toggle-btn"
@@ -548,10 +548,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- red button tab -->
                   <div
                     v-else-if="activeMainTab == 'redButton'"
-                    class="flex flex-col h-full min-h-0 overflow-hidden"
+                    class="flex h-full min-h-0 flex-col overflow-hidden"
                   >
                     <div
-                      class="bg-banner-warning-bg py-1 px-4 rounded-default border border-banner-warning-border text-banner-warning-text mt-2"
+                      class="bg-banner-warning-bg rounded-default border-banner-warning-border text-banner-warning-text mt-2 border px-4 py-1"
                       style="width: fit-content"
                     >
                       <span class="font-semibold">
@@ -562,8 +562,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         days of extension will be applied to the selected date ranges</span
                       >
                     </div>
-                    <div class="mt-2 flex flex-col flex-1 min-h-0">
-                      <div class="text-center mt-2 flex items-center">
+                    <div class="mt-2 flex min-h-0 flex-1 flex-col">
+                      <div class="mt-2 flex items-center text-center">
                         <div class="flex items-center">
                           <span class="font-bold"> Select Date</span>
                           <DateTime
@@ -578,7 +578,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <span class="font-bold"> (UTC Timezone) </span>
                       </div>
 
-                      <div class="mt-2 flex-1 min-h-0 flex flex-col">
+                      <div class="mt-2 flex min-h-0 flex-1 flex-col">
                         <OTable
                           data-test="schema-log-stream-field-mapping-table"
                           :data="redBtnRows"
@@ -626,7 +626,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <!-- floating footer for the table -->
                 <div
-                  class="sticky bottom-0 z-1 w-full mt-auto bg-card-glass-solid flex-shrink-0 px-2 py-1"
+                  class="bg-card-glass-solid sticky bottom-0 z-1 mt-auto w-full flex-shrink-0 px-2 py-1"
                 >
                   <div v-if="indexData.schema.length > 0" class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
@@ -641,7 +641,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :disabled="!selectedFields.length || hasUDSFieldInSelection"
                         @click="updateDefinedSchemaFields"
                       >
-                        <span class="flex items-center justify-start gap-1 mr-1">
+                        <span class="mr-1 flex items-center justify-start gap-1">
                           <OIcon name="verified-user" size="sm" />
                           <OIcon name="format-list-bulleted" size="sm" />
                         </span>

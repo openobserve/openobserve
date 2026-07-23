@@ -1,5 +1,5 @@
 <template>
-  <div class="w-full h-full flex flex-col min-h-0">
+  <div class="flex h-full min-h-0 w-full flex-col">
     <OPageLayout
       v-if="!showSearchResults"
       :title="t('search_scheduler_job.title')"
@@ -31,7 +31,7 @@
           </OButton>
         </div>
       </template>
-      <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
+      <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
         <OTable
           :frame="false"
           data-test="search-scheduler-table"
@@ -107,7 +107,7 @@
             />
           </template>
           <template #expansion="{ row }">
-            <div class="app-tabs-schedule-list px-4 py-0 h-fit w-fit">
+            <div class="app-tabs-schedule-list h-fit w-fit px-4 py-0">
               <AppTabs
                 data-test="expanded-list-tabs"
                 class="mr-3"
@@ -117,9 +117,9 @@
             </div>
             <div v-if="activeTab == 'query'">
               <div
-                class="text-left mb-2 px-4 py-0 w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] max-h-screen overflow-hidden"
+                class="mb-2 max-h-screen w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] overflow-hidden px-4 py-0 text-left"
               >
-                <div class="flex items-center py-2 gap-2">
+                <div class="flex items-center gap-2 py-2">
                   <strong
                     >{{ t("search_scheduler_job.sql_query") }} :
                     <span>
@@ -150,19 +150,19 @@
                 </div>
                 <div class="flex items-start justify-center">
                   <div
-                    class="w-full overflow-y-auto p-2.5 h-full max-h-50 border border-border-default border-l-3 border-l-sql-accent bg-surface-subtle text-text-body o2-colorized-query"
+                    class="border-border-default border-l-sql-accent bg-surface-subtle text-text-body o2-colorized-query h-full max-h-50 w-full overflow-y-auto border border-l-3 p-2.5"
                   >
                     <!-- Monaco-colorized SQL (sanitized in colorizeRow). Falls
                            back to plain text before colorize resolves / if it throws. -->
                     <pre
                       v-if="colorizedSql[row.trace_id]"
-                      class="font-mono text-compact leading-[1.6] m-0 whitespace-pre-wrap break-words"
+                      class="text-compact m-0 font-mono leading-[1.6] break-words whitespace-pre-wrap"
                       data-test="search-scheduler-sql-colorized"
                       v-html="colorizedSql[row.trace_id]"
                     ></pre>
                     <pre
                       v-else
-                      class="font-mono text-compact leading-[1.6] m-0 whitespace-pre-wrap break-words"
+                      class="text-compact m-0 font-mono leading-[1.6] break-words whitespace-pre-wrap"
                       >{{ row?.sql }}</pre
                     >
                   </div>
@@ -170,9 +170,9 @@
               </div>
               <div
                 v-if="row?.function"
-                class="text-left mb-2 px-4 py-0 w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] max-h-screen overflow-hidden"
+                class="mb-2 max-h-screen w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] overflow-hidden px-4 py-0 text-left"
               >
-                <div class="flex items-center py-2 gap-2">
+                <div class="flex items-center gap-2 py-2">
                   <strong
                     >{{ t("search_scheduler_job.function_definition") }} :
                     <span>
@@ -194,17 +194,17 @@
 
                 <div class="flex items-start justify-center">
                   <div
-                    class="w-full overflow-y-auto p-2.5 h-full max-h-50 border border-border-default border-l-3 border-l-function-accent bg-surface-subtle text-text-body o2-colorized-query"
+                    class="border-border-default border-l-function-accent bg-surface-subtle text-text-body o2-colorized-query h-full max-h-50 w-full overflow-y-auto border border-l-3 p-2.5"
                   >
                     <pre
                       v-if="colorizedFunction[row.trace_id]"
-                      class="font-mono text-compact leading-[1.6] m-0 whitespace-pre-wrap break-words"
+                      class="text-compact m-0 font-mono leading-[1.6] break-words whitespace-pre-wrap"
                       data-test="search-scheduler-function-colorized"
                       v-html="colorizedFunction[row.trace_id]"
                     ></pre>
                     <pre
                       v-else
-                      class="font-mono text-compact leading-[1.6] m-0 whitespace-pre-wrap break-words"
+                      class="text-compact m-0 font-mono leading-[1.6] break-words whitespace-pre-wrap"
                       >{{ row?.function }}</pre
                     >
                   </div>
@@ -213,7 +213,7 @@
             </div>
             <div class="py-3" v-else>
               <div
-                class="text-left mb-2 px-4 py-0 w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] max-h-screen overflow-hidden flex flex-col"
+                class="mb-2 flex max-h-screen w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] flex-col overflow-hidden px-4 py-0 text-left"
               >
                 <QueryEditor
                   style="height: 130px"
@@ -229,11 +229,11 @@
             </div>
           </template>
           <template #bottom>
-            <div class="flex items-center justify-between w-full h-12">
-              <div class="text-xs font-normal flex items-center w-25 mr-md">
+            <div class="flex h-12 w-full items-center justify-between">
+              <div class="mr-md flex w-25 items-center text-xs font-normal">
                 {{ resultTotal }} {{ t("search_scheduler_job.results") }}
               </div>
-              <div class="ml-auto mr-2">
+              <div class="mr-2 ml-auto">
                 {{ t("search_scheduler_job.max_limit") }} : <b>1000</b>
               </div>
             </div>

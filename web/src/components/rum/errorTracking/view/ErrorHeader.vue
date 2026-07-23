@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OPageHeader :back="{ onClick: () => router.back(), dataTest: 'back-button' }">
         <template #title>
           <span class="font-bold">{{ t("rum.eventID") }}:</span>
-          <span data-test="error-id" :title="error.error_id" class="pl-1 cursor-pointer"
+          <span data-test="error-id" :title="error.error_id" class="cursor-pointer pl-1"
             >{{ error.error_id }}
             <OIcon
               size="xs"
@@ -33,16 +33,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span>{{ error.timestamp }}</span>
         </template>
       </OPageHeader>
-      <div class="flex items-center flex-nowrap my-1">
+      <div class="my-1 flex flex-nowrap items-center">
         <div data-test="error-header-error-type" class="text-2xl font-bold">{{ error.type }}</div>
       </div>
-      <div class="text-base pt-1 flex items-center">
+      <div class="flex items-center pt-1 text-base">
         <div
           v-if="error.error_handling === 'unhandled'"
           data-test="error-header-unhandled-badge"
           :class="
             error.error_handling === 'unhandled'
-              ? 'text-status-error-text border border-status-negative rounded-default text-sm px-1 mr-2'
+              ? 'text-status-error-text border-status-negative rounded-default mr-2 border px-1 text-sm'
               : ''
           "
         >

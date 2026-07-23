@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="$emit('update:open', $event)"
     @click:secondary="$emit('update:open', false)"
   >
-    <div data-test="panel-layout-settings-content" class="p-0 [min-height:inherit]">
+    <div data-test="panel-layout-settings-content" class="[min-height:inherit] p-0">
       <div>
         <div data-test="panel-layout-settings-height" class="o2-input">
           <OForm id="panel-layout-settings-form" :form="form">
@@ -40,11 +40,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </OForm>
 
-          <div class="text-xs flex items-center gap-1 mt-1">
+          <div class="mt-1 flex items-center gap-1 text-xs">
             <span class="whitespace-nowrap"
               >Approximately <strong>{{ getRowCount }}</strong> table rows will be displayed</span
             >
-            <OIcon name="info-outline" class="cursor-pointer shrink-0" size="xs" />
+            <OIcon name="info-outline" class="shrink-0 cursor-pointer" size="xs" />
             <OTooltip content="1 unit = 30px" />
           </div>
         </div>

@@ -109,13 +109,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
           <div
-            class="h-20 overflow-y-auto content-start flex flex-wrap gap-1 rounded-default border border-border-default p-2"
+            class="rounded-default border-border-default flex h-20 flex-wrap content-start gap-1 overflow-y-auto border p-2"
           >
             <span
               v-for="row in selectedAlertRows"
               :key="row.alert_id"
               :title="row.folder_name"
-              class="inline-flex items-center gap-1 rounded-default px-2 py-0.5 text-xs leading-none max-w-40 h-fit bg-select-item-selected-bg text-select-item-selected-text"
+              class="rounded-default bg-select-item-selected-bg text-select-item-selected-text inline-flex h-fit max-w-40 items-center gap-1 px-2 py-0.5 text-xs leading-none"
               :data-test="`workflow-link-alerts-chip-${row.alert_id}`"
             >
               <span class="truncate">{{ row.name }}</span>

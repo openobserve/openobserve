@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template #extra>
-      <div class="flex items-center justify-center gap-2 flex-wrap">
+      <div class="flex flex-wrap items-center justify-center gap-2">
         <OButton
           v-if="aiEnabled && windowHasStreamData && !jumpTarget"
           variant="ghost"
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="emit('ask-ai')"
         >
           <template #icon-left>
-            <img :src="aiIconSrc" class="w-4 h-4 shrink-0" alt="" />
+            <img :src="aiIconSrc" class="h-4 w-4 shrink-0" alt="" />
           </template>
           {{ t("traces.noEvents.askAi") }}
         </OButton>

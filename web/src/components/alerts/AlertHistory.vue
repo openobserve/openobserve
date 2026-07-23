@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon class="o2-search-input-icon" name="search" size="sm" />
         </template>
         <template #empty>
-          <div class="px-3 py-2 text-muted-foreground">No alerts found</div>
+          <div class="text-muted-foreground px-3 py-2">No alerts found</div>
         </template>
       </OSelect>
       <OButton
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTooltip :content="t('common.refresh') || 'Refresh'" />
       </OButton>
     </template>
-    <div class="flex-1 min-h-0 overflow-hidden">
+    <div class="min-h-0 flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <OTable
           data-test="alert-history-table"
@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                 </OTooltip>
               </OIcon>
-              <span class="text-xs ml-1">×{{ row.group_size || 1 }}</span>
+              <span class="ml-1 text-xs">×{{ row.group_size || 1 }}</span>
             </div>
             <div v-else class="text-status-positive flex items-center justify-center">
               <OIcon name="check-circle" size="md">
@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                 </OTooltip>
               </OIcon>
-              <span v-if="row.dedup_count && row.dedup_count > 1" class="text-xs ml-1">
+              <span v-if="row.dedup_count && row.dedup_count > 1" class="ml-1 text-xs">
                 ×{{ row.dedup_count }}
               </span>
             </div>
@@ -243,16 +243,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div v-if="selectedRow" class="gap-2">
         <!-- Basic Information -->
-        <div class="py-1 px-0">
+        <div class="px-0 py-1">
           <div class="flex gap-3">
             <div class="w-1/2">
-              <div class="text-xs text-text-secondary mb-1">Alert Name</div>
+              <div class="text-text-secondary mb-1 text-xs">Alert Name</div>
               <div class="text-sm font-medium">
                 {{ selectedRow.alert_name }}
               </div>
             </div>
             <div class="w-1/2">
-              <div class="text-xs text-text-secondary mb-1">Status</div>
+              <div class="text-text-secondary mb-1 text-xs">Status</div>
               <OTag type="alertState" :value="selectedRow.status" />
             </div>
           </div>
@@ -261,16 +261,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSeparator class="my-2" />
 
         <!-- Time Information -->
-        <div class="py-1 px-0">
+        <div class="px-0 py-1">
           <div class="flex gap-3">
             <div class="w-1/2">
-              <div class="text-xs text-text-secondary mb-1">Timestamp</div>
+              <div class="text-text-secondary mb-1 text-xs">Timestamp</div>
               <div class="text-sm">
                 {{ formatHistoryDate(selectedRow.timestamp) }}
               </div>
             </div>
             <div class="w-1/2">
-              <div class="text-xs text-text-secondary mb-1">Duration</div>
+              <div class="text-text-secondary mb-1 text-xs">Duration</div>
               <div class="text-sm">
                 {{ formatDuration(selectedRow.end_time - selectedRow.start_time) }}
               </div>
@@ -281,10 +281,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSeparator class="my-2" />
 
         <!-- Alert Configuration -->
-        <div class="py-1 px-0">
+        <div class="px-0 py-1">
           <div class="flex gap-3">
             <div class="w-1/2">
-              <div class="text-xs text-text-secondary mb-1">Type</div>
+              <div class="text-text-secondary mb-1 text-xs">Type</div>
               <div class="text-sm">
                 <OIcon
                   :name="selectedRow.is_realtime ? 'speed' : 'schedule'"
@@ -295,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div class="w-1/2">
-              <div class="text-xs text-text-secondary mb-1">Silenced</div>
+              <div class="text-text-secondary mb-1 text-xs">Silenced</div>
               <div class="text-sm">
                 <OIcon v-if="selectedRow.is_silenced" name="volume-off" size="xs" class="mr-1" />
                 <OIcon v-else name="volume-up" size="xs" class="mr-1" />
@@ -312,18 +312,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <OSeparator class="my-2" />
-          <div class="py-1 px-0">
+          <div class="px-0 py-1">
             <div class="flex gap-3">
               <div v-if="selectedRow.evaluation_took_in_secs" class="w-1/3">
-                <div class="text-xs text-text-secondary mb-1">Evaluation Time</div>
+                <div class="text-text-secondary mb-1 text-xs">Evaluation Time</div>
                 <div class="text-sm">{{ selectedRow.evaluation_took_in_secs.toFixed(2) }}s</div>
               </div>
               <div v-if="selectedRow.query_took" class="w-1/3">
-                <div class="text-xs text-text-secondary mb-1">Query Time</div>
+                <div class="text-text-secondary mb-1 text-xs">Query Time</div>
                 <div class="text-sm">{{ (selectedRow.query_took / 1000).toFixed(2) }}ms</div>
               </div>
               <div v-if="selectedRow.retries > 0" class="w-1/3">
-                <div class="text-xs text-text-secondary mb-1">Retries</div>
+                <div class="text-text-secondary mb-1 text-xs">Retries</div>
                 <div class="text-sm">{{ selectedRow.retries }}</div>
               </div>
             </div>
@@ -333,9 +333,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Source Node (if available) -->
         <template v-if="selectedRow.source_node">
           <OSeparator class="my-2" />
-          <div class="py-1 px-0">
-            <div class="text-xs text-text-secondary mb-1">Source Node</div>
-            <div class="text-sm font-mono">
+          <div class="px-0 py-1">
+            <div class="text-text-secondary mb-1 text-xs">Source Node</div>
+            <div class="font-mono text-sm">
               {{ selectedRow.source_node }}
             </div>
           </div>
@@ -344,13 +344,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Error Details (if available) -->
         <template v-if="selectedRow.error">
           <OSeparator class="my-2" />
-          <div class="py-1 px-0">
-            <div class="text-xs text-text-secondary mb-1">
+          <div class="px-0 py-1">
+            <div class="text-text-secondary mb-1 text-xs">
               <OIcon name="error" size="xs" class="mr-1" />
               Error Details
             </div>
             <div
-              class="rounded-default border border-solid border-negative/30 p-2 mt-2 bg-status-error-bg"
+              class="rounded-default border-negative/30 bg-status-error-bg mt-2 border border-solid p-2"
             >
               <pre
                 class="text-sm"
@@ -370,13 +370,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Success Response (if available) -->
         <template v-if="selectedRow.success_response">
           <OSeparator class="my-2" />
-          <div class="py-1 px-0">
-            <div class="text-xs text-text-secondary mb-1">
+          <div class="px-0 py-1">
+            <div class="text-text-secondary mb-1 text-xs">
               <OIcon name="check-circle" size="xs" class="mr-1" />
               Response
             </div>
             <div
-              class="rounded-default border border-solid border-positive/30 p-2 mt-2 bg-status-success-bg"
+              class="rounded-default border-positive/30 bg-status-success-bg mt-2 border border-solid p-2"
             >
               <pre
                 class="text-sm"
@@ -408,7 +408,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="error" size="sm" class="text-status-error-text" />
       </template>
       <template #header-right>
-        <div class="flex items-center text-compact opacity-70 ml-9 text-xs">
+        <div class="text-compact ml-9 flex items-center text-xs opacity-70">
           <span class="mr-1">Last error:</span>
           <OIcon name="schedule" size="xs" class="mr-1" />
           {{
@@ -419,9 +419,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <div class="mb-4">
-        <div class="text-sm font-semibold tracking-[0.02em] opacity-80 mb-2">Error Summary</div>
+        <div class="mb-2 text-sm font-semibold tracking-[0.02em] opacity-80">Error Summary</div>
         <div
-          class="p-4 rounded-default font-mono text-compact leading-[1.6] whitespace-pre-wrap wrap-break-word bg-status-error-bg border border-solid border-status-negative text-status-error-text"
+          class="rounded-default text-compact bg-status-error-bg border-status-negative text-status-error-text border border-solid p-4 font-mono leading-[1.6] wrap-break-word whitespace-pre-wrap"
         >
           {{ errorMessage.error }}
         </div>

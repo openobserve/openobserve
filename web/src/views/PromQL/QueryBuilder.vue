@@ -7,7 +7,7 @@
     icon="query-stats"
     scroll
   >
-    <div class="max-w-350 mx-auto py-2.5">
+    <div class="mx-auto max-w-350 py-2.5">
       <OCard>
         <OCardSection role="body">
           <!-- Query Builder Section -->
@@ -27,13 +27,13 @@
 
         <!-- Generated Query Display -->
         <OCardSection>
-          <div class="text-base font-medium mb-2">
+          <div class="mb-2 text-base font-medium">
             {{ t("metrics.queryBuilder.generatedQuery") }}
           </div>
           <OCard class="bg-surface-panel">
             <OCardSection>
               <pre
-                class="m-0 p-3 font-mono text-sm leading-relaxed whitespace-pre-wrap wrap-break-word text-text-link font-medium"
+                class="text-text-link m-0 p-3 font-mono text-sm leading-relaxed font-medium wrap-break-word whitespace-pre-wrap"
                 >{{ generatedQuery || t("metrics.queryBuilder.noQueryBuilt") }}</pre
               >
             </OCardSection>
@@ -67,13 +67,13 @@
 
         <!-- Query Result Preview -->
         <OCardSection v-if="queryResult">
-          <div class="text-base font-medium mb-2">
+          <div class="mb-2 text-base font-medium">
             {{ t("metrics.queryBuilder.queryResultPreview") }}
           </div>
           <OCard class="bg-surface-panel">
             <OCardSection>
               <pre
-                class="m-0 p-3 font-mono text-sm leading-relaxed whitespace-pre-wrap wrap-break-word text-text-body max-h-100 overflow-y-auto"
+                class="text-text-body m-0 max-h-100 overflow-y-auto p-3 font-mono text-sm leading-relaxed wrap-break-word whitespace-pre-wrap"
                 >{{ queryResult }}</pre
               >
             </OCardSection>

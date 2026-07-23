@@ -16,21 +16,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="context-menu fixed z-9999 min-w-50 py-1 overflow-hidden bg-surface-overlay border border-border-default rounded-default shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
+    class="context-menu bg-surface-overlay border-border-default rounded-default fixed z-9999 min-w-50 overflow-hidden border py-1 shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
     :style="{ top: `${y}px`, left: `${x}px` }"
     @click.stop
     data-test="alert-insights-context-menu"
   >
-    <div class="menu-header px-4 py-2 text-xs font-semibold bg-surface-subtle text-text-secondary">
+    <div class="menu-header bg-surface-subtle text-text-secondary px-4 py-2 text-xs font-semibold">
       {{ isAlertNameContext ? value : panelTitle }}
     </div>
     <OSeparator />
 
     <!-- Alert-specific actions (shown for Dedup and similar panels) -->
     <template v-if="isAlertNameContext">
-      <div class="menu-section py-1 px-0">
+      <div class="menu-section px-0 py-1">
         <div
-          class="menu-item flex items-center py-2 px-4 cursor-pointer [transition:background-color_0.2s] text-sm"
+          class="menu-item flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
           @click="configureDedupForAlert"
           data-test="context-menu-configure-dedup"
         >
@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span>Configure Dedup</span>
         </div>
         <div
-          class="menu-item flex items-center py-2 px-4 cursor-pointer [transition:background-color_0.2s] text-sm"
+          class="menu-item flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
           @click="editAlert"
           data-test="context-menu-edit-alert"
         >
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span>Edit Alert</span>
         </div>
         <div
-          class="menu-item flex items-center py-2 px-4 cursor-pointer [transition:background-color_0.2s] text-sm"
+          class="menu-item flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
           @click="viewAlertHistory"
           data-test="context-menu-view-history"
         >
@@ -55,9 +55,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <OSeparator />
-      <div class="menu-section py-1 px-0">
+      <div class="menu-section px-0 py-1">
         <div
-          class="menu-item flex items-center py-2 px-4 cursor-pointer [transition:background-color_0.2s] text-sm"
+          class="menu-item flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
           @click="$emit('close')"
           data-test="context-menu-cancel"
         >

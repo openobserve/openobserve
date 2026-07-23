@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col h-full">
+  <div class="flex h-full flex-col">
     <div
       data-test="iam-service-accounts-selection-filters"
-      class="flex justify-start px-3 py-2 bg-card-glass-bg shrink-0"
+      class="bg-card-glass-bg flex shrink-0 justify-start px-3 py-2"
     >
       <div data-test="iam-service-accounts-selection-show-toggle" class="mr-3">
         <div class="flex items-center">
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
-    <div data-test="iam-service-accounts-selection-table" class="flex-1 min-h-0 bg-card-glass-bg">
+    <div data-test="iam-service-accounts-selection-table" class="bg-card-glass-bg min-h-0 flex-1">
       <OTable
         :data="rows"
         :columns="columns"

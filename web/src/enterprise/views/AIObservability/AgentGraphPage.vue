@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Last-refresh + refresh control, consistent with LLM Insights /
              Sessions / Agent Behavior page headers. -->
       <div
-        class="inline-flex items-center border border-border-default rounded-default px-1 h-8 overflow-hidden"
+        class="border-border-default rounded-default inline-flex h-8 items-center overflow-hidden border px-1"
       >
         <ORefreshButton
           :last-run-at="graphLastRunAt"
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          tab picks a discovered agent and the graph follows its source_stream.
          Lives in OPageLayout's #subnav (which draws the full-bleed divider). -->
     <template #subnav>
-      <div class="flex items-center gap-3 px-page-edge py-2">
+      <div class="px-page-edge flex items-center gap-3 py-2">
         <OToggleGroup
           :model-value="filterMode"
           type="single"
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="availableStreams.map((s) => ({ label: s, value: s }))"
             labelKey="label"
             valueKey="value"
-            class="w-full rounded-default"
+            class="rounded-default w-full"
           />
         </div>
         <div v-else data-test="agent-graph-agent-selector" class="w-56 shrink-0">
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="agentSelectOptions"
             labelKey="label"
             valueKey="value"
-            class="w-full rounded-default"
+            class="rounded-default w-full"
           />
         </div>
       </div>
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :stream-filter="effectiveStream"
       hide-stream-selector
       agent-highlight
-      class="flex-1 min-h-0"
+      class="min-h-0 flex-1"
     />
   </OPageLayout>
 </template>

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col h-full p-0">
+  <div class="flex h-full flex-col p-0">
     <OPageLayout
       bleed
       v-if="!showDestinationEditor && !showImportDestination"
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t(`alert_destinations.add`) }}</OButton
         >
       </template>
-      <div class="bg-card-glass-bg flex-1 min-h-0">
+      <div class="bg-card-glass-bg min-h-0 flex-1">
         <OTable
           data-test="alert-destinations-list-table"
           :data="visibleRows"
@@ -162,10 +162,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-template="{ row }">
             <div
               v-if="row.template"
-              class="flex items-center gap-2 min-w-0"
+              class="flex min-w-0 items-center gap-2"
               :data-test="`destination-template-${row.name}`"
             >
-              <span class="truncate min-w-0" :title="row.template">{{ row.template }}</span>
+              <span class="min-w-0 truncate" :title="row.template">{{ row.template }}</span>
               <OTag
                 v-if="isDefaultPrebuiltTemplate(row)"
                 :data-test="`destination-template-default-badge-${row.name}`"
@@ -205,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-actions="{ row }">
-            <div class="flex items-center gap-1 justify-center">
+            <div class="flex items-center justify-center gap-1">
               <OButton
                 data-test="destination-export"
                 data-row-action="export"
@@ -241,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTable>
       </div>
     </OPageLayout>
-    <div v-else-if="showDestinationEditor && !showImportDestination" class="flex-1 min-h-0">
+    <div v-else-if="showDestinationEditor && !showImportDestination" class="min-h-0 flex-1">
       <AddDestination
         :is-alerts="true"
         :destination="editingDestination"
@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @get:destinations="getDestinations"
       />
     </div>
-    <div v-else class="flex-1 min-h-0">
+    <div v-else class="min-h-0 flex-1">
       <ImportDestination
         :destinations="destinations"
         :templates="templates"

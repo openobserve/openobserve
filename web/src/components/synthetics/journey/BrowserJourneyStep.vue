@@ -199,19 +199,19 @@ function toggleExpanded() {
 </script>
 
 <template>
-  <div class="rounded-default border border-border-default bg-surface-base mb-1">
+  <div class="rounded-default border-border-default bg-surface-base mb-1 border">
     <!-- Compact row -->
     <div
-      class="flex items-center gap-2 px-2 h-9 min-h-9 group relative"
+      class="group relative flex h-9 min-h-9 items-center gap-2 px-2"
       :class="[
         rowOpacityClass,
-        { 'border-b border-border-default': expanded },
+        { 'border-border-default border-b': expanded },
         showErrorCard && 'bg-[var(--color-badge-error-soft-bg)]',
       ]"
     >
       <!-- Drag handle — visibility:hidden during replay to preserve layout -->
       <span
-        class="cursor-grab text-text-muted opacity-0 group-hover:opacity-100 transition-opacity shrink-0 absolute left-[-0.1rem]"
+        class="text-text-muted absolute left-[-0.1rem] shrink-0 cursor-grab opacity-0 transition-opacity group-hover:opacity-100"
         :class="{ invisible: replayDotState }"
         data-test="synthetics-journey-step-drag-handle"
         aria-hidden="true"
@@ -220,7 +220,7 @@ function toggleExpanded() {
       </span>
 
       <!-- Leading slot: checkbox (edit) + step number — fixed combined width for no shift -->
-      <span class="flex items-center gap-1 w-12 shrink-0">
+      <span class="flex w-12 shrink-0 items-center gap-1">
         <OCheckbox
           :model-value="selected ? true : false"
           size="xs"
@@ -246,7 +246,7 @@ function toggleExpanded() {
       </span>
 
       <!-- Action icon chip -->
-      <span class="bg-primary-50 rounded-default p-1 shrink-0 flex items-center">
+      <span class="bg-primary-50 rounded-default flex shrink-0 items-center p-1">
         <OIcon :name="actionIcon" size="sm" class="text-primary-500" aria-hidden="true" />
       </span>
 
@@ -254,20 +254,20 @@ function toggleExpanded() {
       <OBadge variant="default" size="sm">{{ actionLabel }}</OBadge>
 
       <!-- Step display name -->
-      <span class="text-sm text-text-body flex-1 truncate min-w-0">
+      <span class="text-text-body min-w-0 flex-1 truncate text-sm">
         {{ displayName }}
       </span>
 
       <!-- Selector/value preview -->
       <span
         v-if="selectorPreview"
-        class="font-mono text-xs text-text-secondary truncate max-w-[25%] shrink-0"
+        class="text-text-secondary max-w-[25%] shrink-0 truncate font-mono text-xs"
       >
         {{ selectorPreview }}
       </span>
 
       <!-- Row actions — hidden during replay (space reserved via visibility) -->
-      <div class="flex items-center gap-0.5 shrink-0" :class="{ invisible: replayLocked }">
+      <div class="flex shrink-0 items-center gap-0.5" :class="{ invisible: replayLocked }">
         <OButton
           variant="ghost"
           size="xs"
@@ -319,21 +319,21 @@ function toggleExpanded() {
     <!-- Inline error card (shown when a step fails during replay) -->
     <div
       v-if="showErrorCard"
-      class="border border-badge-error-ol-border/30 rounded-default mx-6 my-2 overflow-hidden"
+      class="border-badge-error-ol-border/30 rounded-default mx-6 my-2 overflow-hidden border"
       data-test="synthetics-journey-step-error-card"
     >
       <!-- Header -->
-      <div class="flex items-center gap-2 px-3 py-2 bg-[var(--color-badge-error-soft-bg)]">
+      <div class="flex items-center gap-2 bg-[var(--color-badge-error-soft-bg)] px-3 py-2">
         <OIcon :name="errorIconName" size="sm" class="text-status-error-text" aria-hidden="true" />
-        <span class="text-xs font-semibold text-text-heading flex-1">{{ errorLabel }}</span>
-        <span class="text-xs font-mono text-text-secondary"
+        <span class="text-text-heading flex-1 text-xs font-semibold">{{ errorLabel }}</span>
+        <span class="text-text-secondary font-mono text-xs"
           >{{ exitReasonTag }} · {{ errorDurationFormatted }}</span
         >
       </div>
 
       <!-- Error message -->
       <div class="px-3 py-3">
-        <p class="text-xs text-text-body m-0">
+        <p class="text-text-body m-0 text-xs">
           {{ se?.message || props.replayResult?.error }}
         </p>
       </div>
@@ -344,7 +344,7 @@ function toggleExpanded() {
           <OButton
             variant="ghost"
             size="xs"
-            class="text-xs text-text-link"
+            class="text-text-link text-xs"
             data-test="synthetics-journey-step-stack-toggle"
             @click="toggleStackTrace"
           >
@@ -368,7 +368,7 @@ function toggleExpanded() {
         </div>
         <pre
           v-if="showStackTrace"
-          class="mt-2 bg-code-bg rounded-default p-3 overflow-x-auto max-h-75 overflow-y-auto text-xs font-mono leading-relaxed m-0"
+          class="bg-code-bg rounded-default m-0 mt-2 max-h-75 overflow-x-auto overflow-y-auto p-3 font-mono text-xs leading-relaxed"
           data-test="synthetics-journey-step-stack-content"
           >{{ se?.stack }}</pre
         >
@@ -377,16 +377,16 @@ function toggleExpanded() {
       <!-- Info boxes -->
       <div v-if="se?.selector" class="flex gap-4 px-3 pb-3">
         <div class="flex flex-col gap-1">
-          <span class="text-2xs font-medium text-text-label">{{
+          <span class="text-2xs text-text-label font-medium">{{
             t("synthetics.stepErrors.selectorTestId")
           }}</span>
-          <span class="text-xs font-mono text-status-error-text">{{ se.selector }}</span>
+          <span class="text-status-error-text font-mono text-xs">{{ se.selector }}</span>
         </div>
         <div class="flex flex-col gap-1">
-          <span class="text-2xs font-medium text-text-label">{{
+          <span class="text-2xs text-text-label font-medium">{{
             t("synthetics.stepErrors.waited")
           }}</span>
-          <span class="text-xs font-mono text-text-secondary"
+          <span class="text-text-secondary font-mono text-xs"
             >{{ errorDurationFormatted }} · {{ exitReasonTag }}</span
           >
         </div>
@@ -407,7 +407,7 @@ function toggleExpanded() {
     </div>
 
     <!-- Inline editor (expanded) -->
-    <div v-if="expanded" class="pt-3 pb-3 px-8 flex flex-col gap-3 w-32!">
+    <div v-if="expanded" class="flex w-32! flex-col gap-3 px-8 pt-3 pb-3">
       <!-- Action select -->
       <OSelect
         v-model="actionComputed"
