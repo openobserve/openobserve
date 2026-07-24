@@ -523,11 +523,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // pipeline not used on compactors
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
-        tokio::task::spawn(openobserve_core::pipeline::store::watch());
+        tokio::task::spawn(openobserve_core::pipeline::db::watch());
     } else {
         // On nodes that do not run the heavy pipeline watch (e.g. routers), still maintain
         // PIPELINE_ID_TO_ORG so HTTP handlers can perform cross-org IDOR checks in O(1).
-        tokio::task::spawn(openobserve_core::pipeline::store::watch_id_to_org());
+        tokio::task::spawn(openobserve_core::pipeline::db::watch_id_to_org());
     }
 
     // Dashboard id->org cache: maintained on every node type so HTTP handlers (e.g.
@@ -569,7 +569,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         if LOCAL_NODE.is_querier() {
             tokio::task::spawn(async {
                 if let Err(e) =
-                    openobserve_core::model_pricing::sync_built_in_from_github(false).await
+                    openobserve_builtins::model_pricing::sync_built_in_from_github(false).await
                 {
                     log::error!("[model_pricing] initial built-in sync failed: {e}");
                 }
@@ -581,7 +581,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 loop {
                     tokio::time::sleep(interval).await;
                     if let Err(e) =
-                        openobserve_core::model_pricing::sync_built_in_from_github(false).await
+                        openobserve_builtins::model_pricing::sync_built_in_from_github(false).await
                     {
                         log::error!("[model_pricing] periodic built-in sync failed: {e}");
                     }
@@ -1163,7 +1163,7 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
         .await
         .expect("EnrichmentTables cache failed");
     // pipelines can potentially depend on enrichment tables, so cached afterwards
-    openobserve_core::pipeline::store::cache(wait_for_initialization)
+    openobserve_core::pipeline::db::cache(wait_for_initialization)
         .await
         .expect("Pipeline cache failed");
 

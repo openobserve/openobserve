@@ -1598,7 +1598,7 @@ async fn reload_module_cache(module: &str) -> Result<(), anyhow::Error> {
         "user" => db::user::cache().await,
         "session" => db::session::cache().await,
         "functions" => openobserve_core::functions_cache::cache().await,
-        "pipeline" => openobserve_core::pipeline::store::cache(wait_for_initialization).await,
+        "pipeline" => openobserve_core::pipeline::db::cache(wait_for_initialization).await,
         "alerts" => db::alerts::alert::cache().await,
         "destinations" => db::alerts::destinations::cache().await,
         "templates" => db::alerts::templates::cache().await,

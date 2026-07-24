@@ -52,14 +52,11 @@ async fn cleanup_related_resources(
     stream_name: String,
     stream_type: StreamType,
 ) -> Result<(), Response> {
-    for pipeline in crate::pipeline::store::get_by_stream(&StreamParams::new(
-        &org_id,
-        &stream_name,
-        stream_type,
-    ))
-    .await
+    for pipeline in
+        crate::pipeline::db::get_by_stream(&StreamParams::new(&org_id, &stream_name, stream_type))
+            .await
     {
-        if let Err(e) = crate::pipeline::store::delete(&pipeline.id).await {
+        if let Err(e) = crate::pipeline::db::delete(&pipeline.id).await {
             return Err((
                 http::StatusCode::INTERNAL_SERVER_ERROR,
                 [(ERROR_HEADER, format!("failed to delete stream: {e}"))],

@@ -256,6 +256,7 @@ members = [
     "src/compaction",
     "src/stream",
     "src/enrichment_data",
+    "src/builtins",
     "src/org_storage",
     "src/sourcemaps",
     "src/common",
@@ -303,6 +304,7 @@ schema = { path = "src/schema" }
 compaction = { path = "src/compaction" }
 stream = { path = "src/stream" }
 enrichment-data = { path = "src/enrichment_data" }
+openobserve-builtins = { path = "src/builtins" }
 openobserve-org-storage = { path = "src/org_storage" }
 openobserve-sourcemaps = { path = "src/sourcemaps" }
 web = { path = "src/web" }

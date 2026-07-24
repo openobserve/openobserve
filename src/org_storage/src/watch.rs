@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use infra::{db::Event, table::org_storage_providers::OrgStorageProvider};
 
-use crate::store::OSP_PREFIX;
+use crate::db::OSP_PREFIX;
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     let cluster_coordinator = ::infra::db::get_coordinator().await;
@@ -59,7 +59,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 };
                 log::info!("[org_storage]: received provider info via nats org {org_id}");
                 infra::storage::add_account(&org_id, provider).await;
-                crate::store::update_cached_entry(entry).await;
+                crate::db::update_cached_entry(entry).await;
             }
             Event::Delete(ev) => {
                 log::error!(

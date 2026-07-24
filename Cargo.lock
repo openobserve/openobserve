@@ -7361,6 +7361,7 @@ dependencies = [
  "openobserve-api-common",
  "openobserve-api-management",
  "openobserve-api-query",
+ "openobserve-builtins",
  "openobserve-cipher",
  "openobserve-core",
  "openobserve-mcp",
@@ -7494,6 +7495,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "openobserve-builtins"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "chrono",
+ "config",
+ "infra",
+ "log",
+ "reqwest 0.13.2",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "utoipa",
+]
+
+[[package]]
 name = "openobserve-cipher"
 version = "0.1.0"
 dependencies = [
@@ -7524,7 +7543,6 @@ dependencies = [
  "common",
  "config",
  "cron",
- "csv",
  "dashmap",
  "datafusion",
  "db",
@@ -7542,7 +7560,6 @@ dependencies = [
  "jsonwebtoken",
  "lettre",
  "log",
- "maxminddb",
  "md5",
  "multer",
  "o2_dex",
@@ -7559,7 +7576,6 @@ dependencies = [
  "prost-wkt-types",
  "proto",
  "rand 0.10.1",
- "rayon",
  "rcgen",
  "regex",
  "reqwest 0.13.2",
@@ -7587,7 +7603,6 @@ dependencies = [
  "utoipa",
  "version-compare",
  "vrl",
- "wal",
  "webpki-roots 1.0.6",
  "x509-parser",
 ]
@@ -7617,6 +7632,7 @@ dependencies = [
  "o2_dex",
  "o2_enterprise",
  "o2_openfga",
+ "openobserve-builtins",
  "openobserve-core",
  "openobserve-org-storage",
  "prometheus",

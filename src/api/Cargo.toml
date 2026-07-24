@@ -58,6 +58,7 @@ common.workspace = true
 audit.workspace = true
 db.workspace = true
 openobserve-core.workspace = true
+openobserve-builtins.workspace = true
 openobserve-sourcemaps.workspace = true
 ingestion-common.workspace = true
 stream.workspace = true

@@ -23,12 +23,12 @@ use object_store::ObjectStore;
 use crate::utils::_merge_aws_role_arn;
 mod aws_role_utils;
 mod checks;
-mod store;
+mod db;
 mod utils;
 pub mod watch;
 
 pub use checks::{StorageProviderPolicy, enforce_checks};
-pub use store::get_for_org;
+pub use db::get_for_org;
 use utils::{
     _merge_aws_credentials, _merge_azure_credentials, _merge_gcp_credentials, get_aws, get_azure,
     get_gcp, test_provider,
@@ -66,7 +66,7 @@ pub(crate) async fn get_provider(
 }
 
 pub async fn get_provider_list() -> Result<Vec<(String, Box<dyn ObjectStore>)>, anyhow::Error> {
-    let list = store::list_all()
+    let list = db::list_all()
         .await
         .inspect_err(|e| log::error!("error listing object store providers from db : {e}"))?;
 
@@ -105,7 +105,7 @@ fn redact(v: &str) -> String {
 pub async fn get_redacted_config(
     org_id: &str,
 ) -> Result<Option<OrgStorageProvider>, anyhow::Error> {
-    let mut provider = store::get_for_org(org_id).await?;
+    let mut provider = db::get_for_org(org_id).await?;
 
     if let Some(config) = provider.as_mut() {
         match config.provider_type {
@@ -141,7 +141,7 @@ pub async fn set_storage(
 
     test_provider(&provider).await?;
 
-    store::add(provider_data.clone()).await?;
+    db::add(provider_data.clone()).await?;
 
     infra::table::org_storage_providers::update_cache(org_id, provider_data);
     infra::storage::add_account(org_id, provider).await;

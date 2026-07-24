@@ -25,7 +25,7 @@ use crate::{
     alerts::alert::AlertError,
     common::meta::http::{ERROR_HEADER, HttpResponse as MetaHttpResponse},
     dashboards::{DashboardError, reports::ReportError},
-    pipeline::store::PipelineError,
+    pipeline::db::PipelineError,
 };
 #[cfg(feature = "enterprise")]
 use crate::{

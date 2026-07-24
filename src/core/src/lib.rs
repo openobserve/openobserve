@@ -32,7 +32,6 @@ pub mod error_suggest;
 use ::db::folders;
 pub mod functions;
 pub mod functions_cache;
-pub mod github;
 pub mod grpc;
 pub mod http;
 pub mod ingestion;
@@ -43,7 +42,6 @@ pub mod llm_evaluations;
 pub mod logs;
 pub mod metadata;
 pub mod metrics;
-pub mod model_pricing;
 pub mod node;
 #[cfg(feature = "enterprise")]
 pub mod ofga;
