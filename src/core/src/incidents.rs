@@ -16,13 +16,11 @@
 use std::collections::HashMap;
 
 use config::meta::alerts::incidents::{IncidentEvent, IncidentEventType};
+use db::workflows::WorkflowTriggerType;
 use infra::table::workflows::get_all_associations_for_trigger_type;
 use serde_json::Value;
 
-use crate::{
-    alerts::incidents::get_incident_with_alerts,
-    workflows::{WorkflowTriggerType, send_workflow_trigger},
-};
+use crate::{alerts::incidents::get_incident_with_alerts, workflows::send_workflow_trigger};
 
 async fn get_event_metadata(
     org_id: &str,

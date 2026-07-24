@@ -29,12 +29,12 @@ use config::{
 };
 use infra::{
     db::{ORM_CLIENT, connect_to_orm},
-    table::alerts as table,
+    table::{alerts as table, workflows::WorkflowTriggerEntity},
 };
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use svix_ksuid::Ksuid;
 
-use crate as db;
+use crate::{self as db, workflows::WorkflowTriggerType};
 
 /// Gets the alert and its parent folder.
 pub async fn get_by_id<C: ConnectionTrait>(
@@ -172,6 +172,8 @@ pub async fn create<C: TransactionTrait>(
     alert: Alert,
     overwrite: bool,
 ) -> Result<Alert, infra::errors::Error> {
+    let workflows = alert.workflows.clone();
+    let alert_id = alert.get_unique_key();
     let alert = table::create(conn, org_id, folder_id, alert, overwrite).await?;
     let schedule_key = scheduler_key(alert.id);
 
@@ -206,6 +208,17 @@ pub async fn create<C: TransactionTrait>(
         log::error!("Failed to save trigger for alert {schedule_key}: {e}");
         e
     });
+
+    for w in workflows {
+        db::workflows::associate_workflow(
+            org_id,
+            &w,
+            &alert_id,
+            WorkflowTriggerEntity::Alert.to_string(),
+            WorkflowTriggerType::AlertFired.to_string(),
+        )
+        .await?;
+    }
 
     Ok(alert)
 }

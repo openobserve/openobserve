@@ -141,6 +141,20 @@ impl From<workflow_associations::Model> for WorkflowAssociation {
     }
 }
 
+pub enum WorkflowTriggerEntity {
+    Alert,
+    Incident,
+}
+
+impl std::fmt::Display for WorkflowTriggerEntity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Alert => write!(f, "alert"),
+            Self::Incident => write!(f, "incident"),
+        }
+    }
+}
+
 pub async fn list_all() -> Result<Vec<Workflow>, anyhow::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let entities = workflows::Entity::find().all(client).await?;

@@ -30,6 +30,7 @@ use config::{
     },
     utils::time::now_micros,
 };
+use db::workflows::WorkflowTriggerType;
 use infra::table::workflows::{Workflow, WorkflowAssociation, WorkflowRunErrors};
 use openobserve_api_management::request::alerts::history::escape_like;
 use openobserve_core::auth::UserEmail;
@@ -39,7 +40,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id},
     handler::http::extractors::Headers,
-    service::workflows::{self, InputMap, WorkflowTriggerType},
+    service::workflows::{self, InputMap},
 };
 
 #[derive(Deserialize)]

@@ -22,7 +22,7 @@ use config::meta::{
 use db::{
     self,
     authz::{remove_ownership, set_ownership},
-    workflows::AssociationDeleteEvent,
+    workflows::{AssociationDeleteEvent, WorkflowTriggerType},
 };
 use infra::table::workflows::{
     self, Workflow, WorkflowAssociation, WorkflowError, WorkflowRunData, WorkflowRunErrors,
@@ -39,33 +39,6 @@ use crate::{
 };
 
 pub mod runtime;
-
-#[derive(Serialize, Deserialize, Debug, Default)]
-pub enum WorkflowTriggerType {
-    #[default]
-    AlertFired,
-    IncidentEvent,
-}
-
-impl From<&str> for WorkflowTriggerType {
-    fn from(value: &str) -> Self {
-        match value {
-            "AlertFired" => Self::AlertFired,
-            "IncidentEvent" => Self::IncidentEvent,
-            _ => Self::AlertFired,
-        }
-    }
-}
-
-impl std::fmt::Display for WorkflowTriggerType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::AlertFired => write!(f, "AlertFired"),
-            Self::IncidentEvent => write!(f, "IncidentEvent"),
-        }
-    }
-}
-
 #[derive(Serialize, Deserialize)]
 pub struct InputMap {
     complete: Vec<Value>,

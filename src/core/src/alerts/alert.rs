@@ -45,6 +45,8 @@ use config::{
     },
 };
 use cron::Schedule;
+#[cfg(feature = "enterprise")]
+use db::workflows::WorkflowTriggerType;
 use db::{
     self,
     authz::{remove_ownership, set_ownership},
@@ -72,8 +74,6 @@ use tracing::{Level, span};
 
 #[cfg(feature = "enterprise")]
 use crate::auth::check_permissions;
-#[cfg(feature = "enterprise")]
-use crate::workflows::WorkflowTriggerType;
 use crate::{
     alerts::{QueryConditionExt, build_sql, destinations},
     auth::is_ofga_unsupported,
