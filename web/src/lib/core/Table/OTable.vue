@@ -274,10 +274,10 @@ function setActiveCell(key: string | null): void {
   } else if (activeCellKey.value === key) {
     // already active — no debounce needed
   } else {
-    cellActionTimer = setTimeout(() => {
-      activeCellKey.value = key;
-      cellActionTimer = null;
-    }, 200);
+    // Activate immediately so hover actions appear instantly under the pointer
+    // (the main branch shows them on CSS hover with no delay). The leave delay
+    // above still prevents flicker when moving the pointer into the overlay.
+    activeCellKey.value = key;
   }
 }
 onBeforeUnmount(() => {
