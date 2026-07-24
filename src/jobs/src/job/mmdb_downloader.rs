@@ -20,7 +20,7 @@ use config::{
     MMDB_CITY_FILE_NAME,
     utils::download_utils::{download_file, is_digest_different},
 };
-use enrichment_data::enrichment_table::geoip::{Geoip, GeoipConfig, MMDB_INIT_NOTIFIER};
+use enrichment_data::enrichment_table::geoip::{Geoip, GeoipConfig, notify_initialized};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use tokio::time;
@@ -104,7 +104,7 @@ async fn run_download_files() {
         update_maxmind_table(&asn_fname).await;
         update_maxmind_table(&city_fname).await;
         update_maxmind_client().await;
-        LazyLock::force(&MMDB_INIT_NOTIFIER).notify_one();
+        notify_initialized();
     } else {
         if download_asn_files {
             log::info!("New asn file found, updating client");

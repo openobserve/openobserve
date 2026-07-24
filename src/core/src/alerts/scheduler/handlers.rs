@@ -1732,7 +1732,7 @@ async fn handle_derived_stream_triggers(
     };
     // Try to get pipeline from cache first, fallback to database if not found
     let pipeline = if let Some(cached_pipeline) =
-        crate::pipeline::store::get_scheduled_pipeline_from_cache(&pipeline_id).await
+        crate::pipeline::db::get_scheduled_pipeline_from_cache(&pipeline_id).await
     {
         log::debug!(
             "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline {pipeline_id} found in cache"
@@ -1746,7 +1746,7 @@ async fn handle_derived_stream_triggers(
         match infra::pipeline::get_by_id(&pipeline_id).await {
             Ok(pipeline) => {
                 // Cache the pipeline for future use
-                crate::pipeline::store::cache_scheduled_pipeline(&pipeline).await;
+                crate::pipeline::db::cache_scheduled_pipeline(&pipeline).await;
                 log::debug!(
                     "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline {pipeline_id} fetched from database and cached"
                 );
@@ -2647,7 +2647,7 @@ async fn handle_backfill_triggers(
     };
 
     // 3. Fetch the source pipeline configuration
-    let pipeline = match crate::pipeline::store::get_by_id(&config.pipeline_id).await {
+    let pipeline = match crate::pipeline::db::get_by_id(&config.pipeline_id).await {
         Ok(pipeline) => pipeline,
         Err(e) => {
             log::error!(

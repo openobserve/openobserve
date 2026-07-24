@@ -56,9 +56,9 @@ export const STATUS_VALUES = {
  * When the backend adds new devices, add them here only.
  */
 export const KNOWN_DEVICES: Record<string, { label: string; icon: string }> = {
-  laptop_large: { label: "Desktop", icon: "computer" },
+  desktop: { label: "Desktop", icon: "computer" },
   tablet: { label: "Tablet", icon: "tablet" },
-  mobile_small: { label: "Mobile", icon: "smartphone" },
+  mobile: { label: "Mobile", icon: "smartphone" },
 };
 
 /**
