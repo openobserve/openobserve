@@ -20,44 +20,14 @@ const meta: Meta<typeof OTableBodyRow> = {
   title: 'Core/Table/Internals/OTableBodyRow',
   component: OTableBodyRow,
   tags: ['autodocs'],
-  argTypes: {
-    row: { control: false },
-    table: { control: false },
-    clickable: { control: 'boolean' },
-    selectionEnabled: { control: 'boolean' },
-    selectionMultiple: { control: 'boolean' },
-    isRowSelected: { control: 'boolean' },
-    isRowSelectable: { control: false },
-    expansionEnabled: { control: 'boolean' },
-    canExpand: { control: 'boolean' },
-    isExpanded: { control: 'boolean' },
-    highlightText: { control: 'text' },
-    shouldHighlightColumn: { control: false },
-    getHighlightedHtml: { control: false },
-    wrap: { control: 'boolean' },
-    dense: { control: 'boolean' },
-    bordered: { control: 'boolean' },
-    striped: { control: 'boolean' },
-    rowClassFn: { control: false },
-    rowStyleFn: { control: false },
-    measureEl: { control: false },
-    statusBarColor: { control: 'text' },
-    enableCellCopy: { control: 'boolean' },
-    getCellStyle: { control: false },
-    enableRowReorder: { control: 'boolean' },
-    rowDraggable: { control: 'boolean' },
-  },
 };
 
 export default meta;
 type Story = StoryObj<typeof OTableBodyRow>;
 
-export const Playground: Story = {
-  render: (args) => ({
-    components: { OTableBodyRow },
-    setup() {
-      return { args };
-    },
-    template: `<OTableBodyRow v-bind="args" />`,
+/** Reference only — this component needs its parent's runtime context. */
+export const Reference: Story = {
+  render: () => ({
+    template: `<div class="max-w-lg text-sm text-text-secondary">&lt;OTableBodyRow&gt; is an internal piece of OTable and only renders inside that live context. See the OTable story for it in action.</div>`,
   }),
 };

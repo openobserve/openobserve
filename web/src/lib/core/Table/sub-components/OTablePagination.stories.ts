@@ -20,31 +20,14 @@ const meta: Meta<typeof OTablePagination> = {
   title: 'Core/Table/Internals/OTablePagination',
   component: OTablePagination,
   tags: ['autodocs'],
-  argTypes: {
-    currentPage: { control: 'number' },
-    totalPages: { control: 'number' },
-    totalCount: { control: 'number' },
-    pageSize: { control: 'number' },
-    pageSizeOptions: { control: false },
-    showingFrom: { control: 'number' },
-    showingTo: { control: 'number' },
-    isFirstPage: { control: 'boolean' },
-    isLastPage: { control: 'boolean' },
-    position: { control: { type: 'select' }, options: ["top","bottom"] },
-    title: { control: 'text' },
-    loading: { control: 'boolean' },
-  },
 };
 
 export default meta;
 type Story = StoryObj<typeof OTablePagination>;
 
-export const Playground: Story = {
-  render: (args) => ({
-    components: { OTablePagination },
-    setup() {
-      return { args };
-    },
-    template: `<OTablePagination v-bind="args" />`,
+/** Reference only — this component needs its parent's runtime context. */
+export const Reference: Story = {
+  render: () => ({
+    template: `<div class="max-w-lg text-sm text-text-secondary">&lt;OTablePagination&gt; is an internal piece of OTable and only renders inside that live context. See the OTable story for it in action.</div>`,
   }),
 };

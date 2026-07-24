@@ -20,20 +20,14 @@ const meta: Meta<typeof OTableError> = {
   title: 'Core/Table/Internals/OTableError',
   component: OTableError,
   tags: ['autodocs'],
-  argTypes: {
-    message: { control: 'text' },
-  },
 };
 
 export default meta;
 type Story = StoryObj<typeof OTableError>;
 
-export const Playground: Story = {
-  render: (args) => ({
-    components: { OTableError },
-    setup() {
-      return { args };
-    },
-    template: `<OTableError v-bind="args">{{ args.default }}</OTableError>`,
+/** Reference only — this component needs its parent's runtime context. */
+export const Reference: Story = {
+  render: () => ({
+    template: `<div class="max-w-lg text-sm text-text-secondary">&lt;OTableError&gt; is an internal piece of OTable and only renders inside that live context. See the OTable story for it in action.</div>`,
   }),
 };

@@ -20,25 +20,14 @@ const meta: Meta<typeof OTableLoading> = {
   title: 'Core/Table/Internals/OTableLoading',
   component: OTableLoading,
   tags: ['autodocs'],
-  argTypes: {
-    rows: { control: 'number' },
-    tableColumns: { control: false },
-    selectionEnabled: { control: 'boolean' },
-    expansionEnabled: { control: 'boolean' },
-    enableRowReorder: { control: 'boolean' },
-    bordered: { control: 'boolean' },
-  },
 };
 
 export default meta;
 type Story = StoryObj<typeof OTableLoading>;
 
-export const Playground: Story = {
-  render: (args) => ({
-    components: { OTableLoading },
-    setup() {
-      return { args };
-    },
-    template: `<OTableLoading v-bind="args" />`,
+/** Reference only — this component needs its parent's runtime context. */
+export const Reference: Story = {
+  render: () => ({
+    template: `<div class="max-w-lg text-sm text-text-secondary">&lt;OTableLoading&gt; is an internal piece of OTable and only renders inside that live context. See the OTable story for it in action.</div>`,
   }),
 };

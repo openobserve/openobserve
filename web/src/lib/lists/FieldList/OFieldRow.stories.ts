@@ -34,6 +34,6 @@ export const Playground: Story = {
     setup() {
       return { args };
     },
-    template: `<OFieldRow v-bind="args">{{ args.default }}</OFieldRow>`,
+    template: `<div class="w-64"><OFieldRow v-bind="args"><span class="text-sm text-text-secondary">kubernetes_host</span></OFieldRow></div>`,
   }),
 };

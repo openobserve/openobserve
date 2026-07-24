@@ -20,20 +20,14 @@ const meta: Meta<typeof OTableEmpty> = {
   title: 'Core/Table/Internals/OTableEmpty',
   component: OTableEmpty,
   tags: ['autodocs'],
-  argTypes: {
-    message: { control: 'text' },
-  },
 };
 
 export default meta;
 type Story = StoryObj<typeof OTableEmpty>;
 
-export const Playground: Story = {
-  render: (args) => ({
-    components: { OTableEmpty },
-    setup() {
-      return { args };
-    },
-    template: `<OTableEmpty v-bind="args">{{ args.default }}</OTableEmpty>`,
+/** Reference only — this component needs its parent's runtime context. */
+export const Reference: Story = {
+  render: () => ({
+    template: `<div class="max-w-lg text-sm text-text-secondary">&lt;OTableEmpty&gt; is an internal piece of OTable and only renders inside that live context. See the OTable story for it in action.</div>`,
   }),
 };

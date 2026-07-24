@@ -32,7 +32,16 @@ const config: StorybookConfig = {
   addons: ["@storybook/addon-themes"],
   framework: {
     name: "@storybook/vue3-vite",
-    options: {},
+    options: {
+      // Disable auto-docgen: it injects `object` controls for every array /
+      // object / function prop (data, columns, getRowStyle, …) and for slots,
+      // events and exposed methods — overriding the explicit `control: false`
+      // each story declares. Clicking one of those "Set object" buttons sets
+      // the prop to `{}` where the component expects an array/function, which
+      // throws and blanks the story. Each story already declares full argTypes
+      // (with descriptions), so nothing useful is lost.
+      docgen: false,
+    },
   },
   core: {
     disableTelemetry: true,

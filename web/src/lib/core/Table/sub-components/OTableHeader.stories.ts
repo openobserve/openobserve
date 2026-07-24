@@ -20,41 +20,14 @@ const meta: Meta<typeof OTableHeader> = {
   title: 'Core/Table/Internals/OTableHeader',
   component: OTableHeader,
   tags: ['autodocs'],
-  argTypes: {
-    headerGroups: { control: false },
-    table: { control: false },
-    columnOrder: { control: false },
-    selectionMultiple: { control: 'boolean' },
-    isAllSelected: { control: 'boolean' },
-    isIndeterminate: { control: 'boolean' },
-    expansionEnabled: { control: 'boolean' },
-    enableRowReorder: { control: 'boolean' },
-    enableColumnReorder: { control: 'boolean' },
-    enableColumnResize: { control: 'boolean' },
-    isResizing: { control: 'boolean' },
-    sortingEnabled: { control: 'boolean' },
-    sortBy: { control: 'text' },
-    sortOrder: { control: 'text' },
-    sortFieldMap: { control: false },
-    getSortIcon: { control: false },
-    stickyHeader: { control: 'boolean' },
-    bordered: { control: 'boolean' },
-    pivotHeaderLevels: { control: false },
-    pivotRowColumns: { control: false },
-    stickyColTotals: { control: 'boolean' },
-    dense: { control: 'boolean' },
-  },
 };
 
 export default meta;
 type Story = StoryObj<typeof OTableHeader>;
 
-export const Playground: Story = {
-  render: (args) => ({
-    components: { OTableHeader },
-    setup() {
-      return { args };
-    },
-    template: `<OTableHeader v-bind="args" />`,
+/** Reference only — this component needs its parent's runtime context. */
+export const Reference: Story = {
+  render: () => ({
+    template: `<div class="max-w-lg text-sm text-text-secondary">&lt;OTableHeader&gt; is an internal piece of OTable and only renders inside that live context. See the OTable story for it in action.</div>`,
   }),
 };

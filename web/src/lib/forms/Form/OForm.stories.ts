@@ -15,6 +15,9 @@
 
 import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OForm from '@/lib/forms/Form/OForm.vue';
+import OFormInput from '@/lib/forms/Input/OFormInput.vue';
+import OButton from '@/lib/core/Button/OButton.vue';
+import { z } from 'zod';
 
 const meta: Meta<typeof OForm> = {
   title: 'Forms/Form/OForm',
@@ -34,10 +37,16 @@ type Story = StoryObj<typeof OForm>;
 
 export const Playground: Story = {
   render: (args) => ({
-    components: { OForm },
+    components: { OForm, OFormInput, OButton },
     setup() {
-      return { args };
+      return { args, demoSchema: z.object({ name: z.string().min(1), email: z.string().email() }) };
     },
-    template: `<OForm v-bind="args">{{ args.default }}</OForm>`,
+    template: `
+      <OForm v-bind="args" :schema="demoSchema" class="w-80">
+        <OFormInput name="name" label="Name" placeholder="Jane Doe" />
+        <OFormInput name="email" label="Email" placeholder="jane@openobserve.ai" />
+        <OButton type="submit" class="mt-2">Submit</OButton>
+      </OForm>
+    `,
   }),
 };

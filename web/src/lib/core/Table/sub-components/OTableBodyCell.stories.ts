@@ -20,30 +20,14 @@ const meta: Meta<typeof OTableBodyCell> = {
   title: 'Core/Table/Internals/OTableBodyCell',
   component: OTableBodyCell,
   tags: ['autodocs'],
-  argTypes: {
-    cell: { control: false },
-    row: { control: false },
-    rowSelected: { control: 'boolean' },
-    highlightText: { control: 'text' },
-    shouldHighlight: { control: 'boolean' },
-    getHighlightedHtml: { control: false },
-    wrap: { control: 'boolean' },
-    dense: { control: 'boolean' },
-    bordered: { control: 'boolean' },
-    enableCellCopy: { control: 'boolean' },
-    getCellStyle: { control: false },
-  },
 };
 
 export default meta;
 type Story = StoryObj<typeof OTableBodyCell>;
 
-export const Playground: Story = {
-  render: (args) => ({
-    components: { OTableBodyCell },
-    setup() {
-      return { args };
-    },
-    template: `<OTableBodyCell v-bind="args">{{ args.default }}</OTableBodyCell>`,
+/** Reference only — this component needs its parent's runtime context. */
+export const Reference: Story = {
+  render: () => ({
+    template: `<div class="max-w-lg text-sm text-text-secondary">&lt;OTableBodyCell&gt; is an internal piece of OTable and only renders inside that live context. See the OTable story for it in action.</div>`,
   }),
 };

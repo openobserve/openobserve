@@ -20,16 +20,14 @@ const meta: Meta<typeof ShortcutCheatsheet> = {
   title: 'Utilities/ShortcutCheatsheet',
   component: ShortcutCheatsheet,
   tags: ['autodocs'],
-  args: { open: true },
-  argTypes: { toggleKey: { control: 'text' } },
 };
+
 export default meta;
 type Story = StoryObj<typeof ShortcutCheatsheet>;
 
-export const Playground: Story = {
-  render: (args) => ({
-    components: { ShortcutCheatsheet },
-    setup: () => ({ args }),
-    template: `<ShortcutCheatsheet v-bind="args" />`,
+/** Reference only — this component needs its parent's runtime context. */
+export const Reference: Story = {
+  render: () => ({
+    template: `<div class="max-w-lg text-sm text-text-secondary">&lt;ShortcutCheatsheet&gt; is an internal piece of the shortcut-manager and only renders inside that live context. See the the shortcut-manager story for it in action.</div>`,
   }),
 };

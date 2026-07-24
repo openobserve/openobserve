@@ -38,6 +38,6 @@ export const Playground: Story = {
     setup() {
       return { args };
     },
-    template: `<OFieldLabel v-bind="args" />`,
+    template: `<div class="w-64"><OFieldLabel v-bind="args" :field="{ name: 'kubernetes_container_name', type: 'Utf8' }" /></div>`,
   }),
 };

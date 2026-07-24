@@ -20,50 +20,14 @@ const meta: Meta<typeof OTableBody> = {
   title: 'Core/Table/Internals/OTableBody',
   component: OTableBody,
   tags: ['autodocs'],
-  argTypes: {
-    rows: { control: false },
-    table: { control: false },
-    clickable: { control: 'boolean' },
-    selectionEnabled: { control: 'boolean' },
-    selectionMultiple: { control: 'boolean' },
-    isRowSelectedFn: { control: false },
-    isRowSelectable: { control: false },
-    expansionEnabled: { control: 'boolean' },
-    isExpandedFn: { control: false },
-    getRowExpansionEnabled: { control: false },
-    highlightText: { control: 'text' },
-    shouldHighlightColumn: { control: false },
-    getHighlightedHtml: { control: false },
-    wrap: { control: 'boolean' },
-    dense: { control: 'boolean' },
-    bordered: { control: 'boolean' },
-    striped: { control: 'boolean' },
-    rowClass: { control: false },
-    rowStyleFn: { control: false },
-    loading: { control: 'boolean' },
-    enableRowReorder: { control: 'boolean' },
-    disableRowReorder: { control: false },
-    globalFilterActive: { control: 'boolean' },
-    rowKey: { control: 'text' },
-    virtualRows: { control: false },
-    totalSize: { control: 'number' },
-    baseOffset: { control: 'number' },
-    measureElement: { control: false },
-    getStatusBarColor: { control: false },
-    enableCellCopy: { control: 'boolean' },
-    getCellStyle: { control: false },
-  },
 };
 
 export default meta;
 type Story = StoryObj<typeof OTableBody>;
 
-export const Playground: Story = {
-  render: (args) => ({
-    components: { OTableBody },
-    setup() {
-      return { args };
-    },
-    template: `<OTableBody v-bind="args" />`,
+/** Reference only — this component needs its parent's runtime context. */
+export const Reference: Story = {
+  render: () => ({
+    template: `<div class="max-w-lg text-sm text-text-secondary">&lt;OTableBody&gt; is an internal piece of OTable and only renders inside that live context. See the OTable story for it in action.</div>`,
   }),
 };

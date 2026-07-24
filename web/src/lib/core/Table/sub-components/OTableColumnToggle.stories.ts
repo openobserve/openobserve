@@ -20,22 +20,14 @@ const meta: Meta<typeof OTableColumnToggle> = {
   title: 'Core/Table/Internals/OTableColumnToggle',
   component: OTableColumnToggle,
   tags: ['autodocs'],
-  argTypes: {
-    columns: { control: false },
-    columnVisibility: { control: false },
-    hasResizedColumns: { control: 'boolean' },
-  },
 };
 
 export default meta;
 type Story = StoryObj<typeof OTableColumnToggle>;
 
-export const Playground: Story = {
-  render: (args) => ({
-    components: { OTableColumnToggle },
-    setup() {
-      return { args };
-    },
-    template: `<OTableColumnToggle v-bind="args" />`,
+/** Reference only — this component needs its parent's runtime context. */
+export const Reference: Story = {
+  render: () => ({
+    template: `<div class="max-w-lg text-sm text-text-secondary">&lt;OTableColumnToggle&gt; is an internal piece of OTable and only renders inside that live context. See the OTable story for it in action.</div>`,
   }),
 };
