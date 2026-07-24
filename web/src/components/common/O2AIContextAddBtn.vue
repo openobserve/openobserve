@@ -3,7 +3,7 @@
   <OButton
     v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
     variant="ghost"
-    :size="size"
+    size="icon-toolbar"
     @click.stop="sendToAiChat"
     data-test="o2-ai-context-add-btn"
     class="group [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease] hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)] hover:[background:var(--color-gradient-ai)]! dark:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] dark:hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)]!"
@@ -69,10 +69,10 @@ const props = defineProps({
     default: "",
     required: false,
   },
-  // OButton size token (e.g. "icon-toolbar", "icon-xs-circle"). Defaults to
-  // the toolbar size the button previously hard-coded, so existing callers are
-  // unchanged; table cell overlays pass a smaller token to match sibling
-  // actions (QA #2239: AI button oversized vs other action buttons).
+  // Kept for backward-compatible props, but NOT applied: the button always
+  // renders at the "icon-toolbar" size so every AI icon looks identical to the
+  // main branch (which also hard-codes this size). Callers may still pass it;
+  // it is ignored on purpose.
   size: {
     type: String,
     default: "icon-toolbar",
