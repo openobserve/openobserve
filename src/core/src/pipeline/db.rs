@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::{Arc, LazyLock as Lazy};
+use std::{future::Future, sync::Arc};
 
 use config::{
     cluster::LOCAL_NODE,
@@ -239,7 +239,11 @@ pub async fn delete(pipeline_id: &str) -> Result<(), PipelineError> {
 }
 
 /// Preload all enabled pipelines into the cache at startup.
-pub async fn cache() -> Result<(), anyhow::Error> {
+pub async fn cache<W, WFut>(wait_for_mmdb: W) -> Result<(), anyhow::Error>
+where
+    W: FnOnce() -> WFut,
+    WFut: Future<Output = ()>,
+{
     // The id->org map is needed on every node type (including routers) for cross-org
     // IDOR checks in HTTP handlers, so populate it before the heavy-cache early-return.
     cache_id_to_org().await?;
@@ -254,9 +258,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         && !config::get_config().common.mmdb_disable_download
     {
         log::info!("[PIPELINE:CACHE] waiting mmdb data to be available");
-        Lazy::force(&enrichment_data::enrichment_table::geoip::MMDB_INIT_NOTIFIER)
-            .notified()
-            .await;
+        wait_for_mmdb().await;
         log::info!("[PIPELINE:CACHE] done waiting");
     }
     let mut pipeline_stream_mapping_cache = PIPELINE_STREAM_MAPPING.write().await;

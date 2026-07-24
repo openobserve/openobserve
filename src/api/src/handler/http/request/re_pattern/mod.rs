@@ -104,7 +104,7 @@ struct PatternTestResponse {
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 struct BuiltInPatternsResponse {
-    patterns: Vec<openobserve_core::github::adapters::BuiltInPatternResponse>,
+    patterns: Vec<openobserve_builtins::github::adapters::BuiltInPatternResponse>,
     last_updated: i64,
     source_url: String,
 }
@@ -625,22 +625,25 @@ pub async fn get_built_in_patterns(
     Path(_org_id): Path<String>,
     Query(query): Query<BuiltInPatternsQuery>,
 ) -> Response {
-    use openobserve_core::github::{GitHubDataService, adapters::PyWhatAdapter};
+    use openobserve_builtins::github::{GitHubDataService, adapters::PyWhatAdapter};
 
     // Create GitHub service
     let github_service = GitHubDataService::new();
+    let config = config::get_config();
+    let source_url = &config.common.regex_patterns_source_url;
 
     // Fetch patterns without backend caching
-    let mut patterns = match PyWhatAdapter::fetch_built_in_patterns(&github_service).await {
-        Ok(patterns) => patterns,
-        Err(e) => {
-            log::error!("Failed to fetch built-in patterns: {}", e);
-            return MetaHttpResponse::internal_error(format!(
-                "Failed to fetch built-in patterns: {}",
-                e
-            ));
-        }
-    };
+    let mut patterns =
+        match PyWhatAdapter::fetch_built_in_patterns(&github_service, source_url).await {
+            Ok(patterns) => patterns,
+            Err(e) => {
+                log::error!("Failed to fetch built-in patterns: {}", e);
+                return MetaHttpResponse::internal_error(format!(
+                    "Failed to fetch built-in patterns: {}",
+                    e
+                ));
+            }
+        };
 
     // Apply search filter
     if !query.search.is_empty() {
@@ -652,11 +655,10 @@ pub async fn get_built_in_patterns(
         patterns = PyWhatAdapter::filter_by_tags(patterns, &query.tags);
     }
 
-    let config = config::get_config();
     let response = BuiltInPatternsResponse {
         patterns,
         last_updated: chrono::Utc::now().timestamp(),
-        source_url: config.common.regex_patterns_source_url.clone(),
+        source_url: source_url.clone(),
     };
 
     MetaHttpResponse::json(response)
