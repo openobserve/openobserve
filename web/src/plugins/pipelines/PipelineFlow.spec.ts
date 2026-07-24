@@ -298,7 +298,6 @@ describe("PipelineFlow.vue", () => {
     expect(wrapper.vm.pipelineObj.currentSelectedPipeline.nodes.length).toBe(1);
   });
 
-
   // Test 10: VueFlow receives correct props
   it("should pass correct props to VueFlow", () => {
     wrapper = mountComponent();
