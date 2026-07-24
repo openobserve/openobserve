@@ -333,6 +333,7 @@ describe("useEvalJobRuns — failures query", () => {
     mockExecuteQuery.mockResolvedValueOnce([
       {
         span_id: "f1",
+        trace_id: "evaluator-trace-1",
         _timestamp: 123,
         attributes_status: "error",
         attributes_scorer_id: "s1",
@@ -360,6 +361,7 @@ describe("useEvalJobRuns — failures query", () => {
 
     expect(failures.value).toHaveLength(1);
     expect(failures.value[0].id).toBe("f1");
+    expect(failures.value[0].evaluatorTraceId).toBe("evaluator-trace-1");
     expect(failures.value[0].status).toBe("error");
     expect(failures.value[0].scorerId).toBe("s1");
     expect(failures.value[0].scoreNumeric).toBe(0.1);

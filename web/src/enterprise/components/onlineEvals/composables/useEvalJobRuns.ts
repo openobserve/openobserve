@@ -25,6 +25,8 @@ export interface JobRunKpis {
 export interface JobRunRow {
   /** Span id from `_evaluator` itself — used as row key. */
   id: string;
+  /** Trace id from `_evaluator` — opens the complete evaluator execution. */
+  evaluatorTraceId: string;
   timestampMs: number;
   status: RunStatus;
   scorerId: string;
@@ -128,6 +130,7 @@ interface KpiRow {
 
 interface RawRunRow {
   _timestamp?: string | number;
+  trace_id?: string;
   attributes_status?: string;
   attributes_latency_ms?: number | string | null;
   attributes_scorer_id?: string | null;
@@ -145,6 +148,7 @@ function mapRunRow(r: RawRunRow): JobRunRow {
   const score = extractScore(r.attributes_response);
   return {
     id: r.span_id ?? `${r._timestamp ?? ""}-${r.attributes_target_span_id ?? ""}`,
+    evaluatorTraceId: r.trace_id ?? "",
     timestampMs: bucketToMs(r._timestamp),
     status: parseStatus(r.attributes_status),
     scorerId: r.attributes_scorer_id ?? "",
@@ -215,6 +219,7 @@ export function useEvalJobRuns(
     return [
       "SELECT",
       "  span_id,",
+      "  trace_id,",
       "  _timestamp,",
       "  attributes_status,",
       "  attributes_latency_ms,",
@@ -245,6 +250,7 @@ export function useEvalJobRuns(
     return [
       "SELECT",
       "  span_id,",
+      "  trace_id,",
       "  _timestamp,",
       "  attributes_status,",
       "  attributes_latency_ms,",
