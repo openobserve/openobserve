@@ -229,6 +229,7 @@ import useWorkflowCanvas, {
   nodeMeta,
   ADDABLE_NODE_TYPES,
   enabledTriggers,
+  triggerDef,
   triggerTypeForKind,
   DEFAULT_TRIGGER_KIND,
 } from "@/plugins/workflows/useWorkflowCanvas";
@@ -544,11 +545,26 @@ const linkAlerts = ref<{ show: boolean; id: string; name: string }>({
   name: "",
 });
 
+// The current graph's trigger kind — drives whether the post-create "link
+// alerts" prompt is offered (only Alert-Fired workflows associate with alerts;
+// incident/other kinds have no alerts to link).
+const currentTriggerKind = (): string | undefined => {
+  const trigger = (workflowObj.currentSelectedWorkflow.nodes || []).find(
+    (n: any) => n.data?.node_type === "workflow_trigger",
+  );
+  return trigger?.data?.trigger_kind || trigger?.meta?.trigger_kind;
+};
+
 const onSave = async () => {
   const wasCreate = !workflowObj.currentSelectedWorkflow.id;
   if (!(await persist())) return;
-  // persist() captures the new id on create; use it to open the link prompt.
-  if (wasCreate && workflowObj.currentSelectedWorkflow.id) {
+  // persist() captures the new id on create; offer the link prompt only for
+  // trigger kinds that associate with alerts (registry `linksAlerts`).
+  if (
+    wasCreate &&
+    workflowObj.currentSelectedWorkflow.id &&
+    triggerDef(currentTriggerKind()).linksAlerts
+  ) {
     linkAlerts.value = {
       show: true,
       id: workflowObj.currentSelectedWorkflow.id,

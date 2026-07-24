@@ -60,6 +60,12 @@ export interface WorkflowTriggerDef {
    * payloads (e.g. incidents) omit it.
    */
   hasQueryRows?: boolean;
+  /**
+   * True when this kind can be associated with alerts — after creating such a
+   * workflow the editor offers the "link alerts" prompt (the link is stored on
+   * the alert side). Only Alert Fired makes sense here; other kinds skip it.
+   */
+  linksAlerts?: boolean;
 }
 
 export const WORKFLOW_TRIGGERS: WorkflowTriggerDef[] = [
@@ -74,6 +80,7 @@ export const WORKFLOW_TRIGGERS: WorkflowTriggerDef[] = [
     introKey: "workflow.triggerKind.alertFired.intro",
     buildSample: buildTestSample,
     hasQueryRows: true,
+    linksAlerts: true,
   },
   {
     kind: "incident_event",

@@ -862,6 +862,22 @@ describe("WorkflowEditor", () => {
       expect(mockRouter.push).not.toHaveBeenCalled();
     });
 
+    it("skips the link-alerts prompt for a non-alert trigger and navigates away", async () => {
+      wrapper = mountEditor();
+      await flushPromises();
+      seedValidCreate();
+      // Swap the trigger kind to one that doesn't associate with alerts.
+      wf().nodes[0].data.trigger_kind = "incident_event";
+
+      await clickSave(wrapper);
+
+      expect(linkDialog(wrapper).exists()).toBe(false);
+      expect(mockRouter.push).toHaveBeenCalledWith({
+        name: "workflows",
+        query: { org_identifier: "default" },
+      });
+    });
+
     it("returns to the list once the alerts are linked", async () => {
       wrapper = mountEditor();
       await flushPromises();
