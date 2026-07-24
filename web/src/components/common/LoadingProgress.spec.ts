@@ -294,6 +294,6 @@ describe("LoadingProgress", () => {
 
     const container = wrapper.find(".absolute");
     expect(container.classes()).toContain("top-0");
-    expect(container.classes()).toContain("z-[999]");
+    expect(container.classes()).toContain("z-999");
   });
 });

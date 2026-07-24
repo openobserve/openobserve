@@ -23,21 +23,6 @@ import store from "@/test/unit/helpers/store";
 
 import StepPickerDialog from "@/components/flow/StepPickerDialog.vue";
 
-// ODialog portals its panel to document.body via reka-ui, which would move the
-// picker's markup outside the wrapper. The stub renders the same default slot
-// inline, so every assertion below runs against the REAL markup the picker
-// renders (real OSearchInput / OIcon), while `update:open` stays observable.
-const ODialogStub = {
-  name: "ODialog",
-  props: ["open", "title", "size"],
-  emits: ["update:open"],
-  template: `
-    <div class="o-dialog-stub" :data-test="$attrs['data-test']" :data-open="open" :data-title="title" :data-size="size">
-      <slot />
-    </div>
-  `,
-};
-
 const items = [
   {
     key: "condition",
@@ -66,18 +51,22 @@ const items = [
 
 const globalConfig = {
   plugins: [i18n, store],
-  stubs: { ODialog: ODialogStub },
+  // The picker is an anchored popover teleported to <body>, so its content is
+  // outside the wrapper's tree. Stubbing Teleport renders it inline and keeps
+  // every query below working against `wrapper`.
+  stubs: { teleport: true },
 };
 
 function mountPicker(props: Record<string, any> = {}) {
   return mount(StepPickerDialog as any, {
-    props: { items, title: "Add Next Step", ...props },
+    props: { items, ...props },
     global: globalConfig,
   });
 }
 
 const cards = (wrapper: any) => wrapper.findAll(".flow-step-card");
-const dialog = (wrapper: any) => wrapper.findComponent({ name: "ODialog" });
+const panel = (wrapper: any) => wrapper.find('[data-test="flow-step-dialog"]');
+const backdrop = (wrapper: any) => wrapper.find('[data-test="flow-step-backdrop"]');
 const searchInput = (wrapper: any) => wrapper.find("input");
 
 describe("StepPickerDialog", () => {
@@ -90,16 +79,17 @@ describe("StepPickerDialog", () => {
   });
 
   describe("dialog shell", () => {
-    it("mounts and renders the dialog open", () => {
+    it("mounts and renders the anchored panel", () => {
       wrapper = mountPicker();
       expect(wrapper.exists()).toBe(true);
-      expect(dialog(wrapper).props("open")).toBe(true);
+      expect(panel(wrapper).exists()).toBe(true);
     });
 
-    it("passes the title through and uses the md size", () => {
-      wrapper = mountPicker({ title: "Add Next Step" });
-      expect(dialog(wrapper).props("title")).toBe("Add Next Step");
-      expect(dialog(wrapper).props("size")).toBe("md");
+    it("opens at the anchor point, offset below it", () => {
+      wrapper = mountPicker({ anchor: { x: 300, y: 200 } });
+      const style = panel(wrapper).attributes("style") || "";
+      expect(style).toContain("--sp-x: 300px");
+      expect(style).toContain("--sp-y: 208px");
     });
 
     it('data-test on the dialog uses the default "flow-step" prefix', () => {
@@ -290,17 +280,15 @@ describe("StepPickerDialog", () => {
       expect(wrapper.emitted("close")).toBeUndefined();
     });
 
-    it("emits `close` when the dialog reports update:open=false", async () => {
+    it("emits `close` when the backdrop is clicked", async () => {
       wrapper = mountPicker();
-      dialog(wrapper).vm.$emit("update:open", false);
-      await wrapper.vm.$nextTick();
+      await backdrop(wrapper).trigger("click");
       expect(wrapper.emitted("close")).toHaveLength(1);
     });
 
-    it("does NOT emit `close` when the dialog reports update:open=true", async () => {
+    it("does NOT emit `close` when the click is inside the panel", async () => {
       wrapper = mountPicker();
-      dialog(wrapper).vm.$emit("update:open", true);
-      await wrapper.vm.$nextTick();
+      await panel(wrapper).trigger("click");
       expect(wrapper.emitted("close")).toBeUndefined();
     });
   });

@@ -949,8 +949,8 @@ impl opentelemetry_sdk::trace::SpanExporter for MetaOrgTraceExporter {
                     request,
                     config::meta::otlp::OtlpRequestType::HttpJson,
                     None,
-                    openobserve_core::ingestion_types::IngestUser::SystemJob(
-                        openobserve_core::ingestion_types::SystemJobType::SelfReporting,
+                    ingestion_common::IngestUser::SystemJob(
+                        ingestion_common::SystemJobType::SelfReporting,
                     ),
                 )
                 .await

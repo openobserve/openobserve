@@ -42,17 +42,23 @@ class WorkflowsPage {
     this.testBtn = '[data-test="workflow-editor-test"]';
     this.cancelBtn = '[data-test="workflow-editor-cancel"]';
     this.backBtn = '[data-test="workflow-editor-back"]';
-    // Docked palette (the reliable click-to-append add path; the hover-`+` add-out on a node
-    // is display:none until hover so it can't be clicked directly). Verified live 2026-07-21.
+    // Docked palette (the reliable click-to-append add path). NOTE: the rail is
+    // COLLAPSED by default — open it via the canvas control stack
+    // ([data-test="workflow-palette-collapse-btn"]) before using these.
     // Pattern: workflow-palette-<key>-<ioType>-btn (destination=output, condition/function=default).
     this.paletteCondition = '[data-test="workflow-palette-condition-default-btn"]';
     this.paletteFunction = '[data-test="workflow-palette-function-default-btn"]';
     this.paletteDestination = '[data-test="workflow-palette-destination-output-btn"]';
-    // Trigger node (add-out/delete only visible on node hover)
+    // Trigger node (delete only visible on node hover). The hover-`+` add-out
+    // button no longer exists — clicking the node's SOURCE HANDLE opens the step
+    // picker instead.
     this.triggerNode = '[data-test="workflow-node-workflow_trigger"]';
-    this.triggerAddOut = '[data-test="workflow-node-workflow_trigger-add-out"]';
     this.triggerDelete = '[data-test="workflow-node-workflow_trigger-delete-btn"]';
-    // Step picker dialog (hover-`+` path); options keyed by node_type
+    // Empty-canvas start node -> trigger picker. The editor no longer pre-places
+    // an Alert Trigger on create, so a workflow now BEGINS by choosing one here.
+    this.startNode = '[data-test="workflow-flow-start-node"]';
+    this.stepTrigger = '[data-test="workflow-step-workflow_trigger"]';
+    // Step picker dialog (source-handle path); options keyed by node_type
     this.stepCondition = '[data-test="workflow-step-condition"]';
     this.stepFunction = '[data-test="workflow-step-function"]';
     this.stepDestination = '[data-test="workflow-step-destination"]';
@@ -98,10 +104,32 @@ class WorkflowsPage {
     await this.waitForListReady();
   }
 
+  /**
+   * Open the create editor AND choose the Alert Trigger, so callers start from a
+   * workflow that has its trigger — the state the editor used to seed itself.
+   * (`?trigger=` is gone; the canvas starts empty and asks via the start node.)
+   * Use `goToAddEmpty()` when a spec needs the untouched empty canvas.
+   */
   async goToAdd() {
-    const url = `${process.env.ZO_BASE_URL}/web/workflows/add?org_identifier=${getOrgIdentifier()}&trigger=alert_fired`;
+    await this.goToAddEmpty();
+    await this.chooseTrigger();
+  }
+
+  async goToAddEmpty() {
+    const url = `${process.env.ZO_BASE_URL}/web/workflows/add?org_identifier=${getOrgIdentifier()}`;
     await this.page.goto(url, { timeout: 60000 });
     await this.page.locator(this.nameField).waitFor({ state: 'attached', timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  /**
+   * Empty canvas -> start node -> trigger picker -> Alert Trigger. The trigger's
+   * panel is a read-only payload reference, so it is dismissed, not saved.
+   */
+  async chooseTrigger() {
+    await this.page.locator(this.startNode).click({ timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.stepTrigger).click({ timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.triggerNode).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    await this.closeOpenDrawer();
   }
 
   async waitForListReady() {
@@ -143,9 +171,13 @@ class WorkflowsPage {
   }
 
   /**
-   * K9: attempt a PLAIN Playwright click on Save (no JS bypass). Returns true if it was
-   * intercepted (Save is covered by the tooltip overlay so the click never lands). Documents the
-   * K9 bug and acts as a regression marker — if K9 is fixed this returns false and the test fails.
+   * K9 canary probe — attempts a PLAIN Playwright click on Save (no JS bypass) and returns
+   * true if it was intercepted (the click never landed). This is NON-deterministic in headless
+   * CI: Save has no tooltip of its own (WorkflowEditor.vue), so the overlay that intercepts it
+   * is a transient/adjacent tooltip that often never appears on a programmatic hover.
+   * Callers MUST treat the result as informational only, not a hard assertion — see the CT-19
+   * K9 spec. A consistent `false` would be the signal that K9 is fixed and the clickSave()
+   * JS-bypass workaround can be dropped.
    */
   async normalSaveClickIsIntercepted(timeoutMs = 4000) {
     await this.page.locator(this.saveBtn).hover().catch(() => {});
@@ -179,8 +211,16 @@ class WorkflowsPage {
    * Append a node from the docked palette (auto-wires after the end node) and wait for its
    * config drawer. The palette is the reliable add path — the on-node hover-`+` is hidden.
    */
+  async ensureNodePaletteOpen() {
+    const rail = this.page.locator('[data-test="workflow-palette"]');
+    if (await rail.isVisible().catch(() => false)) return;
+    await this.page.locator('[data-test="workflow-palette-collapse-btn"]').click();
+    await rail.waitFor({ state: 'visible' });
+  }
+
   async addNodeFromPalette(type /* 'condition' | 'function' | 'destination' */) {
     await this.closeOpenDrawer();
+    await this.ensureNodePaletteOpen();
     const paletteSel = { condition: this.paletteCondition, function: this.paletteFunction, destination: this.paletteDestination }[type];
     await this.page.locator(paletteSel).click({ timeout: DRAWER_TIMEOUT_MS });
     await this.page.locator(this.nodeDrawer).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });

@@ -1115,7 +1115,7 @@ const fieldWidthClass = computed(() => {
               'bg-select-bg',
               hasError
                 ? 'border-select-border-error focus:ring-[0.125rem] focus:ring-select-border-error/30 data-[state=open]:ring-[0.125rem] data-[state=open]:ring-select-border-error/30'
-                : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-[0.125rem] focus:ring-primary-500/25 data-[state=open]:border-select-border-focus data-[state=open]:ring-[0.125rem] data-[state=open]:ring-primary-500/25',
+                : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-[0.125rem] focus:ring-accent/25 data-[state=open]:border-select-border-focus data-[state=open]:ring-[0.125rem] data-[state=open]:ring-accent/25',
               /* Keep the red error border on focus; focus border color applies only when there's no error. */
               'focus:outline-none',
               'transition-[color,background-color,border-color,box-shadow] duration-150',
@@ -1271,7 +1271,7 @@ const fieldWidthClass = computed(() => {
               parentDataTest ? `${parentDataTest}-popover` : undefined
             "
             :class="[
-              'z-[10001] min-w-(--reka-popover-trigger-width)',
+              'z-10001 min-w-(--reka-popover-trigger-width)',
               'overflow-hidden flex flex-col',
               'rounded-default shadow-lg',
               'bg-select-content-bg',
@@ -1328,7 +1328,7 @@ const fieldWidthClass = computed(() => {
                   :class="[
                     'relative flex items-center w-full gap-2 shrink-0',
                     'ps-3 pe-3 py-1.5 text-sm',
-                    'text-select-item-text rounded-default',
+                    'text-select-item-text',
                     'cursor-pointer select-none outline-none',
                     'hover:bg-select-item-hover-bg',
                     'focus-visible:bg-select-item-hover-bg',
@@ -1343,7 +1343,7 @@ const fieldWidthClass = computed(() => {
                   <span
                     :class="[
                       'flex items-center justify-center shrink-0',
-                      'size-3.5 rounded-default border transition-colors',
+                      'size-3.5 rounded-checkbox border transition-colors',
                       allSelected
                         ? 'bg-checkbox-checked-bg border-checkbox-checked-border'
                         : 'bg-checkbox-bg border-checkbox-border',
@@ -1459,7 +1459,7 @@ const fieldWidthClass = computed(() => {
                         :class="[
                           'relative flex w-full h-full gap-2',
                           'ps-3 pe-3 text-sm',
-                          'text-select-item-text rounded-default',
+                          'text-select-item-text',
                           'cursor-pointer select-none outline-none',
                           'transition-colors duration-100',
                           // Use flex-col for stacked rich items; flex-row for inline subLabel or simple items
@@ -1483,7 +1483,7 @@ const fieldWidthClass = computed(() => {
                           <span
                             :class="[
                               'flex items-center justify-center shrink-0',
-                              'size-3.5 rounded-default border transition-colors',
+                              'size-3.5 rounded-checkbox border transition-colors',
                               selectedValues.includes(
                                 filteredOptions[vRow.index].value,
                               )
@@ -1614,7 +1614,7 @@ const fieldWidthClass = computed(() => {
                 <!-- Checkbox zone hint -->
                 <span class="flex items-center gap-1.5 text-2xs text-select-placeholder shrink-0">
                   <span
-                    class="inline-flex items-center justify-center size-3.5 rounded-default border border-select-placeholder shrink-0"
+                    class="inline-flex items-center justify-center size-3.5 rounded-checkbox border border-select-placeholder shrink-0"
                     aria-hidden="true"
                   >
                     <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-2.5 p-px">
@@ -1675,7 +1675,7 @@ const fieldWidthClass = computed(() => {
             'bg-select-bg',
             hasError
               ? 'border-select-border-error focus:ring-[0.125rem] focus:ring-select-border-error/30 data-[state=open]:ring-[0.125rem] data-[state=open]:ring-select-border-error/30'
-              : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-[0.125rem] focus:ring-primary-500/25 data-[state=open]:border-select-border-focus data-[state=open]:ring-[0.125rem] data-[state=open]:ring-primary-500/25',
+              : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-[0.125rem] focus:ring-accent/25 data-[state=open]:border-select-border-focus data-[state=open]:ring-[0.125rem] data-[state=open]:ring-accent/25',
             /* Keep the red error border on focus; focus border color applies only when there's no error. */
             'focus:outline-none',
             'transition-[color,background-color,border-color,box-shadow] duration-150',
@@ -1784,7 +1784,7 @@ const fieldWidthClass = computed(() => {
           :hide-when-detached="true"
           :data-test="parentDataTest ? `${parentDataTest}-popover` : undefined"
           :class="[
-            'z-[10001] min-w-(--reka-select-trigger-width)',
+            'z-10001 min-w-(--reka-select-trigger-width)',
             'overflow-hidden',
             'rounded-default border shadow-md',
             'bg-select-content-bg border-select-content-border',

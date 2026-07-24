@@ -1695,16 +1695,19 @@ export default defineComponent({
   legacy component internals, print/page setup). All component-own element styles are
   expressed as inline  utilities in the template above.
 -->
-<style>
-/* keep(lib-override:gridstack): all selectors target GridStack-injected DOM
-   (.grid-stack*, .ui-resizable-*) that this template does not render, plus print
-   / @page setup — so the block stays an unscoped global. */
+<style scoped>
+/* keep(lib-override:gridstack): every selector targets GridStack-injected DOM
+   (.grid-stack*, .ui-resizable-*) that this template does not render, reached via
+   :deep() from the `.displayDiv` grid host this component owns. RenderDashboardCharts
+   is the app's sole GridStack.init, so every grid lives inside a `.displayDiv`
+   (License/embedded dashboards render THIS component). The print / @page setup
+   rides along — at-rules are unaffected by scoping. */
 /* When grid is static (disabled), hide resize handles */
-.grid-stack.grid-stack-static .ui-resizable-handle {
+.displayDiv :deep(.grid-stack.grid-stack-static .ui-resizable-handle) {
   display: none !important;
 }
 
-.grid-stack-item .grid-stack-item-content {
+.displayDiv :deep(.grid-stack-item .grid-stack-item-content) {
   border: 1px solid var(--color-border-default);
   border-radius: 0.375rem;
   overflow: visible;
@@ -1712,26 +1715,26 @@ export default defineComponent({
 }
 
 /* GridStack theme overrides */
-.grid-stack .grid-stack-item .drag-allow {
+.displayDiv :deep(.grid-stack .grid-stack-item .drag-allow) {
   cursor: move;
 }
 
-.grid-stack .grid-stack-item.ui-draggable-dragging {
+.displayDiv :deep(.grid-stack .grid-stack-item.ui-draggable-dragging) {
   opacity: 0.8;
   z-index: 1000;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
   box-shadow: 0 0.5rem 1.5rem color-mix(in srgb, var(--color-black) 15%, transparent);
 }
 
-.grid-stack .grid-stack-item.ui-resizable-resizing {
+.displayDiv :deep(.grid-stack .grid-stack-item.ui-resizable-resizing) {
   opacity: 0.9;
 }
 
-.grid-stack .grid-stack-item > .ui-resizable-handle {
+.displayDiv :deep(.grid-stack .grid-stack-item > .ui-resizable-handle) {
   background: none;
 }
 
-.grid-stack .grid-stack-item > .ui-resizable-handle.ui-resizable-se {
+.displayDiv :deep(.grid-stack .grid-stack-item > .ui-resizable-handle.ui-resizable-se) {
   /* Drawn as a mask + background-color rather than a coloured SVG: a data: URI
      cannot resolve var(), so this is the only way the handle takes a token. */
   -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M8 2 L8 8 L2 8' stroke='black' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>")
@@ -1750,8 +1753,8 @@ export default defineComponent({
 }
 
 /* Ensure proper box-sizing */
-.grid-stack-item,
-.grid-stack-item-content {
+.displayDiv :deep(.grid-stack-item),
+.displayDiv :deep(.grid-stack-item-content) {
   box-sizing: border-box;
 }
 
@@ -1767,12 +1770,12 @@ export default defineComponent({
    *
    * (Do NOT convert panels to `position: static` — that changes the visual
    * layout to a single-column stack.) */
-  .grid-stack {
+  .displayDiv :deep(.grid-stack) {
     /* keep GridStack's inline height — it's the true content height */
     overflow: visible !important;
   }
 
-  .grid-stack-item {
+  .displayDiv :deep(.grid-stack-item) {
     /* keep absolute positioning + computed top/left/width/height */
     page-break-inside: avoid;
     break-inside: avoid;
@@ -1781,7 +1784,7 @@ export default defineComponent({
   /* Overflow must stay visible here: `hidden` clips each panel to its
    * grid-cell rectangle which, paired with print pagination, prevents
    * browsers from honouring panel heights. */
-  .grid-stack-item-content {
+  .displayDiv :deep(.grid-stack-item-content) {
     overflow: visible !important;
   }
 }

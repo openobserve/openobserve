@@ -376,6 +376,12 @@
     "datetimeMessage": "* 여러 날짜를 선택할 수 있습니다.",
     "datetimeRelative": "상대",
     "datetimeAbsolute": "절대",
+    "dateRange": "날짜 범위",
+    "copyRange": "시간 범위를 클립보드에 복사",
+    "pasteRange": "시간 범위 붙여넣기",
+    "dateRangeCopied": "날짜 범위가 복사됨",
+    "dateRangePasted": "날짜 범위가 붙여넣기됨",
+    "dateRangePasteError": "날짜 범위를 구문 분석할 수 없음",
     "relative": "상대적",
     "absolute": "앱솔루트",
     "move": "이동",
@@ -512,7 +518,6 @@
   },
   "flow": {
     "stepPicker": {
-      "title": "단계 추가",
       "search": "단계 검색...",
       "noMatch": "일치하는 단계 없음"
     },
@@ -900,7 +905,7 @@
     "language": "언어",
     "actions": "액션",
     "keyboardShortcuts": "키보드 단축키",
-    "synthetic": "합성"
+    "synthetic": "Synthetics"
   },
   "rum": {
     "title": "실제 사용자 모니터링",
@@ -2217,7 +2222,7 @@
       "linkPartial": "{ok}개 알림에 연결됨, {failed}개 실패",
       "linkError": "알림을 연결할 수 없습니다."
     },
-    "canvasEmpty": "워크플로우 구축을 시작하려면 트리거를 추가하세요.",
+    "chooseTrigger": "트리거 선택",
     "node": {
       "kindTrigger": "트리거",
       "kindLogic": "로직",
@@ -2229,8 +2234,6 @@
       "notConfigured": "아직 구성되지 않음",
       "configComingSoon": "{node} 구성은 이후 단계에서 제공됩니다.",
       "addNext": "다음 단계 추가",
-      "stepDialogTitle": "단계 추가",
-      "paletteTitle": "노드",
       "sectionTransform": "변환",
       "sectionDestination": "대상",
       "paletteCollapse": "축소",
@@ -2376,7 +2379,11 @@
     "deleteNodeTitle": "노드 삭제",
     "deleteNodeLlmEvalConfirm": "이 LLM 평가 노드를 정말로 삭제하시겠습니까?",
     "cancel": "취소",
-    "dragDropNodesHere": "노드를 여기로 드래그 앤 드롭하세요",
+    "collapseNodes": "노드 접기",
+    "openNodes": "노드 열기",
+    "chooseSource": "소스 선택",
+    "sourceStreamDesc": "스트림으로 수집되는 데이터를 실시간으로 처리",
+    "sourceQueryDesc": "일정에 따라 쿼리를 실행하고 결과를 처리",
     "promqlOnlyForMetrics": "PromQL은 메트릭 스트림 유형에만 사용할 수 있습니다.",
     "invalidCronExpression": "잘못된 크론 표현식",
     "cronRequired": "Cron 표현식은 필수입니다",
@@ -3325,6 +3332,8 @@
     "seriesName": "시리즈 이름",
     "seriesValue": "시리즈 값",
     "axisValue": "축 값",
+    "expandAllSections": "모든 섹션 펼치기",
+    "collapseAllSections": "모든 섹션 접기",
     "configSectionGeneral": "일반",
     "configSectionPromqlTable": "ProMQL 테이블 모드",
     "configSectionGeographic": "지리적 구성",
@@ -5654,6 +5663,7 @@
     "groupDestinationsTemplates": "대상 및 템플릿",
     "groupDataAI": "데이터 및 AI",
     "groupOperations": "운영",
+    "groupSynthetics": "Synthetics",
     "groupAccount": "계정",
     "generalDesc": "테마, 쿼리 기본값 및 핵심 환경설정",
     "orgDesc": "조직 매개변수 및 식별자",
@@ -6351,6 +6361,7 @@
     "description": "설명",
     "cron": "크론 잡",
     "cronExpression": "크론 표현식",
+    "cronFormatTooltip": "패턴: * * * * * *은 매 초를 의미합니다.\n형식: [초(선택) 0-59] [분 0-59] [시 0-23] [일 1-31, 'L'] [월 1-12] [요일 0-7 또는 '1L-7L', 0과 7은 일요일].\n'*'를 사용하여 모든 값을 나타내며, 'L'은 마지막 날/평일을 나타냅니다.\n예: 0 0 12 * * ? - 매일 오후 12:00에 트리거됩니다.",
     "timeRange": "시간 범위",
     "frequency": "주파수",
     "lastTriggeredAt": "마지막 트리거 시간",
@@ -7719,7 +7730,7 @@
       "sessions": "상담원 세션을 차례대로 찾아보고 살펴보세요",
       "agentGraph": "에이전트가 상호 작용하는 대상(도구, 모델, 서비스, 데이터 저장소)을 확인하세요",
       "agentBehavior": "루프에 갇힌 에이전트와 실패를 유발하는 오류를 발견합니다",
-      "quality": "LLM 응답의 품질 평가 및 추적",
+      "quality": "스팬, 트레이스 및 세션 평가에서 점수 품질 추적",
       "evalJobs": "세션 전반에서 평가 작업 실행 및 모니터링",
       "scorers": "LLM 결과를 채점하는 채점자 생성 및 관리",
       "scoreConfigs": "평가에 사용되는 채점 루브릭을 구성합니다."
@@ -7727,7 +7738,11 @@
     "agentGraph": {
       "allAgents": "모든 에이전트",
       "stream": "스트림",
-      "agent": "에이전트"
+      "agent": "에이전트",
+      "noAgentsTitle": "에이전트를 찾을 수 없음",
+      "noAgentsDescription": "이 시간 범위에서 에이전트를 찾을 수 없습니다. 시간 범위를 넓히거나 추적에 gen_ai 에이전트 속성이 포함되어 있는지 확인하세요.",
+      "agentCountSingular": "에이전트",
+      "agentCountPlural": "에이전트들"
     },
     "kpi": {
       "totalCost": "총 비용",
@@ -7869,7 +7884,22 @@
     },
     "quality": {
       "scopeLabel": "이 작업 공간의 모든 품질 치수",
+      "agentLabel": "에이전트",
       "agentPlaceholder": "모든 상담원",
+      "kpisAriaLabel": "티어 1 KPI",
+      "dataTypes": {
+        "numericShort": "숫자",
+        "categoricalShort": "범주",
+        "booleanShort": "불리언"
+      },
+      "scopes": {
+        "filterLabel": "점수 범위",
+        "filterHint": "이 점수 구성을 평가 대상 범위에서 비교합니다.",
+        "all": "모두",
+        "span": "스팬",
+        "trace": "트레이스",
+        "session": "세션"
+      },
       "timeRange": {
         "label": "시간 범위",
         "last1h": "지난 1시간",
@@ -7883,20 +7913,20 @@
       },
       "refresh": "새로 고침",
       "kpis": {
-        "evaluated": {
-          "title": "평가된 트레이스",
+        "scoreResults": {
+          "title": "점수 결과",
           "unit": "",
-          "hint": "윈도우 내 _llm_scores의 고유한 트레이스 ID"
+          "hint": "창에서 스팬, 트레이스 및 세션 평가의 최신 점수 결과"
         },
         "evaluationCost": {
           "title": "평가 비용",
           "unit": "$",
           "hint": "창의 LLM 심사 위원 채점자 비용 합계"
         },
-        "jobSuccess": {
-          "title": "취업 성공",
+        "scorerSuccess": {
+          "title": "채점자 성공",
           "unit": "%",
-          "hint": "온라인 평가 작업 실행 성공률"
+          "hint": "전체 채점자 호출 대비 성공적인 채점자 호출 비율"
         },
         "scorerFailures": {
           "title": "득점자 실패",
@@ -7904,11 +7934,12 @@
           "hint": "창에서 채점자 호출이 실패했습니다."
         },
         "latencyP95": {
-          "title": "레이턴시 p95",
+          "title": "채점자 지연 시간 p95",
           "unit": "s",
-          "hint": "스코어-콜 p95 레이턴시"
+          "hint": "95번째 백분위수 채점자 호출 지연 시간"
         },
         "vsPrev": "vs 이전",
+        "noPriorData": "이전 데이터 없음",
         "noData": "—"
       },
       "loading": "품질 데이터 로드 중...",
@@ -7917,7 +7948,9 @@
         "noData": "이 창에는 이 구성에 대한 점수가 아직 없습니다.",
         "empty": {
           "title": "첫 번째 점수를 기다리는 중",
-          "description": "선택한 시간 범위에서 이 구성에 대한 점수가 도착하지 않았습니다. 이를 사용하는 스코어러가 실행되면 여기에 자동으로 표시됩니다."
+          "titleScoped": "이 창에 {scope} 점수가 없습니다",
+          "description": "선택한 시간 범위에서 이 구성에 대한 점수가 도착하지 않았습니다. 이를 사용하는 스코어러가 실행되면 여기에 자동으로 표시됩니다.",
+          "descriptionScoped": "선택한 시간 범위에서 이 구성에 대한 {scope} 점수가 없습니다. 다른 범위를 선택하거나 시간 범위를 넓히십시오."
         },
         "drillTitle": "드릴 투 트레이스",
         "trendTitle": "트렌드",
@@ -7926,12 +7959,18 @@
         "compositionTitle": "시간 경과에 따른 구성",
         "categoryDistributionTitle": "카테고리 분포",
         "passRateTitle": "시간 경과에 따른 합격률",
+        "healthyRateTitle": "시간별 건강 비율",
+        "trueRateTitle": "시간별 긍정 비율",
         "trueFalseTitle": "진실 대 거짓",
         "legendAvg": "평균",
         "legendP95": "p95",
         "legendThreshold": "임계값 {방향} {값}",
         "legendHealthy": "건강한",
         "legendUnhealthy": "건강에 해로운",
+        "legendHealthyRate": "건강 비율",
+        "legendTrueRate": "긍정 비율",
+        "legendTrueCount": "참 ({count})",
+        "legendFalseCount": "거짓 ({count})",
         "kpis": {
           "average": "평균",
           "p50": "P50",
@@ -7939,11 +7978,49 @@
           "p50p95": "P50/P95",
           "unhealthy": "건강에 해로운",
           "healthy": "건강한",
-          "coverage": "커버리지"
+          "trueRate": "긍정 비율",
+          "falseRate": "부정 비율",
+          "coverage": "커버리지",
+          "targetsScored": "채점된 대상"
+        },
+        "health": {
+          "title": "건강 상태",
+          "noThreshold": "건강 임계값이 설정되어 있지 않습니다. 아직 점수를 건강 또는 저하로 분류할 수 없습니다.",
+          "thresholdOnly": "{threshold}인 경우 건강",
+          "summary": "임계값보다 {percent}% 낮음 · {threshold}인 경우 건강"
+        }
+      },
+      "runs": {
+        "title": "평가 점수",
+        "hint": "점수와 추론은 _llm_scores에서 제공됩니다. 추가 조사를 위해 실행을 선택하여 평가자 추적을 여십시오.",
+        "filterLabel": "평가 점수 필터링",
+        "footerTitle": "평가 점수",
+        "noThresholdHint": "이 점수 구성에 건강 임계값을 설정하여 건강하지 않은 점수를 분류하고 강조 표시합니다.",
+        "noReasoning": "추론 기록 없음",
+        "unknownAgent": "알 수 없는 에이전트",
+        "unknownScope": "알 수 없는 범위",
+        "queryError": "평가 점수를 새로고침할 수 없습니다. 마지막으로 성공한 페이지가 계속 표시됩니다.",
+        "empty": "이 시간 범위에 평가 점수가 없습니다.",
+        "emptyUnhealthy": "이 시간 범위에 불량 점수가 없습니다.",
+        "filters": {
+          "all": "모든 점수",
+          "unhealthy": "불량"
+        },
+        "health": {
+          "healthy": "정상",
+          "unhealthy": "불량"
+        },
+        "columns": {
+          "time": "평가됨",
+          "result": "점수",
+          "reasoning": "추론",
+          "target": "대상",
+          "agent": "에이전트"
         }
       },
       "sidebar": {
         "allConfigs": "모든 구성",
+        "scoreCount": "{count}개 점수",
         "empty": "이 필터와 일치하는 구성이 없습니다."
       },
       "overview": {
@@ -7960,13 +8037,30 @@
         "waitingPrimaryCta": "공개 평가 채용공고",
         "waitingRefreshCta": "새로 고침",
         "noThreshold": "임계값 없음",
+        "relativeTime": {
+          "daysAgo": "{day}일 전",
+          "monthsAgo": "{month}개월 전"
+        },
+        "status": {
+          "healthy": "정상",
+          "unhealthy": "주의 필요",
+          "noThreshold": "임계값 미설정",
+          "noData": "점수 데이터 없음"
+        },
+        "health": {
+          "thresholdSummary": "{percent}% 미만 · {threshold}이면 정상",
+          "noThresholdHint": "정상 임계값 설정",
+          "noDataHint": "이 기간에 점수 없음"
+        },
         "columns": {
+          "health": "상태",
           "scoreConfig": "점수 구성",
           "type": "타입",
+          "quality": "품질",
           "totalScores": "총점",
-          "coverage": "커버리지",
+          "scopeMix": "범위 혼합",
           "unhealthy": "건강에 해로운",
-          "trend": "트렌드",
+          "volumeTrend": "볼륨 추세",
           "threshold": "건강한 경우",
           "updated": "업데이트됨"
         }
@@ -7994,11 +8088,10 @@
     "buttons": {
       "cancel": "취소",
       "close": "닫기",
-      "create": "작성",
       "remove": "제거",
       "save": "저장",
       "saveAsDraft": "초안으로 저장",
-      "createAndActivate": "생성 및 활성화"
+      "createAndActivate": "저장 및 활성화"
     },
     "scorerTypeDialog": {
       "title": "새 채점자 생성",
@@ -8083,7 +8176,6 @@
         "updatedLabel": "업데이트됨"
       },
       "createTitle": "새 점수 구성",
-      "editTitlePrefix": "편집",
       "subtitle": "점수 구성은 점수 유형, 상태 임계값 및 범주를 정의합니다.",
       "eyebrow": "점수 구성",
       "sectionTitle": "점수 구성",
@@ -8092,8 +8184,6 @@
       "searchPlaceholder": "구성 검색",
       "allTypes": "모든 유형",
       "newButton": "새 점수 구성",
-      "saveButton": "변경 사항 저장",
-      "createButton": "생성",
       "columns": {
         "index": "#",
         "name": "이름",
@@ -8298,14 +8388,13 @@
       "backTo": "득점자로 돌아가기",
       "badgeRemote": "리모트",
       "badgeLlm": "LLM 심사위원",
-      "createTitleRemote": "원격 채점기 생성",
-      "createTitleLlm": "LLM 심사 위원 채점자 생성",
-      "editTitleRemote": "원격 채점기 편집",
-      "editTitleLlm": "LLM 심사 위원 채점자 편집",
+      "createTitleRemote": "새 원격 평가기",
+      "createTitleLlm": "새 LLM 평가기",
+      "editTitleRemote": "원격 평가기 업데이트",
+      "editTitleLlm": "LLM 평가기 업데이트",
       "subtitleRemote": "호스팅하는 HTTP 엔드포인트를 호출합니다.요청을 렌더링하면 점수가 반환됩니다.",
-      "subtitleLlm": "언어 모델은 사용자가 제공한 프롬프트를 사용하여 각 추적을 판단합니다.",
+      "subtitleLlm": "언어 모델이 제공한 프롬프트를 사용하여 각 평가 대상을 판단합니다.",
       "descriptionPlaceholder": "이 스코어러가 측정하는 내용에 대한 간단한 요약입니다.",
-      "producesScoreHelp": "이 스코어러는 어떤 차원을 측정하나요?",
       "providerHelp": "이 심사자가 호출하는 LLM 공급자를 선택하세요. {settingsLink}에서 공급자를 관리하세요.",
       "providerHelpSettingsLink": "설정",
       "refreshProviders": "공급자 새로 고침",
@@ -8318,8 +8407,49 @@
       "rangeLabel": "범위:",
       "healthyLabel": "정상:",
       "typeLabel": "유형:",
-      "promptVariablesLabel": "변수:",
-      "promptHelp": "평가 로직에 집중하세요. {inputVar} 및 {outputVar}를 자리 표시자로 사용하세요.",
+      "promptVariablesLabel": "이 프롬프트의 변수:",
+      "promptVariableGuide": {
+        "title": "사용 가능한 프롬프트 변수",
+        "description": "이 변수들은 위의 프롬프트에서 사용할 수 있습니다. 각 변수가 어떻게 채워지는지는 Eval Job이 평가하는 대상에 따라 다릅니다.",
+        "columns": {
+          "variable": "프롬프트 변수"
+        },
+        "scopes": {
+          "span": "스팬",
+          "trace": "트레이스",
+          "session": "세션"
+        },
+        "statuses": {
+          "jobMapped": "Eval Job에서 매핑",
+          "systemProvided": "시스템 제공",
+          "requiresSelector": "시스템 제공 · 스팬 선택기 필요",
+          "selectorRequired": "스팬 선택기 필요",
+          "unavailable": "사용 불가"
+        },
+        "variables": {
+          "inputOutput": {
+            "span": "입력과 출력을 보유한 스팬 필드에 매핑하세요.",
+            "trace": "트레이스의 루트 스팬에서 가져온 입력 및 출력.",
+            "session": "사용 불가 — 세션에는 단일 입력 또는 출력이 없습니다."
+          },
+          "statistics": {
+            "span": "단일 스팬을 평가할 때 다른 스코어 변수와 마찬가지로 이 이름을 매핑하십시오.",
+            "trace": "트레이스 메트릭: 스팬 수, 기간, LLM 및 도구 호출, 오류, 토큰, 비용.",
+            "session": "세션 메트릭: 트레이스 및 턴 수, 기간, 오류."
+          },
+          "spans": {
+            "span": "단일 스팬을 평가할 때 다른 스코어 변수와 마찬가지로 이 이름을 매핑하십시오.",
+            "trace": "평가 작업의 스팬 선택기로 선택된 트레이스 스팬의 필터링된 하위 집합입니다.",
+            "session": "세션에는 사용할 수 없습니다."
+          },
+          "steps": {
+            "span": "단일 스팬을 평가할 때 다른 스코어 변수와 마찬가지로 이 이름을 매핑하십시오.",
+            "trace": "시간 순서의 스팬; 트레이스가 매우 길면 중간이 접힙니다.",
+            "session": "시간 순서의 트레이스, 대화 턴으로 표현됩니다."
+          }
+        },
+        "indexDescription": "{spansVar} 및 {stepsVar}는 JSON 배열로 도착합니다. 전체 변수를 참조하십시오 — {indexedVar}와 같은 인덱스 접근은 지원되지 않습니다."
+      },
       "identitySection": "정체성",
       "judgeSection": "심사위원 구성",
       "endpointSection": "끝점",
@@ -8337,10 +8467,9 @@
       "modelPlaceholder": "gpt-4o",
       "promptLabel": "판사 프롬프트",
       "includeReasoningLabel": "추론 포함",
-      "includeReasoningHint": "LLM이 점수를 설명합니다. score.metadata.reasoning에 저장됩니다.",
-      "extraFieldsLabel": "추가 메타데이터 필드",
-      "extraFieldsOptional": "선택 사항",
-      "extraFieldsHint": "LLM이 점수와 함께 출력해야 하는 필드를 추가하세요. 추후 분석을 위해 score.metadata에 저장됩니다.",
+      "includeReasoningHint": "판정자가 해당 점수를 부여한 이유를 설명하며, 각 결과와 함께 저장됩니다.",
+      "extraFieldsLabel": "추가 메타데이터 필드(선택 사항)",
+      "extraFieldsHint": "판정자에게 각 점수와 함께 추가 값을 반환하도록 요청하십시오 — 예를 들어 카테고리 또는 신뢰도.",
       "extraFields": {
         "colName": "필드 이름",
         "colType": "유형",
@@ -8442,9 +8571,12 @@
         "eyebrow": "평가 작업",
         "refresh": "새로 고침",
         "descriptionSection": "설명",
-        "targetSection": "대상",
+        "targetSection": "평가 대상",
         "streamLabel": "스트림",
         "streamTypeLabel": "스트림 유형",
+        "targetScopeLabel": "각각 평가",
+        "idleWindowLabel": "유휴 창",
+        "maxAgeLabel": "최대 기간",
         "filterLabel": "필터",
         "filterEmpty": "필터 없음 — 모든 스팬이 평가됩니다",
         "scorersSection": "스코어러",
@@ -8454,13 +8586,30 @@
         "scorerTypeRemote": "원격",
         "producesPrefix": "생성",
         "viewScorerHint": "보기",
-        "inputMappingSection": "입력 매핑",
+        "inputMappingSection": "프롬프트 변수",
         "samplingSection": "샘플링",
         "samplingModeLabel": "모드",
         "samplingValueLabel": "값",
         "samplingAll": "모든 일치 항목 평가",
         "samplingRate": "비율로 무작위 샘플링",
         "samplingCount": "처음 N개 일치 항목",
+        "manualSection": "수동 평가",
+        "manualHelp": "이 작업의 스코어를 하나의 명시적 대상에 대해 대기열에 추가합니다. 수동 실행은 자동 샘플링을 우회하고 점수 메타데이터에 이유를 기록합니다.",
+        "manualTargetIdLabel": "대상 ID",
+        "manualSpanIdLabel": "스팬 ID",
+        "manualSpanIdPlaceholder": "span_id",
+        "manualTraceIdLabel": "트레이스 ID",
+        "manualTraceIdPlaceholder": "trace_id",
+        "manualSessionIdLabel": "세션 ID",
+        "manualSessionIdPlaceholder": "session_id",
+        "manualReasonLabel": "이유",
+        "manualReasonPlaceholder": "이 대상을 다시 실행하는 이유는 무엇입니까?",
+        "manualVariablesLabel": "변수 JSON",
+        "manualVariablesObjectError": "변수는 JSON 객체여야 합니다.",
+        "manualTargetRequired": "대상 ID가 필요합니다.",
+        "manualSubmit": "수동 평가 실행",
+        "manualSuccess": "대기열에 추가된 {count}개 평가 작업",
+        "manualError": "수동 평가 실패",
         "metadataSection": "메타데이터",
         "versionLabel": "버전",
         "pipelineLabel": "파이프라인 ID",
@@ -8513,6 +8662,7 @@
         "name": "이름",
         "status": "상태",
         "stream": "스트림",
+        "targetScope": "범위",
         "scorers": "스코어러",
         "successRate": "성공률",
         "created": "생성됨",
@@ -8526,9 +8676,10 @@
         "chipSampling": "샘플링 제어"
       },
       "descriptionPlaceholder": "이 작업은 무엇을 모니터링하나요?",
-      "samplingValueHelp": "0에서 1 사이의 샘플링 비율을 입력하세요.",
-      "samplingValueAllHelp": "모드가 All일 때는 적용되지 않습니다 — 일치한 모든 이벤트가 평가됩니다.",
-      "samplingHelp": "필터 이후에 적용됩니다. 비용을 제어합니다 — 일치한 스팬만 비율에 집계됩니다.",
+      "samplingValueHelp": "0과 1 사이의 비율을 입력하십시오.",
+      "samplingValuePreview": "일치하는 대상의 {percent}%를 평가합니다.",
+      "samplingValueAllHelp": "모든 일치하는 대상이 평가됩니다.",
+      "samplingHelp": "필터링 후 실행되어 비용을 제어합니다.",
       "presets": {
         "label": "빠른 사전 설정",
         "rootSpans": "루트 스팬만",
@@ -8536,23 +8687,46 @@
         "toolCalls": "도구 호출"
       },
       "backTo": "평가 작업으로 돌아가기",
-      "createTitle": "온라인 평가 작업 생성",
-      "editTitle": "온라인 평가 작업 편집",
+      "createTitle": "새 평가 작업",
+      "editTitle": "평가 작업 업데이트",
       "stepper": {
         "target": "타깃",
         "scorers": "득점자",
         "mapping": "지도 제작",
         "sampling": "샘플링"
       },
-      "targetSection": "타깃",
+      "detailsSection": "세부 정보",
+      "targetSection": "평가 대상",
       "filteringSection": "필터링",
       "scorersSection": "채점자 및 매핑",
       "nameLabel": "이름",
       "namePlaceholder": "프로덕션 충실도 모니터",
-      "streamLabel": "입력 스트림",
-      "streamPlaceholder": "기본값입니다",
+      "streamLabel": "스트림",
+      "streamPlaceholder": "스트림 선택",
       "streamTypeLabel": "스트림 유형",
       "streamTypePlaceholder": "추적",
+      "targetScopeLabel": "각각 평가",
+      "targetScopes": {
+        "span": "스팬",
+        "trace": "트레이스",
+        "session": "세션"
+      },
+      "targetScopeHelp": {
+        "span": "각 일치하는 스팬을 독립적으로 평가합니다.",
+        "trace": "완료 창이 닫힌 후 전체 트레이스를 평가합니다.",
+        "session": "완료 창이 닫힌 후 트레이스 전체의 세션을 평가합니다."
+      },
+      "completionSection": "완료 기준",
+      "completionHelp": {
+        "trace": "이 중 하나가 충족되면 트레이스가 평가됩니다.",
+        "session": "이 중 하나가 충족되면 세션이 평가됩니다."
+      },
+      "idleWindowLabel": "유휴 창(초)",
+      "idleWindowHelp": "새 스팬이 없는 {duration} 후에 평가됩니다.",
+      "idleWindowHelpEmpty": "새 스팬이 도착하지 않으면 평가됩니다.",
+      "maxAgeLabel": "최대 수명(초)",
+      "maxAgeHelp": "첫 번째 스팬 후 {duration}에 평가됩니다.",
+      "maxAgeHelpEmpty": "스팬이 계속 도착하더라도 고정된 시간에 평가됩니다.",
       "descriptionLabel": "설명",
       "samplingModeLabel": "샘플링 모드",
       "samplingValueLabel": "샘플링 비율",
@@ -8563,7 +8737,11 @@
       },
       "scorerPicker": {
         "title": "득점자",
-        "hint": "일치하는 모든 스팬에서 실행할 채점자를 하나 이상 선택합니다.",
+        "hint": {
+          "span": "일치하는 각 스팬에 대해 실행할 하나 이상의 스코어러를 선택합니다.",
+          "trace": "적격한 각 트레이스에 대해 실행할 하나 이상의 스코어러를 선택합니다.",
+          "session": "적격한 각 세션에 대해 실행할 하나 이상의 스코어러를 선택합니다."
+        },
         "meta": "{유형} · v {버전}",
         "placeholder": "스코어러 선택",
         "searchPlaceholder": "스코어러 검색…",
@@ -8571,21 +8749,113 @@
       },
       "filter": {
         "title": "필터 조건",
-        "hint": "이 조건에 맞는 범위만 샘플링 및 채점을 입력합니다."
+        "hint": {
+          "span": "이 조건과 일치하는 스팬만 샘플링 및 채점에 들어갑니다.",
+          "trace": "트레이스는 해당 스팬 중 하나라도 이 조건과 일치하면 샘플링 및 채점에 들어갑니다.",
+          "session": "세션은 해당 스팬 중 하나라도 이 조건과 일치하면 샘플링 및 채점에 들어갑니다."
+        }
+      },
+      "selector": {
+        "title": "어떤 스팬(선택 사항)",
+        "hint": {
+          "trace": "비워두면 트레이스의 모든 스팬이 포함됩니다."
+        }
+      },
+      "endSignal": {
+        "title": "종료 신호(선택 사항)",
+        "hint": {
+          "trace": "스팬이 일치하면 트레이스를 즉시 닫는 스팬 조건을 정의합니다.",
+          "session": "스팬이 일치하면 세션을 즉시 닫는 스팬 조건을 정의합니다."
+        }
       },
       "inputMapping": {
-        "title": "입력 매핑",
-        "hint": "스팬 필드를 각 채점자 템플릿 변수에 매핑합니다.",
+        "title": "프롬프트 변수",
+        "hint": {
+          "span": "각 변수를 값을 제공하는 스팬 필드에 매핑합니다.",
+          "trace": "트레이스 값은 자동으로 채워집니다. 다른 것은 스팬 필드에 매핑하세요.",
+          "session": "세션 값은 자동으로 채워집니다. 다른 것은 스팬 필드에 매핑하세요."
+        },
         "selectScorers": "매핑을 구성할 채점자를 선택합니다.",
         "noVariables": "이 채점기에는 매핑할 템플릿 변수가 없습니다.",
-        "variableCount": "{개수} 개 변수"
+        "variableCount": "{개수} 개 변수",
+        "systemProvided": {
+          "title": "{scope} 변수",
+          "description": "OpenObserve는 {scope} 자체에서 이러한 값을 제공합니다. 스코어러 프롬프트는 매핑 없이 직접 사용할 수 있습니다.",
+          "badge": "시스템 제공",
+          "selectorRequired": "스팬 선택기 필요",
+          "columns": {
+            "variable": "프롬프트 변수",
+            "source": "소스",
+            "description": "제공된 값"
+          },
+          "variables": {
+            "input": {
+              "trace": "트레이스 루트 스팬의 입력."
+            },
+            "output": {
+              "trace": "트레이스 루트 스팬의 출력."
+            },
+            "statistics": {
+              "trace": "트레이스 메트릭: 스팬 수, 기간, LLM 및 도구 호출, 오류, 토큰 및 비용.",
+              "session": "세션 메트릭: 트레이스 및 턴 수, 기간, 오류."
+            },
+            "spans": {
+              "trace": "작업의 스팬 선택기에 의해 선택된 스팬의 필터링된 하위 집합."
+            },
+            "steps": {
+              "trace": "시간 순서의 스팬; 트레이스가 매우 길면 중간이 접힙니다.",
+              "session": "시간 순서의 트레이스, 대화 턴으로 표현됩니다."
+            }
+          }
+        }
+      },
+      "spanSelector": {
+        "select": "스팬 선택기 선택",
+        "bindingHelp": "트레이스는 수백 개의 스팬을 가질 수 있습니다. 이 스코어러가 볼 스팬을 선택하세요.",
+        "createForScorer": "스코어러용 생성",
+        "createForScorerTitle": "이 스코어러에 대한 스팬 선택기 생성",
+        "editorTitle": "스팬 선택기",
+        "name": "선택기 이름",
+        "schemaMode": "읽을 필드",
+        "defaultSchema": "표준 GenAI 필드",
+        "customSchema": "사용자 정의 필드",
+        "defaultSchemaHelp": "일치하는 모든 스팬에서 이 8개 필드를 읽습니다. 누락된 항목은 비어 있는 상태로 전달됩니다.",
+        "fields": "필드",
+        "fieldsHelp": "이 필드만 읽습니다. 다른 것은 점수 계산기로 전송되지 않습니다.",
+        "maximumSpans": "최대 스팬 수",
+        "budget": "추적에서 선택할 스팬 수를 제한합니다.",
+        "validation": {
+          "name": "선택기 이름을 입력하세요.",
+          "duplicateName": "선택기 이름은 이 작업 내에서 고유해야 합니다.",
+          "filter": "완료되지 않은 필터 조건을 완료하거나 제거하세요.",
+          "fields": "사용자 정의 스키마에 대해 최소 하나의 필드를 선택하세요.",
+          "maximumSpans": "최대 스팬 수는 양의 정수여야 합니다.",
+          "budget": "선택한 필드에 비해 스팬이 너무 많습니다. 스팬 수를 줄이거나 더 적은 필드를 읽으세요.",
+          "binding": "각 점수 계산기에 대해 스팬 선택기를 선택하세요."
+        }
       },
       "preview": {
-        "title": "시사",
-        "hint": "왼쪽의 필드를 사용하여 생산 평가 대상을 정의합니다.",
-        "matchedSuffix": "기간 일치 · 지난 24시간",
+        "scopes": {
+          "span": {
+            "title": "일치하는 스팬",
+            "hint": "스트림과 필터를 선택하면 이 패널에 작업이 일치시킬 스팬 수가 표시됩니다.",
+            "matchedSuffix": "일치하는 스팬 · 지난 24시간",
+            "matchedLoading": "일치하는 스팬 계산 중…"
+          },
+          "trace": {
+            "title": "일치하는 추적",
+            "hint": "스트림과 필터를 선택하면 이 패널에 작업이 일치시킬 추적 수가 표시됩니다.",
+            "matchedSuffix": "일치하는 추적 · 지난 24시간",
+            "matchedLoading": "일치하는 추적 계산 중…"
+          },
+          "session": {
+            "title": "일치하는 세션",
+            "hint": "스트림과 필터를 선택하면 이 패널에 작업이 일치시킬 세션 수가 표시됩니다.",
+            "matchedSuffix": "일치하는 세션 · 지난 24시간",
+            "matchedLoading": "일치하는 세션 계산 중…"
+          }
+        },
         "matchedError": "매치 카운트를 로드할 수 없습니다",
-        "matchedLoading": "일치하는 범위 계산 중...",
         "matchedIncomplete": "필터 조건을 완료하여 개수를 업데이트합니다.",
         "summaryTitle": "요약",
         "summaryName": "이름",
@@ -8602,6 +8872,7 @@
       "validation": {
         "nameRequired": "Job name is required",
         "streamRequired": "A stream is required",
+        "idleWindowMinimum": "유휴 창은 최소 45초 이상이어야 합니다.",
         "samplingValueRequired": "A sampling value is required"
       }
     }
@@ -8724,7 +8995,9 @@
     "cellActions": {
       "copy": "복사",
       "includeTerm": "포함 용어",
-      "excludeTerm": "제외 용어"
+      "excludeTerm": "제외 용어",
+      "sendValueToAi": "AI로 값 보내기",
+      "sendRowToAi": "AI로 행 보내기"
     },
     "indexList": {
       "noMatchingFields": "일치하는 필드가 없습니다",
@@ -9108,12 +9381,20 @@
       "stepJourney": "여정",
       "untitledCheck": "제목 없는 검사",
       "variablesHint": "{variables} (예: {baseUrl})를 지원합니다.",
-      "setupStep2Title": "시크릿 모드 활성화",
-      "setupIncognitoHint": "chrome://extensions를 열고 {details}를 클릭한 다음 {setting}을 활성화하세요."
+      "setupStep2Title": "도구 모음에서 OpenObserve Recorder 아이콘을 클릭하세요.",
+      "setupIncognitoHint": "chrome://extensions를 열고 {details}를 클릭한 다음 {setting}을 활성화하세요.",
+      "setupStep2Description": "Chrome은 확장 프로그램을 설치하기 전에 열려 있던 페이지에 자동으로 연결할 수 없습니다. 확장 프로그램 아이콘을 클릭하면 이 탭에 레코더가 주입됩니다(한 번만 수행하면 됩니다).",
+      "setupIconActivateHint": "도구 모음에서 {icon}을(를) 클릭하여 이 페이지에 대한 레코더를 활성화하세요.",
+      "setupStep3Title": "시크릿 모드 활성화",
+      "setupStep3IncognitoHint": "chrome://extensions를 열고 {details}를 클릭한 다음 {setting}을(를) 활성화하세요.",
+      "setupReady": "연결됨 ✓",
+      "setupConnected": "연결됨 ✓"
     },
     "dialog": {
       "bulkDeleteBody": "{count}개의 검사를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
       "bulkDeleteTitle": "검사 삭제",
+      "deleteSingleBody": "\"{name}\"을(를) 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+      "deleteSingleTitle": "체크 삭제",
       "duplicateTitle": "검사 복제"
     },
     "empty": {
@@ -9213,11 +9494,88 @@
       "unknown": "알 수 없음"
     },
     "locations": {
+      "addLocation": "위치 추가",
+      "bottomHeader": "위치",
+      "bulkDeleteConfirmMessage": "{count}개 위치를 삭제하시겠습니까?",
+      "bulkDeleteConfirmTitle": "위치 삭제",
+      "bulkDeleteFailed": "위치 삭제 실패",
+      "bulkDeletePartial": "{total}개 중 {success}개 위치 삭제됨",
+      "bulkDeleteSuccess": "{count}개 위치 삭제됨",
+      "cancel": "취소",
       "comingSoon": "더 많은 지역 및 프라이빗 위치 — 곧 오픈 예정",
+      "createClose": "만들기 및 닫기",
+      "createFailed": "위치 생성 실패",
+      "createSuccess": "위치가 성공적으로 생성되었습니다",
+      "createTitle": "위치 추가",
+      "customProviderLabel": "사용자 정의 공급자",
+      "customProviderPlaceholder": "공급자 이름 입력",
+      "customProviderRequired": "사용자 정의 공급자 이름이 필요합니다",
+      "deleteConfirmMessage": "이 위치를 삭제하시겠습니까?",
+      "deleteConfirmTitle": "위치 삭제",
+      "deleteFailed": "위치 삭제 실패",
+      "deleteSuccess": "위치가 성공적으로 삭제되었습니다",
+      "description": "합성 모니터링을 위한 공개 프로브 위치 관리",
+      "disable": "비활성화",
+      "disabledSuccess": "위치 비활성화됨",
+      "disabling": "비활성화 중…",
+      "editTitle": "위치 편집",
       "empty": "사용 가능한 위치 없음",
+      "enable": "활성화",
+      "enabled": "활성화됨",
+      "enabledSuccess": "위치 활성화됨",
+      "enabling": "활성화 중…",
+      "exportFailed": "위치 내보내기 실패",
+      "exportSuccess": "위치가 성공적으로 내보내졌습니다",
+      "exportTitle": "내보내기",
+      "fetchFailed": "위치 가져오기 실패",
+      "bulkDisableFailed": "위치 비활성화 실패",
+      "bulkDisabledPartial": "{success} / {total} 위치 비활성화됨",
+      "bulkDisabledSuccess": "{count}개 위치 비활성화됨",
+      "bulkEnableFailed": "위치 활성화 실패",
+      "bulkEnabledPartial": "{success} / {total} 위치 활성화됨",
+      "bulkEnabledSuccess": "{count}개 위치 활성화됨",
+      "importFailed": "위치 가져오기 실패",
+      "importJsonLabel": "JSON 입력",
+      "importLabelRequired": "항목 {index}에 라벨이 필요합니다",
+      "importPlaceholder": "여기에 위치의 JSON 배열을 붙여넣으세요...",
+      "importProviderRequired": "항목 {index}에 제공자가 필요합니다",
+      "importRegionRequired": "항목 {index}에 리전이 필요합니다",
+      "importSuccess": "{count}개 위치가 성공적으로 가져와졌습니다",
+      "importTitle": "가져오기",
+      "invalidJson": "잘못된 JSON 형식",
+      "label": "라벨",
+      "labelPlaceholder": "예: AWS 미국 동부(버지니아 북부)",
+      "labelRequired": "라벨이 필요합니다",
       "locationAwsEast": "AWS · 미국-동부-1",
+      "locationId": "위치 ID",
+      "noPreview": "위치를 미리 보려면 유효한 JSON을 입력하세요",
+      "preview": "미리보기",
+      "provider": "제공자",
+      "providerOther": "기타",
+      "providerPlaceholder": "제공자 선택",
+      "providerRequired": "제공자가 필요합니다",
+      "region": "리전",
+      "regionPlaceholder": "예: us-east-1",
+      "regionRequired": "리전이 필요합니다",
+      "searchPlaceholder": "위치 검색…",
+      "selectedCount": "{selected} / {total} 위치 선택됨",
       "subtitle": "여정이 실행될 위치 선택",
-      "title": "위치"
+      "title": "위치",
+      "privateBadge": "비공개",
+      "publicTitle": "공개",
+      "privateTitle": "비공개 위치",
+      "setupAgent": "프라이빗 에이전트 설정",
+      "privateEmptyBody": "자체 VPC 또는 온프레미스 네트워크에서 이 체크를 실행하세요.",
+      "offlineWarning": "라이브 에이전트 없음 — 에이전트가 복귀할 때까지 여기서 체크가 실행되지 않습니다.",
+      "liveAgents": "{count}개의 라이브 에이전트",
+      "liveAgentsNamed": "{count}개의 라이브 에이전트 ({names})",
+      "offlineSince": "오프라인 · 마지막 확인 {ago}",
+      "pendingAgent": "첫 번째 에이전트 등록 대기 중",
+      "toggleFailed": "위치 전환 실패",
+      "updateClose": "업데이트 및 닫기",
+      "updateFailed": "위치 업데이트 실패",
+      "updateSuccess": "위치가 성공적으로 업데이트되었습니다.",
+      "uploadFile": "JSON 파일 업로드"
     },
     "newCheck": {
       "back": "검사",
@@ -9230,6 +9588,7 @@
       "httpDesc": "엔드포인트, 상태 코드 및 응답 본문 확인",
       "leave": "떠나기",
       "loadEditFailed": "검사를 불러오지 못했습니다 — 양식에 기본값이 표시되며 저장하지 마십시오",
+      "notFoundInOrg": "이 체크는 현재 조직에 존재하지 않습니다.",
       "modalSubtitle": "모니터링할 항목 선택",
       "modalTitle": "검사 생성",
       "pageTitle": "새 {label} 검사",
@@ -9252,7 +9611,7 @@
       "willBeCreatedIn": "다음 위치에 생성됨"
     },
     "pageSubtitle": "전 세계 위치에서 가동 시간, 성능 및 사용자 여정을 사전 예방적으로 모니터링",
-    "pageTitle": "합성 검사",
+    "pageTitle": "신세틱스",
     "protocolConfig": {
       "http": {
         "addAssertion": "어설션 추가",
@@ -9349,6 +9708,7 @@
       "failed": "실패",
       "failedRuns": "실패한 실행",
       "jumpToLastRun": "마지막 실행으로 이동",
+      "jumpToLatestData": "최신 데이터로 이동",
       "lastRun": "라스트 런",
       "location": "위치",
       "monitors": "모니터",
@@ -9488,10 +9848,13 @@
       "tabSteps": "단계",
       "timelineAllFailed": "전체 {count}개 실패",
       "timelineAllPassed": "전체 {count}개 통과",
+      "timelineAllWarning": "모든 {count} 경고",
       "timelineMixed": "{total}개 중 {passed}개 통과, {failed}개 실패",
       "timelineNow": "지금",
       "triggerManual": "수동",
       "triggerSchedule": "일정",
+      "warning": "경고",
+      "warningRuns": "경고 실행",
       "window24h": "지난 24시간",
       "window1h": "지난 1시간",
       "windowDays": "지난 {days}일",
@@ -9631,10 +9994,12 @@
     "tabs": {
       "all": "전체",
       "browser": "브라우저",
+      "checks": "체크",
       "http": "HTTP",
       "ssh": "SSH",
       "tcp": "TCP",
-      "tls": "TLS"
+      "tls": "TLS",
+      "private": "프라이빗 위치"
     },
     "timeline": {
       "failed": "실패",
@@ -9673,7 +10038,79 @@
       "nameRequired": "이름은 필수입니다.",
       "selectorRequired": "\"{step}\"에 선택자가 필요합니다.",
       "urlInvalid": "http:// 또는 https://로 시작하는 올바른 URL을 입력하세요.",
-      "urlRequired": "시작 URL은 필수입니다."
+      "urlRequired": "시작 URL은 필수입니다.",
+      "fixHighlightedFields": "저장하기 전에 강조 표시된 필드를 수정하세요"
+    },
+    "privateLocations": {
+      "searchPlaceholder": "위치 검색...",
+      "setupAgent": "에이전트 설정",
+      "copySetupCmd": "설정 명령",
+      "deleteTitle": "위치 삭제",
+      "deleteBody": "프라이빗 위치 \"{name}\"를 삭제하시겠습니까? 해당 에이전트는 작업 수신을 중단합니다.",
+      "deleteBlocked": "{count}개의 체크에서 사용 중 — 먼저 할당을 해제하세요.",
+      "status": {
+        "online": "온라인",
+        "offline": "오프라인",
+        "pending": "보류 중"
+      },
+      "table": {
+        "name": "이름",
+        "region": "지역",
+        "agents": "에이전트",
+        "types": "유형",
+        "checks": "체크",
+        "checksPerMin": "C/분",
+        "lastSeen": "마지막 확인"
+      },
+      "empty": {
+        "title": "아직 프라이빗 위치가 없습니다.",
+        "description": "AGENT_LOCATION을 설정하여 네트워크에 에이전트를 배포하세요. 위치가 자동으로 등록되어 여기에 나타납니다. UI에서 수동 설정이 필요하지 않습니다.",
+        "action": "에이전트 설정"
+      },
+      "toast": {
+        "deleted": "위치가 삭제되었습니다.",
+        "deleteFailed": "위치 삭제 실패",
+        "copied": "설정 명령이 복사되었습니다.",
+        "copyFailed": "클립보드 복사 실패",
+        "locationRequired": "설치 명령을 복사하기 전에 위치 이름을 입력하세요."
+      },
+      "setup": {
+        "title": "프라이빗 에이전트 설정",
+        "step1Title": "에이전트 배포",
+        "step1Body": "네트워크의 모든 머신에서 컨테이너를 실행하세요 — Docker, Kubernetes 또는 네이티브 바이너리. AGENT_LOCATION이 위치 이름을 지정합니다. 해당 위치를 서비스할 모든 에이전트에 동일한 이름을 사용하세요.",
+        "step2Title": "위치가 나타나는 것을 확인하세요",
+        "step2Body": "첫 등록 시 위치 행이 자동으로 생성되고 온라인으로 전환됩니다 — UI에 추가할 것이 없습니다. 동일한 AGENT_LOCATION을 가진 추가 에이전트는 동일한 위치에 합류합니다.",
+        "step3Title": "체크에 할당",
+        "step3Body": "체크를 생성하거나 편집할 때 이 위치를 선택하세요. 체크는 자체 인프라에서 실행됩니다.",
+        "noToken": "설정 명령을 로드할 수 없습니다 — 권한을 확인하고 다시 시도하세요.",
+        "browserNote": "브라우저 테스트는 아직 개인 위치에서 실행할 수 없습니다 — 프로토콜 검사만 가능합니다(HTTP, TCP, TLS, SSH).",
+        "locationNameLabel": "위치 이름",
+        "locationNamePlaceholder": "회사 본사",
+        "tabDocker": "Docker",
+        "tabK8s": "Kubernetes",
+        "tabLinux": "Linux",
+        "tabWindows": "Windows",
+        "agentNameLabel": "에이전트 이름(선택 사항)",
+        "agentNamePlaceholder": "호스트 이름에서 자동 생성",
+        "agentNameHint": "비워 두면 에이전트가 호스트 이름에서 자체 이름을 생성합니다 — 한 위치에서 여러 에이전트를 실행할 때 유용합니다."
+      },
+      "detail": {
+        "title": "개인 위치",
+        "back": "개인 위치",
+        "version": "버전",
+        "pool": "풀",
+        "agentsTitle": "에이전트",
+        "agentsSubtitle": "에이전트는 인프라에서 자체 등록되며 여기서는 읽기 전용입니다.",
+        "agentName": "에이전트",
+        "recoverAgent": "이 에이전트 복구 — 이름이 미리 채워진 설정 명령을 복사하세요",
+        "noAgents": "이 위치에 등록된 에이전트가 아직 없습니다.",
+        "checksTitle": "이 위치에서 실행 중인 검사",
+        "checkName": "이름",
+        "noChecks": "이 위치에 할당된 검사가 아직 없습니다.",
+        "notFound": "위치를 찾을 수 없음"
+      },
+      "urlRequired": "시작 URL이 필요합니다",
+      "fixHighlightedFields": "저장하기 전에 강조 표시된 필드를 수정하세요"
     }
   },
   "shortcuts": {
@@ -9789,6 +10226,8 @@
       "panelEditorQueryInspector": "쿼리 검사기 열기",
       "metricsRunQuery": "PromQL 쿼리 실행",
       "metricsRefresh": "새로 고침",
+      "metricsAddToDashboard": "대시보드에 추가",
+      "metricsCopyUrl": "공유 링크 복사",
       "tracesSearch": "검색 추적",
       "tracesRefresh": "새로 고침",
       "alertsCreate": "새 알림 만들기",

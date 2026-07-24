@@ -177,7 +177,7 @@ const contentStyle = computed(() => ({
 }));
 
 const contentClasses = computed(() => [
-  "z-[10100] px-2.5 py-1.5",
+  "z-10100 px-2.5 py-1.5",
   "bg-surface-overlay rounded-default",
   "text-xs text-text-body font-medium leading-relaxed",
   // Force long unbreakable tokens (file paths, hashes, URLs) to wrap inside the

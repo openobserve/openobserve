@@ -1,0 +1,50 @@
+[package]
+name = "stream"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = []
+enterprise = [
+    "common/enterprise",
+    "config/enterprise",
+    "db/enterprise",
+    "enrichment-data/enterprise",
+    "schema/enterprise",
+]
+cloud = [
+    "enterprise",
+    "common/cloud",
+    "db/cloud",
+    "infra/cloud",
+]
+vectorscan = [
+    "dep:o2_enterprise",
+    "db/vectorscan",
+    "o2_enterprise/vectorscan",
+]
+
+[dependencies]
+anyhow.workspace = true
+arrow-schema.workspace = true
+axum.workspace = true
+chrono.workspace = true
+common.workspace = true
+config.workspace = true
+db.workspace = true
+enrichment-data.workspace = true
+hashbrown.workspace = true
+infra.workspace = true
+log.workspace = true
+o2_enterprise = { workspace = true, optional = true, default-features = false }
+schema.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+tokio.workspace = true

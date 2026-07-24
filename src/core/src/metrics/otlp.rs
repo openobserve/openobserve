@@ -45,6 +45,7 @@ use config::{
 };
 use db;
 use infra::schema::{SchemaCache, get_partition_time_level};
+use ingestion_common::IngestUser;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
     collector::metrics::v1::{
@@ -53,6 +54,7 @@ use opentelemetry_proto::tonic::{
     metrics::v1::{metric::Data, *},
 };
 use prost::Message;
+use schema::{check_for_schema, stream_schema_exists};
 
 use crate::{
     alerts::alert::AlertExt,
@@ -64,13 +66,12 @@ use crate::{
     },
     metrics::get_exclude_labels,
     pipeline::batch_execution::ExecutablePipeline,
-    schema::{check_for_schema, stream_schema_exists},
 };
 
 pub async fn otlp_proto(
     org_id: &str,
     body: Bytes,
-    user: crate::ingestion_types::IngestUser,
+    user: IngestUser,
 ) -> Result<HttpResponse, std::io::Error> {
     let request = match ExportMetricsServiceRequest::decode(body) {
         Ok(v) => v,
@@ -98,7 +99,7 @@ pub async fn otlp_proto(
 pub async fn otlp_json(
     org_id: &str,
     body: Bytes,
-    user: crate::ingestion_types::IngestUser,
+    user: IngestUser,
 ) -> Result<HttpResponse, std::io::Error> {
     let mut body_json = match serde_json::from_slice::<json::Value>(body.as_ref()) {
         Ok(v) => v,
@@ -133,7 +134,7 @@ pub async fn handle_otlp_request(
     org_id: &str,
     request: ExportMetricsServiceRequest,
     req_type: OtlpRequestType,
-    user: crate::ingestion_types::IngestUser,
+    user: IngestUser,
 ) -> Result<HttpResponse, anyhow::Error> {
     // check system resource
     if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None).await {
