@@ -93,7 +93,7 @@ function makeWrapper() {
         OPageHeader: {
           template: `
             <div data-test="app-page-header">
-              <span data-test="app-page-header-title">{{ title }}</span>
+              <slot name="title" />
               <span data-test="app-page-header-subtitle">{{ subtitle }}</span>
               <slot name="actions" />
             </div>
@@ -152,6 +152,9 @@ function makeWrapper() {
             "overrideExecutionId",
           ],
         },
+        BetaBadge: {
+          template: '<span data-test="beta-badge">BETA</span>',
+        },
       },
     },
   });
@@ -192,8 +195,9 @@ describe("MonitorResults", () => {
       wrapper = makeWrapper();
       await flushPromises();
 
-      const title = wrapper.find('[data-test="app-page-header-title"]');
-      expect(title.text()).toBe("Test Monitor");
+      const header = wrapper.find('[data-test="app-page-header"]');
+      expect(header.text()).toContain("Test Monitor");
+      expect(wrapper.find('[data-test="beta-badge"]').exists()).toBe(true);
     });
 
     it("should render MonitorRuns child component", async () => {
@@ -297,8 +301,8 @@ describe("MonitorResults", () => {
       wrapper = makeWrapper();
       await flushPromises();
 
-      const title = wrapper.find('[data-test="app-page-header-title"]');
-      expect(title.text()).toBe("synthetics.results.title");
+      const header = wrapper.find('[data-test="app-page-header"]');
+      expect(header.text()).toContain("synthetics.results.title");
     });
   });
 

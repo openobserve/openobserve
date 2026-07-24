@@ -90,7 +90,7 @@ import CreateProtocolCheck from "./CreateProtocolCheck.vue";
 // ── Stubs ────────────────────────────────────────────────────────────────
 const baseStubs = {
   OPageHeader: {
-    template: '<div data-test="synthetics-header"><slot /></div>',
+    template: '<div data-test="synthetics-header"><slot name="title" /><slot /></div>',
     props: ["title", "subtitle", "back"],
   },
   OButton: {
@@ -132,6 +132,9 @@ const baseStubs = {
   CheckSshConfig: {
     template: '<div data-test="synthetics-ssh-config" />',
     props: ["check"],
+  },
+  BetaBadge: {
+    template: '<span data-test="beta-badge">BETA</span>',
   },
 };
 
@@ -180,6 +183,13 @@ describe("CreateProtocolCheck", () => {
 
       expect(wrapper.find('[data-test="synthetics-create-cancel-btn"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="synthetics-create-save-btn"]').exists()).toBe(true);
+    });
+
+    it("should render the Beta badge in the page title", async () => {
+      wrapper = mountPage("http");
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="beta-badge"]').exists()).toBe(true);
     });
   });
 
