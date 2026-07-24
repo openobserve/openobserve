@@ -219,6 +219,7 @@ openobserve-api.workspace = true
 web.workspace = true
 openobserve-api-management.workspace = true
 openobserve-core.workspace = true
+openobserve-node.workspace = true
 ingestion-common.workspace = true
 compaction.workspace = true
 enrichment-data.workspace = true
@@ -262,6 +263,7 @@ members = [
     "src/tls",
     "src/common",
     "src/core",
+    "src/node",
     "src/transform",
     "src/super_cluster_queue",
     "src/search",
@@ -311,6 +313,7 @@ openobserve-sourcemaps = { path = "src/sourcemaps" }
 openobserve-tls = { path = "src/tls" }
 web = { path = "src/web" }
 openobserve-core = { path = "src/core" }
+openobserve-node = { path = "src/node" }
 common = { path = "src/common" }
 transform = { path = "src/transform" }
 super_cluster_queue = { path = "src/super_cluster_queue" }

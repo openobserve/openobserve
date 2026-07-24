@@ -56,10 +56,9 @@ use openobserve_api::{
     },
     router,
 };
-use openobserve_core::{
-    bootstrap, cluster_info::ClusterInfoService, metadata, node::NodeService, self_reporting,
-};
+use openobserve_core::{bootstrap, metadata, self_reporting};
 use openobserve_jobs::job;
+use openobserve_node::{cluster_info::ClusterInfoService, node::NodeService};
 use opentelemetry::{KeyValue, global, trace::TracerProvider};
 use opentelemetry_otlp::{WithExportConfig, WithHttpConfig, WithTonicConfig};
 use opentelemetry_proto::tonic::collector::{
@@ -269,7 +268,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
             // Register job runtime for metrics collection
             if let Ok(handle) = tokio::runtime::Handle::try_current() {
-                openobserve_core::runtime_metrics::register_runtime("job".to_string(), handle);
+                openobserve_node::runtime_metrics::register_runtime("job".to_string(), handle);
             }
 
             job_init_tx.send(true).ok();
@@ -310,7 +309,7 @@ async fn main() -> Result<(), anyhow::Error> {
         };
 
         // Register gRPC runtime for metrics collection
-        openobserve_core::runtime_metrics::register_runtime(
+        openobserve_node::runtime_metrics::register_runtime(
             "grpc".to_string(),
             rt.handle().clone(),
         );
@@ -334,11 +333,11 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // Register main HTTP runtime for metrics collection
     if let Ok(handle) = tokio::runtime::Handle::try_current() {
-        openobserve_core::runtime_metrics::register_runtime("http".to_string(), handle);
+        openobserve_node::runtime_metrics::register_runtime("http".to_string(), handle);
     }
 
     // Start runtime metrics collector
-    openobserve_core::runtime_metrics::start_metrics_collector().await;
+    openobserve_node::runtime_metrics::start_metrics_collector().await;
 
     // let node online
     let _ = cluster::set_online().await;
@@ -990,7 +989,7 @@ impl opentelemetry_sdk::trace::SpanExporter for MetaOrgTraceExporter {
                     }
                 };
 
-                let (_addr, channel) = match openobserve_core::grpc::get_ingester_channel().await {
+                let (_addr, channel) = match openobserve_node::grpc::get_ingester_channel().await {
                     Ok(v) => v,
                     Err(e) => {
                         log::error!("[SEARCH-INSPECTOR] Failed to get ingester channel: {e}");

@@ -41,6 +41,7 @@ audit.workspace = true
 common.workspace = true
 db.workspace = true
 openobserve-core.workspace = true
+openobserve-node.workspace = true
 openobserve-builtins.workspace = true
 openobserve-org-storage.workspace = true
 ingestion-common.workspace = true

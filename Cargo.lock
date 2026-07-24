@@ -7245,6 +7245,7 @@ dependencies = [
  "openobserve-core",
  "openobserve-jobs",
  "openobserve-mcp",
+ "openobserve-node",
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry-proto",
@@ -7365,6 +7366,7 @@ dependencies = [
  "openobserve-cipher",
  "openobserve-core",
  "openobserve-mcp",
+ "openobserve-node",
  "openobserve-sourcemaps",
  "openobserve-tls",
  "opentelemetry",
@@ -7437,6 +7439,7 @@ dependencies = [
  "o2_openfga",
  "openobserve-api-common",
  "openobserve-core",
+ "openobserve-node",
  "openobserve-org-storage",
  "regex",
  "reqwest 0.13.2",
@@ -7566,6 +7569,7 @@ dependencies = [
  "o2_dex",
  "o2_enterprise",
  "o2_openfga",
+ "openobserve-node",
  "opentelemetry",
  "opentelemetry-proto",
  "parking_lot 0.12.5",
@@ -7630,6 +7634,7 @@ dependencies = [
  "o2_openfga",
  "openobserve-builtins",
  "openobserve-core",
+ "openobserve-node",
  "openobserve-org-storage",
  "prometheus",
  "promql-service",
@@ -7666,6 +7671,22 @@ dependencies = [
  "tokio",
  "url",
  "utoipa",
+]
+
+[[package]]
+name = "openobserve-node"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "common",
+ "config",
+ "db",
+ "infra",
+ "log",
+ "prometheus",
+ "proto",
+ "tokio",
+ "tonic",
 ]
 
 [[package]]
