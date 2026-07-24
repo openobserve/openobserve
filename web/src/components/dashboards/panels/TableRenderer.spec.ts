@@ -622,10 +622,14 @@ describe("TableRenderer", () => {
       expect(controls.exists()).toBe(true);
     });
 
-    it("should render bottom slot when showPagination is false too (always present)", () => {
+    it("should not render the pagination bar when showPagination is false", () => {
+      // The default #bottom pager now owns the whole bar (border + min-height)
+      // since OTable's built-in bar is suppressed via :custom-pagination-bar, so
+      // it must not render an empty bordered bar when pagination is disabled
+      // (QA #2239: duplicate/empty pagination bars).
       wrapper = createWrapper({ showPagination: false });
       const paginationDiv = wrapper.find('[data-test="dashboard-table-pagination"]');
-      expect(paginationDiv.exists()).toBe(true);
+      expect(paginationDiv.exists()).toBe(false);
     });
 
     it("re-slices the rows when the footer page size changes (#2239.3)", async () => {
