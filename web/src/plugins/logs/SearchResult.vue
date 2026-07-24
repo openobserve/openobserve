@@ -420,7 +420,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="pinnedTooltip.visible" class="oo-pin-backdrop" @click="closePinnedTooltip" />
           <div
             v-if="pinnedTooltip.visible"
-            class="oo-pin-tooltip bg-surface-base border border-border-default text-text-heading"
+            class="oo-pin-tooltip bg-surface-base border-border-default text-text-heading border"
             :style="{
               top: pinnedTooltip.y + 'px',
               left: pinnedTooltip.x + 'px',
