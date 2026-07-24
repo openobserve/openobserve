@@ -1389,9 +1389,12 @@ defineExpose({
         />
       </div>
 
-      <!-- ── Bottom Pagination (with optional bulk actions slot) ── -->
+      <!-- ── Bottom Pagination (with optional bulk actions slot) ──
+           Skipped when `customPaginationBar` is set: the caller's #bottom slot
+           owns the whole pagination bar (rendered standalone below), so the
+           built-in controls don't duplicate it (QA #2239). -->
       <OTablePagination
-        v-if="pagination.isEnabled.value"
+        v-if="pagination.isEnabled.value && !props.customPaginationBar"
         position="bottom"
         :current-page="pagination.currentPage.value"
         :total-pages="pagination.totalPages.value"

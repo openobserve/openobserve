@@ -33,6 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :wrap="wrapCells"
       :pagination="showPagination ? 'client' : 'none'"
       :page-size="effectivePageSize"
+      :custom-pagination-bar="showPagination"
+      :horizontal-scroll="isPivot"
       :row-height="22"
       :default-columns="false"
       :show-global-filter="false"
@@ -44,11 +46,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         (row: any, evt: MouseEvent) => $emit('row-click', evt ?? null, row, sortedRows.indexOf(row))
       "
     >
+      <!-- Empty state: mirror the dashboard chart panels' "No Data" (bar-chart)
+           treatment. PanelSchemaRenderer excludes `table` panels from its own
+           OEmptyState, delegating the empty state to this table; without this
+           slot OTable falls back to its default magnifier "No data available",
+           which reads as inconsistent next to sibling chart panels (QA #2239). -->
+      <template #empty>
+        <OEmptyState
+          size="inline"
+          icon="bar-chart"
+          :title="t('panel.noData')"
+          :backdrop="false"
+          data-test="no-data"
+        />
+      </template>
+
       <!-- Pagination footer: forward parent's #bottom slot or show default pagination controls -->
       <template #bottom="scope">
         <slot name="bottom" v-bind="scope">
-          <!-- Default: dashboard pagination controls -->
-          <div class="flex w-full items-center pr-2" data-test="dashboard-table-pagination">
+          <!-- Default: dashboard pagination controls. This #bottom IS the pager
+               (OTable's built-in bar is suppressed via :custom-pagination-bar),
+               so it carries its own top-border separator + padding that the
+               built-in OTablePagination would otherwise have provided. -->
+          <div
+            v-if="showPagination"
+            class="border-border-default flex min-h-10 w-full items-center border-t px-3 py-1"
+            data-test="dashboard-table-pagination"
+          >
             <div class="flex-1" />
             <TablePaginationControls
               :show-pagination="showPagination"
@@ -72,7 +96,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import TablePaginationControls from "@/components/dashboards/addPanel/TablePaginationControls.vue";
 import { TABLE_ROWS_PER_PAGE_DEFAULT_VALUE } from "@/utils/dashboard/constants";
 import { getColorForTable } from "@/utils/dashboard/colorPalette";
@@ -84,6 +110,7 @@ export default defineComponent({
   name: "TableRenderer",
   components: {
     OTable,
+    OEmptyState,
     TablePaginationControls,
   },
   props: {
@@ -121,6 +148,7 @@ export default defineComponent({
   emits: ["row-click"],
   setup(props) {
     const store = useStore();
+    const { t } = useI18n();
     const tableRef = ref<any>(null);
 
     // The "Records per page" config field is `v-model.number`, so clearing it
@@ -131,6 +159,12 @@ export default defineComponent({
       const n = Number(props.rowsPerPage);
       return Number.isFinite(n) && n > 0 ? n : TABLE_ROWS_PER_PAGE_DEFAULT_VALUE;
     });
+
+    // Pivot tables have their own (often numerous) value/group columns and must
+    // scroll horizontally rather than compress to fit. Regular tables keep the
+    // fit-to-container (w-full/table-fixed) layout, so only opt pivot into the
+    // natural-width + overflow path (QA #2239: pivot missing horizontal scroll).
+    const isPivot = computed(() => ((props.data?.pivotHeaderLevels?.length as number) ?? 0) > 0);
 
     const tableColumns = computed(() => (props.data?.columns as any[]) || []);
 
@@ -363,12 +397,14 @@ export default defineComponent({
       handleSortChange(params.column ?? "", params.order ?? "asc");
 
     return {
+      t,
       tableRef,
       tableColumns,
       otableColumns,
       pivotRowColumns,
       cellStyleFn,
       effectivePageSize,
+      isPivot,
       sortedRows,
       localSortBy,
       localSortOrder,

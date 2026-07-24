@@ -204,7 +204,16 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
     class="sticky top-0 z-10"
     data-test="o2-table-pivot-header"
   >
-    <tr v-for="(level, levelIdx) in pivotHeaderLevels" :key="'pivot-hl-' + levelIdx" class="h-7">
+    <!-- bg on the <tr> as well as each <th>: in border-separate mode (forced by
+         pivot) the row-group background does not paint, so border-spacing seams
+         and rowspan/colspan gaps would be transparent and body rows would show
+         through the sticky header while scrolling (QA #2239: header overlap / no
+         header background). Mirrors the non-pivot header <tr> below. -->
+    <tr
+      v-for="(level, levelIdx) in pivotHeaderLevels"
+      :key="'pivot-hl-' + levelIdx"
+      class="bg-table-header-bg h-7"
+    >
       <!-- Row-field column headers: first row only, rowspan all levels.
            Raw pivot row-field columns carry `name`/`field` but no `id`, so key +
            sort + style must use `name` (=== the table column id for pivot). Using

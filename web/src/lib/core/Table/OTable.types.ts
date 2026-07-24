@@ -205,6 +205,16 @@ export interface OTableProps<TData = any> {
   totalCount?: number;
   /** When true, the page index is NOT reset when the data array changes (e.g. on row expand/collapse). Defaults to false. */
   keepPageOnDataChange?: boolean;
+  /**
+   * When true, the caller's `#bottom` slot IS the pagination bar and fully
+   * replaces OTable's built-in pagination controls (records-per-page select +
+   * nav buttons + "showing X–Y of Z"). Use this when a caller renders its own
+   * complete pager in `#bottom` (e.g. the dashboard Table chart's
+   * TablePaginationControls) so the two bars don't render side-by-side
+   * (QA #2239: duplicate pagination controls). Leave false for the common case
+   * where `#bottom` holds only bulk actions that sit beside the built-in bar.
+   */
+  customPaginationBar?: boolean;
 
   // ── Sorting ──
   sorting?: OTableSortingMode;

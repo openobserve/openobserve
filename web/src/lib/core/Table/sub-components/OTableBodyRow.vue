@@ -421,6 +421,11 @@ function onRowBlur() {
    the arrow hides the blue line"). pointer-events:none keeps it click-through. */
 .o2-table-row-with-status > td:first-child {
   position: relative;
+  /* Inset the cell content past the 0.25rem status spine so the expand chevron
+     isn't jammed against the coloured left border (QA #2239: arrow too close to
+     the vertical status line vs main). Scoped to status rows so non-logs tables
+     keep their default expand-column alignment. */
+  padding-left: 0.5rem;
 }
 .o2-table-row-with-status > td:first-child::before {
   content: "";
