@@ -556,12 +556,20 @@ export default function useDragAndDrop() {
   const getInputNodeStream = () => {
     const nodes = pipelineObj.currentSelectedPipeline?.nodes ?? [];
     const inputNode = nodes.find((node: any) => node.io_type === "input");
-    if(Object.prototype.hasOwnProperty.call(inputNode?.data, 'node_type') &&  inputNode.data.node_type === 'stream'){
+    // Guard `inputNode?.data` FIRST: with no source node, inputNode is undefined
+    // and `hasOwnProperty.call(undefined, …)` THROWS ("cannot convert undefined
+    // to object"). That throw is what broke deleting the auto-added destination
+    // after the source was removed — its node_type is 'stream' (copied from the
+    // source), so the delete-confirm dialog calls this, and the throw aborted
+    // the dialog before it could open, so the delete silently did nothing.
+    if (
+      inputNode?.data &&
+      Object.prototype.hasOwnProperty.call(inputNode.data, "node_type") &&
+      inputNode.data.node_type === "stream"
+    ) {
       return inputNode?.data?.stream_name?.value || inputNode.data.stream_name || "";
     }
-    else {
-      return null;
-    }
+    return null;
   };
 
   const checkIfDefaultDestinationNode = (id: string) => {
