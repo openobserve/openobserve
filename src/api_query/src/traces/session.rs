@@ -1367,68 +1367,121 @@ struct SessionTraceServiceNameItem {
     service_type: Option<String>,
 }
 
-/// Extract the first user message from a `gen_ai_input_messages` JSON value.
-///
-/// The input is expected to be a JSON array of message objects with `role` and
-/// `content` fields (e.g. `[{"role":"user","content":"hello"}]`). Returns the
-/// content of the first message with role "user", trimmed to `max_len` chars.
+fn truncate_message(value: String, max_len: usize) -> Option<String> {
+    if value.trim().is_empty() {
+        return None;
+    }
+    Some(value.chars().take(max_len).collect())
+}
+
+fn content_value_to_text(value: &json::Value) -> Option<String> {
+    match value {
+        json::Value::Null => None,
+        json::Value::Bool(value) => Some(value.to_string()),
+        json::Value::Number(value) => Some(value.to_string()),
+        json::Value::String(value) => (!value.trim().is_empty()).then(|| value.to_string()),
+        json::Value::Array(values) => {
+            let parts: Vec<String> = values.iter().filter_map(content_value_to_text).collect();
+            (!parts.is_empty()).then(|| parts.join("\n"))
+        }
+        json::Value::Object(value) => {
+            if let Some(part_type) = value.get("type").and_then(|value| value.as_str()) {
+                if part_type == "text" {
+                    return value
+                        .get("content")
+                        .or_else(|| value.get("text"))
+                        .and_then(content_value_to_text);
+                }
+                return None;
+            }
+
+            value
+                .get("text")
+                .or_else(|| value.get("content"))
+                .or_else(|| value.get("parts"))
+                .and_then(content_value_to_text)
+        }
+    }
+}
+
+fn any_value_to_text(value: &json::Value) -> Option<String> {
+    content_value_to_text(value).or_else(|| match value {
+        json::Value::Null => None,
+        json::Value::Array(value) if value.is_empty() => None,
+        json::Value::Object(value) if value.is_empty() => None,
+        _ => json::to_string(value).ok(),
+    })
+}
+
+fn extract_first_user_message_value(value: &json::Value, max_len: usize) -> Option<String> {
+    match value {
+        json::Value::Null => None,
+        json::Value::String(value) => match json::from_str::<json::Value>(value) {
+            Ok(json::Value::String(parsed)) => truncate_message(parsed, max_len),
+            Ok(parsed) => extract_first_user_message_value(&parsed, max_len),
+            Err(_) => truncate_message(value.to_string(), max_len),
+        },
+        json::Value::Array(values) => {
+            let contains_messages = values.iter().any(|value| {
+                value
+                    .as_object()
+                    .is_some_and(|value| value.contains_key("role"))
+            });
+
+            if contains_messages {
+                for message in values {
+                    let Some(message) = message.as_object() else {
+                        continue;
+                    };
+                    let role = message
+                        .get("role")
+                        .and_then(|value| value.as_str())
+                        .unwrap_or("");
+                    if !role.eq_ignore_ascii_case("user") && !role.eq_ignore_ascii_case("human") {
+                        continue;
+                    }
+
+                    if let Some(content) = message
+                        .get("content")
+                        .or_else(|| message.get("text"))
+                        .or_else(|| message.get("parts"))
+                        .and_then(content_value_to_text)
+                        .and_then(|value| truncate_message(value, max_len))
+                    {
+                        return Some(content);
+                    }
+                }
+                return None;
+            }
+
+            any_value_to_text(value).and_then(|value| truncate_message(value, max_len))
+        }
+        json::Value::Object(value) => {
+            if let Some(messages) = value.get("messages").or_else(|| value.get("contents")) {
+                return extract_first_user_message_value(messages, max_len);
+            }
+
+            if let Some(role) = value.get("role").and_then(|value| value.as_str()) {
+                if !role.eq_ignore_ascii_case("user") && !role.eq_ignore_ascii_case("human") {
+                    return None;
+                }
+            }
+
+            any_value_to_text(&json::Value::Object(value.clone()))
+                .and_then(|value| truncate_message(value, max_len))
+        }
+        json::Value::Bool(_) | json::Value::Number(_) => {
+            any_value_to_text(value).and_then(|value| truncate_message(value, max_len))
+        }
+    }
+}
+
+/// Extract the first user message from an OTEL `gen_ai_input_messages` AnyValue.
 fn extract_first_user_message(
     messages_val: Option<&json::Value>,
     max_len: usize,
 ) -> Option<String> {
-    let val = messages_val?;
-
-    // The value may be:
-    // 1. A JSON array directly: [{"role":"user","content":"..."}]
-    // 2. A JSON string of an array: "[{\"role\":\"user\",...}]"
-    // 3. A JSON string of an object with a nested "messages" array:
-    //    "{\"model\":\"...\",\"messages\":[{\"role\":\"user\",...}]}"
-    let parsed: json::Value;
-    let msgs_val: &json::Value = if val.is_array() {
-        val
-    } else {
-        let s = val.as_str()?;
-        parsed = json::from_str(s).ok()?;
-        &parsed
-    };
-
-    // Resolve the actual messages array — either the top-level value, or a nested
-    // "messages" key (OpenAI-style) or "contents" key (Gemini/LiteLLM-style).
-    let arr = if let Some(a) = msgs_val.as_array() {
-        a
-    } else if let Some(a) = msgs_val.get("messages").and_then(|v| v.as_array()) {
-        a
-    } else {
-        msgs_val.get("contents").and_then(|v| v.as_array())?
-    };
-
-    for msg in arr {
-        let role = msg.get("role").and_then(|v| v.as_str()).unwrap_or("");
-        if !role.eq_ignore_ascii_case("user") {
-            continue;
-        }
-
-        // OpenAI-style: content is a plain string
-        if let Some(content) = msg.get("content").and_then(|v| v.as_str()) {
-            let trimmed: String = content.chars().take(max_len).collect();
-            return Some(trimmed);
-        }
-
-        // Gemini/LiteLLM-style: parts: [{text: "..."}]
-        if let Some(text) = msg
-            .get("parts")
-            .and_then(|v| v.as_array())
-            .and_then(|parts| {
-                parts
-                    .iter()
-                    .find_map(|p| p.get("text").and_then(|t| t.as_str()))
-            })
-        {
-            let trimmed: String = text.chars().take(max_len).collect();
-            return Some(trimmed);
-        }
-    }
-    None
+    extract_first_user_message_value(messages_val?, max_len)
 }
 
 #[derive(Debug, Serialize)]
@@ -2129,5 +2182,57 @@ mod tests {
         ]);
         let result = extract_first_user_message(Some(&messages), 30);
         assert_eq!(result, Some("Hello".to_string()));
+    }
+
+    #[test]
+    fn test_extract_first_user_message_from_plain_string_any_value() {
+        let result = extract_first_user_message(Some(&json::json!("plain input")), 30);
+        assert_eq!(result, Some("plain input".to_string()));
+    }
+
+    #[test]
+    fn test_extract_first_user_message_from_scalar_any_values() {
+        assert_eq!(
+            extract_first_user_message(Some(&json::json!(42)), 30),
+            Some("42".to_string())
+        );
+        assert_eq!(
+            extract_first_user_message(Some(&json::json!(false)), 30),
+            Some("false".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_first_user_message_from_json_encoded_scalar() {
+        let result = extract_first_user_message(Some(&json::json!("\"encoded input\"")), 30);
+        assert_eq!(result, Some("encoded input".to_string()));
+    }
+
+    #[test]
+    fn test_extract_first_user_message_from_json_encoded_messages() {
+        let input = json::json!(r#"[{"role":"user","content":"encoded message"}]"#);
+        let result = extract_first_user_message(Some(&input), 30);
+        assert_eq!(result, Some("encoded message".to_string()));
+    }
+
+    #[test]
+    fn test_extract_first_user_message_from_otel_parts() {
+        let messages = json::json!([
+            {
+                "role": "user",
+                "parts": [
+                    {"type": "text", "content": "Weather in Paris?"}
+                ]
+            }
+        ]);
+        let result = extract_first_user_message(Some(&messages), 30);
+        assert_eq!(result, Some("Weather in Paris?".to_string()));
+    }
+
+    #[test]
+    fn test_extract_first_user_message_from_unstructured_object_any_value() {
+        let input = json::json!({"prompt": "hello"});
+        let result = extract_first_user_message(Some(&input), 30);
+        assert_eq!(result, Some("{\"prompt\":\"hello\"}".to_string()));
     }
 }

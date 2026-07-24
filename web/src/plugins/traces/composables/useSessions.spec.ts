@@ -400,6 +400,13 @@ describe("useSessions — fetchSession: trace row mapping", () => {
     expect(traces[0].cost).toBeCloseTo(0.0099);
   });
 
+  it("maps a plain-text input AnyValue to the turn preview", async () => {
+    setupDetailsMock([makeStreamHit({ gen_ai_input_messages: "hello" })]);
+    const { fetchSession } = useSessions();
+    const { traces } = await fetchSession("stream", "sess-1", 1000, 2000);
+    expect(traces[0].turnUserMessage).toBe("hello");
+  });
+
   it("status='error' when spans[1] (error_count) > 0", async () => {
     setupDetailsMock([makeStreamHit({ spans: [5, 2] })]);
     const { fetchSession } = useSessions();
