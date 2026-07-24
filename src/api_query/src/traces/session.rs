@@ -518,7 +518,9 @@ pub async fn get_latest_sessions(
             Some(s) => s.to_string(),
             None => continue,
         };
-        let first_user_message = extract_first_user_message(item.get("gen_ai_input_messages"), 400);
+        let first_user_message = item
+            .get("gen_ai_input_messages")
+            .and_then(|value| extract_first_user_message(value, 400));
         trace_details.insert(
             tid,
             TraceDetail {
@@ -1413,12 +1415,13 @@ fn any_value_to_text(value: &json::Value) -> Option<String> {
     })
 }
 
-fn extract_first_user_message_value(value: &json::Value, max_len: usize) -> Option<String> {
+/// Extract the first user message from an OTEL `gen_ai_input_messages` AnyValue.
+fn extract_first_user_message(value: &json::Value, max_len: usize) -> Option<String> {
     match value {
         json::Value::Null => None,
         json::Value::String(value) => match json::from_str::<json::Value>(value) {
             Ok(json::Value::String(parsed)) => truncate_message(parsed, max_len),
-            Ok(parsed) => extract_first_user_message_value(&parsed, max_len),
+            Ok(parsed) => extract_first_user_message(&parsed, max_len),
             Err(_) => truncate_message(value.to_string(), max_len),
         },
         json::Value::Array(values) => {
@@ -1458,7 +1461,7 @@ fn extract_first_user_message_value(value: &json::Value, max_len: usize) -> Opti
         }
         json::Value::Object(value) => {
             if let Some(messages) = value.get("messages").or_else(|| value.get("contents")) {
-                return extract_first_user_message_value(messages, max_len);
+                return extract_first_user_message(messages, max_len);
             }
 
             if let Some(role) = value.get("role").and_then(|value| value.as_str()) {
@@ -1474,14 +1477,6 @@ fn extract_first_user_message_value(value: &json::Value, max_len: usize) -> Opti
             any_value_to_text(value).and_then(|value| truncate_message(value, max_len))
         }
     }
-}
-
-/// Extract the first user message from an OTEL `gen_ai_input_messages` AnyValue.
-fn extract_first_user_message(
-    messages_val: Option<&json::Value>,
-    max_len: usize,
-) -> Option<String> {
-    extract_first_user_message_value(messages_val?, max_len)
 }
 
 #[derive(Debug, Serialize)]
@@ -2149,7 +2144,7 @@ mod tests {
             {"role": "user", "content": "Hello, how are you doing today?"},
             {"role": "assistant", "content": "I'm fine, thanks!"}
         ]);
-        let result = extract_first_user_message(Some(&messages), 30);
+        let result = extract_first_user_message(&messages, 30);
         assert_eq!(result, Some("Hello, how are you doing today".to_string()));
     }
 
@@ -2158,19 +2153,15 @@ mod tests {
         let messages = json::json!([
             {"role": "user", "content": "short"}
         ]);
-        let result = extract_first_user_message(Some(&messages), 30);
+        let result = extract_first_user_message(&messages, 30);
         assert_eq!(result, Some("short".to_string()));
     }
 
     #[test]
     fn test_extract_first_user_message_empty() {
-        assert_eq!(extract_first_user_message(None, 30), None);
-        assert_eq!(extract_first_user_message(Some(&json::json!([])), 30), None);
+        assert_eq!(extract_first_user_message(&json::json!([]), 30), None);
         assert_eq!(
-            extract_first_user_message(
-                Some(&json::json!([{"role": "assistant", "content": "hi"}])),
-                30
-            ),
+            extract_first_user_message(&json::json!([{"role": "assistant", "content": "hi"}]), 30),
             None
         );
     }
@@ -2180,38 +2171,38 @@ mod tests {
         let messages = json::json!([
             {"role": "User", "content": "Hello"}
         ]);
-        let result = extract_first_user_message(Some(&messages), 30);
+        let result = extract_first_user_message(&messages, 30);
         assert_eq!(result, Some("Hello".to_string()));
     }
 
     #[test]
     fn test_extract_first_user_message_from_plain_string_any_value() {
-        let result = extract_first_user_message(Some(&json::json!("plain input")), 30);
+        let result = extract_first_user_message(&json::json!("plain input"), 30);
         assert_eq!(result, Some("plain input".to_string()));
     }
 
     #[test]
     fn test_extract_first_user_message_from_scalar_any_values() {
         assert_eq!(
-            extract_first_user_message(Some(&json::json!(42)), 30),
+            extract_first_user_message(&json::json!(42), 30),
             Some("42".to_string())
         );
         assert_eq!(
-            extract_first_user_message(Some(&json::json!(false)), 30),
+            extract_first_user_message(&json::json!(false), 30),
             Some("false".to_string())
         );
     }
 
     #[test]
     fn test_extract_first_user_message_from_json_encoded_scalar() {
-        let result = extract_first_user_message(Some(&json::json!("\"encoded input\"")), 30);
+        let result = extract_first_user_message(&json::json!("\"encoded input\""), 30);
         assert_eq!(result, Some("encoded input".to_string()));
     }
 
     #[test]
     fn test_extract_first_user_message_from_json_encoded_messages() {
         let input = json::json!(r#"[{"role":"user","content":"encoded message"}]"#);
-        let result = extract_first_user_message(Some(&input), 30);
+        let result = extract_first_user_message(&input, 30);
         assert_eq!(result, Some("encoded message".to_string()));
     }
 
@@ -2225,14 +2216,14 @@ mod tests {
                 ]
             }
         ]);
-        let result = extract_first_user_message(Some(&messages), 30);
+        let result = extract_first_user_message(&messages, 30);
         assert_eq!(result, Some("Weather in Paris?".to_string()));
     }
 
     #[test]
     fn test_extract_first_user_message_from_unstructured_object_any_value() {
         let input = json::json!({"prompt": "hello"});
-        let result = extract_first_user_message(Some(&input), 30);
+        let result = extract_first_user_message(&input, 30);
         assert_eq!(result, Some("{\"prompt\":\"hello\"}".to_string()));
     }
 }
