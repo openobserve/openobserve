@@ -407,7 +407,9 @@ pub async fn handle_diff_schema(
             }
         }
 
+        // sort for a deterministic persisted field list
         defined_schema_fields = uds_fields.into_iter().collect::<Vec<_>>();
+        defined_schema_fields.sort_unstable();
         stream_setting.defined_schema_fields = defined_schema_fields.clone();
         final_schema.metadata.insert(
             "settings".to_string(),
@@ -416,23 +418,40 @@ pub async fn handle_diff_schema(
 
         // Persist the automatically enabled UDS settings at the schema layer. This deliberately
         // bypasses the HTTP-facing stream service so schema evolution does not depend on a
-        // higher-level service crate.
-        if !final_schema.metadata.contains_key("created_at") {
-            final_schema
-                .metadata
-                .insert("created_at".to_string(), now_micros().to_string());
-        }
-        if let Err(e) = db::schema::update_setting(
-            org_id,
-            stream_name,
-            stream_type,
-            final_schema.metadata.clone(),
-        )
-        .await
-        {
-            log::error!(
-                "persist auto UDS settings [{org_id}/{stream_type}/{stream_name}] error: {e}"
+        // higher-level service crate, but it must keep the same persistence guards as
+        // save_stream_settings: never write settings for a stream that is being deleted, and
+        // never persist more user fields than the settings API accepts.
+        let uds_user_fields = defined_schema_fields
+            .iter()
+            .filter(|field| !is_uds_internal_column(field))
+            .count();
+        if db::compact::retention::is_deleting_stream(org_id, stream_type, stream_name, None) {
+            log::warn!(
+                "skip persisting auto UDS settings [{org_id}/{stream_type}/{stream_name}]: stream is being deleted"
             );
+        } else if uds_user_fields > cfg.limit.user_defined_schema_max_fields {
+            log::warn!(
+                "skip persisting auto UDS settings [{org_id}/{stream_type}/{stream_name}]: {uds_user_fields} fields exceeds the limit {}",
+                cfg.limit.user_defined_schema_max_fields
+            );
+        } else {
+            if !final_schema.metadata.contains_key("created_at") {
+                final_schema
+                    .metadata
+                    .insert("created_at".to_string(), now_micros().to_string());
+            }
+            if let Err(e) = db::schema::update_setting(
+                org_id,
+                stream_name,
+                stream_type,
+                final_schema.metadata.clone(),
+            )
+            .await
+            {
+                log::error!(
+                    "persist auto UDS settings [{org_id}/{stream_type}/{stream_name}] error: {e}"
+                );
+            }
         }
     }
 
