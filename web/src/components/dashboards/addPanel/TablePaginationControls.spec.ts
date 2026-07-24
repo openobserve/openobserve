@@ -469,6 +469,8 @@ describe("TablePaginationControls", () => {
     it("should handle custom pagination options", () => {
       wrapper = createWrapper({
         paginationOptions: [5, 15, 25],
+        // rowsPerPage is one of the options, so nothing extra is injected.
+        pagination: { rowsPerPage: 15, page: 1 },
       });
 
       const select = wrapper.findComponent({ name: "OSelect" });
@@ -477,6 +479,24 @@ describe("TablePaginationControls", () => {
         { label: "15", value: 15 },
         { label: "25", value: 25 },
       ]);
+    });
+
+    it("injects the active rowsPerPage in sorted position when it isn't a preset", () => {
+      // e.g. a custom "Records per page" typed into the panel config.
+      wrapper = createWrapper({
+        paginationOptions: [10, 20, 50],
+        pagination: { rowsPerPage: 25, page: 1 },
+      });
+
+      const select = wrapper.findComponent({ name: "OSelect" });
+      expect(select.props("options")).toEqual([
+        { label: "10", value: 10 },
+        { label: "20", value: 20 },
+        { label: "25", value: 25 },
+        { label: "50", value: 50 },
+      ]);
+      // The dropdown now reflects the active value instead of going blank.
+      expect(select.props("modelValue")).toBe(25);
     });
 
     it("should handle missing optional props with defaults", () => {

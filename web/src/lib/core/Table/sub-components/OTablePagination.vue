@@ -45,9 +45,18 @@ const pageSizeModel = computed({
   set: (val: number) => emit("update:pageSize", val),
 });
 
-const pageSizeSelectOptions = computed(() =>
-  props.pageSizeOptions.map((n) => ({ label: String(n), value: n })),
-);
+const pageSizeSelectOptions = computed(() => {
+  const opts = [...props.pageSizeOptions];
+  // Surface the active page size when it isn't one of the presets (e.g. a
+  // caller-configured size), inserted in ascending position, so the select
+  // shows it instead of rendering blank.
+  if (props.pageSize != null && props.pageSize > 0 && !opts.includes(props.pageSize)) {
+    const idx = opts.findIndex((o) => o > (props.pageSize as number));
+    if (idx === -1) opts.push(props.pageSize);
+    else opts.splice(idx, 0, props.pageSize);
+  }
+  return opts.map((n) => ({ label: String(n), value: n }));
+});
 </script>
 
 <template>
