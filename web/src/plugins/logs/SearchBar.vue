@@ -2876,6 +2876,20 @@ export default defineComponent({
         return;
       }
 
+      // A URL / short-link restore has just set the SQL query, but the lazy-loaded
+      // Monaco editor fires this callback with an empty "" as it mounts, BEFORE the
+      // restored value is applied. Treating that transient empty as a real edit
+      // wipes searchObj.data.query and (below) flips SQL mode off — the intermittent
+      // "shared SQL link opens an empty editor" bug. While a restore is pending,
+      // ignore the empty emission; clear the flag as soon as the real (non-empty)
+      // value lands so genuine later clears by the user still work.
+      if (searchObj.meta.pendingUrlQueryRestore) {
+        if (value.trim() === "") {
+          return;
+        }
+        searchObj.meta.pendingUrlQueryRestore = false;
+      }
+
       // if (searchObj.meta.jobId != "") {
       //   searchObj.meta.jobId = "";
       //   getQueryData(false);
