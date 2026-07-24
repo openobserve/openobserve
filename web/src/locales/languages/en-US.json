@@ -2836,7 +2836,7 @@
     "addToFavorites": "Add to favorites",
     "removeFromFavorites": "Remove from favorites",
     "noFavoritesTitle": "No favorite dashboards yet",
-    "noFavoritesMessage": "Click the heart icon on any dashboard to see it here, across all folders.",
+    "noFavoritesMessage": "Click the star icon on any dashboard to see it here, across all folders.",
     "moreActions": "More actions",
     "save": "Save",
     "cancel": "Cancel",
