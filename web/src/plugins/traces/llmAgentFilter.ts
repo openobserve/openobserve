@@ -45,14 +45,16 @@ export function buildAgentTraceFilter(
   const field = agent.id ? "gen_ai_agent_id" : "gen_ai_agent_name";
   const value = agent.id ?? agent.name;
   if (!value) return "";
+  // env/version filter on the CANONICAL columns the registry writes back onto
+  // every discovered span (gen_ai_agent_env / gen_ai_agent_version) — stable
+  // regardless of which source attribute the value came from, mirroring how the
+  // agent identity filters on canonical gen_ai_agent_name/id above.
   const clauses = [`${field} = '${sqlQuote(String(value))}'`];
   if (agent.version) {
     clauses.push(`gen_ai_agent_version = '${sqlQuote(String(agent.version))}'`);
   }
   if (agent.env) {
-    clauses.push(
-      `service_deployment_environment_name = '${sqlQuote(String(agent.env))}'`,
-    );
+    clauses.push(`gen_ai_agent_env = '${sqlQuote(String(agent.env))}'`);
   }
   return clauses.join(" AND ");
 }
