@@ -39,6 +39,7 @@ use config::{
     utils::{base64, json},
 };
 use db::{self, alerts::realtime_triggers::REALTIME_ALERT_TRIGGERS, user::is_root_user};
+use enrichment_data::enrichment_table::geoip::wait_for_initialization;
 use hashbrown::HashMap;
 use infra::{
     cache, cluster, file_list,
@@ -1558,7 +1559,7 @@ pub async fn refresh_nodes_list() -> Response {
     match cluster::cache_node_list().await {
         Ok(node_ids) => MetaHttpResponse::json(node_ids),
         Err(e) => {
-            log::error!("[CLUSTER] refresh_node_list failed: {}", e);
+            log::error!("[CLUSTER] refresh_node_list failed: {e}");
             MetaHttpResponse::internal_error(e.to_string())
         }
     }
@@ -1566,7 +1567,7 @@ pub async fn refresh_nodes_list() -> Response {
 
 pub async fn refresh_user_sessions() -> Response {
     let _ = db::session::cache().await.map_err(|e| {
-        log::error!("[CLUSTER] refresh_user_sessions failed: {}", e);
+        log::error!("[CLUSTER] refresh_user_sessions failed: {e}");
         e
     });
     MetaHttpResponse::json("user sessions refreshed")
@@ -1597,7 +1598,7 @@ async fn reload_module_cache(module: &str) -> Result<(), anyhow::Error> {
         "user" => db::user::cache().await,
         "session" => db::session::cache().await,
         "functions" => openobserve_core::functions_cache::cache().await,
-        "pipeline" => openobserve_core::pipeline::store::cache().await,
+        "pipeline" => openobserve_core::pipeline::store::cache(wait_for_initialization).await,
         "alerts" => db::alerts::alert::cache().await,
         "destinations" => db::alerts::destinations::cache().await,
         "templates" => db::alerts::templates::cache().await,
@@ -1642,20 +1643,13 @@ pub async fn cache_reload(
             Ok(_) => {
                 results.insert(module.to_string(), "success".to_string());
                 success_count += 1;
-                log::info!(
-                    "[CACHE_RELOAD] Successfully reloaded cache for module: {}",
-                    module
-                );
+                log::info!("[CACHE_RELOAD] Successfully reloaded cache for module: {module}",);
             }
             Err(e) => {
                 let error_msg = format!("failed: {}", e);
                 results.insert(module.to_string(), error_msg.clone());
                 failed_count += 1;
-                log::error!(
-                    "[CACHE_RELOAD] Failed to reload cache for module {}: {}",
-                    module,
-                    e
-                );
+                log::error!("[CACHE_RELOAD] Failed to reload cache for module {module}: {e}",);
             }
         }
     }

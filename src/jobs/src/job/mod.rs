@@ -65,10 +65,13 @@ mod service_graph;
 mod session_cleanup;
 mod stats;
 
+use enrichment_data::enrichment_table::geoip::wait_for_initialization;
+use openobserve_core::org_cleanup::StreamDataCleanup;
+
 struct CompactionStreamDataCleanup;
 
 #[async_trait::async_trait]
-impl openobserve_core::org_cleanup::StreamDataCleanup for CompactionStreamDataCleanup {
+impl StreamDataCleanup for CompactionStreamDataCleanup {
     async fn delete_stream_data(
         &self,
         org_id: &str,
@@ -1160,7 +1163,7 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
         .await
         .expect("EnrichmentTables cache failed");
     // pipelines can potentially depend on enrichment tables, so cached afterwards
-    openobserve_core::pipeline::store::cache()
+    openobserve_core::pipeline::store::cache(wait_for_initialization)
         .await
         .expect("Pipeline cache failed");
 

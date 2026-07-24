@@ -25,7 +25,6 @@ enterprise = [
     "search/enterprise",
     "search_service/enterprise",
     "stream/enterprise",
-    "enrichment-data/enterprise",
     "usage_reporting/enterprise",
 ]
 cloud = [
@@ -59,7 +58,6 @@ search_service.workspace = true
 ingestion-common.workspace = true
 schema.workspace = true
 stream.workspace = true
-enrichment-data.workspace = true
 usage_reporting.workspace = true
 axum.workspace = true
 http.workspace = true

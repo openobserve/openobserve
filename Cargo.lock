@@ -7529,7 +7529,6 @@ dependencies = [
  "datafusion",
  "db",
  "enrichment",
- "enrichment-data",
  "flate2",
  "futures",
  "futures-util",
