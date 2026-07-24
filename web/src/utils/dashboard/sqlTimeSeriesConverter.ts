@@ -17,6 +17,7 @@ import { toZonedTime } from "date-fns-tz";
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 import { calculateDynamicNameGap } from "./chartDimensionUtils";
 import { formatDate, isTimeSeries, isTimeStamp } from "./dateTimeUtils";
+import { chartColor } from "../chartTheme";
 
 /**
  * Handles auto SQL time series conversion.
@@ -240,7 +241,7 @@ export const applyAutoSQLTimeSeries = (
         label: {
           fontsize: 12,
           precision: panelSchema.config?.decimals,
-          backgroundColor: store.state.theme === "dark" ? "#333" : "",
+          backgroundColor: chartColor("--color-chart-crosshair-bg"),
           formatter: function (params: any) {
             try {
               if (params?.axisDimension == "y")
@@ -476,7 +477,7 @@ export const applyCustomSQLTimeSeries = (
         label: {
           fontsize: 12,
           precision: panelSchema.config?.decimals,
-          backgroundColor: store.state.theme === "dark" ? "#333" : "",
+          backgroundColor: chartColor("--color-chart-crosshair-bg"),
           formatter: function (params: any) {
             try {
               if (params?.axisDimension == "y")

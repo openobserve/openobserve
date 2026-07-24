@@ -260,7 +260,7 @@
               </div>
             </div>
 
-            <OSeparator class="bg-separator-strong" />
+            <OSeparator />
 
             <!-- Test Pattern Card -->
             <div

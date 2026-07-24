@@ -39,7 +39,7 @@ onMounted(async () => {
   }
   try {
     const org = store.state.selectedOrganization.identifier;
-    const res = await syntheticsService.get(org, editId.value);
+    const res = await syntheticsService.get(org, editId.value, String(route.query.folder ?? ""));
     const t = (res.data as any)?.type;
     resolvedType.value = SYNTHETIC_CHECK_TYPES.includes(t) ? (t as SyntheticCheckType) : "browser";
   } catch (err) {

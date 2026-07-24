@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <button
               type="button"
               data-test="dashboard-addpanel-config-add-column"
-              class="rounded-default text-primary-600 hover:border-primary-600 flex w-full shrink-0 cursor-pointer items-center justify-center gap-1.5 border border-dashed border-[color-mix(in_srgb,var(--color-primary-600)_50%,transparent)] bg-transparent p-2.25 text-sm font-medium transition-colors hover:bg-[color-mix(in_srgb,var(--color-primary-600)_5%,transparent)]"
+              class="rounded-default text-accent hover:border-accent flex w-full shrink-0 cursor-pointer items-center justify-center gap-1.5 border border-dashed border-[color-mix(in_srgb,var(--color-primary-600)_50%,transparent)] bg-transparent p-2.25 text-sm font-medium transition-colors hover:bg-[color-mix(in_srgb,var(--color-primary-600)_5%,transparent)]"
             >
               <OIcon name="add" size="sm" />
               {{ t("dashboard.columnFormattingAddField") }}

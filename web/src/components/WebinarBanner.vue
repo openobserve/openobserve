@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Content row -->
     <div
-      class="webinar-home-content relative z-[1] flex flex-wrap items-center justify-between gap-3 p-4 pr-[1.375rem]"
+      class="webinar-home-content relative z-1 flex flex-wrap items-center justify-between gap-3 p-4 pr-[1.375rem]"
     >
       <div class="webinar-home-left flex flex-col gap-[0.3rem]">
         <!-- Live badge -->

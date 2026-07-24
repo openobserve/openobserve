@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </div>
         <button
-          class="text-primary-600 cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100"
+          class="text-text-link cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100"
           @click="goToIncidentList"
         >
           {{ t("overview.viewAll") }} →
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </div>
         <button
-          class="text-primary-600 cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100"
+          class="text-text-link cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100"
           @click="goToServiceGraph"
         >
           {{ t("overview.viewAll") }} →
@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="[
               serviceCardClass(svc),
               selectedService?.id === svc.id && servicePanelVisible
-                ? 'outline-primary-500 bg-[color-mix(in_srgb,var(--color-primary-500)_8%,var(--color-surface-base))] shadow-[0_0.125rem_0.5rem_color-mix(in_srgb,var(--color-primary-500)_22%,transparent)] outline-[0.125em] outline-offset-[-0.0625em] outline-solid'
+                ? 'outline-accent bg-[color-mix(in_srgb,var(--color-primary-500)_8%,var(--color-surface-base))] shadow-[0_0.125rem_0.5rem_color-mix(in_srgb,var(--color-primary-500)_22%,transparent)] outline-[0.125em] outline-offset-[-0.0625em] outline-solid'
                 : 'hover:bg-table-row-hover-bg',
             ]"
             @click="openServicePanel(svc)"
@@ -282,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="isEnterpriseOrCloud && selectedService">
       <div
         v-if="servicePanelVisible"
-        class="fixed inset-0 z-[99] bg-transparent"
+        class="fixed inset-0 z-99 bg-transparent"
         @click="closeServicePanel"
       />
       <ServiceGraphNodeSidePanel
@@ -304,7 +304,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag type="countChip" value="warning">{{ anomalies.length }}</OTag>
         </div>
         <button
-          class="text-primary-600 cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100"
+          class="text-text-link cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100"
           @click="goToAnomalies"
         >
           {{ t("overview.viewAll") }} →
@@ -355,7 +355,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag type="countChip" value="warning">{{ recentEvents.length }}</OTag>
         </div>
         <button
-          class="text-primary-600 cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100"
+          class="text-text-link cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100"
           @click="goToAlertList"
         >
           {{ t("overview.viewAll") }} →
@@ -406,12 +406,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <button
           v-if="showAlertsCard"
           type="button"
-          class="group rounded-default border-border-default bg-surface-base hover:border-primary-400 hover:bg-tabs-hover-bg relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 pr-3.5 pl-3 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)]"
+          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 pr-3.5 pl-3 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)]"
           data-test="overview-empty-alerts-card"
           @click="goToAlertList"
         >
           <span
-            class="rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text group-hover:bg-primary-600 group-hover:text-text-inverse inline-flex h-10 w-10 shrink-0 items-center justify-center transition-[background-color,color] duration-150"
+            class="rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text group-hover:bg-accent group-hover:text-text-inverse inline-flex h-10 w-10 shrink-0 items-center justify-center transition-[background-color,color] duration-150"
           >
             <OIcon name="notifications" size="md" />
           </span>
@@ -426,19 +426,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             name="chevron-right"
             size="sm"
-            class="text-text-disabled group-hover:text-primary-600 shrink-0 transition-[transform,color] duration-150 group-hover:translate-x-0.5"
+            class="text-text-disabled group-hover:text-accent shrink-0 transition-[transform,color] duration-150 group-hover:translate-x-0.5"
           />
         </button>
         <!-- Explore logs -->
         <button
           v-if="showLogsCard"
           type="button"
-          class="group rounded-default border-border-default bg-surface-base hover:border-primary-400 hover:bg-tabs-hover-bg relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 pr-3.5 pl-3 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)]"
+          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 pr-3.5 pl-3 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)]"
           data-test="overview-empty-logs-card"
           @click="goToLogs"
         >
           <span
-            class="rounded-default bg-status-info-bg text-status-info-text group-hover:bg-primary-600 group-hover:text-text-inverse inline-flex h-10 w-10 shrink-0 items-center justify-center transition-[background-color,color] duration-150"
+            class="rounded-default bg-status-info-bg text-status-info-text group-hover:bg-accent group-hover:text-text-inverse inline-flex h-10 w-10 shrink-0 items-center justify-center transition-[background-color,color] duration-150"
           >
             <OIcon name="search" size="md" />
           </span>
@@ -453,19 +453,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             name="chevron-right"
             size="sm"
-            class="text-text-disabled group-hover:text-primary-600 shrink-0 transition-[transform,color] duration-150 group-hover:translate-x-0.5"
+            class="text-text-disabled group-hover:text-accent shrink-0 transition-[transform,color] duration-150 group-hover:translate-x-0.5"
           />
         </button>
         <!-- Explore traces -->
         <button
           v-if="showTracesCard"
           type="button"
-          class="group rounded-default border-border-default bg-surface-base hover:border-primary-400 hover:bg-tabs-hover-bg relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 pr-3.5 pl-3 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)]"
+          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 pr-3.5 pl-3 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)]"
           data-test="overview-empty-traces-card"
           @click="goToTraces"
         >
           <span
-            class="rounded-default bg-status-info-bg text-status-info-text group-hover:bg-primary-600 group-hover:text-text-inverse inline-flex h-10 w-10 shrink-0 items-center justify-center transition-[background-color,color] duration-150"
+            class="rounded-default bg-status-info-bg text-status-info-text group-hover:bg-accent group-hover:text-text-inverse inline-flex h-10 w-10 shrink-0 items-center justify-center transition-[background-color,color] duration-150"
           >
             <OIcon name="account-tree" size="md" />
           </span>
@@ -480,7 +480,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             name="chevron-right"
             size="sm"
-            class="text-text-disabled group-hover:text-primary-600 shrink-0 transition-[transform,color] duration-150 group-hover:translate-x-0.5"
+            class="text-text-disabled group-hover:text-accent shrink-0 transition-[transform,color] duration-150 group-hover:translate-x-0.5"
           />
         </button>
       </template>

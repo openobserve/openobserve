@@ -115,7 +115,7 @@ withDefaults(
           <div class="shrink-0" style="width: 1.5rem; height: 0.875rem">
             <OSkeleton type="text" animation="wave" />
           </div>
-          <!-- Action icon chip: bg-primary-50, rounded, p-1 -->
+          <!-- Action icon chip: bg-icon-chip-primary-bg, rounded, p-1 -->
           <div class="shrink-0" style="width: 1.75rem; height: 1.75rem; border-radius: 0.25rem">
             <OSkeleton type="rect" animation="wave" />
           </div>

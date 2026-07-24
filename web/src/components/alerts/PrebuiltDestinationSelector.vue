@@ -67,7 +67,7 @@ limitations under the License. -->
         <!-- Selection Indicator -->
         <div
           v-if="selectedType === type.id"
-          class="check-icon bg-status-positive absolute top-1.5 right-1.5 z-[1] flex h-5 w-5 items-center justify-center overflow-hidden rounded-full text-white"
+          class="check-icon bg-status-positive absolute top-1.5 right-1.5 z-1 flex h-5 w-5 items-center justify-center overflow-hidden rounded-full text-white"
         >
           <OIcon name="check" size="xs" />
         </div>
@@ -109,7 +109,7 @@ limitations under the License. -->
         <!-- Selection Indicator -->
         <div
           v-if="selectedType === 'custom'"
-          class="check-icon bg-status-positive absolute top-1.5 right-1.5 z-[1] flex h-5 w-5 items-center justify-center overflow-hidden rounded-full text-white"
+          class="check-icon bg-status-positive absolute top-1.5 right-1.5 z-1 flex h-5 w-5 items-center justify-center overflow-hidden rounded-full text-white"
         >
           <OIcon name="check" size="xs" />
         </div>

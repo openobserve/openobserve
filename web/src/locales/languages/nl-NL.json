@@ -2222,6 +2222,7 @@
       "linkPartial": "Gekoppeld aan {ok} melding(en), {failed} mislukt",
       "linkError": "Kan meldingen niet koppelen."
     },
+    "chooseTrigger": "Kies een trigger",
     "node": {
       "kindTrigger": "Trigger",
       "kindLogic": "Logica",
@@ -2378,6 +2379,11 @@
     "deleteNodeTitle": "Knooppunt verwijderen",
     "deleteNodeLlmEvalConfirm": "Weet u zeker dat u dit LLM-evaluatieknooppunt wilt verwijderen?",
     "cancel": "Annuleer",
+    "collapseNodes": "Knooppunten samenvouwen",
+    "openNodes": "Knooppunten openen",
+    "chooseSource": "Kies een bron",
+    "sourceStreamDesc": "Verwerk gegevens in realtime terwijl ze in een stream worden opgenomen",
+    "sourceQueryDesc": "Voer een query uit volgens een schema en verwerk de resultaten",
     "promqlOnlyForMetrics": "ProMQL is alleen beschikbaar voor het streamtype voor statistieken",
     "invalidCronExpression": "Ongeldige cron-expressie",
     "cronRequired": "Cron-expressie is verplicht",
@@ -3326,6 +3332,8 @@
     "seriesName": "Naam van de serie",
     "seriesValue": "Seriewaarde",
     "axisValue": "Axiswaarde",
+    "expandAllSections": "Alle secties uitvouwen",
+    "collapseAllSections": "Alle secties samenvouwen",
     "configSectionGeneral": "Generaal",
     "configSectionPromqlTable": "ProMQL-tabelmodus",
     "configSectionGeographic": "Geografische configuratie",
@@ -7730,7 +7738,11 @@
     "agentGraph": {
       "allAgents": "Alle agenten",
       "stream": "Stream",
-      "agent": "Agent"
+      "agent": "Agent",
+      "noAgentsTitle": "Geen agents gevonden",
+      "noAgentsDescription": "Er zijn geen agents gevonden in dit tijdsbereik. Probeer het tijdsbereik te vergroten of controleer of uw traces gen_ai agent-attributen bevatten.",
+      "agentCountSingular": "agent",
+      "agentCountPlural": "agenten"
     },
     "kpi": {
       "totalCost": "Totale kosten",
@@ -9381,6 +9393,8 @@
     "dialog": {
       "bulkDeleteBody": "Weet u zeker dat u {count} controle(s) wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.",
       "bulkDeleteTitle": "Controles verwijderen",
+      "deleteSingleBody": "Weet u zeker dat u \"{name}\" wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.",
+      "deleteSingleTitle": "Controle verwijderen",
       "duplicateTitle": "Controle dupliceren"
     },
     "empty": {
@@ -9574,6 +9588,7 @@
       "httpDesc": "Controleer eindpunten, statuscodes en responslichamen",
       "leave": "Verlaten",
       "loadEditFailed": "Kan de controle niet laden voor bewerking — het formulier toont standaardwaarden, niet opslaan",
+      "notFoundInOrg": "Deze controle bestaat niet in de huidige organisatie.",
       "modalSubtitle": "Kies wat u wilt monitoren",
       "modalTitle": "Maak een Check",
       "pageTitle": "Nieuwe {label}-controle",
@@ -9693,6 +9708,7 @@
       "failed": "Mislukt",
       "failedRuns": "Mislukte runs",
       "jumpToLastRun": "Ga naar laatste run",
+      "jumpToLatestData": "Ga naar nieuwste gegevens",
       "lastRun": "Laatste run",
       "location": "Locatie",
       "monitors": "Monitoren",
@@ -10022,7 +10038,8 @@
       "nameRequired": "Naam is verplicht",
       "selectorRequired": "Selector is vereist voor \"{step}\"",
       "urlInvalid": "Voer een geldige URL in die begint met http:// of https://",
-      "urlRequired": "Start-URL is verplicht"
+      "urlRequired": "Start-URL is verplicht",
+      "fixHighlightedFields": "Corrigeer de gemarkeerde velden voordat u opslaat"
     },
     "privateLocations": {
       "searchPlaceholder": "Locaties doorzoeken...",
@@ -10209,6 +10226,8 @@
       "panelEditorQueryInspector": "Inspector voor query's openen",
       "metricsRunQuery": "Voer een ProMQL-query uit",
       "metricsRefresh": "Vernieuwen",
+      "metricsAddToDashboard": "Toevoegen aan dashboard",
+      "metricsCopyUrl": "Deellink kopiëren",
       "tracesSearch": "Zoek naar sporen",
       "tracesRefresh": "Vernieuwen",
       "alertsCreate": "Nieuwe waarschuwing aanmaken",

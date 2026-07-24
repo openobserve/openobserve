@@ -30,7 +30,7 @@
               })
             "
             :data-test="`scorer-test-input-${variable}`"
-            class="border-border-default rounded-default bg-surface-base text-text-body placeholder:text-text-muted focus:border-primary-600 box-border max-h-40 w-full [resize:vertical] overflow-y-auto border px-2.25 py-2 font-sans text-xs leading-normal font-normal focus:outline-none"
+            class="border-border-default rounded-default bg-surface-base text-text-body placeholder:text-text-muted focus:border-accent box-border max-h-40 w-full [resize:vertical] overflow-y-auto border px-2.25 py-2 font-sans text-xs leading-normal font-normal focus:outline-none"
             @input="updateInput(variable, ($event.target as HTMLTextAreaElement).value)"
           />
         </div>

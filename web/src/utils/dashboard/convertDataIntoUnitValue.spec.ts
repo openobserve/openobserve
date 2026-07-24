@@ -456,73 +456,73 @@ describe("Dashboard Data Conversion Utils", () => {
 
   describe("getContrastColor", () => {
     it("should return white for dark backgrounds", () => {
-      expect(getContrastColor("#000000", false)).toBe("#FFFFFF");
-      expect(getContrastColor("#333333", false)).toBe("#FFFFFF");
+      expect(getContrastColor("#000000", "#000000", 0.5)).toBe("#FFFFFF");
+      expect(getContrastColor("#333333", "#000000", 0.5)).toBe("#FFFFFF");
     });
 
     it("should return black for light backgrounds", () => {
-      expect(getContrastColor("#ffffff", false)).toBe("#000000");
-      expect(getContrastColor("#f0f0f0", false)).toBe("#000000");
+      expect(getContrastColor("#ffffff", "#000000", 0.5)).toBe("#000000");
+      expect(getContrastColor("#f0f0f0", "#000000", 0.5)).toBe("#000000");
     });
 
     it("should handle theme parameter", () => {
-      expect(getContrastColor("", true)).toBe("#FFFFFF"); // Dark theme
-      expect(getContrastColor("", false)).toBe("#000000"); // Light theme
+      expect(getContrastColor("", "#FFFFFF", 0.8)).toBe("#FFFFFF"); // Dark theme
+      expect(getContrastColor("", "#000000", 0.5)).toBe("#000000"); // Light theme
     });
 
     it("should handle RGB values", () => {
-      expect(getContrastColor("rgb(0, 0, 0)", false)).toBe("#FFFFFF");
-      expect(getContrastColor("rgb(255, 255, 255)", false)).toBe("#000000");
+      expect(getContrastColor("rgb(0, 0, 0)", "#000000", 0.5)).toBe("#FFFFFF");
+      expect(getContrastColor("rgb(255, 255, 255)", "#000000", 0.5)).toBe("#000000");
     });
 
     it("should handle RGBA values", () => {
-      expect(getContrastColor("rgba(0, 0, 0, 0.5)", false)).toBe("#FFFFFF");
-      expect(getContrastColor("rgba(255, 255, 255, 0.8)", false)).toBe("#000000");
+      expect(getContrastColor("rgba(0, 0, 0, 0.5)", "#000000", 0.5)).toBe("#FFFFFF");
+      expect(getContrastColor("rgba(255, 255, 255, 0.8)", "#000000", 0.5)).toBe("#000000");
     });
 
     it("should handle hex colors with different casing", () => {
-      expect(getContrastColor("#FFFFFF", false)).toBe("#000000");
-      expect(getContrastColor("#000000", false)).toBe("#FFFFFF");
-      expect(getContrastColor("#AbCdEf", false)).toBe("#000000");
+      expect(getContrastColor("#FFFFFF", "#000000", 0.5)).toBe("#000000");
+      expect(getContrastColor("#000000", "#000000", 0.5)).toBe("#FFFFFF");
+      expect(getContrastColor("#AbCdEf", "#000000", 0.5)).toBe("#000000");
     });
 
     it("should handle short hex colors", () => {
       // Short hex colors are not properly expanded in the function, so they parse incorrectly
       // #fff -> {r: 255, g: 15, b: 0} (ff, f0, 00) - produces a bright-ish color -> white text
       // #000 -> {r: 0, g: 0, b: 0} (00, 00, 00) - correctly parsed as black -> white text
-      expect(getContrastColor("#fff", false)).toBe("#FFFFFF"); // Actually parsed as bright color
-      expect(getContrastColor("#000", false)).toBe("#FFFFFF"); // Correctly parsed as black
+      expect(getContrastColor("#fff", "#000000", 0.5)).toBe("#FFFFFF"); // Actually parsed as bright color
+      expect(getContrastColor("#000", "#000000", 0.5)).toBe("#FFFFFF"); // Correctly parsed as black
     });
 
     it("should handle colors with spaces", () => {
-      expect(getContrastColor("rgb( 0 , 0 , 0 )", false)).toBe("#FFFFFF");
-      expect(getContrastColor("rgba( 255 , 255 , 255 , 0.5 )", false)).toBe("#000000");
+      expect(getContrastColor("rgb( 0 , 0 , 0 )", "#000000", 0.5)).toBe("#FFFFFF");
+      expect(getContrastColor("rgba( 255 , 255 , 255 , 0.5 )", "#000000", 0.5)).toBe("#000000");
     });
 
     it("should handle invalid color codes gracefully", () => {
-      expect(getContrastColor("invalid", false)).toBe("#000000");
-      expect(getContrastColor(null as any, false)).toBe("#000000");
-      expect(getContrastColor(undefined as any, false)).toBe("#000000");
-      expect(getContrastColor("rgb(invalid)", false)).toBe("#000000");
+      expect(getContrastColor("invalid", "#000000", 0.5)).toBe("#000000");
+      expect(getContrastColor(null as any, "#000000", 0.5)).toBe("#000000");
+      expect(getContrastColor(undefined as any, "#000000", 0.5)).toBe("#000000");
+      expect(getContrastColor("rgb(invalid)", "#000000", 0.5)).toBe("#000000");
     });
 
     it("should handle edge luminance values correctly", () => {
       // Test boundary conditions for luminance calculation
       // #808080 = rgb(128,128,128) has luminance ~0.502, which is > 0.5 in light theme
-      expect(getContrastColor("#808080", false)).toBe("#000000"); // Medium gray -> black text
-      expect(getContrastColor("#7F7F7F", false)).toBe("#FFFFFF"); // Slightly darker -> white text
-      expect(getContrastColor("#808080", true)).toBe("#FFFFFF"); // Dark theme, < 0.8 luminance -> white text
+      expect(getContrastColor("#808080", "#000000", 0.5)).toBe("#000000"); // Medium gray -> black text
+      expect(getContrastColor("#7F7F7F", "#000000", 0.5)).toBe("#FFFFFF"); // Slightly darker -> white text
+      expect(getContrastColor("#808080", "#FFFFFF", 0.8)).toBe("#FFFFFF"); // Dark theme, < 0.8 luminance -> white text
     });
 
     it("should handle very light colors in dark theme", () => {
-      expect(getContrastColor("#F0F0F0", true)).toBe("#000000"); // Very light should return black
-      expect(getContrastColor("#EEEEEE", true)).toBe("#000000"); // Very light should return black
+      expect(getContrastColor("#F0F0F0", "#FFFFFF", 0.8)).toBe("#000000"); // Very light should return black
+      expect(getContrastColor("#EEEEEE", "#FFFFFF", 0.8)).toBe("#000000"); // Very light should return black
     });
 
     it("should handle medium colors differently for light vs dark theme", () => {
       const mediumColor = "#888888"; // rgb(136,136,136) has luminance ~0.533
-      expect(getContrastColor(mediumColor, false)).toBe("#000000"); // Light theme, > 0.5 luminance -> black
-      expect(getContrastColor(mediumColor, true)).toBe("#FFFFFF"); // Dark theme, < 0.8 luminance -> white
+      expect(getContrastColor(mediumColor, "#000000", 0.5)).toBe("#000000"); // Light theme, > 0.5 luminance -> black
+      expect(getContrastColor(mediumColor, "#FFFFFF", 0.8)).toBe("#FFFFFF"); // Dark theme, < 0.8 luminance -> white
     });
   });
 
@@ -1532,10 +1532,10 @@ describe("Dashboard Data Conversion Utils", () => {
     });
     it("should handle parseRGB with invalid hex colors", () => {
       // Test to cover lines around parseRGB function
-      const result1 = getContrastColor("#gggggg", false); // Invalid hex
+      const result1 = getContrastColor("#gggggg", "#000000", 0.5); // Invalid hex
       expect(result1).toBe("#FFFFFF"); // Actually returns white for invalid colors
 
-      const result2 = getContrastColor("#12345", false); // Too short hex
+      const result2 = getContrastColor("#12345", "#000000", 0.5); // Too short hex
       expect(result2).toBe("#FFFFFF"); // Actually returns white for invalid colors
     });
 

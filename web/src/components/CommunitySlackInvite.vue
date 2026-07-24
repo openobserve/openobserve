@@ -111,7 +111,12 @@ const benefits = computed(() => [
 // Background tints for the decorative silhouette-avatar stack (brand gradient,
 // dark enough for a white person glyph). Full literal classes so Tailwind emits
 // them. These are placeholders — not real members.
-const avatarBgClasses = ["bg-primary-700", "bg-primary-600", "bg-primary-500", "bg-primary-400"];
+const avatarBgClasses = [
+  "bg-avatar-tint-1",
+  "bg-avatar-tint-2",
+  "bg-avatar-tint-3",
+  "bg-avatar-tint-4",
+];
 
 // Every dismissal path (× / overlay / Escape, Maybe later, or Join Slack)
 // closes the dialog and marks it seen so it never shows again for this user.
@@ -143,7 +148,7 @@ const joinSlack = () => {
       <!-- Header: Slack badge, title to its right, close button on the far right -->
       <div class="flex items-start gap-3">
         <div
-          class="rounded-default bg-primary-50 flex h-12 w-12 shrink-0 items-center justify-center"
+          class="rounded-default bg-icon-chip-primary-bg flex h-12 w-12 shrink-0 items-center justify-center"
           aria-hidden="true"
         >
           <svg viewBox="0 0 122.8 122.8" class="h-6 w-6" xmlns="http://www.w3.org/2000/svg">
@@ -201,7 +206,7 @@ const joinSlack = () => {
             stroke-width="2.5"
             stroke-linecap="round"
             stroke-linejoin="round"
-            class="text-primary-600 mt-0.5 h-4 w-4 shrink-0"
+            class="text-accent mt-0.5 h-4 w-4 shrink-0"
             aria-hidden="true"
           >
             <path d="M20 6 9 17l-5-5" />

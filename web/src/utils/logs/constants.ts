@@ -121,6 +121,11 @@ export const DEFAULT_LOGS_CONFIG = {
     sqlMode: false,
     sqlModeManualTrigger: false,
     sqlModeEditTransition: false,
+    // True from when a URL / short-link restore sets the query until the
+    // (lazy-loaded) editor has actually applied it. Guards updateQueryValue()
+    // against the editor's transient empty emission during mount wiping the
+    // restored query. See SearchBar.updateQueryValue and useLogs.restoreUrlQueryParams.
+    pendingUrlQueryRestore: false,
     nlpMode: false,
     quickMode: false,
     // True when the current selectedFields were chosen automatically by the FTS

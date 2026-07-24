@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-if="visible"
     ref="menuRef"
-    class="bg-dropdown-bg border-dropdown-border rounded-default fixed z-[9999] min-w-50 border border-solid py-1 shadow-[0_2px_8px_rgba(0,0,0,0.15)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
+    class="bg-dropdown-bg border-dropdown-border rounded-default fixed z-9999 min-w-50 border border-solid py-1 shadow-[0_2px_8px_rgba(0,0,0,0.15)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
     :style="menuStyle"
     @click.stop
     data-test="traces-metrics-context-menu"

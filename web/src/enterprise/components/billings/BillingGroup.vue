@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Left: headline + CTA -->
           <div class="max-w-120 min-w-70 flex-1">
             <div
-              class="text-primary-600 mb-5 inline-flex items-center gap-1.5 rounded-full border border-[color-mix(in_srgb,var(--color-primary-600)_25%,transparent)] bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] px-2.5 py-1 text-xs font-semibold tracking-[0.4px]"
+              class="text-accent mb-5 inline-flex items-center gap-1.5 rounded-full border border-[color-mix(in_srgb,var(--color-primary-600)_25%,transparent)] bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] px-2.5 py-1 text-xs font-semibold tracking-[0.4px]"
             >
               <OIcon name="verified" size="xs" />
               {{ t("billing.billingGroup.statusActive") }}
@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="og-feature rounded-default bg-surface-base border-card-glass-border flex items-start gap-4 border px-5 py-4.5 transition-all duration-200 hover:-translate-y-px hover:shadow-lg"
             >
               <div
-                class="rounded-default text-primary-600 flex h-10 w-10 shrink-0 items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)]"
+                class="rounded-default text-accent flex h-10 w-10 shrink-0 items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)]"
               >
                 <OIcon name="person-add" />
               </div>
@@ -176,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="og-feature rounded-default bg-surface-base border-card-glass-border flex items-start gap-4 border px-5 py-4.5 transition-all duration-200 hover:-translate-y-px hover:shadow-lg"
             >
               <div
-                class="rounded-default text-primary-600 flex h-10 w-10 shrink-0 items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)]"
+                class="rounded-default text-accent flex h-10 w-10 shrink-0 items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)]"
               >
                 <OIcon name="how-to-reg" />
               </div>
@@ -193,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="og-feature rounded-default bg-surface-base border-card-glass-border flex items-start gap-4 border px-5 py-4.5 transition-all duration-200 hover:-translate-y-px hover:shadow-lg"
             >
               <div
-                class="rounded-default text-primary-600 flex h-10 w-10 shrink-0 items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)]"
+                class="rounded-default text-accent flex h-10 w-10 shrink-0 items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)]"
               >
                 <OIcon name="schedule" />
               </div>
@@ -276,7 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               class="flex h-17 w-17 items-center justify-center rounded-full border-[1.5px] border-solid border-[color-mix(in_srgb,var(--color-primary-600)_24%,transparent)] bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)]"
             >
-              <OIcon name="group-add" size="lg" class="text-primary-600 opacity-85" />
+              <OIcon name="group-add" size="lg" class="text-accent opacity-85" />
             </div>
           </div>
 

@@ -128,7 +128,7 @@
     "@vue/tsconfig": "^0.8.1",
     "autoprefixer": "^10.4.23",
     "c8": "^10.1.3",
-    "cypress": "^15.8.1",
+    "cypress": "^15.19.0",
     "cypress-localstorage-commands": "^2.2.8",
     "dotenv": "^17.2.3",
     "eslint": "^9.39.2",

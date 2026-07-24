@@ -34,308 +34,122 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="monitor-runs flex h-full flex-col" data-test="synthetics-monitor-runs">
+    <!-- Full-page empty state — replaces the entire content area when no
+         runs exist in the current time window. The parent (MonitorResults)
+         passes lastTriggeredAt to distinguish "never triggered" from "no
+         runs in this window." -->
+    <template v-if="kpiHasLoadedOnce && synthetics.kpi.value.totalRuns === 0">
+      <div class="flex flex-1 items-center justify-center">
+        <OEmptyState
+          size="hero"
+          :illustration="lastTriggeredAt > 0 ? 'no-results' : 'browser-check'"
+          :title="
+            lastTriggeredAt > 0
+              ? t('synthetics.results.noRunsInWindow')
+              : t('synthetics.results.noRunsYet')
+          "
+          :description="
+            lastTriggeredAt > 0
+              ? t('synthetics.results.noRunsInWindowDesc')
+              : t('synthetics.results.noRunsYetDesc')
+          "
+          data-test="monitor-runs-page-empty"
+        >
+          <template #actions>
+            <EmptyStateActionCard
+              v-if="lastTriggeredAt > 0"
+              icon="schedule"
+              :label="t('synthetics.results.jumpToLatestData')"
+              :sublabel="lastTriggeredAtSublabel"
+              data-test="monitor-runs-empty-jump-latest"
+              @click="handleJumpToLatestData"
+            />
+            <EmptyStateActionCard
+              v-else
+              icon="play-arrow"
+              :label="t('synthetics.results.triggerRunNow')"
+              :sublabel="t('synthetics.results.triggerRunNowDesc')"
+              data-test="monitor-runs-empty-trigger-run"
+              @click="handleEmptyStateAction('trigger-run')"
+            />
+            <EmptyStateActionCard
+              v-if="hasActiveFilters"
+              icon="filter-list"
+              :label="t('synthetics.results.clearFilters')"
+              :sublabel="t('synthetics.results.clearFiltersDesc')"
+              data-test="monitor-runs-empty-clear-filters"
+              @click="handleEmptyStateAction('clear-filters')"
+            />
+          </template>
+        </OEmptyState>
+      </div>
+    </template>
+
     <!-- ── Tabs ──────────────────────────────────────────────────────── -->
-    <OTabs v-model="activeTab" class="px-page-edge border-border-default shrink-0 border-b">
-      <OTab name="overview" data-test="monitor-runs-tab-overview">
-        {{ t("synthetics.runs.tabOverview") }}
-      </OTab>
-      <OTab v-if="isBrowser" name="steps" data-test="monitor-runs-tab-steps">
-        {{ t("synthetics.runs.tabSteps") }}
-      </OTab>
-    </OTabs>
+    <template v-else>
+      <OTabs v-model="activeTab" class="px-page-edge border-border-default shrink-0 border-b">
+        <OTab name="overview" data-test="monitor-runs-tab-overview">
+          {{ t("synthetics.runs.tabOverview") }}
+        </OTab>
+        <OTab v-if="isBrowser" name="steps" data-test="monitor-runs-tab-steps">
+          {{ t("synthetics.runs.tabSteps") }}
+        </OTab>
+      </OTabs>
 
-    <div class="min-h-0 flex-1">
-      <OTabPanels v-model="activeTab" grow scroll="y" class="h-full min-h-0">
-        <!-- ════════════ OVERVIEW ════════════ -->
-        <OTabPanel name="overview">
-          <div class="mx-auto flex flex-col gap-2 py-2">
-            <!-- Status Timeline — gated on runs query -->
-            <template v-if="runsLoading || !runsHasLoadedOnce">
-              <div class="px-page-edge">
-                <div
-                  class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
-                >
-                  <div class="flex items-center gap-2 px-3.5 pt-2.5 pb-2">
-                    <SkeletonBox width="100px" height="14px" rounded-default />
-                    <span class="flex-1" />
-                    <SkeletonBox width="45px" height="12px" rounded-default />
-                    <SkeletonBox width="50px" height="12px" rounded-default />
-                    <SkeletonBox width="45px" height="12px" rounded-default />
-                  </div>
-                  <div class="border-border-default border-t" />
-                  <div class="flex flex-col gap-1 px-3.5 py-2">
-                    <div class="flex items-center gap-1">
-                      <div class="h-5 w-5 shrink-0" />
-                      <div class="rounded-default flex h-6.5 flex-1 items-stretch gap-0.5">
-                        <div
-                          v-for="n in 26"
-                          :key="n"
-                          class="rounded-default bg-border-default h-full flex-1 opacity-40"
-                        />
-                      </div>
-                      <div class="h-5 w-5 shrink-0" />
-                    </div>
-                    <div class="flex justify-between">
-                      <SkeletonBox width="60px" height="10px" rounded-default />
-                      <SkeletonBox width="80px" height="10px" rounded-default />
-                      <SkeletonBox width="60px" height="10px" rounded-default />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </template>
-            <!-- Status Timeline — runs query error state -->
-            <template v-else-if="runsError">
-              <div class="px-page-edge">
-                <div
-                  class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
-                >
-                  <div class="flex items-center gap-2 px-3.5 pt-2.5 pb-2">
-                    <span class="text-text-heading text-sm font-bold">{{
-                      t("synthetics.runs.statusTimeline")
-                    }}</span>
-                  </div>
-                  <div class="border-border-default border-t" />
-                  <div class="text-status-error-text flex items-center justify-center py-6 text-xs">
-                    <span class="flex items-center gap-1">
-                      <OIcon name="error" size="xs" />
-                      {{ runsError }}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </template>
-            <template v-else>
-              <div class="px-page-edge">
-                <MonitorStatusTimeline
-                  :segments="timelineSegments"
-                  :is-browser="isBrowser"
-                  :fail-count="timelineFailCount"
-                  :pass-count="timelinePassCount"
-                  :mixed-count="timelineMixedCount"
-                  :start-label="timelineStartLabel"
-                  :end-label="timelineEndLabel"
-                />
-              </div>
-            </template>
-
-            <!-- KPI Cards — gated on KPI + last-run queries -->
-            <template v-if="kpiLoading || !kpiHasLoadedOnce">
-              <div class="px-page-edge">
-                <div class="grid grid-cols-6 gap-2.5">
-                  <div
-                    v-for="n in 6"
-                    :key="n"
-                    class="card-container rounded-default bg-surface-base border-border-default flex flex-col gap-2 border px-3.5 pt-2.5 pb-2.5"
-                  >
-                    <SkeletonBox width="60%" height="11px" rounded-default />
-                    <SkeletonBox width="55%" height="22px" rounded-default />
-                  </div>
-                </div>
-              </div>
-            </template>
-            <template v-else>
-              <div class="px-page-edge">
-                <div class="grid grid-cols-6 gap-2.5">
-                  <div
-                    v-for="card in kpiCards"
-                    :key="card.key"
-                    class="card-container rounded-default bg-surface-base border-border-default flex flex-col gap-1 border px-2 pt-2.5 pb-2.5 transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
-                    :data-test="`monitor-runs-kpi-${card.key}`"
-                  >
-                    <div class="flex flex-col gap-1">
-                      <div class="kpi-label text-2xs text-text-muted font-semibold">
-                        {{ card.label }}
-                        <span v-if="card.unit"> ({{ card.unit }}) </span>
-                      </div>
-                      <div class="flex items-baseline gap-[0.2rem]">
-                        <!-- Per-card error indicator -->
-                        <template v-if="kpiError">
-                          <span class="text-status-error-text flex items-center gap-1 text-xs">
-                            <OIcon name="error" size="xs" class="shrink-0" />
-                            {{ kpiError }}
-                          </span>
-                        </template>
-                        <template v-else>
-                          <span
-                            class="text-xl leading-none font-bold text-[var(--color-text-heading)]"
-                            :class="card.valueClass"
-                          >
-                            {{ card.value }}
-                          </span>
-                        </template>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </template>
-
-            <!-- Charts — gated on histogram query -->
-            <template v-if="histogramLoading || !histogramHasLoadedOnce">
-              <div class="px-page-edge">
-                <div class="grid grid-cols-2 gap-2">
+      <div class="min-h-0 flex-1">
+        <OTabPanels v-model="activeTab" grow scroll="y" class="h-full min-h-0">
+          <!-- ════════════ OVERVIEW ════════════ -->
+          <OTabPanel name="overview">
+            <div class="mx-auto flex flex-col gap-2 py-2">
+              <!-- Status Timeline — gated on runs query -->
+              <template v-if="runsLoading || !runsHasLoadedOnce">
+                <div class="px-page-edge">
                   <div
                     class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
                   >
-                    <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
-                      <SkeletonBox width="110px" height="14px" rounded-default />
+                    <div class="flex items-center gap-2 px-3.5 pt-2.5 pb-2">
+                      <SkeletonBox width="100px" height="14px" rounded-default />
                       <span class="flex-1" />
-                      <SkeletonBox width="80px" height="20px" rounded-default />
+                      <SkeletonBox width="45px" height="12px" rounded-default />
+                      <SkeletonBox width="50px" height="12px" rounded-default />
+                      <SkeletonBox width="45px" height="12px" rounded-default />
                     </div>
                     <div class="border-border-default border-t" />
-                    <div class="p-4">
-                      <SkeletonBox width="100%" height="160px" rounded-default />
-                    </div>
-                  </div>
-                  <div
-                    class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
-                  >
-                    <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
-                      <SkeletonBox width="120px" height="14px" rounded-default />
-                      <span class="flex-1" />
-                      <SkeletonBox width="90px" height="20px" rounded-default />
-                    </div>
-                    <div class="border-border-default border-t" />
-                    <div class="p-4">
-                      <SkeletonBox width="100%" height="160px" rounded-default />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </template>
-            <template v-else>
-              <div class="px-page-edge">
-                <div class="grid grid-cols-2 gap-2">
-                  <div
-                    class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
-                  >
-                    <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
-                      <span class="text-text-heading text-sm font-bold">
-                        {{ t("synthetics.results.responseTime") }}
-                      </span>
-                      <span class="flex-1" />
-                      <OBadge v-if="!histogramError" variant="default" size="sm">
-                        p95 {{ p95Label }}
-                      </OBadge>
-                      <span
-                        v-else
-                        class="text-status-error-text inline-flex items-center gap-1 text-xs"
-                      >
-                        <OIcon name="error_outline" size="xs" />
-                        {{ t("synthetics.results.error") }}
-                      </span>
-                    </div>
-                    <div class="border-border-default border-t" />
-                    <div class="min-h-45 p-0">
-                      <ChartRenderer
-                        v-if="!histogramError"
-                        :data="{ options: responseChartOption }"
-                        height="180px"
-                      />
-                      <div
-                        v-else
-                        class="text-text-secondary flex h-45 flex-col items-center justify-center gap-1 text-sm"
-                      >
-                        <OIcon name="error_outline" size="sm" class="text-status-error-text" />
-                        <span>{{ histogramError }}</span>
+                    <div class="flex flex-col gap-1 px-3.5 py-2">
+                      <div class="flex items-center gap-1">
+                        <div class="h-5 w-5 shrink-0" />
+                        <div class="rounded-default flex h-6.5 flex-1 items-stretch gap-0.5">
+                          <div
+                            v-for="n in 26"
+                            :key="n"
+                            class="rounded-default bg-border-default h-full flex-1 opacity-40"
+                          />
+                        </div>
+                        <div class="h-5 w-5 shrink-0" />
                       </div>
-                    </div>
-                  </div>
-                  <div
-                    class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
-                  >
-                    <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
-                      <span class="text-text-heading text-sm font-bold">
-                        {{ t("synthetics.runs.errorsOverTime") }}
-                      </span>
-                      <span class="flex-1" />
-                      <OBadge v-if="!histogramError" variant="error" size="sm">
-                        {{ t("synthetics.runs.failedCount", { count: failCount }) }}
-                      </OBadge>
-                      <span
-                        v-else
-                        class="text-status-error-text inline-flex items-center gap-1 text-xs"
-                      >
-                        <OIcon name="error_outline" size="xs" />
-                        {{ t("synthetics.results.error") }}
-                      </span>
-                    </div>
-                    <div class="border-border-default border-t" />
-                    <div class="min-h-45 p-0">
-                      <ChartRenderer
-                        v-if="!histogramError"
-                        :data="{ options: errorChartOption }"
-                        height="180px"
-                      />
-                      <div
-                        v-else
-                        class="text-text-secondary flex h-45 flex-col items-center justify-center gap-1 text-sm"
-                      >
-                        <OIcon name="error_outline" size="sm" class="text-status-error-text" />
-                        <span>{{ histogramError }}</span>
+                      <div class="flex justify-between">
+                        <SkeletonBox width="60px" height="10px" rounded-default />
+                        <SkeletonBox width="80px" height="10px" rounded-default />
+                        <SkeletonBox width="60px" height="10px" rounded-default />
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </template>
-
-            <!-- Breakdown Cards — gated on runs query -->
-            <template v-if="runsLoading || !runsHasLoadedOnce">
-              <div class="px-page-edge">
-                <div :class="['grid gap-2', isBrowser ? 'grid-cols-3' : 'grid-cols-2']">
+              </template>
+              <!-- Status Timeline — runs query error state -->
+              <template v-else-if="runsError">
+                <div class="px-page-edge">
                   <div
-                    v-for="n in isBrowser ? 3 : 2"
-                    :key="n"
                     class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
                   >
-                    <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
-                      <SkeletonBox width="16px" height="16px" :custom-radius="'4px'" />
-                      <SkeletonBox width="110px" height="14px" rounded-default />
-                    </div>
-                    <div class="border-border-default border-t" />
-                    <div class="flex flex-col px-2 py-2">
-                      <div
-                        v-for="row in 3"
-                        :key="row"
-                        class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
-                      >
-                        <SkeletonBox width="16px" height="16px" :custom-radius="'4px'" />
-                        <SkeletonBox width="70px" height="12px" rounded-default />
-                        <div class="bg-border-default h-1.5 flex-1 rounded-full opacity-30" />
-                        <SkeletonBox width="36px" height="12px" rounded-default />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </template>
-            <!-- Breakdown Cards — runs query error state -->
-            <template v-else-if="runsError">
-              <div class="px-page-edge">
-                <div :class="['grid gap-2', isBrowser ? 'grid-cols-3' : 'grid-cols-2']">
-                  <div
-                    v-for="dim in breakdownDimensions"
-                    :key="dim"
-                    class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
-                  >
-                    <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
-                      <span class="text-text-heading text-sm font-bold">
-                        {{
-                          dim === "Browser"
-                            ? t("synthetics.runs.passRateByBrowser")
-                            : dim === "DurationByLocation"
-                              ? t("synthetics.runs.durationByLocation")
-                              : dim === "Location"
-                                ? t("synthetics.runs.passRateByLocation")
-                                : t("synthetics.runs.passRateByDevice")
-                        }}
-                      </span>
+                    <div class="flex items-center gap-2 px-3.5 pt-2.5 pb-2">
+                      <span class="text-text-heading text-sm font-bold">{{
+                        t("synthetics.runs.statusTimeline")
+                      }}</span>
                     </div>
                     <div class="border-border-default border-t" />
                     <div
-                      class="text-status-error-text flex items-center justify-center py-8 text-xs"
+                      class="text-status-error-text flex items-center justify-center py-6 text-xs"
                     >
                       <span class="flex items-center gap-1">
                         <OIcon name="error" size="xs" />
@@ -344,594 +158,848 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                 </div>
-              </div>
-            </template>
-            <template v-else>
-              <div class="px-page-edge">
-                <div :class="['grid gap-2', isBrowser ? 'grid-cols-3' : 'grid-cols-2']">
-                  <div
-                    v-if="isBrowser"
-                    class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
-                  >
-                    <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
-                      <OIcon name="language" size="sm" class="text-primary-700" />
-                      <span class="text-text-heading text-sm font-bold">
-                        {{ t("synthetics.runs.passRateByBrowser") }}
-                      </span>
-                    </div>
-                    <div class="border-border-default border-t" />
-                    <div class="px-2 py-2">
-                      <div
-                        v-for="b in browserBreakdown"
-                        :key="b.name"
-                        class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
-                      >
-                        <OIcon :name="b.icon" size="sm" class="text-text-secondary flex-none" />
-                        <span class="text-text-body w-20 flex-none text-xs font-semibold">
-                          {{ b.name }}
-                        </span>
-                        <div
-                          class="bg-text-disabled/25! h-1.5 min-w-10 flex-1 overflow-hidden rounded-full"
-                        >
-                          <!-- :style for dynamic bar width + computed color — inline required for per-breakdown values -->
-                          <div
-                            class="h-full rounded-full"
-                            :style="{ width: b.barPct || b.pct, background: b.barColor }"
-                          />
-                        </div>
-                        <span
-                          class="w-12 text-right font-mono text-xs font-bold tabular-nums"
-                          :style="{ color: b.textColor }"
-                        >
-                          {{ b.pct }}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <div
-                    class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
-                  >
-                    <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
-                      <OIcon name="location-on" size="sm" class="text-primary-700" />
-                      <span class="text-text-heading text-sm font-bold">
-                        {{ t("synthetics.runs.passRateByLocation") }}
-                      </span>
-                    </div>
-                    <div class="border-border-default border-t" />
-                    <div class="px-2 py-2">
-                      <div
-                        v-for="l in locationBreakdown"
-                        :key="l.id ?? l.name"
-                        class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
-                      >
-                        <OIcon :name="l.icon" size="sm" class="text-text-secondary flex-none" />
-                        <span class="text-text-body w-27.5 flex-none text-xs font-semibold">
-                          {{ l.name }}
-                        </span>
-                        <div
-                          class="bg-text-disabled/25! h-1.5 min-w-10 flex-1 overflow-hidden rounded-full"
-                        >
-                          <div
-                            class="h-full rounded-full"
-                            :style="{ width: l.barPct || l.pct, background: l.barColor }"
-                          />
-                        </div>
-                        <span
-                          class="w-12 text-right font-mono text-xs font-bold tabular-nums"
-                          :style="{ color: l.textColor }"
-                        >
-                          {{ l.pct }}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <div
-                    v-if="!isBrowser"
-                    class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
-                  >
-                    <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
-                      <OIcon name="devices" size="sm" class="text-primary-700" />
-                      <span class="text-text-heading text-sm font-bold">
-                        {{ t("synthetics.runs.passRateByDevice") }}
-                      </span>
-                    </div>
-                    <div class="border-border-default border-t" />
-                    <div class="px-2 py-2">
-                      <div
-                        v-for="d in deviceBreakdown"
-                        :key="d.name"
-                        class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
-                      >
-                        <OIcon :name="d.icon" size="sm" class="text-text-secondary flex-none" />
-                        <span class="text-text-body w-20 flex-none text-xs font-semibold">
-                          {{ d.name }}
-                        </span>
-                        <div
-                          class="bg-text-disabled/25! h-1.5 min-w-10 flex-1 overflow-hidden rounded-full"
-                        >
-                          <div
-                            class="h-full rounded-full"
-                            :style="{ width: d.pct, background: d.barColor }"
-                          />
-                        </div>
-                        <span
-                          class="w-12 text-right font-mono text-xs font-bold tabular-nums"
-                          :style="{ color: d.textColor }"
-                        >
-                          {{ d.pct }}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+              </template>
+              <template v-else>
+                <div class="px-page-edge">
+                  <MonitorStatusTimeline
+                    :segments="timelineSegments"
+                    :is-browser="isBrowser"
+                    :fail-count="timelineFailCount"
+                    :pass-count="timelinePassCount"
+                    :mixed-count="timelineMixedCount"
+                    :start-label="timelineStartLabel"
+                    :end-label="timelineEndLabel"
+                  />
                 </div>
-              </div>
-            </template>
-
-            <!-- Filter bar -->
-            <div class="flex flex-wrap items-center gap-2 px-2">
-              <OToggleGroup v-model="statusFilter" variant="default">
-                <OToggleGroupItem
-                  v-for="so in statusOptions"
-                  :key="so.key"
-                  :value="so.key"
-                  size="sm"
-                >
-                  <template #icon-left>
-                    <span
-                      class="h-[0.4375rem] w-[0.4375rem] rounded-full"
-                      :style="{ background: so.dot }"
-                    />
-                  </template>
-                  {{ so.label }}
-                </OToggleGroupItem>
-              </OToggleGroup>
-
-              <OSelect
-                v-if="isBrowser"
-                v-model="browserFilter"
-                :options="browserOptions"
-                icon-key="icon"
-                size="md"
-                class="w-35!"
-                data-test="monitor-runs-filter-browser"
-              />
-              <OSelect
-                v-if="isBrowser"
-                v-model="deviceFilter"
-                :options="deviceOptions"
-                icon-key="icon"
-                size="md"
-                class="w-35!"
-                data-test="monitor-runs-filter-device"
-              />
-              <OSelect
-                v-model="locationFilter"
-                :options="locationOptions"
-                icon-key="icon"
-                size="md"
-                class="w-35!"
-                data-test="monitor-runs-filter-location"
-              />
-
-              <!-- Failure-specific filters -->
-              <template v-if="statusFilter === 'fail' && false">
-                <OSeparator orientation="vertical" class="h-5" />
-                <OSelect
-                  v-model="failedStepFilter"
-                  :options="failedStepOptions"
-                  size="sm"
-                  class="w-40"
-                  data-test="monitor-runs-filter-step"
-                />
-                <OInput
-                  v-model="locatorFilter"
-                  size="sm"
-                  :placeholder="t('synthetics.runs.locatorPlaceholder')"
-                  class="w-42.5"
-                  data-test="monitor-runs-filter-locator"
-                />
-                <OSelect
-                  v-model="actionFilter"
-                  :options="actionOptions"
-                  size="sm"
-                  class="w-32.5"
-                  data-test="monitor-runs-filter-action"
-                />
               </template>
 
-              <span class="flex-1" />
-              <span class="text-text-secondary text-xs">
-                {{
-                  t("synthetics.runs.filterCount", {
-                    current: filteredRuns.length,
-                    total: allRuns.length,
-                  })
-                }}
-              </span>
-            </div>
+              <!-- KPI Cards — gated on KPI + last-run queries -->
+              <template v-if="kpiLoading || !kpiHasLoadedOnce">
+                <div class="px-page-edge">
+                  <div class="grid grid-cols-6 gap-2.5">
+                    <div
+                      v-for="n in 6"
+                      :key="n"
+                      class="card-container rounded-default bg-surface-base border-border-default flex flex-col gap-2 border px-3.5 pt-2.5 pb-2.5"
+                    >
+                      <SkeletonBox width="60%" height="11px" rounded-default />
+                      <SkeletonBox width="55%" height="22px" rounded-default />
+                    </div>
+                  </div>
+                </div>
+              </template>
+              <template v-else>
+                <div class="px-page-edge">
+                  <div class="grid grid-cols-6 gap-2.5">
+                    <div
+                      v-for="card in kpiCards"
+                      :key="card.key"
+                      class="card-container rounded-default bg-surface-base border-border-default flex flex-col gap-1 border px-2 pt-2.5 pb-2.5 transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
+                      :data-test="`monitor-runs-kpi-${card.key}`"
+                    >
+                      <div class="flex flex-col gap-1">
+                        <div class="kpi-label text-2xs text-text-muted font-semibold">
+                          {{ card.label }}
+                          <span v-if="card.unit"> ({{ card.unit }}) </span>
+                        </div>
+                        <div class="flex items-baseline gap-[0.2rem]">
+                          <!-- Per-card error indicator -->
+                          <template v-if="kpiError">
+                            <span class="text-status-error-text flex items-center gap-1 text-xs">
+                              <OIcon name="error" size="xs" class="shrink-0" />
+                              {{ kpiError }}
+                            </span>
+                          </template>
+                          <template v-else>
+                            <span
+                              class="text-xl leading-none font-bold text-[var(--color-text-heading)]"
+                              :class="card.valueClass"
+                            >
+                              {{ card.value }}
+                            </span>
+                          </template>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </template>
 
-            <!-- Error filter indicator -->
-            <div
-              v-if="errorFilter"
-              class="flex items-center gap-2 px-2"
-              data-test="monitor-runs-error-filter-badge"
-            >
-              <span class="text-text-secondary text-xs">{{
-                t("synthetics.runs.filteringByErrorLabel")
-              }}</span>
-              <OBadge variant="error" size="sm" class="gap-1">
-                {{ errorFilter }}
-                <OButton
-                  variant="ghost"
-                  size="icon-xs"
-                  class="text-inherit"
-                  data-test="synthetics-monitor-runs-clear-error-filter-btn"
-                  @click.stop="clearErrorFilter"
-                >
-                  <OIcon name="close" size="xs" />
-                </OButton>
-              </OBadge>
-            </div>
+              <!-- Charts — gated on histogram query -->
+              <template v-if="histogramLoading || !histogramHasLoadedOnce">
+                <div class="px-page-edge">
+                  <div class="grid grid-cols-2 gap-2">
+                    <div
+                      class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
+                    >
+                      <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
+                        <SkeletonBox width="110px" height="14px" rounded-default />
+                        <span class="flex-1" />
+                        <SkeletonBox width="80px" height="20px" rounded-default />
+                      </div>
+                      <div class="border-border-default border-t" />
+                      <div class="p-4">
+                        <SkeletonBox width="100%" height="160px" rounded-default />
+                      </div>
+                    </div>
+                    <div
+                      class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
+                    >
+                      <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
+                        <SkeletonBox width="120px" height="14px" rounded-default />
+                        <span class="flex-1" />
+                        <SkeletonBox width="90px" height="20px" rounded-default />
+                      </div>
+                      <div class="border-border-default border-t" />
+                      <div class="p-4">
+                        <SkeletonBox width="100%" height="160px" rounded-default />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </template>
+              <template v-else>
+                <div class="px-page-edge">
+                  <div class="grid grid-cols-2 gap-2">
+                    <div
+                      class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
+                    >
+                      <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
+                        <span class="text-text-heading text-sm font-bold">
+                          {{ t("synthetics.results.responseTime") }}
+                        </span>
+                        <span class="flex-1" />
+                        <OBadge v-if="!histogramError" variant="default" size="sm">
+                          p95 {{ p95Label }}
+                        </OBadge>
+                        <span
+                          v-else
+                          class="text-status-error-text inline-flex items-center gap-1 text-xs"
+                        >
+                          <OIcon name="error_outline" size="xs" />
+                          {{ t("synthetics.results.error") }}
+                        </span>
+                      </div>
+                      <div class="border-border-default border-t" />
+                      <div class="min-h-45 p-0">
+                        <ChartRenderer
+                          v-if="!histogramError"
+                          :data="{ options: responseChartOption }"
+                          height="180px"
+                        />
+                        <div
+                          v-else
+                          class="text-text-secondary flex h-45 flex-col items-center justify-center gap-1 text-sm"
+                        >
+                          <OIcon name="error_outline" size="sm" class="text-status-error-text" />
+                          <span>{{ histogramError }}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div
+                      class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
+                    >
+                      <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
+                        <span class="text-text-heading text-sm font-bold">
+                          {{ t("synthetics.runs.errorsOverTime") }}
+                        </span>
+                        <span class="flex-1" />
+                        <OBadge v-if="!histogramError" variant="error" size="sm">
+                          {{ t("synthetics.runs.failedCount", { count: failCount }) }}
+                        </OBadge>
+                        <span
+                          v-else
+                          class="text-status-error-text inline-flex items-center gap-1 text-xs"
+                        >
+                          <OIcon name="error_outline" size="xs" />
+                          {{ t("synthetics.results.error") }}
+                        </span>
+                      </div>
+                      <div class="border-border-default border-t" />
+                      <div class="min-h-45 p-0">
+                        <ChartRenderer
+                          v-if="!histogramError"
+                          :data="{ options: errorChartOption }"
+                          height="180px"
+                        />
+                        <div
+                          v-else
+                          class="text-text-secondary flex h-45 flex-col items-center justify-center gap-1 text-sm"
+                        >
+                          <OIcon name="error_outline" size="sm" class="text-status-error-text" />
+                          <span>{{ histogramError }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </template>
 
-            <!-- Runs table -->
-            <OCard class="p-0" :key="tableFilterKey">
-              <OTable
-                :columns="runColumns"
-                :data="visibleRuns"
-                :loading="runsLoading"
-                pagination="client"
-                :page-size="10"
-                :page-size-options="[10, 20, 25, 50]"
-                row-key="id"
-                :show-global-filter="false"
-                :enable-column-resize="true"
-                :enable-column-reorder="true"
-                data-test="monitor-runs-runs-table"
-                @row-click="openRun"
-              >
-                <template #cell-status="{ row }">
-                  <OBadge :variant="(row as VisibleRun).statusBadgeVariant" size="sm" dot>
-                    {{ (row as VisibleRun).statusLabel }}
-                  </OBadge>
-                </template>
-                <template #cell-scheduled_at="{ row }">
-                  <OTimeCell
-                    :value="(row as VisibleRun).scheduledTs"
-                    unit="ms"
-                    mode="absolute"
-                    empty-label="—"
-                  />
-                </template>
-                <template #cell-last_run_at="{ row }">
-                  <OTimeCell
-                    :value="(row as VisibleRun).lastRunTs"
-                    unit="ms"
-                    mode="absolute"
-                    empty-label="—"
-                  />
-                </template>
-                <template #cell-duration="{ row }">
-                  <span class="text-sm tabular-nums">
-                    {{ (row as VisibleRun).duration }}
-                  </span>
-                </template>
-                <template #cell-location="{ row }">
-                  <span class="text-text-body inline-flex items-center gap-1 text-sm">
-                    <OIcon :name="locationIcon((row as VisibleRun).location)" size="sm" />
-                    {{ locationLabel((row as VisibleRun).location) }}
-                  </span>
-                </template>
-                <template #cell-browser="{ row }">
-                  <span class="text-text-body inline-flex items-center gap-1 text-sm">
-                    <OIcon :name="browserIcon((row as VisibleRun).browser)" size="sm" />
-                    {{ (row as VisibleRun).browser }}
-                  </span>
-                </template>
-                <template #cell-device="{ row }">
-                  <span class="text-text-body inline-flex items-center gap-1 text-sm">
-                    <OIcon :name="deviceIconName((row as VisibleRun).device)" size="sm" />
-                    {{ deviceLabel((row as VisibleRun).device) }}
-                  </span>
-                </template>
-                <template #cell-error="{ row }">
-                  <span
-                    v-if="(row as VisibleRun).errorSnippet"
-                    class="cursor-pointer"
-                    @click.stop="filterByError((row as VisibleRun).errorPattern)"
+              <!-- Breakdown Cards — gated on runs query -->
+              <template v-if="runsLoading || !runsHasLoadedOnce">
+                <div class="px-page-edge">
+                  <div :class="['grid gap-2', isBrowser ? 'grid-cols-3' : 'grid-cols-2']">
+                    <div
+                      v-for="n in isBrowser ? 3 : 2"
+                      :key="n"
+                      class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
+                    >
+                      <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
+                        <SkeletonBox width="16px" height="16px" :custom-radius="'4px'" />
+                        <SkeletonBox width="110px" height="14px" rounded-default />
+                      </div>
+                      <div class="border-border-default border-t" />
+                      <div class="flex flex-col px-2 py-2">
+                        <div
+                          v-for="row in 3"
+                          :key="row"
+                          class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
+                        >
+                          <SkeletonBox width="16px" height="16px" :custom-radius="'4px'" />
+                          <SkeletonBox width="70px" height="12px" rounded-default />
+                          <div class="bg-border-default h-1.5 flex-1 rounded-full opacity-30" />
+                          <SkeletonBox width="36px" height="12px" rounded-default />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </template>
+              <!-- Breakdown Cards — runs query error state -->
+              <template v-else-if="runsError">
+                <div class="px-page-edge">
+                  <div :class="['grid gap-2', isBrowser ? 'grid-cols-3' : 'grid-cols-2']">
+                    <div
+                      v-for="dim in breakdownDimensions"
+                      :key="dim"
+                      class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
+                    >
+                      <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
+                        <span class="text-text-heading text-sm font-bold">
+                          {{
+                            dim === "Browser"
+                              ? t("synthetics.runs.passRateByBrowser")
+                              : dim === "DurationByLocation"
+                                ? t("synthetics.runs.durationByLocation")
+                                : dim === "Location"
+                                  ? t("synthetics.runs.passRateByLocation")
+                                  : t("synthetics.runs.passRateByDevice")
+                          }}
+                        </span>
+                      </div>
+                      <div class="border-border-default border-t" />
+                      <div
+                        class="text-status-error-text flex items-center justify-center py-8 text-xs"
+                      >
+                        <span class="flex items-center gap-1">
+                          <OIcon name="error" size="xs" />
+                          {{ runsError }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </template>
+              <template v-else>
+                <div class="px-page-edge">
+                  <div :class="['grid gap-2', isBrowser ? 'grid-cols-3' : 'grid-cols-2']">
+                    <div
+                      v-if="isBrowser"
+                      class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
+                    >
+                      <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
+                        <OIcon name="language" size="sm" class="text-accent" />
+                        <span class="text-text-heading text-sm font-bold">
+                          {{ t("synthetics.runs.passRateByBrowser") }}
+                        </span>
+                      </div>
+                      <div class="border-border-default border-t" />
+                      <div class="px-2 py-2">
+                        <div
+                          v-for="b in browserBreakdown"
+                          :key="b.name"
+                          class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
+                        >
+                          <OIcon :name="b.icon" size="sm" class="text-text-secondary flex-none" />
+                          <span class="text-text-body w-20 flex-none text-xs font-semibold">
+                            {{ b.name }}
+                          </span>
+                          <div
+                            class="bg-text-disabled/25! h-1.5 min-w-10 flex-1 overflow-hidden rounded-full"
+                          >
+                            <!-- :style for dynamic bar width + computed color — inline required for per-breakdown values -->
+                            <div
+                              class="h-full rounded-full"
+                              :style="{ width: b.barPct || b.pct, background: b.barColor }"
+                            />
+                          </div>
+                          <span
+                            class="w-12 text-right font-mono text-xs font-bold tabular-nums"
+                            :style="{ color: b.textColor }"
+                          >
+                            {{ b.pct }}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div
+                      class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
+                    >
+                      <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
+                        <OIcon name="location-on" size="sm" class="text-accent" />
+                        <span class="text-text-heading text-sm font-bold">
+                          {{ t("synthetics.runs.passRateByLocation") }}
+                        </span>
+                      </div>
+                      <div class="border-border-default border-t" />
+                      <div class="px-2 py-2">
+                        <div
+                          v-for="l in locationBreakdown"
+                          :key="l.id ?? l.name"
+                          class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
+                        >
+                          <OIcon :name="l.icon" size="sm" class="text-text-secondary flex-none" />
+                          <span class="text-text-body w-27.5 flex-none text-xs font-semibold">
+                            {{ l.name }}
+                          </span>
+                          <div
+                            class="bg-text-disabled/25! h-1.5 min-w-10 flex-1 overflow-hidden rounded-full"
+                          >
+                            <div
+                              class="h-full rounded-full"
+                              :style="{ width: l.barPct || l.pct, background: l.barColor }"
+                            />
+                          </div>
+                          <span
+                            class="w-12 text-right font-mono text-xs font-bold tabular-nums"
+                            :style="{ color: l.textColor }"
+                          >
+                            {{ l.pct }}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div
+                      v-if="!isBrowser"
+                      class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
+                    >
+                      <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
+                        <OIcon name="devices" size="sm" class="text-accent" />
+                        <span class="text-text-heading text-sm font-bold">
+                          {{ t("synthetics.runs.passRateByDevice") }}
+                        </span>
+                      </div>
+                      <div class="border-border-default border-t" />
+                      <div class="px-2 py-2">
+                        <div
+                          v-for="d in deviceBreakdown"
+                          :key="d.name"
+                          class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
+                        >
+                          <OIcon :name="d.icon" size="sm" class="text-text-secondary flex-none" />
+                          <span class="text-text-body w-20 flex-none text-xs font-semibold">
+                            {{ d.name }}
+                          </span>
+                          <div
+                            class="bg-text-disabled/25! h-1.5 min-w-10 flex-1 overflow-hidden rounded-full"
+                          >
+                            <div
+                              class="h-full rounded-full"
+                              :style="{ width: d.pct, background: d.barColor }"
+                            />
+                          </div>
+                          <span
+                            class="w-12 text-right font-mono text-xs font-bold tabular-nums"
+                            :style="{ color: d.textColor }"
+                          >
+                            {{ d.pct }}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </template>
+
+              <!-- Filter bar -->
+              <div class="flex flex-wrap items-center gap-2 px-2">
+                <OToggleGroup v-model="statusFilter" variant="default">
+                  <OToggleGroupItem
+                    v-for="so in statusOptions"
+                    :key="so.key"
+                    :value="so.key"
+                    size="sm"
                   >
-                    <OBadge variant="error-outline" size="sm" class="max-w-50 truncate">
-                      {{ (row as VisibleRun).errorSnippet }}
-                    </OBadge>
-                  </span>
-                </template>
-                <template #cell-trigger_type="{ row }">
-                  <span class="text-text-body text-sm">
-                    {{ (row as VisibleRun).triggerType }}
-                  </span>
+                    <template #icon-left>
+                      <span
+                        class="h-[0.4375rem] w-[0.4375rem] rounded-full"
+                        :style="{ background: so.dot }"
+                      />
+                    </template>
+                    {{ so.label }}
+                  </OToggleGroupItem>
+                </OToggleGroup>
+
+                <OSelect
+                  v-if="isBrowser"
+                  v-model="browserFilter"
+                  :options="browserOptions"
+                  icon-key="icon"
+                  size="md"
+                  class="w-35!"
+                  data-test="monitor-runs-filter-browser"
+                />
+                <OSelect
+                  v-if="isBrowser"
+                  v-model="deviceFilter"
+                  :options="deviceOptions"
+                  icon-key="icon"
+                  size="md"
+                  class="w-35!"
+                  data-test="monitor-runs-filter-device"
+                />
+                <OSelect
+                  v-model="locationFilter"
+                  :options="locationOptions"
+                  icon-key="icon"
+                  size="md"
+                  class="w-35!"
+                  data-test="monitor-runs-filter-location"
+                />
+
+                <!-- Failure-specific filters -->
+                <template v-if="statusFilter === 'fail' && false">
+                  <OSeparator orientation="vertical" class="h-5" />
+                  <OSelect
+                    v-model="failedStepFilter"
+                    :options="failedStepOptions"
+                    size="sm"
+                    class="w-40"
+                    data-test="monitor-runs-filter-step"
+                  />
+                  <OInput
+                    v-model="locatorFilter"
+                    size="sm"
+                    :placeholder="t('synthetics.runs.locatorPlaceholder')"
+                    class="w-42.5"
+                    data-test="monitor-runs-filter-locator"
+                  />
+                  <OSelect
+                    v-model="actionFilter"
+                    :options="actionOptions"
+                    size="sm"
+                    class="w-32.5"
+                    data-test="monitor-runs-filter-action"
+                  />
                 </template>
 
-                <!-- Empty state: smart — differentiates "never run" vs "no runs in window" -->
-                <template #empty>
-                  <div v-if="kpiHasLoadedOnce" class="px-page-edge">
-                    <!-- Monitor has runs elsewhere — guide to last run + optionally clear filters -->
-                    <OEmptyState
-                      v-if="synthetics.kpi.value.totalRuns > 0"
-                      size="block"
-                      illustration="no-results"
-                      :title="t('synthetics.results.noRunsInWindow')"
-                      :description="t('synthetics.results.noRunsInWindowDesc')"
-                      data-test="monitor-runs-empty"
-                    >
-                      <template #actions>
-                        <EmptyStateActionCard
-                          icon="schedule"
-                          :label="t('synthetics.results.jumpToLastRun')"
-                          :sublabel="lastRunLabel"
-                          data-test="monitor-runs-empty-jump-last-run"
-                          @click="handleEmptyStateAction('jump-to-last-run')"
-                        />
-                        <EmptyStateActionCard
-                          v-if="hasActiveFilters"
-                          icon="filter-list"
-                          :label="t('synthetics.results.clearFilters')"
-                          :sublabel="t('synthetics.results.clearFiltersDesc')"
-                          data-test="monitor-runs-empty-clear-filters"
-                          @click="handleEmptyStateAction('clear-filters')"
-                        />
-                      </template>
-                    </OEmptyState>
-
-                    <!-- Monitor has never been run — prompt to trigger -->
-                    <OEmptyState
-                      v-else
-                      size="block"
-                      illustration="browser-check"
-                      :title="t('synthetics.results.noRunsYet')"
-                      :description="t('synthetics.results.noRunsYetDesc')"
-                      data-test="monitor-runs-empty"
-                    >
-                      <template #actions>
-                        <EmptyStateActionCard
-                          icon="play-arrow"
-                          :label="t('synthetics.results.triggerRunNow')"
-                          :sublabel="t('synthetics.results.triggerRunNowDesc')"
-                          data-test="monitor-runs-empty-trigger-run"
-                          @click="handleEmptyStateAction('trigger-run')"
-                        />
-                      </template>
-                    </OEmptyState>
-                  </div>
-                </template>
-              </OTable>
-            </OCard>
-          </div>
-        </OTabPanel>
-
-        <!-- ════════════ STEPS ════════════ -->
-        <!-- ════════════ STEPS ════════════ -->
-        <OTabPanel name="steps">
-          <div class="mx-auto flex flex-col gap-2">
-            <!-- Loading skeleton -->
-            <template v-if="stepsLoading || !stepsHasLoadedOnce">
-              <div class="grid grid-cols-2 gap-2">
-                <div
-                  class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
-                >
-                  <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
-                    <SkeletonBox width="100px" height="14px" rounded-default />
-                  </div>
-                  <div class="border-border-default border-t" />
-                  <div class="p-4"><SkeletonBox width="100%" height="160px" rounded-default /></div>
-                </div>
-                <div
-                  class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
-                >
-                  <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
-                    <SkeletonBox width="100px" height="14px" rounded-default />
-                  </div>
-                  <div class="border-border-default border-t" />
-                  <div class="p-4"><SkeletonBox width="100%" height="160px" rounded-default /></div>
-                </div>
+                <span class="flex-1" />
+                <span class="text-text-secondary text-xs">
+                  {{
+                    t("synthetics.runs.filterCount", {
+                      current: filteredRuns.length,
+                      total: allRuns.length,
+                    })
+                  }}
+                </span>
               </div>
-              <div v-for="n in 5" :key="n" class="card-container rounded-default overflow-hidden">
-                <div class="h-10 bg-[var(--color-border-default)] opacity-20" />
-              </div>
-            </template>
 
-            <!-- Steps query error — compact inline indicator -->
-            <template v-else-if="stepsError">
-              <div class="flex items-center gap-2 px-2" data-test="monitor-runs-steps-error">
-                <OIcon name="error_outline" size="xs" class="text-status-error-text shrink-0" />
-                <span class="text-status-error-text min-w-0 flex-1 truncate text-xs">{{
-                  stepsError
+              <!-- Error filter indicator -->
+              <div
+                v-if="errorFilter"
+                class="flex items-center gap-2 px-2"
+                data-test="monitor-runs-error-filter-badge"
+              >
+                <span class="text-text-secondary text-xs">{{
+                  t("synthetics.runs.filteringByErrorLabel")
                 }}</span>
-                <OButton
-                  variant="ghost"
-                  size="xs"
-                  class="text-xs! underline!"
-                  data-test="monitor-runs-steps-retry-btn"
-                  @click="emit('refresh')"
-                >
-                  {{ t("synthetics.journey.retry") }}
-                </OButton>
+                <OBadge variant="error" size="sm" class="gap-1">
+                  {{ errorFilter }}
+                  <OButton
+                    variant="ghost"
+                    size="icon-xs"
+                    class="text-inherit"
+                    data-test="synthetics-monitor-runs-clear-error-filter-btn"
+                    @click.stop="clearErrorFilter"
+                  >
+                    <OIcon name="close" size="xs" />
+                  </OButton>
+                </OBadge>
               </div>
-            </template>
 
-            <!-- Real content -->
-            <template v-else>
-              <!-- Steps Analysis Table -->
-              <OCard class="p-0">
+              <!-- Runs table -->
+              <OCard class="p-0" :key="tableFilterKey">
                 <OTable
-                  :data="stepTableRows"
-                  :columns="stepTableColumns"
+                  :columns="runColumns"
+                  :data="visibleRuns"
+                  :loading="runsLoading"
+                  pagination="client"
+                  :page-size="10"
+                  :page-size-options="[10, 20, 25, 50]"
                   row-key="id"
-                  :pagination="'none'"
-                  :sorting="'client'"
                   :show-global-filter="false"
-                  :show-header="true"
-                  :dense="true"
-                  :bordered="true"
                   :enable-column-resize="true"
                   :enable-column-reorder="true"
-                  :fill-height="false"
+                  data-test="monitor-runs-runs-table"
+                  @row-click="openRun"
                 >
-                  <!-- cell-name: Step name -->
-                  <template #cell-name="{ row }">
-                    <div class="min-w-0">
-                      <div class="truncate text-xs font-semibold text-[var(--color-text-heading)]">
-                        {{ row.name }}
-                      </div>
-                    </div>
+                  <template #cell-status="{ row }">
+                    <OBadge :variant="(row as VisibleRun).statusBadgeVariant" size="sm" dot>
+                      {{ (row as VisibleRun).statusLabel }}
+                    </OBadge>
                   </template>
-
-                  <!-- cell-failRate: Colored percentage + bar -->
-                  <template #cell-failRate="{ row }">
-                    <div class="flex flex-col gap-1">
-                      <span
-                        class="font-mono text-xs font-bold tabular-nums"
-                        :style="{ color: row.failColor }"
-                      >
-                        {{ row.failRatePct }}%&ensp;<span
-                          class="font-normal text-[var(--color-text-muted)]"
-                          >{{ row.failCount }}</span
-                        >
-                      </span>
-                      <div
-                        class="h-1.25 overflow-hidden rounded-full bg-[var(--color-text-disabled)]/25!"
-                      >
-                        <div
-                          class="h-full rounded-full"
-                          :style="{ width: row.failRateBarPct, background: row.failBarColor }"
-                        />
-                      </div>
-                    </div>
+                  <template #cell-scheduled_at="{ row }">
+                    <OTimeCell
+                      :value="(row as VisibleRun).scheduledTs"
+                      unit="ms"
+                      mode="absolute"
+                      empty-label="—"
+                    />
                   </template>
-
-                  <!-- cell-flakyRate: Colored percentage -->
-                  <template #cell-flakyRate="{ row }">
-                    <span class="font-mono text-xs tabular-nums" :style="{ color: row.flakyColor }">
-                      {{ row.flakyRatePct }}%&ensp;<span
-                        class="font-normal text-[var(--color-text-muted)]"
-                        >{{ row.flakyCount }}</span
-                      >
+                  <template #cell-last_run_at="{ row }">
+                    <OTimeCell
+                      :value="(row as VisibleRun).lastRunTs"
+                      unit="ms"
+                      mode="absolute"
+                      empty-label="—"
+                    />
+                  </template>
+                  <template #cell-duration="{ row }">
+                    <span class="text-sm tabular-nums">
+                      {{ (row as VisibleRun).duration }}
+                    </span>
+                  </template>
+                  <template #cell-location="{ row }">
+                    <span class="text-text-body inline-flex items-center gap-1 text-sm">
+                      <OIcon :name="locationIcon((row as VisibleRun).location)" size="sm" />
+                      {{ locationLabel((row as VisibleRun).location) }}
+                    </span>
+                  </template>
+                  <template #cell-browser="{ row }">
+                    <span class="text-text-body inline-flex items-center gap-1 text-sm">
+                      <OIcon :name="browserIcon((row as VisibleRun).browser)" size="sm" />
+                      {{ (row as VisibleRun).browser }}
+                    </span>
+                  </template>
+                  <template #cell-device="{ row }">
+                    <span class="text-text-body inline-flex items-center gap-1 text-sm">
+                      <OIcon :name="deviceIconName((row as VisibleRun).device)" size="sm" />
+                      {{ deviceLabel((row as VisibleRun).device) }}
+                    </span>
+                  </template>
+                  <template #cell-error="{ row }">
+                    <span
+                      v-if="(row as VisibleRun).errorSnippet"
+                      class="cursor-pointer"
+                      @click.stop="filterByError((row as VisibleRun).errorPattern)"
+                    >
+                      <OBadge variant="error-outline" size="sm" class="max-w-50 truncate">
+                        {{ (row as VisibleRun).errorSnippet }}
+                      </OBadge>
+                    </span>
+                  </template>
+                  <template #cell-trigger_type="{ row }">
+                    <span class="text-text-body text-sm">
+                      {{ (row as VisibleRun).triggerType }}
                     </span>
                   </template>
 
-                  <!-- cell-avgDuration: Duration + bar -->
-                  <template #cell-avgDuration="{ row }">
-                    <div class="flex flex-col gap-1">
-                      <span class="font-mono text-xs text-[var(--color-text-body)] tabular-nums">{{
-                        row.avgDuration
-                      }}</span>
-                      <div
-                        class="h-1.25 overflow-hidden rounded-full bg-[var(--color-text-disabled)]/25!"
-                      >
-                        <div
-                          class="h-full rounded-full bg-[var(--color-primary-400)]"
-                          :style="{ width: row.durationBarPct }"
-                        />
-                      </div>
-                    </div>
-                  </template>
-
-                  <!-- cell-p95Duration: Duration + bar -->
-                  <template #cell-p95Duration="{ row }">
-                    <div class="flex flex-col gap-1">
-                      <span class="font-mono text-xs text-[var(--color-text-body)] tabular-nums">{{
-                        row.p95Duration
-                      }}</span>
-                      <div
-                        class="h-1.25 overflow-hidden rounded-full bg-[var(--color-text-disabled)]/25!"
-                      >
-                        <div
-                          class="h-full rounded-full bg-[var(--color-primary-400)]"
-                          :style="{ width: row.p95DurationBarPct }"
-                        />
-                      </div>
-                    </div>
-                  </template>
-
-                  <!-- cell-maxDuration: Duration + bar -->
-                  <template #cell-maxDuration="{ row }">
-                    <div class="flex flex-col gap-1">
-                      <span class="font-mono text-xs text-[var(--color-text-body)] tabular-nums">{{
-                        row.maxDuration
-                      }}</span>
-                      <div
-                        class="h-1.25 overflow-hidden rounded-full bg-[var(--color-text-disabled)]/25!"
-                      >
-                        <div
-                          class="h-full rounded-full bg-[var(--color-primary-400)]"
-                          :style="{ width: row.maxDurationBarPct }"
-                        />
-                      </div>
-                    </div>
-                  </template>
-
-                  <!-- Empty -->
+                  <!-- Empty state: smart — differentiates "never run" vs "no runs in window" -->
                   <template #empty>
-                    <div
-                      class="flex items-center justify-center py-12 text-sm text-[var(--color-text-secondary)]"
-                    >
-                      {{ t("synthetics.runs.noStepData") }}
+                    <div v-if="kpiHasLoadedOnce" class="px-page-edge">
+                      <!-- Monitor has runs elsewhere — guide to last run + optionally clear filters -->
+                      <OEmptyState
+                        v-if="synthetics.kpi.value.totalRuns > 0"
+                        size="block"
+                        illustration="no-results"
+                        :title="t('synthetics.results.noRunsInWindow')"
+                        :description="t('synthetics.results.noRunsInWindowDesc')"
+                        data-test="monitor-runs-empty"
+                      >
+                        <template #actions>
+                          <EmptyStateActionCard
+                            icon="schedule"
+                            :label="t('synthetics.results.jumpToLastRun')"
+                            :sublabel="lastRunLabel"
+                            data-test="monitor-runs-empty-jump-last-run"
+                            @click="handleEmptyStateAction('jump-to-last-run')"
+                          />
+                          <EmptyStateActionCard
+                            v-if="hasActiveFilters"
+                            icon="filter-list"
+                            :label="t('synthetics.results.clearFilters')"
+                            :sublabel="t('synthetics.results.clearFiltersDesc')"
+                            data-test="monitor-runs-empty-clear-filters"
+                            @click="handleEmptyStateAction('clear-filters')"
+                          />
+                        </template>
+                      </OEmptyState>
+
+                      <!-- Monitor has never been run — prompt to trigger -->
+                      <OEmptyState
+                        v-else
+                        size="block"
+                        illustration="browser-check"
+                        :title="t('synthetics.results.noRunsYet')"
+                        :description="t('synthetics.results.noRunsYetDesc')"
+                        data-test="monitor-runs-empty"
+                      >
+                        <template #actions>
+                          <EmptyStateActionCard
+                            icon="play-arrow"
+                            :label="t('synthetics.results.triggerRunNow')"
+                            :sublabel="t('synthetics.results.triggerRunNowDesc')"
+                            data-test="monitor-runs-empty-trigger-run"
+                            @click="handleEmptyStateAction('trigger-run')"
+                          />
+                        </template>
+                      </OEmptyState>
                     </div>
                   </template>
                 </OTable>
               </OCard>
-            </template>
-          </div>
-        </OTabPanel>
-
-        <!-- ════════════ ERRORS ════════════ -->
-        <OTabPanel name="errors">
-          <div class="mx-auto flex flex-col gap-2 px-2 py-2 pb-7">
-            <div class="flex items-center gap-2.5">
-              <span class="text-text-heading text-sm font-bold">
-                {{ t("synthetics.runs.errorPatterns") }}
-              </span>
-              <span class="text-text-secondary text-xs">
-                {{ t("synthetics.runs.errorPatternsWindowDesc", { window: windowLabel }) }}
-              </span>
             </div>
+          </OTabPanel>
 
-            <OCard class="p-0">
-              <div
-                class="bg-surface-subtle border-border-default text-2xs text-text-secondary grid grid-cols-[1fr_100px_160px_32px] gap-2.5 border-b px-4 py-2 font-semibold tracking-wide uppercase"
-              >
-                <span>{{ t("synthetics.runs.errorPattern") }}</span>
-                <span>{{ t("synthetics.runs.count") }}</span>
-                <span>{{ t("synthetics.runs.lastSeen") }}</span>
-                <span />
-              </div>
-              <div
-                v-for="e in errorGroups"
-                :key="e.pattern"
-                class="border-border-default hover:bg-surface-subtle grid cursor-pointer grid-cols-[1fr_100px_160px_32px] items-center gap-2.5 border-b px-4 py-2.75"
-                data-test="monitor-runs-error-row"
-                @click="filterByErrorPattern(e.pattern)"
-              >
-                <span class="text-text-body truncate font-mono text-xs tabular-nums">
-                  {{ e.pattern }}
-                </span>
-                <span class="text-status-error-text text-sm font-bold">
-                  {{ e.count }}
+          <!-- ════════════ STEPS ════════════ -->
+          <!-- ════════════ STEPS ════════════ -->
+          <OTabPanel name="steps">
+            <div class="mx-auto flex flex-col gap-2">
+              <!-- Loading skeleton -->
+              <template v-if="stepsLoading || !stepsHasLoadedOnce">
+                <div class="grid grid-cols-2 gap-2">
+                  <div
+                    class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
+                  >
+                    <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
+                      <SkeletonBox width="100px" height="14px" rounded-default />
+                    </div>
+                    <div class="border-border-default border-t" />
+                    <div class="p-4">
+                      <SkeletonBox width="100%" height="160px" rounded-default />
+                    </div>
+                  </div>
+                  <div
+                    class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
+                  >
+                    <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
+                      <SkeletonBox width="100px" height="14px" rounded-default />
+                    </div>
+                    <div class="border-border-default border-t" />
+                    <div class="p-4">
+                      <SkeletonBox width="100%" height="160px" rounded-default />
+                    </div>
+                  </div>
+                </div>
+                <div v-for="n in 5" :key="n" class="card-container rounded-default overflow-hidden">
+                  <div class="h-10 bg-[var(--color-border-default)] opacity-20" />
+                </div>
+              </template>
+
+              <!-- Steps query error — compact inline indicator -->
+              <template v-else-if="stepsError">
+                <div class="flex items-center gap-2 px-2" data-test="monitor-runs-steps-error">
+                  <OIcon name="error_outline" size="xs" class="text-status-error-text shrink-0" />
+                  <span class="text-status-error-text min-w-0 flex-1 truncate text-xs">{{
+                    stepsError
+                  }}</span>
+                  <OButton
+                    variant="ghost"
+                    size="xs"
+                    class="text-xs! underline!"
+                    data-test="monitor-runs-steps-retry-btn"
+                    @click="emit('refresh')"
+                  >
+                    {{ t("synthetics.journey.retry") }}
+                  </OButton>
+                </div>
+              </template>
+
+              <!-- Real content -->
+              <template v-else>
+                <!-- Steps Analysis Table -->
+                <OCard class="p-0">
+                  <OTable
+                    :data="stepTableRows"
+                    :columns="stepTableColumns"
+                    row-key="id"
+                    :pagination="'none'"
+                    :sorting="'client'"
+                    :show-global-filter="false"
+                    :show-header="true"
+                    :dense="true"
+                    :bordered="true"
+                    :enable-column-resize="true"
+                    :enable-column-reorder="true"
+                    :fill-height="false"
+                  >
+                    <!-- cell-name: Step name -->
+                    <template #cell-name="{ row }">
+                      <div class="min-w-0">
+                        <div
+                          class="truncate text-xs font-semibold text-[var(--color-text-heading)]"
+                        >
+                          {{ row.name }}
+                        </div>
+                      </div>
+                    </template>
+
+                    <!-- cell-failRate: Colored percentage + bar -->
+                    <template #cell-failRate="{ row }">
+                      <div class="flex flex-col gap-1">
+                        <span
+                          class="font-mono text-xs font-bold tabular-nums"
+                          :style="{ color: row.failColor }"
+                        >
+                          {{ row.failRatePct }}%&ensp;<span
+                            class="font-normal text-[var(--color-text-muted)]"
+                            >{{ row.failCount }}</span
+                          >
+                        </span>
+                        <div
+                          class="h-1.25 overflow-hidden rounded-full bg-[var(--color-text-disabled)]/25!"
+                        >
+                          <div
+                            class="h-full rounded-full"
+                            :style="{ width: row.failRateBarPct, background: row.failBarColor }"
+                          />
+                        </div>
+                      </div>
+                    </template>
+
+                    <!-- cell-flakyRate: Colored percentage -->
+                    <template #cell-flakyRate="{ row }">
+                      <span
+                        class="font-mono text-xs tabular-nums"
+                        :style="{ color: row.flakyColor }"
+                      >
+                        {{ row.flakyRatePct }}%&ensp;<span
+                          class="font-normal text-[var(--color-text-muted)]"
+                          >{{ row.flakyCount }}</span
+                        >
+                      </span>
+                    </template>
+
+                    <!-- cell-avgDuration: Duration + bar -->
+                    <template #cell-avgDuration="{ row }">
+                      <div class="flex flex-col gap-1">
+                        <span
+                          class="font-mono text-xs text-[var(--color-text-body)] tabular-nums"
+                          >{{ row.avgDuration }}</span
+                        >
+                        <div
+                          class="h-1.25 overflow-hidden rounded-full bg-[var(--color-text-disabled)]/25!"
+                        >
+                          <div
+                            class="h-full rounded-full bg-[var(--color-primary-400)]"
+                            :style="{ width: row.durationBarPct }"
+                          />
+                        </div>
+                      </div>
+                    </template>
+
+                    <!-- cell-p95Duration: Duration + bar -->
+                    <template #cell-p95Duration="{ row }">
+                      <div class="flex flex-col gap-1">
+                        <span
+                          class="font-mono text-xs text-[var(--color-text-body)] tabular-nums"
+                          >{{ row.p95Duration }}</span
+                        >
+                        <div
+                          class="h-1.25 overflow-hidden rounded-full bg-[var(--color-text-disabled)]/25!"
+                        >
+                          <div
+                            class="h-full rounded-full bg-[var(--color-primary-400)]"
+                            :style="{ width: row.p95DurationBarPct }"
+                          />
+                        </div>
+                      </div>
+                    </template>
+
+                    <!-- cell-maxDuration: Duration + bar -->
+                    <template #cell-maxDuration="{ row }">
+                      <div class="flex flex-col gap-1">
+                        <span
+                          class="font-mono text-xs text-[var(--color-text-body)] tabular-nums"
+                          >{{ row.maxDuration }}</span
+                        >
+                        <div
+                          class="h-1.25 overflow-hidden rounded-full bg-[var(--color-text-disabled)]/25!"
+                        >
+                          <div
+                            class="h-full rounded-full bg-[var(--color-primary-400)]"
+                            :style="{ width: row.maxDurationBarPct }"
+                          />
+                        </div>
+                      </div>
+                    </template>
+
+                    <!-- Empty -->
+                    <template #empty>
+                      <div
+                        class="flex items-center justify-center py-12 text-sm text-[var(--color-text-secondary)]"
+                      >
+                        {{ t("synthetics.runs.noStepData") }}
+                      </div>
+                    </template>
+                  </OTable>
+                </OCard>
+              </template>
+            </div>
+          </OTabPanel>
+
+          <!-- ════════════ ERRORS ════════════ -->
+          <OTabPanel name="errors">
+            <div class="mx-auto flex flex-col gap-2 px-2 py-2 pb-7">
+              <div class="flex items-center gap-2.5">
+                <span class="text-text-heading text-sm font-bold">
+                  {{ t("synthetics.runs.errorPatterns") }}
                 </span>
                 <span class="text-text-secondary text-xs">
-                  {{ e.lastSeen }}
+                  {{ t("synthetics.runs.errorPatternsWindowDesc", { window: windowLabel }) }}
                 </span>
-                <OIcon name="filter_alt" size="sm" class="text-text-secondary" />
               </div>
-            </OCard>
-          </div>
-        </OTabPanel>
-      </OTabPanels>
-    </div>
+
+              <OCard class="p-0">
+                <div
+                  class="bg-surface-subtle border-border-default text-2xs text-text-secondary grid grid-cols-[1fr_100px_160px_32px] gap-2.5 border-b px-4 py-2 font-semibold tracking-wide uppercase"
+                >
+                  <span>{{ t("synthetics.runs.errorPattern") }}</span>
+                  <span>{{ t("synthetics.runs.count") }}</span>
+                  <span>{{ t("synthetics.runs.lastSeen") }}</span>
+                  <span />
+                </div>
+                <div
+                  v-for="e in errorGroups"
+                  :key="e.pattern"
+                  class="border-border-default hover:bg-surface-subtle grid cursor-pointer grid-cols-[1fr_100px_160px_32px] items-center gap-2.5 border-b px-4 py-2.75"
+                  data-test="monitor-runs-error-row"
+                  @click="filterByErrorPattern(e.pattern)"
+                >
+                  <span class="text-text-body truncate font-mono text-xs tabular-nums">
+                    {{ e.pattern }}
+                  </span>
+                  <span class="text-status-error-text text-sm font-bold">
+                    {{ e.count }}
+                  </span>
+                  <span class="text-text-secondary text-xs">
+                    {{ e.lastSeen }}
+                  </span>
+                  <OIcon name="filter_alt" size="sm" class="text-text-secondary" />
+                </div>
+              </OCard>
+            </div>
+          </OTabPanel>
+        </OTabPanels>
+      </div>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
@@ -981,7 +1049,11 @@ const emit = defineEmits<{
 }>();
 
 const store = useStore();
+const route = useRoute();
 const orgIdentifier = computed(() => (store.state as any).selectedOrganization?.identifier ?? "");
+// The check's folder (name), carried on the results-page route as ?folder=.
+// Passed to per-check API calls so RBAC can resolve folder-scoped grants.
+const folderName = computed(() => String(route.query.folder ?? ""));
 
 // id -> "Name (region)" — run records carry the raw location id (KSUID for
 // private, "aws-us-east-1" for public); resolve to a human label wherever
@@ -993,10 +1065,10 @@ function locationLabel(id: string): string {
 onMounted(async () => {
   try {
     const res = await syntheticsService.getLocations(orgIdentifier.value);
-    const locations: { id: string; name: string; region: string }[] =
+    const locations: { id: string; label: string; region: string }[] =
       (res.data as any).locations ?? [];
     locationNames.value = Object.fromEntries(
-      locations.map((loc) => [loc.id, locationDisplayLabel(loc.name, loc.region)]),
+      locations.map((loc) => [loc.id, locationDisplayLabel(loc.label, loc.region)]),
     );
   } catch (err) {
     console.error("[synthetics] failed to load locations", err);
@@ -1008,9 +1080,18 @@ interface Props {
   monitorId: string;
   monitorName: string;
   monitorStatus?: "healthy" | "degraded" | "critical";
+  /** Microsecond timestamp of the check's most recent trigger (0 = never triggered).
+   * Used by the page-level empty state to distinguish "never run" vs "no runs in
+   * this time window" and compute the jump-to-latest-data target. */
+  lastTriggeredAt?: number;
+  /** Check type ("browser" | "http" | etc.) — provided by the parent after it
+   * fetches the check. Controls the tabs grid layout and step analysis visibility. */
+  checkType?: string;
 }
 const props = withDefaults(defineProps<Props>(), {
   monitorStatus: "healthy",
+  lastTriggeredAt: 0,
+  checkType: "browser",
 });
 
 // ── Synthetic results composable ──────────────────────────────────────────
@@ -1058,21 +1139,8 @@ function locationIcon(region: string): string {
 // ── State ────────────────────────────────────────────────────────────────
 const activeTab = ref("overview");
 
-// ── Monitor type resolution ──────────────────────────────────────────────
-const isBrowser = ref(true);
-let monitorTypeResolved = false;
-
-async function resolveMonitorType() {
-  try {
-    const res = await syntheticsService.get(orgIdentifier.value, props.monitorId);
-    const type = (res.data as any)?.type ?? "browser";
-    isBrowser.value = type === "browser";
-    monitorTypeResolved = true;
-  } catch {
-    // Default to browser on fetch failure — safe fallback
-    monitorTypeResolved = true;
-  }
-}
+// ── Monitor type — derived from the prop set by parent's fetchCheck() call ──
+const isBrowser = computed(() => props.checkType === "browser");
 
 // ── Seeded random (for fallback mock data in charts/timeline) ────────────
 function seedRand(seed: number) {
@@ -1121,6 +1189,15 @@ const hasActiveFilters = computed(
     errorFilter.value !== null,
 );
 
+// Sublabel for the "Jump to latest data" action card in the page-level
+// empty state — formats the last_triggered_at timestamp for display.
+// lastTriggeredAt is in microseconds; convert to ms for Date().
+const lastTriggeredAtSublabel = computed(() => {
+  const ts = props.lastTriggeredAt;
+  if (!ts || ts <= 0) return "";
+  return new Date(ts / 1000).toLocaleString();
+});
+
 const lastRunLabel = computed(() => {
   const ts = synthetics.kpi.value.lastRunAt;
   if (!ts) return "";
@@ -1128,6 +1205,17 @@ const lastRunLabel = computed(() => {
 });
 
 const runTriggerLoading = ref(false);
+
+// Page-level "Jump to latest data" — builds a 1-hour window (±30 min)
+// centered on lastTriggeredAt (microseconds) and emits it to the parent.
+function handleJumpToLatestData() {
+  const ts = props.lastTriggeredAt;
+  if (!ts || ts <= 0) return;
+  const HALF_HOUR_US = 30 * 60 * 1000 * 1000;
+  const startTime = ts - HALF_HOUR_US;
+  const endTime = ts + HALF_HOUR_US;
+  emit("jump-to-window", startTime, endTime);
+}
 
 async function handleEmptyStateAction(id: string) {
   if (id === "jump-to-last-run") {
@@ -1154,7 +1242,7 @@ async function handleEmptyStateAction(id: string) {
       timeout: 0,
     });
     try {
-      await syntheticsService.run(orgIdentifier.value, props.monitorId, {});
+      await syntheticsService.run(orgIdentifier.value, props.monitorId, {}, folderName.value);
       dismiss();
       toast({
         variant: "success",
@@ -2287,9 +2375,6 @@ function openRun(row: { id: number }) {
 async function refresh(startTime?: number, endTime?: number) {
   if (!startTime || !endTime) return;
   timeRangeMicros.value = { startTime, endTime };
-  if (!monitorTypeResolved) {
-    resolveMonitorType();
-  }
   await synthetics.fetchAll(props.monitorId, startTime, endTime);
 }
 

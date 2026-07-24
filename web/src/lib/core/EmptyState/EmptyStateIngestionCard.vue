@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <button
     type="button"
-    class="es-ing-card group rounded-default border-border-default bg-surface-base hover:border-primary-400 hover:bg-tabs-hover-bg focus-visible:ring-primary-500/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 pr-3.5 pl-3 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2"
+    class="es-ing-card group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 pr-3.5 pl-3 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2"
     @click="emit('click')"
   >
     <span
@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OIcon
       name="chevron-right"
       size="sm"
-      class="es-ing-card__chevron text-text-disabled group-hover:text-primary-600 shrink-0 transition-[transform,color] duration-150 group-hover:translate-x-0.5"
+      class="es-ing-card__chevron text-text-disabled group-hover:text-accent shrink-0 transition-[transform,color] duration-150 group-hover:translate-x-0.5"
     />
   </button>
 </template>

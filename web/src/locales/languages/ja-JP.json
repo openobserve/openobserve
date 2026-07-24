@@ -2222,6 +2222,7 @@
       "linkPartial": "リンク成功: {ok} 件、失敗: {failed} 件",
       "linkError": "アラートをリンクできませんでした。"
     },
+    "chooseTrigger": "トリガーを選択",
     "node": {
       "kindTrigger": "トリガー",
       "kindLogic": "ロジック",
@@ -2378,6 +2379,11 @@
     "deleteNodeTitle": "ノードを削除",
     "deleteNodeLlmEvalConfirm": "この LLM 評価ノードを削除してよろしいですか?",
     "cancel": "[キャンセル]",
+    "collapseNodes": "ノードを折りたたむ",
+    "openNodes": "ノードを開く",
+    "chooseSource": "ソースを選択",
+    "sourceStreamDesc": "ストリームに取り込まれるデータをリアルタイムで処理",
+    "sourceQueryDesc": "スケジュールでクエリを実行し、結果を処理",
     "promqlOnlyForMetrics": "PromQL はメトリクスストリームタイプでのみ使用できます",
     "invalidCronExpression": "cron 表現が無効です",
     "cronRequired": "Cron式は必須です",
@@ -3326,6 +3332,8 @@
     "seriesName": "シリーズ名",
     "seriesValue": "シリーズ値",
     "axisValue": "軸値",
+    "expandAllSections": "すべてのセクションを展開",
+    "collapseAllSections": "すべてのセクションを折りたたむ",
     "configSectionGeneral": "将軍",
     "configSectionPromqlTable": "プロムQL テーブルモード",
     "configSectionGeographic": "地理的構成",
@@ -7730,7 +7738,11 @@
     "agentGraph": {
       "allAgents": "全エージェント",
       "stream": "ストリーム",
-      "agent": "エージェント"
+      "agent": "エージェント",
+      "noAgentsTitle": "エージェントが見つかりません",
+      "noAgentsDescription": "この時間範囲ではエージェントが見つかりませんでした。時間範囲を広げるか、トレースにgen_aiエージェント属性が含まれていることを確認してください。",
+      "agentCountSingular": "エージェント",
+      "agentCountPlural": "エージェント"
     },
     "kpi": {
       "totalCost": "合計費用",
@@ -9381,6 +9393,8 @@
     "dialog": {
       "bulkDeleteBody": "{count} 個のチェックを削除してもよろしいですか？この操作は元に戻せません。",
       "bulkDeleteTitle": "チェックを削除",
+      "deleteSingleBody": "「{name}」を削除してもよろしいですか？この操作は元に戻せません。",
+      "deleteSingleTitle": "チェックを削除",
       "duplicateTitle": "チェックを複製"
     },
     "empty": {
@@ -9574,6 +9588,7 @@
       "httpDesc": "エンドポイント、ステータスコード、応答本文をチェック",
       "leave": "離脱",
       "loadEditFailed": "編集用のチェックの読み込みに失敗しました - フォームにはデフォルト値が表示されているため、保存しないでください",
+      "notFoundInOrg": "このチェックは現在の組織に存在しません。",
       "modalSubtitle": "監視するものを選択",
       "modalTitle": "チェックを作成",
       "pageTitle": "新規 {label} チェック",
@@ -9693,6 +9708,7 @@
       "failed": "失敗",
       "failedRuns": "失敗した実行",
       "jumpToLastRun": "最終実行にジャンプ",
+      "jumpToLatestData": "最新データにジャンプ",
       "lastRun": "ラストラン",
       "location": "ロケーション",
       "monitors": "モニター",
@@ -10022,7 +10038,8 @@
       "nameRequired": "名前は必須です",
       "selectorRequired": "\"{step}\" にはセレクターが必要です",
       "urlInvalid": "http:// または https:// で始まる有効な URL を入力してください",
-      "urlRequired": "開始 URL は必須です"
+      "urlRequired": "開始 URL は必須です",
+      "fixHighlightedFields": "保存する前にハイライトされたフィールドを修正してください"
     },
     "privateLocations": {
       "searchPlaceholder": "ロケーションを検索...",
@@ -10209,6 +10226,8 @@
       "panelEditorQueryInspector": "クエリインスペクターを開く",
       "metricsRunQuery": "PromQL クエリを実行する",
       "metricsRefresh": "リフレッシュ",
+      "metricsAddToDashboard": "ダッシュボードに追加",
+      "metricsCopyUrl": "共有リンクをコピー",
       "tracesSearch": "トレースを検索する",
       "tracesRefresh": "リフレッシュ",
       "alertsCreate": "新しいアラートを作成",

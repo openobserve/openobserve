@@ -64,8 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-show="permissionsUiType === 'table'"
             data-test="edit-role-permissions-filters"
-            class="sticky flex items-start justify-start gap-3 px-3 py-2"
-            style="top: 0px; z-index: 2"
+            class="sticky top-0 z-2 flex items-start justify-start gap-3 px-3 py-2"
           >
             <div data-test="edit-role-permissions-show-toggle" class="flex items-center">
               <span data-test="edit-role-permissions-show-text" style="font-size: var(--text-sm)">
@@ -141,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="rounded-default min-h-0 flex-1 overflow-y-auto"
         >
           <div v-show="permissionsUiType === 'table'">
-            <PermissionsTable
+            <permissions-table
               ref="permissionTableRef"
               :rows="permissionsState.permissions"
               :customFilteredPermissions="filteredPermissions"
@@ -173,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="flex flex-nowrap">
               <div :style="isHelpOpen ? { width: 'calc(100% - 350px)' } : { width: '100%' }">
-                <QueryEditor
+                <query-editor
                   data-test="logs-vrl-function-editor"
                   editor-id="add-function-editor"
                   class="mt-2"
@@ -220,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <div class="mt-2.5 flex w-full flex-shrink-0 justify-end" style="z-index: 2">
+    <div class="z-2 mt-2.5 flex w-full flex-shrink-0 justify-end">
       <div
         class="bg-card-glass-bg border-border-default flex w-full justify-end gap-2 border-t px-3 py-2"
       >

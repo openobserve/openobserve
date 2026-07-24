@@ -133,11 +133,11 @@ export default defineComponent({
       const fragment = DOMPurify.sanitize(processedContent.value, {
         ADD_TAGS: ["iframe", "style"],
         ADD_ATTR: ["allow", "allowfullscreen", "frameborder", "loading", "csp"],
-        // without this the parser hoists top-level <style> into <head>,
+        // without this the parser hoists a top-level style element into <head>,
         // which DOMPurify discards when returning body content
         FORCE_BODY: true,
         // work on the sanitized DOM directly so style rewriting doesn't
-        // need a second parse (which would re-hoist top-level <style>)
+        // need a second parse (which would re-hoist top-level style elements)
         RETURN_DOM_FRAGMENT: true,
       });
 

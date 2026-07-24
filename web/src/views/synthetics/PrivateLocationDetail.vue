@@ -268,10 +268,11 @@ async function load() {
 onMounted(load);
 
 const openMonitor = (row: { id: string; name: string }) => {
+  const orgIdentifier = route.query.org_identifier;
   router.push({
     name: "synthetic-monitor-results",
     params: { id: row.id },
-    query: { name: row.name },
+    query: { name: row.name, ...(typeof orgIdentifier === "string" && orgIdentifier ? { org_identifier: orgIdentifier } : {}) },
   });
 };
 

@@ -75,6 +75,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :monitor-id="monitorId"
         :monitor-name="monitorName"
         :monitor-status="monitorStatus"
+        :last-triggered-at="lastTriggeredAt"
+        :check-type="checkType"
         @edit="editMonitor"
         @open-run="openRunDetail"
         @refresh="refresh"
@@ -123,6 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, nextTick, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
+import { useStore } from "vuex";
 import DateTime from "@/components/DateTime.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -132,12 +135,21 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import MonitorRuns from "@/views/synthetics/MonitorRuns.vue";
 import RunDetail from "@/views/synthetics/RunDetail.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import syntheticsService from "@/services/synthetics";
 
 defineOptions({ name: "SyntheticMonitorResults" });
 
 const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
+const store = useStore();
+const orgIdentifier = computed(() => store.state.selectedOrganization?.identifier ?? "");
+
+// Fresh check data from the API — avoids a duplicate fetch in MonitorRuns
+// and distinguishes "never triggered" from "no runs in this window."
+const lastTriggeredAt = ref(0);
+const checkType = ref("browser");
 
 const DEFAULT_RELATIVE = "15m";
 
@@ -339,33 +351,12 @@ function openRunDetail(runId: string, executionId: string) {
 }
 
 onMounted(() => {
-  // Anchor the initial time window around last_triggered_at (±15 min)
-  // when arriving from the synthetics list page (fresh navigation with no
-  // explicit time range in the URL). Falls back to readFromUrl / default
-  // relative period for direct page loads, refreshes, or never-run monitors.
-  const lastTriggeredAtRaw = route.query.last_triggered_at;
-  const lastTriggeredAt = typeof lastTriggeredAtRaw === "string" ? Number(lastTriggeredAtRaw) : 0;
-  const hasExplicitRange = route.query.from || route.query.to || route.query.period;
-
-  if (lastTriggeredAt > 0 && !hasExplicitRange) {
-    // Convert microseconds → milliseconds
-    const tsMs = Math.floor(lastTriggeredAt / 1000);
-    const anchor = new Date(tsMs);
-    const PAD_US = 15 * 60 * 1000 * 1000;
-    const startTime = Math.max(0, (anchor.getTime() - 15 * 60 * 1000) * 1000);
-    const endTime = Math.min(Date.now() * 1000, anchor.getTime() * 1000 + PAD_US);
-    timeState.value = {
-      valueType: "absolute",
-      startTime,
-      endTime,
-      relativeTimePeriod: null,
-    };
-    timeRange.value = { startTime, endTime };
-  } else if (!readFromUrl()) {
+  // Always default to last 15 minutes; respect explicit URL params
+  if (!readFromUrl()) {
     applyRelative(DEFAULT_RELATIVE);
   }
   writeToUrl();
-
+  fetchCheck();
   // Auto-open drawer if query params present
   const runQ = route.query.run;
   const execQ = route.query.exec;
@@ -374,9 +365,25 @@ onMounted(() => {
     selectedExecutionId.value = execQ;
     drawerOpen.value = true;
   }
-
-  nextTick(() => {
-    runsRef.value?.refresh?.(timeRange.value.startTime, timeRange.value.endTime);
-  });
 });
+
+// Fetches the check once on mount — provides type and last_triggered_at to
+// MonitorRuns via props, consolidating what was previously split across
+// MonitorRuns.resolveMonitorType() (always on mount) and the on-demand
+// need-check-data emit (when zero runs). One API call instead of two.
+async function fetchCheck() {
+  try {
+    const res = await syntheticsService.get(orgIdentifier.value, monitorId.value);
+    if (res?.data) {
+      lastTriggeredAt.value = Number(res.data.last_triggered_at) || 0;
+      checkType.value = res.data.type ?? "browser";
+    }
+  } catch (err: any) {
+    if (err?.response?.status === 404) {
+      router.push({ name: "synthetics" });
+      toast({ variant: "warning", message: t("synthetics.newCheck.notFoundInOrg") });
+      return;
+    }
+  }
+}
 </script>

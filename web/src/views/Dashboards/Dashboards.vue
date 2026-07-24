@@ -264,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-folder="{ row }">
               <button
                 type="button"
-                class="bg-surface-subtle text-text-body hover:bg-surface-subtle-hover hover:text-text-body focus-visible:ring-primary-500/25 inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-xs leading-5 transition-colors outline-none focus-visible:ring-4 focus-visible:ring-inset"
+                class="bg-surface-subtle text-text-body hover:bg-surface-subtle-hover hover:text-text-body focus-visible:ring-accent/25 inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-xs leading-5 transition-colors outline-none focus-visible:ring-4 focus-visible:ring-inset"
                 @click.stop="updateActiveFolderId(row.folder_id)"
               >
                 <OIcon name="folder-outline" size="xs" />
@@ -352,7 +352,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <template #bottom>
-              <div class="flex w-full items-center justify-between py-1">
+              <div class="flex w-full items-center justify-between gap-4 py-1">
                 <div class="flex shrink-0 items-center text-xs font-normal">
                   {{ resultTotal || 0 }} {{ t("dashboard.header") }}
                 </div>
@@ -596,7 +596,6 @@ export default defineComponent({
     OIcon,
     ODropdown,
     ODropdownItem,
-    ODropdownSeparator,
     OInput,
     ODialog,
     AddDashboard,

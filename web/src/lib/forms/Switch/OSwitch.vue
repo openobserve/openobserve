@@ -128,11 +128,11 @@ const hasLabel = computed(
         props.disabled
           ? 'border-switch-disabled-border border-dashed bg-transparent'
           : isChecked
-            ? 'bg-primary-500 border-switch-border'
+            ? 'bg-switch-track-on border-switch-border'
             : 'border-switch-border-off bg-transparent',
         props.disabled ? 'cursor-not-allowed' : 'cursor-pointer',
         'outline-none',
-        'focus-visible:ring-primary-500/25 focus-visible:ring-4',
+        'focus-visible:ring-accent/25 focus-visible:ring-4',
         'transition-[color,background-color,border-color,box-shadow] duration-200',
       ]"
     >

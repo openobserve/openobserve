@@ -366,6 +366,15 @@ const useLogs = () => {
       const decodedQuery = b64DecodeUnicode(queryParams.query)!;
       searchObj.data.editorValue = decodedQuery;
       searchObj.data.query = decodedQuery;
+      // The Monaco query editor is lazy-loaded and, while it mounts, fires its
+      // change callback with an empty "" BEFORE this restored value is applied.
+      // Flag the restore as pending so updateQueryValue() ignores that transient
+      // empty emission instead of wiping the query (and flipping SQL mode off) —
+      // the intermittent "shared SQL link opens an empty editor" bug. The flag is
+      // cleared the moment the real (non-empty) value lands in the editor.
+      if (decodedQuery.trim() !== "") {
+        searchObj.meta.pendingUrlQueryRestore = true;
+      }
     }
 
     if (

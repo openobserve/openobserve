@@ -104,10 +104,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <button
         type="button"
-        class="rounded-default hover:border-primary-600 mt-3 inline-flex cursor-pointer items-center gap-2 border px-2.5 py-1.5 text-left transition-colors"
+        class="rounded-default hover:border-accent mt-3 inline-flex cursor-pointer items-center gap-2 border px-2.5 py-1.5 text-left transition-colors"
         :class="
           col.autoColor
-            ? 'border-primary-600 bg-[color-mix(in_srgb,var(--color-primary-600)_7%,transparent)]'
+            ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_7%,transparent)]'
             : 'border-[color-mix(in_srgb,var(--color-grey-500)_28%,transparent)] bg-transparent'
         "
         :data-test="`o2-format-unique-color-${col.field}`"

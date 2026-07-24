@@ -88,6 +88,7 @@
           @duplicate="duplicateMonitor"
           @run="runMonitor"
           @delete="deleteMonitor"
+          @move="moveSingleMonitor"
           @update:selected-ids="selectedMonitorIds = $event"
           @delete-selected="openBulkDeleteConfirm"
           @move-selected="moveMultipleMonitors"
@@ -331,11 +332,13 @@ import syntheticsService from "@/services/synthetics";
 import { locationDisplayLabel } from "@/utils/synthetics/format";
 import { getFoldersListByType } from "@/utils/commons";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
 const { t } = useI18n();
+const { confirm } = useConfirmDialog();
 
 // ── API types ──────────────────────────────────────────────────────────
 interface ApiMonitorFrequency {
@@ -615,6 +618,11 @@ const moveMultipleMonitors = () => {
   showMoveDialog.value = true;
 };
 
+const moveSingleMonitor = (row: any) => {
+  monitorsToMove.value = [String(row.id)];
+  showMoveDialog.value = true;
+};
+
 const onMoveUpdated = async () => {
   selectedMonitorIds.value = [];
   showMoveDialog.value = false;
@@ -625,6 +633,8 @@ const onMoveUpdated = async () => {
 const openDetail = (monitor: any) => {
   const query: Record<string, string> = { name: monitor.name, folder: monitor.folder_name };
   if (monitor.lastTriggeredAt > 0) query.last_triggered_at = String(monitor.lastTriggeredAt);
+  const orgIdentifier = route.query.org_identifier;
+  if (typeof orgIdentifier === "string" && orgIdentifier) query.org_identifier = orgIdentifier;
   router.push({
     name: "synthetic-monitor-results",
     params: { id: String(monitor.id) },
@@ -751,8 +761,22 @@ const enrichedMonitors = computed(() => {
   }));
 });
 
+// Monitors filtered by type, search, and location — used for status counts
+// so they reflect the currently visible subset. Status is excluded so selecting
+// "Failed" doesn't zero out all other status counts.
+const filteredStatusMonitors = computed(() =>
+  enrichedMonitors.value.filter(
+    (m) =>
+      (typeFilter.value === "all" || m.type === typeFilter.value) &&
+      (locationFilter.value === "all" || m.locations.includes(locationFilter.value)) &&
+      (!search.value ||
+        m.name.toLowerCase().includes(search.value.toLowerCase()) ||
+        m.url.toLowerCase().includes(search.value.toLowerCase())),
+  ),
+);
+
 const statusTabs = computed(() => {
-  const ms = enrichedMonitors.value;
+  const ms = filteredStatusMonitors.value;
   const tabs = [
     { filter: "all", label: t("synthetics.filters.allStatuses"), count: ms.length },
     {
@@ -839,7 +863,12 @@ async function bulkPauseMonitors() {
   });
   const results = await Promise.allSettled(
     toPause.map((m) =>
-      syntheticsService.enable(orgIdentifier.value, String(m.id), { enabled: false }),
+      syntheticsService.enable(
+        orgIdentifier.value,
+        String(m.id),
+        { enabled: false },
+        m.folder_name,
+      ),
     ),
   );
   dismiss();
@@ -877,7 +906,7 @@ async function bulkEnableMonitors() {
   });
   const results = await Promise.allSettled(
     toEnable.map((m) =>
-      syntheticsService.enable(orgIdentifier.value, String(m.id), { enabled: true }),
+      syntheticsService.enable(orgIdentifier.value, String(m.id), { enabled: true }, m.folder_name),
     ),
   );
   dismiss();
@@ -914,7 +943,9 @@ async function bulkTriggerMonitors() {
     timeout: 0,
   });
   const results = await Promise.allSettled(
-    toTrigger.map((m) => syntheticsService.run(orgIdentifier.value, String(m.id), {})),
+    toTrigger.map((m) =>
+      syntheticsService.run(orgIdentifier.value, String(m.id), {}, m.folder_name),
+    ),
   );
   dismiss();
   const failed = results.filter((r) => r.status === "rejected").length;
@@ -980,7 +1011,7 @@ async function toggleEnabled(m: any) {
     timeout: 0,
   });
   try {
-    await syntheticsService.enable(org, id, { enabled: newEnabled });
+    await syntheticsService.enable(org, id, { enabled: newEnabled }, m.folder_name);
     const found = monitors.value.find((mon) => String(mon.id) === id);
     if (found) found.enabled = newEnabled;
     dismiss();
@@ -1022,7 +1053,11 @@ async function saveDuplicate() {
   });
   try {
     const org = orgIdentifier.value;
-    const res = await syntheticsService.get(org, String(duplicateTarget.value.id));
+    const res = await syntheticsService.get(
+      org,
+      String(duplicateTarget.value.id),
+      activeFolderId.value,
+    );
     const check = mapResponseToBrowserCheck(res.data as Record<string, unknown>);
     check.name = duplicateName.value;
     check.folder = duplicateFolder.value;
@@ -1072,7 +1107,7 @@ async function runMonitor(m: any) {
     timeout: 0,
   });
   try {
-    await syntheticsService.run(org, id, {});
+    await syntheticsService.run(org, id, {}, m.folder_name);
     dismiss();
     toast({ variant: "success", message: t("synthetics.toast.triggerSuccessSingle", { name }) });
   } catch (err: any) {
@@ -1088,6 +1123,12 @@ async function runMonitor(m: any) {
 }
 
 async function deleteMonitor(m: any) {
+  const ok = await confirm({
+    title: t("synthetics.dialog.deleteSingleTitle"),
+    message: t("synthetics.dialog.deleteSingleBody", { name: m.name }),
+  });
+  if (!ok) return;
+
   const org = orgIdentifier.value;
   const dismiss = toast({
     variant: "loading",

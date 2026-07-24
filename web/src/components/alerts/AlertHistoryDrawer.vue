@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <div
                 class="rounded-default flex flex-1 flex-col overflow-hidden border"
-                :class="'border-border-default bg-surface-panel'"
+                :class="'border-border-default bg-surface-base'"
               >
                 <OTable
                   :data="groupedHistory"

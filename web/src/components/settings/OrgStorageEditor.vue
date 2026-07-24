@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div
                     v-if="selectedProvider === provider.value"
-                    class="check-icon bg-status-positive absolute top-1.5 right-1.5 z-[1] flex h-5 w-5 items-center justify-center overflow-hidden rounded-full text-white"
+                    class="check-icon bg-status-positive absolute top-1.5 right-1.5 z-1 flex h-5 w-5 items-center justify-center overflow-hidden rounded-full text-white"
                   >
                     <OIcon name="check" size="xs" />
                   </div>

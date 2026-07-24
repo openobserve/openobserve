@@ -160,7 +160,7 @@ function formatTime(ts: string): string {
         :key="chat.id"
         class="group rounded-default hover:bg-interactive-hover-bg flex cursor-pointer items-center gap-1 px-2 py-[0.4375em] transition-[background] duration-[120ms]"
         :class="{
-          'bg-primary-100!': activeChatId === chat.id,
+          'bg-surface-accent-active!': activeChatId === chat.id,
         }"
         @click="selectChat(chat.id)"
       >

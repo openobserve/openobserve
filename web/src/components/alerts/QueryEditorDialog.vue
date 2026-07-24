@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}</span>
 
         <!-- Separator -->
-        <div class="bg-border-strong h-4 w-px opacity-30" />
+        <div class="bg-separator h-4 w-px opacity-30" />
 
         <!-- Stream Type + Stream Name -->
         <div class="flex items-center gap-2">
@@ -194,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           (localTab === 'sql' ? !localSqlQuery : !localPromqlQuery) &&
                           queryEditorPlaceholderFlag
                         "
-                        class="pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-[1] flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] select-none"
+                        class="pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] select-none"
                       >
                         <span
                           class="text-text-placeholder overflow-hidden font-mono [line-height:1.3125rem] text-ellipsis whitespace-nowrap text-[var(--text-sm)]"
@@ -309,7 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="!sqlEditorMaximized && vrlContentMounted"
                     class="relative min-h-0 flex-1"
                   >
-                    <UnifiedQueryEditor
+                    <unified-query-editor
                       data-test="scheduled-alert-vrl-function-editor"
                       data-test-prefix="alert-dialog-vrl"
                       ref="fnEditorRef"
@@ -334,7 +334,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <div
                       v-if="!vrlFunctionContent && functionEditorPlaceholderFlag"
-                      class="pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-[1] flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] select-none"
+                      class="pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] select-none"
                     >
                       <span
                         class="text-text-placeholder overflow-hidden font-mono [line-height:1.3125rem] text-ellipsis whitespace-nowrap text-[var(--text-sm)]"

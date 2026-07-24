@@ -1,6 +1,6 @@
 <template>
   <div
-    class="absolute top-0 left-0 z-[999] w-full transition-opacity duration-500 ease-out"
+    class="absolute top-0 left-0 z-999 w-full transition-opacity duration-500 ease-out"
     :class="{
       'opacity-0': !loading && !isFadingOut,
       'opacity-100': loading || isFadingOut,
@@ -18,7 +18,7 @@
         }"
       >
         <div
-          class="loading-progress__shimmer dark:via-grey-300/40 absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+          class="loading-progress__shimmer absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
         ></div>
       </div>
       <!-- Moving circle indicator -->
@@ -30,9 +30,7 @@
           transition: shouldAnimate ? 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
         }"
       >
-        <div
-          class="loading-progress__head-glow dark:bg-grey-300/20 absolute inset-0 rounded-full bg-white/20"
-        ></div>
+        <div class="loading-progress__head-glow absolute inset-0 rounded-full bg-white/20"></div>
       </div>
     </div>
   </div>

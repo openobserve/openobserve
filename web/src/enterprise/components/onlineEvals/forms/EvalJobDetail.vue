@@ -273,7 +273,7 @@
                     </div>
                   </div>
                   <span
-                    class="text-text-secondary text-2xs group-[:hover:not(:disabled)]:text-primary-600 inline-flex shrink-0 items-center gap-1 font-semibold"
+                    class="text-text-secondary text-2xs group-[:hover:not(:disabled)]:text-accent inline-flex shrink-0 items-center gap-1 font-semibold"
                   >
                     <span
                       class="opacity-0 transition-opacity duration-150 group-[:hover:not(:disabled)]:opacity-100"

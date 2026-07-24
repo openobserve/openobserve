@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
   >
     <template #actions>
-      <SyntaxGuideMetrics />
+      <syntax-guide-metrics />
       <MetricLegends />
       <DateTimePickerDashboard
         v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type) && selectedDate"
@@ -52,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="outline"
         size="icon-toolbar"
         data-test="metrics-share-btn"
+        shortcut-id="metricsCopyUrl"
         class="h-8"
       />
       <template v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)">
@@ -77,6 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="runQuery"
         >
           {{ t("metrics.runQuery") }}
+          <OTooltip :content="t('metrics.runQuery')" shortcut-id="metricsRunQuery" />
         </OButton>
       </template>
     </template>
@@ -94,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- Add to Dashboard Dialog -->
-    <AddToDashboard
+    <add-to-dashboard
       v-model:open="showAddToDashboardDialog"
       :dashboardPanelData="dashboardPanelData"
       @save="addPanelToDashboard"
@@ -152,6 +154,7 @@ const AddToDashboard = defineAsyncComponent(() => {
   return import("./../metrics/AddToDashboard.vue");
 });
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
@@ -168,6 +171,7 @@ export default defineComponent({
     AutoRefreshInterval,
     PanelEditor,
     OButton,
+    OTooltip,
     ShareButton,
   },
   setup() {
@@ -587,6 +591,30 @@ export default defineComponent({
         handler: () => {
           if (isInputFocused()) return;
           runQuery();
+        },
+      },
+      {
+        id: "metricsFocusQuery",
+        handler: () => {
+          // The metrics PromQL editor is Monaco — focus its inner textarea.
+          const el = document.querySelector<HTMLElement>(
+            '[data-test="dashboard-panel-query-editor"] textarea, [data-test="dashboard-panel-query-editor"] .monaco-editor textarea, [data-test="dashboard-panel-query-editor"] .cm-editor',
+          );
+          el?.focus();
+        },
+      },
+      {
+        id: "metricsAddToDashboard",
+        handler: () => {
+          if (isInputFocused()) return;
+          addToDashboard();
+        },
+      },
+      {
+        id: "metricsCopyUrl",
+        handler: () => {
+          // Reuse ShareButton's short-URL + clipboard + toast flow.
+          document.querySelector<HTMLElement>('[data-test="metrics-share-btn"]')?.click();
         },
       },
     ]);

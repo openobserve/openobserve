@@ -2222,6 +2222,7 @@
       "linkPartial": "Mit {ok} Alarm(en) verknüpft, {failed} fehlgeschlagen",
       "linkError": "Alarme konnten nicht verknüpft werden."
     },
+    "chooseTrigger": "Trigger auswählen",
     "node": {
       "kindTrigger": "Auslöser",
       "kindLogic": "Logik",
@@ -2378,6 +2379,11 @@
     "deleteNodeTitle": "Knoten löschen",
     "deleteNodeLlmEvalConfirm": "Möchten Sie diesen LLM-Evaluierungsknoten wirklich löschen?",
     "cancel": "Stornieren",
+    "collapseNodes": "Knoten einklappen",
+    "openNodes": "Knoten öffnen",
+    "chooseSource": "Quelle auswählen",
+    "sourceStreamDesc": "Daten in Echtzeit verarbeiten, während sie in einen Stream aufgenommen werden",
+    "sourceQueryDesc": "Eine Abfrage planmäßig ausführen und Ergebnisse verarbeiten",
     "promqlOnlyForMetrics": "PromQL ist nur für den Metrik-Stream-Typ verfügbar",
     "invalidCronExpression": "Ungültiger Cron-Ausdruck",
     "cronRequired": "Cron-Ausdruck ist erforderlich",
@@ -3326,6 +3332,8 @@
     "seriesName": "Name der Serie",
     "seriesValue": "Wert der Serie",
     "axisValue": "Achsenwert",
+    "expandAllSections": "Alle Abschnitte erweitern",
+    "collapseAllSections": "Alle Abschnitte einklappen",
     "configSectionGeneral": "Allgemeines",
     "configSectionPromqlTable": "PromQL-Tabellenmodus",
     "configSectionGeographic": "Geografische Konfiguration",
@@ -7730,7 +7738,11 @@
     "agentGraph": {
       "allAgents": "Alle Agenten",
       "stream": "Stream",
-      "agent": "Agent"
+      "agent": "Agent",
+      "noAgentsTitle": "Keine Agenten gefunden",
+      "noAgentsDescription": "In diesem Zeitraum wurden keine Agenten gefunden. Versuchen Sie, den Zeitraum zu erweitern, oder überprüfen Sie, ob Ihre Traces gen_ai-Agentenattribute enthalten.",
+      "agentCountSingular": "Agent",
+      "agentCountPlural": "Agenten"
     },
     "kpi": {
       "totalCost": "Gesamtkosten",
@@ -9381,6 +9393,8 @@
     "dialog": {
       "bulkDeleteBody": "Sind Sie sicher, dass Sie {count} Prüfung(en) löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.",
       "bulkDeleteTitle": "Prüfungen löschen",
+      "deleteSingleBody": "Sind Sie sicher, dass Sie \"{name}\" löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.",
+      "deleteSingleTitle": "Check löschen",
       "duplicateTitle": "Prüfung duplizieren"
     },
     "empty": {
@@ -9574,6 +9588,7 @@
       "httpDesc": "Endpunkte, Statuscodes und Antworttexte prüfen",
       "leave": "Verlassen",
       "loadEditFailed": "Die Prüfung konnte nicht zum Bearbeiten geladen werden – das Formular zeigt Standardwerte, nicht speichern",
+      "notFoundInOrg": "Dieser Check existiert in der aktuellen Organisation nicht.",
       "modalSubtitle": "Wählen Sie aus, was Sie überwachen möchten",
       "modalTitle": "Eine Prüfung erstellen",
       "pageTitle": "Neue {label}-Prüfung",
@@ -9693,6 +9708,7 @@
       "failed": "Fehlgeschlagen",
       "failedRuns": "Fehlgeschlagene Ausführungen",
       "jumpToLastRun": "Zum letzten Lauf springen",
+      "jumpToLatestData": "Zu den neuesten Daten springen",
       "lastRun": "Letzter Lauf",
       "location": "Standort",
       "monitors": "Monitore",
@@ -10022,7 +10038,8 @@
       "nameRequired": "Name ist erforderlich",
       "selectorRequired": "Selektor ist erforderlich für \"{step}\"",
       "urlInvalid": "Geben Sie eine gültige URL ein, die mit http:// oder https:// beginnt",
-      "urlRequired": "Start-URL ist erforderlich"
+      "urlRequired": "Start-URL ist erforderlich",
+      "fixHighlightedFields": "Korrigieren Sie die markierten Felder vor dem Speichern"
     },
     "privateLocations": {
       "searchPlaceholder": "Standorte suchen...",
@@ -10209,6 +10226,8 @@
       "panelEditorQueryInspector": "Abfrageinspektor öffnen",
       "metricsRunQuery": "PromQL-Abfrage ausführen",
       "metricsRefresh": "Auffrischen",
+      "metricsAddToDashboard": "Zum Dashboard hinzufügen",
+      "metricsCopyUrl": "Freigabelink kopieren",
       "tracesSearch": "Suche nach Spuren",
       "tracesRefresh": "Auffrischen",
       "alertsCreate": "Neue Warnung erstellen",

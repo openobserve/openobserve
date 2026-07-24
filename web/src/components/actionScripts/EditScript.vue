@@ -380,10 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div class="mx-2">
-        <div
-          class="bg-card-glass-bg sticky flex w-full justify-end gap-2 px-3 py-2.5"
-          style="bottom: 0px; z-index: 2"
-        >
+        <div class="bg-card-glass-bg sticky bottom-0 z-2 flex w-full justify-end gap-2 px-3 py-2.5">
           <OButton
             data-test="add-action-script-cancel-btn"
             variant="outline"

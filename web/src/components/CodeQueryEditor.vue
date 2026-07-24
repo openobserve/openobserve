@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       variant="sidebar-toggle"
       size="icon-toolbar"
       class="bg-card-glass-bg border-card-glass-border hover:bg-button-outline-hover-bg hover:border-accent absolute! top-2 right-2 z-10 border transition-all duration-200"
-      :class="nlpMode ? 'bg-primary-100 border-accent' : ''"
+      :class="nlpMode ? 'bg-surface-accent-active border-accent' : ''"
       @click="toggleNlpMode"
       data-test="query-editor-ai-icon-btn"
     >

@@ -16,8 +16,8 @@
 //! PromQL parsing and evaluation.
 //!
 //! Storage access and query cancellation enter through [`TableProvider`].
-//! Cluster routing, caching, WAL access, and request orchestration remain in
-//! the host crate.
+//! Cluster routing, caching, WAL access, and request orchestration live in the
+//! separate `promql-service` crate.
 
 use std::{
     sync::Arc,

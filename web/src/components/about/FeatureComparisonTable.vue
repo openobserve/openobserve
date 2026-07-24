@@ -70,11 +70,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Edition name + hosting + price ────────────────────────────── -->
         <div class="mb-5">
           <div class="text-text-heading m-0 mb-0.5 text-base font-bold">{{ ed.shortName }}</div>
-          <div class="text-compact text-text-muted m-0 mb-3.5">{{ ed.hosting }}</div>
+          <div class="text-compact text-text-secondary m-0 mb-3.5">{{ ed.hosting }}</div>
           <div class="text-accent m-0 mb-1 text-3xl leading-[1.1] font-bold tracking-[-0.03em]">
             {{ ed.price }}
           </div>
-          <div class="text-compact text-text-muted m-0 leading-[1.4]">{{ ed.priceSub }}</div>
+          <div class="text-compact text-text-secondary m-0 leading-[1.4]">{{ ed.priceSub }}</div>
         </div>
 
         <!-- All Five Pillars chips ────────────────────────────────────── -->

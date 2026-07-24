@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <button
       type="button"
       class="rounded-default border-border-default relative inline-flex h-5 w-5 cursor-pointer items-center justify-center border bg-[repeating-linear-gradient(45deg,color-mix(in_srgb,var(--color-grey-500)_12%,transparent),color-mix(in_srgb,var(--color-grey-500)_12%,transparent)_2px,transparent_2px,transparent_6px)] p-0 transition-[transform,box-shadow,border-color] duration-100 hover:scale-[1.12]"
-      :class="!modelValue ? 'border-primary-600 ring-focus-ring ring-2' : ''"
+      :class="!modelValue ? 'border-accent ring-focus-ring ring-2' : ''"
       :title="t('dashboard.colorNone')"
       :aria-label="t('dashboard.colorNone')"
       :aria-pressed="!modelValue"
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :key="c"
       type="button"
       class="rounded-default border-border-default relative inline-flex h-5 w-5 cursor-pointer items-center justify-center border p-0 transition-[transform,box-shadow,border-color] duration-100 hover:scale-[1.12]"
-      :class="isActive(c) ? 'border-primary-600 ring-focus-ring ring-2' : ''"
+      :class="isActive(c) ? 'border-accent ring-focus-ring ring-2' : ''"
       :style="{ background: c }"
       :title="c"
       :aria-label="c"
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Custom (native color input) — rainbow wheel until a colour is chosen -->
     <label
       class="rounded-default border-border-default relative inline-flex h-5 w-5 cursor-pointer items-center justify-center border bg-[conic-gradient(from_0deg,var(--color-error-500),var(--color-warning-400),var(--color-success-500),var(--color-blue-500),var(--color-purple-500),var(--color-error-500))] p-0 transition-[transform,box-shadow,border-color] duration-100 hover:scale-[1.12]"
-      :class="isCustomActive ? 'border-primary-600 ring-focus-ring ring-2' : ''"
+      :class="isCustomActive ? 'border-accent ring-focus-ring ring-2' : ''"
       :style="customStyle"
       :title="t('dashboard.customColor')"
     >

@@ -596,7 +596,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >{{ t("alerts.queryConfig.onThese") }}</span
                     >
                     <div
-                      class="filters-inline-toggle rounded-default bg-surface-panel hover:bg-primary-50 flex cursor-pointer items-center gap-1 px-2 py-0.5 transition-colors select-none"
+                      class="filters-inline-toggle rounded-default bg-surface-panel hover:bg-tabs-hover-bg flex cursor-pointer items-center gap-1 px-2 py-0.5 transition-colors select-none"
                       @click="toggleFilters"
                     >
                       <OIcon
@@ -691,7 +691,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-else class="mb-1 px-3">
               <div class="flex items-center gap-2 py-1">
                 <div
-                  class="filters-inline-toggle rounded-default bg-surface-panel hover:bg-primary-50 flex cursor-pointer items-center gap-1 px-2 py-0.5 transition-colors select-none"
+                  class="filters-inline-toggle rounded-default bg-surface-panel hover:bg-tabs-hover-bg flex cursor-pointer items-center gap-1 px-2 py-0.5 transition-colors select-none"
                   @click="toggleFilters"
                 >
                   <OIcon

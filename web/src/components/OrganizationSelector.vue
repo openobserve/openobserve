@@ -207,7 +207,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
           size="xs"
           data-test="navbar-organizations-select-trigger"
           class="text-text-body! w-56"
-          :class="open ? 'ring-primary-300 ring-1 ring-inset' : ''"
+          :class="open ? 'ring-accent/25 ring-2 ring-inset' : ''"
         >
           <template #icon-left>
             <OIcon name="domain" size="sm" class="shrink-0 opacity-60" />
@@ -302,10 +302,10 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
                 type="button"
                 data-test="organization-menu-item-copy-id"
                 :aria-label="`Copy organization ID ${row.org.identifier}`"
-                class="rounded-default hover:bg-primary-200 hover:text-select-item-selected-text inline-flex size-6 shrink-0 items-center justify-center transition"
+                class="rounded-default hover:bg-select-item-selected-bg hover:text-select-item-selected-text inline-flex size-6 shrink-0 items-center justify-center transition"
                 :class="
                   copiedId === row.org.identifier
-                    ? 'text-primary-600 opacity-100'
+                    ? 'text-accent opacity-100'
                     : row.index === highlightedIndex
                       ? 'text-text-secondary opacity-100'
                       : 'text-text-secondary opacity-0 focus-visible:opacity-100'

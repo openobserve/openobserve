@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           class="flex h-17 w-17 items-center justify-center rounded-full border-[1.5px] border-solid border-[color-mix(in_srgb,var(--color-primary-600)_24%,transparent)] bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)]"
         >
-          <OIcon name="account-balance" size="lg" class="text-primary-600 opacity-85" />
+          <OIcon name="account-balance" size="lg" class="text-accent opacity-85" />
         </div>
       </div>
 
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </div>
     <template v-else>
-      <TrialPeriod class="mb-3" currentPage="billing"></TrialPeriod>
+      <trial-period class="mb-3" currentPage="billing"></trial-period>
       <!-- AI Credits card -->
       <div v-if="aiUsage" class="mb-4 grid w-full grid-cols-1 gap-4">
         <div
@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSpinner size="md" class="mx-auto mt-3 block text-center" />
       </div>
       <div v-else class="mt-3 grid grid-cols-2 gap-3">
-        <ProPlan
+        <pro-plan
           :planType="planType"
           :billingProvider="billingProvider"
           :subscriptionType="subscriptionType"
@@ -156,11 +156,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :pricingError="pricingError"
           @update:proSubscription="onLoadSubscription(config.paidPlan)"
           @update:cancelSubscription="onUnsubscribe"
-        ></ProPlan>
-        <EnterprisePlan
+        ></pro-plan>
+        <enterprise-plan
           :features="enterprisePlanFeatures"
           :pricingError="pricingError"
-        ></EnterprisePlan>
+        ></enterprise-plan>
       </div>
     </template>
   </div>

@@ -92,10 +92,14 @@ export const isColorDark = (hex: string): boolean => {
   return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 < 0.5;
 };
 
-export const getContrastColor = (backgroundColor: string, isDarkTheme: boolean): string => {
-  // If no background color, return based on theme
+export const getContrastColor = (
+  backgroundColor: string,
+  defaultColor: string,
+  threshold: number,
+): string => {
+  // No background: use the caller-provided default (a --color-chart-metric-text token).
   if (!backgroundColor) {
-    return isDarkTheme ? "#FFFFFF" : "#000000";
+    return defaultColor;
   }
 
   // Normalize input (support hex, rgb, rgba)
@@ -135,12 +139,6 @@ export const getContrastColor = (backgroundColor: string, isDarkTheme: boolean):
   // Calculate relative luminance
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
 
-  // Return black or white based on luminance and theme
-  if (isDarkTheme) {
-    // In dark theme, prefer white text unless background is very light
-    return luminance > 0.8 ? "#000000" : "#FFFFFF";
-  } else {
-    // In light theme, prefer black text unless background is very dark
-    return luminance > 0.5 ? "#000000" : "#FFFFFF";
-  }
+  // Above the (theme-provided) luminance threshold → dark text, else light text.
+  return luminance > threshold ? "#000000" : "#FFFFFF";
 };

@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="text-text-heading overflow-hidden font-mono text-sm font-semibold text-ellipsis whitespace-nowrap"
                     >Cargo.toml</span
                   >
-                  <span class="text-text-muted text-xs">Rust crates</span>
+                  <span class="text-text-secondary text-xs">Rust crates</span>
                 </div>
                 <OIcon name="open-in-new" size="sm" class="text-text-muted shrink-0" />
               </a>
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="text-text-heading overflow-hidden font-mono text-sm font-semibold text-ellipsis whitespace-nowrap"
                     >package.json</span
                   >
-                  <span class="text-text-muted text-xs">Node packages</span>
+                  <span class="text-text-secondary text-xs">Node packages</span>
                 </div>
                 <OIcon name="open-in-new" size="sm" class="text-text-muted shrink-0" />
               </a>
@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="text-text-heading overflow-hidden font-mono text-sm font-semibold text-ellipsis whitespace-nowrap"
                     >npmjs.com</span
                   >
-                  <span class="text-text-muted text-xs">JS registry</span>
+                  <span class="text-text-secondary text-xs">JS registry</span>
                 </div>
                 <OIcon name="open-in-new" size="sm" class="text-text-muted shrink-0" />
               </a>
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="text-text-heading overflow-hidden font-mono text-sm font-semibold text-ellipsis whitespace-nowrap"
                     >crates.io</span
                   >
-                  <span class="text-text-muted text-xs">Rust registry</span>
+                  <span class="text-text-secondary text-xs">Rust registry</span>
                 </div>
                 <OIcon name="open-in-new" size="sm" class="text-text-muted shrink-0" />
               </a>

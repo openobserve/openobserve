@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <BaseImport
+  <base-import
     ref="baseImportRef"
     title="Import Pipeline"
     test-prefix="pipeline"
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           Output Messages
         </div>
         <OSeparator class="mt-1 shrink-0" />
-        <div class="error-report-container min-h-0 flex-1">
+        <div class="error-report-container min-h-0 flex-1 resize-none overflow-auto">
           <!-- Pipeline Errors Section -->
           <div class="mb-2.5 p-2.5" v-if="pipelineErrorsToDisplay.length > 0">
             <div>
@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ errorMessage.message }}
                     <div>
-                      <QueryEditor
+                      <query-editor
                         class="w-full"
                         style="height: 200px"
                         data-test="pipeline-import-sql-query-input"
@@ -374,7 +374,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </template>
-  </BaseImport>
+  </base-import>
 
   <!-- Actions live in the pipeline shell's OPageHeader (Functions.vue), next
        to the "Pipelines › Import" breadcrumb — the shell owns the single header

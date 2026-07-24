@@ -54,12 +54,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="item in group.items"
             :key="item.key"
             type="button"
-            class="o2-hub-card group rounded-default border-border-default bg-surface-panel hover:border-primary-500 hover:bg-surface-subtle focus-visible:ring-primary-500 flex items-start gap-3 border p-4 text-left transition-colors outline-none focus-visible:ring-2"
+            class="o2-hub-card group rounded-default border-border-default bg-surface-panel hover:border-accent hover:bg-surface-subtle focus-visible:ring-accent flex items-start gap-3 border p-4 text-left transition-colors outline-none focus-visible:ring-2"
             :data-test="item.dataTest || `section-hub-card-${item.key}`"
             @click="router.push(item.to)"
           >
             <span
-              class="rounded-default bg-surface-subtle text-text-secondary group-hover:bg-primary-50 group-hover:text-primary-600 mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center transition-colors"
+              class="rounded-default bg-surface-subtle text-text-secondary group-hover:bg-tabs-hover-bg group-hover:text-accent mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center transition-colors"
             >
               <img
                 v-if="item.icon && isImg(item.icon)"
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <span class="flex min-w-0 flex-col">
               <span
-                class="text-text-heading group-hover:text-primary-600 text-sm font-semibold transition-colors"
+                class="text-text-heading group-hover:text-accent text-sm font-semibold transition-colors"
                 >{{ item.label }}</span
               >
               <span

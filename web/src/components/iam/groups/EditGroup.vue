@@ -57,11 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :removed-users="removedServiceAccounts"
       />
     </div>
-    <div
-      data-test="edit-group-footer"
-      class="flex w-full flex-shrink-0 justify-end"
-      style="z-index: 2"
-    >
+    <div data-test="edit-group-footer" class="z-2 flex w-full flex-shrink-0 justify-end">
       <div
         class="bg-card-glass-bg px-page-edge border-border-default flex w-full justify-end gap-2 border-t py-2"
       >

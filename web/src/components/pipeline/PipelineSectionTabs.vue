@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="text-2xs rounded-full px-1.5 py-1 leading-none font-bold"
         :class="
           s.key === activeSectionKey
-            ? 'bg-primary-100 text-primary-700'
+            ? 'bg-badge-primary-soft-bg text-badge-primary-soft-text'
             : 'bg-surface-subtle text-text-secondary'
         "
         >{{ s.count }}</span

@@ -265,6 +265,105 @@
   --color-span-49: #fde68a;
   --color-span-50: #fca5a5;
 
+  /* --- Dashboard classic series palette — light values (dark overrides in dark.css).
+     Read by utils/dashboard/colorPalette.ts getColorPalette() via chartColor(), so the
+     light/dark swap lives in CSS instead of a `theme === "dark"` branch in JS. --- */
+  --color-chart-series-1: #5b8ef0;
+  --color-chart-series-2: #34d399;
+  --color-chart-series-3: #fb923c;
+  --color-chart-series-4: #f472b6;
+  --color-chart-series-5: #a78bfa;
+  --color-chart-series-6: #fbbf24;
+  --color-chart-series-7: #38bdf8;
+  --color-chart-series-8: #f87171;
+  --color-chart-series-9: #2dd4bf;
+  --color-chart-series-10: #4ade80;
+  --color-chart-series-11: #e879f9;
+  --color-chart-series-12: #facc15;
+
+  /* --- Dashboard table row-highlight palette — light values (dark overrides in
+     dark.css). Read by colorPalette.ts getColorForTable() via chartColor(). --- */
+  --color-chart-table-1: #ffcdee;
+  --color-chart-table-2: #ffd2d3;
+  --color-chart-table-3: #c8fcfa;
+  --color-chart-table-4: #b2dafb;
+  --color-chart-table-5: #c0e9fc;
+  --color-chart-table-6: #ffcde5;
+  --color-chart-table-7: #c0eff5;
+  --color-chart-table-8: #fffdba;
+  --color-chart-table-9: #e6f3ff;
+  --color-chart-table-10: #f2b9b9;
+  --color-chart-table-11: #a6e8f0;
+  --color-chart-table-12: #c8e5fc;
+  --color-chart-table-13: #e8a3f4;
+  --color-chart-table-14: #c0e5e2;
+  --color-chart-table-15: #c9ffbd;
+  --color-chart-table-16: #f8b1c9;
+  --color-chart-table-17: #bddfff;
+  --color-chart-table-18: #d2b9ff;
+  --color-chart-table-19: #d2ebda;
+  --color-chart-table-20: #c0e3c2;
+  --color-chart-table-21: #f0f8e8;
+  --color-chart-table-22: #fff2cc;
+  --color-chart-table-23: #ffe6e6;
+  --color-chart-table-24: #e8f4fd;
+
+  /* --- Chart grid line (dashed split-line) — light value; dark in dark.css --- */
+  --color-chart-gridline: rgba(0, 0, 0, 0.08);
+
+  /* --- Chart crosshair label chip is intentionally NOT declared here (light): it is
+     dark-only (#333 in dark.css). chartColor() returns "" in light, which is the
+     empty value ECharts reads as its own "auto" default — preserving today's look. --- */
+
+  /* --- Trace span palette (35 colors, HEX/canvas variant) — light values; dark
+     overrides in dark.css. Read by traceColors.ts getSpanColorHex()/getAllSpanColors()
+     via chartColor(). Distinct from --color-span-* (the 50-colour var() palette). --- */
+  --color-trace-span-1: #10b981;
+  --color-trace-span-2: #06b6d4;
+  --color-trace-span-3: #84cc16;
+  --color-trace-span-4: #6366f1;
+  --color-trace-span-5: #f59e0b;
+  --color-trace-span-6: #3b82f6;
+  --color-trace-span-7: #14b8a6;
+  --color-trace-span-8: #d946ef;
+  --color-trace-span-9: #7c3aed;
+  --color-trace-span-10: #f59e0b;
+  --color-trace-span-11: #0284c7;
+  --color-trace-span-12: #84cc16;
+  --color-trace-span-13: #6366f1;
+  --color-trace-span-14: #f9a8d4;
+  --color-trace-span-15: #10b981;
+  --color-trace-span-16: #8b5cf6;
+  --color-trace-span-17: #f97316;
+  --color-trace-span-18: #22d3ee;
+  --color-trace-span-19: #06b6d4;
+  --color-trace-span-20: #21cb60;
+  --color-trace-span-21: #a855f7;
+  --color-trace-span-22: #fbbf24;
+  --color-trace-span-23: #3b82f6;
+  --color-trace-span-24: #14b8a6;
+  --color-trace-span-25: #6366f1;
+  --color-trace-span-26: #fb923c;
+  --color-trace-span-27: #0ea5e9;
+  --color-trace-span-28: #f472b6;
+  --color-trace-span-29: #a855f7;
+  --color-trace-span-30: #818cf8;
+  --color-trace-span-31: #f97316;
+  --color-trace-span-32: #fca5a5;
+  --color-trace-span-33: #06b6d4;
+  --color-trace-span-34: #a78bfa;
+  --color-trace-span-35: #3b82f6;
+
+  /* --- Chart metric-panel text default — contrast fallback when a panel has no
+     background; read via chartColor() by getContrastColor's callers. --- */
+  --color-chart-metric-text: #000000;
+
+  /* --- Chart NUMERIC tokens (not colours) — read via chartNumber(); light/dark
+     swap lives in dark.css, so chart JS branches on neither token nor theme. --- */
+  --chart-area-fill-top-opacity: 0.9;
+  --chart-area-fill-bottom-opacity: 0.4;
+  --chart-metric-contrast-threshold: 0.5;
+
   /* --- White / Black --- */
   --color-white: #ffffff;
   --color-black: #000000;
@@ -295,18 +394,6 @@
      control tier's 6px reads as visibly round on a box that small. Pinned to its
      own knob so it holds independent of --radius-default. */
   --radius-checkbox: 0.25rem; /* 4px  — checkbox tick box only */
-
-  /* --- Stacking scale ---
-     Portaled floating surfaces need a shared knob, not a number typed at each
-     call site. The app stack, for context: header 2000, drawer/dialog scrim
-     5999, drawer/dialog content 6000 (+1000 per nesting level, computed in
-     ODialog/ODrawer).
-     --z-menu sits at the base overlay layer: a menu opened from the page must
-     clear the header, and one opened from a dialog is portaled after that
-     dialog's content, so equal z + later DOM order puts it on top.
-     Consumed as the `z-menu` utility (registered in styles/tailwind.css) —
-     never as an arbitrary z-index at the call site. */
-  --z-menu: 6000; /* dropdown / context menu surfaces */
 
   /* --- Shadow scale — hairline-border philosophy ---
      Only md/lg render real elevation (overlays: dialogs, menus). Cards use a
@@ -572,4 +659,62 @@
   --color-illustration-umber: #5b4a3a;
   --color-illustration-cocoa: #4a3b2d;
   --color-illustration-espresso: #3a2f25;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Z-index scale — the single source for every z-index in the app, in Tailwind's
+   `--z-index-*` theme namespace (same pattern as the color/radius/shadow tokens).
+   The numeric `z-<n>` utilities (z-10, z-1000, z-9999, …) are generated from
+   these and compile to `z-index: var(--z-index-<n>)`, backed by the :root custom
+   property emitted here — components only ever write the class (`z-9999`), never
+   var(). Change a value here and every matching class follows (verified:
+   --z-index-10 = 777 makes `.z-10` resolve to 777). Grouped by tier; values
+   preserve today's usage exactly (no stacking change). NOTE: Tailwind still
+   generates an *undefined* z-<n> on demand — this block is the sanctioned set by
+   convention, the source, not a hard gate. ── */
+@theme {
+  /* Local / intra-component — relative layering inside one stacking context */
+  --z-index-0: 0;
+  --z-index-1: 1;
+  --z-index-2: 2;
+  --z-index-3: 3;
+  --z-index-5: 5;
+  --z-index-8: 8;
+  --z-index-10: 10;
+  --z-index-11: 11;
+  --z-index-12: 12;
+  --z-index-15: 15;
+  --z-index-16: 16;
+  --z-index-20: 20;
+  --z-index-30: 30;
+  --z-index-50: 50;
+  --z-index-51: 51;
+  --z-index-60: 60;
+  /* Sticky / raised */
+  --z-index-99: 99;
+  --z-index-100: 100;
+  --z-index-200: 200;
+  /* Dropdowns, menus, popovers */
+  --z-index-999: 999;
+  --z-index-1000: 1000;
+  --z-index-1001: 1001;
+  --z-index-1999: 1999;
+  /* Drawers, side panels */
+  --z-index-5000: 5000;
+  --z-index-5100: 5100;
+  /* 6000 = drawer/dialog content AND page menu overlays (dropdown, context menu).
+     App stack for context: header 2000, drawer/dialog scrim 5999, content 6000
+     (+1000 per nesting level, computed in ODialog/ODrawer). A page-opened menu
+     must clear the header; a dialog-opened one is portaled after that dialog's
+     content, so equal z + later DOM order puts it on top. */
+  --z-index-6000: 6000;
+  /* Modal / dialog overlays */
+  --z-index-9998: 9998;
+  --z-index-9999: 9999;
+  /* Tooltips / toasts above modals */
+  --z-index-10001: 10001;
+  --z-index-10100: 10100;
+  /* Absolute top */
+  --z-index-100000: 100000;
+  --z-index-9999999: 9999999;
 }

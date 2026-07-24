@@ -17,6 +17,7 @@ import { formatUnitValue, getUnitValue } from "../../convertDataIntoUnitValue";
 import { calculateOptimalFontSize } from "../../chartDimensionUtils";
 import { getContrastColor } from "../../chartColorUtils";
 import { type SQLContext } from "../shared/types";
+import { chartColor, chartNumber } from "../../../chartTheme";
 
 // Copy-button size (icon-xs-sq) and the slot it needs beside the value
 // (button + gaps). The value stays perfectly centered, so free width splits
@@ -89,7 +90,8 @@ export function applyMetricChart(ctx: SQLContext): void {
   options.yAxis = [];
   const metricFillColor = getContrastColor(
     panelSchema?.config?.background?.value?.color,
-    store?.state?.theme === "dark",
+    chartColor("--color-chart-metric-text"),
+    chartNumber("--chart-metric-contrast-threshold", 0.5),
   );
   const metricFieldLabel = panelSchema?.queries?.[0]?.fields?.y?.[0]?.label || key1;
   options.series = [
@@ -101,7 +103,6 @@ export function applyMetricChart(ctx: SQLContext): void {
       renderItem: function (params: any) {
         try {
           const backgroundColor = panelSchema?.config?.background?.value?.color;
-          const isDarkTheme = store?.state?.theme === "dark";
           return {
             type: "text",
             style: {
@@ -116,7 +117,11 @@ export function applyMetricChart(ctx: SQLContext): void {
               verticalAlign: "middle",
               x: params?.coordSys?.cx,
               y: params?.coordSys?.cy,
-              fill: getContrastColor(backgroundColor, isDarkTheme),
+              fill: getContrastColor(
+                backgroundColor,
+                chartColor("--color-chart-metric-text"),
+                chartNumber("--chart-metric-contrast-threshold", 0.5),
+              ),
             },
           };
         } catch (error) {

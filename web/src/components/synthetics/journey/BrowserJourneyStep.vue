@@ -240,14 +240,14 @@ function toggleExpanded() {
               : undefined
           "
         >
-          <OSpinner v-if="stepNumberSpinning" variant="ring" size="xs" class="text-primary-500" />
+          <OSpinner v-if="stepNumberSpinning" variant="ring" size="xs" class="text-accent" />
           <template v-else>{{ index + 1 }}</template>
         </span>
       </span>
 
       <!-- Action icon chip -->
-      <span class="bg-primary-50 rounded-default flex shrink-0 items-center p-1">
-        <OIcon :name="actionIcon" size="sm" class="text-primary-500" aria-hidden="true" />
+      <span class="bg-tabs-active-bg rounded-default flex shrink-0 items-center p-1">
+        <OIcon :name="actionIcon" size="sm" class="text-tabs-active-text" aria-hidden="true" />
       </span>
 
       <!-- Action label badge -->

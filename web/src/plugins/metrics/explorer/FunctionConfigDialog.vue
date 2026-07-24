@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="rounded-default flex max-w-full min-w-0 grow basis-[17.5rem] cursor-pointer flex-col gap-1 border p-2"
         :class="
           variant.id === selectedId
-            ? 'border-primary-600 ring-primary-600 ring-1'
+            ? 'border-accent ring-accent ring-1'
             : 'border-border-default hover:border-border-default'
         "
         :data-test="`metrics-fn-variant-${variant.id}`"

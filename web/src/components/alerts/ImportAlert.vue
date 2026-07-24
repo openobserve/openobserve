@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <BaseImport
+  <base-import
     ref="baseImportRef"
     title="Import Alert"
     test-prefix="alert"
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           Output Messages
         </div>
         <OSeparator class="mt-1 shrink-0" />
-        <div class="error-report-container min-h-0 flex-1">
+        <div class="error-report-container min-h-0 flex-1 resize-none overflow-auto">
           <!-- Alert Errors Section -->
           <div class="mb-2.5 p-2.5" v-if="alertErrorsToDisplay.length > 0">
             <div class="error-list">
@@ -290,7 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </template>
-  </BaseImport>
+  </base-import>
 </template>
 
 <script lang="ts">

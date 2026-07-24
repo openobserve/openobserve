@@ -34,23 +34,23 @@ const emit = defineEmits<{ (e: "select", prompt: string): void }>();
         aria-hidden="true"
       ></span>
       <div
-        class="capability-card__icon rounded-default relative z-[1] mb-2.5 inline-flex h-9.5 w-9.5 items-center justify-center shadow-[inset_0_0_0_1px_rgba(var(--accent),0.18)]"
+        class="capability-card__icon rounded-default relative z-1 mb-2.5 inline-flex h-9.5 w-9.5 items-center justify-center shadow-[inset_0_0_0_1px_rgba(var(--accent),0.18)]"
         :class="card.iconBgClass"
       >
         <OIcon :name="card.icon" size="md" :class="card.iconColorClass" />
       </div>
       <div
-        class="capability-card__title text-typography-body relative z-[1] m-0 overflow-hidden text-sm leading-[1.3] font-semibold text-ellipsis whitespace-nowrap"
+        class="capability-card__title text-typography-body relative z-1 m-0 overflow-hidden text-sm leading-[1.3] font-semibold text-ellipsis whitespace-nowrap"
       >
         {{ t(`aiAssistant.capabilities.${card.id}.title`) }}
       </div>
       <div
-        class="capability-card__desc text-text-secondary relative z-[1] mt-1.5 mb-0 text-xs leading-[1.45]"
+        class="capability-card__desc text-text-secondary relative z-1 mt-1.5 mb-0 text-xs leading-[1.45]"
       >
         {{ t(`aiAssistant.capabilities.${card.id}.description`) }}
       </div>
       <span
-        class="capability-card__chevron absolute top-3.5 right-3.5 z-[1] inline-flex h-5.5 w-5.5 translate-x-[-4px] translate-y-[4px] items-center justify-center rounded-full bg-[rgba(var(--accent),0.15)] text-[rgba(var(--accent),1)] opacity-0 transition-[opacity,translate] duration-200 ease-[ease] group-hover/card:translate-x-0 group-hover/card:translate-y-0 group-hover/card:opacity-100"
+        class="capability-card__chevron absolute top-3.5 right-3.5 z-1 inline-flex h-5.5 w-5.5 translate-x-[-4px] translate-y-[4px] items-center justify-center rounded-full bg-[rgba(var(--accent),0.15)] text-[rgba(var(--accent),1)] opacity-0 transition-[opacity,translate] duration-200 ease-[ease] group-hover/card:translate-x-0 group-hover/card:translate-y-0 group-hover/card:opacity-100"
         aria-hidden="true"
       >
         <OIcon name="arrow-forward" size="xs" />

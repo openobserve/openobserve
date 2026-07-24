@@ -873,22 +873,23 @@ export default defineComponent({
 });
 </script>
 
-<style>
+<style scoped>
 /* keep(lib-override:monaco): fixed Monaco editor heights for the import editors
-   plus the folder-dropdown button spacing. .editor-container-url is a cross-file
-   shared class (also used by BaseImport.vue, which relies on this height rule),
-   so these stay unscoped globals targeting Monaco's internal DOM. */
-.editor-container-url .monaco-editor {
+   plus the folder-dropdown button spacing, reaching Monaco's internal DOM via
+   :deep(). The elements carrying these container classes are this view's own,
+   so scoping matches the exact same DOM the former global rule did. BaseImport.vue
+   carries the matching .editor-container-url rule for its own editor. */
+.editor-container-url :deep(.monaco-editor) {
   height: calc(100vh - 17.8125rem) !important;
   overflow: hidden;
   resize: none;
 }
-.dashboard-import-json-container .monaco-editor {
+.dashboard-import-json-container :deep(.monaco-editor) {
   height: calc(100vh - 17.625rem) !important;
   overflow: hidden;
   resize: none;
 }
-.import-folder-dropdown-container .add-folder-btn {
+.import-folder-dropdown-container :deep(.add-folder-btn) {
   margin-bottom: 0 !important;
   margin-top: 0.75rem !important;
 }

@@ -587,8 +587,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      class="bg-card-glass-bg border-card-glass-border sticky! bottom-0 flex w-full justify-end border-t px-3 py-3"
-      style="z-index: 2"
+      class="bg-card-glass-bg border-card-glass-border sticky! bottom-0 z-2 flex w-full justify-end border-t px-3 py-3"
     >
       <OButton
         data-test="add-report-cancel-btn"

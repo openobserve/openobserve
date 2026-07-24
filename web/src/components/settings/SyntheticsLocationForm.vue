@@ -152,7 +152,7 @@ export default defineComponent({
           provider: isCustom ? "custom" : provider,
           customProvider: isCustom ? provider : "",
           region: (props.data as any)?.region ?? "",
-          label: (props.data as any)?.name ?? "",
+          label: (props.data as any)?.label ?? "",
           enabled: (props.data as any)?.enabled ?? true,
         };
       }

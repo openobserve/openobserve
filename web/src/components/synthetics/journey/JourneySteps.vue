@@ -266,7 +266,7 @@ function handleUpdateExpanded(ids: string[]) {
             v-if="getDotState(row) === 'active'"
             variant="ring"
             size="xs"
-            class="text-primary-500"
+            class="text-accent"
           />
           <template v-else>{{ (data as any[]).indexOf(row) + 1 }}</template>
         </span>
@@ -274,8 +274,13 @@ function handleUpdateExpanded(ids: string[]) {
         <!-- Selection is handled by OTable's built-in checkbox column when selection="multiple" -->
 
         <!-- Action icon chip -->
-        <span class="bg-primary-50 rounded-default flex shrink-0 items-center p-1">
-          <OIcon :name="actionIcon(row)" size="sm" class="text-primary-500" aria-hidden="true" />
+        <span class="bg-tabs-active-bg rounded-default flex shrink-0 items-center p-1">
+          <OIcon
+            :name="actionIcon(row)"
+            size="sm"
+            class="text-tabs-active-text"
+            aria-hidden="true"
+          />
         </span>
 
         <!-- Action label badge -->

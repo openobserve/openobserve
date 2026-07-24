@@ -305,7 +305,7 @@ describe("CreateBrowserTest", () => {
       wrapper = mountPage({ editId: "check-123" });
       await flushPromises();
 
-      expect(mockServiceGet).toHaveBeenCalledWith("default", "check-123");
+      expect(mockServiceGet).toHaveBeenCalledWith("default", "check-123", "");
     });
 
     it("should NOT call syntheticsService.get when editId prop is not provided", async () => {

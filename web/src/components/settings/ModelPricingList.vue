@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #toolbar>
             <div class="flex w-full items-center gap-2">
               <div class="app-tabs-container h-9">
-                <AppTabs
+                <app-tabs
                   class="tabs-selection-container"
                   :tabs="tabOptions"
                   v-model:active-tab="selectedTab"
@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #cell-name="{ row }">
-            <div class="relative z-[2] flex min-h-6 flex-nowrap items-center">
+            <div class="relative z-2 flex min-h-6 flex-nowrap items-center">
               <span
                 v-if="getSource(row) === 'built_in'"
                 class="mr-1 inline-flex shrink-0 cursor-default"
@@ -460,7 +460,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </ODrawer>
 
-    <ConfirmDialog
+    <confirm-dialog
       v-model="confirmDialogMeta.show"
       :title="confirmDialogMeta.title"
       :message="confirmDialogMeta.message"

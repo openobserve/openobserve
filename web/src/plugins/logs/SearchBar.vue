@@ -569,14 +569,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div ref="toolbarRightRef" class="flex flex-shrink-0 items-center gap-1">
         <template v-if="searchObj.meta.showTransformEditor && !shouldMoveShareToMenu">
-          <TransformSelector
+          <transform-selector
             v-if="isActionsEnabled"
             :function-options="functionOptions"
             :hide-toggle="true"
             @select:function="populateFunctionImplementation"
             @save:function="fnSavedFunctionDialog"
           />
-          <FunctionSelector
+          <function-selector
             v-else
             :function-options="functionOptions"
             :hide-toggle="true"
@@ -611,7 +611,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="p-2"
             data-test="logs-search-bar-menu-share-link-btn"
           >
-            <ShareButton
+            <share-button
               :url="shareURL"
               variant="outline"
               size="sm-action"
@@ -665,7 +665,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <div
                 v-if="showDownloadSubmenu && !isDownloadDisabled"
-                class="search-download-submenu bg-dropdown-bg rounded-default absolute top-0 right-full z-[9999] mr-1 min-w-40 px-0 py-1 [box-shadow:0_0.5rem_1.5rem_var(--color-hover-shadow)] [border:0.063rem_solid_var(--color-card-glass-border)]"
+                class="search-download-submenu bg-dropdown-bg rounded-default absolute top-0 right-full z-9999 mr-1 min-w-40 px-0 py-1 [box-shadow:0_0.5rem_1.5rem_var(--color-hover-shadow)] [border:0.063rem_solid_var(--color-card-glass-border)]"
                 data-test="search-download-submenu"
               >
                 <button
@@ -805,7 +805,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </ODropdownItem>
           </ODropdownGroup>
         </ODropdown>
-        <ShareButton
+        <share-button
           v-if="!shouldMoveShareToMenu"
           data-test="logs-search-bar-share-link-btn"
           :url="shareURL"
@@ -832,7 +832,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
 
         <div class="order-1 mr-1">
-          <DateTime
+          <date-time
             ref="dateTimeRef"
             auto-apply
             menu-align="end"
@@ -1254,7 +1254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </p>
               </ODropdown>
               <!-- Compact Auto Refresh Button -->
-              <AutoRefreshInterval
+              <auto-refresh-interval
                 class="ml-1"
                 v-model="searchObj.meta.refreshInterval"
                 :trigger="true"
@@ -1290,7 +1290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost"
         size="icon-toolbar"
         @click="toggleEditorFullscreen"
-        class="rounded-default absolute! top-[0.1875rem] right-1 z-[51] h-7.5! min-h-7.5! w-7.5! min-w-7.5! [border:1px_solid_var(--color-card-glass-border)]!"
+        class="rounded-default absolute! top-[0.1875rem] right-1 z-51 h-7.5! min-h-7.5! w-7.5! min-w-7.5! [border:1px_solid_var(--color-card-glass-border)]!"
       >
         <OTooltip :content="isFocused ? t('search.collapse') : t('search.expand')" />
       </OButton>
@@ -1312,7 +1312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
             >
               <!-- Unified Query Editor (with built-in AI bar) -->
-              <UnifiedQueryEditor
+              <unified-query-editor
                 v-if="router.currentRoute.value.name === 'logs'"
                 ref="queryEditorRef"
                 :query="searchObj.data.query"
@@ -1352,7 +1352,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   searchObj.meta.queryEditorPlaceholderFlag &&
                   !searchObj.meta.nlpMode
                 "
-                class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-[1] flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] select-none"
+                class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] select-none"
               >
                 <span class="query-editor-placeholder-typewriter">{{ editorPlaceholder }}</span>
               </div>
@@ -1368,7 +1368,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="relative h-full w-full">
                   <div class="relative h-full">
                     <!-- Unified Query Editor (with built-in AI bar) -->
-                    <UnifiedQueryEditor
+                    <unified-query-editor
                       v-if="router.currentRoute.value.name === 'logs'"
                       data-test="logs-vrl-function-editor"
                       ref="fnEditorRef"
@@ -1396,7 +1396,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.meta.functionEditorPlaceholderFlag &&
                         !isVrlEditorDisabled
                       "
-                      class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-[1] flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] select-none"
+                      class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] select-none"
                     >
                       <span class="query-editor-placeholder-typewriter">{{ vrlPlaceholder }}</span>
                     </div>
@@ -1415,7 +1415,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
               <template v-else-if="searchObj.data.transformType === 'action'">
-                <CodeQueryEditor
+                <code-query-editor
                   v-if="router.currentRoute.value.name === 'logs'"
                   data-test="logs-vrl-function-editor"
                   ref="fnEditorRef"
@@ -1484,7 +1484,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="py-2"
         />
         <div>
-          <div class="text-text-label pr-2 text-sm leading-tight font-semibold">
+          <div class="text-compact text-input-label-text pr-2 leading-tight font-medium">
             {{ t("search.fileType") }}
           </div>
           <OButtonGroup
@@ -2804,6 +2804,20 @@ export default defineComponent({
       // reappearing in the search bar.
       if (searchObj.loadingStream) {
         return;
+      }
+
+      // A URL / short-link restore has just set the SQL query, but the lazy-loaded
+      // Monaco editor fires this callback with an empty "" as it mounts, BEFORE the
+      // restored value is applied. Treating that transient empty as a real edit
+      // wipes searchObj.data.query and (below) flips SQL mode off — the intermittent
+      // "shared SQL link opens an empty editor" bug. While a restore is pending,
+      // ignore the empty emission; clear the flag as soon as the real (non-empty)
+      // value lands so genuine later clears by the user still work.
+      if (searchObj.meta.pendingUrlQueryRestore) {
+        if (value.trim() === "") {
+          return;
+        }
+        searchObj.meta.pendingUrlQueryRestore = false;
       }
 
       // if (searchObj.meta.jobId != "") {

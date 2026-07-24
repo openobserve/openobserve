@@ -2071,7 +2071,7 @@
   "workflow": {
     "header": "Рабочие процессы",
     "subtitle": "Автоматизируйте действия с помощью триггеров, логики и пунктов назначения",
-    "create": "Новый рабочий процесс",
+    "create": "Новый workflow",
     "createTitle": "Создать рабочий процесс",
     "createConfirm": "Создать",
     "createSuccess": "Рабочий процесс успешно создан",
@@ -2222,6 +2222,7 @@
       "linkPartial": "Привязано к {ok} оповещению(ям), {failed} не удалось",
       "linkError": "Не удалось привязать оповещения."
     },
+    "chooseTrigger": "Выберите триггер",
     "node": {
       "kindTrigger": "Триггер",
       "kindLogic": "Логика",
@@ -2378,6 +2379,11 @@
     "deleteNodeTitle": "Удалить узел",
     "deleteNodeLlmEvalConfirm": "Вы уверены, что хотите удалить этот узел оценки LLM?",
     "cancel": "Отмена",
+    "collapseNodes": "Свернуть узлы",
+    "openNodes": "Открыть узлы",
+    "chooseSource": "Выберите источник",
+    "sourceStreamDesc": "Обрабатывайте данные в реальном времени по мере их поступления в поток",
+    "sourceQueryDesc": "Выполняйте запрос по расписанию и обрабатывайте его результаты",
     "promqlOnlyForMetrics": "PromQL доступен только для типа потока метрик",
     "invalidCronExpression": "Недопустимое выражение cron",
     "cronRequired": "Необходимо указать выражение cron",
@@ -3326,6 +3332,8 @@
     "seriesName": "Имя серии",
     "seriesValue": "Значение серии",
     "axisValue": "Значение оси",
+    "expandAllSections": "Развернуть все разделы",
+    "collapseAllSections": "Свернуть все разделы",
     "configSectionGeneral": "Общие",
     "configSectionPromqlTable": "Табличный режим PromQL",
     "configSectionGeographic": "Географическая конфигурация",
@@ -7730,7 +7738,11 @@
     "agentGraph": {
       "allAgents": "Все агенты",
       "stream": "Поток",
-      "agent": "Агент"
+      "agent": "Агент",
+      "noAgentsTitle": "Агенты не найдены",
+      "noAgentsDescription": "В этом временном диапазоне агенты не обнаружены. Попробуйте расширить временной диапазон или проверьте, что ваши трассы содержат атрибуты агента gen_ai.",
+      "agentCountSingular": "агент",
+      "agentCountPlural": "агенты"
     },
     "kpi": {
       "totalCost": "Общая стоимость",
@@ -9381,6 +9393,8 @@
     "dialog": {
       "bulkDeleteBody": "Вы уверены, что хотите удалить {count} проверку(и)? Это действие нельзя отменить.",
       "bulkDeleteTitle": "Удалить проверки",
+      "deleteSingleBody": "Вы уверены, что хотите удалить \"{name}\"? Это действие нельзя отменить.",
+      "deleteSingleTitle": "Удалить проверку",
       "duplicateTitle": "Дублировать проверку"
     },
     "empty": {
@@ -9574,6 +9588,7 @@
       "httpDesc": "Проверяйте конечные точки, коды состояния и тела ответов",
       "leave": "Уйти",
       "loadEditFailed": "Не удалось загрузить проверку для редактирования — форма показывает значения по умолчанию, не сохраняйте",
+      "notFoundInOrg": "Эта проверка не существует в текущей организации.",
       "modalSubtitle": "Выберите, что вы хотите мониторить",
       "modalTitle": "Создать проверку",
       "pageTitle": "Новая проверка {label}",
@@ -9693,6 +9708,7 @@
       "failed": "Не удалось",
       "failedRuns": "Неудачные запуски",
       "jumpToLastRun": "Перейти к последнему запуску",
+      "jumpToLatestData": "Перейти к последним данным",
       "lastRun": "Последний запуск",
       "location": "Местоположение",
       "monitors": "Мониторы",
@@ -10022,7 +10038,8 @@
       "nameRequired": "Имя обязательно",
       "selectorRequired": "Селектор обязателен для \"{step}\"",
       "urlInvalid": "Введите действительный URL, начинающийся с http:// или https://",
-      "urlRequired": "Начальный URL обязателен"
+      "urlRequired": "Начальный URL обязателен",
+      "fixHighlightedFields": "Исправьте выделенные поля перед сохранением"
     },
     "privateLocations": {
       "searchPlaceholder": "Поиск локаций...",
@@ -10209,6 +10226,8 @@
       "panelEditorQueryInspector": "Открыть инспектор запросов",
       "metricsRunQuery": "Выполнить запрос PromQL",
       "metricsRefresh": "Обновить",
+      "metricsAddToDashboard": "Добавить на панель управления",
+      "metricsCopyUrl": "Копировать ссылку для общего доступа",
       "tracesSearch": "Выполнить запрос",
       "tracesRefresh": "Обновить",
       "alertsCreate": "Создать новое оповещение",

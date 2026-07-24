@@ -376,7 +376,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                turn row, sticky so they persist on scroll. -->
                     <div
                       v-if="filteredTraces.length"
-                      class="bg-surface-base border-border-default text-text-label sticky top-0 z-[5] grid grid-cols-[auto_auto_minmax(0,1fr)_5rem_5rem_5rem] items-center gap-3 border-b px-3 py-[0.4rem] text-xs font-medium"
+                      class="bg-surface-base border-border-default text-text-label sticky top-0 z-5 grid grid-cols-[auto_auto_minmax(0,1fr)_5rem_5rem_5rem] items-center gap-3 border-b px-3 py-[0.4rem] text-xs font-medium"
                       data-test="session-turn-columns"
                     >
                       <span></span>
@@ -1570,7 +1570,7 @@ function turnRowClass(trace: SessionTraceRow): string {
     trace.status === "error"
       ? "bg-[color-mix(in_srgb,var(--color-error-500)_5%,var(--color-surface-base))]"
       : "bg-surface-base";
-  const flash = flashTurn.value === n ? " ring-2 ring-primary-500" : "";
+  const flash = flashTurn.value === n ? " ring-2 ring-accent" : "";
   return `rounded-default border border-border-default ${surface} overflow-hidden${flash}`;
 }
 

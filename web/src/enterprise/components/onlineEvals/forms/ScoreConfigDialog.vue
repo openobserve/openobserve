@@ -95,7 +95,7 @@
             class="sc-dtype-radio rounded-default min-w-0 flex-1 border transition-[border-color,background] duration-120"
             :class="[
               formValues.dataType === type
-                ? 'border-primary-600 bg-[color-mix(in_srgb,var(--color-primary-600)_5%,var(--color-card-bg))]'
+                ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_5%,var(--color-card-bg))]'
                 : 'border-dialog-header-border bg-card-bg',
               mode === 'edit'
                 ? ''
@@ -210,7 +210,7 @@
               class="rounded-default grid min-w-0 flex-1 cursor-pointer grid-cols-[1.125rem_1.25rem_minmax(0,1fr)_5rem] items-center gap-2 border px-3 py-1.5 transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
               :class="
                 formValues.healthyDirection === 'gte'
-                  ? 'border-primary-600 bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
+                  ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
                   : 'border-dialog-header-border bg-card-bg'
               "
             >
@@ -239,7 +239,7 @@
               class="rounded-default grid min-w-0 flex-1 cursor-pointer grid-cols-[1.125rem_1.25rem_minmax(0,1fr)_5rem] items-center gap-2 border px-3 py-1.5 transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
               :class="
                 formValues.healthyDirection === 'lte'
-                  ? 'border-primary-600 bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
+                  ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
                   : 'border-dialog-header-border bg-card-bg'
               "
             >
@@ -318,7 +318,7 @@
               class="rounded-default grid min-w-0 flex-1 cursor-pointer grid-cols-[1rem_1fr] items-start gap-2.5 border px-3 py-1.75 transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
               :class="
                 formValues.healthyBool === true
-                  ? 'border-primary-600 bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
+                  ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
                   : 'border-dialog-header-border bg-card-bg'
               "
             >
@@ -342,7 +342,7 @@
               class="rounded-default grid min-w-0 flex-1 cursor-pointer grid-cols-[1rem_1fr] items-start gap-2.5 border px-3 py-1.75 transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
               :class="
                 formValues.healthyBool === false
-                  ? 'border-primary-600 bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
+                  ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
                   : 'border-dialog-header-border bg-card-bg'
               "
             >

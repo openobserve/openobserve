@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="card in kpiCards"
           :key="card.label"
-          class="bg-card-glass-bg rounded-default border-border-default hover:border-border-strong flex min-h-32.5 flex-col gap-1 border px-3.5 py-2.5 transition-colors duration-200"
+          class="bg-card-glass-bg rounded-default border-border-default flex min-h-32.5 flex-col gap-1 border px-3.5 py-2.5"
         >
           <!-- P95 rides its own (slower) query — skeleton the WHOLE card while
                it loads, matching the initial strip skeleton tile (see

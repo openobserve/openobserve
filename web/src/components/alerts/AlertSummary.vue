@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Scroll to bottom button -->
     <div
       v-show="showScrollToBottom"
-      class="pointer-events-none absolute right-5 bottom-5 z-[1000] transition-all duration-300"
+      class="pointer-events-none absolute right-5 bottom-5 z-1000 transition-all duration-300"
     >
       <OButton
         round

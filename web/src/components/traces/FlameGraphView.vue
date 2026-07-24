@@ -47,7 +47,7 @@
           <template v-for="(tick, index) in timelineTicks" :key="'tic-' + index">
             <div
               v-if="index > 0 && index < timelineTicks.length - 1"
-              class="bg-grey-400 absolute bottom-0 h-full w-px"
+              class="bg-separator absolute bottom-0 h-full w-px"
               :style="{ left: tick.left, transform: 'translateX(-50%)' }"
             ></div>
           </template>

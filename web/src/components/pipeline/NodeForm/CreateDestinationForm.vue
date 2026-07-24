@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="destinationType === destType.value"
-                  class="bg-status-positive text-text-inverse absolute top-1.5 right-1.5 z-[1] flex h-5 w-5 items-center justify-center overflow-hidden rounded-full"
+                  class="bg-status-positive text-text-inverse absolute top-1.5 right-1.5 z-1 flex h-5 w-5 items-center justify-center overflow-hidden rounded-full"
                 >
                   <!-- eslint-disable-next-line vue/max-attributes-per-line -->
                   <OIcon name="check" size="xs" />

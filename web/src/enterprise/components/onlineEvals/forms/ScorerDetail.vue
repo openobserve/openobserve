@@ -750,32 +750,6 @@ function relativeTime(timestampMs: number): string {
   color: var(--color-text-heading, currentColor);
 }
 
-.sd-type-chip {
-  display: inline-flex;
-  padding: 0.0625rem 0.375rem;
-  border-radius: 0.1875rem;
-  font-size: var(--text-2xs);
-  font-weight: 600;
-  background: var(--color-badge-indigo-soft-bg);
-  color: var(--color-badge-indigo-soft-text);
-}
-
-.sd-type-chip--remote {
-  background: var(--color-badge-orange-soft-bg);
-  color: var(--color-badge-orange-soft-text);
-}
-
-.sd-version-chip {
-  display: inline-flex;
-  margin-left: 0.375rem;
-  padding: 0.0625rem 0.375rem;
-  border-radius: 0.1875rem;
-  font-size: var(--text-2xs);
-  font-weight: 600;
-  background: color-mix(in srgb, var(--color-text-secondary) 10%, transparent);
-  color: var(--color-text-secondary, var(--color-text-secondary));
-}
-
 .sd-produces {
   display: flex;
   align-items: center;
@@ -853,55 +827,10 @@ function relativeTime(timestampMs: number): string {
   color: var(--color-text-heading, currentColor);
 }
 
-.sd-versions__chip {
-  display: inline-flex;
-  padding: 0.0625rem 0.4375rem;
-  border-radius: 0.1875rem;
-  font-size: var(--text-3xs);
-  font-weight: 600;
-  background: color-mix(in srgb, var(--color-status-success-text) 14%, transparent);
-  color: var(--color-status-success-text);
-}
-
 .sd-versions__meta {
   margin-top: 0.375rem;
   font-size: var(--text-2xs);
   color: var(--color-text-secondary, var(--color-text-secondary));
-}
-
-/* — Runs tab — */
-.sd-status-cell {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3125rem;
-  color: var(--color-text-secondary, var(--color-text-secondary));
-}
-
-.sd-status-cell__dot {
-  width: 0.375rem;
-  height: 0.375rem;
-  border-radius: 50%;
-  background: var(--color-text-secondary, var(--color-text-secondary));
-}
-
-.sd-status-cell--success {
-  color: var(--color-status-success-text);
-}
-.sd-status-cell--success .sd-status-cell__dot {
-  background: var(--color-status-success-text);
-}
-
-.sd-status-cell--error,
-.sd-status-cell--timeout {
-  color: var(--color-status-error-text);
-}
-.sd-status-cell--error .sd-status-cell__dot,
-.sd-status-cell--timeout .sd-status-cell__dot {
-  background: var(--color-status-error-text);
-}
-
-.sd-status-cell--skipped .sd-status-cell__dot {
-  background: color-mix(in srgb, var(--color-text-secondary) 60%, transparent);
 }
 
 /* — Used by tab — */

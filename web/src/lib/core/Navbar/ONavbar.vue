@@ -207,7 +207,7 @@ onBeforeUnmount(() => {
 // on the near-black rail.
 const indicatorClass = computed(() => [
   "pointer-events-none absolute left-0 top-0 z-0 rounded-surface border-l-2",
-  "bg-surface-base border-primary-600 dark:bg-tabs-active-bg dark:border-primary-400",
+  "bg-surface-base border-accent dark:bg-tabs-active-bg dark:border-accent",
   transitionOn.value &&
     "transition-[transform,width,height] duration-300 ease-out motion-reduce:transition-none",
   indicatorVisible.value ? "opacity-100" : "opacity-0",

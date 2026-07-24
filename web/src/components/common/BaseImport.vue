@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Tabs Section -->
               <div class="bg-card-glass-bg px-page-edge mb-1 shrink-0 py-2.5">
                 <div class="app-tabs-container h-9 w-fit">
-                  <AppTabs
+                  <app-tabs
                     :data-test="`${testPrefix}-import-tabs`"
                     class="tabs-selection-container"
                     :tabs="tabs"
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </slot>
 
-                  <QueryEditor
+                  <query-editor
                     :key="`editor-${editorKey}`"
                     :data-test="`${testPrefix}-import-sql-editor`"
                     ref="queryEditorRef"
@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </slot>
 
-                  <QueryEditor
+                  <query-editor
                     :key="`editor-${editorKey}`"
                     :data-test="`${testPrefix}-import-sql-editor`"
                     ref="queryEditorRef"
@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     Output Messages
                   </div>
                   <OSeparator class="mt-1 shrink-0" />
-                  <div class="error-report-container min-h-0 flex-1 overflow-auto">
+                  <div class="error-report-container min-h-0 flex-1 resize-none overflow-auto">
                     <div class="text-text-muted p-3 text-center">No messages to display</div>
                   </div>
                 </slot>
@@ -536,13 +536,14 @@ export default defineComponent({
 });
 </script>
 
-<style>
-/* keep(scrollbar): cross-file shared scroll container. .error-report-container
-   supplies overflow scrolling to BaseImport, ImportAlert.vue and
-   ImportPipeline.vue (those two carry no local overflow utility), so the rule
-   must stay an unscoped global rather than be inlined here. */
-.error-report-container {
-  overflow: auto;
+<style scoped>
+/* keep(lib-override:monaco): fixed Monaco height for the URL import editor.
+   Previously inherited from ImportDashboard.vue's global .editor-container-url
+   rule; now owned locally (via :deep to Monaco's DOM), same value/props, so the
+   editor no longer depends on that view having been mounted first. */
+.editor-container-url :deep(.monaco-editor) {
+  height: calc(100vh - 17.8125rem) !important;
+  overflow: hidden;
   resize: none;
 }
 </style>

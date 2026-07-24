@@ -29,6 +29,7 @@ enterprise = [
     "openobserve-jobs/enterprise",
     "super_cluster_queue/enterprise",
     "search_service/enterprise",
+    "enrichment-data/enterprise",
 ]
 vectorscan = [
     "openobserve-api/vectorscan",
@@ -41,13 +42,6 @@ cloud = [
     "openobserve-api/cloud",
     "openobserve-core/cloud",
     "openobserve-jobs/cloud",
-]
-vortex = [
-    "config/vortex",
-    "openobserve-api/vortex",
-    "openobserve-core/vortex",
-    "openobserve-jobs/vortex",
-    "search_service/vortex",
 ]
 mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
@@ -225,6 +219,9 @@ openobserve-api.workspace = true
 web.workspace = true
 openobserve-api-management.workspace = true
 openobserve-core.workspace = true
+ingestion-common.workspace = true
+compaction.workspace = true
+enrichment-data.workspace = true
 common.workspace = true
 db.workspace = true
 search.workspace = true
@@ -234,11 +231,18 @@ openobserve-jobs.workspace = true
 openobserve-mcp.workspace = true
 
 [dev-dependencies]
+arrow.workspace = true
+bytes.workspace = true
+enrichment-data.workspace = true
 expect-test.workspace = true
 base64.workspace = true
 float-cmp.workspace = true
 multer.workspace = true
+prost.workspace = true
 rcgen.workspace = true
+schema.workspace = true
+snap.workspace = true
+tower.workspace = true
 transform.workspace = true
 
 [workspace]
@@ -247,6 +251,11 @@ members = [
     "src/api_management",
     "src/api_query",
     "src/api_common",
+    "src/ingestion_common",
+    "src/schema",
+    "src/compaction",
+    "src/stream",
+    "src/enrichment_data",
     "src/common",
     "src/core",
     "src/transform",
@@ -258,6 +267,7 @@ members = [
     "src/usage_reporting",
     "src/audit",
     "src/promql",
+    "src/promql_service",
     "src/jobs",
     "src/mcp",
     "src/config",
@@ -286,6 +296,11 @@ proto = { path = "src/proto" }
 report_server = { path = "src/report_server" }
 flight = { path = "src/flight" }
 tantivy_utils = { path = "src/tantivy_utils" }
+ingestion-common = { path = "src/ingestion_common" }
+schema = { path = "src/schema" }
+compaction = { path = "src/compaction" }
+stream = { path = "src/stream" }
+enrichment-data = { path = "src/enrichment_data" }
 web = { path = "src/web" }
 openobserve-core = { path = "src/core" }
 common = { path = "src/common" }
@@ -298,6 +313,7 @@ search_service = { path = "src/search_service" }
 usage_reporting = { path = "src/usage_reporting" }
 audit = { path = "src/audit" }
 promql = { path = "src/promql" }
+promql-service = { path = "src/promql_service" }
 openobserve-api = { path = "src/api" }
 openobserve-api-management = { path = "src/api_management" }
 openobserve-api-query = { path = "src/api_query" }
@@ -308,8 +324,10 @@ o2_dex = { path = "src/enterprise/o2_dex" }
 o2_enterprise = { path = "src/enterprise/o2_enterprise", default-features = false }
 o2_openfga = { path = "src/enterprise/o2_openfga" }
 o2_ratelimit = { path = "src/enterprise/o2_ratelimit" }
-vortex = { path = "src/enterprise/vortex" }
-vortex-datafusion = { path = "src/enterprise/vortex-datafusion" }
+vortex = { git = "https://github.com/openobserve/vortex", rev = "57ffbf2b2dde0d63df03ff1f4788cd85206388a0", features = [
+    "tokio",
+] }
+vortex-datafusion = { git = "https://github.com/openobserve/vortex", rev = "57ffbf2b2dde0d63df03ff1f4788cd85206388a0" }
 aes-siv = "0.7.0"
 ahash = { version = "0.8", features = ["serde"] }
 axum = { version = "0.8", features = ["macros", "multipart", "tracing"] }

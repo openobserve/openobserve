@@ -240,6 +240,7 @@ jobs:
                 "logsQueryBuilder-filters-advanced.spec.js",
                 "logsquickmode.spec.js",
                 "logshistogram.spec.js",
+                "logsQuickPick.spec.js",
               ]
           - testfolder: "Logs-Core"
             browser: "chrome"

@@ -24,6 +24,7 @@ import {
   getSQLMinMaxValue,
   getSeriesColor,
 } from "./colorPalette";
+import { chartColor } from "../chartTheme";
 
 // Mock d3-scale
 vi.mock("d3-scale", () => ({
@@ -66,24 +67,21 @@ describe("Color Palette Utils", () => {
   });
 
   describe("getColorPalette", () => {
-    it("should return dark theme colors for dark theme", () => {
-      const result = getColorPalette("dark");
-      expect(result).toBe(classicColorPaletteDarkTheme);
+    // The palette now resolves the --color-chart-series-* design tokens via
+    // chartColor(); the light/dark swap lives in dark.css, not a JS branch.
+    it("resolves the 12 --color-chart-series-* tokens", () => {
+      const result = getColorPalette();
+      expect(result).toHaveLength(12);
+      result.forEach((c, i) => {
+        expect(c).toBe(chartColor(`--color-chart-series-${i + 1}`));
+      });
     });
 
-    it("should return light theme colors for light theme", () => {
-      const result = getColorPalette("light");
-      expect(result).toBe(classicColorPaletteLightTheme);
-    });
-
-    it("should return light theme colors for unknown theme", () => {
-      const result = getColorPalette("unknown");
-      expect(result).toBe(classicColorPaletteLightTheme);
-    });
-
-    it("should return light theme colors for empty string", () => {
-      const result = getColorPalette("");
-      expect(result).toBe(classicColorPaletteLightTheme);
+    it("ignores the legacy theme arg — no JS theme branch remains", () => {
+      // In jsdom there is no live CSSOM, so both themes resolve to the same
+      // token fallbacks; the point is the function no longer switches on theme.
+      expect(getColorPalette("dark")).toEqual(getColorPalette("light"));
+      expect(getColorPalette()).toEqual(getColorPalette("dark"));
     });
   });
 

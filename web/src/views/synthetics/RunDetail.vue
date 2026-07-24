@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :run-id="runIdParam"
     :execution-id="executionIdParam"
     :drawer-mode="drawerMode"
+    :location-names="locationNames"
     @update-status="emit('update-status', $event)"
   />
   <OPageLayout v-else class="run-detail" data-test="synthetics-run-detail" bleed>
@@ -252,7 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- ── Left: Session Replay Player ── -->
               <OCard v-if="currentRun.hasReplay" class="w-[30%] min-w-[30rem] gap-0 p-0">
                 <OCardSection role="header" class="gap-2">
-                  <OIcon name="smart_display" size="sm" class="text-primary-700" />
+                  <OIcon name="smart_display" size="sm" class="text-accent" />
                   <span class="text-text-heading text-sm font-bold">{{
                     t("synthetics.runDetail.sessionReplay")
                   }}</span>
@@ -651,10 +652,10 @@ function locationLabel(id: string): string {
 syntheticsService
   .getLocations(store.state.selectedOrganization.identifier)
   .then((res) => {
-    const locations: { id: string; name: string; region: string }[] =
+    const locations: { id: string; label: string; region: string }[] =
       (res.data as any).locations ?? [];
     locationNames.value = Object.fromEntries(
-      locations.map((loc) => [loc.id, locationDisplayLabel(loc.name, loc.region)]),
+      locations.map((loc) => [loc.id, locationDisplayLabel(loc.label, loc.region)]),
     );
   })
   .catch((err) => console.error("[synthetics] failed to load locations", err));
@@ -669,6 +670,9 @@ const runIdParam = computed(() =>
 const executionIdParam = computed(() =>
   props.drawerMode ? props.overrideExecutionId : String(route.params.executionId ?? ""),
 );
+// The check's folder (name), carried on the results-page route as ?folder=.
+// Passed to per-check API calls so RBAC can resolve folder-scoped grants.
+const folderName = computed(() => String(route.query.folder ?? ""));
 
 // ── Composable ─────────────────────────────────────────────────────────────
 const synthetics = useSyntheticResults();
@@ -681,7 +685,7 @@ const monitorType = ref<string | null>(null);
 async function resolveMonitorType() {
   try {
     const org = store.state.selectedOrganization.identifier;
-    const res = await syntheticsService.get(org, monitorId.value);
+    const res = await syntheticsService.get(org, monitorId.value, folderName.value);
     monitorType.value = (res.data as any)?.type ?? "browser";
   } catch {
     monitorType.value = "browser";
@@ -814,7 +818,12 @@ async function presignRunArtifacts() {
   if (!keys.length) return;
   const orgId = store.state.selectedOrganization.identifier;
   try {
-    const { data } = await syntheticsService.presignArtifacts(orgId, monitorId.value, keys);
+    const { data } = await syntheticsService.presignArtifacts(
+      orgId,
+      monitorId.value,
+      keys,
+      folderName.value,
+    );
     const map: Record<string, string> = {};
     for (const entry of data.urls ?? []) {
       map[entry.key] = entry.url;
@@ -840,7 +849,7 @@ function screenshotUrl(key: string | null): string {
   const signed = artifactUrls.value[key];
   if (signed) return signed;
   const orgId = store.state.selectedOrganization.identifier;
-  return syntheticsService.artifactUrl(orgId, key);
+  return syntheticsService.artifactUrl(orgId, key, folderName.value);
 }
 
 // ── Display model for the current run (mapped from SyntheticRunDetail) ─────

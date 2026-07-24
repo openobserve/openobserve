@@ -183,7 +183,7 @@ export function applyHeatmapChart(ctx: SQLContext): void {
       label: {
         fontsize: 12,
         precision: panelSchema.config?.decimals,
-        backgroundColor: store.state.theme === "dark" ? "#333" : "",
+        backgroundColor: chartColor("--color-chart-crosshair-bg"),
       },
     }));
   // if auto sql

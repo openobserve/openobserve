@@ -6,6 +6,7 @@
 // (those are browser-run concepts).
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -23,8 +24,9 @@ const props = withDefaults(
     runId: string;
     executionId: string;
     drawerMode?: boolean;
+    locationNames?: Record<string, string>;
   }>(),
-  { drawerMode: false },
+  { drawerMode: false, locationNames: () => ({}) },
 );
 
 const emit = defineEmits<{
@@ -36,6 +38,9 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 const store = useStore();
+const route = useRoute();
+// The check's folder (name), carried on the results-page route as ?folder=.
+const folderName = computed(() => String(route.query.folder ?? ""));
 const synthetics = useSyntheticResults();
 
 const run = computed(() => synthetics.protocolRunDetail.value);
@@ -61,7 +66,7 @@ async function loadRun() {
 async function loadAssertionDefs() {
   try {
     const org = store.state.selectedOrganization.identifier;
-    const res = await syntheticsService.get(org, props.monitorId);
+    const res = await syntheticsService.get(org, props.monitorId, folderName.value);
     assertionDefs.value = ((res.data as any)?.config?.assertions ?? []) as HttpAssertion[];
   } catch {
     assertionDefs.value = [];
@@ -69,6 +74,10 @@ async function loadAssertionDefs() {
 }
 
 onMounted(loadAssertionDefs);
+
+function locationLabel(id: string): string {
+  return props.locationNames?.[id] ?? id;
+}
 
 watch(
   () => [props.runId, props.executionId] as [string, string],
@@ -224,7 +233,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionDef
         <!-- ── Result ── -->
         <div class="rounded-default border-border-default border">
           <div class="border-border-default flex items-center border-b px-3 py-2">
-            <div class="rounded-default bg-primary-600 mr-2 h-4 w-[0.1875rem] shrink-0" />
+            <div class="rounded-default bg-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
             <h3 class="text-text-heading text-base font-semibold">
               {{ t("synthetics.protocolRun.result") }}
             </h3>
@@ -280,7 +289,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionDef
         <!-- ── Timing breakdown ── -->
         <div v-if="timingBars.length" class="rounded-default border-border-default border">
           <div class="border-border-default flex items-center border-b px-3 py-2">
-            <div class="rounded-default bg-primary-600 mr-2 h-4 w-[0.1875rem] shrink-0" />
+            <div class="rounded-default bg-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
             <h3 class="text-text-heading text-base font-semibold">
               {{ t("synthetics.protocolRun.timings") }}
             </h3>
@@ -291,10 +300,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionDef
                 t(`synthetics.protocolRun.phase.${bar.phase}`)
               }}</span>
               <div class="rounded-default bg-surface-subtle h-3 flex-1 overflow-hidden">
-                <div
-                  class="rounded-default bg-primary-600 h-full"
-                  :style="{ width: bar.pct + '%' }"
-                />
+                <div class="rounded-default bg-accent h-full" :style="{ width: bar.pct + '%' }" />
               </div>
               <span class="text-text-secondary w-[4.5rem] shrink-0 text-right text-xs">{{
                 fmtMs(bar.ms)
@@ -315,7 +321,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionDef
         <!-- ── Assertions (http) ── -->
         <div v-if="showAssertions" class="rounded-default border-border-default border">
           <div class="border-border-default flex items-center border-b px-3 py-2">
-            <div class="rounded-default bg-primary-600 mr-2 h-4 w-[0.1875rem] shrink-0" />
+            <div class="rounded-default bg-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
             <h3 class="text-text-heading text-base font-semibold">
               {{ t("synthetics.protocolRun.assertions") }}
             </h3>
@@ -351,7 +357,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionDef
         <!-- ── TLS certificate ── -->
         <div v-if="certExpiryDate" class="rounded-default border-border-default border">
           <div class="border-border-default flex items-center border-b px-3 py-2">
-            <div class="rounded-default bg-primary-600 mr-2 h-4 w-[0.1875rem] shrink-0" />
+            <div class="rounded-default bg-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
             <h3 class="text-text-heading text-base font-semibold">
               {{ t("synthetics.protocolRun.tlsCert") }}
             </h3>
@@ -371,7 +377,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionDef
         <!-- ── Probe ── -->
         <div class="rounded-default border-border-default border">
           <div class="border-border-default flex items-center border-b px-3 py-2">
-            <div class="rounded-default bg-primary-600 mr-2 h-4 w-[0.1875rem] shrink-0" />
+            <div class="rounded-default bg-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
             <h3 class="text-text-heading text-base font-semibold">
               {{ t("synthetics.protocolRun.probe") }}
             </h3>
@@ -381,7 +387,7 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionDef
               <span class="text-text-muted text-xs">{{
                 t("synthetics.protocolRun.location")
               }}</span>
-              <span class="font-medium">{{ run.location || "—" }}</span>
+              <span class="font-medium">{{ locationLabel(run.location) || "—" }}</span>
             </div>
             <div class="rounded-default bg-surface-subtle flex flex-col gap-1.5 p-3">
               <span class="text-text-muted text-xs">{{ t("synthetics.protocolRun.runtime") }}</span>

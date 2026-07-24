@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           class="flex items-center gap-1.5"
         >
-          <DateTime
+          <date-time
             ref="dateTimeRef"
             auto-apply
             menu-align="end"
@@ -238,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OIcon name="download" size="sm" />
           </OButton>
-          <ShareButton
+          <share-button
             data-test="logs-search-bar-share-link-btn"
             :url="tracesShareURL"
             variant="outline"
@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Service Graph right toolbar: DateTime, Refresh, Tree/Graph tabs, Layout -->
         <div v-if="searchObj.meta.searchMode === 'service-graph'" class="ml-auto">
           <div class="flex items-center gap-2">
-            <DateTime
+            <date-time
               ref="dateTimeRef"
               auto-apply
               :default-type="searchObj.data.datetime.type"
@@ -302,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Services Catalog right toolbar: DateTime, Refresh -->
         <div v-if="searchObj.meta.searchMode === 'services-catalog'" class="ml-auto">
           <div class="flex items-center gap-2">
-            <DateTime
+            <date-time
               ref="dateTimeRef"
               auto-apply
               menu-align="end"
@@ -330,7 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-border-default flex min-h-0 flex-1 border-b"
     >
       <div class="relative flex h-full w-full flex-col overflow-hidden">
-        <CodeQueryEditor
+        <code-query-editor
           ref="queryEditorRef"
           editor-id="traces-query-editor"
           v-model:query="searchObj.data.editorValue"
@@ -343,7 +343,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           v-if="searchObj.data.editorValue == '' && searchObj.meta.queryEditorPlaceholderFlag"
-          class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-[1] flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] select-none"
+          class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] select-none"
         >
           <span class="query-editor-placeholder-typewriter">{{ traceEditorPlaceholder }}</span>
         </div>

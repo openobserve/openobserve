@@ -435,7 +435,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
         <div
           v-if="data.node_type == 'function' && hasNodeError"
           data-test="pipeline-node-error-badge"
-          class="bg-status-negative error-badge absolute -top-3 -right-3 z-[15] flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border-2 border-white shadow-[0_0.125rem_0.375rem_color-mix(in_srgb,var(--color-status-negative)_50%,transparent)] transition-all duration-200"
+          class="bg-status-negative error-badge absolute -top-3 -right-3 z-15 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border-2 border-white shadow-[0_0.125rem_0.375rem_color-mix(in_srgb,var(--color-status-negative)_50%,transparent)] transition-all duration-200"
           @click.stop="navigateToFunction(data.name)"
         >
           <OIcon name="error" size="sm" />
@@ -487,7 +487,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
     </FlowNodeCard>
   </div>
 
-  <ConfirmDialog
+  <confirm-dialog
     :title="confirmDialogMeta.title"
     :message="confirmDialogMeta.message"
     @update:ok="confirmDialogMeta.onConfirm()"

@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <button v-if="!shown" class="tt-toggle" @click="shown = true">
       <span class="tt-zz"></span>
       <span class="tt-pill">
-        <span class="tt-count">
+        <span class="tt-count text-text-secondary">
           {{ toolCalls.length }}
           {{
             toolCalls.length === 1
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="{ 'thread-tool--open': expandedTools.has(tool.span_id) }"
       >
         <div class="thread-tool-row" @click="toggleTool(tool.span_id)">
-          <span class="thread-tool-row__caret">{{
+          <span class="thread-tool-row__caret text-text-secondary">{{
             expandedTools.has(tool.span_id) ? "▾" : "▸"
           }}</span>
           <OIcon name="build" size="xs" class="thread-tool-row__icon" />
@@ -223,7 +223,6 @@ function formatDuration(ns: number): string {
 
   .tt-count {
     font-size: var(--text-xs);
-    color: var(--color-text-secondary);
     font-weight: 600;
     white-space: nowrap;
   }
@@ -280,7 +279,6 @@ function formatDuration(ns: number): string {
   }
 
   &__caret {
-    color: var(--color-text-secondary);
     font-size: var(--text-2xs);
     width: 0.75rem;
     text-align: center;

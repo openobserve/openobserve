@@ -673,7 +673,7 @@ function openChromeExtensions() {
       role="status"
       data-test="synthetics-journey-replay-banner"
     >
-      <OIcon name="sync" size="sm" class="text-primary-500 animate-spin" aria-hidden="true" />
+      <OIcon name="sync" size="sm" class="text-accent animate-spin" aria-hidden="true" />
       <span class="text-text-body text-sm" data-test="synthetics-journey-replay-banner-text">
         {{ t("synthetics.journey.replaying") }}
       </span>

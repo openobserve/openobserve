@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="enterprise-dialog-v3 relative -mx-(--spacing-dialog-content-px) -my-(--spacing-dialog-content-py) overflow-hidden"
     >
       <!-- Close Button -->
-      <div class="text-text-secondary hover:text-text-body absolute top-4 right-4 z-[100]">
+      <div class="text-text-secondary hover:text-text-body absolute top-4 right-4 z-100">
         <OButton variant="ghost" size="icon" @click="showDialog = false">
           <svg
             xmlns="http://www.w3.org/2000/svg"

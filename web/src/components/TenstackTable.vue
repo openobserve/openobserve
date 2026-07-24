@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="headerGroup in table.getHeaderGroups()"
           :key="headerGroup.id"
         >
-          <VueDraggable
+          <vue-draggable
             v-model="columnOrder"
             :element="'table'"
             :animation="200"
@@ -294,9 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           name="filter-list"
                           size="sm"
                           :data-test="`o2-table-column-filter-icon-${header.column.id}-${isColFiltered(header.column.id) ? 'active' : 'inactive'}`"
-                          :class="
-                            isColFiltered(header.column.id) ? 'text-primary-600' : 'opacity-50'
-                          "
+                          :class="isColFiltered(header.column.id) ? 'text-accent' : 'opacity-50'"
                         />
                       </OButton>
                     </template>
@@ -385,7 +383,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </th>
-          </VueDraggable>
+          </vue-draggable>
 
           <!-- Loading row: only rendered when the parent supplies a custom
             #loading slot. With no slot, the shimmer skeleton <tbody> below
