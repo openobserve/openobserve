@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi, afterEach, Mock } from "vitest";
-import { mount, flushPromises, DOMWrapper } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import { copyToClipboard } from "@/utils/clipboard";
 import { nextTick } from "vue";
 
@@ -54,7 +54,7 @@ vi.mock("@/utils/zincutils", async () => {
   return {
     ...actual,
     getImageURL: vi.fn(() => "mocked-image-url"),
-    mergeRoutes: vi.fn((route1: any, route2: any) => route1)
+    mergeRoutes: vi.fn((route1: any) => route1)
   };
 });
 
@@ -237,7 +237,7 @@ describe("DetailTable Component", () => {
   });
 
   it("should initialize reactive data correctly", () => {
-    expect(wrapper.vm.tab).toBe("json");
+    expect(wrapper.vm.tab).toBe("table");
     expect(wrapper.vm.selectedRelativeValue).toBe(10);
     expect(wrapper.vm.shouldWrapValues).toBe(true);
     expect(wrapper.vm.recordSizeOptions).toEqual([
@@ -307,10 +307,10 @@ describe("DetailTable Component", () => {
   });
 
   // Test 11-15: Tab Functionality
-  it("should start with JSON tab active", () => {
-    expect(wrapper.vm.tab).toBe("json");
-    const jsonTab = wrapper.find('[data-test="log-detail-json-tab"]');
-    expect(jsonTab.exists()).toBe(true);
+  it("should start with Table tab active", () => {
+    expect(wrapper.vm.tab).toBe("table");
+    const tableTab = wrapper.find('[data-test="log-detail-table-tab"]');
+    expect(tableTab.exists()).toBe(true);
     // OTab uses Tailwind classes for active state
   });
 
@@ -442,15 +442,22 @@ describe("DetailTable Component", () => {
     expect(wrapper.vm.shouldWrapValues).toBe(!initialValue);
   });
 
+  // Asserts the handler's observable effect rather than spying on the instance
+  // method: the template captures the handler into the vnode at render time, so
+  // a spy installed on wrapper.vm afterwards is only picked up if something
+  // forces a re-render — which made the old spy-based version silently depend
+  // on `tab` actually changing here.
   it("should call toggleWrapLogDetails when wrap toggle changed", async () => {
-    const spy = vi.spyOn(wrapper.vm, "toggleWrapLogDetails");
-    wrapper.vm.tab = "table";
-    await nextTick();
-    
+    const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
+    const initialValue = wrapper.vm.shouldWrapValues;
+
     const wrapToggle = wrapper.find('[data-test="log-detail-wrap-values-toggle-btn"]');
     await wrapToggle.trigger("click");
-    
-    expect(spy).toHaveBeenCalled();
+
+    expect(setItemSpy).toHaveBeenCalledWith(
+      "wrap-log-details",
+      String(!initialValue),
+    );
   });
 
   it("should update localStorage when toggleWrapLogDetails called", () => {

@@ -14,18 +14,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::{Json, extract::Path, http::StatusCode, response::Response};
-
+use db::user::is_root_user;
+use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
-use crate::common::utils::auth::check_permissions;
+use openobserve_core::auth::check_permissions;
+use openobserve_core::{alerts::templates, auth::UserEmail, http::template_error_response};
+
 use crate::{
-    common::{
-        meta::http::HttpResponse as MetaHttpResponse,
-        utils::auth::{UserEmail, is_root_user},
-    },
-    extractors::Headers,
+    common::meta::http::HttpResponse as MetaHttpResponse,
     models::destinations::Template,
     request::{BulkDeleteRequest, BulkDeleteResponse},
-    service::alerts::templates,
 };
 
 /// CreateTemplate
@@ -68,7 +66,7 @@ pub async fn save_template(
                 .with_id(v.id.map(|id| id.to_string()).unwrap_or_default())
                 .with_name(v.name),
         ),
-        Err(e) => e.into(),
+        Err(e) => template_error_response(e),
     }
 }
 
@@ -109,7 +107,7 @@ pub async fn update_template(
     let tmpl = tmpl.into(&org_id);
     match templates::save(&name, tmpl, false, is_root_user(&user_email.user_id)).await {
         Ok(_) => MetaHttpResponse::ok("Template updated"),
-        Err(e) => e.into(),
+        Err(e) => template_error_response(e),
     }
 }
 
@@ -144,7 +142,7 @@ pub async fn update_template(
 pub async fn get_template(Path((org_id, name)): Path<(String, String)>) -> Response {
     match templates::get(&org_id, &name).await {
         Ok(data) => MetaHttpResponse::json(Template::from(data)),
-        Err(e) => e.into(),
+        Err(e) => template_error_response(e),
     }
 }
 
@@ -195,7 +193,7 @@ pub async fn list_templates(
                 _permitted = list;
             }
             Err(e) => {
-                return crate::common::meta::http::HttpResponse::forbidden(e.to_string());
+                return common::meta::http::HttpResponse::forbidden(e.to_string());
             }
         }
         // Get List of allowed objects ends
@@ -205,7 +203,7 @@ pub async fn list_templates(
         Ok(data) => {
             MetaHttpResponse::json(data.into_iter().map(Template::from).collect::<Vec<_>>())
         }
-        Err(e) => e.into(),
+        Err(e) => template_error_response(e),
     }
 }
 
@@ -244,7 +242,7 @@ pub async fn delete_template(
 ) -> Response {
     match templates::delete(&org_id, &name, is_root_user(&user_email.user_id)).await {
         Ok(_) => MetaHttpResponse::ok("Template deleted"),
-        Err(e) => e.into(),
+        Err(e) => template_error_response(e),
     }
 }
 
@@ -350,7 +348,11 @@ pub async fn delete_template_bulk(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "Get system prebuilt templates", "category": "alerts"}))
+        ("x-o2-mcp" = json!({
+            "description": "Get system prebuilt templates",
+            "category": "alerts",
+            "summary_fields": ["name", "type", "isDefault", "title"]
+        }))
     )
 )]
 pub async fn get_system_templates(Path(org_id): Path<String>) -> Response {
@@ -381,12 +383,12 @@ pub async fn get_system_templates(Path(org_id): Path<String>) -> Response {
 
 #[cfg(test)]
 mod tests {
-    use axum::{http::StatusCode, response::Response};
-
-    use crate::service::db::alerts::templates::TemplateError;
+    use axum::http::StatusCode;
+    use db::alerts::templates::TemplateError;
+    use openobserve_core::http::template_error_response;
 
     fn status(err: TemplateError) -> StatusCode {
-        Response::from(err).status()
+        template_error_response(err).status()
     }
 
     // 404 Not Found

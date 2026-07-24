@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #guidelines>
           <div
-            class="note-container bg-banner-warning-bg text-banner-warning-text w-full rounded-default p-3 my-3 flex flex-col gap-2"
+            class="note-container bg-banner-warning-bg border border-banner-warning-border text-banner-warning-text w-full rounded-default p-3 my-3 flex flex-col gap-2"
             data-test="add-condition-note-container"
           >
             <div
@@ -139,7 +139,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import {
   computed,
-  defineAsyncComponent,
   onMounted,
   ref,
   type Ref,
@@ -150,23 +149,14 @@ import { useI18n } from "vue-i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ConditionBuilder from "@/components/flow/forms/ConditionBuilder.vue";
 import {
-  getTimezoneOffset,
   getUUID,
-  getTimezonesByOffset,
 } from "@/utils/zincutils";
 import { useStore } from "vuex";
-import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "../../ConfirmDialog.vue";
-import { convertDateToTimestamp } from "@/utils/date";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import { toast } from "@/lib/feedback/Toast/useToast";
-
-const VariablesInput = defineAsyncComponent(
-  () => import("@/components/alerts/VariablesInput.vue"),
-);
 
 // V1 interfaces (legacy support)
 interface FilterCondition {
@@ -188,19 +178,12 @@ interface ConditionGroup {
   items?: (FilterCondition | ConditionGroup)[];
 }
 
-interface StreamRoute {
-  name: string;
-  query_condition: any | null;
-}
-
 const { t } = useI18n();
 
 
-const router = useRouter();
-
 const store = useStore();
 
-const { getStream, getStreams } = useStreams();
+const { getStream } = useStreams();
 
 const emit = defineEmits(["update:node", "cancel:hideform", "delete:node"]);
 
@@ -217,21 +200,9 @@ function handleDrawerClose(v: boolean) {
   internalOpen.value = v;
 }
 
-const isUpdating = ref(false);
-
 const filteredColumns: any = ref([]);
 
-const scheduledAlertRef = ref<any>(null);
-
-const filteredStreams: Ref<any[]> = ref([]);
-
-const indexOptions = ref([]);
-
 const originalStreamFields: Ref<any[]> = ref([]);
-
-const isAggregationEnabled = ref(false);
-
-const showTimezoneWarning = ref(false);
 
 const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
 
@@ -240,11 +211,6 @@ watch(selected, (newValue: any) => {
   pipelineObj.userSelectedNode = newValue;
 });
 let parser: any;
-
-const nodeLink = ref({
-  from: "",
-  to: "",
-});
 
 const dialog = ref({
   show: false,
@@ -325,12 +291,6 @@ const importSqlParser = async () => {
   parser = await sqlParser();
 };
 
-const streamTypes = ["logs", "enrichment_tables"];
-
-const streamRoute: Ref<StreamRoute> = ref(getDefaultStreamRoute());
-
-const originalStreamRouting: Ref<StreamRoute> = ref(getDefaultStreamRoute());
-
 // The shared ConditionBuilder owns the condition tree + its OForm/zod schema.
 // We only hold a ref to it (for submit() and the cancel dirty-check).
 const builder = ref<any>(null);
@@ -342,27 +302,6 @@ onMounted(() => {
     JSON.stringify(builder.value?.conditionGroup ?? null),
   );
 });
-
-const filterColumns = (options: any[], val: String, update: Function) => {
-  let filteredOptions: any[] = [];
-  if (val === "") {
-    update(() => {
-      filteredOptions = [...options];
-    });
-    return filteredOptions;
-  }
-  update(() => {
-    const value = val.toLowerCase();
-    filteredOptions = options.filter(
-      (column: any) => column.toLowerCase().indexOf(value) > -1,
-    );
-  });
-  return filteredOptions;
-};
-
-const filterStreams = (val: string, update: any) => {
-  filteredStreams.value = filterColumns(indexOptions.value, val, update);
-};
 
 const updateStreamFields = async (streamName: any, streamType: any) => {
   let streamCols: any = [];

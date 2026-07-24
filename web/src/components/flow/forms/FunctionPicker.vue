@@ -170,8 +170,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Same theme-aware banner tokens the pipeline + workflow Condition
                notes use, so all three match and work in dark mode (the old
                #f9f290/#2d3748 were light-only). These were --color-note-* until
-               #13173 removed that set; banner-warning-* is its replacement. -->
-          <div class="bg-banner-warning-bg text-banner-warning-text w-full rounded-default p-3 flex flex-col gap-2">
+               #13173 removed that set; banner-warning-* is its replacement.
+               The `border-banner-warning-border` matters in LIGHT mode: the bg
+               (warning-50, ~#fefce8) is near-white, so without the border the
+               callout blends into the page and reads as unstyled — the canonical
+               warning banners (logstream/schema, settings/*) all carry it. -->
+          <div class="bg-banner-warning-bg border border-banner-warning-border text-banner-warning-text w-full rounded-default p-3 flex flex-col gap-2">
             <div class="text-sm">
               {{ t("flow.function.guidelinesTitle") }}
             </div>
@@ -367,7 +371,7 @@ const submit = async () => {
   if (createNewFunction.value) return null; // still in the inline editor
   validated.value = null;
   await form.handleSubmit();
-  const values = validated.value;
+  const values = validated.value as AssociateFunctionForm | null;
   if (!values?.selectedFunction) return null;
   return props.showFlatten
     ? { name: values.selectedFunction, after_flatten: !!values.afterFlattening }

@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :run-id="runIdParam"
     :execution-id="executionIdParam"
     :drawer-mode="drawerMode"
+    :location-names="locationNames"
     @update-status="emit('update-status', $event)"
   />
   <OPageLayout
@@ -78,14 +79,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="icon-xs"
-            icon-left="chevron_left"
+            icon-left="chevron-left"
             :disabled="true"
             data-test="synthetics-run-detail-prev-btn"
           />
           <OButton
             variant="ghost"
             size="icon-xs"
-            icon-left="chevron_right"
+            icon-left="chevron-right"
             :disabled="true"
             data-test="synthetics-run-detail-next-btn"
           />
@@ -95,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="outline"
           size="sm"
-          icon-left="open_in_new"
+          icon-left="open-in-new"
           data-test="synthetics-run-detail-trace-btn"
         >
           {{ t('synthetics.runDetail.openTrace') }}
@@ -274,14 +275,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon
                     name="smart_display"
                     size="sm"
-                    class="text-primary-700"
+                    class="text-accent"
                   />
                   <span class="font-bold text-sm text-text-heading"
                     >{{ t('synthetics.runDetail.sessionReplay') }}</span
                   >
                   <span class="flex-1" />
                   <span class="font-mono text-2xs text-text-secondary">
-                    {{ t('synthetics.runDetail.stepOf', { selected: selectedStep.id, total: steps.length }) }}
+                    {{ t('synthetics.runDetail.stepOf', { selected: selectedStep?.id, total: steps.length }) }}
                   </span>
                 </OCardSection>
                 <OSeparator />
@@ -384,7 +385,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <dt class="text-sm font-semibold text-text-secondary capitalize tracking-wide">{{ t('synthetics.runDetail.detailSelector') }}</dt>
                             <dd class="text-text-secondary">{{ row.detail }}</dd>
                             <dt class="text-sm font-semibold text-text-secondary capitalize tracking-wide">{{ t('synthetics.runDetail.detailUrl') }}</dt>
-                            <dd class="truncate text-text-secondary">{{ row.detail }}</dd>
+                            <dd class="truncate text-text-secondary">{{ row.url || currentRun.url }}</dd>
                             <dt class="text-sm font-semibold text-text-secondary capitalize tracking-wide">{{ t('synthetics.results.duration') }}</dt>
                             <dd class="text-text-secondary">{{ row.durStr }}</dd>
                           </dl>
@@ -439,7 +440,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTabPanel name="logs">
           <div class="h-full flex items-center justify-center">
             <OEmptyState
-              preset="no-results"
+              preset="no-search-results"
               size="block"
               data-test="synthetics-run-detail-logs-empty"
             >
@@ -457,7 +458,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTabPanel name="traces">
           <div class="h-full flex items-center justify-center">
             <OEmptyState
-              preset="no-results"
+              preset="no-search-results"
               size="block"
               data-test="synthetics-run-detail-traces-empty"
             >
@@ -475,7 +476,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTabPanel name="rum">
           <div class="h-full flex items-center justify-center">
             <OEmptyState
-              preset="no-results"
+              preset="no-search-results"
               size="block"
               data-test="synthetics-run-detail-rum-empty"
             >
@@ -554,12 +555,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { computed, nextTick, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import syntheticsService from "@/services/synthetics";
 import { timestampToTimezoneDate } from "@/utils/timezone";
+import { locationDisplayLabel } from "@/utils/synthetics/format";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
@@ -597,7 +600,7 @@ const emit = defineEmits<{
   (
     e: "update-status",
     status: {
-      variant: string;
+      variant: BadgeVariant;
       icon: string;
       label: string;
       url: string;
@@ -626,6 +629,22 @@ const { t } = useI18n();
 const route = useRoute();
 const store = useStore();
 
+// id -> "Name (region)" — the run's location field is the raw id (KSUID for
+// private, "aws-us-east-1" for public); resolve it for display.
+const locationNames = ref<Record<string, string>>({});
+function locationLabel(id: string): string {
+  return locationNames.value[id] ?? id;
+}
+syntheticsService
+  .getLocations(store.state.selectedOrganization.identifier)
+  .then((res) => {
+    const locations: { id: string; label: string; region: string }[] = (res.data as any).locations ?? [];
+    locationNames.value = Object.fromEntries(
+      locations.map((loc) => [loc.id, locationDisplayLabel(loc.label, loc.region)]),
+    );
+  })
+  .catch((err) => console.error("[synthetics] failed to load locations", err));
+
 // ── Source IDs — props in drawer mode, route params otherwise ────────────────
 const monitorId = computed(() =>
   props.drawerMode ? props.overrideMonitorId : String(route.params.id ?? ""),
@@ -638,6 +657,9 @@ const executionIdParam = computed(() =>
     ? props.overrideExecutionId
     : String(route.params.executionId ?? ""),
 );
+// The check's folder (name), carried on the results-page route as ?folder=.
+// Passed to per-check API calls so RBAC can resolve folder-scoped grants.
+const folderName = computed(() => String(route.query.folder ?? ""));
 
 // ── Composable ─────────────────────────────────────────────────────────────
 const synthetics = useSyntheticResults();
@@ -650,7 +672,7 @@ const monitorType = ref<string | null>(null);
 async function resolveMonitorType() {
   try {
     const org = store.state.selectedOrganization.identifier;
-    const res = await syntheticsService.get(org, monitorId.value);
+    const res = await syntheticsService.get(org, monitorId.value, folderName.value);
     monitorType.value = (res.data as any)?.type ?? "browser";
   } catch {
     monitorType.value = "browser";
@@ -682,6 +704,7 @@ interface StepRow {
   action: string;
   name: string;
   detail: string;
+  url: string;
   duration: number;
   status: "pass" | "fail";
   icon: string;
@@ -716,6 +739,7 @@ function buildSteps(detail: SyntheticRunDetail | null): StepRow[] {
         recorded?.url ||
         ex.step_id.slice(0, 8),
       detail: recorded?.selector ?? recorded?.url ?? ex.step_id,
+      url: recorded?.url ?? "",
       duration: ex.duration_ms,
       status: isFail ? ("fail" as const) : ("pass" as const),
       icon: recorded ? actionIcon(recorded.action) : "radio_button_checked",
@@ -792,6 +816,7 @@ async function presignRunArtifacts() {
       orgId,
       monitorId.value,
       keys,
+      folderName.value,
     );
     const map: Record<string, string> = {};
     for (const entry of data.urls ?? []) {
@@ -818,7 +843,7 @@ function screenshotUrl(key: string | null): string {
   const signed = artifactUrls.value[key];
   if (signed) return signed;
   const orgId = store.state.selectedOrganization.identifier;
-  return syntheticsService.artifactUrl(orgId, key);
+  return syntheticsService.artifactUrl(orgId, key, folderName.value);
 }
 
 // ── Display model for the current run (mapped from SyntheticRunDetail) ─────
@@ -909,6 +934,9 @@ const stepsWithTotal = computed(() => {
   const total = currentRun.value.duration || 1;
   return steps.value.map((s) => ({ ...s, _totalDuration: total }));
 });
+
+/** Current step shown in the session-replay panel (first step for now). */
+const selectedStep = computed<StepRow | null>(() => steps.value[0] ?? null);
 
 // ── Screenshot lightbox ──────────────────────────────────────────────────────
 const lightboxStepId = ref<number | null>(null);
@@ -1070,7 +1098,14 @@ const statusChip = computed(() => {
   };
 });
 
-const infoChips = computed(() => [
+interface InfoChip {
+  label: string;
+  value: string;
+  icon: string;
+  colorClass?: string;
+}
+
+const infoChips = computed<InfoChip[]>(() => [
   statusChip.value,
   { label: t('synthetics.results.duration'), value: fmtDur(currentRun.value.duration), icon: "schedule" },
   {
@@ -1085,7 +1120,7 @@ const infoChips = computed(() => [
   },
   {
     label: t('synthetics.results.location'),
-    value: currentRun.value.location,
+    value: locationLabel(currentRun.value.location),
     icon: locationIcon(currentRun.value.location),
   },
 ]);

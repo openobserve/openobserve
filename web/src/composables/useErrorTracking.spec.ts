@@ -239,8 +239,8 @@ describe("useErrorTracking", () => {
       const refreshTimes = errorTrackingInstance.errorTrackingState.config.refreshTimes;
       
       // Test all values are numbers and labels are strings
-      refreshTimes.forEach((row, rowIndex) => {
-        row.forEach((item, itemIndex) => {
+      refreshTimes.forEach((row) => {
+        row.forEach((item) => {
           expect(typeof item.label).toBe("string");
           expect(typeof item.value).toBe("number");
           expect(item.value).toBeGreaterThan(0);

@@ -14,21 +14,51 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #[cfg(feature = "enterprise")]
+use common::utils::jwt;
+#[cfg(feature = "enterprise")]
+use db;
+#[cfg(feature = "enterprise")]
 use o2_dex::{config::get_config as get_dex_config, service::auth::get_dex_jwks};
+use openobserve_core::auth::AuthExtractor;
+#[cfg(feature = "enterprise")]
+use openobserve_core::users;
 
 use super::validator::{AuthError, AuthValidationResult, RequestData};
-use crate::common::utils::auth::AuthExtractor;
-#[cfg(feature = "enterprise")]
-use crate::common::utils::jwt;
-#[cfg(feature = "enterprise")]
-use crate::service::{db, users};
+
+/// Whether a request whose user is NOT found in the target org may still be
+/// authenticated *without* an OpenFGA permission check.
+///
+/// The `None` arm of the user lookup in [`token_validator`] skips
+/// `check_permissions` entirely, so every input that returns `true` here is an
+/// authorization bypass by construction. Only the path-scoped, self-checking
+/// pre-provisioning cases qualify:
+///
+/// - `is_list_invite_call` / `is_member_subscription`: a user accepting an invitation is
+///   legitimately not yet a member of any org, and both handlers re-verify identity by email.
+/// - org `LIST`: results are filtered by the caller's email downstream.
+///
+/// MCP requests are deliberately NOT exempt. The only legitimate MCP callers
+/// are a service-account credential (Basic auth — never reaches this function)
+/// or an SSO user actually provisioned in the target org (which takes the
+/// `Some(user)` arm and IS permission-checked). A Dex identity with no
+/// membership in the org is either unprovisioned or a member of a *different*
+/// org; neither should read this org's data, so both are denied like any other
+/// endpoint rather than waved through with `user_role: None`.
+#[cfg(any(feature = "enterprise", test))]
+fn may_skip_permission_check(
+    is_list_invite_call: bool,
+    is_member_subscription: bool,
+    is_org_list_call: bool,
+) -> bool {
+    is_list_invite_call || is_member_subscription || is_org_list_call
+}
 
 #[cfg(feature = "enterprise")]
 pub async fn token_validator(
     req_data: &RequestData,
     auth_info: &AuthExtractor,
 ) -> Result<AuthValidationResult, AuthError> {
-    use crate::{common::utils::auth::V2_API_PREFIX, service::authz::check_permissions};
+    use openobserve_core::{auth::V2_API_PREFIX, authz::check_permissions};
 
     let user;
     let keys = get_dex_jwks().await;
@@ -97,8 +127,6 @@ pub async fn token_validator(
                     && path_columns.first().is_some_and(|p| p.eq(&"invites"))
                     && (auth_info.method.eq("GET") || auth_info.method.eq("DELETE"));
 
-                // For MCP endpoints, allow any authenticated user from Dex
-                let allow_nonexistent_user = is_mcp_request;
                 let path_suffix = path_columns.last().unwrap_or(&"");
                 if path_suffix.eq(&"organizations")
                     || path_suffix.eq(&"clusters")
@@ -178,10 +206,11 @@ pub async fn token_validator(
                     // nothing else. Similarly for accepting invite, we will not have the
                     // user in db anymore, and the fn checks based on email and token, so ok to
                     // bypass. Similarly specifically for org list, we check by email
-                    None if (is_list_invite_call
-                        || is_member_subscription
-                        || allow_nonexistent_user
-                        || (path_suffix.eq(&"organizations") && auth_info.method.eq("LIST"))) =>
+                    None if may_skip_permission_check(
+                        is_list_invite_call,
+                        is_member_subscription,
+                        path_suffix.eq(&"organizations") && auth_info.method.eq("LIST"),
+                    ) =>
                     {
                         // Allow these special cases without requiring user in DB
                         Ok(AuthValidationResult {
@@ -229,4 +258,56 @@ pub async fn token_validator(
     _token: &AuthExtractor,
 ) -> Result<AuthValidationResult, AuthError> {
     Err(AuthError::Unauthorized("Not Supported".to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The path-scoped pre-provisioning exemptions are intentional: a user
+    /// accepting an invitation is legitimately not yet a member of any org, and
+    /// those handlers re-verify identity by email.
+    #[test]
+    fn path_scoped_exemptions_are_intentional() {
+        assert!(may_skip_permission_check(true, false, false), "invites");
+        assert!(
+            may_skip_permission_check(false, true, false),
+            "member_subscription"
+        );
+        assert!(may_skip_permission_check(false, false, true), "org LIST");
+    }
+
+    /// A user absent from the target org, on an ordinary route, is not exempt.
+    #[test]
+    fn ordinary_request_for_nonmember_is_not_exempt() {
+        assert!(!may_skip_permission_check(false, false, false));
+    }
+
+    /// SECURITY REGRESSION GUARD: an MCP-flagged request must NOT skip the
+    /// OpenFGA permission check when the caller is absent from the target org.
+    ///
+    /// Previously `allow_nonexistent_user = is_mcp_request` was OR-ed into this
+    /// decision, so any valid Dex identity — unprovisioned, or a member of a
+    /// *different* org — was admitted against any org with no permission check,
+    /// reachable on arbitrary routes via the `x-o2-mcp: true` header. The
+    /// legitimate MCP callers (service-account Basic auth, or an SSO user
+    /// provisioned in the org) never hit this arm, so removing the MCP
+    /// exemption denies only cross-org / unprovisioned access.
+    ///
+    /// `may_skip_permission_check` no longer takes an MCP parameter at all;
+    /// this test exists so that reintroducing one is a conscious, reviewed act.
+    #[test]
+    fn mcp_flag_is_not_a_parameter_of_the_permission_skip_decision() {
+        // Whatever an MCP request looks like, the ONLY way to be exempt is to
+        // match one of the three path-scoped pre-provisioning cases. There is
+        // no MCP input that flips the result.
+        assert!(
+            !may_skip_permission_check(false, false, false),
+            "SECURITY: a request that matches none of the invite / \
+             member_subscription / org-LIST cases must be permission-checked, \
+             regardless of whether it is an MCP request. The MCP exemption \
+             (allow_nonexistent_user) was a cross-org authorization bypass and \
+             must not return."
+        );
+    }
 }

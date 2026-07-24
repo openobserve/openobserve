@@ -19,17 +19,16 @@ use axum::{
     extract::{Path, Query},
     response::Response,
 };
+use common::meta::http::HttpResponse as MetaHttpResponse;
+#[cfg(feature = "enterprise")]
+use openobserve_core::alerts::backfill;
+pub use openobserve_core::alerts::backfill::BackfillRequest;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
-#[cfg(feature = "enterprise")]
-use crate::service::alerts::backfill;
-pub use crate::service::alerts::backfill::BackfillRequest;
-
 #[cfg(feature = "enterprise")]
 async fn ensure_user_pipeline(org_id: &str, pipeline_id: &str) -> Result<(), Response> {
-    crate::service::pipeline::get_user_pipeline(org_id, pipeline_id)
+    openobserve_core::pipeline::get_user_pipeline(org_id, pipeline_id)
         .await
         .map(|_| ())
         .map_err(Into::into)
@@ -169,6 +168,13 @@ pub async fn create_backfill(
         (status = 200, description = "List of backfill jobs", body = Vec<backfill::BackfillJobStatus>),
         (status = 500, description = "Internal server error"),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({
+            "description": "List all backfill jobs",
+            "category": "pipelines",
+            "summary_fields": ["job_id", "pipeline_id", "pipeline_name", "status", "progress_percent", "enabled"]
+        }))
+    )
 )]
 pub async fn list_backfills(Path(org_id): Path<String>) -> Response {
     match backfill::list_backfill_jobs(&org_id).await {

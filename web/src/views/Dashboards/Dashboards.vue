@@ -77,6 +77,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
             </div>
           </ODropdownItem>
+          <ODropdownSeparator />
+          <ODropdownItem
+            v-for="migration in migrationOptions"
+            :key="migration.key"
+            :data-test="`dashboard-migrate-${migration.key}`"
+            @select="openMigration(migration.url)"
+          >
+            <div class="flex items-center gap-2 w-full">
+              <div class="flex flex-col flex-1 min-w-0">
+                <span>{{ t(`dashboard.${migration.labelKey}`) }}</span>
+                <span class="text-xs text-dropdown-item-text opacity-60"
+                  >{{ t(`dashboard.${migration.descKey}`) }}</span
+                >
+              </div>
+              <OIcon
+                name="open-in-new"
+                size="xs"
+                class="shrink-0 text-dropdown-item-text opacity-60"
+              />
+            </div>
+          </ODropdownItem>
         </ODropdown>
         <!-- new dashboard button -->
         <OButton
@@ -188,13 +209,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #cell-name="{ row, value }">
               <span class="inline-flex items-center gap-1">
-                <!-- One-click favorite toggle — filled rose heart when
+                <!-- One-click favorite toggle — filled gold star when
                      favorited, neutral outline otherwise. -->
                 <OButton
                   variant="ghost"
                   size="icon-xs-sq"
                   :icon-left="
-                    isFavorite(row.id) ? 'favorite' : 'favorite-border'
+                    isFavorite(row.id) ? 'star' : 'star-outline'
                   "
                   :class="
                     isFavorite(row.id) ? 'text-favorite shrink-0' : 'shrink-0'
@@ -256,7 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-folder="{ row }">
               <button
                 type="button"
-                class="inline-flex items-center gap-1 max-w-full px-2 py-0.5 rounded-full bg-surface-subtle text-text-body text-xs leading-5 transition-colors outline-none hover:bg-surface-subtle-hover hover:text-text-body focus-visible:ring-4 focus-visible:ring-primary-500/25 focus-visible:ring-inset"
+                class="inline-flex items-center gap-1 max-w-full px-2 py-0.5 rounded-full bg-surface-subtle text-text-body text-xs leading-5 transition-colors outline-none hover:bg-surface-subtle-hover hover:text-text-body focus-visible:ring-4 focus-visible:ring-accent/25 focus-visible:ring-inset"
                 @click.stop="updateActiveFolderId(row.folder_id)"
               >
                 <OIcon name="folder-outline" size="xs" />
@@ -357,7 +378,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #bottom>
               <div
-                class="flex w-full justify-between items-center py-1"
+                class="flex w-full justify-between items-center gap-4 py-1"
               >
                 <div
                   class="text-xs font-normal flex items-center shrink-0"
@@ -395,6 +416,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm-action"
                     icon-left="delete"
                     data-test="dashboard-list-delete-dashboards-btn"
+                    :loading="bulkDeleteLoading"
                     @click="openBulkDeleteDialog"
                   >
                     {{ t('common.delete') }}
@@ -422,7 +444,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="addDashboardRef"
               @close="showAddDashboardDialog = false"
               @updated="updateDashboardList"
-              :activeFolderId="activeFolderId"
+              :activeFolderId="activeFolderId ?? undefined"
             />
           </ODialog>
 
@@ -459,8 +481,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <MoveDashboardToAnotherFolder
             v-model:open="showMoveDashboardDialog"
             @updated="handleDashboardMoved"
-            :dashboard-ids="selectedDashboardIdToMove"
-            :activeFolderId="activeFolderToMove"
+            :dashboard-ids="selectedDashboardIdToMove ?? undefined"
+            :activeFolderId="activeFolderToMove ?? undefined"
             data-test="dashboard-move-to-another-folder-dialog"
           />
 
@@ -504,8 +526,8 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 // @ts-nocheck
@@ -530,6 +552,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useRoute, useRouter } from "vue-router";
 import { toRaw } from "vue";
@@ -538,12 +561,13 @@ import ConfirmDialog from "../../components/ConfirmDialog.vue";
 import {
   deleteDashboardById,
   deleteFolderById,
+  evictDashboardsFromCache,
   getAllDashboards,
   getAllDashboardsByFolderId,
   getDashboard,
   getFoldersList,
   moveModuleToAnotherFolder,
-} from "../../utils/commons.ts";
+} from "../../utils/commons";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
 import useNotifications from "@/composables/useNotifications";
@@ -574,6 +598,37 @@ const AddDashboardFromGitHub = defineAsyncComponent(() => {
   return import("@/components/dashboards/AddDashboardFromGitHub.vue");
 });
 
+interface DashboardRow {
+  "#": string | number;
+  id: string;
+  folder?: string;
+  folder_id?: string;
+  name: string;
+  identifier: string;
+  description: string;
+  owner: string;
+  created_raw: string;
+  created: string;
+  actions: string;
+}
+
+interface DashboardSearchResult {
+  dashboard: Record<string, any>;
+  hash: string;
+  folder_id: string;
+  folder_name: string;
+}
+
+// Narrows a caught `unknown` to the axios-style error shape this view reads.
+interface CaughtError {
+  name?: string;
+  message?: string;
+  status?: number;
+  response?: { status?: number; data?: { message?: string } };
+}
+const asCaughtError = (e: unknown): CaughtError =>
+  (e ?? {}) as CaughtError;
+
 export default defineComponent({
   name: "Dashboards",
   components: {
@@ -586,7 +641,6 @@ export default defineComponent({
     ODropdown,
     ODropdownItem,
     OInput,
-    OCheckbox,
     ODialog,
     AddDashboard,
     OTooltip,
@@ -613,19 +667,19 @@ export default defineComponent({
     const route = useRoute();
     const orgData: any = ref(store.state.selectedOrganization);
     const confirmDeleteDialog = ref<boolean>(false);
-    const selectedDelete = ref(null);
-    const activeFolderId = ref(null);
+    const selectedDelete = ref<DashboardRow | null>(null);
+    const activeFolderId = ref<string | null>(null);
     // Set once the onMounted landing decision has run; folder-selection events
     // arriving earlier are child-initialization noise, not user intent.
     let landingDecided = false;
     const isFolderEditMode = ref(false);
-    const selectedFolderDelete = ref(null);
-    const selectedFolderToEdit = ref(null);
+    const selectedFolderDelete = ref<string | null>(null);
+    const selectedFolderToEdit = ref<string | null>(null);
     const searchQuery = ref("");
-    const filteredResults = ref([]);
+    const filteredResults = ref<DashboardSearchResult[]>([]);
     const confirmDeleteFolderDialog = ref<boolean>(false);
-    const selectedDashboardToMove = ref(null);
-    const selectedDashboardIdToMove = ref(null);
+    const selectedDashboardToMove = ref<DashboardRow | null>(null);
+    const selectedDashboardIdToMove = ref<string[] | null>(null);
     const showMoveDashboardDialog = ref(false);
     const searchAcrossFolders = ref(false);
     const filterQuery = ref("");
@@ -646,7 +700,15 @@ export default defineComponent({
       isFavorite,
       toggleFavorite: toggleFavoriteSetting,
       load: loadFavorites,
+      removeFavorites,
     } = useFavoriteDashboards();
+    // Prune favorites that pointed at just-deleted dashboards, so the Favorites
+    // view doesn't keep a row whose id is already gone from the backend.
+    const pruneFavorites = async (dashboardIds: string[]) => {
+      const org = store.state.selectedOrganization?.identifier;
+      const userId = store.state.userInfo?.email;
+      if (org && userId) await removeFavorites(org, userId, dashboardIds);
+    };
     // The favorites view is a rail location, not a toolbar filter: it is
     // active exactly when the Favorites pseudo-folder is selected.
     const showFavoritesOnly = computed(
@@ -755,9 +817,9 @@ export default defineComponent({
       offDashboardEvent(handleAiDashboardEvent);
     });
 
-    let currentSearchAbortController = null;
+    let currentSearchAbortController: AbortController | null = null;
     const columns = computed(() => {
-      const baseColumns = [
+      const baseColumns: OTableColumnDef[] = [
         {
           id: "name",
           header: t("dashboard.name"),
@@ -848,22 +910,15 @@ export default defineComponent({
       const userId = store.state.userInfo?.email;
       if (org && userId) await loadFavorites(org, userId);
 
-      // Landing rules: an explicit deep link (?folder=...) wins — including
-      // the Favorites pseudo-folder. `folder=default` is NOT treated as
-      // explicit: the folder watcher stamps it into the URL on every ordinary
-      // visit, so honoring it would defeat the favorites-first landing on
-      // every reload. With no (effective) deep link, land on Favorites when
-      // the user has any, else on the default folder.
+      // Landing rules: the folder is synced in the URL, so whenever it's
+      // present — a deep link, the folder-watcher stamp, or the
+      // dashboard-view back button — it wins outright and we redirect to
+      // that folder (Favorites pseudo-folder included). Only with no folder
+      // in the URL at all do we fall back to the favorites-first landing.
       activeFolderId.value = null;
       if (route.query.folder === FAVORITES_FOLDER_ID) {
         activeFolderId.value = FAVORITES_FOLDER_ID;
-      } else if (
-        route.query.folder &&
-        route.query.folder !== "default" &&
-        store.state.organizationData.folders.find(
-          (it: any) => it.folderId === route.query.folder,
-        )
-      ) {
+      } else if (typeof route.query.folder === "string" && route.query.folder) {
         activeFolderId.value = route.query.folder;
       } else if (favorites.value.length > 0) {
         activeFolderId.value = FAVORITES_FOLDER_ID;
@@ -904,8 +959,11 @@ export default defineComponent({
           return;
         }
         // skip the skeleton for already-cached folders so we don't flash it
+        // String() matches JS's own null→"null" key coercion (behavior-neutral).
         loading.value =
-          !store.state.organizationData.allDashboardList[activeFolderId.value];
+          !store.state.organizationData.allDashboardList[
+            String(activeFolderId.value)
+          ];
         try {
           const response = await getAllDashboardsByFolderId(
             store,
@@ -916,7 +974,7 @@ export default defineComponent({
         } catch (error) {
           console.error("Error loading dashboards:", error);
           showErrorNotification(
-            error?.message ||
+            asCaughtError(error).message ||
               t("dashboard.dashboards.failedToLoadFolder"),
           );
         } finally {
@@ -968,7 +1026,12 @@ export default defineComponent({
             );
             filteredResults.value = toRaw(searchResults);
           } catch (error) {
-            if (!error.name === "AbortError") {
+            // Latent bug preserved: `!x === "AbortError"` compares a boolean to a
+            // string, so this body never runs. Kept as-is to avoid changing
+            // runtime behavior in a type-only fix; the mistaken comparison is
+            // what makes this branch dead, not the types.
+            // @ts-expect-error -- intentional no-op comparison (boolean vs string), see note
+            if (!asCaughtError(error).name === "AbortError") {
               filteredResults.value = [];
               // Handle error state
             }
@@ -1058,6 +1121,17 @@ export default defineComponent({
       });
     };
 
+    const migrationOptions = [
+      { key: "datadog",     url: "https://migration.openobserve.ai/datadog-to-o2",    labelKey: "migrateFromDatadog",     descKey: "migrateFromDatadogDesc" },
+      { key: "grafana",     url: "https://migration.openobserve.ai/grafana-to-o2",    labelKey: "migrateFromGrafana",     descKey: "migrateFromGrafanaDesc" },
+      { key: "kibana",      url: "https://migration.openobserve.ai/kibana-to-o2",     labelKey: "migrateFromKibana",      descKey: "migrateFromKibanaDesc" },
+      { key: "cloudwatch",  url: "https://migration.openobserve.ai/cloudwatch-to-o2", labelKey: "migrateFromCloudWatch",  descKey: "migrateFromCloudWatchDesc" },
+    ];
+
+    const openMigration = (url: string) => {
+      window.open(url, "_blank", "noopener,noreferrer");
+    };
+
     const duplicateDashboard = async (
       dashboardId: any,
       folderId = activeFolderId.value,
@@ -1094,13 +1168,13 @@ export default defineComponent({
 
         showPositiveNotification(t("dashboard.dashboards.duplicatedSuccessfully"));
       } catch (err) {
-        showErrorNotification(err?.message ?? t("dashboard.dashboards.duplicationFailed"));
+        showErrorNotification(asCaughtError(err).message ?? t("dashboard.dashboards.duplicationFailed"));
       }
 
       dismiss();
     };
 
-    const routeToViewD = (row) => {
+    const routeToViewD = (row: DashboardRow) => {
       return router.push({
         path: "/dashboards/view",
         query: {
@@ -1111,7 +1185,7 @@ export default defineComponent({
         },
       });
     };
-    const dashboardList = ref([]);
+    const dashboardList = ref<Record<string, any>[]>([]);
     // Start in the loading state so the table shows the skeleton on first
     // render instead of briefly flashing the empty state before the fetch.
     const loading = ref(true);
@@ -1132,20 +1206,41 @@ export default defineComponent({
           const favFolders = [
             ...new Set(favorites.value.map((f: any) => f.folderId)),
           ];
-          await Promise.all(
+          const fetched = await Promise.all(
             favFolders.map((fid) =>
-              getAllDashboards(store, fid).catch(() => null),
+              getAllDashboards(store, fid)
+                .then(() => fid)
+                .catch(() => null),
             ),
           );
+          // Self-heal favorites left behind by deletions we didn't perform here
+          // (another tab, another user's session, the dashboard view). Only
+          // folders that actually came back are authoritative — a failed fetch
+          // must not be read as "the dashboard is gone".
+          const refreshed = new Set(fetched.filter(Boolean));
+          const lists = store.state.organizationData?.allDashboardList ?? {};
+          const stale = favorites.value
+            .filter(
+              (f: any) =>
+                refreshed.has(f.folderId) &&
+                Array.isArray(lists[f.folderId]) &&
+                !lists[f.folderId].some(
+                  (b: any) => b.dashboardId === f.dashboardId,
+                ),
+            )
+            .map((f: any) => f.dashboardId);
+          await pruneFavorites(stale);
         } else {
           const response = await getAllDashboards(
             store,
             activeFolderId.value ?? "default",
           );
-          dashboardList.value = response;
+          // folderId is always truthy here, so getAllDashboards never returns
+          // undefined; `?? []` only satisfies the type (fallback unreachable).
+          dashboardList.value = response ?? [];
         }
       } catch (err) {
-        showErrorNotification(err?.message || t("dashboard.dashboards.failedToLoad"));
+        showErrorNotification(asCaughtError(err).message || t("dashboard.dashboards.failedToLoad"));
       } finally {
         dismiss();
         loading.value = false;
@@ -1175,7 +1270,6 @@ export default defineComponent({
     });
 
     const dashboards = computed(function () {
-      selectedIds.value = [];
       // The favorites view is folder-independent: rows come from the stored
       // favorites themselves (each carries its folderId), enriched from any
       // folder list already cached in the store. A favorite whose folder
@@ -1211,14 +1305,14 @@ export default defineComponent({
       if (!searchAcrossFolders.value || searchQuery.value == "") {
         const dashboardList = toRaw(
           store.state.organizationData?.allDashboardList[
-            activeFolderId.value
+            String(activeFolderId.value)
           ] ?? [],
         );
-        return dashboardList.map((board: any, index) =>
+        return dashboardList.map((board: Record<string, any>, index: number) =>
           mapDashboard(board, index),
         );
       } else {
-        return filteredResults.value.map((board: any, index) =>
+        return filteredResults.value.map((board: Record<string, any>, index: number) =>
           mapDashboard(board, index, {
             name: board.folder_name,
             id: board.folder_id,
@@ -1226,6 +1320,18 @@ export default defineComponent({
         );
       }
     });
+
+    // Clear selection whenever the derived list recomputes (favorites toggle,
+    // folder switch, cross-folder search, store list changes). Runs sync so the
+    // selection is cleared in the same tick the list changes, matching the prior
+    // in-computed side effect.
+    watch(
+      dashboards,
+      () => {
+        selectedIds.value = [];
+      },
+      { flush: "sync" },
+    );
 
     const resultTotal = computed(function () {
       // Derived from the rendered rows so the footer count matches what the
@@ -1238,6 +1344,7 @@ export default defineComponent({
         // Capture before the row reference is cleared — used below to drop a
         // stale Home pin that pointed at the just-deleted dashboard.
         const deletedWasHome = isHome(selectedDelete.value.id);
+        const deletedId = selectedDelete.value.id;
         try {
           //delete dashboard by id and folder id
           await deleteDashboardById(
@@ -1252,6 +1359,7 @@ export default defineComponent({
               ? t("dashboard.pinnedDeletedPinRemoved")
               : t("dashboard.deletedSuccessfully"),
           );
+          await pruneFavorites([deletedId]);
           // The backend clears the home_dashboard setting on delete; re-read it
           // so the Home shortcut button / pin state updates immediately instead
           // of lingering until the next navigation.
@@ -1260,7 +1368,7 @@ export default defineComponent({
             if (org) useHomeDashboard().load(org);
           }
         } catch (err) {
-          showErrorNotification(err?.message ?? t("dashboard.dashboards.deletionFailed"), {
+          showErrorNotification(asCaughtError(err).message ?? t("dashboard.dashboards.deletionFailed"), {
           });
         }
       }
@@ -1312,8 +1420,8 @@ export default defineComponent({
           });
         } catch (err) {
           showErrorNotification(
-            err?.response?.data?.message ||
-              err?.message ||
+            asCaughtError(err).response?.data?.message ||
+              asCaughtError(err).message ||
               t("dashboard.dashboards.folderDeletionFailed"),
             {
             },
@@ -1339,7 +1447,7 @@ export default defineComponent({
       },
     });
 
-    const fetchSearchResults = useLoading(async (query) => {
+    const fetchSearchResults = useLoading(async (query: string) => {
       //this is used for showing search msg when user tries to toggle every time before searching across folders
       try {
         //here we are directly calling the dashboard service to get the search results
@@ -1371,7 +1479,7 @@ export default defineComponent({
         return migratedDashboards;
       } catch (error) {
         showErrorNotification(
-          error?.message ?? t("dashboard.dashboards.errorFetchingSearch"),
+          asCaughtError(error).message ?? t("dashboard.dashboards.errorFetchingSearch"),
         );
       }
     });
@@ -1447,7 +1555,7 @@ export default defineComponent({
         );
         selectedIds.value = [];
       } catch (error) {
-        showErrorNotification(error?.message ?? t("dashboard.dashboards.errorExporting"));
+        showErrorNotification(asCaughtError(error).message ?? t("dashboard.dashboards.errorExporting"));
       }
     };
 
@@ -1459,12 +1567,14 @@ export default defineComponent({
     };
 
     const confirmBulkDelete = ref<boolean>(false);
+    const bulkDeleteLoading = ref(false);
 
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;
     };
 
     const bulkDeleteDashboards = async () => {
+      bulkDeleteLoading.value = true;
       const dismiss = toast({
         variant: "loading",
         message: t("dashboard.dashboards.deletingDashboards"),
@@ -1481,29 +1591,56 @@ export default defineComponent({
           return;
         }
 
+        // Snapshot the selection first: reading `dashboards` below can re-run
+        // that computed, which resets selectedIds as a side effect.
+        const idsToDelete = [...selectedDashboardIds.value];
+
         // Did this batch include the Home-pinned dashboard? Captured before the
         // delete so we can refresh the pin state afterwards (the backend clears
         // the home_dashboard setting when the pinned dashboard is deleted).
-        const bulkIncludedHome = selectedDashboardIds.value.some((id: string) =>
-          isHome(id),
+        const bulkIncludedHome = idsToDelete.some((id: string) => isHome(id));
+
+        // Group the selection by the folder each dashboard actually lives in.
+        // The Favorites view is a pseudo-folder spanning many real folders, so
+        // its id is not a valid `?folder=` value (the backend 404s on it) and a
+        // single folder-scoped call could not cover the selection anyway. In a
+        // normal folder view every row shares activeFolderId, so this collapses
+        // to the one request it always was.
+        const rowFolders = new Map<string, string>(
+          dashboards.value.map((row: any) => [row.id, row.folder_id]),
         );
+        const idsByFolder = new Map<string, string[]>();
+        for (const id of idsToDelete) {
+          const folderId =
+            rowFolders.get(id) ||
+            (showFavoritesOnly.value ? "default" : activeFolderId.value) ||
+            "default";
+          const bucket = idsByFolder.get(folderId);
+          if (bucket) bucket.push(id);
+          else idsByFolder.set(folderId, [id]);
+        }
 
-        // Extract dashboard ids
-        const payload = {
-          ids: selectedDashboardIds.value,
-        };
-
-        const response = await dashboardService.bulkDelete(
-          store.state.selectedOrganization.identifier,
-          payload,
-          activeFolderId.value,
+        const responses = await Promise.all(
+          [...idsByFolder].map(([folderId, ids]) =>
+            dashboardService.bulkDelete(
+              store.state.selectedOrganization.identifier,
+              { ids },
+              folderId,
+            ),
+          ),
         );
 
         dismiss();
 
-        // Handle response based on successful/unsuccessful arrays
-        if (response.data) {
-          const { successful = [], unsuccessful = [] } = response.data;
+        // Handle response based on successful/unsuccessful arrays, merged
+        // across the per-folder calls.
+        const successful = responses.flatMap(
+          (r: any) => r?.data?.successful ?? [],
+        );
+        const unsuccessful = responses.flatMap(
+          (r: any) => r?.data?.unsuccessful ?? [],
+        );
+        if (responses.some((r: any) => r?.data)) {
           const successCount = successful.length;
           const failCount = unsuccessful.length;
 
@@ -1531,34 +1668,62 @@ export default defineComponent({
           // Fallback success message
           toast({
             variant: "success",
-            message: t("dashboard.dashboards.deletedSuccessfullyCount", { count: selectedIds.value.length }),
+            message: t("dashboard.dashboards.deletedSuccessfullyCount", { count: idsToDelete.length }),
           });
         }
 
+        // Drop favorites for everything that actually got deleted, so the
+        // Favorites view doesn't keep rows whose ids are gone. `unsuccessful`
+        // entries may be plain ids or objects, so normalise before excluding.
+        const failedIds = new Set(
+          unsuccessful.map((u: any) =>
+            typeof u === "string" ? u : (u?.dashboardId ?? u?.id),
+          ),
+        );
+        const deletedIds = idsToDelete.filter((id: string) => !failedIds.has(id));
+
+        // Drop the deleted rows from the cached folder lists. Folder navigation
+        // is cache-first, so the source folder would otherwise keep rendering
+        // them until a manual refresh — and pruning favorites below removes the
+        // folder from the set that gets refetched, so nothing else would.
+        const deletedByFolder = new Map<string, string[]>();
+        idsByFolder.forEach((ids, folderId) => {
+          const kept = ids.filter((id: string) => !failedIds.has(id));
+          if (kept.length) deletedByFolder.set(folderId, kept);
+        });
+        evictDashboardsFromCache(store, deletedByFolder);
+
+        await pruneFavorites(deletedIds);
+
         selectedIds.value = [];
-        // Refresh dashboards
-        await getDashboards(store, activeFolderId.value);
+        // Refresh dashboards. The local getDashboards() takes no arguments; the
+        // previous (store, folderId) args were silently ignored at runtime, so
+        // dropping them is behavior-neutral.
+        await getDashboards();
         // If the pinned dashboard was in the batch, re-read the (now cleared)
         // home_dashboard setting so the Home shortcut/pin updates immediately.
         if (bulkIncludedHome) {
           const org = store.state.selectedOrganization?.identifier;
           if (org) await useHomeDashboard().load(org);
         }
-      } catch (error: any) {
+      } catch (error) {
         dismiss();
         console.error("Error deleting dashboards:", error);
 
+        const caught = asCaughtError(error);
         // Show error message from response if available
         const errorMessage =
-          error.response?.data?.message ||
-          error?.message ||
+          caught.response?.data?.message ||
+          caught.message ||
           t("dashboard.dashboards.errorDeleting");
-        if (error.response?.status != 403 || error?.status != 403) {
+        if (caught.response?.status != 403 || caught.status != 403) {
           toast({
             variant: "error",
             message: errorMessage,
           });
         }
+      } finally {
+        bulkDeleteLoading.value = false;
       }
 
       confirmBulkDelete.value = false;
@@ -1602,6 +1767,8 @@ export default defineComponent({
       showAddDashboardFromGitHub,
       addDashboard,
       importDashboard,
+      migrationOptions,
+      openMigration,
       resultTotal,
       routeToViewD,
       showDeleteDialogFn,
@@ -1647,6 +1814,7 @@ export default defineComponent({
       openBulkDeleteDialog,
       bulkDeleteDashboards,
       confirmBulkDelete,
+      bulkDeleteLoading,
       isHome,
       toggleHome,
       homeDashboard,
@@ -1673,8 +1841,8 @@ export default defineComponent({
         },
       });
     },
-    onRowClick(row, _evt) {
-      this.routeToViewD(row);
+    onRowClick(row: Record<string, any>, _evt: MouseEvent) {
+      this.routeToViewD(row as DashboardRow);
     },
     ownerInitials(name: string) {
       if (!name) return "";

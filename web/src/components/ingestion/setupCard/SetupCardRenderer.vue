@@ -138,7 +138,7 @@ const viewData = async () => {
     stream: watchedStream.value,
     period: "15m",
     refresh: "0",
-    query: b64EncodeUnicode(props.content.detect.filter),
+    query: b64EncodeUnicode(props.content.detect.filter) ?? "",
   };
   if (isLogsStream.value) {
     query.stream_type = "logs";
@@ -807,7 +807,12 @@ function fireConfetti() {
 
       <!-- Supplementary accordions (shared OCollapsible) -->
       <div
-        v-if="hasInstallerAccordion || extras.advanced || extras.troubleshooting?.length"
+        v-if="
+          hasInstallerAccordion ||
+          extras.advanced ||
+          extras.troubleshooting?.length ||
+          extras.uninstall
+        "
         class="c-more"
       >
         <!-- Alternative manual path (e.g. the raw Helm sequence) — collapsed, so
@@ -893,6 +898,28 @@ function fireConfetti() {
               <div class="ts-q"><OIcon name="warning" size="sm" /> {{ r.q }}</div>
               <div class="ts-a" v-html="inlineMd(r.a)"></div>
             </div>
+          </div>
+        </OCollapsible>
+
+        <!-- Removal path — last, and collapsed, since it undoes the flow above. -->
+        <OCollapsible
+          v-if="extras.uninstall"
+          :label="extras.uninstall.label"
+          icon="delete-outline"
+          class="acc-item"
+          data-test="ai-uninstall-accordion"
+        >
+          <div class="acc-body">
+            <p
+              v-if="extras.uninstall.description"
+              class="step-desc"
+              v-html="inlineMd(extras.uninstall.description)"
+            ></p>
+            <OCodeBlock
+              :lang="extras.uninstall.code.lang"
+              :code="extras.uninstall.code.raw"
+              data-test="ai-uninstall-code"
+            />
           </div>
         </OCollapsible>
       </div>

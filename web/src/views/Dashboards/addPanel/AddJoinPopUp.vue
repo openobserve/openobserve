@@ -23,7 +23,7 @@
           <label>{{ t('dashboard.addJoinPopUp.join') }}</label>
         </div>
         <OSelect
-          v-model="mainStream"
+          :model-value="mainStream"
           :options="[]"
           disabled
           :label="t('dashboard.addJoinPopUp.joiningStream')"
@@ -79,7 +79,7 @@
         </div>
 
         <OSelect
-          v-model="modelValue.stream"
+          v-model="modelValueModel.stream"
           :options="streamOptions"
           :label="t('dashboard.addJoinPopUp.onStream')"
           searchable
@@ -126,7 +126,7 @@
           <div class="flex-1 min-w-0 overflow-hidden">
             <StreamFieldSelect
               :streams="getStreamsBasedJoinIndex()"
-              v-model="modelValue.conditions[argIndex].leftField"
+              v-model="modelValueModel.conditions[argIndex].leftField"
               :data-test="`dashboard-join-condition-left-field-${argIndex}`"
             />
           </div>
@@ -134,7 +134,7 @@
           <div class="flex-1 min-w-0 overflow-hidden">
             <OSelect
               :label-position="'inside'"
-              v-model="modelValue.conditions[argIndex].operation"
+              v-model="modelValueModel.conditions[argIndex].operation"
               :options="operationSelectOptions"
               :label="t('dashboard.addJoinPopUp.selectOperation')"
               :data-test="`dashboard-join-condition-operation-${argIndex}`"
@@ -144,7 +144,7 @@
           <div class="flex-1 min-w-0 overflow-hidden">
             <StreamFieldSelect
               :streams="rightFieldStreams"
-              v-model="modelValue.conditions[argIndex].rightField"
+              v-model="modelValueModel.conditions[argIndex].rightField"
               :data-test="`dashboard-join-condition-right-field-${argIndex}`"
             />
           </div>
@@ -213,6 +213,17 @@ export interface StreamOption {
   value: string;
 }
 
+// Shape returned by useStreams' getStreams for a specific stream type.
+interface StreamListEntry {
+  name: string;
+}
+
+interface GetStreamsResponse {
+  name: string;
+  list: StreamListEntry[];
+  schema: boolean;
+}
+
 export interface JoinFieldReference {
   streamAlias: string;
   field: string;
@@ -236,12 +247,6 @@ export interface StreamReference {
   stream: string;
   streamAlias?: string;
 }
-
-const JOIN_TYPES = {
-  INNER: "inner",
-  LEFT: "left",
-  RIGHT: "right",
-} as const;
 
 const JOIN_OPERATIONS = ["=", "!=", ">", "<", ">=", "<="] as const;
 
@@ -319,6 +324,9 @@ export default defineComponent({
     const { dashboardPanelData } = useDashboardPanelData(
       dashboardPanelDataPageKey,
     );
+
+    // Same reference as props.modelValue; mutation targets its nested fields only.
+    const modelValueModel = computed(() => props.modelValue);
 
     const streamOptions = ref<StreamOption[]>([]);
     const operationOptions = [...JOIN_OPERATIONS];
@@ -444,10 +452,13 @@ export default defineComponent({
      */
     async function fetchStreamList(streamType: string): Promise<void> {
       try {
-        const response = await getStreams(streamType, false);
+        const response = (await getStreams(
+          streamType,
+          false,
+        )) as GetStreamsResponse;
 
         streamOptions.value = response.list.map(
-          (stream: any): StreamOption => ({
+          (stream: StreamListEntry): StreamOption => ({
             label: stream.name,
             value: stream.name,
           }),
@@ -457,7 +468,7 @@ export default defineComponent({
         if (streamOptions.value.length > 0) {
           if (!props.modelValue.stream) {
             // No stream selected, select first one
-            props.modelValue.stream = streamOptions.value[0].value;
+            modelValueModel.value.stream = streamOptions.value[0].value;
           } else {
             // Check if current stream is valid
             const isCurrentStreamValid = streamOptions.value.some(
@@ -465,7 +476,7 @@ export default defineComponent({
             );
 
             if (!isCurrentStreamValid) {
-              props.modelValue.stream = streamOptions.value[0].value;
+              modelValueModel.value.stream = streamOptions.value[0].value;
             }
           }
         }
@@ -490,7 +501,7 @@ export default defineComponent({
      */
     function handleJoinTypeChange(type: "inner" | "left" | "right"): void {
       try {
-        props.modelValue.joinType = type;
+        modelValueModel.value.joinType = type;
       } catch (error) {
         console.error("Error changing join type:", error);
       }
@@ -502,7 +513,7 @@ export default defineComponent({
     function handleAddCondition(index: number): void {
       try {
         const newCondition = createDefaultCondition();
-        props.modelValue.conditions.splice(index + 1, 0, newCondition);
+        modelValueModel.value.conditions.splice(index + 1, 0, newCondition);
       } catch (error) {
         console.error("Error adding condition:", error);
       }
@@ -523,7 +534,7 @@ export default defineComponent({
           return;
         }
 
-        props.modelValue.conditions.splice(index, 1);
+        modelValueModel.value.conditions.splice(index, 1);
       } catch (error) {
         console.error("Error removing condition:", error);
       }
@@ -545,6 +556,7 @@ export default defineComponent({
     return {
       t,
       store,
+      modelValueModel,
       operationOptions,
       operationSelectOptions,
       streamOptions,

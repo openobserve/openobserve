@@ -388,8 +388,6 @@ describe("PreviewAlert - watcher behavior", () => {
       query: "SELECT * FROM logs",
       selectedTab: "custom",
     });
-    const initialChartData = w.vm.chartData;
-
     await w.setProps({ query: "" });
     await flushPromises();
 

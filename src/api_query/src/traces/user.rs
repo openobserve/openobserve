@@ -21,20 +21,18 @@ use config::{
     utils::json,
 };
 use hashbrown::HashMap;
+use openobserve_api_common::extractors::Headers;
+use openobserve_core::auth::UserEmail;
+use search_service as SearchService;
 use serde::Serialize;
 use tracing::{Instrument, Span};
 
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
-        utils::{
-            auth::UserEmail,
-            http::{get_or_create_trace_id, get_use_cache_from_request},
-        },
+        utils::http::{get_or_create_trace_id, get_use_cache_from_request},
     },
-    extractors::Headers,
     search::error_utils::map_error_to_http_response,
-    service::search as SearchService,
 };
 
 /// GetLatestUsers
@@ -96,7 +94,7 @@ pub async fn get_latest_users(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(&stream_name)) {
+        if let Err(e) = search_service::check_search_allowed(&org_id, Some(&stream_name)) {
             return MetaHttpResponse::too_many_requests(e.to_string());
         }
     }
@@ -122,15 +120,12 @@ pub async fn get_latest_users(
     {
         use o2_openfga::meta::mapping::OFGA_MODELS;
 
-        use crate::{
-            common::utils::auth::{AuthExtractor, is_root_user},
-            service::users::get_user,
-        };
-        if !is_root_user(user_id) {
+        use crate::service::{auth::AuthExtractor, users::get_user};
+        if !db::user::is_root_user(user_id) {
             let user: config::meta::user::User = get_user(Some(&org_id), user_id).await.unwrap();
             let stream_type_str = StreamType::Traces.as_str();
 
-            if !crate::service::authz::check_permissions(
+            if !openobserve_core::authz::check_permissions(
                 user_id,
                 AuthExtractor {
                     auth: "".to_string(),
@@ -183,7 +178,7 @@ pub async fn get_latest_users(
         return MetaHttpResponse::bad_request("end_time is empty");
     }
 
-    let max_query_range = crate::common::utils::stream::get_max_query_range(
+    let max_query_range = search_service::query_range::get_max_query_range(
         std::slice::from_ref(&stream_name),
         org_id.as_str(),
         user_id,
@@ -297,7 +292,15 @@ pub async fn get_latest_users(
         }
     };
     if resp_search.hits.is_empty() {
-        return MetaHttpResponse::json(resp_search);
+        return MetaHttpResponse::json(PaginatedResponse {
+            took: resp_search.took,
+            total: 0,
+            from,
+            size,
+            hits: vec![],
+            trace_id,
+            function_error: range_error,
+        });
     }
 
     // Parse user_id -> trace_ids from Phase 1 results

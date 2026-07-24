@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, onMounted, onBeforeMount } from "vue";
+import { defineComponent, ref, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -88,15 +88,6 @@ import DateTime from "@/components/DateTime.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import useLogs from "@/composables/useLogs";
 import type { IDateTime } from "@/ts/interfaces";
-
-const defaultValue: any = () => {
-  return {
-    name: "",
-    function: "",
-    params: "row",
-    transType: "0",
-  };
-};
 
 export default defineComponent({
   name: "ComponentSearchSearchBar",

@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <slot name="back">
           <button
             type="button"
-            class="inline-flex items-center justify-center shrink-0 w-9.5 h-9.5 rounded-default bg-surface-subtle text-text-body transition-colors hover:bg-button-ghost-hover-bg outline-none focus-visible:ring-4 focus-visible:ring-primary-500/25 focus-visible:ring-inset"
+            class="inline-flex items-center justify-center shrink-0 w-9.5 h-9.5 rounded-default bg-surface-subtle text-text-body transition-colors hover:bg-button-ghost-hover-bg outline-none focus-visible:ring-4 focus-visible:ring-accent/25 focus-visible:ring-inset"
             :title="backLabel"
             :aria-label="backLabel"
             :data-test="props.back?.dataTest ?? 'app-page-header-back'"
@@ -163,7 +163,8 @@ import OText from "@/lib/core/Typography/OText.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 interface BackTarget {
-  label: string;
+  /** Optional; button falls back to plain "Back" aria-label when omitted. */
+  label?: string;
   to?: import("vue-router").RouteLocationRaw;
   onClick?: () => void;
   dataTest?: string;

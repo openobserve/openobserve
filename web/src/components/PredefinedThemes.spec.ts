@@ -341,7 +341,6 @@ describe("PredefinedThemes", () => {
 
     it("renders theme row buttons for each predefined theme in light mode", () => {
       const wrapper = createWrapper();
-      const vm = wrapper.vm as any;
 
       // Each predefined theme should have a row button in the active (light) mode
       const pulseSlug = themeNameSlug("O2 Pulse");

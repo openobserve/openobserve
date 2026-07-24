@@ -443,7 +443,7 @@ export function createTreeVisualizationEngine() {
       }
     }
 
-    const onNodeMouseOut = (params: any) => {
+    const onNodeMouseOut = () => {
 
       if (activeNodeId) {
         // Clear existing timer before setting new one

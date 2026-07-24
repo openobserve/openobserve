@@ -39,8 +39,7 @@ use datafusion::{
 use futures::TryStreamExt;
 use parquet::arrow::{ProjectionMask, arrow_reader::ParquetRecordBatchReaderBuilder};
 use rayon::prelude::*;
-
-use crate::enrichment::ENRICHMENT_TABLES;
+use transform::enrichment::ENRICHMENT_TABLES;
 
 #[derive(Debug, Clone)]
 pub struct EnrichmentExec {

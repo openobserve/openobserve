@@ -22,7 +22,7 @@
 //! directory on remote storage whose data is entirely older than the cutoff.
 //!
 //! The deletion decision mirrors the compactor retention logic
-//! ([`crate::service::compact::retention`]): a stream's effective retention is
+//! ([`compaction::retention`]): a stream's effective retention is
 //! `stream_settings.data_retention` (falling back to
 //! `ZO_COMPACT_DATA_RETENTION_DAYS`), and any day overlapping an
 //! `extended_retention_days` range is preserved.
@@ -33,8 +33,7 @@ use config::{
     meta::stream::{ALL_STREAM_TYPES, StreamType, TimeRange},
     utils::time::now,
 };
-
-use crate::service::db;
+use db;
 
 /// Entry point for the `gc-file-list` command.
 ///

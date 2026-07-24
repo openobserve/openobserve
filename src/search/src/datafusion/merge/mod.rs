@@ -245,17 +245,7 @@ async fn write_vortex(
     rx: tokio::sync::mpsc::Receiver<RecordBatch>,
     read_task: tokio::task::JoinHandle<Result<()>>,
 ) -> Result<Vec<u8>> {
-    #[cfg(all(feature = "enterprise", feature = "vortex"))]
-    {
-        o2_enterprise::enterprise::search::vortex::write_vortex(schema, rx, read_task).await
-    }
-    #[cfg(not(all(feature = "enterprise", feature = "vortex")))]
-    {
-        let _ = (schema, rx, read_task);
-        Err(DataFusionError::Execution(
-            "Vortex file format requires enterprise and vortex features".to_string(),
-        ))
-    }
+    crate::datafusion::vortex::write_vortex(schema, rx, read_task).await
 }
 
 pub fn append_metadata(

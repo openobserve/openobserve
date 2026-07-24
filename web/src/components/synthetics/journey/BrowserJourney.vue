@@ -2,7 +2,7 @@
 // Copyright 2026 OpenObserve Inc.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { BrowserStep, ReplayPhase, StepReplayResult } from '@/types/synthetics'
+import type { BrowserStep, ReplayPhase, StepReplayResult, WireStep } from '@/types/synthetics'
 import type { StepDotState } from './JourneySteps.vue'
 import useSyntheticsRecorder from '@/composables/useSyntheticsRecorder'
 import { getUUIDv7 } from '@/utils/zincutils'
@@ -137,8 +137,13 @@ function deleteSelectedSteps() {
   selectedStepIds.value = []
 }
 
-// Clear selection when the step list changes, filter changes, or replay starts
-watch(() => props.modelValue.length, () => { selectedStepIds.value = [] })
+// Clear selection when the step list changes, filter changes, or replay starts.
+// Also clear replay banner when all steps are deleted so stale pass/fail banners
+// don't linger after the user removes every step.
+watch(() => props.modelValue.length, (newLen) => {
+  selectedStepIds.value = []
+  if (newLen === 0) emit('clear-results')
+})
 watch(filterQuery, () => { selectedStepIds.value = [] })
 watch(() => props.replayPhase, (phase) => {
   if (phase === 'running') {
@@ -377,7 +382,7 @@ function handleInsertBelow(row: BrowserStep) {
   const idx = findIndex(row)
   if (idx < 0) return
   const next = [...props.modelValue]
-  next.splice(idx + 1, 0, { id: getUUIDv7(true), action: 'click', name: '', timeout: 30000 })
+  next.splice(idx + 1, 0, { id: getUUIDv7(true), action: 'click', name: '', timeout: 30000, code: '' })
   emit('update:modelValue', next)
 }
 function handleRowReorder(reordered: BrowserStep[]) {
@@ -390,7 +395,7 @@ function handleUpdateExpanded(ids: string[]) {
   expandedStepIds.value = ids
 }
 function addStep() {
-  emit('update:modelValue', [...props.modelValue, { id: getUUIDv7(true), action: 'click', name: '', timeout: 30000 }])
+  emit('update:modelValue', [...props.modelValue, { id: getUUIDv7(true), action: 'click', name: '', timeout: 30000, code: '' }])
 }
 function duplicateCapturedStep(index: number, step: BrowserStep) {
   capturedSteps.value.splice(index + 1, 0, { ...step, id: getUUIDv7(true) })
@@ -431,7 +436,21 @@ function handleStepUpdate(row: BrowserStep, patch: Partial<BrowserStep>) {
   const idx = findIndex(row)
   if (idx < 0) return
   const next = [...props.modelValue]
-  next[idx] = { ...next[idx], ...patch }
+
+  // Sync edits into the recorded wire step so the API receives the updated
+  // values. journeyToWireSteps prefers wire over UI fields, so without this
+  // sync, edits to recorded steps are silently discarded on save.
+  let wire = next[idx].wire ? { ...next[idx].wire } : undefined
+  if (wire) {
+    if (patch.name !== undefined) wire.name = patch.name
+    if (patch.selector !== undefined) wire.selector = patch.selector
+    if (patch.selectorType !== undefined) wire.selector_type = patch.selectorType.toLowerCase() as WireStep['selector_type']
+    if (patch.value !== undefined) wire.value = patch.value
+    if (patch.timeout !== undefined) wire.timeout_ms = patch.timeout
+    if (patch.action !== undefined) wire = undefined // action changed → wire metadata is no longer accurate
+  }
+
+  next[idx] = { ...next[idx], wire, ...patch }
   emit('update:modelValue', next)
 }
 
@@ -608,7 +627,7 @@ function openChromeExtensions() {
       role="status"
       data-test="synthetics-journey-replay-banner"
     >
-      <OIcon name="sync" size="sm" class="animate-spin text-primary-500" aria-hidden="true" />
+      <OIcon name="sync" size="sm" class="animate-spin text-accent" aria-hidden="true" />
       <span
         class="text-sm text-text-body"
         data-test="synthetics-journey-replay-banner-text"

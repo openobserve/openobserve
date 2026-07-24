@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div v-else class="text-center text-sm font-semibold text-text-heading py-3 shrink-0">Output Messages</div>
         <OSeparator class="mt-1 shrink-0" />
-        <div class="error-report-container flex-1 min-h-0">
+        <div class="error-report-container flex-1 min-h-0 overflow-auto resize-none">
           <!-- Pipeline Errors Section -->
           <div
             class="p-2.5 mb-2.5"
@@ -76,9 +76,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :error="touchedPipelineName[index] && !userSelectedPipelineName[index]"
                         :error-message="touchedPipelineName[index] && !userSelectedPipelineName[index] ? 'Name is required' : ''"
                         tabindex="0"
-                        @update:model-value="(val: string) => {
+                        @update:model-value="(val: string | number) => {
                           touchedPipelineName[index] = true;
-                          userSelectedPipelineName[index] = val;
+                          userSelectedPipelineName[index] = val as string;
                           updatePipelineName(val as string, index);
                         }"
                       />
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :label="t('alerts.stream_name') + ' *'"
                         class="py-2 showLabelOnTop no-case"
                         @update:model-value="(val) => {
-                          userSelectedStreamName[index] = val;
+                          userSelectedStreamName[index] = val as string;
                           updateStreamFields(val, index);
                         }"
                         @search="handleDynamicStreamName($event, index)"
@@ -386,8 +386,6 @@ import BaseImport from "../common/BaseImport.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
 import {
   detectConditionsVersion,
   convertV0ToV2,
@@ -544,7 +542,7 @@ export default defineComponent({
           }
         });
         baseImportRef.value.jsonArrayOfObj[index].edges.forEach((edge: any) => {
-          if (edge.hasOwnProperty("sourceNode")) {
+          if (Object.prototype.hasOwnProperty.call(edge, "sourceNode")) {
             edge.sourceNode.data.stream_name = stream_name;
           }
         });
@@ -665,7 +663,7 @@ export default defineComponent({
       });
     };
 
-    const importJson = async ({ jsonStr: jsonString, jsonArray }: any) => {
+    const importJson = async ({ jsonStr: jsonString }: any) => {
       pipelineErrorsToDisplay.value = [];
       pipelineCreators.value = [];
 
@@ -1043,14 +1041,7 @@ export default defineComponent({
         input.source.source_type == "scheduled" ||
         input.source.source_type == "realtime"
       ) {
-        const validationPromises = input.nodes.map(async (node: any) => {
-          const validDestinationStreamTypes = [
-            "logs",
-            "metrics",
-            "traces",
-            "enrichment_tables",
-          ];
-        });
+        const validationPromises = input.nodes.map(async () => {});
         // Wait for all validation to complete
         await Promise.all(validationPromises);
       }
@@ -1274,7 +1265,6 @@ export default defineComponent({
     const getSourceStreamsList = async (
       streamType: string,
       index: number,
-      isInput: boolean = false,
     ) => {
       //update the stream type if user selects a different stream type
       if (index != -1 && baseImportRef.value?.jsonArrayOfObj[index]) {
@@ -1320,7 +1310,6 @@ export default defineComponent({
     const getDestinationStreamsList = async (
       streamType: string,
       index: number,
-      isInput: boolean = false,
     ) => {
       //update the stream type if user selects a different stream type
       if (index != -1 && baseImportRef.value?.jsonArrayOfObj[index]) {
@@ -1350,7 +1339,6 @@ export default defineComponent({
     const getOutputStreamsList = async (
       streamType: string,
       index: number,
-      isInput: boolean = false,
     ) => {
       //update the stream type if user selects a different stream type
       if (index != -1 && baseImportRef.value?.jsonArrayOfObj[index]) {

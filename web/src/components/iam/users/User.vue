@@ -177,6 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline-destructive"
               size="sm"
               icon-left="delete"
+              :loading="bulkDeleteLoading"
               @click="openBulkDeleteDialog"
             >
               {{ t('iam.user.delete') }}
@@ -273,8 +274,8 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
-import { computed, nextTick } from "vue";
-import { getRoles as getCustomRolesApi, getRoleUsers } from "@/services/iam";
+import { computed } from "vue";
+import { getRoles as getCustomRolesApi } from "@/services/iam";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
@@ -301,7 +302,7 @@ export default defineComponent({
     "deleted:fields",
     "updated:dates",
   ],
-  setup(props, { emit }) {
+  setup() {
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
@@ -322,6 +323,7 @@ export default defineComponent({
     };
     const selectedUsers: any = ref([]);
     const confirmBulkDelete = ref(false);
+    const bulkDeleteLoading = ref(false);
     const rows = ref<any[]>([]);
     const tableKey = ref(0);
 
@@ -474,8 +476,8 @@ export default defineComponent({
     const isBuiltinRole = (r: string) =>
       BUILTIN_ROLES.has(String(r ?? "").toLowerCase());
     const userEmail: any = ref("");
-    const options = ref([]);
-    const customRoles = ref([]);
+    const options = ref<{ label: string; value: string }[]>([]);
+    const customRoles = ref<string[]>([]);
     const selectedRole = ref();
     const currentUserRole = ref("");
     let deleteUserEmail = "";
@@ -536,71 +538,6 @@ export default defineComponent({
           });
       });
     }
-
-    let hydrateGeneration = 0;
-
-    const clearLoading = (targets: any[]) => {
-      for (const u of targets) {
-        u.custom_roles_loading = false;
-      }
-    };
-
-    // Inverts OFGA per-role memberships into per-user role lists.
-    // Cost: O(R) HTTP calls where R is the number of custom roles,
-    // independent of the user count.
-    const hydrateCustomRoles = async () => {
-      const myGen = ++hydrateGeneration;
-      const orgId = store.state.selectedOrganization.identifier;
-      const targets = usersState.users.filter(
-        (u: any) => (u.rawEmail || u.email) && u.status !== "pending",
-      );
-      if (targets.length === 0) return;
-
-      const byEmail = new Map<string, any>();
-      for (const u of targets) {
-        byEmail.set(String(u.rawEmail || u.email).toLowerCase(), u);
-      }
-
-      try {
-        // Always fetch a fresh role list scoped to this hydration run so we
-        // don't race with concurrent picker loads mutating the shared ref.
-        // Silent mode: hydration is a background operation; surface fetch
-        // errors via the per-row loading state, not a toast.
-        let roleNames: string[] = [];
-        try {
-          const res = await getCustomRolesApi(orgId);
-          roleNames = Array.isArray(res.data) ? res.data : [];
-        } catch {
-          roleNames = [];
-        }
-        if (myGen !== hydrateGeneration) return;
-        if (roleNames.length === 0) return;
-
-        const results = await Promise.all(
-          roleNames.map((role) =>
-            getRoleUsers(role, orgId)
-              .then((r) => ({ role, emails: Array.isArray(r.data) ? r.data : [] }))
-              .catch(() => ({ role, emails: [] as string[] })),
-          ),
-        );
-        if (myGen !== hydrateGeneration) return;
-
-        for (const { role, emails } of results) {
-          for (const email of emails) {
-            const row = byEmail.get(String(email).toLowerCase());
-            if (!row) continue;
-            const next = Array.isArray(row.custom_roles)
-              ? row.custom_roles
-              : [];
-            if (next.indexOf(role) === -1) {
-              row.custom_roles = [...next, role];
-            }
-          }
-        }
-      } finally {
-        clearLoading(targets);
-      }
-    };
 
     const loading = ref(false);
     const getOrgMembers = () => {
@@ -758,8 +695,6 @@ export default defineComponent({
     //     );
     //   }
     // });
-
-    const currentUser = computed(() => store.state.userInfo.email);
 
     const updateUserActions = () => {
       usersState.users.forEach((member: any) => {
@@ -1099,7 +1034,7 @@ export default defineComponent({
 
       organizationsService
         .revoke_invite(store.state.selectedOrganization.identifier, revokeInviteToken)
-        .then(async (res: any) => {
+        .then(async () => {
           dismiss();
           toast({
             message: t('iam.user.invitationRevokedSuccess'),
@@ -1134,6 +1069,7 @@ export default defineComponent({
     };
 
     const bulkDeleteUsers = async () => {
+      bulkDeleteLoading.value = true;
       const userEmails = selectedUsers.value.map((user: any) => user.email);
 
       try {
@@ -1171,6 +1107,8 @@ export default defineComponent({
             variant: "error",
           });
         }
+      } finally {
+        bulkDeleteLoading.value = false;
       }
     };
 
@@ -1319,6 +1257,7 @@ export default defineComponent({
       selectedUserIds,
       handleSelectedIdsUpdate,
       confirmBulkDelete,
+      bulkDeleteLoading,
       openBulkDeleteDialog,
       bulkDeleteUsers,
       rows,

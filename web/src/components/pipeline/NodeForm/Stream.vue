@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <div
               v-if="selectedNodeType == 'output'"
-              class="note-message bg-banner-warning-bg text-banner-warning-text w-full rounded-default p-3 flex flex-col gap-2"
+              class="note-message bg-banner-warning-bg border border-banner-warning-border text-banner-warning-text w-full rounded-default p-3 flex flex-col gap-2"
             >
               <div class="text-sm text-banner-warning-text">Guidelines:</div>
               <div class="flex flex-col gap-1 text-sm text-banner-warning-text">
@@ -335,7 +335,8 @@ function sanitizeStaticPart(str: string): string[] {
 
 
 async function getStreamList() {
-  const streamType = pipelineObj.currentSelectedNodeData.data.hasOwnProperty(
+  const streamType = Object.prototype.hasOwnProperty.call(
+    pipelineObj.currentSelectedNodeData.data,
     "stream_type",
   )
     ? pipelineObj.currentSelectedNodeData.data.stream_type
@@ -348,7 +349,10 @@ async function getStreamList() {
 
     if (
       res.list.length > 0 &&
-      pipelineObj.currentSelectedNodeData.hasOwnProperty("type") &&
+      Object.prototype.hasOwnProperty.call(
+        pipelineObj.currentSelectedNodeData,
+        "type",
+      ) &&
       pipelineObj.currentSelectedNodeData.type === "input"
     ) {
       res.list.forEach((stream: any) => {
@@ -455,7 +459,10 @@ const openDeleteDialog = () => {
   dialog.value.message = "Are you sure you want to delete stream association?";
   //here we will check if the destination node is added by default if yes then we will show a warning message to the user
   if (
-    pipelineObj.currentSelectedNodeData?.data.hasOwnProperty("node_type") &&
+    Object.prototype.hasOwnProperty.call(
+      pipelineObj.currentSelectedNodeData?.data,
+      "node_type",
+    ) &&
     pipelineObj.currentSelectedNodeData?.data.node_type === "stream" &&
     checkIfDefaultDestinationNode(pipelineObj.currentSelectedNodeID)
   ) {

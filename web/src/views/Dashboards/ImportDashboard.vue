@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </div>
                     <div v-if="filesImportResults.length" class="py-2" data-test="dashboard-import-file-results">
-                      <div v-for="importResult in filesImportResults">
+                      <div v-for="(importResult, index) in filesImportResults" :key="index">
                         <span
                           v-if="importResult.status == 'rejected'"
                           class="text-status-negative"
@@ -286,7 +286,6 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -522,7 +521,8 @@ export default defineComponent({
       }
 
       const data = jsonStr.value.map((parsedContent, fileIndex) => {
-        return new Promise(async (resolve, reject) => {
+        return new Promise((resolve, reject) => {
+          (async () => {
           const fileName =
             jsonFiles.value[fileIndex]?.name ||
             t("dashboard.importDashboardPage.fileFallback", { n: fileIndex + 1 });
@@ -582,6 +582,7 @@ export default defineComponent({
           } catch (e) {
             reject({ file: fileName, error: t("dashboard.importDashboardPage.errorProcessingFile") });
           }
+          })().catch(reject);
         });
       });
 
@@ -881,27 +882,28 @@ export default defineComponent({
   },
   components: { OSeparator, SelectFolderDropdown, AppTabs, OPageLayout, QueryEditor, OButton, OInput, OSelect,
     OForm, OFormInput, OFormFile,
-    OIcon, OSplitter,
+    OSplitter,
 },
 });
 </script>
 
-<style>
+<style scoped>
 /* keep(lib-override:monaco): fixed Monaco editor heights for the import editors
-   plus the folder-dropdown button spacing. .editor-container-url is a cross-file
-   shared class (also used by BaseImport.vue, which relies on this height rule),
-   so these stay unscoped globals targeting Monaco's internal DOM. */
-.editor-container-url .monaco-editor {
+   plus the folder-dropdown button spacing, reaching Monaco's internal DOM via
+   :deep(). The elements carrying these container classes are this view's own,
+   so scoping matches the exact same DOM the former global rule did. BaseImport.vue
+   carries the matching .editor-container-url rule for its own editor. */
+.editor-container-url :deep(.monaco-editor) {
   height: calc(100vh - 17.8125rem) !important;
   overflow: hidden;
   resize: none;
 }
-.dashboard-import-json-container .monaco-editor {
+.dashboard-import-json-container :deep(.monaco-editor) {
   height: calc(100vh - 17.625rem) !important;
   overflow: hidden;
   resize: none;
 }
-.import-folder-dropdown-container .add-folder-btn {
+.import-folder-dropdown-container :deep(.add-folder-btn) {
   margin-bottom: 0 !important;
   margin-top: 0.75rem !important;
 }

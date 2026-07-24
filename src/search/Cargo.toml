@@ -7,14 +7,8 @@ publish = false
 
 [features]
 default = []
-enterprise = ["dep:o2_enterprise"]
+enterprise = ["dep:openobserve-cipher", "openobserve-cipher/enterprise", "dep:o2_enterprise"]
 vectorscan = ["dep:o2_enterprise", "o2_enterprise/vectorscan"]
-vortex = [
-    "dep:vortex",
-    "dep:vortex-datafusion",
-    "config/vortex",
-    "o2_enterprise?/vortex",
-]
 
 [dependencies]
 anyhow.workspace = true
@@ -25,6 +19,7 @@ async-stream.workspace = true
 async-trait.workspace = true
 bytes.workspace = true
 chrono.workspace = true
+openobserve-cipher = { workspace = true, optional = true }
 config.workspace = true
 dashmap.workspace = true
 datafusion.workspace = true
@@ -40,7 +35,9 @@ log.workspace = true
 md5.workspace = true
 memchr.workspace = true
 object_store.workspace = true
-openobserve-vrl.workspace = true
+transform.workspace = true
+vector-enrichment.workspace = true
+vrl.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 opentelemetry.workspace = true
 parking_lot.workspace = true
@@ -64,7 +61,5 @@ tracing.workspace = true
 tracing-opentelemetry.workspace = true
 url.workspace = true
 utoipa.workspace = true
-vector-enrichment.workspace = true
-vortex = { workspace = true, optional = true }
-vortex-datafusion = { workspace = true, optional = true }
-vrl.workspace = true
+vortex = { workspace = true }
+vortex-datafusion = { workspace = true }

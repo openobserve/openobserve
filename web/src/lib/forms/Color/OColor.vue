@@ -28,6 +28,7 @@ const parentDataTest = computed(() => $attrs["data-test"] as string | undefined)
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
 const wrapperAttrs = computed(() => {
   const { tabindex, ...rest } = $attrs;
+  void tabindex;
   return rest;
 });
 
@@ -175,7 +176,7 @@ const wrapperClasses = computed(() => [
         <PopoverContent
           :side-offset="6"
           align="start"
-          class="z-[10001] rounded-default border shadow-md p-3 flex flex-col gap-3 bg-colorpicker-popup-bg border-colorpicker-popup-border w-55"
+          class="z-10001 rounded-default border shadow-md p-3 flex flex-col gap-3 bg-colorpicker-popup-bg border-colorpicker-popup-border w-55"
         >
           <!-- Saturation / Brightness area -->
           <!-- ColorAreaRoot passes gradient styles via scoped slot -->

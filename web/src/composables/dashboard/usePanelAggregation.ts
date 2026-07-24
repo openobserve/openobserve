@@ -255,7 +255,7 @@ export const usePanelAggregation = ({
           dashboardPanelData.layout.currentQueryIndex
         ].config.time_shift = [];
         break;
-      case "html":
+      case "html": {
         // Preserve current stream and stream_type before resetting
         const htmlCurrentStream =
           dashboardPanelData.data.queries[
@@ -290,7 +290,8 @@ export const usePanelAggregation = ({
           dashboardPanelData.layout.currentQueryIndex
         ].config.time_shift = [];
         break;
-      case "markdown":
+      }
+      case "markdown": {
         // Preserve current stream and stream_type before resetting
         const markdownCurrentStream =
           dashboardPanelData.data.queries[
@@ -326,7 +327,8 @@ export const usePanelAggregation = ({
           dashboardPanelData.layout.currentQueryIndex
         ].config.time_shift = [];
         break;
-      case "custom_chart":
+      }
+      case "custom_chart": {
         // Preserve current stream and stream_type before resetting
         const customChartCurrentStream =
           dashboardPanelData.data.queries[
@@ -367,6 +369,7 @@ export const usePanelAggregation = ({
           dashboardPanelData.layout.currentQueryIndex
         ].config.time_shift = [];
         break;
+      }
       case "maps":
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -426,6 +429,7 @@ export const usePanelAggregation = ({
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].config.time_shift = [];
+        break;
       default:
         break;
     }

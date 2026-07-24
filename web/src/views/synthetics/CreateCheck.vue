@@ -1,9 +1,9 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 //
-// Router view for `synthetic-new`. Dispatches on `?type=` (create) or the
-// fetched monitor's type (`?edit=`) — the browser flow keeps its dedicated
-// journey/configure view; protocol checks (http/tcp/tls/ssh) share the
+// Router view for `synthetics-add` and `synthetics-edit/:id`. Dispatches on
+// `?type=` (create) or the route param `:id` (edit) — the browser flow keeps
+// its dedicated journey/configure view; protocol checks share the
 // configure-only page.
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
@@ -18,7 +18,7 @@ const route = useRoute()
 const store = useStore()
 
 const editId = computed(() =>
-  typeof route.query.edit === 'string' && route.query.edit ? route.query.edit : undefined,
+  typeof route.params.id === 'string' && route.params.id ? route.params.id : undefined,
 )
 
 // Create: type comes from the query. Edit: type comes from the stored monitor,
@@ -35,7 +35,7 @@ onMounted(async () => {
   }
   try {
     const org = store.state.selectedOrganization.identifier
-    const res = await syntheticsService.get(org, editId.value)
+    const res = await syntheticsService.get(org, editId.value, String(route.query.folder ?? ''))
     const t = (res.data as any)?.type
     resolvedType.value = SYNTHETIC_CHECK_TYPES.includes(t) ? (t as SyntheticCheckType) : 'browser'
   } catch (err) {
@@ -47,7 +47,7 @@ onMounted(async () => {
 
 <template>
   <CreateBrowserTestSkeleton v-if="resolvedType === null" :rows="10" />
-  <CreateBrowserTest v-else-if="resolvedType === 'browser'" />
+  <CreateBrowserTest v-else-if="resolvedType === 'browser'" :edit-id="editId" />
   <CreateProtocolCheck
     v-else
     :key="resolvedType"

@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #cell-name="{ row }">
-          <div class="flex items-center flex-nowrap relative z-[2] min-h-6">
+          <div class="flex items-center flex-nowrap relative z-2 min-h-6">
             <span
               v-if="getSource(row) === 'built_in'"
               class="shrink-0 cursor-default inline-flex mr-1"
@@ -339,7 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
 
-        <template #bottom="scope">
+        <template #bottom>
           <div class="flex items-center w-full h-12 gap-x-2">
             <div
               class="text-xs font-normal flex items-center w-25"
@@ -363,6 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="model-pricing-delete-selected-btn"
               variant="outline-destructive"
               size="sm"
+              :loading="bulkDeleteLoading"
               @click="confirmDeleteSelected"
               icon-left="delete"
             >
@@ -503,7 +504,6 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import TestModelMatchDialog from "@/components/settings/TestModelMatchDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -548,6 +548,7 @@ const filterQuery = ref("");
 const showImportModelPricingPage = ref(false);
 const showTestMatchDialog = ref(false);
 const selectedIds = ref<string[]>([]);
+const bulkDeleteLoading = ref(false);
 const selectedTab = ref("all");
 
 const tabOptions = computed(() => [
@@ -915,26 +916,31 @@ function confirmDeleteSelected() {
     title: t("modelPricing.confirmDeleteSelectedTitle"),
     message: t("modelPricing.confirmDeleteSelectedMessage", { count }),
     onConfirm: async () => {
-      let successCount = 0;
-      for (const id of selectedIds.value) {
-        const modelEntry = allModels.value.find((m: any) => m.id === id);
-        const modelName = modelEntry?.name || id;
-        try {
-          await modelPricingService.delete(orgIdentifier.value, id);
-          successCount++;
-        } catch (e: any) {
-          notifyError(t("modelPricing.errDeleteNamed", { name: modelName }), e);
+      bulkDeleteLoading.value = true;
+      try {
+        let successCount = 0;
+        for (const id of selectedIds.value) {
+          const modelEntry = allModels.value.find((m: any) => m.id === id);
+          const modelName = modelEntry?.name || id;
+          try {
+            await modelPricingService.delete(orgIdentifier.value, id);
+            successCount++;
+          } catch (e: any) {
+            notifyError(t("modelPricing.errDeleteNamed", { name: modelName }), e);
+          }
         }
-      }
-      if (successCount > 0) {
-        toast({
-          variant: "success",
-          message: t("modelPricing.deletedModelsNotif", {
-            count: successCount,
-          }),
-        });
-        selectedIds.value = [];
-        await fetchModels();
+        if (successCount > 0) {
+          toast({
+            variant: "success",
+            message: t("modelPricing.deletedModelsNotif", {
+              count: successCount,
+            }),
+          });
+          selectedIds.value = [];
+          await fetchModels();
+        }
+      } finally {
+        bulkDeleteLoading.value = false;
       }
     },
   };

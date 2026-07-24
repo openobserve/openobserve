@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     class="bg-surface-base"
     title="Upload Source Maps"
-    :back="{ onClick: navigateBack, dataTest: 'add-alert-back-btn' }"
+    :back="{ label: 'Source Maps', onClick: navigateBack, dataTest: 'add-alert-back-btn' }"
     bleed
   >
     <OForm
@@ -70,8 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Bottom Action Bar -->
-      <div class="action-bar shrink-0 bg-card-glass-bg flex items-center justify-end gap-3 py-3 pr-3 border-t border-card-glass-border sticky"
-        style="z-index: 2">
+      <div class="action-bar shrink-0 bg-card-glass-bg flex items-center justify-end gap-3 py-3 pr-3 border-t border-card-glass-border sticky z-2">
         <OButton
           data-test="rum-upload-source-maps-cancel-btn"
           variant="outline"
@@ -99,7 +98,6 @@ import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import sourcemapsService from "@/services/sourcemaps";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import SourceMapDropzone from "./SourceMapDropzone.vue";
@@ -124,7 +122,8 @@ const uploadSourceMapsDefaults = computed((): UploadSourceMapsForm => ({
   service: (route.query.service as string) || "",
   version: (route.query.version as string) || "",
   environment: (route.query.environment as string) || "",
-  file: null,
+  // Empty file slot at init; schema is `.nullable()` so null is valid at runtime.
+  file: null as unknown as File,
 }));
 
 // Navigate back to source maps list

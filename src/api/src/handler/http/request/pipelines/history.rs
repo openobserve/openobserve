@@ -29,6 +29,10 @@ use config::{
 };
 #[cfg(feature = "enterprise")]
 use o2_openfga::{config::get_config as get_openfga_config, meta::mapping::OFGA_MODELS};
+use openobserve_api_management::request::alerts::history::escape_like;
+use openobserve_core::{auth::UserEmail, pipeline::list_user_pipelines};
+use search_service as SearchService;
+use search_service::query_range::get_settings_max_query_range;
 use serde::{Deserialize, Serialize};
 use tracing::{Instrument, Span};
 use utoipa::ToSchema;
@@ -36,17 +40,8 @@ use utoipa::ToSchema;
 #[cfg(feature = "enterprise")]
 use crate::handler::http::auth::validator::list_objects_for_user;
 use crate::{
-    common::{
-        meta::http::HttpResponse as MetaHttpResponse,
-        utils::{
-            auth::UserEmail, http::get_or_create_trace_id, stream::get_settings_max_query_range,
-        },
-    },
-    handler::http::{extractors::Headers, request::alerts::history::escape_like},
-    service::{
-        pipeline::list_user_pipelines,
-        search::{self as SearchService},
-    },
+    common::{meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id},
+    handler::http::extractors::Headers,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -238,7 +233,7 @@ pub async fn get_pipeline_history(
     // RBAC: Check permissions for the requested pipeline(s)
     #[cfg(feature = "enterprise")]
     let permitted_pipeline_ids = {
-        use crate::common::utils::auth::is_root_user;
+        use db::user::is_root_user;
 
         let user_id = &user_email.user_id;
         if is_root_user(user_id) {
@@ -246,7 +241,7 @@ pub async fn get_pipeline_history(
         }
         // If RBAC is enabled, check permissions
         else if get_openfga_config().enabled {
-            let user = match crate::service::users::get_user(Some(&org_id), user_id).await {
+            let user = match openobserve_core::users::get_user(Some(&org_id), user_id).await {
                 Some(user) => user,
                 None => {
                     return MetaHttpResponse::forbidden("User not found");
@@ -428,6 +423,16 @@ pub async fn get_pipeline_history(
     {
         Ok(result) => result.total,
         Err(e) => {
+            // Triggers stream doesn't exist yet (no pipeline has ever fired in this org).
+            let msg = e.to_string().to_lowercase();
+            if msg.contains("stream not found") || msg.contains("not found") {
+                return MetaHttpResponse::json(PipelineHistoryResponse {
+                    total: 0,
+                    from,
+                    size,
+                    hits: vec![],
+                });
+            }
             log::error!("Failed to get pipeline history count: {}", e);
             return MetaHttpResponse::internal_error(format!(
                 "Failed to get pipeline history count: {e}"

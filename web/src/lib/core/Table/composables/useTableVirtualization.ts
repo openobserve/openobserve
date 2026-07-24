@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { computed, ref, watch, type Ref } from "vue";
+import { computed, type Ref } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import type { Row } from "@tanstack/vue-table";
 

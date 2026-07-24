@@ -22,10 +22,22 @@ impl From<DataFusionError> for Error {
         if let DataFusionError::SchemaError(schema_err, _) = &err
             && let SchemaError::FieldNotFound {
                 field,
-                valid_fields: _,
+                valid_fields,
             } = schema_err.as_ref()
         {
-            return Error::ErrorCode(ErrorCodes::SearchFieldNotFound(field.name.clone()));
+            // Keep the same textual shape DataFusion's Display uses so the
+            // HTTP layer can parse candidates out of either origin and offer
+            // did-you-mean suggestions.
+            let valid = valid_fields
+                .iter()
+                .map(|f| f.flat_name())
+                .collect::<Vec<_>>()
+                .join(", ");
+            return Error::ErrorCode(ErrorCodes::SearchFieldNotFound(if valid.is_empty() {
+                format!("No field named {}.", field.name)
+            } else {
+                format!("No field named {}. Valid fields are {}.", field.name, valid)
+            }));
         }
 
         let err = err.to_string();

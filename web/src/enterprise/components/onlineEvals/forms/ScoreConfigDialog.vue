@@ -11,11 +11,7 @@
     :title="drawerTitle"
     form-id="score-config-form"
     :secondary-button-label="t('onlineEvals.buttons.cancel')"
-    :primary-button-label="
-      mode === 'create'
-        ? t('onlineEvals.scoreConfig.createButton')
-        : t('onlineEvals.scoreConfig.saveButton')
-    "
+    :primary-button-label="t('onlineEvals.buttons.save')"
     :primary-button-disabled="mode === 'edit' && !isDirty"
     @update:open="handleOpenChange"
     @click:secondary="$emit('cancel')"
@@ -83,7 +79,7 @@
           orientation="horizontal"
           class="mt-0.5"
           data-test="score-config-datatype-radios"
-          @update:model-value="form.setFieldValue('dataType', $event)"
+          @update:model-value="onDataTypeChange"
         >
           <!-- `sc-dtype-radio` is kept purely as the hook for the ORadio
                :deep() keeper below; all of its own chrome is utilities. In edit
@@ -95,7 +91,7 @@
             class="sc-dtype-radio flex-1 min-w-0 border rounded-default transition-[border-color,background] duration-120"
             :class="[
               formValues.dataType === type
-                ? 'border-primary-600 bg-[color-mix(in_srgb,var(--color-primary-600)_5%,var(--color-card-bg))]'
+                ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_5%,var(--color-card-bg))]'
                 : 'border-dialog-header-border bg-card-bg',
               mode === 'edit'
                 ? ''
@@ -193,7 +189,7 @@
               class="flex-1 min-w-0 grid grid-cols-[1.125rem_1.25rem_minmax(0,1fr)_5rem] items-center gap-2 px-3 py-1.5 border rounded-default cursor-pointer transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
               :class="
                 formValues.healthyDirection === 'gte'
-                  ? 'border-primary-600 bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
+                  ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
                   : 'border-dialog-header-border bg-card-bg'
               "
             >
@@ -220,7 +216,7 @@
               class="flex-1 min-w-0 grid grid-cols-[1.125rem_1.25rem_minmax(0,1fr)_5rem] items-center gap-2 px-3 py-1.5 border rounded-default cursor-pointer transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
               :class="
                 formValues.healthyDirection === 'lte'
-                  ? 'border-primary-600 bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
+                  ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
                   : 'border-dialog-header-border bg-card-bg'
               "
             >
@@ -287,7 +283,7 @@
               class="flex-1 min-w-0 grid grid-cols-[1rem_1fr] items-start gap-2.5 px-3 py-1.75 border rounded-default cursor-pointer transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
               :class="
                 formValues.healthyBool === true
-                  ? 'border-primary-600 bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
+                  ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
                   : 'border-dialog-header-border bg-card-bg'
               "
             >
@@ -307,7 +303,7 @@
               class="flex-1 min-w-0 grid grid-cols-[1rem_1fr] items-start gap-2.5 px-3 py-1.75 border rounded-default cursor-pointer transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
               :class="
                 formValues.healthyBool === false
-                  ? 'border-primary-600 bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
+                  ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
                   : 'border-dialog-header-border bg-card-bg'
               "
             >
@@ -347,6 +343,7 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
+import type { RadioValue } from "@/lib/forms/Radio/ORadio.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -392,6 +389,12 @@ const drawerTitle = computed(() =>
 
 // Data-type radio options.
 const DATA_TYPES = ["numeric", "categorical", "boolean"] as const;
+
+const onDataTypeChange = (value: RadioValue) => {
+  if (value === "numeric" || value === "categorical" || value === "boolean") {
+    form.setFieldValue("dataType", value);
+  }
+};
 
 // Co-located Zod schema (factory keeps messages i18n-driven and branches the
 // create-only name-slug rule on `mode`).

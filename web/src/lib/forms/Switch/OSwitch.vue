@@ -12,7 +12,7 @@ const parentDataTest = computed(() => $attrs["data-test"] as string | undefined)
 // Forward tabindex to the switch control; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
 const wrapperAttrs = computed(() => {
-  const { tabindex, ...rest } = $attrs;
+  const { tabindex: _tabindex, ...rest } = $attrs;
   return rest;
 });
 
@@ -87,13 +87,6 @@ const trackSizes: Record<NonNullable<SwitchProps["size"]>, TrackSize> = {
   },
 };
 
-const labelSize: Record<NonNullable<SwitchProps["size"]>, string> = {
-  sm: "text-xs",
-  md: "text-sm",
-  lg: "text-sm",
-  xl: "text-lg",
-};
-
 const currentSizes = computed(() => trackSizes[props.size ?? "md"]);
 
 const slots = useSlots();
@@ -138,11 +131,11 @@ const hasLabel = computed(
         props.disabled
           ? 'bg-transparent border-switch-disabled-border border-dashed'
           : isChecked
-            ? 'bg-primary-500 border-switch-border'
+            ? 'bg-switch-track-on border-switch-border'
             : 'bg-transparent border-switch-border-off',
         props.disabled ? 'cursor-not-allowed' : 'cursor-pointer',
         'outline-none',
-        'focus-visible:ring-4 focus-visible:ring-primary-500/25',
+        'focus-visible:ring-4 focus-visible:ring-accent/25',
         'transition-[color,background-color,border-color,box-shadow] duration-200',
       ]"
     >

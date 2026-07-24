@@ -26,7 +26,7 @@ const parentDataTest = computed(() => $attrs["data-test"] as string | undefined)
 // Forward tabindex to the real control; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
 const wrapperAttrs = computed(() => {
-  const { tabindex, ...rest } = $attrs;
+  const { tabindex: _tabindex, ...rest } = $attrs;
   return rest;
 });
 
@@ -232,7 +232,7 @@ const wrapperClasses = computed(() => [
      while the field is focused. */
   hasError.value
     ? "border-input-border-error focus-within:ring-[0.125rem] focus-within:ring-input-border-error/30"
-    : "border-input-border hover:border-input-border-hover focus-within:border-input-border-focus focus-within:ring-[0.125rem] focus-within:ring-primary-500/25",
+    : "border-input-border hover:border-input-border-hover focus-within:border-input-border-focus focus-within:ring-[0.125rem] focus-within:ring-accent/25",
   /* Disabled inputs get a muted bg + dashed border so they read as obviously
      inactive at a glance. */
   props.disabled
@@ -299,6 +299,7 @@ const wrapperClasses = computed(() => [
         :placeholder="placeholder"
         :disabled="disabled"
         :readonly="readonly"
+        :aria-required="required || undefined"
         :autofocus="autofocus"
         :maxlength="maxlength"
         :rows="autogrow ? 1 : rows"
@@ -321,6 +322,7 @@ const wrapperClasses = computed(() => [
         @keydown="emit('keydown', $event)"
         @keyup="emit('keyup', $event)"
         @keypress="emit('keypress', $event)"
+        @paste="emit('paste', $event)"
       />
 
       <!-- Text/number/etc input -->
@@ -335,6 +337,7 @@ const wrapperClasses = computed(() => [
         :placeholder="placeholder"
         :disabled="disabled"
         :readonly="readonly"
+        :aria-required="required || undefined"
         :autofocus="autofocus"
         :maxlength="maxlength"
         :autocomplete="autocomplete"
@@ -356,6 +359,7 @@ const wrapperClasses = computed(() => [
         @keydown="emit('keydown', $event)"
         @keyup="emit('keyup', $event)"
         @keypress="emit('keypress', $event)"
+        @paste="emit('paste', $event)"
       />
 
       <!-- Clear button -->

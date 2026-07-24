@@ -1,6 +1,6 @@
 <template>
   <div
-    class="absolute top-0 left-0 w-full z-[999] transition-opacity duration-500 ease-out"
+    class="absolute top-0 left-0 w-full z-999 transition-opacity duration-500 ease-out"
     :class="{
       'opacity-0': !loading && !isFadingOut,
       'opacity-100': loading || isFadingOut,
@@ -24,7 +24,7 @@
         }"
       >
         <div
-          class="loading-progress__shimmer absolute inset-0 bg-gradient-to-r from-transparent to-transparent via-white/40 dark:via-grey-300/40"
+          class="loading-progress__shimmer absolute inset-0 bg-gradient-to-r from-transparent to-transparent via-white/40"
         ></div>
       </div>
       <!-- Moving circle indicator -->
@@ -41,7 +41,7 @@
         }"
       >
         <div
-          class="loading-progress__head-glow absolute inset-0 rounded-full bg-white/20 dark:bg-grey-300/20"
+          class="loading-progress__head-glow absolute inset-0 rounded-full bg-white/20"
         ></div>
       </div>
     </div>
@@ -76,6 +76,10 @@ export default defineComponent({
     watch(
       () => props.loading,
       (newValue, oldValue) => {
+        // Remember the previous loading state so shouldAnimate can stay
+        // true through the loading -> not-loading transition.
+        lastLoadingState.value = oldValue;
+
         if (oldValue && !newValue) {
           // When loading becomes false, quickly complete to 100% and start fade out
           internalPercentage.value = 100;
@@ -95,9 +99,7 @@ export default defineComponent({
     });
 
     const shouldAnimate = computed(() => {
-      const wasLoading = lastLoadingState.value;
-      lastLoadingState.value = props.loading;
-      return props.loading || wasLoading || isFadingOut.value;
+      return props.loading || lastLoadingState.value || isFadingOut.value;
     });
 
     const displayPercentage = computed(() => {

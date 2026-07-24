@@ -20,14 +20,12 @@ use config::{
     MMDB_CITY_FILE_NAME,
     utils::download_utils::{download_file, is_digest_different},
 };
+use enrichment_data::enrichment_table::geoip::{Geoip, GeoipConfig, MMDB_INIT_NOTIFIER};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use tokio::time;
 
-use crate::{
-    common::{infra::config::MAXMIND_DB_CLIENT, meta::maxmind::MaxmindClient},
-    service::enrichment_table::geoip::{Geoip, GeoipConfig, MMDB_INIT_NOTIFIER},
-};
+use crate::common::{infra::config::MAXMIND_DB_CLIENT, meta::maxmind::MaxmindClient};
 
 static CLIENT_INITIALIZED: LazyLock<bool> = LazyLock::new(|| true);
 
@@ -154,7 +152,7 @@ async fn update_maxmind_table(fname: &str) {
         Ok(_) => {
             #[cfg(feature = "enterprise")]
             if get_o2_config().common.enable_enterprise_mmdb {
-                openobserve_vrl::register_global_enrichment_table(
+                transform::register_global_enrichment_table(
                     o2_enterprise::enterprise::common::config::GEO_IP_ENTERPRISE_ENRICHMENT_TABLE,
                     Geoip::new(GeoipConfig::new(
                         &get_o2_config().common.mmdb_enterprise_file_name,
@@ -164,12 +162,12 @@ async fn update_maxmind_table(fname: &str) {
             }
 
             if fname.ends_with(MMDB_CITY_FILE_NAME) {
-                openobserve_vrl::register_global_enrichment_table(
+                transform::register_global_enrichment_table(
                     GEO_IP_CITY_ENRICHMENT_TABLE,
                     Geoip::new(GeoipConfig::new(MMDB_CITY_FILE_NAME)).unwrap(),
                 );
             } else if fname.ends_with(MMDB_ASN_FILE_NAME) {
-                openobserve_vrl::register_global_enrichment_table(
+                transform::register_global_enrichment_table(
                     GEO_IP_ASN_ENRICHMENT_TABLE,
                     Geoip::new(GeoipConfig::new(MMDB_ASN_FILE_NAME)).unwrap(),
                 );

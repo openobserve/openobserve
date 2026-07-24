@@ -495,7 +495,7 @@ export function buildSQLContext(
           show: true,
           fontsize: 12,
           precision: panelSchema.config?.decimals,
-          backgroundColor: store.state.theme === "dark" ? "#333" : "",
+          backgroundColor: chartColor("--color-chart-crosshair-bg"),
           formatter: function (params: any) {
             try {
               let lineBreaks = "";
@@ -663,7 +663,6 @@ export function buildSQLContext(
         hasTimestampField || isHorizontalChart
           ? 120
           : panelSchema.config?.axis_label_truncate_width || 120;
-      const labelFontSize = 12;
       const labelMargin = 10;
 
       return {
@@ -790,9 +789,14 @@ export function buildSQLContext(
       bottom: "100%",
       feature: {
         dataZoom: {
-          yAxisIndex: panelSchema.config?.dataZoom?.hasOwnProperty("yAxisIndex")
-            ? panelSchema.config?.dataZoom.yAxisIndex
-            : "none",
+          yAxisIndex:
+            panelSchema.config?.dataZoom &&
+            Object.prototype.hasOwnProperty.call(
+              panelSchema.config.dataZoom,
+              "yAxisIndex",
+            )
+              ? panelSchema.config?.dataZoom.yAxisIndex
+              : "none",
         },
       },
     },
@@ -802,7 +806,7 @@ export function buildSQLContext(
   // Ensure gridlines visibility is set for all xAxis and yAxis (handles both array and object cases)
   if (options.xAxis) {
     (Array.isArray(options.xAxis) ? options.xAxis : [options.xAxis]).forEach(
-      (axis) => {
+      (axis: { splitLine: { show: boolean; lineStyle: unknown } }) => {
         axis.splitLine.show = showGridlines;
         axis.splitLine.lineStyle = gridLineStyle;
       },
@@ -810,7 +814,7 @@ export function buildSQLContext(
   }
   if (options.yAxis) {
     (Array.isArray(options.yAxis) ? options.yAxis : [options.yAxis]).forEach(
-      (axis) => {
+      (axis: { splitLine: { show: boolean; lineStyle: unknown } }) => {
         // if (!axis.splitLine) axis.splitLine = {};
         axis.splitLine.show = showGridlines;
         axis.splitLine.lineStyle = gridLineStyle;

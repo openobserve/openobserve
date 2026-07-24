@@ -23,6 +23,8 @@ import { useStore } from "vuex";
 import {
   SearchRequestPayload,
   WebSocketSearchPayload,
+  WebSocketSearchResponse,
+  WebSocketErrorResponse,
 } from "@/ts/interfaces/query";
 import { generateTraceContext } from "@/utils/zincutils";
 
@@ -38,10 +40,9 @@ export const useSearchConnection = () => {
   } = logsUtils();
   const store = useStore();
   const { searchObj, notificationMsg, searchPartitionMap } = searchState();
-  const { resetHistogramWithError } = useHistogram();
+  useHistogram();
 
   const {
-    fetchQueryDataWithWebSocket,
     sendSearchMessageBasedOnRequestId,
     closeSocketBasedOnRequestId,
   } = useSearchWebSocket();
@@ -73,6 +74,19 @@ export const useSearchConnection = () => {
       org_id: string;
       meta?: any;
       clear_cache?: boolean;
+      onData?: (
+        payload: WebSocketSearchPayload,
+        response: WebSocketSearchResponse,
+      ) => void;
+      onError?: (
+        payload: WebSocketSearchPayload,
+        error: WebSocketErrorResponse,
+      ) => void;
+      onComplete?: (
+        payload: WebSocketSearchPayload,
+        response: unknown,
+      ) => void;
+      onReset?: (data: unknown, traceId?: string) => void;
     } = {
       queryReq,
       type,

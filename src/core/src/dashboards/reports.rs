@@ -34,6 +34,10 @@ use config::{
     utils::time::now_micros,
 };
 use cron::Schedule;
+use db::{
+    self,
+    authz::{remove_ownership, set_ownership},
+};
 use futures::{StreamExt, future::try_join_all};
 use infra::{
     db::{ORM_CLIENT, connect_to_orm},
@@ -46,13 +50,7 @@ use lettre::{
 };
 use reqwest::Client;
 
-use crate::{
-    common::{
-        meta::authz::Authz,
-        utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
-    },
-    service::{db, short_url},
-};
+use crate::{auth::is_ofga_unsupported, common::meta::authz::Authz, short_url};
 
 /// Errors that can occur when interacting with reports.
 #[derive(Debug, thiserror::Error)]

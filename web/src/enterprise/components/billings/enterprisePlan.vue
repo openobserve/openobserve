@@ -95,7 +95,7 @@ export default defineComponent({
   name: "enterprisePlan",
   components: { OSeparator, OButton, OTag, OIcon, OCard },
   props: ["features", "pricingError"],
-  setup(props, { emit }) {
+  setup() {
     const { t } = useI18n();
 
     const contactSales = () => {

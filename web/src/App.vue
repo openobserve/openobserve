@@ -24,7 +24,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { onMounted, watch } from "vue";
-import config from "@/aws-exports";
 import { applyCurrentTheme } from "@/utils/themeManager";
 import OToastProvider from "@/lib/feedback/Toast/OToastProvider.vue";
 import ConfirmDialogProvider from "@/components/ConfirmDialogProvider.vue";

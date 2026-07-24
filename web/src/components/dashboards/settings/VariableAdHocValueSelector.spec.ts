@@ -253,8 +253,6 @@ describe("VariableAdHocValueSelector", () => {
     });
 
     it("should update operator when selection changes", async () => {
-      const operatorSelect = wrapper.find('[data-test="dashboard-variable-adhoc-operator-selector"]');
-      
       // Simulate selecting a different operator
       wrapper.vm.adhocVariables[0].operator = "!=";
       await nextTick();

@@ -21,7 +21,6 @@ import i18n from "@/locales";
 import { nextTick } from "vue";
 import {
   mockDomainData,
-  createMockStore,
   domainValidationTestCases,
   emailValidationTestCases,
   apiErrorScenarios,
@@ -280,7 +279,6 @@ describe("DomainManagement Integration Tests", () => {
     describe("Domain Validation", () => {
       domainValidationTestCases.forEach(({ input, expected, description }) => {
         it(`should ${expected ? 'accept' : 'reject'} ${description}: "${input}"`, () => {
-          const vm = wrapper.vm;
           expect(isValidDomain(input)).toBe(expected);
         });
       });
@@ -289,7 +287,6 @@ describe("DomainManagement Integration Tests", () => {
     describe("Email Validation", () => {
       emailValidationTestCases.forEach(({ email, domain, expected, description }) => {
         it(`should ${expected ? 'accept' : 'reject'} ${description}`, () => {
-          const vm = wrapper.vm;
           expect(isValidEmail(email, domain)).toBe(expected);
         });
       });
@@ -297,7 +294,7 @@ describe("DomainManagement Integration Tests", () => {
   });
 
   describe("Error Handling Scenarios", () => {
-    apiErrorScenarios.forEach(({ name, error, expectedMessage }) => {
+    apiErrorScenarios.forEach(({ name, error }) => {
       it(`should handle ${name} gracefully`, async () => {
         mockDomainManagement.getDomainRestrictions.mockRejectedValue(error);
         
@@ -450,7 +447,6 @@ describe("DomainManagement Integration Tests", () => {
 
     describe("Input Validation Edge Cases", () => {
       it("should reject malicious script injection in domain names", async () => {
-        const vm = wrapper.vm;
         const maliciousDomains = [
           "<script>alert('xss')</script>.com",
           "javascript:alert(1).com",
@@ -465,7 +461,6 @@ describe("DomainManagement Integration Tests", () => {
       });
 
       it("should reject malicious script injection in email addresses", async () => {
-        const vm = wrapper.vm;
         const maliciousEmails = [
           "<script>alert('xss')</script>@example.com",
           "javascript:alert(1)@example.com",
@@ -480,7 +475,6 @@ describe("DomainManagement Integration Tests", () => {
       });
 
       it("should reject extremely long domain names", async () => {
-        const vm = wrapper.vm;
         const longDomain = "a".repeat(250) + ".com"; // Domain names should be max 253 chars
         const veryLongDomain = "a".repeat(300) + ".com";
 
@@ -489,14 +483,12 @@ describe("DomainManagement Integration Tests", () => {
       });
 
       it("should reject extremely long email addresses", async () => {
-        const vm = wrapper.vm;
         const longEmail = "a".repeat(300) + "@example.com"; // Email addresses have practical limits
 
         expect(isValidEmail(longEmail, "example.com")).toBe(false);
       });
 
       it("should reject Unicode and special character exploits", async () => {
-        const vm = wrapper.vm;
         const unicodeExploits = [
           "еxample.com", // Cyrillic 'e' that looks like Latin 'e'
           "example․com", // Unicode one-dot leader instead of period
@@ -553,8 +545,6 @@ describe("DomainManagement Integration Tests", () => {
       });
 
       it("should handle empty and whitespace-only inputs", async () => {
-        const vm = wrapper.vm;
-        
         // Test empty domain
         expect(isValidDomain("")).toBe(true); // Empty is considered valid (optional)
         
@@ -618,8 +608,6 @@ describe("DomainManagement Integration Tests", () => {
         const vm = wrapper.vm;
         
         // Try to corrupt the domains array
-        const originalLength = vm.domains.length;
-        
         try {
           // Attempt various state corruptions
           vm.domains.push(null);

@@ -38,6 +38,7 @@ use config::{
     stats::{CacheStats, CacheStatsAsync},
     utils::{base64, json},
 };
+use db::{self, alerts::realtime_triggers::REALTIME_ALERT_TRIGGERS, user::is_root_user};
 use hashbrown::HashMap;
 use infra::{
     cache, cluster, file_list,
@@ -46,17 +47,22 @@ use infra::{
         STREAM_STATS_EXISTS,
     },
 };
+use openobserve_core::{auth::UserEmail, cache::STREAM_EXECUTABLE_PIPELINES};
+use search::{
+    datafusion::{storage::file_statistics_cache, udf::DEFAULT_FUNCTIONS},
+    tantivy::cache as tantivy_result_cache,
+};
 use serde::Serialize;
 use time;
 use utoipa::ToSchema;
 #[cfg(feature = "enterprise")]
 use {
-    crate::common::utils::jwt::verify_decode_token,
     crate::handler::http::auth::{
         jwt::process_token,
         validator::{ID_TOKEN_HEADER, PKCE_STATE_ORG, get_user_email_from_auth_str},
     },
-    crate::service::self_reporting::audit,
+    audit::audit,
+    common::utils::jwt::verify_decode_token,
     config::{ider, utils::time::now_micros},
     o2_dex::{
         config::{get_config as get_dex_config, refresh_config as refresh_dex_config},
@@ -76,21 +82,11 @@ use {
 };
 
 use crate::{
-    common::{
-        meta::{
-            http::HttpResponse as MetaHttpResponse,
-            user::{AuthTokens, AuthTokensExt},
-        },
-        utils::auth::{UserEmail, is_root_user},
+    common::meta::{
+        http::HttpResponse as MetaHttpResponse,
+        user::{AuthTokens, AuthTokensExt},
     },
     handler::http::extractors::Headers,
-    service::{
-        db,
-        search::{
-            datafusion::{storage::file_statistics_cache, udf::DEFAULT_FUNCTIONS},
-            grpc::tantivy_result_cache,
-        },
-    },
 };
 
 /// Macro to conditionally select a value based on the "enterprise" feature flag.
@@ -603,7 +599,7 @@ pub async fn cache_status() -> impl IntoResponse {
     );
 
     #[cfg(feature = "enterprise")]
-    let (total_count, expired_count) = crate::service::search::cardinality::get_cache_stats().await;
+    let (total_count, expired_count) = search_service::cardinality::get_cache_stats().await;
     #[cfg(not(feature = "enterprise"))]
     let (total_count, expired_count) = (0, 0);
     stats.insert(
@@ -612,118 +608,104 @@ pub async fn cache_status() -> impl IntoResponse {
     );
 
     // query cache
-    let (len, cap, mem_size) = crate::service::promql::search::get_cache_stats().await;
+    let (len, cap, mem_size) = promql_service::search::get_cache_stats().await;
     stats.insert(
         "PROMQL_QUERY_CACHE",
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
     );
 
     // Config caches from src/core/src/common/infra/config.rs
-    let (len, cap, mem_size) = crate::common::infra::config::KVS.stats();
+    let (len, cap, mem_size) = common::infra::config::KVS.stats();
     stats.insert(
         "KVS_CACHE",
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
     );
 
-    let (len, cap, mem_size) = crate::common::infra::config::QUERY_FUNCTIONS.stats();
+    let (len, cap, mem_size) = transform::QUERY_FUNCTIONS.stats();
     stats.insert(
         "QUERY_FUNCTIONS",
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
     );
 
-    let (len, cap, mem_size) = crate::common::infra::config::ALERTS_TEMPLATES.stats();
+    let (len, cap, mem_size) = common::infra::config::ALERTS_TEMPLATES.stats();
     stats.insert(
         "ALERTS_TEMPLATES",
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
     );
 
-    let (len, cap, mem_size) = crate::common::infra::config::DESTINATIONS.stats();
+    let (len, cap, mem_size) = common::infra::config::DESTINATIONS.stats();
     stats.insert(
         "DESTINATIONS",
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
     );
 
-    let (len, cap, mem_size) = crate::common::infra::config::ENRICHMENT_TABLES.stats();
+    let (len, cap, mem_size) = transform::enrichment::ENRICHMENT_TABLES.stats();
     stats.insert(
         "ENRICHMENT_TABLES",
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
     );
 
-    let (len, cap, mem_size) = crate::common::infra::config::ORGANIZATION_SETTING
-        .stats()
-        .await;
+    let (len, cap, mem_size) = common::infra::config::ORGANIZATION_SETTING.stats().await;
     stats.insert(
         "ORGANIZATION_SETTING",
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
     );
 
-    let (len, cap, mem_size) = crate::common::infra::config::ORGANIZATIONS.stats().await;
+    let (len, cap, mem_size) = common::infra::config::ORGANIZATIONS.stats().await;
     stats.insert(
         "ORGANIZATIONS",
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
     );
 
-    let (len, cap, mem_size) = crate::common::infra::config::METRIC_CLUSTER_MAP
-        .stats()
-        .await;
+    let (len, cap, mem_size) = common::infra::config::METRIC_CLUSTER_MAP.stats().await;
     stats.insert(
         "METRIC_CLUSTER_MAP",
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
     );
 
-    let (len, cap, mem_size) = crate::common::infra::config::METRIC_CLUSTER_LEADER
-        .stats()
-        .await;
+    let (len, cap, mem_size) = common::infra::config::METRIC_CLUSTER_LEADER.stats().await;
     stats.insert(
         "METRIC_CLUSTER_LEADER",
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
     );
 
-    let (len, cap, mem_size) = crate::common::infra::config::STREAM_ALERTS.stats().await;
+    let (len, cap, mem_size) = common::infra::config::STREAM_ALERTS.stats().await;
     stats.insert(
         "STREAM_ALERTS",
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
     );
 
-    let (len, cap, mem_size) = crate::common::infra::config::ALERTS.stats().await;
+    let (len, cap, mem_size) = common::infra::config::ALERTS.stats().await;
     stats.insert(
         "ALERTS",
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
     );
 
-    let (len, cap, mem_size) = crate::common::infra::config::REALTIME_ALERT_TRIGGERS
-        .stats()
-        .await;
+    let (len, cap, mem_size) = REALTIME_ALERT_TRIGGERS.stats().await;
     stats.insert(
         "REALTIME_ALERT_TRIGGERS",
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
     );
 
-    let (len, cap, mem_size) = crate::common::infra::config::STREAM_EXECUTABLE_PIPELINES
-        .stats()
-        .await;
+    let (len, cap, mem_size) = STREAM_EXECUTABLE_PIPELINES.stats().await;
     stats.insert(
         "STREAM_EXECUTABLE_PIPELINES",
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
     );
 
-    let (len, cap, mem_size) = crate::common::infra::config::PIPELINE_STREAM_MAPPING
-        .stats()
-        .await;
+    let (len, cap, mem_size) = common::infra::config::PIPELINE_STREAM_MAPPING.stats().await;
     stats.insert(
         "PIPELINE_STREAM_MAPPING",
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
     );
 
-    let (len, cap, mem_size) = crate::common::infra::config::SCHEDULED_PIPELINES
-        .stats()
-        .await;
+    let (len, cap, mem_size) = common::infra::config::SCHEDULED_PIPELINES.stats().await;
     stats.insert(
         "SCHEDULED_PIPELINES",
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
     );
 
-    let (len, cap, mem_size) = crate::common::infra::config::SYSTEM_SETTINGS.stats().await;
+    let (len, cap, mem_size) = common::infra::config::SYSTEM_SETTINGS.stats().await;
     stats.insert(
         "SYSTEM_SETTINGS",
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
@@ -767,13 +749,13 @@ pub async fn cache_status() -> impl IntoResponse {
     );
 
     // File list caches (2) from src/core/src/service/db/file_list/mod.rs
-    let (len, cap, mem_size) = crate::service::db::file_list::DELETED_FILES.stats();
+    let (len, cap, mem_size) = db::file_list::DELETED_FILES.stats();
     stats.insert(
         "DELETED_FILES",
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
     );
 
-    let (len, cap, mem_size) = crate::service::db::file_list::DEDUPLICATE_FILES.stats();
+    let (len, cap, mem_size) = db::file_list::DEDUPLICATE_FILES.stats();
     stats.insert(
         "DEDUPLICATE_FILES",
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
@@ -781,7 +763,7 @@ pub async fn cache_status() -> impl IntoResponse {
 
     // Organization streams cache from
     // src/core/src/service/db/compact/organization.rs line 21
-    let (len, cap, mem_size) = crate::service::db::compact::organization::STREAMS.stats();
+    let (len, cap, mem_size) = db::compact::organization::STREAMS.stats();
     stats.insert(
         "COMPACT_ORGANIZATION_STREAMS",
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
@@ -942,10 +924,9 @@ async fn get_stream_schema_status() -> (usize, usize) {
 #[cfg(feature = "enterprise")]
 pub async fn redirect(Query(query): Query<std::collections::HashMap<String, String>>) -> Response {
     use axum_extra::extract::cookie::{Cookie, SameSite};
+    use common::meta::user::AuthTokens;
     use config::meta::user::UserRole;
     use itertools::Itertools;
-
-    use crate::common::meta::user::AuthTokens;
 
     let code = match query.get("code") {
         Some(code) => code,
@@ -974,9 +955,9 @@ pub async fn redirect(Query(query): Query<std::collections::HashMap<String, Stri
     };
 
     match query.get("state") {
-        Some(code) => match crate::service::kv::get(PKCE_STATE_ORG, code).await {
+        Some(code) => match openobserve_core::kv::get(PKCE_STATE_ORG, code).await {
             Ok(_) => {
-                let _ = crate::service::kv::delete(PKCE_STATE_ORG, code).await;
+                let _ = openobserve_core::kv::delete(PKCE_STATE_ORG, code).await;
             }
             Err(_) => {
                 // Bad Request
@@ -1112,7 +1093,7 @@ pub async fn redirect(Query(query): Query<std::collections::HashMap<String, Stri
             }
 
             // store session_id in cluster co-ordinator
-            if crate::service::session::set_session(&session_id, &access_token)
+            if openobserve_core::session::set_session(&session_id, &access_token)
                 .await
                 .is_none()
             {
@@ -1173,16 +1154,16 @@ pub async fn dex_login() -> impl IntoResponse {
     use o2_dex::meta::auth::PreLoginData;
 
     if block_feature_for_report_failure().await {
-        return crate::common::meta::http::HttpResponse::internal_error(
+        return common::meta::http::HttpResponse::internal_error(
             "feature blocked due to usage reporting failure",
         );
     }
 
     let login_data: PreLoginData = get_dex_login();
     let state = login_data.state.clone();
-    let _ = crate::service::kv::set(PKCE_STATE_ORG, &state, state.clone().into()).await;
+    let _ = openobserve_core::kv::set(PKCE_STATE_ORG, &state, state.clone().into()).await;
 
-    crate::common::meta::http::HttpResponse::json(login_data.url)
+    common::meta::http::HttpResponse::json(login_data.url)
 }
 
 #[cfg(feature = "enterprise")]
@@ -1227,8 +1208,10 @@ pub async fn refresh_token_with_dex(
         // remove old session id from cluster co-ordinator
         let access_token = auth_tokens.access_token;
         if access_token.starts_with("session") {
-            crate::service::session::remove_session(access_token.strip_prefix("session ").unwrap())
-                .await;
+            openobserve_core::session::remove_session(
+                access_token.strip_prefix("session ").unwrap(),
+            )
+            .await;
         }
 
         auth_tokens.refresh_token
@@ -1309,7 +1292,7 @@ pub async fn refresh_token_with_dex(
             }
 
             // store session_id in cluster co-ordinator
-            if crate::service::session::set_session(&session_id, &access_token)
+            if openobserve_core::session::set_session(&session_id, &access_token)
                 .await
                 .is_none()
             {
@@ -1421,8 +1404,10 @@ pub async fn logout(
         let access_token = auth_tokens.access_token;
 
         if access_token.starts_with("session") {
-            crate::service::session::remove_session(access_token.strip_prefix("session ").unwrap())
-                .await;
+            openobserve_core::session::remove_session(
+                access_token.strip_prefix("session ").unwrap(),
+            )
+            .await;
         }
     };
     let auth_cookie = prepare_empty_cookie("auth_tokens", &AuthTokens::default(), &conf);
@@ -1476,7 +1461,7 @@ pub async fn enable_node(
     node.scheduled = enable;
     if !node.scheduled {
         // release all the searching files
-        crate::common::infra::wal::clean_lock_files();
+        common::infra::wal::clean_lock_files();
 
         #[cfg(feature = "enterprise")]
         {
@@ -1503,7 +1488,7 @@ pub async fn enable_node(
             }
         }
     }
-    match crate::common::infra::cluster::update_local_node(&node).await {
+    match common::infra::cluster::update_local_node(&node).await {
         Ok(_) => MetaHttpResponse::json(true),
         Err(e) => MetaHttpResponse::internal_error(e),
     }
@@ -1515,7 +1500,7 @@ pub async fn flush_node() -> Response {
     };
 
     // release all the searching files
-    crate::common::infra::wal::clean_lock_files();
+    common::infra::wal::clean_lock_files();
 
     match ingester::flush_all().await {
         Ok(_) => MetaHttpResponse::json(true),
@@ -1611,8 +1596,8 @@ async fn reload_module_cache(module: &str) -> Result<(), anyhow::Error> {
         "organization" => db::organization::cache().await,
         "user" => db::user::cache().await,
         "session" => db::session::cache().await,
-        "functions" => db::functions::cache().await,
-        "pipeline" => db::pipeline::cache().await,
+        "functions" => openobserve_core::functions_cache::cache().await,
+        "pipeline" => openobserve_core::pipeline::store::cache().await,
         "alerts" => db::alerts::alert::cache().await,
         "destinations" => db::alerts::destinations::cache().await,
         "templates" => db::alerts::templates::cache().await,

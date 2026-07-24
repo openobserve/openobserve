@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="getDimensionOptions(key, value)"
           labelKey="label"
           valueKey="value"
-          @update:model-value="(newValue) => handleDimensionChange(key, newValue)"
+          @update:model-value="(newValue) => handleDimensionChange(key, newValue as string)"
           class="dimension-dropdown"
           style="min-width: 120px"
           :data-test="`dimension-filter-${key}`"

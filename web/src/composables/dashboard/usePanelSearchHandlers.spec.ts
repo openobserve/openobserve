@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { usePanelSearchHandlers } from "./usePanelSearchHandlers";
 
 // Mock Vue to avoid issues with markRaw/toRaw in test env

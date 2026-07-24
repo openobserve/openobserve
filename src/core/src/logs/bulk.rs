@@ -27,24 +27,21 @@ use config::{
     metrics,
     utils::{
         json,
+        schema::format_stream_name,
         time::{now_micros, parse_timestamp_micro_from_value},
     },
 };
 use infra::errors::Result;
+use ingestion_common::{
+    BulkResponse, BulkResponseError, BulkResponseItem, IngestionRequest, IngestionValueType,
+};
+use schema::{get_future_discard_error, get_upto_discard_error};
+use transform::TRANSFORM_FAILED;
 
 use crate::{
-    common::meta::ingestion::{
-        BulkResponse, BulkResponseError, BulkResponseItem, IngestionRequest, IngestionValueType,
-    },
-    service::{
-        format_stream_name,
-        ingestion::check_ingestion_allowed,
-        logs::{ingestion_log_enabled, log_failed_record},
-        schema::{get_future_discard_error, get_upto_discard_error},
-    },
+    ingestion::check_ingestion_allowed,
+    logs::{ingestion_log_enabled, log_failed_record},
 };
-
-pub const TRANSFORM_FAILED: &str = "document_failed_transform";
 pub const TS_PARSE_FAILED: &str = "timestamp_parsing_failed";
 pub const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
 pub const PIPELINE_EXEC_FAILED: &str = "pipeline_execution_failed";
@@ -53,7 +50,7 @@ pub async fn ingest(
     thread_id: usize,
     org_id: &str,
     body: Bytes,
-    user: crate::common::meta::ingestion::IngestUser,
+    user: ingestion_common::IngestUser,
 ) -> Result<BulkResponse> {
     let start = std::time::Instant::now();
 
@@ -406,8 +403,9 @@ pub fn add_record_status(
 
 #[cfg(test)]
 mod tests {
+    use ingestion_common::IngestUser;
+
     use super::*;
-    use crate::common::meta::ingestion::IngestUser;
 
     #[test]
     fn test_add_record_status() {

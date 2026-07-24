@@ -1,0 +1,38 @@
+[package]
+name = "compaction"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = []
+enterprise = ["dep:o2_enterprise", "tantivy_utils/enterprise"]
+
+[dependencies]
+anyhow.workspace = true
+arrow.workspace = true
+arrow-schema.workspace = true
+bytes.workspace = true
+chrono.workspace = true
+config.workspace = true
+datafusion.workspace = true
+db.workspace = true
+futures.workspace = true
+hashbrown.workspace = true
+infra.workspace = true
+ingester.workspace = true
+itertools.workspace = true
+log.workspace = true
+o2_enterprise = { workspace = true, optional = true, default-features = false }
+parking_lot.workspace = true
+parquet.workspace = true
+rand.workspace = true
+schema.workspace = true
+search.workspace = true
+search_service.workspace = true
+tantivy_utils.workspace = true
+tokio.workspace = true

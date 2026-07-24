@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { OTabProps, OTabSlots } from './OTab.types'
-import { computed, inject, useAttrs, type ComputedRef } from 'vue'
+import { computed, inject, type ComputedRef } from 'vue'
 import { TABS_CONTEXT_KEY } from './OTabs.types'
 import type { TabsContext } from './OTabs.types'
 import { TabsTrigger } from 'reka-ui'
@@ -18,21 +18,6 @@ const props = withDefaults(defineProps<OTabProps>(), {
 })
 
 defineSlots<OTabSlots>()
-
-const $attrs = useAttrs()
-const parentDataTest = computed(() => $attrs['data-test'] as string | undefined)
-
-/**
- * Attrs forwarded to the outer <span> wrapper — everything except data-test.
- * data-test must only land on the inner <TabsTrigger> (the actual clickable
- * button) to avoid a strict-mode locator violation in Playwright (two elements
- * matching the same selector).
- */
-const spanAttrs = computed(() => {
-   
-  const { 'data-test': _dt, ...rest } = $attrs
-  return rest
-})
 
 const context = inject<ComputedRef<TabsContext>>(TABS_CONTEXT_KEY)
 
@@ -174,7 +159,7 @@ const heightClasses = computed<string>(() => {
       <span
         v-if="isDropTarget"
         aria-hidden="true"
-        class="absolute rounded-full bg-primary-600 pointer-events-none z-20"
+        class="absolute rounded-full bg-tabs-indicator pointer-events-none z-20"
         :class="dropIndicatorClass"
       />
       <!-- Drag handle — shown only in reorderable mode to signal the tab can be

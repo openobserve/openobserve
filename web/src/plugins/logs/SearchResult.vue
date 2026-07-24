@@ -86,6 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-else>
             <template v-if="patternChips">
               <OTag
+                v-if="patternChips.events !== null"
                 type="logsResultChip"
                 value="neutral"
                 data-test="logs-result-events-chip"
@@ -264,12 +265,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <!-- Combined scroll area: histogram + logs/patterns scroll together -->
-      <div class="flex-1 overflow-auto" ref="scrollContainerRef">
+      <!-- The histogram is pinned: in the logs view this strip does not scroll,
+        the table below owns both scrollbars, so scrolling the log lines
+        sideways can never drag the chart out from under the toolbar. The
+        patterns view has no such table of its own, so it keeps the older
+        combined scroll where the histogram scrolls away with the list. -->
+      <div
+        ref="scrollContainerRef"
+        :class="[
+          'flex-1 min-h-0',
+          searchObj.meta.logsVisualizeToggle === 'patterns'
+            ? 'overflow-auto'
+            : 'flex flex-col overflow-hidden',
+        ]"
+      >
         <div
           ref="histogramRef"
           :class="[
-            'histogram-container',
+            'histogram-container shrink-0',
             searchObj.meta.showHistogram
               ? 'histogram-container--visible'
               : 'histogram-container--hidden',
@@ -321,7 +334,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="histogram-skeleton__y-label" style="width: 2.25rem" />
                 <div class="histogram-skeleton__y-label" style="width: 1rem" />
               </div>
-              <div class="histogram-skeleton__plot">
+              <div class="histogram-skeleton__plot border-l border-b border-card-glass-border">
                 <div class="histogram-skeleton__bars">
                   <div
                     v-for="h in skeletonBarHeights"
@@ -334,7 +347,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <!-- x-axis labels row -->
             <div class="histogram-skeleton__x-axis">
-              <div v-for="i in 6" :key="i" class="histogram-skeleton__x-label" />
+              <div v-for="i in 6" :key="i" class="histogram-skeleton__x-label bg-skeleton-base" />
             </div>
           </div>
 
@@ -370,7 +383,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           :class="[
-            'histogram-container',
+            'histogram-container shrink-0',
             searchObj.meta.showHistogram
               ? 'histogram-container--visible'
               : 'histogram-container--hidden',
@@ -473,7 +486,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :columns="getColumns || []"
             :rows="searchObj.data.queryResults?.hits || []"
             :wrap="searchObj.meta.toggleSourceWrap"
-            :width="getTableWidth"
             :err-msg="searchObj.data.missingStreamMessage"
             :loading="searchObj.loading"
             :loadingProgressPercentage="searchObj.loadingProgressPercentage || 0"
@@ -483,17 +495,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :selected-stream-fts-keys="selectedStreamFullTextSearchKeys"
             :highlight-query="searchObj.data.highlightQuery"
             :default-columns="!searchObj.data.stream.selectedFields.length"
-            class="w-full"
             :selectedStreamFields="searchObj.data.stream.selectedStreamFields"
-            :scroll-el="scrollContainerRef"
-            :scroll-margin="0"
-            :class="[
-              !searchObj.meta.showHistogram ||
-              (searchObj.meta.showHistogram &&
-                searchObj.data.histogram.errorCode == -1)
-                ? 'min-h-full!'
-                : 'min-h-[calc(100%-6.25rem)]!',
-            ]"
+            class="w-full flex-1 min-h-0"
             @update:columnSizes="handleColumnSizesUpdate"
             @update:columnOrder="handleColumnOrderUpdate"
             @copy="copyLogToClipboard"
@@ -531,9 +534,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :scroll-target="scrollContainerRef"
             :stream-doc-time-range="streamDocTimeRange"
             :query-window-us="queryWindowUs"
+            :window-total="patternWindowTotal"
             @open-details="openPatternDetails"
-            @add-to-search="addPatternToSearch"
-            @create-alert="createAlertFromPattern"
             @filter-value="addWildcardValueToSearch"
             @jump-to-stream-data="(from, to) => $emit('jump-to-stream-data', from, to)"
           />
@@ -563,7 +565,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :stream-type="searchObj.data.stream.streamType"
           :correlation-props="correlationDashboardProps"
           :correlation-loading="correlationLoading"
-          :correlation-error="correlationError"
+          :correlation-error="correlationError ?? undefined"
           :initial-tab="detailTableInitialTab"
           class="rounded-default"
           :currentIndex="searchObj.meta.resultGrid.navigation.currentRowIndex"
@@ -593,9 +595,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <PatternDetailsDialog
         v-model="showPatternDetails"
         :selectedPattern="selectedPattern"
-        :totalPatterns="patternsState?.patterns?.patterns?.length || 0"
+        :totalPatterns="patternNavTotal"
         @navigate="navigatePatternDetail"
         @filter-value="addWildcardValueToSearch"
+        @add-to-search="addPatternToSearch"
+        @create-alert="createAlertFromPattern"
       />
 
       <!-- Volume Analysis Dashboard -->
@@ -654,6 +658,8 @@ import {
   defineAsyncComponent,
   watch,
   nextTick,
+  type PropType,
+  provide,
 } from "vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useStore } from "vuex";
@@ -682,8 +688,6 @@ import { usePagination } from "@/composables/useLogs/usePagination";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { searchState } from "@/composables/useLogs/searchState";
-import EqualIcon from "@/components/icons/EqualIcon.vue";
-import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
@@ -705,6 +709,13 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import {
+  buildPatternVolumeContext,
+  fetchWindowTotal,
+  usePatternVolumeCache,
+  PATTERN_VOLUME_CACHE,
+  type PatternVolumeContext,
+} from "./patterns/usePatternVolume";
 
 export default defineComponent({
   name: "SearchResult",
@@ -724,9 +735,6 @@ export default defineComponent({
     ),
     SanitizedHtmlRenderer,
     TenstackTable: defineAsyncComponent(() => import("./TenstackTable.vue")),
-    JsonPreview: defineAsyncComponent(() => import("./JsonPreview.vue")),
-    EqualIcon,
-    NotEqualIcon,
     TelemetryCorrelationDashboard,
     PatternList: defineAsyncComponent(
       () => import("./patterns/PatternList.vue"),
@@ -760,22 +768,26 @@ export default defineComponent({
       default: () => [],
     },
     streamDocTimeRange: {
-      type: Object,
+      type: Object as PropType<{ min: number; max: number }>,
       default: undefined,
     },
     queryWindowUs: {
-      type: Object,
+      type: Object as PropType<{ start: number; end: number }>,
       default: undefined,
     },
   },
   methods: {
     handleColumnSizesUpdate(newColSizes: any) {
+      // colSizes entries are arrays of size-maps keyed by joined stream name.
+      const colSizes = this.searchObj.data.resultGrid?.colSizes as Record<
+        string,
+        Record<string, unknown>[]
+      >;
       const prevColSizes =
-        this.searchObj.data.resultGrid?.colSizes[
-          this.searchObj.data.stream.selectedStream
-        ]?.[0] || {};
+        colSizes?.[this.searchObj.data.stream.selectedStream.join(",")]?.[0] ||
+        {};
       this.searchObj.data.resultGrid.colSizes[
-        this.searchObj.data.stream.selectedStream
+        this.searchObj.data.stream.selectedStream.join(",")
       ] = [
         {
           ...prevColSizes,
@@ -783,18 +795,18 @@ export default defineComponent({
         },
       ];
     },
-    handleColumnOrderUpdate(newColOrder: string[], columns: any[]) {
+    handleColumnOrderUpdate(newColOrder: string[]) {
       // Here we are checking if the columns are default columns ( _timestamp and source)
       // If selected fields are empty, then we are setting colOrder to empty array as we
       // don't change the order of default columns
       // If you store the colOrder it will create issue when you save the view and load it again
       if (!this.searchObj.data.stream.selectedFields.length) {
         this.searchObj.data.resultGrid.colOrder[
-          this.searchObj.data.stream.selectedStream
+          this.searchObj.data.stream.selectedStream.join(",")
         ] = [];
       } else {
         this.searchObj.data.resultGrid.colOrder[
-          this.searchObj.data.stream.selectedStream
+          this.searchObj.data.stream.selectedStream.join(",")
         ] = [...newColOrder];
 
         if (newColOrder.length > 0) {
@@ -884,6 +896,7 @@ export default defineComponent({
         this.$emit("update:scroll");
         this.scrollTableToTop(0);
       }
+      return undefined;
     },
     closeColumn(col: any) {
       // Explicit user action — clear the system-pick marker so the result persists.
@@ -1013,8 +1026,14 @@ export default defineComponent({
       if (!stats) return null;
 
       const patternsFound = stats.total_patterns_found || 0;
-      const totalEvents = searchObj.data.queryResults?.total || stats.total_logs_analyzed || 0;
-      const totalEventsStr = totalEvents ? formatLargeNumber(totalEvents) : "0";
+      // The window's real event count — NOT `total_logs_analyzed`, which is the
+      // extraction sample (capped at ~10K). Showing that read as "this window
+      // holds 10K events" when it holds millions, and disagreed with the same
+      // chip when arriving from the search page.
+      const totalEvents =
+        patternWindowTotal.value ?? searchObj.data.queryResults?.total ?? null;
+      const totalEventsStr =
+        totalEvents === null ? null : formatLargeNumber(totalEvents);
       const totalTimeMs =
         (searchObj.data.queryResults?.took || 0) + (stats.extraction_time_ms || 0);
 
@@ -1047,10 +1066,54 @@ export default defineComponent({
       showPatternDetails,
       openPatternDetails,
       navigatePatternDetail,
+      navTotal: patternNavTotal,
       addPatternToSearch,
       addWildcardValueToSearch,
       createAlertFromPattern,
     } = usePatternActions();
+
+    // Context the pattern details drawer needs to look up a pattern's
+    // window-wide volume, so its Occurrences figure matches the list's `~N`
+    // instead of falling back to the much smaller extraction-sample count.
+    const patternVolumeContext = computed<PatternVolumeContext | null>(() =>
+      buildPatternVolumeContext({
+        orgId: store.state.selectedOrganization?.identifier ?? "",
+        streamName: searchObj.data.stream.selectedStream[0],
+        window: props.queryWindowUs as { start: number; end: number } | undefined,
+        lastQuery: patternsState.value?.lastQuery,
+      }),
+    );
+
+    // Exact event count for the query window, from one aggregate query. Feeds
+    // both the "N events" chip and the severity-chip scaling in PatternList, so
+    // they can't disagree. Generation-guarded: a slow reply for an earlier
+    // window must not overwrite the current one.
+    // One volume cache for the whole patterns view. Provided here rather than in
+    // PatternList so the details drawer — a sibling of the list, not a child —
+    // reads the same entries the rows already fetched. Opening a row is then a
+    // cache hit and shows its real count immediately, instead of rendering the
+    // extraction-sample figure and swapping it out a moment later.
+    const patternVolumeCache = usePatternVolumeCache(patternVolumeContext);
+    provide(PATTERN_VOLUME_CACHE, {
+      request: patternVolumeCache.request,
+      get: patternVolumeCache.get,
+    });
+
+    const patternWindowTotal = ref<number | null>(null);
+    let patternWindowTotalGeneration = 0;
+    watch(
+      patternVolumeContext,
+      async (ctx) => {
+        const token = ++patternWindowTotalGeneration;
+        patternWindowTotal.value = null;
+        if (!ctx) return;
+        const total = await fetchWindowTotal(ctx);
+        if (token === patternWindowTotalGeneration) {
+          patternWindowTotal.value = total;
+        }
+      },
+      { immediate: true },
+    );
 
     const pageNumberInput = ref(1);
     const totalHeight = ref(0);
@@ -1058,7 +1121,12 @@ export default defineComponent({
     // Volume Analysis state
     const showVolumeAnalysisDashboard = ref(false);
     const hasHistogramSelection = ref(false);
-    const histogramSelectionRange = ref({
+    const histogramSelectionRange = ref<{
+      start: number;
+      end: number;
+      timeStart: number | undefined;
+      timeEnd: number | undefined;
+    }>({
       start: 0,
       end: 0,
       timeStart: undefined,
@@ -1070,7 +1138,7 @@ export default defineComponent({
     } | null>(null);
 
     const searchTableRef: any = ref(null);
-    const scrollContainerRef = ref(null);
+    const scrollContainerRef = ref<HTMLElement | null>(null);
     const histogramRef = ref(null);
 
     // Correlation dashboard state
@@ -1079,7 +1147,7 @@ export default defineComponent({
     const correlationDashboardProps = ref<any>(null);
     const correlationLoading = ref(false);
     const correlationError = ref<string | null>(null);
-    const detailTableInitialTab = ref<string>("json");
+    const detailTableInitialTab = ref<string>("table");
     const { findRelatedTelemetry, semanticGroups } = useServiceCorrelation();
 
     // Flag to prevent duplicate correlation API calls
@@ -1339,7 +1407,10 @@ export default defineComponent({
     const reDrawChart = () => {
       if (
          
-        searchObj.data.histogram.hasOwnProperty("xData") &&
+        Object.prototype.hasOwnProperty.call(
+          searchObj.data.histogram,
+          "xData",
+        ) &&
         searchObj.data.histogram.xData.length > 0
       ) {
         const { xData, yData, breakdownSeries, chartParams, breakdownField } =
@@ -1365,14 +1436,14 @@ export default defineComponent({
       });
     };
 
-    const changeMaxRecordToReturn = (val: any) => {
+    const changeMaxRecordToReturn = () => {
       // searchObj.meta.resultGrid.pagination.rowsPerPage = val;
     };
 
     const openLogDetails = (props: any, index: number) => {
       searchObj.meta.showDetailTab = true;
       searchObj.meta.resultGrid.navigation.currentRowIndex = index;
-      detailTableInitialTab.value = "json"; // Reset to default tab
+      detailTableInitialTab.value = "table"; // Reset to default tab
 
       // Prepare correlation context (but don't open panel automatically)
       const logData = searchObj.data.queryResults?.hits?.[index];
@@ -1687,8 +1758,12 @@ export default defineComponent({
       return window.innerWidth - (leftSidebarMenu + fieldList) - 5;
     });
 
+    // In the logs view the table scrolls itself (the histogram above it is
+    // pinned), so a page change has to reset that element rather than the
+    // pane. The patterns view still scrolls as a whole.
     const scrollTableToTop = (value: number) => {
-      scrollContainerRef.value?.scrollTo({ top: value });
+      const logsTableScrollEl = searchTableRef.value?.parentRef;
+      (logsTableScrollEl ?? scrollContainerRef.value)?.scrollTo({ top: value });
     };
 
     const getColumns = computed(() => {
@@ -1841,19 +1916,6 @@ export default defineComponent({
       }
     });
 
-    // Debug watcher for patterns state
-    watch(
-      () => patternsState.value.patterns,
-      (newPatterns) => {
-        // console.log("[SearchResult] Patterns state changed:", {
-        //   hasPatterns: !!newPatterns,
-        //   patternCount: newPatterns?.patterns?.length || 0,
-        //   statistics: newPatterns?.statistics,
-        // });
-      },
-      { deep: true },
-    );
-
     // Watch for sidebar close to clear correlation data
     // This ensures fresh correlation data when reopening with a different "row"
     watch(
@@ -1912,7 +1974,7 @@ export default defineComponent({
     const selectedStreamFullTextSearchKeys = computed(() => {
       const defaultFTSKeys = store?.state?.zoConfig?.default_fts_keys || [];
       const selectedStreamFTSKeys = searchObj.data.stream.selectedStreamFields
-        .filter((field: string) => field.ftsKey)
+        .filter((field: any) => field.ftsKey)
         .map((field: any) => field.name);
       //merge default FTS keys with selected stream FTS keys
       return [...new Set([...defaultFTSKeys, ...selectedStreamFTSKeys])];
@@ -1991,6 +2053,9 @@ export default defineComponent({
       showVolumeAnalysisDashboard,
       openPatternDetails,
       navigatePatternDetail,
+      patternNavTotal,
+      patternVolumeContext,
+      patternWindowTotal,
       addPatternToSearch,
       addWildcardValueToSearch,
       createAlertFromPattern,
@@ -2314,8 +2379,6 @@ export default defineComponent({
     min-width: 0;
     display: flex;
     flex-direction: column;
-    border-left: 1px solid var(--color-card-glass-border);
-    border-bottom: 1px solid var(--color-card-glass-border);
   }
 
   &__bars {
@@ -2365,7 +2428,6 @@ export default defineComponent({
     width: 2.25rem;
     height: 0.4375rem;
     border-radius: 0.125rem;
-    background-color: var(--color-skeleton-base);
   }
 }
 

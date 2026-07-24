@@ -91,7 +91,6 @@ const totalSize = computed(() => virtualizer.value.getTotalSize());
 
 const rows = computed(() =>
   virtualizer.value.getVirtualItems().map((v) => ({
-    key: v.key,
     index: v.index,
     start: v.start,
     size: v.size,
@@ -179,12 +178,15 @@ watch(open, async (isOpen) => {
 // Keep the virtual window in sync, re-aim the highlight at the first match so
 // Enter selects the obvious result, and snap the scroll back to the top —
 // otherwise a prior scroll offset would hide the first results after a search.
+//
+// Reset and re-measure synchronously rather than in nextTick: the scroll
+// element already exists here (unlike on open), and deferring means rows paint
+// at stale offsets for one tick, then shift. A click landing in that window
+// hits a row that is about to move out from under the pointer.
 watch(filtered, (list) => {
   highlightedIndex.value = list.length ? 0 : -1;
-  nextTick(() => {
-    if (scrollRef.value) scrollRef.value.scrollTop = 0;
-    virtualizer.value.measure();
-  });
+  if (scrollRef.value) scrollRef.value.scrollTop = 0;
+  virtualizer.value.measure();
 });
 
 const isSelected = (org: OrgOption) =>
@@ -212,7 +214,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
           size="xs"
           data-test="navbar-organizations-select-trigger"
           class="w-56 text-text-body!"
-          :class="open ? 'ring-1 ring-inset ring-primary-300' : ''"
+          :class="open ? 'ring-2 ring-inset ring-accent/25' : ''"
         >
           <template #icon-left>
             <OIcon
@@ -286,7 +288,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
           <div class="relative w-full" :style="{ height: `${totalSize}px` }">
             <div
               v-for="row in rows"
-              :key="row.key"
+              :key="row.org.identifier"
               data-test="organization-menu-item-label-item-label"
               :data-test-org-identifier="row.org.identifier"
               class="group absolute left-0 right-0 top-0 box-border flex items-center gap-2 px-3 rounded-default cursor-pointer transition-colors"
@@ -324,10 +326,10 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
                 type="button"
                 data-test="organization-menu-item-copy-id"
                 :aria-label="`Copy organization ID ${row.org.identifier}`"
-                class="shrink-0 inline-flex items-center justify-center size-6 rounded-default transition hover:bg-primary-200 hover:text-select-item-selected-text"
+                class="shrink-0 inline-flex items-center justify-center size-6 rounded-default transition hover:bg-select-item-selected-bg hover:text-select-item-selected-text"
                 :class="
                   copiedId === row.org.identifier
-                    ? 'opacity-100 text-primary-600'
+                    ? 'opacity-100 text-accent'
                     : row.index === highlightedIndex
                       ? 'text-text-secondary opacity-100'
                       : 'text-text-secondary opacity-0 focus-visible:opacity-100'

@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                        dashboard mode) so its `my-2` margin isn't dead space. -->
                   <div
                     v-if="pageType === 'build' || resolvedConfig.showAddToDashboardButton"
-                    class="flex justify-between items-center my-2 mx-2"
+                    class="flex justify-between items-center px-2 py-2 border-b border-border-default"
                   >
                     <QueryTypeSelector
                       v-if="pageType === 'build'"
@@ -651,6 +651,7 @@ import {
   defineAsyncComponent,
   toRef,
   watch,
+  type CSSProperties,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -916,7 +917,7 @@ const mainContentAreaClass = computed(() => {
 });
 
 // Row style - logs/build needs height: 100%, others need overflow-y: auto
-const rowStyle = computed(() => {
+const rowStyle = computed<CSSProperties>(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
     return { height: "100%", width: "100%" };
   }
@@ -932,7 +933,7 @@ const mainContentContainerClass = computed(() => {
 });
 
 // Main content container style
-const mainContentContainerStyle = computed(() => {
+const mainContentContainerStyle = computed<CSSProperties>(() => {
   // if (props.pageType === "logs" || props.pageType === "build") {
   //   return { width: "100%", height: "100%" };
   // }
@@ -949,7 +950,7 @@ const mainContentContainerStyle = computed(() => {
 });
 
 // Splitter limits - logs/build uses [0, 100], others use [0, 20]
-const splitterLimits = computed(() => {
+const splitterLimits = computed<[number, number]>(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
     return [0, 100];
   }
@@ -986,7 +987,7 @@ const afterSlotInnerClass = computed(() => {
 });
 
 // After slot inner div style
-const afterSlotInnerStyle = computed(() => {
+const afterSlotInnerStyle = computed<CSSProperties>(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
     return { height: "100%" };
   }

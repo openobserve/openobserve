@@ -22,7 +22,6 @@ import {
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
-import { getSpanColorHex } from "@/utils/traces/traceColors";
 import { getOrSetServiceColor as registryGetOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { buildFieldToGroupIdMap } from "@/utils/telemetryCorrelation";
@@ -34,6 +33,7 @@ const defaultObject = {
   runQuery: false,
   loading: false,
   loadingStream: false,
+  searchApplied: false,
 
   config: {
     splitterModel: 20,
@@ -87,6 +87,7 @@ const defaultObject = {
     serviceColors: {} as any,
     redirectedFromLogs: false,
     searchApplied: false,
+    lastRunAt: undefined as number | undefined,
     metricsRangeFilters: new Map<
       string,
       { panelTitle: string; start: number; end: number }
@@ -127,6 +128,7 @@ const defaultObject = {
       removeFilterField: "",
       functions: [],
       filters: [] as any[],
+      userDefinedSchema: [] as string[],
       fieldValues: {} as {
         [key: string | number]: {
           isLoading: boolean;
@@ -166,15 +168,19 @@ const defaultObject = {
         trace_id: string;
         trace_start_time: number;
         trace_end_time: number;
+        // Stamped on at runtime by TraceDetails' updateServiceColors: the
+        // per-service span counts derived from the span list.
+        service_name?: { service_name: string; count: number }[];
+        services?: Record<string, number>;
       } | null,
       traceId: "",
       spanList: [],
       isLoadingTraceMeta: false,
       isLoadingTraceDetails: false,
-      selectedSpanId: "" as String | null,
+      selectedSpanId: "" as string | null,
       expandedSpans: [] as String[],
       showSpanDetails: false,
-      selectedLogStreams: [] as String[],
+      selectedLogStreams: [] as string[],
       correlationProps: null as any,
     },
   },
@@ -275,20 +281,17 @@ const useTraces = () => {
   ): void => {
     const identifier: string = searchObj.organizationIdentifier || "default";
     const key = `${identifier}_${searchObj.data.stream.selectedStream.value}`;
-    const saved = useLocalTraceFilterField()?.value?.[key];
+    // storage ref .value is typed {} at this boundary; narrow to the stored map shape
+    const stored = useLocalTraceFilterField()?.value as
+      | Record<string, Record<string, string[]>>
+      | undefined;
+    const saved: Record<string, string[]> | undefined = stored?.[key];
 
-    let fields = [];
-    fields = saved?.[searchMode]?.length
-      ? saved?.[searchMode]
-      : [...DEFAULT_TRACE_COLUMNS[searchMode]];
+    const fields: string[] =
+      saved?.[searchMode]?.length
+        ? saved?.[searchMode]
+        : [...DEFAULT_TRACE_COLUMNS[searchMode]];
 
-    fields = fields.map((field) => {
-      if (field === "status" && searchMode === "spans") {
-        return "span_status";
-      } else {
-        return field;
-      }
-    });
     searchObj.data.stream.selectedFields = fields;
   };
 
@@ -333,7 +336,7 @@ const useTraces = () => {
 
     const searchParams = new URLSearchParams();
     for (const [key, value] of Object.entries(queryParams)) {
-      searchParams.append(key, value);
+      searchParams.append(key, value as string);
     }
     const queryString = searchParams.toString();
 

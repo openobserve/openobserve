@@ -15,7 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="trace-details h-[calc(100vh-2.625rem)] overflow-hidden w-full flex flex-col relative">
+  <div
+    class="trace-details h-[calc(100vh-2.625rem)] overflow-hidden w-full flex flex-col relative"
+  >
     <!-- Original View -->
     <div
       class="flex-1 flex flex-col min-h-0 overflow-hidden box-border"
@@ -64,11 +66,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
 
               <!-- Copy Trace ID Button -->
-              <OIcon
+              <OButton
                 data-test="trace-details-copy-trace-id-btn"
-                name="content-copy"
-                size="xs"
-                class="cursor-pointer hover:text-text-body"
+                variant="ghost"
+                size="icon-xs"
+                icon-left="content-copy"
                 :title="t('traces.copyTraceId')"
                 @click="copyTraceId"
               />
@@ -86,11 +88,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ sessionId }}
                   </span>
                 </span>
-                <OIcon
+                <OButton
                   data-test="trace-details-copy-session-id-btn"
-                  name="content-copy"
-                  size="xs"
-                  class="cursor-pointer hover:text-text-body"
+                  variant="ghost"
+                  size="icon-xs"
+                  icon-left="content-copy"
                   :title="t('traces.traceDetails.copySessionId')"
                   @click="copySessionId"
                 />
@@ -184,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex items-center space-x-4 w-fit!">
             <!-- Back button -->
             <OButton
-              v-if="mode === 'standalone' && showBackButton"
+              v-if="isStandaloneMode && showBackButton"
               data-test="trace-details-back-btn"
               variant="ghost-muted"
               size="icon-xs"
@@ -192,7 +194,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="handleBackOrClose"
             >
               <OIcon name="arrow-back" size="sm" />
-              <OTooltip :content="areFiltersAdded ? t('traces.applyPendingFilters') : t('traces.backToTraces')" />
+              <OTooltip
+                :content="
+                  areFiltersAdded
+                    ? t('traces.applyPendingFilters')
+                    : t('traces.backToTraces')
+                "
+              />
             </OButton>
 
             <div
@@ -238,11 +246,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
 
                 <!-- Copy Trace ID Button -->
-                <OIcon
+                <OButton
                   data-test="trace-details-copy-trace-id-btn"
-                  name="content-copy"
-                  size="xs"
-                  class="cursor-pointer hover:text-text-body"
+                  variant="ghost"
+                  size="icon-xs"
+                  icon-left="content-copy"
                   :title="t('traces.copyTraceId')"
                   @click="copyTraceId"
                 />
@@ -262,23 +270,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ sessionId }}
                     </span>
                   </span>
-                  <OIcon
+                  <OButton
                     data-test="trace-details-copy-session-id-btn"
-                    name="content-copy"
-                    size="xs"
-                    class="cursor-pointer hover:text-text-body"
+                    variant="ghost"
+                    size="icon-xs"
+                    icon-left="content-copy"
                     :title="t('traces.traceDetails.copySessionId')"
                     @click="copySessionId"
                   />
                 </template>
 
                 <!-- Open in new icon (embedded mode only) -->
-                <OIcon
+                <OButton
                   v-if="mode === 'embedded' && showExpandButton"
                   data-test="trace-details-trace-id-open-btn"
-                  class="cursor-pointer hover:text-theme-accent"
-                  size="xs"
-                  name="open-in-new"
+                  variant="ghost"
+                  size="icon-xs"
+                  icon-left="open-in-new"
                   :title="t('traces.openInTraces')"
                   @click="handleExpandToFullView"
                 />
@@ -299,7 +307,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ t("traces.spansLabel") }}
                   </span>
                 </OTag>
-                <OTooltip :content="effectiveSpanList.length + ' ' + t('traces.spansLabel')" />
+                <OTooltip
+                  :content="
+                    effectiveSpanList.length + ' ' + t('traces.spansLabel')
+                  "
+                />
               </span>
 
               <div
@@ -318,17 +330,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ t("traces.errorsLabel") }}</span
                   >
                 </OTag>
-                <OTooltip :content="errorSpansCount + ' ' + t('traces.errorsLabel')" />
+                <OTooltip
+                  :content="errorSpansCount + ' ' + t('traces.errorsLabel')"
+                />
               </span>
             </div>
           </div>
 
-          <div
-            class="flex justify-end items-center space-x-3 w-fit!"
-          >
+          <div class="flex justify-end items-center space-x-3 w-fit!">
             <!-- Apply filters button (standalone mode, right side) -->
             <OButton
-              v-if="mode === 'standalone' && areFiltersAdded"
+              v-if="isStandaloneMode && areFiltersAdded"
               data-test="trace-details-apply-filters-btn-right"
               variant="outline"
               size="xs"
@@ -336,8 +348,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="openFilterPopover"
             >
               <template #icon-left
-                ><OIcon name="filter-alt"
-size="xs"
+                ><OIcon name="filter-alt" size="xs"
               /></template>
               <span class="text-xs">{{ t("traces.viewFilters") }}</span>
               <OTooltip :content="t('traces.reviewAndApplyFilters')" />
@@ -357,7 +368,7 @@ size="xs"
 
             <!-- Share button (standalone mode) -->
             <share-button
-              v-if="mode === 'standalone' && showShareButton"
+              v-if="isStandaloneMode && showShareButton"
               data-test="trace-details-share-link-btn"
               :url="traceDetailsShareURL"
               variant="outline"
@@ -367,7 +378,7 @@ size="xs"
 
             <!-- Close button -->
             <OButton
-              v-if="mode === 'standalone' && showCloseButton"
+              v-if="isStandaloneMode && showCloseButton"
               data-test="trace-details-close-btn"
               variant="ghost"
               size="icon-xs"
@@ -390,54 +401,29 @@ size="xs"
           <div
             class="flex items-center space-x-4 trace-details-view-tabs ml-[0.325rem] py-[0.325rem]"
           >
+            <!--
+              Tabs are data-driven from `traceTabs` so they can be dragged to
+              reorder (same interaction as the Home page tab bar). Visibility
+              rules — including the Thread tab's `VITE_SHOW_LLM_UI` + LLM-span
+              gate — live in `isTraceTabVisible`.
+            -->
             <OToggleGroup
               :model-value="activeTab"
+              reorderable
               @update:model-value="updateActiveTab"
+              @reorder="onTabReorder"
             >
-              <OToggleGroupItem value="waterfall" size="sm">
-                <template #icon-left
-                  ><OIcon name="align-left" size="sm" class="shrink-0"
-                /></template>
-                {{ t('traces.waterfall') }}
-              </OToggleGroupItem>
-              <OToggleGroupItem value="flame-graph" size="sm">
-                <template #icon-left>
-                  <OIcon name="flame" size="sm" />
-                </template>
-                {{ t('traces.flameGraph') }}
-              </OToggleGroupItem>
-              <OToggleGroupItem value="map" size="sm">
-                <template #icon-left
-                  ><OIcon name="account-tree" size="sm" class="shrink-0"
-                /></template>
-                {{ t('traces.traceGraph') }}
-              </OToggleGroupItem>
-              <OToggleGroupItem v-if="hasLLMSpans"
-value="dag"
-size="sm">
-                <template #icon-left>
-                  <OIcon name="git-branch" size="sm" />
-                </template>
-                {{ t('traces.dag') }}
-              </OToggleGroupItem>
-              <!--
-                Thread tab gated on:
-                  1. `VITE_SHOW_LLM_UI` env flag is NOT explicitly set
-                     to `"false"`. Unset / any other value keeps the
-                     feature visible.
-                  2. The trace actually has LLM spans worth rendering
-                     as a chat (`hasLLMSpans`).
-              -->
               <OToggleGroupItem
-                v-if="config.showLLMUI !== 'false' && hasLLMSpans"
-                value="thread"
+                v-for="tab in traceTabs"
+                :key="tab.value"
+                :value="tab.value"
                 size="sm"
-                data-test="trace-details-thread-tab"
+                :data-test="`trace-details-${tab.value}-tab`"
               >
-                <template #icon-left
-                  ><OIcon name="chat" size="xs" class="shrink-0"
-                /></template>
-                {{ t('traces.thread') }}
+                <template #icon-left>
+                  <OIcon :name="tab.icon" :size="tab.iconSize" class="shrink-0" />
+                </template>
+                {{ t(tab.labelKey) }}
               </OToggleGroupItem>
             </OToggleGroup>
           </div>
@@ -518,10 +504,7 @@ size="sm">
               />
               <span class="traces-view-logs-btn pl-1">
                 <!-- Single button with wrapper for tooltip functionality -->
-                <span
-                  class="inline-block"
-                  tabindex="0"
-                >
+                <span class="inline-block" tabindex="0">
                   <OButton
                     data-test="trace-details-view-logs-btn"
                     variant="outline"
@@ -540,23 +523,27 @@ size="sm">
                     }}
                   </OButton>
                   <OTooltip
-                    :content="isViewLogsDisabled ? t('search.selectLogsStreamFirst') : t('traces.viewLogs')"
+                    :content="
+                      isViewLogsDisabled
+                        ? t('search.selectLogsStreamFirst')
+                        : t('traces.viewLogs')
+                    "
                   />
                 </span>
               </span>
             </div>
             <OButton
-                v-if="hasRumSessionId && !hideSessionReplayButton"
-                data-test="trace-details-view-session-replay-btn"
-                variant="outline"
-                size="sm"
-                class="ml-1"
-                @click="redirectToSessionReplay"
-              >
-                <template #icon-left>
-                  <OIcon name="play-circle" size="sm"/>
-                </template>
-                {{ t("rum.playSessionReplay") }}
+              v-if="hasRumSessionId && !hideSessionReplayButton"
+              data-test="trace-details-view-session-replay-btn"
+              variant="outline"
+              size="sm"
+              class="ml-1"
+              @click="redirectToSessionReplay"
+            >
+              <template #icon-left>
+                <OIcon name="play-circle" size="sm" />
+              </template>
+              {{ t("rum.playSessionReplay") }}
             </OButton>
           </div>
         </div>
@@ -620,7 +607,7 @@ size="sm">
                         :spanDimensions="spanDimensions"
                         :spanMap="spanMap"
                         :leftWidth="leftWidth"
-                        :scrollContainer="traceScrollContainer"
+                        :scrollContainer="scrollContainerForTree"
                         ref="traceTreeRef"
                         class="bg-card-glass-bg!"
                         :search-query="searchQuery"
@@ -662,7 +649,9 @@ size="sm">
                   :service-streams-enabled="serviceStreamsEnabled"
                   :parent-mode="mode"
                   :activeTab="sidebarActiveTab"
-                  :selected-log-streams="searchObj.data.traceDetails.selectedLogStreams"
+                  :selected-log-streams="
+                    searchObj.data.traceDetails.selectedLogStreams
+                  "
                   :show-log-stream-selector="showLogStreamSelector"
                   @view-logs="redirectToLogs"
                   @close="closeSidebar"
@@ -680,13 +669,12 @@ size="sm">
               class="flex flex-1 min-h-0"
             >
               <div
-                class="h-[calc(100vh-200px)] p-4 min-w-0 overflow-hidden"
+                class="h-[calc(100vh-12.5rem)] min-w-[12.5rem] overflow-hidden p-4"
                 :style="{
                   width:
                     isSidebarOpen && (selectedSpanId || showTraceDetails)
                       ? `${dagLeftWidth}%`
                       : '100%',
-                  minWidth: '200px',
                 }"
               >
                 <TraceDAG
@@ -713,10 +701,9 @@ size="sm">
               </div>
               <div
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
-                class="h-[calc(100vh-200px)] overflow-y-auto overflow-x-hidden min-h-0"
+                class="h-[calc(100vh-12.5rem)] min-h-0 min-w-[18.75rem] overflow-x-hidden overflow-y-auto"
                 :style="{
                   width: `${100 - dagLeftWidth}%`,
-                  minWidth: '300px',
                 }"
               >
                 <trace-details-sidebar
@@ -728,7 +715,9 @@ size="sm">
                   :service-streams-enabled="serviceStreamsEnabled"
                   :parent-mode="mode"
                   :activeTab="sidebarActiveTab"
-                  :selected-log-streams="searchObj.data.traceDetails.selectedLogStreams"
+                  :selected-log-streams="
+                    searchObj.data.traceDetails.selectedLogStreams
+                  "
                   :show-log-stream-selector="showLogStreamSelector"
                   @view-logs="redirectToLogs"
                   @close="closeSidebar"
@@ -776,15 +765,12 @@ size="sm">
               class="w-full bg-card-glass-bg! flex flex-1 min-h-0"
             >
               <div
-                class="thread-left-panel"
+                class="thread-left-panel h-full min-w-[20rem] overflow-hidden"
                 :style="{
                   width:
                     isSidebarOpen && (selectedSpanId || showTraceDetails)
                       ? '60%'
                       : '100%',
-                  minWidth: '320px',
-                  height: '100%',
-                  overflow: 'hidden',
                 }"
               >
                 <ThreadView
@@ -807,7 +793,9 @@ size="sm">
                   :service-streams-enabled="serviceStreamsEnabled"
                   :parent-mode="mode"
                   :activeTab="sidebarActiveTab"
-                  :selected-log-streams="searchObj.data.traceDetails.selectedLogStreams"
+                  :selected-log-streams="
+                    searchObj.data.traceDetails.selectedLogStreams
+                  "
                   :show-log-stream-selector="showLogStreamSelector"
                   @view-logs="redirectToLogs"
                   @close="closeSidebar"
@@ -866,7 +854,6 @@ size="sm">
                 </div>
               </div>
             </div>
-
           </div>
         </div>
       </div>
@@ -877,20 +864,17 @@ size="sm">
         (searchObj.data.traceDetails.isLoadingTraceDetails ||
           searchObj.data.traceDetails.isLoadingTraceMeta)
       "
-      class="flex flex-col items-center justify-center"
-      :style="{ height: '100%' }"
+      class="flex h-full flex-col items-center justify-center"
     >
-      <OSpinner
-        data-test="trace-details-loading-spinner"
-        size="lg"
-      />
+      <OSpinner data-test="trace-details-loading-spinner" size="lg" />
       <div data-test="trace-details-loading-text" class="pt-2">
         {{ t("traces.fetchingTrace") }}
       </div>
     </div>
 
     <!-- Filters Sidebar -->
-    <ODrawer data-test="trace-details-filter-popover-drawer"
+    <ODrawer
+      data-test="trace-details-filter-popover-drawer"
       v-model:open="showFilterPopover"
       :width="30"
       :title="t('traces.traceFilters')"
@@ -940,8 +924,6 @@ import { contextRegistry } from "@/composables/contextProviders";
 import {
   formatTimeWithSuffix,
   getImageURL,
-  convertTimeFromNsToMs,
-  convertTimeFromNsToUs,
 } from "@/utils/zincutils";
 import TraceTimelineIcon from "@/components/icons/TraceTimelineIcon.vue";
 import ServiceMapIcon from "@/components/icons/ServiceMapIcon.vue";
@@ -954,12 +936,16 @@ import { resolveSessionId } from "./traceDetails.utils";
 import { buildFilterTerm, applyFilterTerm } from "@/utils/traces/filterUtils";
 import { buildPatternConsolidatedTree } from "@/utils/traces/patternDetection";
 import { useTracePatternTree } from "@/composables/useTracePatternTree";
-import { createTreeVisualizationEngine } from "@/utils/traces/treeVisualizationEngine";
-import { generateTracePatternTooltipContent } from "@/utils/traces/treeTooltipHelpers";
+import type { TreeNode as PatternTreeNode } from "@/composables/useTreeVisualization";
+import type { EnrichedSpan } from "@/ts/interfaces/traces/span.types";
+import type { AcceptableValue } from "reka-ui";
+import {
+  createTreeVisualizationEngine,
+  type TreeVisualizationData,
+  type TreeNode as EngineTreeNode,
+} from "@/utils/traces/treeVisualizationEngine";
 import {
   SPAN_KIND_MAP,
-  SPAN_KIND_UNSPECIFIED,
-  SPAN_KIND_CLIENT,
 } from "@/utils/traces/constants";
 import useResizer from "@/composables/useResizer";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -975,6 +961,7 @@ import useNotifications from "@/composables/useNotifications";
 import {
   parseUsageDetails,
   parseCostDetails,
+  hasTracePreview,
   isLLMTrace,
 } from "@/utils/llmUtils";
 import {
@@ -984,7 +971,7 @@ import {
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -993,7 +980,6 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
-import { resolveSpanIdentity } from "@/utils/traces/spanIdentity";
 import {
   TRACE_SERVICE_DETECTION_KEY,
   useSpanServiceDetection,
@@ -1011,9 +997,75 @@ const FlameGraphView = defineAsyncComponent(
 );
 
 // Import ThreadView (LLM Thread tab)
-const ThreadView = defineAsyncComponent(
-  () => import("./ThreadView.vue"),
-);
+const ThreadView = defineAsyncComponent(() => import("./ThreadView.vue"));
+
+/**
+ * Tab definitions for the trace detail views. The order here is the *default*
+ * order — Waterfall leads because it is the default landing view. Users can
+ * drag tabs to reorder them (same interaction as the Home page tab bar) and
+ * that order is persisted per-browser under LS_TRACE_TAB_ORDER_KEY.
+ *
+ * `iconSize` is per-tab because the chat glyph reads visually larger than the
+ * others at the same nominal size.
+ */
+const TRACE_TAB_DEFS = [
+  { value: "waterfall", labelKey: "traces.waterfall", icon: "align-left", iconSize: "sm" },
+  { value: "flame-graph", labelKey: "traces.flameGraph", icon: "flame", iconSize: "sm" },
+  { value: "map", labelKey: "traces.traceGraph", icon: "account-tree", iconSize: "sm" },
+  { value: "dag", labelKey: "traces.dag", icon: "git-branch", iconSize: "sm" },
+  { value: "thread", labelKey: "traces.thread", icon: "chat", iconSize: "xs" },
+] as const;
+
+type TraceTabValue = (typeof TRACE_TAB_DEFS)[number]["value"];
+
+/** The view a trace opens on when the user has no persisted preference. */
+const DEFAULT_TRACE_TAB: TraceTabValue = "waterfall";
+
+const LS_TRACE_TAB_ORDER_KEY = "o2_trace_tab_order";
+const LS_TRACE_ACTIVE_TAB_KEY = "o2_trace_active_tab";
+
+const isKnownTraceTab = (value: string): value is TraceTabValue =>
+  TRACE_TAB_DEFS.some((tab) => tab.value === value);
+
+/**
+ * Reads the saved tab order, dropping any values that are no longer known and
+ * appending tabs added since the order was saved, so a shipped new tab still
+ * shows up for users with a stored order.
+ */
+function loadTraceTabOrder(): TraceTabValue[] {
+  const defaults = TRACE_TAB_DEFS.map((tab) => tab.value);
+  try {
+    const saved = localStorage.getItem(LS_TRACE_TAB_ORDER_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        const ordered = parsed.filter(
+          (value: unknown): value is TraceTabValue =>
+            typeof value === "string" && isKnownTraceTab(value),
+        );
+        // De-dupe defensively — a corrupted entry shouldn't render a tab twice.
+        const unique = [...new Set(ordered)];
+        defaults.forEach((value) => {
+          if (!unique.includes(value)) unique.push(value);
+        });
+        return unique;
+      }
+    }
+  } catch {
+    // Corrupt/unavailable storage → fall through to the default order.
+  }
+  return [...defaults];
+}
+
+function loadTraceActiveTab(): TraceTabValue {
+  try {
+    const saved = localStorage.getItem(LS_TRACE_ACTIVE_TAB_KEY);
+    if (saved && isKnownTraceTab(saved)) return saved;
+  } catch {
+    // Ignore — fall through to the default tab.
+  }
+  return DEFAULT_TRACE_TAB;
+}
 
 export default defineComponent({
   name: "TraceDetails",
@@ -1121,18 +1173,19 @@ export default defineComponent({
   setup(props, { emit }) {
     const serviceDetectionConfig = ref<ServiceDetectionConfig | null>(null);
     provide(TRACE_SERVICE_DETECTION_KEY, serviceDetectionConfig);
-    const { resolveSpanIdentity } = useSpanServiceDetection(serviceDetectionConfig);
+    const { resolveSpanIdentity } = useSpanServiceDetection(
+      serviceDetectionConfig,
+    );
 
     const traceTree: any = ref([]);
     const spanMap: any = ref({});
-    const activeTab = ref("waterfall");
+    const activeTab = ref<string>(loadTraceActiveTab());
+    const tabOrder = ref<TraceTabValue[]>(loadTraceTabOrder());
     const sidebarActiveTab = ref("attributes");
 
     const {
       searchObj,
       getUrlQueryParams,
-      buildQueryDetails,
-      navigateToLogs,
       navigateToCorrelatedLogs,
     } = useTraces();
 
@@ -1145,7 +1198,7 @@ export default defineComponent({
     const splitterModel = ref(25);
     const timeRange: any = ref({ start: 0, end: 0 });
     const store = useStore();
-    const { getStreams, getStream } = useStreams();
+    const { getStreams } = useStreams();
 
     // Chart renderer ref for tooltip integration
     const chartRendererRef = ref<any>(null);
@@ -1178,19 +1231,34 @@ export default defineComponent({
       treeData: patternTreeData,
       getNodeLabel: getPatternNodeLabel,
       getNodeTooltip: getPatternNodeTooltip,
-      getNodeErrorRate: getPatternNodeErrorRate
+      getNodeErrorRate: getPatternNodeErrorRate,
     } = useTracePatternTree(consolidatedPatterns, isDarkMode);
 
     // Computed chart options that switches between pattern and span views
     const traceServiceMapChartOptions = computed(() => {
         // Pattern view - use new pattern-based visualization
+        // Engine TreeNode makes errorRate/children optional while the pattern
+        // callbacks (useTreeVisualization) require errorRate; adapt each call to
+        // a compatible node (errorRate defaults to 0 — pattern nodes read only
+        // name/value/metadata, never errorRate/children).
+        const toPatternNode = (node: EngineTreeNode): PatternTreeNode => ({
+          id: node.id,
+          name: node.name,
+          label: node.label,
+          value: node.value,
+          errorRate: node.errorRate ?? 0,
+          metadata: node.metadata,
+        });
         const chartOptions = generateEChartsOptions(
           {
             treeData: patternTreeData.value,
-            getNodeLabel: getPatternNodeLabel,
-            getNodeTooltip: getPatternNodeTooltip,
-            getNodeErrorRate: getPatternNodeErrorRate,
-            getNodeServiceColor: (node: any) =>
+            getNodeLabel: (node: EngineTreeNode) =>
+              getPatternNodeLabel(toPatternNode(node)),
+            getNodeTooltip: (node: EngineTreeNode) =>
+              getPatternNodeTooltip(toPatternNode(node)),
+            getNodeErrorRate: (node: EngineTreeNode) =>
+              getPatternNodeErrorRate(toPatternNode(node)),
+            getNodeServiceColor: (node: EngineTreeNode) =>
               searchObj.meta.serviceColors[node.name]
           },
           {
@@ -1200,12 +1268,12 @@ export default defineComponent({
           }
         );
 
-        // Wrap in the format expected by ChartRenderer
-        return {
-          options: chartOptions,
-          notMerge: true,
-          lazyUpdate: true
-        };
+      // Wrap in the format expected by ChartRenderer
+      return {
+        options: chartOptions,
+        notMerge: true,
+        lazyUpdate: true,
+      };
     });
 
     const spanDimensions = {
@@ -1224,6 +1292,12 @@ export default defineComponent({
     };
     const parentContainer = ref<HTMLElement | null>(null);
     const traceScrollContainer = ref<HTMLElement | null>(null);
+    // TraceTree's `scrollContainer` prop is under-declared (default: null, no
+    // type → vue-tsc infers null | undefined). Forward the real element through
+    // this boundary accessor; runtime value is unchanged.
+    const scrollContainerForTree = computed(
+      () => traceScrollContainer.value as unknown as null | undefined,
+    );
     let parentHeight = ref(0);
     let currentHeight = 0;
     const updateHeight = async () => {
@@ -1239,14 +1313,13 @@ export default defineComponent({
 
     const { showErrorNotification } = useNotifications();
 
-    const logStreams = ref([]);
+    const logStreams = ref<string[]>([]);
 
-    const filteredStreamOptions = ref([]);
+    const filteredStreamOptions = ref<string[]>([]);
 
     const streamSearchValue = ref<string>("");
 
     const { t } = useI18n();
-
 
     const router = useRouter();
 
@@ -1254,6 +1327,7 @@ export default defineComponent({
 
     // ── Filter-from-trace-details state ──────────────────────────────────────
     const areFiltersAdded = ref(false);
+    const isStandaloneMode = computed(() => props.mode === "standalone");
     const showFilterPopover = ref(false);
     const filterDialogReady = ref(false);
     const localEditorValue = ref("");
@@ -1315,10 +1389,7 @@ export default defineComponent({
 
     const ChartData: any = ref({});
 
-    const {
-      value: leftWidth,
-      onMouseDown: startResize,
-    } = useResizer({
+    const { value: leftWidth, onMouseDown: startResize } = useResizer({
       direction: "horizontal",
       initialValue: 460,
       unit: "px",
@@ -1326,10 +1397,7 @@ export default defineComponent({
     });
 
     // DAG panel resize state
-    const {
-      value: dagLeftWidth,
-      onMouseDown: startDagResize,
-    } = useResizer({
+    const { value: dagLeftWidth, onMouseDown: startDagResize } = useResizer({
       direction: "horizontal",
       initialValue: 50,
       minValue: 20,
@@ -1461,7 +1529,7 @@ export default defineComponent({
     // Use trace processing composable for FlameGraph
     // Pass traceTree (nested) instead of flat span list
     const treeForFlameGraph = computed(() => traceTree.value || []);
-    const flatSpans = ref([]);
+    const flatSpans = ref<EnrichedSpan[]>([]);
 
     // Calculate trace metadata for FlameGraph
     const traceMetadata = computed(() => {
@@ -1515,23 +1583,83 @@ export default defineComponent({
       return Math.min(...spans.map((span: any) => span.start_time));
     });
 
-    // Tabs configuration
-    const traceTabs = computed(() => {
-      const tabs = [
-        { label: "Waterfall", value: "waterfall" },
-        { label: "Flame Graph", value: "flame-graph" },
-        { label: "Trace Graph", value: "map" },
-      ];
-      // Conditionally add DAG tab for LLM traces
-      if (hasLLMSpans.value) {
-        tabs.push({ label: "DAG", value: "dag" });
+    /** Which tabs this trace can show, independent of ordering. */
+    const isTraceTabVisible = (value: TraceTabValue) => {
+      switch (value) {
+        // DAG and Thread only make sense for traces containing LLM spans.
+        case "dag":
+          return hasLLMSpans.value;
+        // Thread view — chat-style projection of LLM turns and tool calls —
+        // is additionally gated on the VITE_SHOW_LLM_UI env flag.
+        case "thread":
+          return config.showLLMUI !== "false" && hasLLMSpans.value;
+        default:
+          return true;
       }
-      // Thread view — chat-style projection of LLM turns and tool calls.
-      if (hasLLMSpans.value) {
-        tabs.push({ label: "Thread", value: "thread" });
+    };
+
+    /**
+     * The tab bar, in the user's order, filtered to what this trace supports.
+     * `tabOrder` keeps hidden tabs in place so a user's arrangement survives
+     * moving between traces that do and don't have LLM spans.
+     */
+    const traceTabs = computed(() =>
+      tabOrder.value
+        .filter(isTraceTabVisible)
+        .map((value) => TRACE_TAB_DEFS.find((tab) => tab.value === value)!),
+    );
+
+    /**
+     * Applies a drag-reorder reported by OToggleGroup and persists the result.
+     * Indices are resolved against the full order (including hidden tabs) so
+     * the moved tab lands adjacent to its drop target either way.
+     */
+    const onTabReorder = ({
+      from,
+      to,
+      before = true,
+    }: {
+      from: string;
+      to: string;
+      before?: boolean;
+    }) => {
+      if (from === to) return;
+      const order = [...tabOrder.value];
+      const fromIdx = order.indexOf(from as TraceTabValue);
+      if (fromIdx === -1) return;
+
+      const [moved] = order.splice(fromIdx, 1);
+      // Recompute the target index after removal, then insert on the chosen side.
+      let toIdx = order.indexOf(to as TraceTabValue);
+      if (toIdx === -1) return;
+      if (!before) toIdx += 1;
+      order.splice(toIdx, 0, moved);
+
+      tabOrder.value = order;
+      try {
+        localStorage.setItem(LS_TRACE_TAB_ORDER_KEY, JSON.stringify(order));
+      } catch {
+        // Storage unavailable (private mode / quota) — order still applies for
+        // this session, it just won't survive a reload.
       }
-      return tabs;
-    });
+    };
+
+    /**
+     * A persisted tab can be invalid for the trace being opened — e.g. the user
+     * last viewed "thread" on an LLM trace and then opens a plain HTTP trace.
+     * Fall back to the default view rather than rendering an empty body.
+     */
+    watch(
+      traceTabs,
+      (tabs) => {
+        if (!tabs.length) return;
+        if (tabs.some((tab) => tab.value === activeTab.value)) return;
+        activeTab.value = tabs.some((tab) => tab.value === DEFAULT_TRACE_TAB)
+          ? DEFAULT_TRACE_TAB
+          : tabs[0].value;
+      },
+      { immediate: true },
+    );
 
     const showTraceDetails = ref(false);
     const currentIndex = ref(0);
@@ -1589,7 +1717,9 @@ export default defineComponent({
       () => props.spanListProp,
       (newSpanList) => {
         if (props.mode === "embedded" && newSpanList.length > 0) {
-          searchObj.data.traceDetails.spanList = newSpanList;
+          // spanList is never[] in useTraces state; widen container to accept spans.
+          (searchObj.data.traceDetails as { spanList: unknown[] }).spanList =
+            newSpanList;
           updateServiceColors();
           buildTracesTree();
         }
@@ -1608,12 +1738,22 @@ export default defineComponent({
       },
     );
 
-    const updateActiveTab = (tab: string) => {
+    const updateActiveTab = (
+      value: boolean | AcceptableValue | AcceptableValue[],
+    ) => {
+      const tab = String(value);
       activeTab.value = tab;
-      if(tab === 'map') {
+      // Remember the last view so reopening a trace lands where the user left
+      // off, rather than resetting to the default every time.
+      try {
+        localStorage.setItem(LS_TRACE_ACTIVE_TAB_KEY, tab);
+      } catch {
+        // Storage unavailable — selection still applies for this session.
+      }
+      if (tab === "map") {
         setupTooltips();
       }
-    }
+    };
 
     const setupTooltips = async () => {
       // Cleanup existing tooltips
@@ -1633,15 +1773,16 @@ export default defineComponent({
         const chart = chartRendererRef.value?.chart;
         if (chart) {
           const { setupTraceNodeTooltips } = createTreeVisualizationEngine();
+          // Tooltip setup never calls getNodeLabel, so it is omitted here.
           tooltipCleanup = setupTraceNodeTooltips(chart, {
             treeData: patternTreeData.value,
             getNodeTooltip: getPatternNodeTooltip,
             getNodeErrorRate: getPatternNodeErrorRate
-          }, isDarkMode.value);
+          } as TreeVisualizationData, isDarkMode.value);
         }
       }, 300);
-    }
-    
+    };
+
     const backgroundStyle = computed(() => {
       return {
         background: "var(--color-surface-base)",
@@ -1723,7 +1864,9 @@ export default defineComponent({
       // If embedded mode with span list provided, skip fetching
       if (props.mode === "embedded" && props.spanListProp.length > 0) {
         // Use provided span list directly
-        searchObj.data.traceDetails.spanList = props.spanListProp;
+        // spanList is never[] in useTraces state; widen container to accept spans.
+        (searchObj.data.traceDetails as { spanList: unknown[] }).spanList =
+          props.spanListProp;
 
         // Set up minimal trace metadata from span list
         if (props.spanListProp.length > 0) {
@@ -1759,7 +1902,8 @@ export default defineComponent({
       setupContextProvider();
 
       const keyFields: KeyFieldsConfig = await loadKeyFields();
-      serviceDetectionConfig.value = keyFields["traces"]?.service_detection ?? null;
+      serviceDetectionConfig.value =
+        keyFields["traces"]?.service_detection ?? null;
 
       const params = router.currentRoute.value.query;
       if (params.span_id) {
@@ -1799,8 +1943,10 @@ export default defineComponent({
       return searchObj.data.traceDetails.showSpanDetails;
     });
 
-    const selectedSpanId = computed(() => {
-      return searchObj.data.traceDetails.selectedSpanId;
+    const selectedSpanId = computed<string | undefined>(() => {
+      // Child props declare String (string | undefined); the store keeps null —
+      // normalize null → undefined (truthy/equality checks are unchanged).
+      return searchObj.data.traceDetails.selectedSpanId ?? undefined;
     });
 
     const hoveredSpanId = ref("");
@@ -1813,12 +1959,12 @@ export default defineComponent({
     // (e.g. moving from LLM span with "preview" to a non-LLM span).
     watch(selectedSpanId, (newSpanId, oldSpanId) => {
       if (newSpanId && spanMap.value[newSpanId]) {
-        const isLLM = isLLMTrace(spanMap.value[newSpanId]);
+        const canPreview = hasTracePreview(spanMap.value[newSpanId]);
         if (
           !oldSpanId ||
-          (sidebarActiveTab.value === "preview" && !isLLM)
+          (sidebarActiveTab.value === "preview" && !canPreview)
         ) {
-          sidebarActiveTab.value = isLLM ? "preview" : "attributes";
+          sidebarActiveTab.value = canPreview ? "preview" : "attributes";
         }
       }
     });
@@ -1980,12 +2126,8 @@ export default defineComponent({
             }
 
             const traceSpans = traceRes.data?.hits || [];
-            const {
-              tracedResources,
-              viewEvents,
-              actionEvents,
-              allViewEvents,
-            } = rumData;
+            const { tracedResources, viewEvents, actionEvents, allViewEvents } =
+              rumData;
             const rumSpans = formatRumEventsAsSpans(
               tracedResources,
               viewEvents,
@@ -1997,7 +2139,8 @@ export default defineComponent({
             const deduplicatedTraceSpans = traceSpans.filter(
               (s: any) => !rumSpanIds.has(s.span_id),
             );
-            searchObj.data.traceDetails.spanList = [
+            // spanList is never[] in useTraces state; widen container to accept spans.
+            (searchObj.data.traceDetails as { spanList: unknown[] }).spanList = [
               ...rumSpans,
               ...deduplicatedTraceSpans,
             ];
@@ -2040,22 +2183,21 @@ export default defineComponent({
     };
 
     const updateServiceColors = () => {
-      searchObj.data.traceDetails.selectedTrace.service_name.forEach(
-        (service: any) => {
-          if (!searchObj.meta.serviceColors[service.service_name]) {
-            if (serviceColorIndex.value >= colors.value.length)
-              generateNewColor();
+      // service_name / services are stamped onto selectedTrace at runtime (see
+      // useTraces type); non-null asserts preserve the existing unguarded access.
+      const selected = searchObj.data.traceDetails.selectedTrace!;
+      selected.service_name!.forEach((service) => {
+        if (!searchObj.meta.serviceColors[service.service_name]) {
+          if (serviceColorIndex.value >= colors.value.length)
+            generateNewColor();
 
-            searchObj.meta.serviceColors[service.service_name] =
-              colors.value[serviceColorIndex.value];
+          searchObj.meta.serviceColors[service.service_name] =
+            colors.value[serviceColorIndex.value];
 
-            serviceColorIndex.value++;
-          }
-          (searchObj.data.traceDetails.selectedTrace as any).services[
-            service.service_name
-          ] = service.count;
-        },
-      );
+          serviceColorIndex.value++;
+        }
+        selected.services![service.service_name] = service.count;
+      });
     };
 
     const showTraceDetailsError = () => {
@@ -2085,7 +2227,7 @@ export default defineComponent({
     }
 
     const calculateTracePosition = () => {
-      const tics = [];
+      const tics: { value: number; label: string; left: string }[] = [];
       baseTracePosition.value["durationMs"] = timeRange.value.end;
       baseTracePosition.value["durationUs"] = timeRange.value.end * 1000;
       baseTracePosition.value["startTimeUs"] =
@@ -2217,6 +2359,15 @@ export default defineComponent({
           searchObj.data.traceDetails.selectedSpanId = "";
           searchObj.data.traceDetails.showSpanDetails = false;
         } else {
+          // A span selected from the URL is set before `spanMap` is populated,
+          // so the selectedSpanId watcher cannot classify it on first pass.
+          // Re-apply the default now that the span exists: evaluator/LLM spans
+          // land directly on Preview, while ordinary spans use Attributes.
+          sidebarActiveTab.value = hasTracePreview(
+            spanMap.value[selectedSpanId.value],
+          )
+            ? "preview"
+            : "attributes";
           scrollSpanIntoView(selectedSpanId.value);
         }
       }
@@ -2282,7 +2433,8 @@ export default defineComponent({
       ) => {
         maxHeight[depth] =
           maxHeight[depth] === undefined ? 1 : maxHeight[depth] + 1;
-        const serviceIdentity = span.resolvedIdentity || span.serviceName || 'unknown';
+        const serviceIdentity =
+          span.resolvedIdentity || span.serviceName || "unknown";
         if (serviceName !== serviceIdentity) {
           const children: any[] = [];
           currentColumn.push({
@@ -2322,7 +2474,9 @@ export default defineComponent({
       });
 
       // Build consolidated patterns for pattern view
-      consolidatedPatterns.value = buildPatternConsolidatedTree(traceTree.value);
+      consolidatedPatterns.value = buildPatternConsolidatedTree(
+        traceTree.value,
+      );
       // console.log('[DEBUG] consolidatedPatterns size:', consolidatedPatterns.value?.size || 0);
       // console.log('[DEBUG] consolidatedPatterns keys:', Array.from(consolidatedPatterns.value?.keys() || []));
       // Pattern consolidation completed successfully
@@ -2387,8 +2541,7 @@ export default defineComponent({
         parentId: span.reference_parent_span_id || "",
         spans: [],
         index: 0,
-        style: {
-        },
+        style: {},
         links: JSON.parse(span.links || "[]"),
         genAiUsage: usage,
         genAiCost: cost,
@@ -2508,9 +2661,7 @@ export default defineComponent({
       });
     };
 
-    const sessionId = computed<string>(() =>
-      resolveSessionId(spanList.value),
-    );
+    const sessionId = computed<string>(() => resolveSessionId(spanList.value));
 
     const copySessionId = () => {
       if (!sessionId.value) return;
@@ -2533,7 +2684,7 @@ export default defineComponent({
       if (customFrom) queryParams.from = customFrom;
       if (customTo) queryParams.to = customTo;
 
-      if(effectiveStreamName.value){
+      if (effectiveStreamName.value) {
         queryParams.stream = effectiveStreamName.value as string;
       }
 
@@ -2650,7 +2801,9 @@ export default defineComponent({
       searchObj.data.traceDetails.showSpanDetails = true;
       searchObj.data.traceDetails.selectedSpanId = spanId;
       if (swichToWaterfall && activeTab.value !== "waterfall") {
-        activeTab.value = "waterfall";
+        // Goes through updateActiveTab so the persisted last-viewed tab stays
+        // in sync with what's actually on screen.
+        updateActiveTab("waterfall");
       }
 
       scrollSpanIntoView(spanId);
@@ -2752,14 +2905,18 @@ export default defineComponent({
       if (isInputFocused()) return;
       const list = spanList.value;
       if (!list?.length) return;
-      const idx = list.findIndex((s: any) => s.span_id === selectedSpanId.value);
+      const idx = list.findIndex(
+        (s: any) => s.span_id === selectedSpanId.value,
+      );
       if (idx < list.length - 1) updateSelectedSpan(list[idx + 1].span_id);
     };
     const prevSpanHandler = () => {
       if (isInputFocused()) return;
       const list = spanList.value;
       if (!list?.length) return;
-      const idx = list.findIndex((s: any) => s.span_id === selectedSpanId.value);
+      const idx = list.findIndex(
+        (s: any) => s.span_id === selectedSpanId.value,
+      );
       if (idx > 0) updateSelectedSpan(list[idx - 1].span_id);
     };
 
@@ -2777,6 +2934,8 @@ export default defineComponent({
       // `config.showLLMUI`.
       config,
       activeTab,
+      traceTabs,
+      onTabReorder,
       sidebarActiveTab,
       traceTree,
       collapseMapping,
@@ -2816,7 +2975,7 @@ export default defineComponent({
       sessionId,
       copySessionId,
       traceDetailsShareURL,
-      "info": "info",
+      info: "info",
       outlinedPlayCircle: "play-circle",
       redirectToLogs,
       handleTreeViewCorrelatedLogs,
@@ -2847,6 +3006,7 @@ export default defineComponent({
       searchResults,
       parentContainer,
       traceScrollContainer,
+      scrollContainerForTree,
       parentHeight,
       updateHeight,
       getSpanKind,
@@ -2874,6 +3034,7 @@ export default defineComponent({
       handleDAGNodeClick,
       // Filter-from-trace-details
       areFiltersAdded,
+      isStandaloneMode,
       showFilterPopover,
       filterDialogReady,
       localEditorValue,
@@ -2895,7 +3056,7 @@ export default defineComponent({
       flatSpans,
       traceMetadata,
       formatLargeNumber,
-      updateActiveTab
+      updateActiveTab,
     };
   },
 });

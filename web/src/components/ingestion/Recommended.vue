@@ -47,9 +47,7 @@ import { defineComponent, ref, onBeforeMount, onUpdated } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { copyToClipboard } from "@/utils/clipboard";
 import config from "@/aws-exports";
-import segment from "@/services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import { resolveTab } from "@/utils/routeTabMaps";
 
@@ -132,6 +130,18 @@ export default defineComponent({
         },
         icon: "img:" + getImageURL("images/common/linux.svg"),
         label: t("ingestion.linux"),
+        contentClass: "tab_content",
+      },
+      {
+        name: "ingestFromMacOS",
+        to: {
+          name: "ingestFromMacOS",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        icon: "img:" + getImageURL("images/common/macos.png"),
+        label: t("ingestion.macos"),
         contentClass: "tab_content",
       },
       {

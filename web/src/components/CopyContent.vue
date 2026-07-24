@@ -58,7 +58,7 @@ export default defineComponent({
       default: "", // Default value for displayContent prop (empty string in this case)
     },
   },
-  setup(props, { emit }) {
+  setup(props) {
     const store = useStore();
     const { t } = useI18n();
     const email = ref(store.state.userInfo.email);

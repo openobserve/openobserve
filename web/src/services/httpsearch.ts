@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import store from "../stores";
-import router from "../router";
 import axios from "axios";
 import { toast } from "@/lib/feedback/Toast/useToast";
 

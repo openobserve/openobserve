@@ -44,7 +44,10 @@ import useStreams from "@/composables/useStreams";
 const EMPTY_KPI: SyntheticKpi = {
   uptimePct: 0,
   p95Ms: 0,
+  passedRuns: 0,
+  warningRuns: 0,
   failedRuns: 0,
+  errorRuns: 0,
   totalRuns: 0,
   retriedRuns: 0,
   lastRunStatus: null,

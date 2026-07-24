@@ -61,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="icon-toolbar"
           data-test="metrics-share-btn"
+          shortcut-id="metricsCopyUrl"
           class="h-8"
         />
         <template
@@ -88,6 +89,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="runQuery"
           >
             {{ t("metrics.runQuery") }}
+            <OTooltip
+              :content="t('metrics.runQuery')"
+              shortcut-id="metricsRunQuery"
+            />
           </OButton>
         </template>
       </template>
@@ -97,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       pageType="metrics"
       :editMode="false"
       :dashboardData="currentDashboardData.data"
-      :variablesData="{}"
+      :variablesData="({} as unknown as PanelEditorVariablesData)"
       :selectedDateTime="dashboardPanelData.meta.dateTime"
       @addToDashboard="addToDashboard"
       @chartApiError="handleChartApiError"
@@ -121,7 +126,6 @@ import {
   nextTick,
   watch,
   reactive,
-  onUnmounted,
   onMounted,
   onBeforeMount,
   defineAsyncComponent,
@@ -140,7 +144,10 @@ import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
-import { PanelEditor } from "@/components/dashboards/PanelEditor";
+import {
+  PanelEditor,
+  type PanelEditorVariablesData,
+} from "@/components/dashboards/PanelEditor";
 import { saveMetricsStream, restoreMetricsStream } from "@/utils/streamPersist";
 import useDefaultPanelFields from "@/composables/dashboard/useDefaultPanelFields";
 import { useRoute, useRouter } from "vue-router";
@@ -164,6 +171,7 @@ const AddToDashboard = defineAsyncComponent(() => {
   return import("./../metrics/AddToDashboard.vue");
 });
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
@@ -180,9 +188,10 @@ export default defineComponent({
     AutoRefreshInterval,
     PanelEditor,
     OButton,
+    OTooltip,
     ShareButton,
   },
-  setup(props) {
+  setup() {
     provide("dashboardPanelDataPageKey", "metrics");
 
     // PanelEditor ref for accessing exposed methods/properties
@@ -340,7 +349,7 @@ export default defineComponent({
 
     onMounted(async () => {
       // DateTimePicker is now mounted; safe to read its value
-      updateDateTime(selectedDate.value);
+      updateDateTime();
 
       // let it call the watchers and then mark the panel config watcher as activated
       await nextTick();
@@ -351,7 +360,7 @@ export default defineComponent({
       // auto-run a restored blob / inbound deep-link, then normalize the URL
       if (pendingAutoRun) {
         pendingAutoRun = false;
-        updateDateTime(selectedDate.value);
+        updateDateTime();
         runQuery();
       }
     });
@@ -370,7 +379,7 @@ export default defineComponent({
     );
 
     watch(selectedDate, () => {
-      updateDateTime(selectedDate.value);
+      updateDateTime();
     });
 
     // resize the chart when config panel is opened and closed
@@ -426,7 +435,7 @@ export default defineComponent({
       chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
       // refresh the date time based on current time if relative date is selected
       dateTimePickerRef.value && dateTimePickerRef.value.refresh();
-      updateDateTime(selectedDate.value);
+      updateDateTime();
 
       // Call PanelEditor's runQuery if available
       if (panelEditorRef.value) {
@@ -437,7 +446,7 @@ export default defineComponent({
       syncStateToUrl();
     };
 
-    const updateDateTime = (value: object) => {
+    const updateDateTime = () => {
       if (selectedDate.value && dateTimePickerRef?.value) {
         const date = dateTimePickerRef.value?.getConsumableDateTime();
 
@@ -460,7 +469,7 @@ export default defineComponent({
     );
 
     // Auto-apply config changes that don't require API calls (similar to dashboard)
-    const debouncedUpdateChartConfig = debounce((newVal, oldVal) => {
+    const debouncedUpdateChartConfig = debounce((newVal) => {
       if (!isEqual(chartData.value, newVal)) {
         const configNeedsApiCall = checkIfConfigChangeRequiredApiCallOrNot(
           chartData.value,
@@ -630,6 +639,32 @@ export default defineComponent({
         handler: () => {
           if (isInputFocused()) return;
           runQuery();
+        },
+      },
+      {
+        id: "metricsFocusQuery",
+        handler: () => {
+          // The metrics PromQL editor is Monaco — focus its inner textarea.
+          const el = document.querySelector<HTMLElement>(
+            '[data-test="dashboard-panel-query-editor"] textarea, [data-test="dashboard-panel-query-editor"] .monaco-editor textarea, [data-test="dashboard-panel-query-editor"] .cm-editor',
+          );
+          el?.focus();
+        },
+      },
+      {
+        id: "metricsAddToDashboard",
+        handler: () => {
+          if (isInputFocused()) return;
+          addToDashboard();
+        },
+      },
+      {
+        id: "metricsCopyUrl",
+        handler: () => {
+          // Reuse ShareButton's short-URL + clipboard + toast flow.
+          document
+            .querySelector<HTMLElement>('[data-test="metrics-share-btn"]')
+            ?.click();
         },
       },
     ]);

@@ -171,7 +171,7 @@ const useMetricsExplorer = () => {
 
   const generateLabelFromName = (name: string) => {
     return name
-      .replace(/[\_\-\s\.]/g, " ")
+      .replace(/[_\-\s.]/g, " ")
       .split(" ")
       .map((string) => string.charAt(0).toUpperCase() + string.slice(1))
       .filter((it) => it)
@@ -182,7 +182,7 @@ const useMetricsExplorer = () => {
     () => dashboardPanelData.data.queryType == "promql"
   );
 
-  const isAddXAxisNotAllowed = computed((e: any) => {
+  const isAddXAxisNotAllowed = computed(() => {
     switch (dashboardPanelData.data.type) {
       case "pie":
       case "donut":
@@ -210,7 +210,7 @@ const useMetricsExplorer = () => {
     }
   });
 
-  const isAddYAxisNotAllowed = computed((e: any) => {
+  const isAddYAxisNotAllowed = computed(() => {
     switch (dashboardPanelData.data.type) {
       case "pie":
       case "donut":
@@ -240,7 +240,7 @@ const useMetricsExplorer = () => {
     }
   });
 
-  const isAddZAxisNotAllowed = computed((e: any) => {
+  const isAddZAxisNotAllowed = computed(() => {
     switch (dashboardPanelData.data.type) {
       case "heatmap":
         return (

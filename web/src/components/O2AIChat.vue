@@ -314,7 +314,7 @@
                   <!-- Tool call block - expandable -->
                   <div
                     v-if="block.type === 'tool_call'"
-                    class="tool-call-item flex flex-col px-3 py-2 rounded-default text-compact mb-2"
+                    class="tool-call-item flex flex-col px-3 py-2 rounded-default text-compact mb-2 min-w-0 max-w-full"
                     :class="[
                       { 'has-details': hasToolCallDetails(block) },
                       {
@@ -398,26 +398,26 @@
                     <!-- Expandable details -->
                     <div
                       v-if="isToolCallExpanded(index, blockIndex)"
-                      class="tool-call-details mt-2.5 pt-2.5 border-t border-border-default flex flex-col gap-2"
+                      class="tool-call-details mt-2.5 pt-2.5 border-t border-border-default flex flex-col gap-2 min-w-0"
                       @click.stop
                     >
                       <!-- Error details for failed tool calls -->
                       <template v-if="block.success === false">
                         <div v-if="block.resultMessage" class="detail-item flex flex-col gap-1">
                           <span class="detail-label text-2xs font-semibold uppercase opacity-60">Error</span>
-                          <span class="detail-value text-xs select-text text-status-negative">{{
+                          <span class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere] text-status-negative">{{
                             block.resultMessage
                           }}</span>
                         </div>
                         <div v-if="block.errorType" class="detail-item flex flex-col gap-1">
                           <span class="detail-label text-2xs font-semibold uppercase opacity-60">Type</span>
-                          <code class="detail-value text-xs select-text">{{
+                          <code class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]">{{
                             block.errorType
                           }}</code>
                         </div>
                         <div v-if="block.suggestion" class="detail-item flex flex-col gap-1">
                           <span class="detail-label text-2xs font-semibold uppercase opacity-60">Suggestion</span>
-                          <span class="detail-value text-xs select-text italic opacity-85">{{
+                          <span class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere] italic opacity-85">{{
                             block.suggestion
                           }}</span>
                         </div>
@@ -429,7 +429,7 @@
                           class="detail-item flex flex-col gap-1"
                         >
                           <span class="detail-label text-2xs font-semibold uppercase opacity-60">Results</span>
-                          <span class="detail-value text-xs select-text"
+                          <span class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]"
                             >{{ block.summary.count }} records</span
                           >
                         </div>
@@ -438,7 +438,7 @@
                           class="detail-item flex flex-col gap-1"
                         >
                           <span class="detail-label text-2xs font-semibold uppercase opacity-60">Duration</span>
-                          <span class="detail-value text-xs select-text"
+                          <span class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]"
                             >{{ block.summary.took }}ms</span
                           >
                         </div>
@@ -448,7 +448,7 @@
                           class="detail-item flex flex-col gap-1"
                         >
                           <span class="detail-label text-2xs font-semibold uppercase opacity-60">Exit code</span>
-                          <code class="detail-value text-xs select-text">{{
+                          <code class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]">{{
                             block.summary.return_code
                           }}</code>
                         </div>
@@ -457,7 +457,7 @@
                           class="detail-item flex flex-col gap-1"
                         >
                           <span class="detail-label text-2xs font-semibold uppercase opacity-60">Stdout</span>
-                          <span class="detail-value text-xs select-text"
+                          <span class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]"
                             >{{ block.summary.stdout_lines }} lines</span
                           >
                         </div>
@@ -466,13 +466,13 @@
                           class="detail-item flex flex-col gap-1"
                         >
                           <span class="detail-label text-2xs font-semibold uppercase opacity-60">Stderr</span>
-                          <span class="detail-value text-xs select-text"
+                          <span class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]"
                             >{{ block.summary.stderr_lines }} lines</span
                           >
                         </div>
                         <div v-if="block.summary.truncated" class="detail-item flex flex-col gap-1">
                           <span class="detail-label text-2xs font-semibold uppercase opacity-60">Output</span>
-                          <span class="detail-value text-xs select-text">truncated</span>
+                          <span class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]">truncated</span>
                         </div>
                       </template>
                       <!-- Existing context details -->
@@ -505,7 +505,7 @@
                         class="detail-item flex flex-col gap-1"
                       >
                         <span class="detail-label text-2xs font-semibold uppercase opacity-60">Stream</span>
-                        <code class="detail-value text-xs select-text">{{
+                        <code class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]">{{
                           getToolCallDisplayData(block.context)?.stream
                         }}</code>
                       </div>
@@ -514,7 +514,7 @@
                         class="detail-item flex flex-col gap-1"
                       >
                         <span class="detail-label text-2xs font-semibold uppercase opacity-60">Type</span>
-                        <code class="detail-value text-xs select-text">{{
+                        <code class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]">{{
                           getToolCallDisplayData(block.context)?.type
                         }}</code>
                       </div>
@@ -523,7 +523,7 @@
                         class="detail-item flex flex-col gap-1"
                       >
                         <span class="detail-label text-2xs font-semibold uppercase opacity-60">Start</span>
-                        <span class="detail-value text-xs select-text">{{
+                        <span class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]">{{
                           formatTimestamp(
                             getToolCallDisplayData(block.context)?.start_time,
                           )
@@ -534,7 +534,7 @@
                         class="detail-item flex flex-col gap-1"
                       >
                         <span class="detail-label text-2xs font-semibold uppercase opacity-60">End</span>
-                        <span class="detail-value text-xs select-text">{{
+                        <span class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]">{{
                           formatTimestamp(
                             getToolCallDisplayData(block.context)?.end_time,
                           )
@@ -548,7 +548,7 @@
                         class="detail-item flex flex-col gap-1"
                       >
                         <span class="detail-label text-2xs font-semibold uppercase opacity-60">From</span>
-                        <span class="detail-value text-xs select-text">{{
+                        <span class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]">{{
                           getToolCallDisplayData(block.context)?.from
                         }}</span>
                       </div>
@@ -560,7 +560,7 @@
                         class="detail-item flex flex-col gap-1"
                       >
                         <span class="detail-label text-2xs font-semibold uppercase opacity-60">Size</span>
-                        <span class="detail-value text-xs select-text">{{
+                        <span class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]">{{
                           getToolCallDisplayData(block.context)?.size
                         }}</span>
                       </div>
@@ -569,7 +569,7 @@
                         class="detail-item flex flex-col gap-1"
                       >
                         <span class="detail-label text-2xs font-semibold uppercase opacity-60">Query Type</span>
-                        <code class="detail-value text-xs select-text">{{
+                        <code class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]">{{
                           getToolCallDisplayData(block.context)?.query_type
                         }}</code>
                       </div>
@@ -1388,6 +1388,7 @@
 import {
   defineComponent,
   ref,
+  reactive,
   onMounted,
   nextTick,
   watch,
@@ -1395,7 +1396,7 @@ import {
   onUnmounted,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
 import hljs from "highlight.js";
 import "highlight.js/styles/github.css";
@@ -1411,7 +1412,6 @@ import { chartColor } from "@/utils/chartTheme";
 import {
   ChatMessage,
   ChatHistoryEntry,
-  ToolCall,
   ContentBlock,
   NavigationAction,
   ImageAttachment,
@@ -1478,6 +1478,56 @@ function renderMarkdown(content: any) {
   return marked.parse(content);
 }
 
+// --- Shared, cross-instance streaming registry ---
+// O2AIChat is instantiated more than once (the Home page's inline AI tab and
+// the sidebar panel in MainLayout are SEPARATE component instances). When the
+// user starts a chat on Home and navigates to another page, the Home instance
+// unmounts and the sidebar instance mounts — a brand new setup() scope.
+//
+// For an in-flight stream to keep rendering after that hand-off, the detach/
+// re-attach bookkeeping MUST live outside setup() so both instances see the
+// same live array + AbortController. When these were per-instance, the sidebar
+// instance's map was empty, so loadChat() never re-attached and fell back to
+// the stale IndexedDB snapshot — the stream kept running but its text never
+// rendered in the new instance. Module scope is what makes the hand-off work.
+const backgroundStreams = new Set<AbortController>();
+const MAX_BACKGROUND_STREAMS = 3;
+
+// Map sessionId → live stream context for re-attachment when a (possibly
+// different) instance loads the same session. loadChat swaps chatMessages.value
+// back to `msgs` so processStream's isActive() becomes true again and the UI
+// updates in real-time.
+const backgroundStreamMap = new Map<
+  string,
+  {
+    msgs: ChatMessage[];
+    controller: AbortController;
+    chatId: number | null;
+  }
+>();
+
+// Cross-instance streaming status, keyed by sessionId. processStream runs in the
+// closure of the instance that STARTED it, so its completion resets isLoading on
+// THAT instance's ref — not on a different instance that re-attached to the same
+// stream (e.g. the sidebar taking over from the Home tab). Each instance watches
+// this shared reactive map for its current session and clears its own streaming
+// UI when the background turn finishes, so the sidebar's loading indicator
+// doesn't hang forever after re-attaching. true = streaming, false/absent = done.
+const sessionStreamingState = reactive<Record<string, boolean>>({});
+
+// Detached streams deliberately outlive the component that started them, and
+// this registry is module scope, so nothing else will ever stop them. Call when
+// the turn is no longer authorized for what it is writing — org switch, logout
+// — never for ordinary navigation, which is the case detaching exists for.
+const abortBackgroundStreams = () => {
+  for (const controller of backgroundStreams) controller.abort();
+  backgroundStreams.clear();
+  backgroundStreamMap.clear();
+  for (const key of Object.keys(sessionStreamingState)) {
+    delete sessionStreamingState[key];
+  }
+};
+
 export default defineComponent({
   name: "O2AIChat",
   components: {
@@ -1532,6 +1582,7 @@ export default defineComponent({
   },
   setup(props) {
     const router = useRouter();
+    const route = useRoute();
     const inputMessage = ref(
       props.aiChatInputContext ? props.aiChatInputContext : "",
     );
@@ -1539,11 +1590,11 @@ export default defineComponent({
     const isLoading = ref(false);
     const messagesContainer = ref<HTMLElement | null>(null);
     const chatInput = ref<any>(null); // RichTextInput component instance
-    const scrollTimeoutId = ref<ReturnType<typeof setTimeout> | null>(null);
     const currentStreamingMessage = ref("");
     const currentTextSegment = ref(""); // Track current text segment (resets after each tool call)
     const showHistory = ref(false);
-    const chatHistory = ref<ChatHistoryEntry[]>([]);
+    // `model` is stored on persisted entries but missing from the shared interface
+    const chatHistory = ref<(ChatHistoryEntry & { model?: string })[]>([]);
     const currentChatId = ref<number | null>(null);
     const currentSessionId = ref<string | null>(null); // UUID v7 for tracking all API calls in this chat session
     const lastTraceId = ref<string | null>(null); // OTEL trace_id from last workflow for feedback correlation
@@ -1658,6 +1709,7 @@ export default defineComponent({
       tool: string;
       message: string;
       context: Record<string, any>;
+      call_id?: string;
     } | null>(null);
 
     // Pending tool calls - stores tool calls that arrive before text content to avoid empty message boxes
@@ -1666,22 +1718,11 @@ export default defineComponent({
     // AbortController for managing request cancellation - allows users to stop ongoing AI requests
     const currentAbortController = ref<AbortController | null>(null);
 
-    // Background streams: when the user switches sessions while streaming,
-    // the detached stream continues in background and saves to IndexedDB on completion.
-    const backgroundStreams = new Set<AbortController>();
-    const MAX_BACKGROUND_STREAMS = 3;
-
-    // Map sessionId → live stream context for re-attachment when user navigates back.
-    // This allows loadChat to swap chatMessages.value back to the live array so that
-    // processStream's isActive() becomes true again and the UI updates in real-time.
-    const backgroundStreamMap = new Map<
-      string,
-      {
-        msgs: ChatMessage[];
-        controller: AbortController;
-        chatId: number | null;
-      }
-    >();
+    // NOTE: backgroundStreams / backgroundStreamMap / MAX_BACKGROUND_STREAMS are
+    // declared at MODULE scope (above defineComponent), not here. They must be
+    // shared across all O2AIChat instances so an in-flight stream started on the
+    // Home tab keeps rendering after navigating to a page where the sidebar
+    // instance takes over. See the comment on their declaration for why.
 
     // Typewriter animation state for LLM responses
     const displayedStreamingContent = ref("");
@@ -1705,6 +1746,10 @@ export default defineComponent({
     // Component readiness tracking
     const componentReady = ref(false);
     const pendingChips = ref<ReferenceChip[]>([]);
+
+    // Set true in onUnmounted so watchers firing during teardown don't re-attach
+    // a just-detached stream back to this dying instance (see chatUpdated watch).
+    const isUnmounting = ref(false);
 
     // Analyzing messages for loading indicator
     const ANALYZING_MESSAGES = [
@@ -1756,28 +1801,6 @@ export default defineComponent({
         clearInterval(analyzingRotationInterval.value);
         analyzingRotationInterval.value = null;
       }
-    };
-
-    // Flush any in-progress streaming text into the last assistant text block
-    // and reset streaming state. Called before inserting non-text blocks
-    // (confirmation_required, navigation_action) so the text preceding them is
-    // not lost.
-    const finalizeTextBlock = () => {
-      if (currentTextSegment.value) {
-        const lm = chatMessages.value[chatMessages.value.length - 1];
-        if (lm && lm.role === "assistant" && lm.contentBlocks) {
-          const lb = lm.contentBlocks[lm.contentBlocks.length - 1];
-          if (lb && lb.type === "text") {
-            lb.text = currentTextSegment.value;
-          }
-        }
-      }
-      if (typewriterAnimationId.value) {
-        cancelAnimationFrame(typewriterAnimationId.value);
-        typewriterAnimationId.value = null;
-      }
-      currentTextSegment.value = "";
-      displayedStreamingContent.value = "";
     };
 
     // Interval ID for title animation
@@ -1890,8 +1913,18 @@ export default defineComponent({
           );
         }
       } else {
-        // Regular text - reveal one character
-        displayedStreamingContent.value = target.slice(0, current.length + 1);
+        // Regular text - reveal one character per tick when caught up, but
+        // catch up faster when a backlog has built up (e.g. the backend
+        // delivered a large chunk in one burst). Without this, a fixed
+        // 1-char-per-tick reveal can lag the actual stream by many seconds
+        // on bursty responses, then "snap" to the full text once the stream
+        // ends and the remaining backlog is force-flushed.
+        const backlog = remaining.length;
+        const revealCount = backlog > 200 ? Math.ceil(backlog / 20) : 1;
+        displayedStreamingContent.value = target.slice(
+          0,
+          current.length + revealCount,
+        );
       }
 
       // Schedule next frame
@@ -1905,16 +1938,6 @@ export default defineComponent({
     const historyIndex = ref(-1);
     const HISTORY_KEY = "ai-chat-query-history";
     const MAX_HISTORY_SIZE = 10;
-
-    const modelConfig: any = {
-      openai: ["gpt-4.1"],
-      groq: [
-        "llama-3.3-70b-versatile",
-        "meta-llama/llama-4-scout-17b-16e-instruct",
-        "meta-llama/llama-4-maverick-17b-128e-instruct",
-      ],
-      xai: ["xai/grok-3-mini-beta", "xai/grok-3-latest"],
-    };
 
     const capabilities = [
       "1. Create a SQL query for me",
@@ -2240,6 +2263,38 @@ export default defineComponent({
       isLoading.value = false;
       stopAnalyzingRotation();
       scrollToBottom();
+    };
+
+    /**
+     * Extract streamed assistant text from an SSE event.
+     *
+     * The o2-ai (opencode) backend emits streamed text as
+     *   {"type":"message_delta","content":"<plain string>"}
+     * and non-streamed notices as {"type":"message","content":"..."} — the text
+     * is ALWAYS the plain-string `content` field. We also defensively accept the
+     * handful of OpenAI-compatible shapes the enterprise RCA proxy can surface
+     * (`response`, `delta.content`, `choices[].delta.content`, `text`) so an
+     * agent/proxy variant doesn't silently render nothing. Returns the text, or
+     * null when the event carries no assistant text.
+     */
+    const extractStreamText = (data: any): string | null => {
+      if (data == null || typeof data !== "object") return null;
+
+      // Canonical o2-ai chat shape.
+      if (typeof data.content === "string") return data.content;
+
+      // Defensive fallbacks (OpenAI-style / RCA proxy formats).
+      if (typeof data.response === "string") return data.response;
+      if (data.delta && typeof data.delta.content === "string") {
+        return data.delta.content;
+      }
+      const firstChoice = Array.isArray(data.choices) ? data.choices[0] : null;
+      if (firstChoice && typeof firstChoice.delta?.content === "string") {
+        return firstChoice.delta.content;
+      }
+      if (typeof data.text === "string") return data.text;
+
+      return null;
     };
 
     const processStream = async (
@@ -2900,7 +2955,10 @@ export default defineComponent({
                   }
 
                   // Handle streamed deltas and full/legacy message content.
-                  if (data && typeof data.content === "string") {
+                  // Tolerant of multiple shapes (content/text/delta/nested/OpenAI)
+                  // so an agent schema change doesn't silently drop text.
+                  const streamText = extractStreamText(data);
+                  if (typeof streamText === "string") {
                     // Complete any active tool call first (add green checkmark to chat)
                     if (activeToolCall.value) {
                       const completedToolBlock: ContentBlock = {
@@ -2921,11 +2979,17 @@ export default defineComponent({
                       if (isActive()) activeToolCall.value = null;
                     }
 
-                    const isMessageDelta = data.type === "message_delta";
+                    // Deltas (append verbatim) vs full/legacy messages (reformat
+                    // code fences). o2-ai streams text as type "message_delta";
+                    // any content arriving via a non-`content` fallback field is
+                    // also an incremental delta.
+                    const isMessageDelta =
+                      data.type === "message_delta" ||
+                      typeof data.content !== "string";
 
                     // Format code blocks with proper line breaks for full/legacy
                     // messages. Deltas must be appended exactly as received.
-                    let content = data.content;
+                    let content = streamText;
                     if (!isMessageDelta) {
                       content = content.replace(
                         /```(\w*)\s*([^`])/g,
@@ -3315,7 +3379,9 @@ export default defineComponent({
                 }
 
                 // Handle streamed deltas and full/legacy message content.
-                if (data && typeof data.content === "string") {
+                // Tolerant of multiple event shapes (see extractStreamText).
+                const streamText = extractStreamText(data);
+                if (typeof streamText === "string") {
                   if (activeToolCall.value) {
                     const completedToolBlock: ContentBlock = {
                       type: "tool_call",
@@ -3335,9 +3401,11 @@ export default defineComponent({
                     if (isActive()) activeToolCall.value = null;
                   }
 
-                  const isMessageDelta = data.type === "message_delta";
+                  const isMessageDelta =
+                    data.type === "message_delta" ||
+                    typeof data.content !== "string";
 
-                  let content = data.content;
+                  let content = streamText;
                   if (!isMessageDelta) {
                     content = content.replace(/```(\w*)\s*([^`])/g, "```$1\n$2");
                     content = content.replace(/([^`])\s*```/g, "$1\n```");
@@ -3490,22 +3558,6 @@ export default defineComponent({
       }
     };
 
-    /**
-     * Throttled save for streaming - saves at most every STREAMING_SAVE_INTERVAL ms
-     * This prevents data loss if the user reloads the page during streaming
-     * @param force - If true, saves immediately regardless of throttle (used for first assistant message)
-     */
-    const throttledStreamingSave = async (force: boolean = false) => {
-      const now = Date.now();
-      if (
-        force ||
-        now - lastStreamingSaveTime.value >= STREAMING_SAVE_INTERVAL
-      ) {
-        lastStreamingSaveTime.value = now;
-        await saveToHistory();
-      }
-    };
-
     const loadHistory = async () => {
       try {
         // Load history using the composable (automatically prunes to 100 items)
@@ -3562,6 +3614,18 @@ export default defineComponent({
       currentStreamingMessage.value = "";
       currentTextSegment.value = "";
       displayedStreamingContent.value = "";
+    };
+
+    // Logout has to kill the foreground turn too, not just the detached ones.
+    // MainLayout.signout() fires this as a window event because it lives in the
+    // Options API half of that file and can't reach setup scope directly (same
+    // pattern as o2:home-switch-tab).
+    const abortAllStreams = () => {
+      abortBackgroundStreams();
+      if (currentAbortController.value) {
+        currentAbortController.value.abort();
+        currentAbortController.value = null;
+      }
     };
 
     const toggleExpand = () => {
@@ -3982,6 +4046,15 @@ export default defineComponent({
     };
 
     const handleNavigationAction = async (action: NavigationAction) => {
+      // Detach the stream before navigating: the route change can unmount/
+      // recreate this component, and onUnmounted aborts currentAbortController
+      // to avoid leaking requests. Without detaching first, that abort races
+      // an in-flight opencode turn and kills any tool calls still queued
+      // after this navigation (e.g. create dashboard -> create alert -> nav).
+      // detachCurrentStream() moves the controller to backgroundStreams so
+      // processStream keeps running and the turn finishes in the background.
+      detachCurrentStream();
+
       // Helper to encode strings for URL (same as search history)
       const encodeForUrl = (str: string) =>
         btoa(unescape(encodeURIComponent(str)));
@@ -4029,7 +4102,11 @@ export default defineComponent({
 
         // Add base64 encoded query
         if (target.query) {
-          queryParams.query = encodeForUrl(target.query);
+          queryParams.query = encodeForUrl(
+            typeof target.query === "string"
+              ? target.query
+              : JSON.stringify(target.query),
+          );
         }
 
         // Add VRL function if present
@@ -4048,33 +4125,36 @@ export default defineComponent({
       } else if (action.action === "navigate_direct") {
         // Direct navigation - build proper URLs based on resource type
         let path = action.target.path || `/${action.resource_type}`;
+        // navigate_direct always carries the record form of `query`
+        const targetQuery = action.target.query as
+          | Record<string, any>
+          | undefined;
         const queryParams: Record<string, string> = {
           org_identifier: store.state.selectedOrganization.identifier,
-          ...action.target.query,
+          ...targetQuery,
         };
 
         // Resource-type-specific URL handling
         if (action.resource_type === "alert") {
           path = "/alerts";
-          const alertId =
-            action.target.alert_id || action.target.query?.alert_id;
+          const alertId = action.target.alert_id || targetQuery?.alert_id;
           if (alertId) {
             // Navigate to specific alert with update action
             queryParams.action = "update";
             queryParams.alert_id = alertId;
-            queryParams.name = action.target.name || action.target.query?.name;
+            queryParams.name = action.target.name || targetQuery?.name;
           }
           queryParams.folder =
-            action.target.folder || action.target.query?.folder || "default";
+            action.target.folder || targetQuery?.folder || "default";
         } else if (action.resource_type === "dashboard") {
           // Dashboards use /dashboards/view path
           path = "/dashboards/view";
           queryParams.dashboard =
             action.target.dashboard_id ||
             action.target.dashboardId ||
-            action.target.query?.dashboardId;
+            targetQuery?.dashboardId;
           queryParams.folder =
-            action.target.folder || action.target.query?.folder || "default";
+            action.target.folder || targetQuery?.folder || "default";
           queryParams.tab = action.target.tab || "tab-1";
           queryParams.refresh = "Off";
           queryParams.period = "15m";
@@ -4083,10 +4163,8 @@ export default defineComponent({
           // Pipelines use /pipeline/pipelines/edit path
           path = "/pipeline/pipelines/edit";
           queryParams.id =
-            action.target.pipeline_id ||
-            action.target.id ||
-            action.target.query?.id;
-          queryParams.name = action.target.name || action.target.query?.name;
+            action.target.pipeline_id || action.target.id || targetQuery?.id;
+          queryParams.name = action.target.name || targetQuery?.name;
         }
 
         await router.push({ path, query: queryParams });
@@ -4186,6 +4264,24 @@ export default defineComponent({
             // Restore streaming UI state so loading indicator shows
             isLoading.value = true;
             startAnalyzingRotation();
+
+            // Prime the typewriter from whatever the stream has accumulated so
+            // far, in THIS fresh instance. processStream only syncs the segment
+            // refs and (re)starts the animation on the NEXT chunk that arrives
+            // while isActive(); text already streamed before we re-attached
+            // would otherwise sit invisible until the next delta. Reveal the
+            // existing text instantly, then let the ongoing stream continue.
+            const lastMsg = chatMessages.value[chatMessages.value.length - 1];
+            if (lastMsg?.role === "assistant" && lastMsg.contentBlocks?.length) {
+              const lastBlock =
+                lastMsg.contentBlocks[lastMsg.contentBlocks.length - 1];
+              if (lastBlock?.type === "text" && lastBlock.text) {
+                currentStreamingMessage.value = lastMsg.content || lastBlock.text;
+                currentTextSegment.value = lastBlock.text;
+                // Instant reveal (no per-char catch-up) for the backlog.
+                displayedStreamingContent.value = lastBlock.text;
+              }
+            }
           } else {
             // Normal load from IndexedDB snapshot (no active stream)
             const formattedMessages = chat.messages.map((msg: any) => ({
@@ -4217,9 +4313,8 @@ export default defineComponent({
           }
 
           // Scroll to bottom after loading chat
-          await nextTick(() => {
-            scrollToBottom();
-          });
+          await nextTick();
+          scrollToBottom();
         }
       } catch (error) {
         console.error("Error loading chat:", error);
@@ -4278,6 +4373,20 @@ export default defineComponent({
       resetTypewriterState(); // Reset typewriter animation for new message
       startAnalyzingRotation(); // Start rotating analyzing messages
 
+      // Mint the session id here rather than inside the try below. A new chat
+      // has none yet, and the cleanup on every exit path has to clear the flag
+      // for the SAME id we set it on — otherwise an instance that re-attached
+      // never sees the streaming->done transition and spins forever.
+      if (!currentSessionId.value) {
+        currentSessionId.value = getUUIDv7();
+      }
+      const streamSessionId = currentSessionId.value;
+
+      // Mark this session as actively streaming in the cross-instance registry
+      // so that if another instance re-attaches, it knows when to stop showing
+      // its own loading indicator (see sessionStreamingState declaration).
+      sessionStreamingState[streamSessionId] = true;
+
       // Create new AbortController for this request - enables cancellation via Stop button
       currentAbortController.value = new AbortController();
 
@@ -4287,11 +4396,6 @@ export default defineComponent({
 
         let response: any;
         try {
-          // Ensure session ID exists for tracking this chat session
-          if (!currentSessionId.value) {
-            currentSessionId.value = getUUIDv7();
-          }
-
           // Pass abort signal, session ID, and images to enable request cancellation and multimodal support
           response = await fetchAiChat(
             chatMessages.value,
@@ -4338,7 +4442,6 @@ export default defineComponent({
         // detachment and clean up after processStream
         const streamController = currentAbortController.value;
         const streamMsgs = chatMessages.value;
-        const streamSessionId = currentSessionId.value;
 
         await processStream(reader);
 
@@ -4383,6 +4486,14 @@ export default defineComponent({
       isLoading.value = false;
       activeToolCall.value = null;
       stopAnalyzingRotation();
+
+      // Mark the session's stream as finished in the cross-instance registry so
+      // any OTHER instance that re-attached to it (e.g. the sidebar) can clear
+      // its own loading indicator. Runs on all exit paths (success/abort/error).
+      // Uses the id captured before the request, not currentSessionId — by the
+      // time an early failure lands here the user may have switched chats, and
+      // clearing the wrong session leaves the real one flagged as streaming.
+      sessionStreamingState[streamSessionId] = false;
 
       // Clean up AbortController after request completion (success or error)
       currentAbortController.value = null;
@@ -4897,36 +5008,6 @@ export default defineComponent({
       previewImage.value = null;
     };
 
-    // Scroll input textarea to bottom to show latest appended content
-    const scrollInputToBottom = () => {
-      // Clear any pending scroll timeout
-      if (scrollTimeoutId.value !== null) {
-        clearTimeout(scrollTimeoutId.value);
-      }
-
-      // Set new timeout for scroll
-      scrollTimeoutId.value = setTimeout(() => {
-        const textarea = chatInput.value?.$el?.querySelector("textarea");
-        if (!textarea) return;
-
-        textarea.focus();
-        textarea.setSelectionRange(
-          textarea.value.length,
-          textarea.value.length,
-        );
-
-        // Scroll all scrollable parent elements
-        let element = textarea;
-        while (element && element !== document.body) {
-          if (element.scrollHeight > element.clientHeight) {
-            element.scrollTop = element.scrollHeight;
-          }
-          element = element.parentElement;
-        }
-
-        scrollTimeoutId.value = null;
-      }, 50);
-    };
 
     // Load query history from localStorage
     const loadQueryHistory = () => {
@@ -5043,10 +5124,43 @@ export default defineComponent({
       () => store.state.selectedOrganization?.identifier,
       (newOrgId, oldOrgId) => {
         if (newOrgId && newOrgId !== oldOrgId) {
+          // A turn started under the old org must not keep streaming and
+          // writing chat history after the switch.
+          abortBackgroundStreams();
           addNewChat();
           if (props.isOpen) {
             loadHistory();
           }
+        }
+      },
+    );
+
+    // When this instance has re-attached to a stream that another instance
+    // started (its processStream completion runs in the OTHER instance's
+    // closure and can't reset our isLoading), watch the shared streaming
+    // registry and clear our own streaming UI once that session finishes.
+    watch(
+      () =>
+        currentSessionId.value
+          ? sessionStreamingState[currentSessionId.value]
+          : undefined,
+      (isStreaming) => {
+        // React to the session going false, not to a true->false transition: an
+        // instance that re-attached mid-stream never observed the `true`, so it
+        // would see undefined->false and skip the cleanup, spinning forever.
+        // isLoading guards against acting when we aren't showing a stream.
+        if (isStreaming === false && isLoading.value) {
+          isLoading.value = false;
+          activeToolCall.value = null;
+          stopAnalyzingRotation();
+          // The owning instance's processStream already wrote the final text
+          // into the message blocks, so this instance only clears its own
+          // typewriter UI.
+          resetTypewriterState();
+          // Reflect the completed turn into the sync handshake + history so a
+          // later mount reads the finished chat, not a mid-stream snapshot.
+          store.dispatch("setCurrentChatTimestamp", currentChatId.value);
+          nextTick(() => scrollToBottom());
         }
       },
     );
@@ -5064,6 +5178,7 @@ export default defineComponent({
           setTimeout(() => {
             componentReady.value = true;
             processPendingChips();
+            focusInput();
           }, 100);
         });
       }
@@ -5073,21 +5188,45 @@ export default defineComponent({
 
       // Load auto navigation preferences from localStorage
       loadAutoNavigationPreferences();
+
+      window.addEventListener("o2:abort-ai-streams", abortAllStreams);
     });
 
     onUnmounted(() => {
-      // Cancel any ongoing requests when component is unmounted to prevent memory leaks
-      if (currentAbortController.value) {
-        currentAbortController.value.abort();
-        currentAbortController.value = null;
+      window.removeEventListener("o2:abort-ai-streams", abortAllStreams);
+      // Mark unmounting FIRST so any reactive watcher that fires during teardown
+      // (e.g. our own chatUpdated watch, triggered by the dispatch below) does
+      // not re-attach the just-detached stream back to this dying instance.
+      isUnmounting.value = true;
+
+      // Detach (not abort) any in-flight request: every mount site except
+      // MainLayout's sidebar is behind a v-if (Home's AI tab, the query-editor
+      // panels), so ordinary navigation tears this instance down and used to
+      // kill the answer mid-word. Unmount is the only hook that knows the
+      // component is actually going away — a route watcher can't tell the
+      // difference between "leaving" and "the page updated its query string".
+      const wasStreaming = !!currentAbortController.value;
+      detachCurrentStream();
+
+      // Home runs the chat in its own inline tab with the sidebar closed. If we
+      // leave Home mid-stream, open the sidebar so its instance can re-attach
+      // and keep rendering. Skip when we're still on Home (the user only
+      // switched Home tabs) — MainLayout keeps the sidebar closed there, so
+      // opening it would show the panel and the Home AI tab at once.
+      if (
+        wasStreaming &&
+        props.centeredStart &&
+        route.name !== "home" &&
+        !store.state.isAiChatEnabled
+      ) {
+        store.dispatch("setIsAiChatEnabled", true);
       }
 
-      // Abort all background streams to prevent memory leaks
-      for (const controller of backgroundStreams) {
-        controller.abort();
-      }
-      backgroundStreams.clear();
-      backgroundStreamMap.clear();
+      // Note: background streams are intentionally NOT aborted here.
+      // detachCurrentStream() moves a turn's controller into backgroundStreams
+      // specifically so it keeps running after this component instance goes
+      // away (e.g. navigation, logout); aborting them on unmount would defeat
+      // that guarantee in exactly the scenario it exists for.
 
       // Clean up typewriter animation to prevent memory leaks
       if (typewriterAnimationId.value) {
@@ -5101,22 +5240,41 @@ export default defineComponent({
         titleIntervalId = null;
       }
 
-      //this step is added because we are using seperate instances of o2 ai chat component to make sync between them
-      //whenever a new chat is created or a new message is sent, the currentChatTimestamp is set to the chatId
-      //so we need to make sure that the currentChatTimestamp is set to the correct chatId
-      //and the chat gets updated when the component is unmounted so that the main layout component can load the correct chat
+      // Clean up the trailing-edge streaming render timer. This matters more
+      // here than a typical unmount cleanup: we intentionally let the stream
+      // keep running (see detachCurrentStream above), so displayedStreamingContent
+      // may still be ticking as this instance dies and a flush is often pending.
+      // Left alone it fires after unmount and writes into this dead instance's
+      // chatMessages, keeping the whole setup closure alive across the routine
+      // home <-> sidebar hand-off.
+      if (streamingRenderFlushTimer) {
+        clearTimeout(streamingRenderFlushTimer);
+        streamingRenderFlushTimer = null;
+      }
+      pendingStreamingRenderContent = null;
+
+      // We use separate O2AIChat instances (home inline tab + sidebar) and sync
+      // them via the store: publish which chat is current + a "chatUpdated" pulse
+      // so the SURVIVING instance loads it (its chatUpdated watch calls loadChat).
+      //
+      // CRITICAL: this dying instance must NOT call loadChat()/addNewChat() on
+      // itself here. detachCurrentStream() (above) just registered the in-flight
+      // turn in backgroundStreamMap for the survivor to re-attach to; calling
+      // loadChat() on ourselves would immediately re-attach it back to THIS
+      // instance and delete the map entry, so the survivor then finds nothing
+      // and falls back to the stale IndexedDB snapshot — the exact reason the
+      // streamed text stopped rendering after navigating away mid-stream.
+      // Only publish the handoff state; let the survivor act on it.
       store.dispatch("setCurrentChatTimestamp", currentChatId.value);
       store.dispatch("setChatUpdated", true);
-      if (store.state.currentChatTimestamp) {
-        loadChat(store.state.currentChatTimestamp);
-      }
-      if (!store.state.currentChatTimestamp) {
-        addNewChat();
-      }
     });
     //this watch is added to make sure that the chat gets updated
     // when the component is unmounted so that the main layout component can load the correct chat
     watch(chatUpdated, (newChatUpdated: boolean) => {
+      // A dying instance must not react to the handoff pulse it just published —
+      // otherwise it re-attaches its own detached stream and steals it from the
+      // surviving instance. Let the survivor handle it.
+      if (isUnmounting.value) return;
       if (newChatUpdated && store.state.currentChatTimestamp) {
         loadChat(store.state.currentChatTimestamp);
       }
@@ -5126,13 +5284,29 @@ export default defineComponent({
       store.dispatch("setChatUpdated", false);
     });
 
-    // Watch for typewriter animation updates to refresh the displayed text
-    watch(displayedStreamingContent, (newContent) => {
-      if (!isLoading.value) return;
-      // Don't overwrite existing text with empty string when displayedStreamingContent
-      // is reset (e.g., on tool_call). The reset signals "new segment starts" not
-      // "clear previous content".
-      if (!newContent) return;
+    // Writing displayedStreamingContent into chatMessages triggers a
+    // re-render of the message list, which re-runs formatMessage() ->
+    // marked.parse() (incl. hljs.highlight for code blocks) over the WHOLE
+    // accumulated text, not just the new characters. The typewriter ticks
+    // every ~8ms; re-parsing/re-highlighting full markdown at that rate is
+    // O(n^2) over a response and eventually can't keep up with
+    // requestAnimationFrame, so the page appears to hang with data already
+    // in memory but not painted, then "snaps" to the final text once the
+    // stream ends and the last write goes through. Throttle how often the
+    // expensive reactive write happens, independent of how often the cheap
+    // per-character animation ref ticks; the animation itself stays smooth.
+    const STREAMING_RENDER_INTERVAL = 80; // ms between reactive markdown re-renders
+    let lastStreamingRenderTime = 0;
+    let pendingStreamingRenderContent: string | null = null;
+    let streamingRenderFlushTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const flushStreamingRenderNow = (content: string) => {
+      lastStreamingRenderTime = Date.now();
+      pendingStreamingRenderContent = null;
+      if (streamingRenderFlushTimer) {
+        clearTimeout(streamingRenderFlushTimer);
+        streamingRenderFlushTimer = null;
+      }
 
       const lastMessage = chatMessages.value[chatMessages.value.length - 1];
       if (
@@ -5143,8 +5317,43 @@ export default defineComponent({
         const lastBlock =
           lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
         if (lastBlock && lastBlock.type === "text") {
-          lastBlock.text = newContent;
+          // Additive-only: the stream handler writes the FULL accumulated
+          // textSegment into this block as it arrives; the typewriter only
+          // reveals a prefix of it. Never let a lagging/stalled typewriter
+          // reveal (or an empty reset) shorten what's already rendered — that
+          // was a source of "text arrived but nothing/less showed". Only grow.
+          if ((content?.length || 0) >= (lastBlock.text?.length || 0)) {
+            lastBlock.text = content;
+          }
         }
+      }
+    };
+
+    // Watch for typewriter animation updates to refresh the displayed text
+    watch(displayedStreamingContent, (newContent) => {
+      if (!isLoading.value) return;
+      // Don't overwrite existing text with empty string when displayedStreamingContent
+      // is reset (e.g., on tool_call). The reset signals "new segment starts" not
+      // "clear previous content".
+      if (!newContent) return;
+
+      const now = Date.now();
+      if (now - lastStreamingRenderTime >= STREAMING_RENDER_INTERVAL) {
+        flushStreamingRenderNow(newContent);
+        return;
+      }
+
+      // Trailing edge: make sure the latest content always lands even if
+      // ticks keep arriving faster than the interval.
+      pendingStreamingRenderContent = newContent;
+      if (!streamingRenderFlushTimer) {
+        const delay = STREAMING_RENDER_INTERVAL - (now - lastStreamingRenderTime);
+        streamingRenderFlushTimer = setTimeout(() => {
+          streamingRenderFlushTimer = null;
+          if (pendingStreamingRenderContent !== null) {
+            flushStreamingRenderNow(pendingStreamingRenderContent);
+          }
+        }, delay);
       }
     });
 
@@ -5267,7 +5476,7 @@ export default defineComponent({
         const formatted = JSON.stringify(parsed, null, 2);
         // Apply syntax highlighting
         const highlighted = formatted.replace(
-          /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+          /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g,
           (match) => {
             let cls = "json-number";
             if (/^"/.test(match)) {
@@ -5381,12 +5590,6 @@ export default defineComponent({
           contentBlocks: message.contentBlocks || [],
         };
       });
-    });
-
-    // Check if there's an assistant message in progress (for loading indicator positioning)
-    const hasAssistantMessage = computed(() => {
-      const lastMessage = chatMessages.value[chatMessages.value.length - 1];
-      return lastMessage?.role === "assistant";
     });
 
     const retryGeneration = async (message: any) => {
@@ -5545,15 +5748,21 @@ export default defineComponent({
       return Object.keys(data).length > 0 ? data : null;
     };
 
-    const hasToolCallDetails = (block: ContentBlock) => {
+    // `response` is stamped onto blocks by the stream handler but is not part
+    // of the shared ContentBlock interface.
+    const hasToolCallDetails = (
+      block: ContentBlock & { response?: Record<string, any> },
+    ) => {
       // Show details for failed tools, successful tools with summary, tools with context data, or tools with response
       if (block.success === false) return true;
-      if (block.success !== false && block.summary) return true;
+      if (block.summary) return true;
       if (block.response) return true;
       return getToolCallDisplayData(block.context) !== null;
     };
 
-    const formatToolCallMessage = (block: ContentBlock) => {
+    const formatToolCallMessage = (
+      block: ContentBlock & { response?: Record<string, any> },
+    ) => {
       // Show error message for failed tools
       // Tool-specific messages (both success and error)
       if (block.tool === "testFunction") {

@@ -525,7 +525,6 @@ import searchService from "@/services/search";
 import FrustrationEventBadge from "./FrustrationEventBadge.vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import EventDetailsSection from "./common/EventDetailsSection.vue";
-import EventTypeBadge from "./common/EventTypeBadge.vue";
 import { useEventFormatters } from "@/composables/useEventFormatters";
 import { formatDuration } from "@/utils/zincutils";
 import OButton from '@/lib/core/Button/OButton.vue';
@@ -579,7 +578,6 @@ const {
   formatId,
   getStatusIcon,
   getStatusColorClass,
-  formatResourceDuration,
   getEventTypeClass,
 } = useEventFormatters();
 
@@ -594,52 +592,6 @@ const copyAttributesToClipboard = () => {
 const networkResources = computed(() => {
   return relatedResources.value.filter((item) => item.type === "resource");
 });
-
-// Computed fields for different event types
-const errorFields = computed(() => [
-  {
-    key: "error_type",
-    label: "Error Type",
-    value: props.rawEvent?.error_type,
-  },
-  {
-    key: "error_message",
-    label: "Message",
-    value: props.rawEvent?.error_message,
-  },
-  {
-    key: "error_handling",
-    label: "Handling",
-    value: props.rawEvent?.error_handling,
-    slot: true,
-  },
-  {
-    key: "error_id",
-    label: "Error ID",
-    value: props.rawEvent?.error_id,
-    slot: true,
-  },
-]);
-
-const viewFields = computed(() => [
-  {
-    key: "view_loading_type",
-    label: "Loading Type",
-    value: props.rawEvent?.view_loading_type?.replace("_", " "),
-    valueClass: "capitalize",
-  },
-  {
-    key: "view_url",
-    label: "URL",
-    value: props.rawEvent?.view_url,
-  },
-  {
-    key: "view_id",
-    label: "View ID",
-    value: props.rawEvent?.view_id,
-    slot: true,
-  },
-]);
 
 const actionFields = computed(() => [
   {

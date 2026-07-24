@@ -15,49 +15,29 @@
 
 use std::time::Duration;
 
-use chrono::{DateTime, Datelike, Timelike};
 #[cfg(feature = "enterprise")]
-use config::META_ORG_ID;
-#[cfg(feature = "enterprise")]
-use config::spawn_pausable_job;
+use audit::flush as flush_audit;
 use config::{
-    SIZE_IN_MB,
     cluster::LOCAL_NODE,
     get_config,
-    meta::{
-        self_reporting::{
-            EnqueueError, ReportingData,
-            error::ErrorData,
-            usage::{RequestStats, TriggerData, UsageData, UsageEvent, UsageType},
-        },
-        stream::StreamType,
-    },
+    meta::self_reporting::{EnqueueError, ReportingData, error::ErrorData, usage::TriggerData},
     metrics,
 };
-#[cfg(feature = "enterprise")]
-pub use o2_enterprise::enterprise::common::auditor;
-#[cfg(feature = "enterprise")]
-use proto::cluster_rpc;
-use tokio::sync::oneshot;
 
 #[cfg(feature = "cloud")]
 pub mod cloud_events;
 #[cfg(feature = "enterprise")]
-mod evaluator_schema;
+pub mod evaluator_schema;
 mod ingestion;
 #[cfg(feature = "enterprise")]
-mod llm_scores_schema;
-mod queues;
+pub mod llm_scores_schema;
+pub(crate) mod persistence;
 pub mod search;
 mod triggers_schema;
 mod usage_schema;
 
-#[cfg(feature = "enterprise")]
-pub use evaluator_schema::ensure_evaluator_stream_initialized;
 #[cfg(feature = "cloud")]
 pub use ingestion::ingest_data_retention_usages;
-#[cfg(feature = "enterprise")]
-pub use llm_scores_schema::ensure_llm_scores_stream_initialized;
 
 pub async fn run() {
     #[cfg(not(feature = "enterprise"))]
@@ -68,193 +48,12 @@ pub async fn run() {
         }
     }
 
-    // Force initialization usage queue
-    let (usage_start_sender, usage_start_receiver) = oneshot::channel();
-    if let Err(e) = queues::USAGE_QUEUE.start(usage_start_sender).await {
-        log::error!("[SELF-REPORTING] Failed to initialize usage queue: {e}");
-        return;
-    }
-
-    if let Err(e) = usage_start_receiver.await {
-        log::error!("[SELF-REPORTING] Usage queue initialization failed: {e}");
-        return;
-    }
-
-    // Force initialization error queue
-    let (error_start_sender, error_start_receiver) = oneshot::channel();
-    if let Err(e) = queues::ERROR_QUEUE.start(error_start_sender).await {
-        log::error!("[SELF-REPORTING] Failed to initialize error queue: {e}");
-        return;
-    }
-
-    if let Err(e) = error_start_receiver.await {
-        log::error!("[SELF-REPORTING] Error queue initialization failed: {e}");
+    if let Err(error) = usage_reporting::start().await {
+        log::error!("[SELF-REPORTING] Reporting queue initialization failed: {error}");
         return;
     }
 
     log::debug!("[SELF-REPORTING] successfully initialized reporting queues");
-}
-
-pub async fn report_request_usage_stats(
-    stats: RequestStats,
-    org_id: &str,
-    stream_name: &str,
-    stream_type: StreamType,
-    usage_type: UsageType,
-    num_functions: u16,
-    timestamp: i64,
-) {
-    let event: UsageEvent = usage_type.into();
-    if matches!(event, UsageEvent::Ingestion) {
-        metrics::INGEST_RECORDS
-            .with_label_values(&[org_id, stream_type.as_str()])
-            .inc_by(stats.records as u64);
-        metrics::INGEST_BYTES
-            .with_label_values(&[org_id, stream_type.as_str()])
-            .inc_by((stats.size * SIZE_IN_MB) as u64);
-    }
-
-    #[cfg(not(feature = "enterprise"))]
-    if !get_config().common.usage_enabled {
-        return;
-    }
-
-    let now = DateTime::from_timestamp_micros(timestamp).unwrap();
-    let request_body = stats.request_body.unwrap_or(usage_type.to_string());
-    let user_email = stats.user_email.unwrap_or("".to_owned());
-
-    let mut usage = vec![];
-
-    if num_functions > 0 {
-        usage.push(UsageData {
-            _timestamp: timestamp,
-            event: UsageEvent::Functions,
-            day: now.day(),
-            hour: now.hour(),
-            month: now.month(),
-            year: now.year(),
-            event_time_hour: format!(
-                "{:04}{:02}{:02}{:02}",
-                now.year(),
-                now.month(),
-                now.day(),
-                now.hour()
-            ),
-            org_id: org_id.to_owned(),
-            request_body: request_body.to_owned(),
-            function: None,
-            size: stats.size,
-            scan_files: stats.scan_files,
-            unit: "MB".to_owned(),
-            user_email: user_email.to_owned(),
-            response_time: stats.response_time,
-            num_records: stats.records * num_functions as i64,
-            dropped_records: stats.dropped_records,
-            stream_type,
-            stream_name: stream_name.to_owned(),
-            min_ts: None,
-            max_ts: None,
-            cached_ratio: None,
-            compressed_size: None,
-            search_type: stats.search_type,
-            search_event_context: stats.search_event_context.clone(),
-            trace_id: None,
-            took_wait_in_queue: stats.took_wait_in_queue,
-            result_cache_ratio: None,
-            is_partial: stats.is_partial,
-            work_group: None,
-            node_name: stats.node_name.clone(),
-            dashboard_info: stats.dashboard_info.clone(),
-            peak_memory_usage: stats.peak_memory_usage,
-        });
-    };
-
-    usage.push(UsageData {
-        _timestamp: timestamp,
-        event,
-        day: now.day(),
-        hour: now.hour(),
-        month: now.month(),
-        year: now.year(),
-        event_time_hour: format!(
-            "{:04}{:02}{:02}{:02}",
-            now.year(),
-            now.month(),
-            now.day(),
-            now.hour()
-        ),
-        org_id: org_id.to_owned(),
-        request_body: request_body.to_owned(),
-        size: if matches!(
-            event,
-            UsageEvent::NewIncident | UsageEvent::IncidentReAnalysis
-        ) {
-            stats.records as f64
-        } else {
-            stats.size
-        },
-        scan_files: stats.scan_files,
-        unit: if matches!(
-            event,
-            UsageEvent::NewIncident | UsageEvent::IncidentReAnalysis
-        ) {
-            "Count".to_owned()
-        } else {
-            "MB".to_owned()
-        },
-        user_email,
-        response_time: stats.response_time,
-        function: stats.function,
-        num_records: stats.records,
-        dropped_records: stats.dropped_records,
-        stream_type,
-        stream_name: stream_name.to_owned(),
-        min_ts: stats.min_ts,
-        max_ts: stats.max_ts,
-        cached_ratio: stats.cached_ratio,
-        compressed_size: None,
-        search_type: stats.search_type,
-        search_event_context: stats.search_event_context.clone(),
-        trace_id: stats.trace_id,
-        took_wait_in_queue: stats.took_wait_in_queue,
-        result_cache_ratio: stats.result_cache_ratio,
-        is_partial: stats.is_partial,
-        work_group: stats.work_group,
-        node_name: stats.node_name,
-        dashboard_info: stats.dashboard_info,
-        peak_memory_usage: stats.peak_memory_usage,
-    });
-    if !usage.is_empty() {
-        report_usage(usage);
-    }
-}
-
-/// Public entry point for publishing usage data from other services
-/// (e.g. AI credits billing). Enqueues UsageData records for background
-/// ingestion into the _usage stream.
-pub fn report_usage(usages: Vec<UsageData>) {
-    tokio::spawn(publish_usage(usages));
-}
-
-async fn publish_usage(usages: Vec<UsageData>) {
-    #[cfg(not(feature = "enterprise"))]
-    {
-        let cfg = get_config();
-        if !cfg.common.usage_enabled {
-            return;
-        }
-    }
-
-    for usage in usages {
-        if let Err(e) = queues::USAGE_QUEUE
-            .enqueue(ReportingData::Usage(Box::new(usage)))
-            .await
-        {
-            log::error!(
-                "[SELF-REPORTING] Failed to send usage data to background ingesting job: {e}"
-            );
-        }
-    }
 }
 
 pub fn publish_triggers_usage(trigger: TriggerData) {
@@ -278,7 +77,7 @@ pub fn publish_triggers_usage(trigger: TriggerData) {
     );
 
     // Use non-blocking try_enqueue to prevent scheduler blocking
-    match queues::USAGE_QUEUE.try_enqueue(ReportingData::Trigger(Box::new(trigger))) {
+    match usage_reporting::try_enqueue(ReportingData::Trigger(Box::new(trigger))) {
         Ok(()) => {
             log::debug!(
                 "[SELF-REPORTING] Successfully queued trigger usage data to be ingested (non-blocking)"
@@ -356,9 +155,11 @@ pub async fn publish_error(error_data: ErrorData) {
     );
 
     let start = std::time::Instant::now();
-    match queues::ERROR_QUEUE
-        .enqueue_with_timeout(ReportingData::Error(Box::new(error_data)), timeout_duration)
-        .await
+    match usage_reporting::enqueue_error_with_timeout(
+        ReportingData::Error(Box::new(error_data)),
+        timeout_duration,
+    )
+    .await
     {
         Ok(()) => {
             let elapsed = start.elapsed();
@@ -407,96 +208,21 @@ pub async fn flush() {
         return;
     }
 
-    // shutdown usage_queuer
-    for _ in 0..cfg.limit.usage_reporting_thread_num {
-        let (res_sender, res_receiver) = oneshot::channel();
-        if let Err(e) = queues::USAGE_QUEUE.shutdown(res_sender).await {
-            log::error!("[SELF-REPORTING] Error shutting down USAGE_QUEUER: {e}");
-        }
-        // wait for flush ingestion job
-        res_receiver.await.ok();
+    usage_reporting::shutdown(cfg.limit.usage_reporting_thread_num).await;
+}
 
-        let (error_sender, error_receiver) = oneshot::channel();
-        if let Err(e) = queues::ERROR_QUEUE.shutdown(error_sender).await {
-            log::error!("[SELF-REPORTING] Error shutting down ERROR_QUEUE: {e}");
-        }
-        // wait for flush ingestion job
-        error_receiver.await.ok();
+#[cfg(feature = "enterprise")]
+pub struct CoreAuditPublisher;
+
+#[cfg(feature = "enterprise")]
+#[async_trait::async_trait]
+impl audit::AuditPublisher for CoreAuditPublisher {
+    async fn publish(
+        &self,
+        request: proto::cluster_rpc::IngestionRequest,
+    ) -> Result<proto::cluster_rpc::IngestionResponse, anyhow::Error> {
+        crate::ingestion::ingestion_service::ingest(request)
+            .await
+            .map_err(|error| anyhow::anyhow!(error.to_string()))
     }
-}
-
-// Cron job to frequently publish auditted events
-#[cfg(feature = "enterprise")]
-pub fn run_audit_publish() -> Option<tokio::task::JoinHandle<()>> {
-    let o2cfg = o2_enterprise::enterprise::common::config::get_config();
-    if !o2cfg.common.audit_enabled {
-        return None;
-    }
-
-    Some(spawn_pausable_job!(
-        "audit_publish",
-        o2cfg.common.audit_publish_interval,
-        {
-            log::debug!("Audit ingestion loop running");
-            o2_enterprise::enterprise::common::auditor::publish_existing_audits(
-                META_ORG_ID,
-                publish_audit,
-            )
-            .await;
-        },
-        pause_if: o2cfg.common.audit_publish_interval == 0 || !o2_enterprise::enterprise::common::config::get_config().common.audit_enabled
-    ))
-}
-
-#[cfg(feature = "enterprise")]
-pub async fn audit(msg: auditor::AuditMessage) {
-    auditor::audit(META_ORG_ID, msg, publish_audit).await;
-}
-
-#[cfg(feature = "enterprise")]
-pub async fn flush_audit() {
-    auditor::flush_audit(META_ORG_ID, publish_audit).await;
-}
-
-#[cfg(feature = "enterprise")]
-async fn publish_audit(
-    req: cluster_rpc::IngestionRequest,
-) -> Result<cluster_rpc::IngestionResponse, anyhow::Error> {
-    crate::service::ingestion::ingestion_service::ingest(req)
-        .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))
-}
-
-#[inline]
-pub fn http_report_metrics(
-    start: std::time::Instant,
-    org_id: &str,
-    stream_type: StreamType,
-    code: &str,
-    uri: &str,
-    search_type: &str,
-    search_group: &str,
-) {
-    let time = start.elapsed().as_secs_f64();
-    let uri = format!("/api/org/{uri}");
-    metrics::HTTP_RESPONSE_TIME
-        .with_label_values(&[
-            uri.as_str(),
-            code,
-            org_id,
-            stream_type.as_str(),
-            search_type,
-            search_group,
-        ])
-        .observe(time);
-    metrics::HTTP_INCOMING_REQUESTS
-        .with_label_values(&[
-            uri.as_str(),
-            code,
-            org_id,
-            stream_type.as_str(),
-            search_type,
-            search_group,
-        ])
-        .inc();
 }

@@ -299,8 +299,6 @@ import {
   defineComponent,
   ref,
   onActivated,
-  onDeactivated,
-  onUnmounted,
   onBeforeMount,
   type Ref,
 } from "vue";
@@ -322,7 +320,6 @@ import {
   formatSizeFromMB,
 } from "../utils/zincutils";
 import config from "@/aws-exports";
-import { cloneDeep } from "lodash-es";
 import useStreams from "@/composables/useStreams";
 import AddStream from "@/components/logstream/AddStream.vue";
 import { watch } from "vue";
@@ -332,7 +329,6 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -353,13 +349,12 @@ export default defineComponent({
     OIcon,
     OToggleGroup,
     OToggleGroupItem,
-    OSpinner,
     OSearchInput,
     OCheckbox,
     OTable,
   },
   emits: [],
-  setup(props, { emit }) {
+  setup() {
     const store = useStore();
     const { t } = useI18n();
     const router = useRouter();
@@ -395,8 +390,6 @@ export default defineComponent({
 
     const streamTabs: never[] = [];
     const {
-      getStreams,
-      resetStreams,
       removeStream,
       getStream,
       getPaginatedStreams,
@@ -514,7 +507,7 @@ export default defineComponent({
     //   },
     // );
 
-    const getLogStream = (refresh: boolean = false) => {
+    const getLogStream = (_refresh?: boolean) => {
       if (store.state.selectedOrganization != null) {
         loadingState.value = true;
         previousOrgIdentifier.value =
@@ -642,7 +635,38 @@ export default defineComponent({
       confirmBatchDelete.value = true;
     };
 
+    // Prune deleted streams locally; re-fetch is racy (list is async-cached).
+    const removeStreamsFromTable = (
+      items: { name: string; stream_type: string }[],
+    ) => {
+      if (!items.length) return;
+
+      const removedKeys = new Set(
+        items.map((s) => `${s.name}-${s.stream_type}`),
+      );
+
+      // Prune the table first so the UI updates even if cache eviction fails.
+      const before = logStream.value.length;
+      logStream.value = logStream.value.filter(
+        (s: any) => !removedKeys.has(s._rowKey),
+      );
+      duplicateStreamList.value = duplicateStreamList.value.filter(
+        (s: any) => !removedKeys.has(s._rowKey),
+      );
+
+      const removedCount = before - logStream.value.length;
+      totalCount.value = Math.max(0, totalCount.value - removedCount);
+      resultTotal.value = logStream.value.length;
+
+      selectedIds.value = [];
+
+      items.forEach((stream) => {
+        removeStream(stream.name, stream.stream_type);
+      });
+    };
+
     const deleteStream = () => {
+      isDeleting.value = true;
       streamService
         .delete(
           store.state.selectedOrganization.identifier,
@@ -656,9 +680,9 @@ export default defineComponent({
               message: "Stream deleted successfully.",
               variant: "success",
             });
-            removeStream(deleteStreamName, deleteStreamType);
-            selectedIds.value = [];
-            getLogStream();
+            removeStreamsFromTable([
+              { name: deleteStreamName, stream_type: deleteStreamType },
+            ]);
           }
         })
         .catch((err: any) => {
@@ -671,6 +695,7 @@ export default defineComponent({
         })
         .finally(() => {
           deleteAssociatedAlertsPipelines.value = true;
+          isDeleting.value = false;
         });
     };
     const deleteBatchStream = () => {
@@ -712,13 +737,7 @@ export default defineComponent({
             });
           }
 
-          // Remove deleted streams from the list
-          items.forEach((stream: any) => {
-            removeStream(stream.name, stream.stream_type);
-          });
-
-          selectedIds.value = [];
-          getLogStream();
+          removeStreamsFromTable(items);
         })
         .catch((error) => {
           if (error.response.status != 403) {
@@ -792,7 +811,7 @@ export default defineComponent({
               dateTime["period"] = "15m";
             }
           })
-          .catch((err) => {
+          .catch(() => {
             dateTime["period"] = "15m";
           })
           .finally(() => {

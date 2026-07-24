@@ -115,6 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="iam-groups-bulk-delete-btn"
               variant="outline-destructive"
               size="sm"
+              :loading="bulkDeleteLoading"
               @click="openBulkDeleteDialog"
               icon-left="delete"
             >
@@ -205,6 +206,7 @@ const handleSelectedIdsUpdate = (ids: string[]) => {
 };
 
 const confirmBulkDelete = ref(false);
+const bulkDeleteLoading = ref(false);
 
 const columns: OTableColumnDef[] = [
   {
@@ -225,8 +227,6 @@ const columns: OTableColumnDef[] = [
     meta: { align: "center", actionCount: 2 },
   },
 ];
-
-const groups = ref([]);
 
 onBeforeMount(() => {
   setupGroups();
@@ -294,11 +294,6 @@ const setupGroups = async () => {
       loading.value = false;
     });
 };
-
-const hideAddGroup = () => {
-  showAddGroup.value = false;
-};
-
 
 const deleteUserGroup = (group: any) => {
   deleteGroup(group.group_name, store.state.selectedOrganization.identifier)
@@ -379,6 +374,7 @@ const openBulkDeleteDialog = async () => {
 };
 
 const bulkDeleteUserGroups = async () => {
+  bulkDeleteLoading.value = true;
   const groupNames = selectedGroups.value.map((group: any) => group.group_name);
 
   try {
@@ -423,6 +419,8 @@ const bulkDeleteUserGroups = async () => {
       });
     }
     confirmBulkDelete.value = false;
+  } finally {
+    bulkDeleteLoading.value = false;
   }
 };
 

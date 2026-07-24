@@ -411,21 +411,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             class="ml-1 cursor-pointer text-text-muted"
                           >
                             <OTooltip side="right" align="center">
-                              <template #content><span style="font-size: var(--text-sm)">
-                                Pattern: * * * * * * means every second.
-                                <br />
-                                Format: [Second (optional) 0-59] [Minute 0-59]
-                                [Hour 0-23] [Day of Month 1-31, 'L'] [Month
-                                1-12] [Day of Week 0-7 or '1L-7L', 0 and 7 for
-                                Sunday].
-                                <br />
-                                Use '*' to represent any value, 'L' for the last
-                                day/weekday. <br />
-                                Example: 0 0 12 * * ? - Triggers at 12:00 PM
-                                daily. It specifies second, minute, hour, day of
-                                month, month, and day of week,
-                                respectively.</span
-                              ></template>
+                              <template #content>
+                                <span style="font-size: var(--text-sm); white-space: pre-line">
+                                  {{ t('reports.cronFormatTooltip') }}
+                                </span>
+                              </template>
                             </OTooltip>
                           </OIcon>
                         </div>
@@ -674,8 +664,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      class="flex justify-end px-3 w-full py-3 bg-card-glass-bg sticky! bottom-0 border-t border-card-glass-border"
-      style="z-index: 2"
+      class="flex justify-end px-3 w-full py-3 bg-card-glass-bg sticky! bottom-0 border-t border-card-glass-border z-2"
     >
       <OButton
         data-test="add-report-cancel-btn"
@@ -828,6 +817,10 @@ const form = useOForm<CreateReportForm>({
   onSubmit: (value) => saveReport(value),
 });
 
+// The form's field-name (DeepKeys) union — used to type helpers that call
+// form.validateField/getFieldMeta/setFieldMeta so no per-call cast is needed.
+type ReportFieldName = Parameters<typeof form.validateField>[0];
+
 const originalReportData: Ref<string> = ref("");
 
 const step = ref(1);
@@ -873,7 +866,9 @@ const frequencyType = form.useStore(
 const selectedTimeTab = form.useStore(
   (s: any) => s.values?.selectedTimeTab ?? "scheduleNow",
 );
-const dashboardRows = form.useStore((s: any) => s.values?.dashboards ?? []);
+const dashboardRows = form.useStore(
+  (s: any): any[] => s.values?.dashboards ?? [],
+);
 
 // `variables` are now form-owned (VariablesInput renders in form mode,
 // name-prefix="variables"); read from the form value at save.
@@ -1037,7 +1032,9 @@ watch(submissionAttempts, (n, o) => {
 // put (clearing them made a later Continue wipe the errors Save had just surfaced
 // on other steps). We simply don't READ the out-of-step fields when deciding
 // whether to advance.
-const validateStepFields = async (fields: string[]): Promise<boolean> => {
+const validateStepFields = async (
+  fields: ReportFieldName[],
+): Promise<boolean> => {
   let valid = true;
   for (const name of fields) {
     await form.validateField(name, "submit");
@@ -1048,20 +1045,20 @@ const validateStepFields = async (fields: string[]): Promise<boolean> => {
 };
 
 // Validate the given fields; only advance to `next` when they all pass.
-const goToStep = async (fields: string[], next: number) => {
+const goToStep = async (fields: ReportFieldName[], next: number) => {
   if (await validateStepFields(fields)) step.value = next;
 };
 
 // Map a Zod issue path to its OForm field name so we can match issues to the
 // field that owns them: ["dashboards", 0, "folder"] → "dashboards[0].folder",
 // ["cron"] → "cron".
-const issuePathToName = (path: readonly (string | number)[]): string =>
+const issuePathToName = (path: readonly PropertyKey[]): string =>
   path.reduce<string>(
     (acc, seg) =>
       typeof seg === "number"
         ? `${acc}[${seg}]`
         : acc
-          ? `${acc}.${seg}`
+          ? `${acc}.${String(seg)}`
           : String(seg),
     "",
   );
@@ -1081,7 +1078,9 @@ watch(
     const invalidNames = new Set(
       res.success ? [] : res.error.issues.map((i) => issuePathToName(i.path)),
     );
-    for (const name of Object.keys(form.state.fieldMeta ?? {})) {
+    for (const name of Object.keys(
+      form.state.fieldMeta ?? {},
+    ) as ReportFieldName[]) {
       const meta = form.getFieldMeta(name);
       if (!meta) continue;
       const hasError = (meta.errors?.length ?? 0) > 0;
@@ -1235,7 +1234,7 @@ const allDashboardsArePdf = computed(
 
 // Returns the available attachment type options for a given report type.
 // Inline is disabled for PDF since the report server does not support it.
-const attachmentTypeOptions = (rType: string) => [
+const attachmentTypeOptions = (rType: string | undefined) => [
   { label: "Standard — downloadable attachment (default)", value: "standard" },
   {
     label: "Inline — embedded in email body",

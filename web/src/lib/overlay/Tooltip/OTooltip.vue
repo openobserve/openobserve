@@ -8,8 +8,16 @@ import {
   TooltipContent,
   TooltipArrow,
 } from "reka-ui";
-import { ref, computed, onMounted, onUnmounted, useSlots } from "vue";
+import { ref, computed, onMounted, onUnmounted, useAttrs, useSlots } from "vue";
 import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
+
+// Both modes render a fragment (provider + portalled content, or the child-mode
+// anchor pair), so Vue has no single root to fall attributes onto: anything a
+// call site passed — class, style, aria-* — was silently DROPPED with an
+// "Extraneous non-props attributes" warning. Take them over explicitly and put
+// them on the bubble, which is what a caller styling or labelling a tooltip
+// means.
+defineOptions({ inheritAttrs: false });
 
 const props = withDefaults(defineProps<TooltipProps>(), {
   side: "top",
@@ -33,6 +41,16 @@ defineSlots<TooltipSlots>();
 
 const slots = useSlots();
 const hasDefaultSlot = computed(() => !!slots.default);
+
+const attrs = useAttrs();
+
+// `data-test` stays owned by the component: e2e selects the bubble by
+// `o-tooltip-content` in many places, so a call-site value must not replace it.
+// Everything else (class, style, aria-*, id) is forwarded to the content.
+const forwardedAttrs = computed(() => {
+  const { "data-test": _componentOwned, ...rest } = attrs;
+  return rest;
+});
 
 // ─── Child mode (placed inside a parent element as its tooltip) ───────────────
 // When no default slot is provided, OTooltip attaches to its parent: it finds
@@ -148,7 +166,7 @@ const contentStyle = computed(() => ({
 }));
 
 const contentClasses = computed(() => [
-  "z-[10100] px-2.5 py-1.5",
+  "z-10100 px-2.5 py-1.5",
   "bg-surface-overlay rounded-default",
   "text-xs text-text-body font-medium leading-relaxed",
   // Force long unbreakable tokens (file paths, hashes, URLs) to wrap inside the
@@ -182,6 +200,7 @@ const contentClasses = computed(() => [
       </TooltipTrigger>
       <TooltipPortal>
         <TooltipContent
+          v-bind="forwardedAttrs"
           data-test="o-tooltip-content"
           :side="side"
           :align="align"
@@ -231,6 +250,7 @@ const contentClasses = computed(() => [
         />
         <TooltipPortal>
           <TooltipContent
+            v-bind="forwardedAttrs"
             data-test="o-tooltip-content"
             :side="side"
             :align="align"

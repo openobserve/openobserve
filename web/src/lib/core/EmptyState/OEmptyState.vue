@@ -150,6 +150,7 @@ import {
   emptyStatePresets,
   presetNouns,
   type EmptyStateAction,
+  type EmptyStatePreset,
   type EmptyStatePresetName,
   type EmptyStateVariant,
 } from "./presets";
@@ -206,7 +207,9 @@ const emit = defineEmits<{
 const slots = useSlots();
 const { t } = useI18n();
 
-const preset = computed(() =>
+// Widen to the interface: the `satisfies` map keeps per-key literal types,
+// and unioning 25 literals breaks `?.actions` on entries without actions.
+const preset = computed<EmptyStatePreset | undefined>(() =>
   props.preset ? emptyStatePresets[props.preset] : undefined,
 );
 

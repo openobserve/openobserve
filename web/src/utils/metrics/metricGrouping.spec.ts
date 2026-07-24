@@ -21,7 +21,6 @@ import {
   DEFAULT_METRIC_GROUP_DEFINITIONS,
   K8S_METRIC_GROUP_DEFINITIONS,
   type MetricGroupDefinition,
-  type MetricGroupConfig,
 } from "./metricGrouping";
 import type { StreamInfo } from "@/services/service_streams";
 

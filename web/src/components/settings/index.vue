@@ -72,11 +72,8 @@ import {
   ref,
   onBeforeMount,
   onActivated,
-  onDeactivated,
-  onUnmounted,
   onUpdated,
   computed,
-  watch,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -121,6 +118,7 @@ export default defineComponent({
       license:               "license",
       orgnizationManagement: "organization_management",
       regexPatterns:         "regex_patterns",
+      syntheticsLocations:   "synthetics_locations",
       correlationSettings:   "correlation_settings",
       genAiAgentMapping:     "gen_ai_agent_mapping",
     };
@@ -174,7 +172,7 @@ export default defineComponent({
       const notMeta =
         store.state.zoConfig.meta_org &&
         (!isMetaOrg.value || config.isEnterprise === "false");
-      if ((name === "nodes" || name === "license") && notMeta) {
+      if ((name === "nodes" || name === "license" || name === "syntheticsLocations") && notMeta) {
         settingsTab.value = "general";
         router.push({
           path: "/settings/general",
@@ -202,6 +200,7 @@ export default defineComponent({
       "Destinations & Templates",
       "Data & AI",
       "Operations",
+      "Synthetics",
       "Account",
     ];
 
@@ -365,6 +364,16 @@ export default defineComponent({
           group: "Operations",
         },
         {
+          key: "synthetics_locations",
+          label: t("synthetics.locations.title"),
+          description: t("synthetics.locations.description"),
+          icon: "location-on",
+          to: { name: "syntheticsLocations", query: { org_identifier: org } },
+          visible: isEnt && meta,
+          dataTest: "synthetics-locations-tab",
+          group: "Synthetics",
+        },
+        {
           key: "license",
           label: t("settings.license"),
           description: t("settings.licenseDesc"),
@@ -414,6 +423,7 @@ export default defineComponent({
         "Destinations & Templates": t("settings.groupDestinationsTemplates"),
         "Data & AI": t("settings.groupDataAI"),
         "Operations": t("settings.groupOperations"),
+        "Synthetics": t("settings.groupSynthetics"),
         "Account": t("settings.groupAccount"),
       };
       return [...buckets.keys()]

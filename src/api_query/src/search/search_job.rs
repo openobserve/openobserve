@@ -20,22 +20,21 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use config::meta::search::Request;
+use openobserve_api_common::extractors::Headers;
+#[cfg(feature = "cloud")]
+use openobserve_core::organization::is_org_in_free_trial_period;
 #[cfg(feature = "enterprise")]
 use {
+    crate::common::{
+        meta::http::HttpResponse as MetaHttpResponse,
+        utils::http::{
+            get_or_create_trace_id, get_search_event_context_from_request,
+            get_stream_type_from_request, get_use_cache_from_request,
+        },
+    },
     crate::search::{
         query_manager::cancel_query_inner,
         utils::{StreamPermissionResourceType, check_stream_permissions},
-    },
-    crate::service::search_jobs::{get_result, merge_response},
-    crate::{
-        common::{
-            meta::http::HttpResponse as MetaHttpResponse,
-            utils::http::{
-                get_or_create_trace_id, get_search_event_context_from_request,
-                get_stream_type_from_request, get_use_cache_from_request,
-            },
-        },
-        service::db::search_job::{search_job_partitions::*, search_jobs::*},
     },
     axum::http::HeaderMap,
     config::{
@@ -47,16 +46,16 @@ use {
         },
         utils::json,
     },
+    db::search_job::{search_job_partitions::*, search_jobs::*},
     hashbrown::HashMap,
     infra::table::entity::search_jobs::Model as JobModel,
+    search_service::search_jobs::{get_result, merge_response},
     tracing::Span,
 };
 
 #[cfg(feature = "enterprise")]
 use crate::search::error_utils::map_error_to_http_response;
-#[cfg(feature = "cloud")]
-use crate::service::organization::is_org_in_free_trial_period;
-use crate::{common::utils::auth::UserEmail, extractors::Headers};
+use crate::service::auth::UserEmail;
 
 // 1. submit
 /// SearchSQL
@@ -270,7 +269,11 @@ pub async fn submit_job(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search Jobs", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all search jobs", "category": "search"}))
+        ("x-o2-mcp" = json!({
+            "description": "List all search jobs",
+            "category": "search",
+            "summary_fields": ["id", "org_id", "stream_type", "stream_names", "status", "created_at"]
+        }))
     )
 )]
 pub async fn list_status(Path(org_id): Path<String>) -> Response {

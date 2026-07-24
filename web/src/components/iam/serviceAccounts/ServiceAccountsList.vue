@@ -181,6 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="service-accounts-list-delete-accounts-btn"
                 variant="outline-destructive"
                 size="sm"
+                :loading="bulkDeleteLoading"
                 @click="openBulkDeleteDialog"
                 icon-left="delete"
               >
@@ -454,7 +455,7 @@ export default defineComponent({
   name: "ServiceAccountsList",
   components: { OEmptyState, AddServiceAccount, ConfirmDialog, OButton, ODialog, OIcon, OPageLayout, OTooltip, OTable, OTag, OCodeCell, OUserCell, OSearchInput, OTabs, OTab, OTabPanels, OTabPanel, OSpinner },
   emits: [],
-  setup(props, { emit }) {
+  setup() {
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
@@ -463,7 +464,6 @@ export default defineComponent({
     const confirmDelete = ref<boolean>(false);
     const selectedUser: any = ref({});
     const orgData: any = ref(store.state.selectedOrganization);
-    const qTable: any = ref(null);
     const isUpdated = ref(false);
     const showAddUserDialog = ref(false);
     const { serviceAccountsState } = usePermissions();
@@ -472,9 +472,7 @@ export default defineComponent({
     const isShowToken = ref(false);
     const confirmRefresh  = ref(false);
     const filterQuery = ref("");
-    const toBeRefreshed = ref({
-
-    });
+    const toBeRefreshed = ref<{ email?: string }>({});
 
     const serviceToken  = ref("");
     const tokenAccountEmail = ref("");
@@ -623,6 +621,7 @@ export default defineComponent({
     const serviceAccounts = ref([]);
     const selectedAccounts: any = ref([]);
     const confirmBulkDelete = ref(false);
+    const bulkDeleteLoading = ref(false);
 
     onBeforeMount(async () => {
       await getServiceAccountsUsers();
@@ -699,8 +698,6 @@ export default defineComponent({
     let deleteUserEmail = "";
     const deleteUserEmailIdentifier = ref("");
 
-    const currentUser = computed(() => store.state.userInfo.email);
-
     const selectedAccountEmails = computed(() =>
       selectedAccounts.value.map((a: any) => a.email),
     );
@@ -751,7 +748,7 @@ export default defineComponent({
 
             resolve(true);
           })
-          .catch((err) => {
+          .catch(() => {
             dismiss();
             reject(false);
           })
@@ -938,6 +935,7 @@ export default defineComponent({
     };
 
     const bulkDeleteServiceAccounts = async () => {
+      bulkDeleteLoading.value = true;
       const accountEmails = selectedAccounts.value
         .filter((account: any) => !isSystemAccount(account.email))
         .map((account: any) => account.email);
@@ -976,6 +974,8 @@ export default defineComponent({
             variant: "error",
           });
         }
+      } finally {
+        bulkDeleteLoading.value = false;
       }
     };
 
@@ -1101,6 +1101,7 @@ export default defineComponent({
       selectedAccountEmails,
       handleSelectedIdsUpdate,
       confirmBulkDelete,
+      bulkDeleteLoading,
       openBulkDeleteDialog,
       bulkDeleteServiceAccounts,
       redactToken,

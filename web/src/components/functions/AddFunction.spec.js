@@ -1,7 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils";
-import AddFunction, { defaultValue } from "./AddFunction.vue"; // Import defaultValue for prop tests
+import AddFunction from "./AddFunction.vue";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import { nextTick } from 'vue';
 import * as vueRouter from 'vue-router';
@@ -281,10 +280,9 @@ describe("AddFunction Component", () => {
       // Simulate unsaved changes
       wrapper.vm.formData.name = "changed";
       await nextTick();
-      const event = { returnValue: "" };
       window.dispatchEvent(new Event('beforeunload'));
       // We can't directly test the return value, but we can check that the event handler is present
-      expect(typeof window.onbeforeunload === 'function' || window.hasOwnProperty('onbeforeunload')).toBe(true);
+      expect(typeof window.onbeforeunload === 'function' || Object.prototype.hasOwnProperty.call(window, 'onbeforeunload')).toBe(true);
     });
 
 

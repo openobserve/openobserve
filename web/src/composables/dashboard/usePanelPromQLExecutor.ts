@@ -100,7 +100,14 @@ export const usePanelPromQLExecutor = (ctx: {
 
       // Process all queries in parallel using streaming
       await Promise.all(
-        panelSchema.value.queries.map(async (it, queryIndex) => {
+        panelSchema.value.queries.map(async (
+          it: {
+            query: string;
+            tabName?: string;
+            config: { step_value?: string; query_type?: string };
+          },
+          queryIndex: number,
+        ) => {
           const { query: query1, metadata: metadata1 } = replaceQueryValue(
             it.query,
             startISOTimestamp,
@@ -269,7 +276,7 @@ export const usePanelPromQLExecutor = (ctx: {
             }
           };
 
-          const handlePromQLComplete = (data: any, _: any) => {
+          const handlePromQLComplete = () => {
             // Mark this query as completed
             completedQueries.add(queryIndex);
 
@@ -301,7 +308,7 @@ export const usePanelPromQLExecutor = (ctx: {
             }
           };
 
-          const handlePromQLReset = (data: any, res: any) => {
+          const handlePromQLReset = () => {
             // Reset handling if needed
           };
 

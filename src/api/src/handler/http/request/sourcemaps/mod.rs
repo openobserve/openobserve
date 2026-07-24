@@ -21,17 +21,13 @@ use axum::{
     http::HeaderMap,
     response::Response,
 };
+use db::sourcemaps as db_sourcemaps;
 use infra::table::source_maps::FileType;
+use openobserve_core::sourcemaps::{self as sv_sourcemaps, TranslatedStack};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse,
-    service::{
-        db::sourcemaps as db_sourcemaps,
-        sourcemaps::{self as sv_sourcemaps, TranslatedStack},
-    },
-};
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 #[derive(Serialize)]
 struct SourceMapRepr {

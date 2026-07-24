@@ -148,7 +148,7 @@
             <OToggleGroup
               :model-value="collapseMode"
               class="w-full"
-              @update:model-value="(v) => setCollapseMode(v as string)"
+              @update:model-value="(v) => setCollapseMode(v as 'auto' | 'expanded' | 'collapsed')"
             >
               <OToggleGroupItem
                 v-for="m in (['auto', 'expanded', 'collapsed'] as const)"
@@ -188,11 +188,11 @@
         </ODropdown>
         <OSeparator
           vertical
-          v-if="searchObj.meta.serviceGraphVisualizationType === 'graph'"
+          v-if="resolvedVizType === 'graph'"
           class="self-stretch mx-1"
         />
         <div
-          v-if="searchObj.meta.serviceGraphVisualizationType === 'graph'"
+          v-if="resolvedVizType === 'graph'"
           data-test="sg-node-size-info"
           class="flex flex-row items-center gap-2 min-w-0"
         >
@@ -367,8 +367,8 @@ import {
   computed,
   watch,
   nextTick,
+  type PropType,
 } from "vue";
-import * as echarts from "echarts";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { useRouter } from "vue-router";
@@ -385,13 +385,10 @@ import {
   GROUP_PREFIX,
 } from "@/utils/traces/applyGraphCollapse";
 import {
-  formatNumber,
-  formatLatency,
   pointToBezierDistance,
   generateNodeTooltipContent,
   generateEdgeTooltipContent,
   findIncomingEdgeForNode,
-  calculateRootNodeMetrics,
 } from "@/utils/traces/treeTooltipHelpers";
 import useStreams from "@/composables/useStreams";
 import useTraces from "@/composables/useTraces";
@@ -401,6 +398,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OCard from "@/lib/core/Card/OCard.vue";
@@ -461,9 +459,24 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    // Optional external control of visualization + layout type. When set (the
+    // Agent Graph page owns its own Tree/Graph + layout selection), these win
+    // over the shared traces store `searchObj.meta.serviceGraph*Type`. This
+    // keeps the Agent Graph fully decoupled from the Traces Service Graph tab:
+    // its type no longer bleeds in from that tab, and a remount can't paint the
+    // stale shared state. Undefined = fall back to the shared store (the Traces
+    // Service Graph tab, which is driven by the SearchBar toolbar).
+    vizType: {
+      type: String as PropType<"tree" | "graph" | undefined>,
+      default: undefined,
+    },
+    layoutType: {
+      type: String,
+      default: undefined,
+    },
   },
   emits: ["view-traces", "request:stream-change", "jump-to-stream-data"],
-  setup(props, { emit }) {
+  setup(props, { emit, expose }) {
     const store = useStore();
     const { isDark } = useTheme();
     const router = useRouter();
@@ -471,7 +484,23 @@ export default defineComponent({
     const { getStreams } = useStreams();
     const { searchObj } = useTraces();
 
+    // Resolved visualization + layout type. A parent that owns its own type
+    // selection (the Agent Graph page) passes `vizType`/`layoutType` props;
+    // those win. Otherwise fall back to the shared traces store, which the
+    // Traces Service Graph tab drives via the SearchBar toolbar. All reads below
+    // go through these — never `searchObj.meta.serviceGraph*Type` directly — so
+    // the two surfaces stay decoupled.
+    const resolvedVizType = computed<"tree" | "graph">(
+      () => props.vizType ?? searchObj.meta.serviceGraphVisualizationType,
+    );
+    const resolvedLayoutType = computed<string>(
+      () => props.layoutType ?? searchObj.meta.serviceGraphLayoutType,
+    );
+
     const loading = ref(false);
+    // Stamped when a graph load settles — lets a parent page show a
+    // "last refreshed" time next to its refresh control.
+    const lastRunAt = ref<number | null>(null);
     const error = ref<string | null>(null);
     const showSettings = ref(false);
     const lastUpdated = ref("");
@@ -540,22 +569,24 @@ export default defineComponent({
       const s = new Set(expandedGroups.value);
       s.has(groupId) ? s.delete(groupId) : s.add(groupId);
       expandedGroups.value = s;
-      lastChartOptions.value = null;
+      lastChartOptions = null;
       applyFilters();
     };
     const setCollapseMode = (m: "auto" | "expanded" | "collapsed") => {
       collapseMode.value = m;
-      lastChartOptions.value = null;
+      lastChartOptions = null;
       applyFilters();
     };
 
     // ── Zoom controls ─────────────────────────────────────────────────────────
     // The mouse still zooms (roam:true) so you can focus an area with the wheel;
-    // scaleLimit on the series bounds it so it can't run away. The +/- buttons
-    // drive the SAME series `zoom` option via setOption, reading the chart's
-    // CURRENT zoom first so button + wheel stay in sync.
+    // scaleLimit on the series bounds it so it can't run away (the old "erratic"
+    // feel). The +/- buttons drive the SAME series `zoom` option via setOption,
+    // reading the chart's CURRENT zoom first so button + wheel stay in sync.
+    // Match the series `scaleLimit` (convertTraceData.ts) so the +/- buttons and
+    // box-zoom never compute a factor the chart will silently clamp away.
     const ZOOM_MIN = 0.4;
-    const ZOOM_MAX = 4;
+    const ZOOM_MAX = 3;
 
     // The live zoom level from the chart (kept in sync with wheel zoom), so a
     // button press adjusts from where the user actually is, not a stale ref.
@@ -579,19 +610,21 @@ export default defineComponent({
     const zoomIn = () => zoomBy(1.25);
     const zoomOut = () => zoomBy(1 / 1.25);
 
+
     // Fit-to-screen: recreate the chart (keyed on chartKey) so ECharts re-fits
     // the full graph bounding box into the panel at zoom 1, re-centered — the
     // reliable reset for both tree (layout:none) and graph series (also clears
     // any wheel pan/zoom the user applied).
     const fitToScreen = () => {
-      lastChartOptions.value = null;
+      lastChartOptions = null;
       chartKey.value++;
     };
+
     const toggleKindVisibility = (kind: string) => {
       const s = new Set(hiddenKinds.value);
       s.has(kind) ? s.delete(kind) : s.add(kind);
       hiddenKinds.value = s;
-      lastChartOptions.value = null;
+      lastChartOptions = null;
       applyFilters();
     };
 
@@ -665,16 +698,44 @@ export default defineComponent({
     // Key to control chart recreation - only change when layout/visualization type changes
     const chartKey = ref(0);
 
-    // Track last chart options to prevent unnecessary recreation for graph view
-    const lastChartOptions = ref<any>(null);
+    // Restore drag-to-pan (map-style). The shared ChartRenderer arms the
+    // `dataZoomSelect` global cursor on every render, which turns a drag into a
+    // rectangle-select and HIJACKS it away from the graph's `roam` pan — the
+    // reason you couldn't move the graph left/right/up/down. This graph has no
+    // dataZoom, so we turn that cursor mode OFF: once the chart exists, and again
+    // after each `finished` render (ChartRenderer re-arms it on every setOption).
+    const disablePanBlockingCursor = (chart: any) => {
+      chart?.dispatchAction?.({
+        type: "takeGlobalCursor",
+        key: "dataZoomSelect",
+        dataZoomSelectActive: false,
+      });
+    };
+    const boundCursorClear = () =>
+      disablePanBlockingCursor(chartRendererRef.value?.chart);
+    watch(
+      [chartKey, () => chartRendererRef.value?.chart],
+      () => {
+        const chart = chartRendererRef.value?.chart;
+        if (!chart) return;
+        disablePanBlockingCursor(chart);
+        chart.off?.("finished", boundCursorClear);
+        chart.on?.("finished", boundCursorClear);
+      },
+      { immediate: true, flush: "post" },
+    );
+
+    // Non-reactive memo to prevent unnecessary recreation for graph view.
+    // Kept as a plain variable so writes are not reactive side effects.
+    let lastChartOptions: { key: number; data: any } | null = null;
 
     const chartData = computed(() => {
       if (!filteredGraphData.value.nodes.length) {
         return { options: {}, notMerge: true };
       }
 
-      const vizType = searchObj.meta.serviceGraphVisualizationType;
-      const layoutType = searchObj.meta.serviceGraphLayoutType;
+      const vizType = resolvedVizType.value;
+      const layoutType = resolvedLayoutType.value;
 
       // Don't use cache if filters are active (search filter)
       const hasActiveFilters = searchFilter.value?.trim();
@@ -683,12 +744,12 @@ export default defineComponent({
       // BUT only if no filters are active and no new baselines have arrived
       if (
         vizType === "graph" &&
-        lastChartOptions.value &&
-        chartKey.value === lastChartOptions.value.key &&
+        lastChartOptions &&
+        chartKey.value === lastChartOptions.key &&
         !hasActiveFilters
       ) {
         return {
-          options: lastChartOptions.value.data.options,
+          options: lastChartOptions.data.options,
           // Full-replace even on a cache hit: graph uses fixed node positions,
           // so replacing re-renders at the same coordinates (no jump) while
           // never leaving a stale wrong-type series behind. Consistent with the
@@ -729,13 +790,13 @@ export default defineComponent({
       // Cache the options for graph view
       // BUT only if no filters are active (to avoid caching filtered states)
       if (vizType === "graph" && !hasActiveFilters) {
-        lastChartOptions.value = {
+        lastChartOptions = {
           key: chartKey.value,
           data: newOptions,
         };
       } else if (hasActiveFilters) {
         // Clear cache when filtering to ensure fresh render on filter removal
-        lastChartOptions.value = null;
+        lastChartOptions = null;
       }
 
       return {
@@ -849,7 +910,7 @@ export default defineComponent({
 
       // Tree view: emphasis.focus:'relative' in the series config handles dimming natively.
       // No manual dispatch needed — ECharts triggers it on mouseover automatically.
-      if (searchObj.meta.serviceGraphVisualizationType !== "graph") return;
+      if (resolvedVizType.value !== "graph") return;
 
       const rawEdges: any[] = filteredGraphData.value.edges || [];
 
@@ -945,6 +1006,7 @@ export default defineComponent({
         x: number;
         y: number;
         name: string;
+        value: number;
       }> = [];
 
       // Robust child access — handles children(), _children, or childAt/childCount
@@ -1417,7 +1479,7 @@ export default defineComponent({
     // but the series type swaps via setOption. Re-register tooltip handlers so both
     // ZRender (tree) and ECharts edge events (graph) work correctly after the swap.
     watch(
-      () => searchObj.meta.serviceGraphVisualizationType,
+      () => resolvedVizType.value,
       async () => {
         if (edgeTooltipCleanup) {
           edgeTooltipCleanup();
@@ -1459,7 +1521,7 @@ export default defineComponent({
       error.value = null;
 
       // Clear cache to force chart regeneration with fresh data
-      lastChartOptions.value = null;
+      lastChartOptions = null;
       chartKey.value++;
       try {
         const orgId = store.state.selectedOrganization.identifier;
@@ -1576,95 +1638,11 @@ export default defineComponent({
         }
       } finally {
         loading.value = false;
+        lastRunAt.value = Date.now();
       }
     };
 
-    const parsePrometheusMetrics = (metricsText: string) => {
-      const nodes = new Map<string, any>();
-      const edges: any[] = [];
-
-      const lines = metricsText.split("\n");
-
-      for (const line of lines) {
-        if (line.startsWith("#") || !line.trim()) continue;
-
-        // Parse metric line: metric_name{labels} value
-        const match = line.match(/^(\w+)\{([^}]+)\}\s+([\d.eE+-]+)/);
-        if (!match) continue;
-
-        const [, metricName, labelsStr, value] = match;
-        const labels: any = {};
-
-        // Parse labels
-        const labelMatches = Array.from(labelsStr.matchAll(/(\w+)="([^"]+)"/g));
-        for (const [, key, val] of labelMatches) {
-          labels[key] = val;
-        }
-
-        if (!labels.client || !labels.server) continue;
-
-        // Add nodes
-        if (!nodes.has(labels.client)) {
-          nodes.set(labels.client, {
-            id: labels.client,
-            label: labels.client,
-            is_virtual: labels.client === "unknown",
-          });
-        }
-        if (!nodes.has(labels.server)) {
-          nodes.set(labels.server, {
-            id: labels.server,
-            label: labels.server,
-            is_virtual: labels.server.includes("unknown"),
-          });
-        }
-
-        // Add edge data
-        if (metricName === "traces_service_graph_request_total") {
-          const edgeId = `${labels.client}->${labels.server}`;
-          let edge = edges.find((e) => e.id === edgeId);
-
-          if (!edge) {
-            edge = {
-              id: edgeId,
-              from: labels.client,
-              to: labels.server,
-              total_requests: 0,
-              failed_requests: 0,
-            };
-            edges.push(edge);
-          }
-
-          edge.total_requests = parseFloat(value);
-        }
-
-        if (metricName === "traces_service_graph_request_failed_total") {
-          const edgeId = `${labels.client}->${labels.server}`;
-          let edge = edges.find((e) => e.id === edgeId);
-
-          // Create edge if it doesn't exist yet (failed_total may come before request_total)
-          if (!edge) {
-            edge = {
-              id: edgeId,
-              from: labels.client,
-              to: labels.server,
-              total_requests: 0,
-              failed_requests: 0,
-            };
-            edges.push(edge);
-          }
-
-          edge.failed_requests = parseFloat(value);
-        }
-      }
-
-      return {
-        nodes: Array.from(nodes.values()),
-        edges,
-      };
-    };
-
-    const onStreamFilterChange = (stream: string) => {
+    const onStreamFilterChange = (stream: SelectModelValue) => {
       emit("request:stream-change", stream);
     };
 
@@ -1707,21 +1685,22 @@ export default defineComponent({
       );
     };
 
-    // Watch composable viz/layout state changes from SearchBar toolbar
+    // Watch resolved viz/layout state changes (SearchBar toolbar for the Traces
+    // Service Graph tab, or the Agent Graph page's own selector via props).
     watch(
-      () => searchObj.meta.serviceGraphVisualizationType,
+      () => resolvedVizType.value,
       () => {
         // Only clear the cache — do NOT bump chartKey (that would recreate the
         // ChartRenderer and replay the tree expand animation). The clean series
         // swap comes from chartData rendering with notMerge:true (full replace),
         // which lets a `type:"tree"` series be replaced by a `type:"graph"` one
         // (and vice-versa) — a merge cannot swap series types.
-        lastChartOptions.value = null;
+        lastChartOptions = null;
       },
     );
 
     watch(
-      () => searchObj.meta.serviceGraphLayoutType,
+      () => resolvedLayoutType.value,
       () => {
         chartKey.value++;
       },
@@ -1757,9 +1736,11 @@ export default defineComponent({
     // Load trace streams using the same method as the Traces search page
     const loadTraceStreams = async () => {
       try {
-        const res = await getStreams("traces", false, false);
-        if (res?.list?.length > 0) {
-          availableStreams.value = res.list.map((stream: any) => stream.name);
+        const res = (await getStreams("traces", false, false)) as {
+          list?: { name: string }[];
+        };
+        if (res?.list && res.list.length > 0) {
+          availableStreams.value = res.list.map((stream) => stream.name);
         }
       } catch (e) {
         console.error("Error loading trace streams:", e);
@@ -1838,6 +1819,9 @@ export default defineComponent({
       loadServiceGraph();
     });
 
+    // Public API for parent pages (e.g. Agent Graph page's header refresh).
+    expose({ refresh: loadServiceGraph, loading, lastRunAt });
+
     return {
       t,
       loading,
@@ -1860,6 +1844,7 @@ export default defineComponent({
       chartRendererRef,
       graphContainerRef,
       searchObj,
+      resolvedVizType,
       loadServiceGraph,
       formatNumber,
       applyFilters,

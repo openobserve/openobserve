@@ -1034,12 +1034,13 @@ class APICleanup {
     }
 
     /**
-     * Fetch all log streams
+     * Fetch all streams of the given type
+     * @param {string} [streamType='logs'] - Stream type to list (e.g. 'logs', 'traces', 'metrics')
      * @returns {Promise<Array>} Array of stream objects
      */
-    async fetchStreams() {
+    async fetchStreams(streamType = 'logs') {
         try {
-            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/streams?type=logs`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/streams?type=${streamType}`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -1063,11 +1064,12 @@ class APICleanup {
     /**
      * Delete a single stream
      * @param {string} streamName - The stream name
+     * @param {string} [streamType='logs'] - Stream type to delete (e.g. 'logs', 'traces', 'metrics')
      * @returns {Promise<Object>} Deletion result
      */
-    async deleteStream(streamName) {
+    async deleteStream(streamName, streamType = 'logs') {
         try {
-            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/streams/${streamName}?type=logs&delete_all=true`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/streams/${streamName}?type=${streamType}&delete_all=true`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -1094,13 +1096,14 @@ class APICleanup {
      * 1. GET stream settings - checks if schema exists
      * 2. If schema gone, PUT settings to check if deletion marker is still active
      * @param {string} streamName - The stream name to check
+     * @param {string} [streamType='logs'] - Stream type to check (e.g. 'logs', 'traces', 'metrics')
      * @returns {Promise<boolean>} True if stream still exists or is being deleted
      */
-    async isStreamStillDeleting(streamName) {
+    async isStreamStillDeleting(streamName, streamType = 'logs') {
         try {
             // Phase 1: Check if stream schema exists via GET
             const getResponse = await this._fetch(
-                `${this.baseUrl}/api/${this.org}/streams/${streamName}/settings?type=logs`,
+                `${this.baseUrl}/api/${this.org}/streams/${streamName}/settings?type=${streamType}`,
                 {
                     method: 'GET',
                     headers: {
@@ -1126,7 +1129,7 @@ class APICleanup {
             // Phase 2: Schema is gone (404), but deletion marker might still be active
             // Try PUT settings - this triggers is_deleting_stream check without creating data
             const putResponse = await this._fetch(
-                `${this.baseUrl}/api/${this.org}/streams/${streamName}/settings?type=logs`,
+                `${this.baseUrl}/api/${this.org}/streams/${streamName}/settings?type=${streamType}`,
                 {
                     method: 'PUT',
                     headers: {
@@ -1160,15 +1163,16 @@ class APICleanup {
      * @param {string} streamName - The stream name to wait for
      * @param {number} maxWaitMs - Maximum time to wait in milliseconds (default: 120000 = 2 minutes)
      * @param {number} pollIntervalMs - Polling interval in milliseconds (default: 3000 = 3 seconds)
+     * @param {string} [streamType='logs'] - Stream type to poll (e.g. 'logs', 'traces', 'metrics')
      * @returns {Promise<boolean>} True if deletion completed, false if timed out
      */
-    async waitForStreamDeletion(streamName, maxWaitMs = 120000, pollIntervalMs = 3000) {
+    async waitForStreamDeletion(streamName, maxWaitMs = 120000, pollIntervalMs = 3000, streamType = 'logs') {
         const startTime = Date.now();
         let attempts = 0;
 
         while (Date.now() - startTime < maxWaitMs) {
             attempts++;
-            const stillDeleting = await this.isStreamStillDeleting(streamName);
+            const stillDeleting = await this.isStreamStillDeleting(streamName, streamType);
 
             if (!stillDeleting) {
                 testLogger.debug('Stream deletion confirmed complete', {
@@ -1371,19 +1375,21 @@ class APICleanup {
      * @param {Object} options - Optional configuration
      * @param {boolean} options.waitForDeletion - Whether to wait for deletions to complete (default: true)
      * @param {number} options.maxWaitPerStreamMs - Max wait time per stream in ms (default: 120000)
+     * @param {string} [options.streamType='logs'] - Stream type to sweep (e.g. 'logs', 'traces', 'metrics')
      */
     async cleanupStreams(patterns = [], protectedStreams = [], options = {}) {
-        const { waitForDeletion = true, maxWaitPerStreamMs = 120000 } = options;
+        const { waitForDeletion = true, maxWaitPerStreamMs = 120000, streamType = 'logs' } = options;
 
         testLogger.info('Starting streams cleanup', {
             patterns: patterns.map(p => p.source),
             protectedStreams,
-            waitForDeletion
+            waitForDeletion,
+            streamType
         });
 
         try {
-            // Fetch all log streams
-            const streams = await this.fetchStreams();
+            // Fetch all streams of the requested type (logs by default; e.g. traces for SDR trace streams)
+            const streams = await this.fetchStreams(streamType);
             testLogger.info('Fetched streams', { total: streams.length });
 
             // Filter streams matching patterns but excluding protected streams
@@ -1404,7 +1410,7 @@ class APICleanup {
             const streamsToWaitFor = [];
 
             for (const stream of matchingStreams) {
-                const result = await this.deleteStream(stream.name);
+                const result = await this.deleteStream(stream.name, streamType);
 
                 if (result.code === 200) {
                     deletedCount++;
@@ -1437,7 +1443,7 @@ class APICleanup {
                 for (let i = 0; i < streamsToWaitFor.length; i += batchSize) {
                     const batch = streamsToWaitFor.slice(i, i + batchSize);
                     const results = await Promise.all(
-                        batch.map(streamName => this.waitForStreamDeletion(streamName, maxWaitPerStreamMs))
+                        batch.map(streamName => this.waitForStreamDeletion(streamName, maxWaitPerStreamMs, 3000, streamType))
                     );
 
                     results.forEach((completed, index) => {
@@ -1855,7 +1861,8 @@ class APICleanup {
                 'email_format_',        // SDR tests
                 'us_phone_',            // SDR tests
                 'credit_card_',         // SDR tests
-                'ssn_'                  // SDR tests
+                'ssn_',                 // SDR tests
+                'traces_'               // Traces SDR tests (traces_<field>_<action>_<runId> patterns)
             ];
 
             // Filter patterns that match test data names (using prefix matching to catch patterns with unique suffixes)
@@ -2158,14 +2165,89 @@ class APICleanup {
         }
     }
 
+    // ============================================================
+    // WORKFLOWS (v1) cleanup — Enterprise "Workflows" feature.
+    // A workflow linked to an alert is delete-protected, so callers must delete
+    // the linked test alerts FIRST (completeCascadeCleanup does this in STEP 1),
+    // then call cleanupWorkflows() to remove the now-unlinked workflows.
+    // ============================================================
+
+    /** Fetch all workflows in the current org. Returns an array (list endpoint returns a bare array). */
+    async fetchWorkflows() {
+        try {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/workflows`, {
+                method: 'GET',
+                headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' }
+            });
+            if (!response.ok) {
+                testLogger.error('Failed to fetch workflows', { status: response.status });
+                return [];
+            }
+            const data = await response.json();
+            return Array.isArray(data) ? data : (data.list || data.data || []);
+        } catch (error) {
+            testLogger.error('Failed to fetch workflows', { error: error.message });
+            return [];
+        }
+    }
+
+    /** Delete a single workflow by id. */
+    async deleteWorkflow(workflowId) {
+        try {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/workflows/${workflowId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' }
+            });
+            const result = await response.json().catch(() => ({}));
+            return { code: response.status, ...result };
+        } catch (error) {
+            testLogger.error('Failed to delete workflow', { workflowId, error: error.message });
+            return { code: 500, error: error.message };
+        }
+    }
+
+    /**
+     * Delete all workflows whose name matches any of the given prefixes/regexes.
+     * Safe to call as a standalone sweep; linked workflows will report an error
+     * (delete the referencing alerts first — see completeCascadeCleanup STEP 1).
+     * @param {Array<string|RegExp>} patterns
+     */
+    async cleanupWorkflows(patterns = []) {
+        if (!patterns.length) return;
+        testLogger.info('Starting workflows cleanup', { patterns: patterns.map(p => p.source || p) });
+        try {
+            const workflows = await this.fetchWorkflows();
+            const matching = workflows.filter(w =>
+                patterns.some(p => (p instanceof RegExp) ? p.test(w.name) : String(w.name).startsWith(p))
+            );
+            testLogger.info('Workflows matching cleanup patterns', { total: workflows.length, matching: matching.length });
+
+            let deleted = 0, failed = 0;
+            for (const w of matching) {
+                const res = await this.deleteWorkflow(w.id);
+                if (res.code === 200) {
+                    deleted++;
+                    testLogger.debug('Deleted workflow', { id: w.id, name: w.name });
+                } else {
+                    failed++;
+                    testLogger.warn('Failed to delete workflow (still linked to an alert?)', { id: w.id, name: w.name, res });
+                }
+            }
+            testLogger.info('Workflows cleanup completed', { deleted, failed });
+        } catch (error) {
+            testLogger.error('Failed to cleanup workflows', { error: error.message });
+        }
+    }
+
     /**
      * Complete cascade cleanup: Alerts -> Folders -> Destinations -> Templates
      * Deletes resources in correct dependency order to avoid conflicts
      * @param {Array<string|RegExp>} destinationPrefixes - Array of destination name prefixes or regex patterns to match (e.g., ['auto_', /^destination\d{1,3}$/])
      * @param {Array<string>} templatePrefixes - Array of template name prefixes to match (e.g., ['auto_email_template_', 'auto_webhook_template_'])
      * @param {Array<string>} folderPrefixes - Array of folder name prefixes to match (e.g., ['auto_'])
+     * @param {Array<string|RegExp>} workflowPrefixes - Array of workflow name prefixes/regexes to match (deleted AFTER alerts are unlinked)
      */
-    async completeCascadeCleanup(destinationPrefixes = [], templatePrefixes = [], folderPrefixes = []) {
+    async completeCascadeCleanup(destinationPrefixes = [], templatePrefixes = [], folderPrefixes = [], workflowPrefixes = ['wf_auto_']) {
         testLogger.info('Starting complete cascade cleanup (Alerts -> Folders -> Destinations -> Templates)', {
             destinationPrefixes,
             templatePrefixes,
@@ -2179,6 +2261,7 @@ class APICleanup {
             'Automation_',
             'sanity',
             'rbac_',
+            'wf_auto_',                // Workflows v1 test alerts (unlink workflows before deleting them)
             'user_delete_test_',      // RBAC user delete test alerts (orphaned)
             'user_update_test_',      // RBAC user update test alerts (orphaned)
             'viewer_delete_test_',    // RBAC viewer delete test alerts (orphaned)
@@ -2382,6 +2465,14 @@ class APICleanup {
             }
 
             testLogger.info('Step 4 complete: Templates deleted', { deletedTemplates });
+
+            // STEP 5: Delete WORKFLOWS (alerts were unlinked in STEP 1, so these are now deletable)
+            if (workflowPrefixes && workflowPrefixes.length) {
+                testLogger.info('Step 5: Deleting workflows matching prefixes', {
+                    workflowPrefixes: workflowPrefixes.map(p => p.source || p)
+                });
+                await this.cleanupWorkflows(workflowPrefixes);
+            }
 
             testLogger.info('Complete cascade cleanup finished', {
                 deletedAlerts,

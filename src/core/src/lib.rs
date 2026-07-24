@@ -17,9 +17,6 @@
 
 #![recursion_limit = "256"]
 
-#[cfg(feature = "enterprise")]
-pub use ::search::cipher;
-
 pub mod alerts;
 #[cfg(feature = "enterprise")]
 pub mod anomaly_detection;
@@ -28,16 +25,13 @@ pub mod authz;
 pub mod bootstrap;
 pub mod cache;
 pub mod cluster_info;
-pub mod compact;
 pub mod dashboards;
-pub mod db;
-pub mod enrichment;
-pub mod enrichment_table;
-pub mod file_downloader;
-pub mod file_list;
-pub mod file_list_dump;
-pub mod folders;
+use ::common;
+use ::db;
+pub mod error_suggest;
+use ::db::folders;
 pub mod functions;
+pub mod functions_cache;
 pub mod github;
 pub mod grpc;
 pub mod http;
@@ -45,13 +39,13 @@ pub mod http;
 pub mod incidents;
 pub mod ingestion;
 pub mod ingestion_tokens;
-pub mod ingestion_types;
 pub mod kv;
 #[cfg(feature = "enterprise")]
 pub mod llm_evaluations;
 pub mod logs;
 pub mod metadata;
 pub mod metrics;
+pub mod model_pricing;
 pub mod node;
 #[cfg(feature = "enterprise")]
 pub mod ofga;
@@ -62,16 +56,13 @@ pub mod org_storage_providers;
 pub mod org_usage;
 pub mod organization;
 pub mod pipeline;
-pub mod promql;
 #[cfg(feature = "enterprise")]
 pub mod providers;
 #[cfg(feature = "enterprise")]
 pub mod ratelimit;
 pub mod runtime_metrics;
-pub mod schema;
-pub mod search;
-#[cfg(feature = "enterprise")]
-pub mod search_jobs;
+pub mod schema_watcher;
+use search_service as search;
 pub mod self_reporting;
 pub mod service;
 pub mod session;
@@ -80,7 +71,8 @@ pub mod sourcemaps;
 pub mod stream;
 pub mod stream_utils;
 pub mod synthetics;
-pub mod tantivy;
+pub mod system_settings;
+pub use tantivy_utils::index_builder as tantivy;
 pub mod tls;
 pub mod traces;
 #[cfg(feature = "cloud")]
@@ -88,43 +80,3 @@ pub mod trial_quota;
 pub mod users;
 #[cfg(feature = "enterprise")]
 pub mod workflows;
-
-/// Compatibility namespace for the common crate. Authentication and stream-query helpers remain
-/// available at their historical paths while their service-backed implementations live in the
-/// service layer.
-pub mod common {
-    pub mod meta {
-        pub use ::common::meta::*;
-
-        pub use crate::service::ingestion_types as ingestion;
-
-        /// Lives here rather than in the `common` crate so that `common` does not
-        /// depend on the `search` crate.
-        pub mod search {
-            pub use ::search::{
-                AuditContext, CAPPED_RESULTS_MSG, CacheQueryRequest, CachedQueryResponse,
-                MultiCachedQueryResponse, QueryDelta, ResultCacheSelectionStrategy,
-                SearchResultType, SortStrategy,
-            };
-        }
-    }
-
-    pub mod infra {
-        pub use ::common::infra::{cluster, wal};
-
-        pub mod config {
-            pub use ::common::infra::config::*;
-
-            pub use crate::service::cache::{REALTIME_ALERT_TRIGGERS, STREAM_EXECUTABLE_PIPELINES};
-        }
-
-        #[cfg(feature = "enterprise")]
-        pub use crate::service::ofga;
-    }
-
-    pub mod utils {
-        pub use ::common::utils::*;
-
-        pub use crate::service::{auth, stream_utils as stream};
-    }
-}

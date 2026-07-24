@@ -227,14 +227,14 @@ function toggleExpanded() {
           :data-test="replayDotState ? `synthetics-journey-step-dot-${index}` : undefined"
           :aria-label="replayDotState ? t('synthetics.journey.stepNumberAria', { number: index + 1, state: replayDotState }) : undefined"
         >
-          <OSpinner v-if="stepNumberSpinning" variant="ring" size="xs" class="text-primary-500" />
+          <OSpinner v-if="stepNumberSpinning" variant="ring" size="xs" class="text-accent" />
           <template v-else>{{ index + 1 }}</template>
         </span>
       </span>
 
       <!-- Action icon chip -->
-      <span class="bg-primary-50 rounded-default p-1 shrink-0 flex items-center">
-        <OIcon :name="actionIcon" size="sm" class="text-primary-500" aria-hidden="true" />
+      <span class="bg-tabs-active-bg rounded-default p-1 shrink-0 flex items-center">
+        <OIcon :name="actionIcon" size="sm" class="text-tabs-active-text" aria-hidden="true" />
       </span>
 
       <!-- Action label badge -->
@@ -351,7 +351,7 @@ function toggleExpanded() {
           v-if="showStackTrace"
           class="mt-2 bg-code-bg rounded-default p-3 overflow-x-auto max-h-75 overflow-y-auto text-xs font-mono leading-relaxed m-0"
           data-test="synthetics-journey-step-stack-content"
-        >{{ se.stack }}</pre>
+        >{{ se?.stack }}</pre>
       </div>
 
       <!-- Info boxes -->

@@ -28,21 +28,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          instead of floating inside a padded box. -->
     <div
       v-if="availableStreams.length > 0"
-      class="flex items-center justify-end gap-2 px-page-edge py-2"
+      class="flex items-center gap-3 px-page-edge py-2 border-b border-border-default"
     >
-      <!-- Filter mode: view a whole Stream, or a single Agent. Sits directly
-           beside the picker so switching mode and choosing the value are one
-           motion. On the Agent tab the stream + trace filter are derived from
-           the agents API (agent.source_stream), so there's no separate agent
-           filter. -->
+      <!-- Scope control — left-aligned Stream/Agent bar directly under the
+           header, matching Agent Graph / Agent Behavior / Sessions so every AI
+           page places its scope selector the same way. Switching mode and
+           choosing the value are one motion. On the Agent tab the stream +
+           trace filter are derived from the agents API (agent.source_stream). -->
       <OToggleGroup
         :model-value="filterMode"
         type="single"
         data-test="llm-insights-filter-mode"
         @update:model-value="onFilterModeChange"
       >
-        <OToggleGroupItem value="stream" size="sm">{{ t('traces.lLMInsightsDashboard.stream') }}</OToggleGroupItem>
         <OToggleGroupItem value="agent" size="sm">{{ t('traces.lLMInsightsDashboard.agent') }}</OToggleGroupItem>
+        <OToggleGroupItem value="stream" size="sm">{{ t('traces.lLMInsightsDashboard.stream') }}</OToggleGroupItem>
       </OToggleGroup>
 
       <!-- Picker: Stream tab → stream picker; Agent tab → agent picker. -->
@@ -168,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="card in kpiCards"
           :key="card.label"
-          class="bg-card-glass-bg rounded-default flex flex-col px-3.5 py-2.5 gap-1 min-h-32.5 border border-border-default transition-colors duration-200 hover:border-border-strong"
+          class="bg-card-glass-bg rounded-default flex flex-col px-3.5 py-2.5 gap-1 min-h-32.5 border border-border-default"
         >
           <!-- P95 rides its own (slower) query — skeleton the WHOLE card while
                it loads, matching the initial strip skeleton tile (see
@@ -256,12 +256,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
+
+      <!-- Agent behavior signals (loops / failure taxonomy) moved to their own
+           dedicated "Agent Behavior" page under Monitor. LLM Insights keeps the
+           cost/latency/error story; behavior lives beside Agent Graph. -->
     </div>
   </div>
 </template>
 
 <script lang="ts" setup>
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import type { AcceptableValue } from "reka-ui";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -283,7 +288,6 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { LLM_INSIGHTS_PANELS } from "./config/llmInsightsPanels";
 import { kpiCache, selectionKey } from "./llmInsightsCache";
 import useStreams from "@/composables/useStreams";
@@ -355,14 +359,17 @@ const switching = ref(false);
 // Filter mode: "stream" = view a whole stream; "agent" = view a single agent,
 // whose source stream + trace filter both come from the agents API.
 const MODE_LS_KEY = "llmInsights_filterMode";
+// Default scope is "agent" — the AI module is agent-centric. Explicit choices
+// still win: a `?type=` URL param, then a saved localStorage preference; only
+// when neither is present do we fall back to the agent default.
 const filterMode = ref<"stream" | "agent">(
   urlType === "agent"
     ? "agent"
     : urlType === "stream"
       ? "stream"
-      : localStorage.getItem(MODE_LS_KEY) === "agent"
-        ? "agent"
-        : "stream",
+      : localStorage.getItem(MODE_LS_KEY) === "stream"
+        ? "stream"
+        : "agent",
 );
 // An agent name from the URL we still need to resolve to a concrete agent once
 // the agents list loads (the URL carries the readable name, not the internal
@@ -523,7 +530,7 @@ function ensureStreamsLoaded(): Promise<void> {
 async function loadTraceStreams() {
   streamsLoaded.value = false;
   try {
-    const res = await getStreams("traces", false, false);
+    const res: any = await getStreams("traces", false, false);
     const list = res?.list || [];
     const llmStreams = list.filter(
       (stream: any) => stream?.settings?.is_llm_stream !== false,
@@ -794,7 +801,9 @@ async function loadInsights(
   }
 }
 
-function onFilterModeChange(mode?: string | number | null) {
+function onFilterModeChange(
+  mode: boolean | AcceptableValue | AcceptableValue[],
+) {
   const next = mode === "agent" ? "agent" : "stream";
   if (next === filterMode.value) return;
   filterMode.value = next;

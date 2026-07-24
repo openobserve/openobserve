@@ -15,7 +15,7 @@ export const convertLogData = (
     title: any;
     unparsed_x_data: any;
     timezone: string;
-    itemStyle: any;
+    itemStyle?: any;
   },
 ) => {
   const options: any = {
@@ -31,7 +31,10 @@ export const convertLogData = (
       containLabel: true,
       left: "20",
       right: "20",
-      top: "5",
+      // 8 rather than 5: `containLabel` reserves room for the axis labels but
+      // not for the half of the topmost y-axis label that sits above its tick,
+      // which clipped that number against the top of the histogram strip.
+      top: "8",
       bottom: "5",
     },
     tooltip: {
@@ -273,7 +276,9 @@ export const convertStackedLogData = (
         containLabel: true,
         left: "20",
         right: "20",
-        top: "5",
+        // Matches convertLogData: 3 extra pixels so the topmost y-axis number
+        // is not clipped by the top of the histogram strip.
+        top: "8",
         bottom: series.length > 1 ? "20" : "5",
       },
       tooltip: {

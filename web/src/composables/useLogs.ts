@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { useI18n } from "vue-i18n";
 import { reactive, onBeforeMount, nextTick } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -30,6 +29,7 @@ import { searchState } from "@/composables/useLogs/searchState";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import { DEFAULT_LOGS_CONFIG } from "@/utils/logs/constants";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
+import type { ExtendedParsedSQLResult } from "@/composables/useLogs/logsUtils";
 import { usePagination } from "@/composables/useLogs/usePagination";
 
 import useStreamFields from "@/composables/useLogs/useStreamFields";
@@ -41,20 +41,17 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 
 const useLogs = () => {
   const store = useStore();
-  const { t } = useI18n();
 
   let {
     searchObj,
-    searchObjDebug,
     initialQueryPayload,
     resetFunctions,
     notificationMsg,
-    fieldValues,
   } = searchState();
 
   const { getHistogramTitle } = useHistogram();
 
-  const { refreshPartitionPagination, getPaginatedData } = usePagination();
+  const { getPaginatedData } = usePagination();
 
   const { buildSearch } = useSearchStream();
 
@@ -63,11 +60,8 @@ const useLogs = () => {
   const {
     fnParsedSQL,
     fnUnparsedSQL,
-    extractTimestamps,
     addTransformToQuery,
     isActionsEnabled,
-    showCancelSearchNotification,
-    isTimestampASC,
   } = logsUtils();
 
   const {
@@ -132,7 +126,10 @@ const useLogs = () => {
             if (
               searchObj.meta.refreshInterval == 0 &&
               router.currentRoute.value.name == "logs" &&
-              searchObj.data.queryResults.hasOwnProperty("hits")
+              Object.prototype.hasOwnProperty.call(
+                searchObj.data.queryResults,
+                "hits",
+              )
             ) {
               const start_time: number =
                 initialQueryPayload.value?.query?.start_time || 0;
@@ -156,7 +153,7 @@ const useLogs = () => {
             },
             "ui",
           )
-          .then((res: any) => {
+          .then(() => {
             toast({
               variant: "success",
               message: "Job added successfully",
@@ -359,7 +356,7 @@ const useLogs = () => {
     }
   };
 
-  const restoreUrlQueryParams = async (dashboardPanelData: any = null) => {
+  const restoreUrlQueryParams = async (_dashboardPanelData: any = null) => {
     searchObj.shouldIgnoreWatcher = true;
     const queryParams: any = router.currentRoute.value.query;
     // Allow SQL mode queries without stream param (will be auto-detected from SQL)
@@ -392,12 +389,24 @@ const useLogs = () => {
       // If value of sqlMode is changed, watcher gets called which resets the editor and query value
       // The editor value and query value assigned below, is overrided by the watcher
       await nextTick();
-      searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
-      searchObj.data.query = b64DecodeUnicode(queryParams.query);
+      // b64DecodeUnicode is string|undefined only on its decode-error path; the
+      // guard above ensures a valid encoded query, so decode yields a string.
+      const decodedQuery = b64DecodeUnicode(queryParams.query)!;
+      searchObj.data.editorValue = decodedQuery;
+      searchObj.data.query = decodedQuery;
+      // The Monaco query editor is lazy-loaded and, while it mounts, fires its
+      // change callback with an empty "" BEFORE this restored value is applied.
+      // Flag the restore as pending so updateQueryValue() ignores that transient
+      // empty emission instead of wiping the query (and flipping SQL mode off) —
+      // the intermittent "shared SQL link opens an empty editor" bug. The flag is
+      // cleared the moment the real (non-empty) value lands in the editor.
+      if (decodedQuery.trim() !== "") {
+        searchObj.meta.pendingUrlQueryRestore = true;
+      }
     }
 
     if (
-      queryParams.hasOwnProperty("defined_schemas") &&
+      Object.prototype.hasOwnProperty.call(queryParams, "defined_schemas") &&
       queryParams.defined_schemas != ""
     ) {
       searchObj.meta.useUserDefinedSchemas = queryParams.defined_schemas;
@@ -463,7 +472,10 @@ const useLogs = () => {
     }
 
     if (
-      queryParams.hasOwnProperty("logs_visualize_toggle") &&
+      Object.prototype.hasOwnProperty.call(
+        queryParams,
+        "logs_visualize_toggle",
+      ) &&
       queryParams.logs_visualize_toggle != ""
     ) {
       searchObj.meta.logsVisualizeToggle = queryParams.logs_visualize_toggle;
@@ -532,8 +544,9 @@ const useLogs = () => {
         _field !== (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
     );
 
+    // selectedStream array is coerced to its comma-joined string form as key
     let colOrder = searchObj.data.resultGrid.colOrder[
-      searchObj.data.stream.selectedStream
+      searchObj.data.stream.selectedStream.join(",")
     ].filter(
       (_field) =>
         _field !== (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
@@ -665,10 +678,12 @@ const useLogs = () => {
         newParsedSQL.where = parsedSQL.where;
 
         query = fnUnparsedSQL(newParsedSQL).replace(/`/g, '"');
-        outputQueries[parsedSQL.from[0].table] = query.replace(
-          "INDEX_NAME",
-          "[INDEX_NAME]",
-        );
+        const tableName = parsedSQL.from[0]?.table;
+        if (tableName)
+          outputQueries[tableName] = query.replace(
+            "INDEX_NAME",
+            "[INDEX_NAME]",
+          );
       } else {
         // parse join queries & union queries
         if (Object.hasOwn(parsedSQL, "from") && parsedSQL.from.length > 1) {
@@ -689,13 +704,16 @@ const useLogs = () => {
             newParsedSQL.where = parsedSQL.where;
 
             query = fnUnparsedSQL(newParsedSQL).replace(/`/g, '"');
-            outputQueries[parsedSQL.from[0].table] = query.replace(
-              "INDEX_NAME",
-              "[INDEX_NAME]",
-            );
+            const tableName = parsedSQL.from[0]?.table;
+            if (tableName)
+              outputQueries[tableName] = query.replace(
+                "INDEX_NAME",
+                "[INDEX_NAME]",
+              );
           }
 
-          let nextTable = parsedSQL._next;
+          let nextTable: ExtendedParsedSQLResult | null | undefined =
+            parsedSQL._next;
           let depth = 0;
           const MAX_DEPTH = 100;
           while (nextTable && depth++ < MAX_DEPTH) {
@@ -707,10 +725,12 @@ const useLogs = () => {
               newParsedSQL.where = nextTable.where;
 
               query = fnUnparsedSQL(newParsedSQL).replace(/`/g, '"');
-              outputQueries[nextTable.from[0].table] = query.replace(
-                "INDEX_NAME",
-                "[INDEX_NAME]",
-              );
+              const tableName = nextTable.from[0]?.table;
+              if (tableName)
+                outputQueries[tableName] = query.replace(
+                  "INDEX_NAME",
+                  "[INDEX_NAME]",
+                );
             }
             nextTable = nextTable._next;
           }

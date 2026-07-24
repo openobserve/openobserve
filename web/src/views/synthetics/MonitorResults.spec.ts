@@ -41,6 +41,7 @@ vi.mock("vue-router", () => ({
     replace: mockRouterReplace,
   }),
   RouterLink: { name: "RouterLinkStub", template: "<a><slot /></a>" },
+  onBeforeRouteUpdate: vi.fn(),
 }));
 
 vi.mock("vuex", async (importOriginal) => {
@@ -63,6 +64,22 @@ vi.mock("@/utils/date", () => ({
     }
     return null;
   }),
+}));
+
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: vi.fn(() => vi.fn()),
+}));
+
+// Mock syntheticsService.get — called via bootstrap() when MonitorRuns emits
+// need-check-data (only when there are zero runs and no lastTriggeredAt).
+const mockSyntheticsServiceGet = vi.fn().mockResolvedValue({
+  data: { name: "Test Monitor", status: "healthy", last_triggered_at: 0 },
+});
+vi.mock("@/services/synthetics", () => ({
+  default: {
+    get: (...args: any[]) => mockSyntheticsServiceGet(...args),
+    run: vi.fn().mockResolvedValue({}),
+  },
 }));
 
 import MonitorResults from "./MonitorResults.vue";
@@ -124,7 +141,7 @@ function makeWrapper() {
               <button data-test="trigger-jump-to-window" @click="$emit('jump-to-window', 1000, 2000)" />
             </div>
           `,
-          props: ["monitorId", "monitorName", "monitorStatus"],
+          props: ["monitorId", "monitorName", "monitorStatus", "lastTriggeredAt", "checkType"],
         },
         RunDetail: {
           template: '<div data-test="run-detail" />',
@@ -203,7 +220,7 @@ describe("MonitorResults", () => {
       expect(editBtn.exists()).toBe(true);
     });
 
-    it("should navigate to synthetic-new with edit query on click", async () => {
+    it("should navigate to synthetics-edit with id param on click", async () => {
       wrapper = makeWrapper();
       await flushPromises();
 
@@ -213,8 +230,8 @@ describe("MonitorResults", () => {
       await editBtn.trigger("click");
 
       expect(mockRouterPush).toHaveBeenCalledWith({
-        name: "synthetic-new",
-        query: { edit: "mon-1" },
+        name: "synthetics-edit",
+        params: { id: "mon-1" },
       });
     });
   });
@@ -308,8 +325,8 @@ describe("MonitorResults", () => {
       await editBtn.trigger("click");
 
       expect(mockRouterPush).toHaveBeenCalledWith({
-        name: "synthetic-new",
-        query: { edit: "mon-1" },
+        name: "synthetics-edit",
+        params: { id: "mon-1" },
       });
     });
 

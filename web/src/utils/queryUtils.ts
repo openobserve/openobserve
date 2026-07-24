@@ -177,11 +177,12 @@ export const validateEmail = (email: string) => {
     }
   } catch (e) {
     console.log(`Error: Error while validatig email id ${email}`);
+    return undefined;
   }
 };
 
 export const isValidResourceName = (name: string) => {
-  const roleNameRegex = /^[^:#?&%'"\/\s]+$/;
+  const roleNameRegex = /^[^:#?&%'"/\s]+$/;
   return roleNameRegex.test(name);
 };
 
@@ -271,11 +272,11 @@ export const getWebSocketUrl = (
   return `${protocol}//${apiEndPoint.split("//")[1]}/api/${org_identifier}/ws/v2/${request_id}`;
 };
 
-export const isWebSocketEnabled = (data: any) => {
+export const isWebSocketEnabled = () => {
   return false;
 };
 
-export const isStreamingEnabled = (data: any) => {
+export const isStreamingEnabled = (_data?: unknown) => {
   return true;
 };
 
@@ -305,10 +306,11 @@ export const getEndPoint = (ingestionURL: string) => {
 
 export function getCronIntervalDifferenceInSeconds(cronExpression: string) {
   try {
+    // `utc` is a cron-parser v4 option; v5 types only accept `tz` — cast keeps runtime unchanged
     const interval = CronExpressionParser.parse(cronExpression, {
       currentDate: new Date(),
       utc: true,
-    });
+    } as Parameters<typeof CronExpressionParser.parse>[1]);
 
     const firstExecution = interval.next();
     const secondExecution = interval.next();
@@ -321,10 +323,11 @@ export function getCronIntervalDifferenceInSeconds(cronExpression: string) {
 
 export const getCronIntervalInMinutes = (cronExpression: string): number => {
   try {
+    // `utc` is a cron-parser v4 option; v5 types only accept `tz` — cast keeps runtime unchanged
     const interval = CronExpressionParser.parse(cronExpression, {
       currentDate: new Date(),
       utc: true,
-    });
+    } as Parameters<typeof CronExpressionParser.parse>[1]);
 
     const first = interval.next();
     const second = interval.next();

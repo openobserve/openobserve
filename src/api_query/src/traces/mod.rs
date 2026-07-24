@@ -30,28 +30,25 @@ use config::{
 };
 use futures::stream::StreamExt;
 use hashbrown::HashMap;
+use openobserve_api_common::extractors::Headers;
+#[cfg(feature = "cloud")]
+use openobserve_core::ingestion::check_ingestion_allowed;
+// Re-export agent-signals read API handler
+pub use openobserve_core::traces::agent_signals::get_agent_signals;
+// Re-export service graph API handlers
+pub use openobserve_core::traces::service_graph::{self, get_current_topology, get_edge_history};
+use openobserve_core::{auth::UserEmail, traces};
+use search_service::{self as SearchService, streaming::sorting::TopKHeap};
 use serde::Serialize;
 use tokio::sync::mpsc;
 use tracing::{Instrument, Span};
 
-#[cfg(feature = "cloud")]
-use crate::service::ingestion::check_ingestion_allowed;
-// Re-export service graph API handlers
-pub use crate::service::traces::service_graph::{self, get_current_topology, get_edge_history};
 use crate::{
     common::{
         meta::http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, HttpResponse as MetaHttpResponse},
-        utils::{
-            auth::UserEmail,
-            http::{get_or_create_trace_id, get_use_cache_from_request},
-        },
+        utils::http::{get_or_create_trace_id, get_use_cache_from_request},
     },
-    extractors::Headers,
     search::error_utils::map_error_to_http_response,
-    service::{
-        search::{self as SearchService, streaming::sorting::TopKHeap},
-        traces,
-    },
 };
 
 pub mod dag;
@@ -109,7 +106,7 @@ pub async fn traces_write(
     // log start processing time
     let process_time = get_process_time();
 
-    let user = crate::common::meta::ingestion::IngestUser::from_user_email(&user_email.user_id);
+    let user = ingestion_common::IngestUser::from_user_email(&user_email.user_id);
 
     #[cfg(feature = "cloud")]
     match check_ingestion_allowed(&org_id, StreamType::Traces, None).await {
@@ -212,7 +209,7 @@ pub async fn get_latest_traces(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(&stream_name)) {
+        if let Err(e) = search_service::check_search_allowed(&org_id, Some(&stream_name)) {
             return MetaHttpResponse::too_many_requests(e.to_string());
         }
     }
@@ -238,15 +235,12 @@ pub async fn get_latest_traces(
     {
         use o2_openfga::meta::mapping::OFGA_MODELS;
 
-        use crate::{
-            common::utils::auth::{AuthExtractor, is_root_user},
-            service::users::get_user,
-        };
-        if !is_root_user(user_id) {
+        use crate::service::{auth::AuthExtractor, users::get_user};
+        if !db::user::is_root_user(user_id) {
             let user: config::meta::user::User = get_user(Some(&org_id), user_id).await.unwrap();
             let stream_type_str = StreamType::Traces.as_str();
 
-            if !crate::service::authz::check_permissions(
+            if !openobserve_core::authz::check_permissions(
                 user_id,
                 AuthExtractor {
                     auth: "".to_string(),
@@ -325,12 +319,24 @@ pub async fn get_latest_traces(
         0
     };
 
-    if start_time_from_trace_id > 0 {
+    // A UUID v7 trace_id encodes its creation time, which lets us narrow the
+    // scan to a tight [t-60s, t+1h] window instead of the caller's broad range.
+    // BUT only when that encoded time actually falls inside the window the
+    // caller asked for. If it doesn't — e.g. spans re-ingested with a
+    // `_timestamp` shifted away from the trace_id's embedded time — the encoded
+    // time points at an empty window and the lookup would spuriously return
+    // "trace not found". In that case we trust the caller's window, which is
+    // where the data actually is. (On real data the two always agree, so this
+    // is a safety net, not a behavior change for normal traffic.)
+    if start_time_from_trace_id > 0
+        && start_time_from_trace_id >= start_time
+        && start_time_from_trace_id <= end_time
+    {
         start_time = start_time_from_trace_id - 60 * 1_000_000; //60 seconds earlier
         end_time = std::cmp::min(now_micros(), start_time_from_trace_id + 3600 * 1_000_000); //1 hour later
     }
 
-    let max_query_range = crate::common::utils::stream::get_max_query_range(
+    let max_query_range = search_service::query_range::get_max_query_range(
         std::slice::from_ref(&stream_name),
         org_id.as_str(),
         user_id,
@@ -476,6 +482,7 @@ pub async fn get_latest_traces(
         use_cache: default_use_cache(),
         clear_cache: false,
         local_mode: None,
+        agent_options: None,
     };
 
     req.use_cache = get_use_cache_from_request(&query);
@@ -929,7 +936,7 @@ pub async fn get_latest_traces_stream(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(&stream_name)) {
+        if let Err(e) = search_service::check_search_allowed(&org_id, Some(&stream_name)) {
             return MetaHttpResponse::too_many_requests(e.to_string());
         }
     }
@@ -954,15 +961,12 @@ pub async fn get_latest_traces_stream(
     {
         use o2_openfga::meta::mapping::OFGA_MODELS;
 
-        use crate::{
-            common::utils::auth::{AuthExtractor, is_root_user},
-            service::users::get_user,
-        };
-        if !is_root_user(user_id) {
+        use crate::service::{auth::AuthExtractor, users::get_user};
+        if !db::user::is_root_user(user_id) {
             let user: config::meta::user::User = get_user(Some(&org_id), user_id).await.unwrap();
             let stream_type_str = StreamType::Traces.as_str();
 
-            if !crate::service::authz::check_permissions(
+            if !openobserve_core::authz::check_permissions(
                 user_id,
                 AuthExtractor {
                     auth: "".to_string(),
@@ -1041,7 +1045,7 @@ pub async fn get_latest_traces_stream(
         end_time = start_time_from_trace_id + 3600 * 1_000_000;
     }
 
-    let max_query_range = crate::common::utils::stream::get_max_query_range(
+    let max_query_range = search_service::query_range::get_max_query_range(
         std::slice::from_ref(&stream_name),
         org_id.as_str(),
         user_id,
@@ -1296,6 +1300,7 @@ async fn process_latest_traces_stream(
         use_cache,
         clear_cache: false,
         local_mode: None,
+        agent_options: None,
     };
 
     // Get time partitions

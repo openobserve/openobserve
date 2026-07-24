@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { createI18n } from "vue-i18n";
 import CustomNode from "./CustomNode.vue";
@@ -31,6 +31,11 @@ const i18n = createI18n({
     en: {
       common: {
         delete: "Delete",
+      },
+      // Kept byte-identical to en-US.json — the overflow assertion below checks
+      // rendered text, so a drifting stub would silently weaken it.
+      pipeline: {
+        moreErrors: "... and {count} more errors",
       },
     },
   },
@@ -623,6 +628,49 @@ describe("CustomNode.vue", () => {
       const vm = wrapper.vm as any;
       expect(vm.getNodeErrorInfo).toContain("and 4 more errors");
     });
+
+    // `NodeErrors.errors` went from HashSet<String> to
+    // HashSet<(String, Option<Value>)>. The column is untyped JSON and the read
+    // path is passthrough, so a single deployment serves BOTH shapes forever —
+    // pre-upgrade rows as strings, post-upgrade rows as [message, payload].
+    const errorsFixture = (errors: unknown[], error_count = errors.length) => ({
+      currentSelectedPipeline: {
+        nodes: [],
+        edges: [],
+        last_error: { node_errors: { "node-1": { errors, error_count } } },
+      },
+    });
+
+    it("renders legacy plain-string errors", () => {
+      wrapper = createWrapper(
+        { id: "node-1" },
+        errorsFixture(["error one", "error two"]),
+      );
+      expect((wrapper.vm as any).getNodeErrorInfo).toBe("error one\n\nerror two");
+    });
+
+    it("🔑 renders [message, payload] tuple errors without leaking the payload", () => {
+      // Regression: a bare .join() over this shape produced
+      // "error one,\n\nerror two,[object Object]" in the node tooltip.
+      wrapper = createWrapper(
+        { id: "node-1" },
+        errorsFixture([
+          ["error one", null],
+          ["error two", { detail: 1 }],
+        ]),
+      );
+      const text = (wrapper.vm as any).getNodeErrorInfo;
+      expect(text).toBe("error one\n\nerror two");
+      expect(text).not.toContain("[object Object]");
+    });
+
+    it("survives a row that mixes both shapes", () => {
+      wrapper = createWrapper(
+        { id: "node-1" },
+        errorsFixture(["error one", ["error two", null]]),
+      );
+      expect((wrapper.vm as any).getNodeErrorInfo).toBe("error one\n\nerror two");
+    });
   });
 
   // =========================================================================
@@ -776,7 +824,10 @@ describe("CustomNode.vue", () => {
       expect(edge.style.stroke).toBe("#f59e0b"); // default color
     });
 
-    it("sets showDeleteTooltip to true on mouseenter of delete button", async () => {
+    // The delete button now labels itself with the central OTooltip (same as the
+    // workflow node and the rest of the app) — the hand-rolled `showDeleteTooltip`
+    // state it replaced is gone, so there is nothing bespoke left to assert here.
+    it("renders an OTooltip on the delete button", async () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
       vm.showButtons = true;
@@ -785,8 +836,7 @@ describe("CustomNode.vue", () => {
         '[data-test="pipeline-node-default-delete-btn"]'
       );
       if (deleteBtn.exists()) {
-        await deleteBtn.trigger("mouseenter");
-        expect(vm.showDeleteTooltip).toBe(true);
+        expect(deleteBtn.findComponent({ name: "OTooltip" }).exists()).toBe(true);
       }
     });
   });
@@ -1066,27 +1116,6 @@ describe("CustomNode.vue", () => {
       // Should not throw
       const vm = wrapper.vm as any;
       expect(() => vm.updateEdgeColors("node-1", "#f00", false)).not.toThrow();
-    });
-  });
-
-  // =========================================================================
-  describe("functionInfo", () => {
-    it("returns function info from pipelineObj.functions when present", () => {
-      wrapper = createWrapper({}, {
-        functions: {
-          myFunc: { name: "myFunc", body: "." },
-        },
-      });
-      const vm = wrapper.vm as any;
-      const info = vm.functionInfo({ name: "myFunc" });
-      expect(info).toEqual({ name: "myFunc", body: "." });
-    });
-
-    it("returns null when function is not in pipelineObj.functions", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const info = vm.functionInfo({ name: "notExists" });
-      expect(info).toBeNull();
     });
   });
 

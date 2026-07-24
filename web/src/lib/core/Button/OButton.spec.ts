@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
 import OButton from "./OButton.vue";
 
@@ -264,11 +264,11 @@ describe("OButton", () => {
     expect(wrapper.classes()).not.toContain("transition-colors");
   });
 
-  it("applies unified focus glow (ring-[0.125rem]! ring-primary-500/25!) as base", () => {
+  it("applies unified focus glow (ring-[0.125rem]! ring-accent/25!) as base", () => {
     const wrapper = mount(OButton);
     const classes = wrapper.classes().join(" ");
     expect(classes).toContain("focus-visible:ring-[0.125rem]!");
-    expect(classes).toContain("focus-visible:ring-primary-500/25!");
+    expect(classes).toContain("focus-visible:ring-accent/25!");
   });
 
   it("retains outline-none as part of base classes", () => {

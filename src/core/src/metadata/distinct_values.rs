@@ -30,22 +30,20 @@ use config::{
         json, schema::infer_json_schema_from_map, time::now_micros, util::get_distinct_stream_name,
     },
 };
+use db;
 use infra::{
     errors::{Error, Result},
     schema::{SchemaCache, get_partition_time_level},
 };
+use schema::get_schema_changes;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use tokio::sync::{RwLock, mpsc};
 
 use crate::{
     common::meta::stream::SchemaRecords,
-    service::{
-        db,
-        ingestion::{self, get_thread_id},
-        metadata::{Metadata, MetadataItem},
-        schema::get_schema_changes,
-    },
+    ingestion::{self, get_thread_id},
+    metadata::{Metadata, MetadataItem},
 };
 
 const CHANNEL_SIZE: usize = 10240;
@@ -237,8 +235,7 @@ impl Metadata for DistinctValues {
                 };
 
                 if let Some(ret) =
-                    super::super::stream::get_stream_retention(&org_id, stream_type, &stream_name)
-                        .await
+                    stream::get_stream_retention(&org_id, stream_type, &stream_name).await
                 {
                     let mut new_settings = infra::schema::get_settings(
                         &org_id,
@@ -248,7 +245,7 @@ impl Metadata for DistinctValues {
                     .await
                     .unwrap_or_default();
                     new_settings.data_retention = ret;
-                    if let Err(e) = super::super::stream::save_stream_settings(
+                    if let Err(e) = stream::save_stream_settings(
                         &org_id,
                         &distinct_stream_name,
                         StreamType::Metadata,

@@ -380,7 +380,7 @@ export const usePanelSearchHandlers = ({
     saveCurrentStateToCache();
   };
 
-  const handleSearchReset = (payload: any, traceId?: string) => {
+  const handleSearchReset = () => {
     // Save current state to cache
     saveCurrentStateToCache();
     loadData();

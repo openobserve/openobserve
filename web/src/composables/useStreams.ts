@@ -15,7 +15,7 @@
 
 import { useStore } from "vuex";
 import StreamService from "@/services/stream";
-import { computed, ComputedRef, reactive } from "vue";
+import { computed, ComputedRef } from "vue";
 import { ref } from "vue";
 import { deepCopy } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -53,16 +53,17 @@ const useStreams = () => {
     notify: boolean = true,
     force: boolean = false,
   ) => {
-    return new Promise(async (resolve, reject) => {
+    return new Promise((resolve, reject) => {
       const streamName = _streamName || "all";
 
       // We don't fetch schema while fetching all streams or specific type all streams
       // So keeping it false, don't change this
       schema = false;
-      if (getStreamsPromise.value) {
-        await getStreamsPromise.value;
-      }
+      void (async () => {
       try {
+        if (getStreamsPromise.value) {
+          await getStreamsPromise.value;
+        }
         if (!isStreamFetched(streamName || "all") || force) {
           // Added adddtional check to fetch all streamstype separately if streamName is all
           const dismiss = notify
@@ -162,6 +163,7 @@ const useStreams = () => {
       } catch (e: any) {
         reject(new Error(e.message));
       }
+      })();
     });
   };
 
@@ -175,16 +177,17 @@ const useStreams = () => {
     sort: string = "",
     asc: boolean = false,
   ) => {
-    return new Promise(async (resolve, reject) => {
+    return new Promise((resolve, reject) => {
       const streamType = _streamType || "all";
 
       // We don't fetch schema while fetching all streams or specific type all streams
       // So keeping it false, don't change this
       schema = false;
-      if (getStreamsPromise.value) {
-        await getStreamsPromise.value;
-      }
+      void (async () => {
       try {
+        if (getStreamsPromise.value) {
+          await getStreamsPromise.value;
+        }
         // Added adddtional check to fetch all streamstype separately if streamName is all
         const dismiss = notify
           ? toast({
@@ -224,6 +227,7 @@ const useStreams = () => {
       } catch (e: any) {
         reject(new Error(e.message));
       }
+      })();
     });
   };
 
@@ -245,7 +249,8 @@ const useStreams = () => {
     schema: boolean,
     force: boolean = false,
   ): Promise<any> => {
-    return new Promise(async (resolve, reject) => {
+    return new Promise((resolve, reject) => {
+      void (async () => {
       if (!streamName || !streamType) {
         resolve(null);
       }
@@ -313,6 +318,7 @@ const useStreams = () => {
       } catch (e: any) {
         reject(new Error(e.message));
       }
+      })();
     });
   };
 
@@ -482,12 +488,14 @@ const useStreams = () => {
   // Don't add delete log here, it will create issue
   // This method is to remove specific stream from cache
   const removeStream = (streamName: string, streamType: string) => {
-    if (
-      Object.prototype.hasOwnProperty.call(
-        store.state.streams.streamsIndexMapping[streamType],
-        streamName,
-      )
-    ) {
+    const indexMapping = store.state.streams.streamsIndexMapping[streamType];
+
+    // Bail out safely when the mapping/cache for this type isn't populated.
+    if (!indexMapping || !streamsCache[streamType]) {
+      return;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(indexMapping, streamName)) {
       const indexToRemove =
         store.state.streams.streamsIndexMapping[streamType][streamName];
 

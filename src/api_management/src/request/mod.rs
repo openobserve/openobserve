@@ -21,4 +21,4 @@ pub mod folders;
 pub mod organization;
 pub mod users;
 
-pub use openobserve_api_common::request::{BulkDeleteRequest, BulkDeleteResponse};
+use openobserve_api_common::request::{BulkDeleteRequest, BulkDeleteResponse};

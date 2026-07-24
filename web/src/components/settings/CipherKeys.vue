@@ -118,6 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline-destructive"
             size="sm"
             icon-left="delete"
+            :loading="bulkDeleteLoading"
             @click="openBulkDeleteDialog"
           >
             {{ t('settings.cipherKeysPage.delete') }}
@@ -155,9 +156,6 @@ import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import segment from "@/services/segment_analytics";
-import { convertToTitleCase } from "@/utils/zincutils";
-import config from "@/aws-exports";
 import AddCipherKey from "@/components/cipherkeys/AddCipherKey.vue";
 import CipherKeysService from "@/services/cipher_keys";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -241,6 +239,7 @@ export default defineComponent({
     }> = ref({ visible: false, data: null });
     const selectedKeys: Ref<any[]> = ref([]);
     const confirmBulkDelete = ref(false);
+    const bulkDeleteLoading = ref(false);
 
     watch(
       () => router.currentRoute.value.query?.action,
@@ -280,7 +279,7 @@ export default defineComponent({
       selectedKeys.value = ids.map((id: any) => map.get(id)).filter(Boolean);
     };
 
-    const addCipherKey = (evt: any) => {
+    const addCipherKey = () => {
       router.push({
         query: {
           action: "add",
@@ -424,6 +423,7 @@ export default defineComponent({
     };
 
     const bulkDeleteCipherKeys = () => {
+      bulkDeleteLoading.value = true;
       const keyNames = selectedKeys.value.map((key: any) => key.name);
 
       CipherKeysService.bulkDelete(store.state.selectedOrganization.identifier, { ids: keyNames })
@@ -458,6 +458,9 @@ export default defineComponent({
               message: err.response?.data?.message || err?.message || t("settings.cipherKeysPage.bulkDeleteError"),
             });
           }
+        })
+        .finally(() => {
+          bulkDeleteLoading.value = false;
         });
     };
 
@@ -489,6 +492,7 @@ export default defineComponent({
       selectedKeyIds,
       handleSelectedIdsUpdate,
       confirmBulkDelete,
+      bulkDeleteLoading,
       openBulkDeleteDialog,
       bulkDeleteCipherKeys,
     };

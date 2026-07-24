@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { convertPromQLData } from "./convertPromQLData";
 import { getPropsByChartTypeForSeries } from "./promqlChartSeriesProps";
 import { chartColor } from "@/utils/chartTheme";
+import { applyMeasuredYAxisLeftInset } from "./chartDimensionUtils";
 
 // Mock dependencies
 vi.mock("./convertDataIntoUnitValue", () => ({
@@ -23,6 +24,7 @@ vi.mock("./chartDimensionUtils", () => ({
   calculateWidthText: vi.fn((text) => (text?.length || 0) * 8),
   calculateDynamicNameGap: vi.fn(() => 25),
   calculateRotatedLabelBottomSpace: vi.fn(() => 0),
+  applyMeasuredYAxisLeftInset: vi.fn(),
 }));
 
 vi.mock("./chartColorUtils", () => ({
@@ -31,7 +33,7 @@ vi.mock("./chartColorUtils", () => ({
 }));
 
 vi.mock("./dateTimeUtils", () => ({
-  formatDate: vi.fn((date) => "2023-12-25 10:00:00"),
+  formatDate: vi.fn(() => "2023-12-25 10:00:00"),
 }));
 
 vi.mock("date-fns-tz", () => ({
@@ -186,6 +188,40 @@ describe("Convert PromQL Data Utils", () => {
       );
 
       expect(result).toEqual({ options: null });
+    });
+
+    it("should call applyMeasuredYAxisLeftInset with the final options before returning", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "line",
+        config: { show_legends: true, legends_position: "bottom" },
+        queries: [{ config: { promql_legend: "{{job}}" } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { job: "test-job" },
+              values: [
+                [1640435200, "10"],
+                [1640435260, "20"],
+              ],
+            },
+          ],
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      expect(applyMeasuredYAxisLeftInset).toHaveBeenCalledWith(result.options);
     });
 
     it("should process valid line chart data", async () => {

@@ -32,6 +32,7 @@ use config::{
     utils::{
         flatten,
         json::{self, estimate_json_bytes},
+        schema::format_stream_name,
         time::{now_micros, parse_timestamp_micro_from_value},
     },
 };
@@ -39,6 +40,11 @@ use flate2::read::GzDecoder;
 use infra::{
     errors::{Error, Result},
     schema::get_flatten_level,
+};
+use ingestion_common::{
+    AWSRecordType, BulkResponse, GCPIngestionResponse, IngestUser, IngestionData,
+    IngestionDataIter, IngestionError, IngestionRequest, IngestionResponse, IngestionStatus,
+    IngestionValueType, KinesisFHIngestionResponse, StreamStatus,
 };
 #[cfg(feature = "vectorscan")]
 use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
@@ -48,22 +54,12 @@ use opentelemetry_proto::tonic::{
     metrics::v1::metric::Data,
 };
 use prost::Message;
+use schema::{get_future_discard_error, get_upto_discard_error};
 use serde_json::json;
+use transform::TRANSFORM_FAILED;
 
 use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
-use crate::{
-    common::meta::ingestion::{
-        AWSRecordType, BulkResponse, GCPIngestionResponse, IngestUser, IngestionData,
-        IngestionDataIter, IngestionError, IngestionRequest, IngestionResponse, IngestionStatus,
-        IngestionValueType, KinesisFHIngestionResponse, StreamStatus,
-    },
-    service::{
-        format_stream_name, get_formatted_stream_name,
-        ingestion::check_ingestion_allowed,
-        logs::bulk::TRANSFORM_FAILED,
-        schema::{get_future_discard_error, get_upto_discard_error},
-    },
-};
+use crate::{ingestion::check_ingestion_allowed, service::get_formatted_stream_name};
 
 type LogDataByStream = HashMap<String, (Vec<(i64, json::Map<String, json::Value>)>, Option<usize>)>;
 
@@ -141,7 +137,7 @@ pub async fn ingest(
     // Start retrieve associated pipeline and construct pipeline components
     let stream_param = StreamParams::new(org_id, &stream_name, stream_type);
     let executable_pipelines =
-        crate::service::ingestion::get_stream_executable_pipelines(&stream_param).await;
+        crate::ingestion::get_stream_executable_pipelines(&stream_param).await;
     let mut stream_params = vec![stream_param];
     let mut pipeline_inputs = Vec::with_capacity(stream_params.len());
     let mut original_options = Vec::with_capacity(stream_params.len());
@@ -158,7 +154,7 @@ pub async fn ingest(
     let mut user_defined_schema_map: HashMap<String, Option<HashSet<String>>> = HashMap::new();
     let mut streams_need_original_map: HashMap<String, bool> = HashMap::new();
     let mut streams_need_all_values_map: HashMap<String, bool> = HashMap::new();
-    crate::service::ingestion::get_uds_and_original_data_streams(
+    crate::ingestion::get_uds_and_original_data_streams(
         &stream_params,
         &mut user_defined_schema_map,
         &mut streams_need_original_map,
@@ -374,7 +370,7 @@ pub async fn ingest(
                         if !user_defined_schema_map.contains_key(&destination_stream) {
                             // a new dynamically created stream. need to check the two maps
                             // again
-                            crate::service::ingestion::get_uds_and_original_data_streams(
+                            crate::ingestion::get_uds_and_original_data_streams(
                                 &[stream_params],
                                 &mut user_defined_schema_map,
                                 &mut streams_need_original_map,
@@ -415,8 +411,7 @@ pub async fn ingest(
                             if let Some(Some(fields)) =
                                 user_defined_schema_map.get(&destination_stream)
                             {
-                                local_val =
-                                    crate::service::ingestion::refactor_map(local_val, fields);
+                                local_val = crate::ingestion::refactor_map(local_val, fields);
                             }
 
                             // usize::MAX used as a flag when pipeline is applied with
@@ -433,7 +428,7 @@ pub async fn ingest(
                                     ORIGINAL_DATA_COL_NAME.to_string(),
                                     original_options[idx].clone().unwrap().into(),
                                 );
-                                let record_id = crate::service::ingestion::generate_record_id(
+                                let record_id = crate::ingestion::generate_record_id(
                                     org_id,
                                     &destination_stream,
                                     &StreamType::Logs,
@@ -678,7 +673,7 @@ fn finalize_and_buffer_record(
                     ctx.org_id,
                     StreamType::Logs.as_str(),
                     ctx.stream_name,
-                    crate::service::logs::bulk::TS_PARSE_FAILED,
+                    crate::logs::bulk::TS_PARSE_FAILED,
                 ])
                 .inc();
             log_failed_record(ctx.log_ingestion_errors, &res, &e.to_string());
@@ -693,7 +688,7 @@ fn finalize_and_buffer_record(
         }
     };
     if let Some(Some(fields)) = ctx.user_defined_schema_map.get(ctx.stream_name) {
-        local_val = crate::service::ingestion::refactor_map(local_val, fields);
+        local_val = crate::ingestion::refactor_map(local_val, fields);
     }
     if ctx
         .streams_need_original_map
@@ -702,11 +697,8 @@ fn finalize_and_buffer_record(
         && let Some(ref od) = original_data
     {
         local_val.insert(ORIGINAL_DATA_COL_NAME.to_string(), od.clone().into());
-        let record_id = crate::service::ingestion::generate_record_id(
-            ctx.org_id,
-            ctx.stream_name,
-            &StreamType::Logs,
-        );
+        let record_id =
+            crate::ingestion::generate_record_id(ctx.org_id, ctx.stream_name, &StreamType::Logs);
         local_val.insert(
             ID_COL_NAME.to_string(),
             json::Value::String(record_id.to_string()),
@@ -794,11 +786,13 @@ pub fn handle_timestamp(
     Ok(timestamp)
 }
 
-impl Iterator for IngestionDataIter {
+struct IngestionDataIterator(IngestionDataIter);
+
+impl Iterator for IngestionDataIterator {
     type Item = Result<json::Value, IngestionError>;
 
     fn next(&mut self) -> Option<Result<json::Value, IngestionError>> {
-        match self {
+        match &mut self.0 {
             IngestionDataIter::JSONIter(iter) => iter.next().map(Ok),
             IngestionDataIter::MultiIter(iter) => loop {
                 match iter.next() {
@@ -832,9 +826,13 @@ impl Iterator for IngestionDataIter {
     }
 }
 
-impl IngestionData {
-    pub fn iter(self) -> IngestionDataIter {
-        match self {
+trait IngestionDataExt {
+    fn iter(self) -> IngestionDataIterator;
+}
+
+impl IngestionDataExt for IngestionData {
+    fn iter(self) -> IngestionDataIterator {
+        let iter = match self {
             IngestionData::JSON(vec) => IngestionDataIter::JSONIter(vec.into_iter()),
             IngestionData::Multi(data) => {
                 let cursor = Cursor::new(data);
@@ -867,27 +865,27 @@ impl IngestionData {
                 for record in &request.records {
                     match decode_and_decompress_to_vec(&record.data) {
                         Err(err) => {
-                            return IngestionDataIter::KinesisFH(
+                            return IngestionDataIterator(IngestionDataIter::KinesisFH(
                                 events.into_iter(),
                                 Some(KinesisFHIngestionResponse {
                                     request_id: request_id.to_string(),
                                     error_message: Some(err.to_string()),
                                     timestamp: req_timestamp,
                                 }),
-                            );
+                            ));
                         }
                         Ok(decompressed_data) => {
                             match deserialize_aws_record_from_vec(decompressed_data, request_id) {
                                 Ok(parsed_events) => events.extend(parsed_events),
                                 Err(err) => {
-                                    return IngestionDataIter::KinesisFH(
+                                    return IngestionDataIterator(IngestionDataIter::KinesisFH(
                                         events.into_iter(),
                                         Some(KinesisFHIngestionResponse {
                                             request_id: request_id.to_string(),
                                             error_message: Some(err.to_string()),
                                             timestamp: req_timestamp,
                                         }),
-                                    );
+                                    ));
                                 }
                             }
                         }
@@ -895,7 +893,8 @@ impl IngestionData {
                 }
                 IngestionDataIter::KinesisFH(events.into_iter(), None)
             }
-        }
+        };
+        IngestionDataIterator(iter)
     }
 }
 

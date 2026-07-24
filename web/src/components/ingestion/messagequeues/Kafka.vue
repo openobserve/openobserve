@@ -15,14 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { useStore } from "vuex";
 import CopyContent from "@/components/CopyContent.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
 import useIngestion from "@/composables/useIngestion";
 const name = "kafka";
-const store = useStore();
-const { endpoint, messageQueuesContent, messageQueuesDocURLs } = useIngestion();
+const { messageQueuesContent, messageQueuesDocURLs } = useIngestion();
 const content = messageQueuesContent.replace("[STREAM_NAME]", name.replace(" ", "_").toLowerCase());
 const docURL = messageQueuesDocURLs[name];
 </script>

@@ -5,93 +5,20 @@
  * `--color-span-*` set (50 colours) in tokens/base.css — prefer it wherever a CSS
  * colour is accepted.
  *
- * `getSpanColorHex(i, theme)` returns a raw hex from the two arrays below, for the
- * canvas/ECharts call sites that cannot consume a CSS var. NOTE: these arrays hold
- * 35 entries and do NOT match the 50 --color-span-* token values.
+ * `getSpanColorHex(i, theme)` returns a raw hex for the canvas/ECharts call sites
+ * that cannot consume a CSS var. The hex now comes from the `--color-trace-span-*`
+ * tokens (base/dark.css, theme-aware) via `chartColor()`, which falls back to the
+ * FALLBACKS map in chartTheme.ts under jsdom/SSR. There are 35 trace-span colours.
  */
 
-/**
- * Light-mode span colours — 35-entry raw-hex fallback for getSpanColorHex (NOT the
- * --color-span-* token set; see the file header). Used only where a CSS var can't go.
- */
-export const LIGHT_SPAN_COLORS = [
-  "#10B981",
-  "#06B6D4",
-  "#84CC16",
-  "#6366F1",
-  "#F59E0B",
-  "#3B82F6",
-  "#14B8A6",
-  "#D946EF",
-  "#7C3AED",
-  "#F59E0B",
-  "#0284C7",
-  "#84CC16",
-  "#6366F1",
-  "#F9A8D4",
-  "#10B981",
-  "#8B5CF6",
-  "#F97316",
-  "#22D3EE",
-  "#06B6D4",
-  "#21cb60",
-  "#A855F7",
-  "#FBBF24",
-  "#3B82F6",
-  "#14B8A6",
-  "#6366F1",
-  "#FB923C",
-  "#0EA5E9",
-  "#F472B6",
-  "#A855F7",
-  "#818CF8",
-  "#F97316",
-  "#FCA5A5",
-  "#06B6D4",
-  "#A78BFA",
-  "#3B82F6",
-] as const;
+import { chartColor, TRACE_SPAN_COLOR_COUNT } from "../chartTheme";
 
 /**
- * Dark mode span colors (50 colors)
+ * Number of `--color-trace-span-*` tokens. Derived from chartTheme's FALLBACKS
+ * registry (which mirrors base/dark.css) rather than hardcoded, so it never drifts
+ * when the trace-span palette grows or shrinks.
  */
-export const DARK_SPAN_COLORS = [
-  "#60A5FA",
-  "#F87171",
-  "#34D399",
-  "#C084FC",
-  "#FB923C",
-  "#22D3EE",
-  "#F472B6",
-  "#A3E635",
-  "#818CF8",
-  "#FBBF24",
-  "#2DD4BF",
-  "#E879F9",
-  "#4ADE80",
-  "#A78BFA",
-  "#FCD34D",
-  "#38BDF8",
-  "#FB7185",
-  "#BEF264",
-  "#818CF8",
-  "#FCA5A5",
-  "#6EE7B7",
-  "#C084FC",
-  "#FDBA74",
-  "#67E8F9",
-  "#F9A8D4",
-  "#86EFAC",
-  "#D8B4FE",
-  "#FDE68A",
-  "#93C5FD",
-  "#FECACA",
-  "#5EEAD4",
-  "#F0ABFC",
-  "#D9F99D",
-  "#A5B4FC",
-  "#FED7AA",
-] as const;
+export const SPAN_COLOR_COUNT = TRACE_SPAN_COLOR_COUNT;
 
 /**
  * Get a span color by index (1-50)
@@ -113,12 +40,13 @@ export const getSpanColor = (index: number): string => {
  */
 export const getSpanColorHex = (
   index: number,
-  theme: "light" | "dark" = "light",
+  _theme: "light" | "dark" = "light",
 ): string => {
-  const colors = theme === "dark" ? DARK_SPAN_COLORS : LIGHT_SPAN_COLORS;
-  const colorIndex =
-    (((index - 1) % colors.length) + colors.length) % colors.length;
-  return colors[colorIndex];
+  // Light/dark swap lives in the --color-trace-span-* tokens (base/dark css);
+  // `_theme` kept for call-site compatibility, ignored — CSS owns the swap.
+  const n = SPAN_COLOR_COUNT;
+  const colorIndex = (((index - 1) % n) + n) % n;
+  return chartColor(`--color-trace-span-${colorIndex + 1}`);
 };
 
 /**
@@ -182,11 +110,13 @@ export const getSpanColorWithOpacity = (
  * @returns Array of hex color strings
  */
 export const getAllSpanColors = (
-  theme: "light" | "dark" = "light",
+  _theme: "light" | "dark" = "light",
 ): string[] => {
-  const colors = theme === "dark" ? DARK_SPAN_COLORS : LIGHT_SPAN_COLORS;
-  // Return reversed order to maintain existing behavior
-  return [...colors].reverse();
+  // Tokens own the light/dark swap; reversed to maintain existing behavior.
+  const n = SPAN_COLOR_COUNT;
+  return Array.from({ length: n }, (_v, i) =>
+    chartColor(`--color-trace-span-${i + 1}`),
+  ).reverse();
 };
 
 /**
@@ -212,7 +142,7 @@ export const generateServiceColorMap = (
   const colorMap = new Map<string, string>();
   const usedColors = new Set<number>();
 
-  serviceNames.forEach((serviceName, index) => {
+  serviceNames.forEach((serviceName) => {
     // Use hash for consistency, but track used colors to maximize distinction
     let hash = 0;
     for (let i = 0; i < serviceName.length; i++) {
@@ -240,7 +170,7 @@ export const generateServiceColorMap = (
  * @param backgroundColor - Background color CSS variable
  * @returns 'white' or 'black'
  */
-export const getContrastTextColor = (backgroundColor: string): string => {
+export const getContrastTextColor = (_backgroundColor: string): string => {
   // For now, return white for all span colors as they're designed with good contrast
   // Can be enhanced with actual luminance calculation if needed
   return "white";

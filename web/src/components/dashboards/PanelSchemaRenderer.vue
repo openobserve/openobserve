@@ -51,11 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <TableRenderer
           v-else-if="panelSchema.type == 'table'"
-          :data="
-            panelData.chartType == 'table'
-              ? panelData
-              : { options: { backgroundColor: 'transparent' } }
-          "
+          :data="tableRendererData"
           :value-mapping="panelSchema?.config?.mappings ?? []"
           @row-click="onChartClick"
           ref="tableRendererRef"
@@ -205,8 +201,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSeparator
             v-if="
               drilldown._isCrossLink &&
-              index > 0 &&
-              !drilldownArray[index - 1]._isCrossLink
+              Number(index) > 0 &&
+              !drilldownArray[Number(index) - 1]._isCrossLink
             "
           />
           <div
@@ -335,7 +331,6 @@ const AlertContextMenu = defineAsyncComponent(() => {
 });
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { copyToClipboard } from "@/utils/clipboard";
 import { calculateWidthText } from "@/utils/dashboard/chartDimensionUtils";
@@ -358,7 +353,6 @@ export default defineComponent({
     LoadingProgress,
     OButton,
     OIcon,
-    OTooltip,
     OEmptyState,
   },
   props: {
@@ -462,6 +456,19 @@ export default defineComponent({
       default: false,
     },
     regionClusterParams: {
+      type: Object,
+      required: false,
+      default: undefined,
+    },
+    /**
+     * Pre-fetched PromQL results to render instead of the panel running its own
+     * query. `{ data, metadata?, resultMetaData? }`, where `data` is one entry
+     * per query (the shape the PromQL executor writes to `state.data`). Used by
+     * the metrics explorer, which owns the fetch lifecycle via its preview
+     * queue but still wants to render through this component. Undefined for
+     * normal dashboard panels, which fetch their own data.
+     */
+    injectedPromqlData: {
       type: Object,
       required: false,
       default: undefined,
@@ -667,8 +674,8 @@ export default defineComponent({
       searchResponse,
       is_ui_histogram,
       shouldRefreshWithoutCache,
-      showLegendsButton,
       regionClusterParams,
+      injectedPromqlData,
     } = toRefs(props);
     // calls the apis to get the data based on the panel config
     let {
@@ -703,6 +710,7 @@ export default defineComponent({
       shouldRefreshWithoutCache,
       regionClusterParams,
       allowAnnotationsAPI,
+      injectedPromqlData,
     );
 
     const {
@@ -912,7 +920,6 @@ export default defineComponent({
     onMounted(async () => {
       // fetch all panels
       await fetchAllPanels();
-      panelsList.value = panelsList.value;
     });
 
     // When switching of tab was done, reset the loading state of the panels in variablesAndPanelsDataLoadingState
@@ -1352,7 +1359,7 @@ export default defineComponent({
 
     // ResizeObserver to detect chartPanelRef dimension changes
     let resizeObserver: ResizeObserver | null = null;
-    let resizeTimeout: ReturnType<typeof setTimeout> | null = null;
+    let resizeTimeout: number | null = null;
 
     onMounted(() => {
       if (chartPanelRef.value) {
@@ -1614,6 +1621,14 @@ export default defineComponent({
 
     const tableRendererData = computed(() => {
       if (panelSchema.value.type === "table") {
+        // Once the underlying data is cleared (e.g. required columns removed
+        // after a successful run), convertPanelDataCommon bails on validation
+        // and never refreshes panelData — so guard on noData here to avoid
+        // rendering the stale converted rows behind the "No Data" state.
+        // Mirrors chartRendererData's noData guard for the chart path.
+        if (noData.value === "No Data") {
+          return { rows: [], columns: [] };
+        }
         if (panelSchema.value.queryType === "promql") {
           // For PromQL tables, the data is in panelData.options (same as pie/donut)
           // The TableConverter returns {columns, rows, ...} which gets placed in options
@@ -1678,10 +1693,6 @@ export default defineComponent({
         };
       },
       logDataAsJSON: (title: string) => {
-        const chartData =
-          panelSchema.value?.queryType === "promql"
-            ? filteredData.value
-            : data.value;
         console.group(`[oo] ${title ?? panelSchema.value?.title ?? "panel"}`);
         console.groupEnd();
       },

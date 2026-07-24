@@ -386,7 +386,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchObj.data.editorValue == '' &&
             searchObj.meta.queryEditorPlaceholderFlag
           "
-          class="query-editor-placeholder-overlay absolute top-0 left-0 right-0 bottom-0 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-[1] select-none"
+          class="query-editor-placeholder-overlay absolute top-0 left-0 right-0 bottom-0 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-1 select-none"
         >
           <span class="query-editor-placeholder-typewriter">{{ traceEditorPlaceholder }}</span>
         </div>
@@ -597,7 +597,7 @@ export default defineComponent({
       getSuggestions();
     };
 
-    const updateQueryValue = async (value: string, event?: any) => {
+    const updateQueryValue = async (value: string) => {
       _sqlOnQueryChange();
       updateAutoComplete(value);
       if (searchObj.meta.sqlMode == true) {
@@ -663,10 +663,10 @@ export default defineComponent({
         value.valueType == "absolute" &&
         searchObj.data.stream.selectedStream.length > 0 &&
         searchObj.data.datetime.queryRangeRestrictionInHour > 0 &&
-        value.hasOwnProperty("selectedDate") &&
-        value.hasOwnProperty("selectedTime") &&
-        value.selectedDate.hasOwnProperty("from") &&
-        value.selectedTime.hasOwnProperty("startTime")
+        Object.prototype.hasOwnProperty.call(value, "selectedDate") &&
+        Object.prototype.hasOwnProperty.call(value, "selectedTime") &&
+        Object.prototype.hasOwnProperty.call(value.selectedDate, "from") &&
+        Object.prototype.hasOwnProperty.call(value.selectedTime, "startTime")
       ) {
         // Convert hours to microseconds
         let newStartTime =

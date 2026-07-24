@@ -49,6 +49,20 @@ export class LogsPage {
         this.indexDropDownTrigger = '[data-test="log-search-index-list-select-stream-trigger"]';
         this.indexDropDownPopover = '[data-test="log-search-index-list-select-stream-popover"]';
         this.indexDropDownSearch = '[data-test="log-search-index-list-select-stream-search"]';
+        // Quick Pick (no-stream-selected sidebar state) locators
+        this.quickPickContainer = '[data-test="logs-search-stream-quick-pick"]';
+        this.quickPickButton = (streamName) => `[data-test="logs-search-stream-quick-pick-${streamName}"]`;
+        // Match only the per-stream quick-pick buttons, NOT the "-more" footer
+        // span (which also starts with `logs-search-stream-quick-pick-`).
+        this.quickPickButtonWildcard = '[data-test^="logs-search-stream-quick-pick-"]:not([data-test="logs-search-stream-quick-pick-more"])';
+        this.quickPickMoreFooter = '[data-test="logs-search-stream-quick-pick-more"]';
+        // Hero state (main content no-stream-selected) locators
+        this.noStreamHero = '[data-test="logs-search-no-stream-selected-text"]';
+        this.selectStreamCard = '[data-test="logs-no-stream-select-stream-card"]';
+        this.queryGuideCard = '[data-test="logs-no-stream-query-guide-card"]';
+        this.recentChip = (streamName) => `[data-test="logs-no-stream-recent-${streamName}"]`;
+        // Post stream-selection: empty schema indicator
+        this.noFieldFoundText = '[data-test="logs-search-no-field-found-text"]';
         this.streamToggle = '[data-test="log-search-index-list-stream-toggle-default"] [data-state]';
         this.searchPartitionButton = '[data-test="logs-search-partition-btn"]';
         this.histogramToggle = '[data-test="logs-search-bar-show-histogram-toggle-btn"]';
@@ -407,9 +421,12 @@ export class LogsPage {
         this.patternCardAnomalyBadge = (index) => `[data-test="pattern-card-${index}-anomaly-badge"]`;
         this.patternCardFrequency = (index) => `[data-test="pattern-card-${index}-frequency"]`;
         this.patternCardPercentage = (index) => `[data-test="pattern-card-${index}-percentage"]`;
-        this.patternCardIncludeBtn = (index) => `[data-test="pattern-card-${index}-include-btn"]`;
-        this.patternCardExcludeBtn = (index) => `[data-test="pattern-card-${index}-exclude-btn"]`;
         this.patternCardDetailsIcon = (index) => `[data-test="pattern-card-${index}"]`;
+        // Include/exclude/create-alert moved off the card and into the details
+        // dialog in the patterns UI redesign, so they are no longer per-index.
+        this.patternDetailIncludeBtn = '[data-test="pattern-detail-include-btn"]';
+        this.patternDetailExcludeBtn = '[data-test="pattern-detail-exclude-btn"]';
+        this.patternDetailCreateAlertBtn = '[data-test="pattern-detail-create-alert-btn"]';
         // The pattern-template wildcard chip carries a data-test hook (the `.wildcard-chip`
         // scoped class was dropped when the chip moved from a class to the OTag component).
         this.patternCardWildcardChips = (index) => `[data-test="pattern-card-${index}-template"] [data-test="pattern-card-wildcard-chip"]`;
@@ -3393,22 +3410,25 @@ export class LogsPage {
     }
 
     /**
-     * Verifies that the JSON tab is selected by default (Bug #9724)
-     * Checks that JSON tab is visible AND JSON content is visible
+     * Verifies that the Table tab is selected by default.
+     * As of #13368 ("logs sidebar table will be default view") the log-detail sidebar
+     * opens on the Table tab, superseding the earlier Bug #9724 JSON-default behavior.
+     * Checks that the Table tab is visible AND is the active tab AND table content shows.
      * @returns {Promise<void>}
      */
-    async verifyJsonTabSelectedByDefault() {
-        // Verify JSON tab exists
-        const jsonTab = this.page.locator(this.logDetailJsonTab);
-        await expect(jsonTab).toBeVisible();
+    async verifyTableTabSelectedByDefault() {
+        const tableTab = this.page.locator(this.logDetailTableTab);
+        await expect(tableTab).toBeVisible();
 
-        // Check if JSON tab is selected (has data-state="active" for Reka OTab)
-        const isJsonTabActive = await jsonTab.evaluate(el => el.getAttribute('data-state') === 'active');
-        expect(isJsonTabActive, 'JSON tab should be selected by default (Bug #9724)').toBe(true);
+        // The Reka OTab (TabsTrigger) carries data-state="active" when selected. The
+        // DetailTable drawer is an async component, so on open the trigger can render a
+        // tick before Reka's reactive data-state settles. Poll with toHaveAttribute,
+        // which auto-retries until the attribute settles (avoids CI-load flakes).
+        await expect(tableTab, 'Table tab should be selected by default (#13368)')
+            .toHaveAttribute('data-state', 'active', { timeout: 10000 });
 
-        // Verify JSON content is visible
-        await expect(this.page.locator(this.logDetailJsonContent)).toBeVisible();
-        testLogger.info('✓ JSON tab is selected by default (Bug #9724 verified)');
+        await expect(this.page.locator(this.logDetailTableContent)).toBeVisible();
+        testLogger.info('✓ Table tab is selected by default (#13368 verified)');
     }
 
     /**
@@ -3449,8 +3469,10 @@ export class LogsPage {
      */
     async verifyTableTabSelected() {
         const tableTab = this.page.locator(this.logDetailTableTab);
-        const isTableTabActive = await tableTab.evaluate(el => el.getAttribute('data-state') === 'active');
-        expect(isTableTabActive, 'Table tab should be selected').toBe(true);
+        // Poll data-state via toHaveAttribute (auto-retries) rather than a one-shot
+        // getAttribute read, so the Reka tab-switch reactive update can settle under CI load.
+        await expect(tableTab, 'Table tab should be selected')
+            .toHaveAttribute('data-state', 'active', { timeout: 10000 });
         await expect(this.page.locator(this.logDetailTableContent)).toBeVisible();
         testLogger.info('✓ Table tab is selected and content is visible');
     }
@@ -3461,8 +3483,10 @@ export class LogsPage {
      */
     async verifyJsonTabSelected() {
         const jsonTab = this.page.locator(this.logDetailJsonTab);
-        const isJsonTabActive = await jsonTab.evaluate(el => el.getAttribute('data-state') === 'active');
-        expect(isJsonTabActive, 'JSON tab should be selected').toBe(true);
+        // Poll data-state via toHaveAttribute (auto-retries) rather than a one-shot
+        // getAttribute read, so the Reka tab-switch reactive update can settle under CI load.
+        await expect(jsonTab, 'JSON tab should be selected')
+            .toHaveAttribute('data-state', 'active', { timeout: 10000 });
         await expect(this.page.locator(this.logDetailJsonContent)).toBeVisible();
         testLogger.info('✓ JSON tab is selected and content is visible');
     }
@@ -9053,20 +9077,24 @@ export class LogsPage {
     }
 
     /**
-     * Click the include button on a pattern card
+     * Include a pattern in the query. The action lives in the pattern details
+     * dialog (opened by clicking the card), not on the card itself.
      * @param {number} index - The pattern card index (0-based)
      */
     async clickPatternIncludeBtn(index = 0) {
-        await this.page.locator(this.patternCardIncludeBtn(index)).click();
+        await this.page.locator(this.patternCard(index)).click();
+        await this.page.locator(this.patternDetailIncludeBtn).click();
         testLogger.info(`Clicked include button on pattern ${index}`);
     }
 
     /**
-     * Click the exclude button on a pattern card
+     * Exclude a pattern from the query. As with include, the action lives in the
+     * pattern details dialog rather than on the card.
      * @param {number} index - The pattern card index (0-based)
      */
     async clickPatternExcludeBtn(index = 0) {
-        await this.page.locator(this.patternCardExcludeBtn(index)).click();
+        await this.page.locator(this.patternCard(index)).click();
+        await this.page.locator(this.patternDetailExcludeBtn).click();
         testLogger.info(`Clicked exclude button on pattern ${index}`);
     }
 
@@ -9240,23 +9268,10 @@ export class LogsPage {
         return content;
     }
 
-    /**
-     * Check if pattern include button is active/selected
-     * @param {number} index - The pattern card index (0-based)
-     */
-    async expectPatternIncludeBtnActive(index = 0) {
-        await expect(this.page.locator(this.patternCardIncludeBtn(index))).toHaveClass(/active|selected/);
-        testLogger.info(`Pattern ${index} include button is active`);
-    }
-
-    /**
-     * Check if pattern exclude button is active/selected
-     * @param {number} index - The pattern card index (0-based)
-     */
-    async expectPatternExcludeBtnActive(index = 0) {
-        await expect(this.page.locator(this.patternCardExcludeBtn(index))).toHaveClass(/active|selected/);
-        testLogger.info(`Pattern ${index} exclude button is active`);
-    }
+    // expectPatternIncludeBtnActive/expectPatternExcludeBtnActive were dropped in the
+    // patterns UI redesign: the include/exclude controls moved into the details dialog,
+    // where they are one-shot actions with no active/selected state to assert. They had
+    // no callers.
 
     // ============================================================================
     // BUILD TAB / QUERY BUILDER METHODS - PR #10305
@@ -10584,33 +10599,51 @@ export class LogsPage {
     /**
      * Get the scroll position (scrollTop) of the main results scroll container.
      * Call waitForResultsLoaded() first to ensure the container exists.
-     * Navigates from pagination -> .search-list -> child with overflow-y-auto.
+     * Post design-token migration (#13173) the `.search-list` wrapper is gone:
+     * the scroller is the combined scroll area (`ref="scrollContainerRef"` in
+     * logs/SearchResult.vue), a scrollable sibling below the pagination header.
+     * Walk up from the pagination until an ancestor has a scrollable child
+     * that is not the header itself (matched by computed overflow-y, so class
+     * renames don't break it).
      * @returns {Promise<number>}
      */
     async getScrollContainerPosition() {
         return await this.page.evaluate(() => {
             const pagination = document.querySelector('[data-test="logs-search-result-pagination"]');
             if (!pagination) return -1;
-            const searchList = pagination.closest('.search-list');
-            if (!searchList) return -1;
-            const container = searchList.querySelector('[class*="overflow-y-auto"]');
-            return container ? container.scrollTop : -1;
+            let el = pagination.parentElement;
+            while (el && el !== document.body) {
+                const container = Array.from(el.children).find(
+                    (child) => !child.contains(pagination) &&
+                        /(auto|scroll)/.test(getComputedStyle(child).overflowY)
+                );
+                if (container) return container.scrollTop;
+                el = el.parentElement;
+            }
+            return -1;
         });
     }
 
     /**
      * Scroll the main results container to the bottom.
      * Call waitForResultsLoaded() first to ensure the container exists.
+     * Uses the same container discovery as getScrollContainerPosition().
      */
     async scrollToResultsBottom() {
         await this.page.evaluate(() => {
             const pagination = document.querySelector('[data-test="logs-search-result-pagination"]');
             if (!pagination) return;
-            const searchList = pagination.closest('.search-list');
-            if (!searchList) return;
-            const container = searchList.querySelector('[class*="overflow-y-auto"]');
-            if (container) {
-                container.scrollTop = container.scrollHeight;
+            let el = pagination.parentElement;
+            while (el && el !== document.body) {
+                const container = Array.from(el.children).find(
+                    (child) => !child.contains(pagination) &&
+                        /(auto|scroll)/.test(getComputedStyle(child).overflowY)
+                );
+                if (container) {
+                    container.scrollTop = container.scrollHeight;
+                    return;
+                }
+                el = el.parentElement;
             }
         });
         await this.page.waitForTimeout(500);
@@ -11189,5 +11222,290 @@ export class LogsPage {
         const option = this.page.locator(this.datetimeTimezoneOption(value));
         await option.waitFor({ state: 'visible', timeout: 10000 });
         await option.click();
+    }
+
+    // ──────────────────────────────────────────────
+    //  Quick Pick (No-Stream-Selected) helpers
+    // ──────────────────────────────────────────────
+
+    /**
+     * Waits for the sidebar quick pick container to become visible.
+     */
+    async expectQuickPickContainerVisible() {
+        const container = this.page.locator(this.quickPickContainer);
+        await container.waitFor({ state: 'visible', timeout: 15000 });
+        testLogger.info('Quick pick container is visible');
+    }
+
+    /**
+     * Asserts the sidebar quick pick container is NOT visible (hidden or detached).
+     * Uses toBeHidden() which covers both CSS hidden and DOM-detached states.
+     */
+    async expectQuickPickContainerNotVisible() {
+        const container = this.page.locator(this.quickPickContainer);
+        await expect(container, 'Quick pick container should not be visible after stream selection').toBeHidden({ timeout: 15000 });
+        testLogger.info('Quick pick container is not visible');
+    }
+
+    /**
+     * Clicks a quick pick stream button in the sidebar.
+     * @param {string} streamName — e.g. "e2e_automate"
+     */
+    async clickQuickPickButton(streamName) {
+        testLogger.info(`Clicking quick pick button for stream: ${streamName}`);
+        const btn = this.page.locator(this.quickPickButton(streamName));
+        await btn.waitFor({ state: 'visible', timeout: 10000 });
+        await btn.click();
+    }
+
+    /**
+     * Seeds `count` logs streams named `${prefix}${i}` (1-based) by ingesting a
+     * single record into each. First-time ingestion creates the stream, so this
+     * is how the footer test pushes the org above the quick-pick limit (8) to make
+     * the "more" footer render. Returns the created stream names.
+     *
+     * Freshly-ingested streams have no computed stats yet, so they sort to the
+     * bottom of the quick pick (ordered by stats.doc_time_max desc) and do NOT
+     * displace already-active streams like e2e_automate. These streams are swept
+     * by cleanup.spec.js via the matching `${prefix}` regex.
+     * @param {string} prefix — e.g. "e2e_qp_more_stream_"
+     * @param {number} count
+     * @returns {Promise<string[]>}
+     */
+    async seedLogStreams(prefix, count) {
+        const names = [];
+        for (let i = 1; i <= count; i++) {
+            const name = `${prefix}${i}`;
+            await this.ingestData(name, [{
+                level: 'info',
+                job: 'quickpick_more_footer_seed',
+                message: `quick-pick more-footer seed record ${i}`,
+            }]);
+            names.push(name);
+        }
+        testLogger.info(`Seeded ${names.length} quick-pick streams`, { prefix });
+        return names;
+    }
+
+    /**
+     * Polls the streams API until every name in `names` is listed (logs type),
+     * so a subsequent page load reflects the newly-seeded streams. Best-effort:
+     * returns true once all appear, false on timeout.
+     * @param {string[]} names
+     * @param {number} timeout
+     */
+    async waitForStreamsListed(names, timeout = 20000) {
+        const fetch = (await import('node-fetch')).default;
+        const orgId = getOrgIdentifier();
+        const url = `${process.env.INGESTION_URL}/api/${orgId}/streams?type=logs`;
+        const deadline = Date.now() + timeout;
+        while (Date.now() < deadline) {
+            try {
+                const res = await fetch(url, { headers: getAuthHeaders() });
+                const body = await res.json();
+                const existing = new Set((body.list || []).map((s) => s.name));
+                if (names.every((n) => existing.has(n))) {
+                    testLogger.info('All seeded streams are listed', { count: names.length });
+                    return true;
+                }
+            } catch (e) {
+                testLogger.debug(`waitForStreamsListed retry: ${e.message}`);
+            }
+            await this.page.waitForTimeout(1000);
+        }
+        testLogger.warn('Not all seeded streams listed before timeout', { names });
+        return false;
+    }
+
+    /**
+     * Deselects a stream from the logs stream selector's checkbox zone.
+     *
+     * The logs stream OSelect runs in multi-mode with rowClickSingleSelect=true.
+     * In that mode clicking an option's LABEL zone re-selects it (single-select
+     * replace), while clicking its CHECKBOX zone — the area left of the option's
+     * `[data-select-separator]` — lets Reka toggle it OFF. See OSelect.vue
+     * handleItemClickCapture. The generic `deselectStream` clicks the option row
+     * (label zone), so it cannot clear a single selected stream here — this helper
+     * clicks inside the checkbox zone instead, computing the x offset from the
+     * separator's position (falling back to a small fixed offset) so it stays
+     * correct if the checkbox/padding dimensions change.
+     * @param {string} streamName
+     */
+    async deselectStreamViaCheckbox(streamName) {
+        testLogger.info(`Deselecting stream via checkbox zone: ${streamName}`);
+        const trigger = this.page.locator(this.indexDropDownTrigger).first();
+        const popover = this.page.locator(this.indexDropDownPopover);
+        const search = this.page.locator(this.indexDropDownSearch);
+
+        if (await trigger.count() > 0) {
+            await trigger.click();
+        } else {
+            await this.page.locator(this.indexDropDown).click();
+        }
+        await popover.waitFor({ state: 'visible', timeout: 5000 });
+
+        // Narrow the list so the target option is rendered even with many streams.
+        if (await search.count() > 0) {
+            await search.fill(streamName).catch(() => {});
+            await this.page.waitForTimeout(300);
+        }
+
+        const option = this.page.locator(
+            `[data-test="log-search-index-list-select-stream-option"][data-test-value="${streamName}"]`,
+        ).first();
+        await option.waitFor({ state: 'visible', timeout: 5000 });
+        const box = await option.boundingBox();
+        // The checkbox zone spans from the option's left edge to the separator.
+        // Click its midpoint so Reka toggles the option off (instead of the label
+        // zone, which would re-select it). Derive the x from the separator's
+        // position; fall back to a small fixed offset if it can't be measured.
+        const sepBox = await option
+            .locator('[data-select-separator]')
+            .first()
+            .boundingBox()
+            .catch(() => null);
+        const x = (sepBox && box) ? Math.max(4, (sepBox.x - box.x) / 2) : 6;
+        await option.click({ position: { x, y: box ? box.height / 2 : 12 } });
+        await this.page.keyboard.press('Escape').catch(() => {});
+        testLogger.info(`Deselected stream via checkbox zone: ${streamName}`);
+    }
+
+    /**
+     * Returns the count of visible quick pick stream buttons in the sidebar.
+     * @returns {Promise<number>}
+     */
+    async getQuickPickButtonCount() {
+        const buttons = this.page.locator(this.quickPickButtonWildcard);
+        await buttons.first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+        return await buttons.count();
+    }
+
+    /**
+     * Asserts the quick pick "more" footer is visible.
+     */
+    async expectQuickPickMoreFooterVisible() {
+        const footer = this.page.locator(this.quickPickMoreFooter);
+        await expect(footer, 'Quick pick more footer should be visible').toBeVisible({ timeout: 10000 });
+        testLogger.info('Quick pick more footer is visible');
+    }
+
+    /**
+     * Waits for the hero-state "no stream selected" container to be visible.
+     */
+    async expectNoStreamHeroVisible() {
+        const hero = this.page.locator(this.noStreamHero);
+        await hero.waitFor({ state: 'visible', timeout: 15000 });
+        testLogger.info('No-stream hero is visible');
+    }
+
+    /**
+     * Asserts the "Select a stream" hero card is visible.
+     */
+    async expectSelectStreamCardVisible() {
+        const card = this.page.locator(this.selectStreamCard);
+        await expect(card, 'Select stream card should be visible').toBeVisible({ timeout: 10000 });
+        testLogger.info('Select stream card is visible');
+    }
+
+    /**
+     * Asserts the "Read the query guide" hero card is visible.
+     */
+    async expectQueryGuideCardVisible() {
+        const card = this.page.locator(this.queryGuideCard);
+        await expect(card, 'Query guide card should be visible').toBeVisible({ timeout: 10000 });
+        testLogger.info('Query guide card is visible');
+    }
+
+    /**
+     * Clicks the "Select a stream" hero card.
+     */
+    async clickSelectStreamCard() {
+        testLogger.info('Clicking Select a stream card');
+        const card = this.page.locator(this.selectStreamCard);
+        await card.waitFor({ state: 'visible', timeout: 10000 });
+        await card.click();
+    }
+
+    /**
+     * Clicks the "Read the query guide" hero card.
+     */
+    async clickQueryGuideCard() {
+        testLogger.info('Clicking Query guide card');
+        const card = this.page.locator(this.queryGuideCard);
+        await card.waitFor({ state: 'visible', timeout: 10000 });
+        await card.click();
+    }
+
+    /**
+     * Asserts a recent-stream chip is visible in the hero state.
+     * @param {string} streamName
+     */
+    async expectRecentChipVisible(streamName) {
+        const chip = this.page.locator(this.recentChip(streamName));
+        await expect(chip, `Recent chip for ${streamName} should be visible`).toBeVisible({ timeout: 10000 });
+        testLogger.info(`Recent chip for ${streamName} is visible`);
+    }
+
+    /**
+     * Clicks a recent-stream chip in the hero state.
+     * @param {string} streamName
+     */
+    async clickRecentChip(streamName) {
+        testLogger.info(`Clicking recent chip for stream: ${streamName}`);
+        const chip = this.page.locator(this.recentChip(streamName));
+        await chip.waitFor({ state: 'visible', timeout: 10000 });
+        await chip.click();
+    }
+
+    /**
+     * Asserts the stream dropdown popover is visible.
+     */
+    async expectStreamDropdownPopoverVisible() {
+        const popover = this.page.locator(this.indexDropDownPopover);
+        await expect(popover, 'Stream dropdown popover should be visible').toBeVisible({ timeout: 10000 });
+        testLogger.info('Stream dropdown popover is visible');
+    }
+
+    /**
+     * Asserts the stream dropdown wrapper shows the selected stream name
+     * (i.e. the placeholder "Select Stream" has been replaced by a selected-item chip).
+     * Uses the wrapper div since OSelect renders selected items as tokens within it.
+     * @param {string} streamName
+     */
+    async expectStreamDropdownShowsStream(streamName) {
+        const wrapper = this.page.locator(this.indexDropDown);
+        await expect(wrapper, `Stream dropdown should show ${streamName}`).toContainText(streamName, { timeout: 10000 });
+        testLogger.info(`Stream dropdown shows stream: ${streamName}`);
+    }
+
+    /**
+     * Waits for the field list to settle after selecting a stream via quick pick.
+     * Resolves as soon as EITHER the fields table or the "no field found" text
+     * appears (both are valid post-selection states). THROWS if neither shows
+     * within the timeout — a stream whose field list silently never loads is a
+     * real failure, not a state to swallow.
+     */
+    async waitForFieldListAfterStreamSelection() {
+        // The logs field list renders one `logs-field-list-item-<name>` row per
+        // field (GroupedFieldList / FieldRow), or the "no field found" empty text
+        // when the stream has no fields. (The old `log-search-index-list-fields-table`
+        // data-test only exists in the traces IndexList, never the logs one.)
+        const fieldItem = this.page.locator('[data-test^="logs-field-list-item-"]').first();
+        const noField = this.page.locator(this.noFieldFoundText);
+        // Promise.any resolves on the first success and only rejects if BOTH
+        // waits time out (unlike Promise.race, which would reject on the first
+        // timeout even when the other locator is about to appear).
+        try {
+            await Promise.any([
+                fieldItem.waitFor({ state: 'visible', timeout: 20000 }),
+                noField.waitFor({ state: 'visible', timeout: 20000 }),
+            ]);
+        } catch {
+            throw new Error(
+                'Field list did not load after stream selection: neither the fields '
+                + 'table nor the "no field found" text appeared within 20s',
+            );
+        }
+        testLogger.info('Field list loaded after stream selection');
     }
 }

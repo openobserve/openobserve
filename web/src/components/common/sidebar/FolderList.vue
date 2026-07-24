@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }}</span>
                 <OIcon
                   v-if="tab.folderId === FAVORITES_FOLDER_ID"
-                  name="favorite"
+                  name="star"
                   size="sm"
                   class="shrink-0 text-favorite"
                 />
@@ -143,7 +143,6 @@ import ODropdownItem from '@/lib/overlay/Dropdown/ODropdownItem.vue';
   // @ts-nocheck
   import {
     computed,
-    defineAsyncComponent,
     defineComponent,
     onBeforeMount,
     onBeforeUnmount,
@@ -155,8 +154,6 @@ import ODropdownItem from '@/lib/overlay/Dropdown/ODropdownItem.vue';
   import { useI18n } from "vue-i18n";
 
   import dashboardService from "@/services/dashboards";
-  import QTablePagination from "@/components/shared/grid/Pagination.vue";
-  import NoData from "@/components/shared/grid/NoData.vue";
   import { useRoute, useRouter } from "vue-router";
   import { toRaw } from "vue";
   import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
@@ -172,7 +169,6 @@ import ODropdownItem from '@/lib/overlay/Dropdown/ODropdownItem.vue';
     getFoldersListByType
   } from "@/utils/commons";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
   import AddFolder from "./AddFolder.vue";
   import useNotifications from "@/composables/useNotifications";
   import { FAVORITES_FOLDER_ID } from "@/composables/useFavoriteDashboards";
@@ -181,25 +177,12 @@ import OSeparator from '@/lib/core/Separator/OSeparator.vue';
   import { useLoading } from "@/composables/useLoading";
   import { useReo } from "@/services/reodotdev_analytics";
 
-  const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
-    return import("@/components/common/sidebar/MoveAcrossFolders.vue");
-  });
-
-  const AddDashboard = defineAsyncComponent(() => {
-    return import("@/components/dashboards/AddDashboard.vue");
-  });
-
 export default defineComponent({
     name: "FolderList",
     components: {
-      OSeparator,
       OIcon,
-      AddDashboard,
-      QTablePagination,
-      NoData,
       ConfirmDialog,
       AddFolder,
-      MoveDashboardToAnotherFolder,
       OTabs,
       OTab,
       OButton,
@@ -243,7 +226,7 @@ export default defineComponent({
           await getFoldersListByType(store, props.type);
         }
         if(router.currentRoute.value.query.folder) {
-          activeFolderId.value = router.currentRoute.value.query.folder;
+          activeFolderId.value = router.currentRoute.value.query.folder as string;
         }
         else if (!props.showFavorites) {
           activeFolderId.value = "default";
@@ -254,7 +237,7 @@ export default defineComponent({
         // watcher below selects the tab once the owner has pushed.
       });
 
-      watch(()=> router.currentRoute.value.query.folder, (newVal)=> {
+      watch(()=> router.currentRoute.value.query.folder as string | undefined, (newVal)=> {
         activeFolderId.value = newVal || "default";
       })
       const addFolder = () => {
@@ -290,9 +273,10 @@ export default defineComponent({
             timeout: 2000,
           });
         } catch (err) {
+          const e = err as { response?: { data?: { message?: string } }; message?: string };
           showErrorNotification(
-            err?.response?.data?.message ||
-              err?.message ||
+            e?.response?.data?.message ||
+              e?.message ||
               "Folder deletion failed",
             {
               timeout: 2000,
@@ -338,7 +322,7 @@ export default defineComponent({
       if (!searchQuery.value || searchQuery.value == "") {
         return tabs;
       }
-      return tabs.filter((tab) =>
+      return tabs.filter((tab: { name: string }) =>
         tab.name.toLowerCase().includes(searchQuery.value.toLowerCase()),
       );
     });

@@ -433,7 +433,7 @@ size="xs" class="text-warning" />{{
 
 <script lang="ts">
 
-import { defineComponent, PropType, computed, ref, watch, nextTick } from "vue";
+import { defineComponent, PropType, computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { useTheme } from "@/composables/useTheme";

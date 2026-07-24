@@ -28,6 +28,7 @@ const {
   mockServiceUpdate,
   mockServiceGet,
   mockRouterPush,
+  mockToast,
 } = vi.hoisted(() => ({
   mockServiceGetLocations: vi.fn().mockResolvedValue({
     data: { locations: [], browsers: [], devices: [] },
@@ -36,6 +37,7 @@ const {
   mockServiceUpdate: vi.fn().mockResolvedValue({}),
   mockServiceGet: vi.fn().mockResolvedValue({ data: {} }),
   mockRouterPush: vi.fn(),
+  mockToast: vi.fn(() => vi.fn()),
 }));
 
 vi.mock("vue-router", () => ({
@@ -61,6 +63,8 @@ vi.mock("@/composables/useSyntheticsRecorder", () => ({
     replay: vi.fn().mockResolvedValue({}),
     stopReplay: vi.fn().mockResolvedValue({}),
     stopReplayAndForget: vi.fn(),
+    registerAutoDetect: vi.fn(),
+    isReplaying: { value: false },
   }),
 }));
 
@@ -84,7 +88,7 @@ vi.mock("@/utils/commons", () => ({
 }));
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
-  toast: vi.fn(() => vi.fn()),
+  toast: mockToast,
 }));
 
 vi.mock("@/utils/synthetics/buildPayload", () => ({
@@ -108,7 +112,7 @@ vi.mock(
         }),
       makeBrowserCheckSaveSchema: (t: any) =>
         z.object({
-          name: z.string().optional(),
+          name: z.string().min(1, "Name is required"),
           url: z.string().optional(),
           locations: z.array(z.any()).optional(),
           journey: z.array(z.any()).optional(),
@@ -206,12 +210,21 @@ const baseStubs = {
   },
 };
 
-function mountPage() {
+// ── Missing component stubs required by OPageLayout ──────────────────────
+const pageLayoutStubs = {
+  OPageLayout: {
+    template: '<div><slot /></div>',
+    props: ["title", "subtitle", "back", "class", "bleed"],
+  },
+};
+
+function mountPage(props: Record<string, unknown> = {}) {
   return mount(CreateBrowserTest, {
     global: {
       plugins: [i18n, store],
-      stubs: baseStubs,
+      stubs: { ...baseStubs, ...pageLayoutStubs },
     },
+    props,
   });
 }
 
@@ -286,10 +299,108 @@ describe("CreateBrowserTest", () => {
       await recordBtn.trigger("click");
       await flushPromises();
 
-      // Now we should be on the extension setup phase - check for setup elements
+      // Now we should be on the extension setup phase - check for the Open & Record button
       expect(
-        wrapper.find('[data-test="synthetics-setup-recheck-btn"]').exists(),
+        wrapper.find('[data-test="synthetics-setup-open-record-btn"]').exists(),
       ).toBe(true);
+    });
+  });
+
+  describe("edit mode", () => {
+    it("should call syntheticsService.get when editId prop is provided", async () => {
+      wrapper = mountPage({ editId: "check-123" });
+      await flushPromises();
+
+      expect(mockServiceGet).toHaveBeenCalledWith("default", "check-123", "");
+    });
+
+    it("should NOT call syntheticsService.get when editId prop is not provided", async () => {
+      wrapper = mountPage();
+      await flushPromises();
+
+      expect(mockServiceGet).not.toHaveBeenCalled();
+    });
+
+    it("should render 'Update Check' button in Journey step footer when editId is set", async () => {
+      mockServiceGet.mockResolvedValue({
+        data: { name: "Test Check", url: "https://example.com", journey: [] },
+      });
+
+      wrapper = mountPage({ editId: "check-123" });
+      await flushPromises();
+
+      expect(
+        wrapper.find('[data-test="synthetics-create-save-from-journey-btn"]').exists(),
+      ).toBe(true);
+    });
+
+    it("should NOT render 'Update Check' button when editId is not set, even in editor phase", async () => {
+      wrapper = mountPage();
+      await flushPromises();
+
+      // Navigate to editor phase via Build Manually
+      const urlInput = wrapper.find('[data-test="synthetics-create-url-input"]');
+      await urlInput.setValue("https://example.com");
+
+      const buildBtn = wrapper.find('[data-test="synthetics-create-build-btn"]');
+      await buildBtn.trigger("click");
+      await flushPromises();
+
+      // We are now in the editor phase on step 1 — verify footer buttons
+      // Continue and Cancel should be present
+      expect(
+        wrapper.find('[data-test="synthetics-create-continue-btn"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="synthetics-create-cancel-btn"]').exists(),
+      ).toBe(true);
+      // Update Check button should NOT appear (no editId)
+      expect(
+        wrapper.find('[data-test="synthetics-create-save-from-journey-btn"]').exists(),
+      ).toBe(false);
+    });
+  });
+
+  describe("validation", () => {
+    it("should show error toast when saving with an empty name", async () => {
+      // Mount in edit mode so the Journey footer save button is rendered.
+      // The save schema requires name to be non-empty — the check starts
+      // with an empty name, so the first save attempt must fail validation.
+      mockServiceGet.mockResolvedValue({
+        data: { name: "", url: "https://example.com", journey: [] },
+      });
+
+      wrapper = mountPage({ editId: "check-123" });
+      await flushPromises();
+
+      const saveBtn = wrapper.find('[data-test="synthetics-create-save-from-journey-btn"]');
+      expect(saveBtn.exists()).toBe(true);
+
+      await saveBtn.trigger("click");
+      await flushPromises();
+
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "error",
+        }),
+      );
+    });
+
+    it("should NOT call create or update services when validation fails", async () => {
+      mockServiceGet.mockResolvedValue({
+        data: { name: "", url: "https://example.com", journey: [] },
+      });
+
+      wrapper = mountPage({ editId: "check-123" });
+      await flushPromises();
+
+      const saveBtn = wrapper.find('[data-test="synthetics-create-save-from-journey-btn"]');
+      await saveBtn.trigger("click");
+      await flushPromises();
+
+      // Validation should fail before any API call
+      expect(mockServiceCreate).not.toHaveBeenCalled();
+      expect(mockServiceUpdate).not.toHaveBeenCalled();
     });
   });
 });

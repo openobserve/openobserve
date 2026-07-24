@@ -196,45 +196,6 @@ describe("MessageQueues.vue", () => {
   // Test 9: messageQueueTabs array structure
   it("should have correctly structured messageQueueTabs array", () => {
     wrapper = createWrapper();
-    const expectedTabs = [
-      {
-        name: "rabbitmq",
-        to: {
-          name: "rabbitmq",
-          query: {
-            org_identifier: "test-org",
-          },
-        },
-        icon: "img:mocked-images/ingestion/rabbitmq.svg",
-        label: "ingestion.rabbitmq",
-        contentClass: "tab_content",
-      },
-      {
-        name: "kafka",
-        to: {
-          name: "kafka",
-          query: {
-            org_identifier: "test-org",
-          },
-        },
-        icon: "img:mocked-images/ingestion/kafka.svg",
-        label: "ingestion.kafka",
-        contentClass: "tab_content",
-      },
-      {
-        name: "nats",
-        to: {
-          name: "nats",
-          query: {
-            org_identifier: "test-org",
-          },
-        },
-        icon: "img:mocked-images/ingestion/nats.svg",
-        label: "ingestion.nats",
-        contentClass: "tab_content",
-      },
-    ];
-    
     // Access messageQueueTabs via the setup return values
     expect(wrapper.vm.messageQueueTabs).toHaveLength(3);
   });

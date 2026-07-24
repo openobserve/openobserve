@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="text-lg font-semibold text-dialog-header-text truncate block">{{ t('alerts.addConditions') }}</span>
 
           <!-- Separator -->
-          <div class="w-px h-4 opacity-30 bg-border-strong" />
+          <div class="w-px h-4 opacity-30 bg-separator" />
 
           <!-- Stream Type + Stream Name -->
           <div class="flex items-center gap-2">
@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <div
                         v-if="(localTab === 'sql' ? !localSqlQuery : !localPromqlQuery) && queryEditorPlaceholderFlag"
-                        class="absolute top-0 left-0 right-0 bottom-0 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-[1] select-none"
+                        class="absolute top-0 left-0 right-0 bottom-0 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-1 select-none"
                       >
                         <span class="font-mono text-[var(--text-sm)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden text-ellipsis">{{ fullEditorPlaceholder }}</span>
                       </div>
@@ -287,7 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <div
                       v-if="!vrlFunctionContent && functionEditorPlaceholderFlag"
-                      class="absolute top-0 left-0 right-0 bottom-0 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-[1] select-none"
+                      class="absolute top-0 left-0 right-0 bottom-0 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-1 select-none"
                     >
                       <span class="font-mono text-[var(--text-sm)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden text-ellipsis">{{ vrlPlaceholder }}</span>
                     </div>
@@ -450,9 +450,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import searchService from "@/services/search";
 import { defineAsyncComponent } from "vue";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
-import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 import UnifiedQueryEditor from "@/components/QueryEditor.vue";
-import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import O2AIChat from "@/components/O2AIChat.vue";
 import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";
 import config from "@/aws-exports";
@@ -476,7 +474,7 @@ const props = defineProps({
     required: true,
   },
   tab: {
-    type: String,
+    type: String as PropType<'sql' | 'promql'>,
     default: "sql",
   },
   sqlQuery: {
@@ -597,11 +595,10 @@ const closeDialog = () => {
 
 // Local state
 // Default to SQL tab if no tab is provided, otherwise use the provided tab
-const localTab = ref(props.tab || 'sql');
+const localTab = ref<'sql' | 'promql'>(props.tab || 'sql');
 const localSqlQuery = ref(props.sqlQuery);
 const localPromqlQuery = ref(props.promqlQuery);
 const vrlFunctionContent = ref(props.vrlFunction);
-const isFullScreen = ref(false);
 const sqlEditorMaximized = ref(false);
 // Controls whether the VRL Monaco editor is mounted. Kept false briefly when
 // restoring from maximized so Monaco mounts AFTER the flex container has
@@ -745,10 +742,7 @@ const handleAlertFunctionEditorGenerationEnd = () => {
 /**
  * Handle successful generation from alert function editor
  */
-const handleAlertFunctionEditorGenerationSuccess = (payload: {
-  type: string;
-  message: string;
-}) => {
+const handleAlertFunctionEditorGenerationSuccess = () => {
   // Function code is already updated via @update:query handler
 };
 
@@ -1077,7 +1071,7 @@ const handleFieldListEvent = (event: string, value: any) => {
 };
 
 // Determine available languages based on stream type
-const availableLanguages = computed(() => {
+const availableLanguages = computed<('sql' | 'promql')[]>(() => {
   // For metrics streams, only PromQL is available
   if (props.streamType === 'metrics') {
     return ['promql'];
@@ -1108,7 +1102,9 @@ const handleQueryUpdate = (newQuery: string) => {
   getSuggestions();
 };
 
-const handleLanguageChange = (newLanguage: 'sql' | 'promql') => {
+const handleLanguageChange = (language: 'sql' | 'promql' | 'vrl' | 'javascript') => {
+  // Alert editor only offers sql/promql
+  const newLanguage = language as 'sql' | 'promql';
   localTab.value = newLanguage;
 
   // Explicitly sync the editor with the correct query after language change
@@ -1129,7 +1125,7 @@ const handleRunQuery = (language: 'sql' | 'promql') => {
   }
 };
 
-const handleAskAI = async (_naturalLanguage: string, _language: string) => {
+const handleAskAI = async () => {
   // The unified component handles AI generation internally
   // This event is just for parent components that may need to react
 };
@@ -1139,10 +1135,6 @@ const toggleAIChat = () => {
   const isEnabled = !store.state.isAiChatEnabled;
   store.dispatch("setIsAiChatEnabled", isEnabled);
 };
-
-const getBtnO2Logo = computed(() => {
-  return getImageURL('images/common/ai_icon_blue.svg');
-});
 
 const getBtnLogo = computed(() => {
   if (isHovered.value || store.state.isAiChatEnabled) {

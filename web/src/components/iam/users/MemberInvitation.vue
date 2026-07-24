@@ -68,7 +68,6 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import organizationsService from "@/services/organizations";
 import segment from "@/services/segment_analytics";
-import { getRoles } from "@/services/iam";
 import usersService from "@/services/users";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {

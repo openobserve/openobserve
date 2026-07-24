@@ -32,24 +32,23 @@
       />
     </template>
        <template #node-input="{ id, data }">
-        <CustomNode :id="id" :data="data" io_type="input" />
+        <CustomNode :id="id" :data="data" io_type="input" read-only />
       </template>
       <template #node-output="{ id, data }">
-        <CustomNode :id="id" :data="data" io_type="output" />
+        <CustomNode :id="id" :data="data" io_type="output" read-only />
       </template>
       <template #node-default="{ id, data }">
-        <CustomNode :id="id" :data="data" io_type="default" />
+        <CustomNode :id="id" :data="data" io_type="default" read-only />
       </template>
       </VueFlow>
     </div>
   </template>
   
-  <script>
-  import { getImageURL } from "@/utils/zincutils";
+  <script lang="ts">
+    import { getImageURL } from "@/utils/zincutils";
 import DropzoneBackground from "@/plugins/pipelines/DropzoneBackground.vue";
-  import { defineComponent, computed, watch } from 'vue';
-  import { ControlButton, Controls } from '@vue-flow/controls'
-  import { VueFlow } from "@vue-flow/core";
+  import { defineComponent, computed, watch, type PropType } from 'vue';
+  import { VueFlow, type Node, type Edge } from "@vue-flow/core";
   import { ref, onMounted, nextTick } from "vue";
 import CustomNode from '@/plugins/pipelines/CustomNode.vue';
 import FlowEdge from "@/components/flow/FlowEdge.vue";
@@ -64,20 +63,34 @@ const externalOutputImage = getImageURL("images/pipeline/output_remote.png");
 const conditionImage = getImageURL("images/pipeline/transform_condition.png");
 const queryImage = getImageURL("images/pipeline/input_query.png");
 
-  
+  interface PipelineNode extends Node {
+    io_type?: string;
+  }
+
+  type PipelineEdge = Edge;
+
+  interface Pipeline {
+    name: string;
+    description: string;
+    source: { source_type: string };
+    nodes: PipelineNode[];
+    edges: PipelineEdge[];
+    org: string;
+  }
+
   export default defineComponent({
     props: {
-      pipeline: Object
+      pipeline: { type: Object as PropType<Pipeline>, required: true }
     },
-    components: { VueFlow, CustomNode, DropzoneBackground, FlowEdge, ControlButton, Controls },
+    components: { VueFlow, CustomNode, DropzoneBackground, FlowEdge },
     setup(props) {
       const {
       pipelineObj,
     } = useDragAndDrop();
-      const vueFlowRef = ref(null);
+      const vueFlowRef = ref<InstanceType<typeof VueFlow> | null>(null);
       // Computed properties for nodes and edges
       const lockedNodes = computed(() => {
-        return props.pipeline.nodes.map(node => ({
+        return props.pipeline.nodes.map((node: PipelineNode) => ({
           ...node,
           type: node.io_type
         }));
@@ -192,21 +205,21 @@ const queryImage = getImageURL("images/pipeline/input_query.png");
     background-color: var(--color-status-info-bg) !important;
     border-color: var(--color-status-info-text) !important;
     color: var(--color-text-body) !important;
-    padding: 8px 12px !important;
+    padding: 0.5rem 0.75rem !important;
   }
 
   .pipeline-view-tooltip :deep(.vue-flow__node-output .btn-fixed-width) {
     background-color: var(--color-status-success-bg) !important;
     border-color: var(--color-status-positive) !important;
     color: var(--color-text-body) !important;
-    padding: 8px 12px !important;
+    padding: 0.5rem 0.75rem !important;
   }
 
   .pipeline-view-tooltip :deep(.vue-flow__node-default .btn-fixed-width) {
     background-color: var(--color-status-warning-bg) !important;
     border-color: var(--color-status-warning-text) !important;
     color: var(--color-text-body) !important;
-    padding: 8px 12px !important;
+    padding: 0.5rem 0.75rem !important;
   }
 
   /* Handle colors — ::before pseudo-elements, must stay in CSS */

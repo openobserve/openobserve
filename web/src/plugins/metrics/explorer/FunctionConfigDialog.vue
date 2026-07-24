@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex grow basis-[17.5rem] max-w-full min-w-0 cursor-pointer flex-col gap-1 rounded-default border p-2"
         :class="
           variant.id === selectedId
-            ? 'border-primary-600 ring-1 ring-primary-600'
+            ? 'border-accent ring-1 ring-accent'
             : 'border-border-default hover:border-border-default'
         "
         :data-test="`metrics-fn-variant-${variant.id}`"
@@ -147,9 +147,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :queries="queriesOf(variant)"
             :chart-type="variant.chartType || defaults.chartType"
             :unit="unitOf(variant).unit"
-            :unit-custom="unitOf(variant).unitCustom"
-            :bucket-unit="bucketUnitOf(variant).unit"
-            :bucket-unit-custom="bucketUnitOf(variant).unitCustom"
+            :unit-custom="unitOf(variant).unitCustom ?? undefined"
+            :bucket-unit="bucketUnitOf(variant).unit ?? undefined"
+            :bucket-unit-custom="bucketUnitOf(variant).unitCustom ?? undefined"
             :color="color"
             :data-test="`metrics-fn-chart-${variant.id}`"
             @error="onRenderError(variant, $event)"

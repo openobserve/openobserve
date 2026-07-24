@@ -16,6 +16,7 @@
 import { describe, it, expect } from "vitest";
 import {
   isLLMTrace,
+  hasTracePreview,
   parseUsageDetails,
   parseCostDetails,
   parseModelParameters,
@@ -92,6 +93,19 @@ describe("isLLMTrace", () => {
   });
 });
 
+describe("hasTracePreview", () => {
+  it("includes remote evaluator spans with stored prompt or response", () => {
+    expect(hasTracePreview({ attributes_prompt: "request body" })).toBe(true);
+    expect(hasTracePreview({ attributes_response: '{"score":0.9}' })).toBe(
+      true,
+    );
+  });
+
+  it("does not classify an ordinary span as previewable", () => {
+    expect(hasTracePreview({ service_name: "api" })).toBe(false);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // parseUsageDetails
 // ---------------------------------------------------------------------------
@@ -109,7 +123,13 @@ describe("parseUsageDetails", () => {
   });
 
   it("parses gen_ai usage fields from object", () => {
-    expect(parseUsageDetails({ gen_ai_usage_input_tokens: 10, gen_ai_usage_output_tokens: 20, gen_ai_usage_total_tokens: 30 })).toEqual({
+    expect(
+      parseUsageDetails({
+        gen_ai_usage_input_tokens: 10,
+        gen_ai_usage_output_tokens: 20,
+        gen_ai_usage_total_tokens: 30,
+      }),
+    ).toEqual({
       input: 10,
       output: 20,
       total: 30,
@@ -117,7 +137,12 @@ describe("parseUsageDetails", () => {
   });
 
   it("computes total from input + output when total is absent", () => {
-    expect(parseUsageDetails({ gen_ai_usage_input_tokens: 10, gen_ai_usage_output_tokens: 20 })).toEqual({
+    expect(
+      parseUsageDetails({
+        gen_ai_usage_input_tokens: 10,
+        gen_ai_usage_output_tokens: 20,
+      }),
+    ).toEqual({
       input: 10,
       output: 20,
       total: 30,
@@ -143,7 +168,11 @@ describe("parseUsageDetails", () => {
 
   it("parses a JSON string", () => {
     const result = parseUsageDetails(
-      JSON.stringify({ gen_ai_usage_input_tokens: 7, gen_ai_usage_output_tokens: 3, gen_ai_usage_total_tokens: 10 }),
+      JSON.stringify({
+        gen_ai_usage_input_tokens: 7,
+        gen_ai_usage_output_tokens: 3,
+        gen_ai_usage_total_tokens: 10,
+      }),
     );
     expect(result).toEqual({ input: 7, output: 3, total: 10 });
   });
@@ -167,7 +196,11 @@ describe("parseCostDetails", () => {
 
   it("parses gen_ai cost fields from object", () => {
     expect(
-      parseCostDetails({ gen_ai_usage_cost_input: 0.001, gen_ai_usage_cost_output: 0.002, gen_ai_usage_cost: 0.003 }),
+      parseCostDetails({
+        gen_ai_usage_cost_input: 0.001,
+        gen_ai_usage_cost_output: 0.002,
+        gen_ai_usage_cost: 0.003,
+      }),
     ).toEqual({
       input: 0.001,
       output: 0.002,
@@ -176,13 +209,20 @@ describe("parseCostDetails", () => {
   });
 
   it("computes total from input + output when total is absent", () => {
-    const result = parseCostDetails({ gen_ai_usage_cost_input: 0.001, gen_ai_usage_cost_output: 0.002 });
+    const result = parseCostDetails({
+      gen_ai_usage_cost_input: 0.001,
+      gen_ai_usage_cost_output: 0.002,
+    });
     expect(result.total).toBeCloseTo(0.003);
   });
 
   it("parses a JSON string", () => {
     const result = parseCostDetails(
-      JSON.stringify({ gen_ai_usage_cost_input: 0.01, gen_ai_usage_cost_output: 0.02, gen_ai_usage_cost: 0.03 }),
+      JSON.stringify({
+        gen_ai_usage_cost_input: 0.01,
+        gen_ai_usage_cost_output: 0.02,
+        gen_ai_usage_cost: 0.03,
+      }),
     );
     expect(result).toEqual({ input: 0.01, output: 0.02, total: 0.03 });
   });

@@ -38,7 +38,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeMount, onMounted, ref, type Ref } from "vue";
+import { onBeforeMount, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
@@ -54,7 +54,6 @@ import { logsErrorMessage } from "@/utils/common";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { getConsumableRelativeTime } from "@/utils/date";
 import type { IDateTime } from "@/ts/interfaces";
-import { toast } from "@/lib/feedback/Toast/useToast";
 
 type SearchBarInstance = InstanceType<typeof SearchBar>;
 
@@ -119,15 +118,6 @@ function onPaginationChange(params: { page: number; size: number }) {
   currentPage.value = params.page;
   pageSize.value = params.size;
   getQueryData();
-}
-
-function ErrorException(message: string) {
-  isLoading.value = false;
-  toast({
-    variant: "error",
-    message,
-    timeout: 10000,
-  });
 }
 
 function getQueryData() {

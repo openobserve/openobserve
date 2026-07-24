@@ -1,9 +1,7 @@
 import { ref, watch } from "vue";
-import { annotationService } from "../../services/dashboard_annotations";
 import useNotifications from "../useNotifications";
 import { getDashboard } from "@/utils/commons";
 import { useStore } from "vuex";
-import { fromZonedTime } from "date-fns-tz";
 import { getUTCTimestampFromZonedTimestamp } from "@/utils/dashboard/dateTimeUtils";
 
 export const useAnnotationsData = (

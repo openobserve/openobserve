@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="w-25 h-25 rounded-full border border-dashed border-[color-mix(in_srgb,var(--color-primary-600)_30%,transparent)] flex items-center justify-center mb-7">
         <div class="w-17 h-17 rounded-full bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] border-[1.5px] border-[color-mix(in_srgb,var(--color-primary-600)_24%,transparent)] border-solid flex items-center justify-center">
-          <OIcon name="account-balance" size="lg" class="text-primary-600 opacity-85" />
+          <OIcon name="account-balance" size="lg" class="text-accent opacity-85" />
         </div>
       </div>
 
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ aiUsage.credits_used }} / {{ aiUsage.credits_limit }} credits used
           </div>
           <div v-if="aiUsage.mode === 'exhausted'" class="text-status-error-text mt-2" style="font-size: var(--text-compact);">
-            {{ t("billing.aiExhaustedMessage") }}
+            {{ t(aiUsage.requires_additional_credits ? "billing.aiContractExhaustedMessage" : "billing.aiExhaustedMessage") }}
           </div>
           <div v-else-if="aiUsage.mode === 'pay_as_you_go'" class="text-info mt-2" style="font-size: var(--text-compact);">
             {{ t("billing.aiPaygMessage") }}
@@ -262,8 +262,8 @@ export default defineComponent({
         BillingService.resume_subscription(
           this.store.state.selectedOrganization.identifier,
         )
-          .then(async (res) => {
-            await this.loadSubscription(true);
+          .then(async () => {
+            await this.loadSubscription();
           })
           .catch((e) => {
             this.proLoading = false;
@@ -313,7 +313,7 @@ export default defineComponent({
           });
         });
     },
-    async loadSubscription(fromPro = false) {
+    async loadSubscription() {
       try {
         const res = await BillingService.list_subscription(
           this.store.state.selectedOrganization.identifier,

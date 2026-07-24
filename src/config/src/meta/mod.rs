@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod actions;
+pub mod agent_signals;
 pub mod ai;
 pub mod alerts;
 pub mod cluster;
@@ -34,6 +35,7 @@ pub mod pipeline;
 pub mod plan;
 pub mod projections;
 pub mod promql;
+pub mod queue_store;
 pub mod ratelimit;
 pub mod search;
 pub mod self_reporting;

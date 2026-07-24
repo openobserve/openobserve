@@ -73,11 +73,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           data-test="metrics-explorer-mode-workspace"
         >
-          <!-- `favorite-border` (outline), not the filled `favorite`: a filled
-               heart is the card's ON state and on a tab would read as "already
+          <!-- `star-outline` (outline), not the filled `star`: a filled star is
+               the card's ON state and on a tab would read as "already
                favourited" rather than "your favourites live here". -->
           <template #icon-left>
-            <OIcon name="favorite-border" size="sm" class="shrink-0" />
+            <OIcon name="star-outline" size="sm" class="shrink-0" />
           </template>
           {{ t("metrics.explorer.modeWorkspace") }}
         </OToggleGroupItem>
@@ -108,9 +108,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="isGridMode && (refreshing || grid.loading.value)"
           :loading="isGridMode && refreshing"
           data-test="metrics-explorer-refresh"
-          @click="onRefresh"
+          @click="() => onRefresh()"
         >
           {{ t("metrics.explorer.refresh") }}
+          <OTooltip
+            :content="t('metrics.explorer.refresh')"
+            shortcut-id="metricsRefresh"
+          />
         </OButton>
         <ShareButton
           v-if="shareUrl"
@@ -118,6 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="icon-toolbar"
           data-test="metrics-explorer-share-btn"
+          shortcut-id="metricsCopyUrl"
         />
       </div>
     </div>
@@ -399,6 +404,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   count: grid.favorites.value.length,
                 })
               "
+              shortcut-id="metricsAddToDashboard"
             />
           </OButton>
         </div>
@@ -477,7 +483,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                collide. -->
           <div
             v-for="row in virtualizer.getVirtualItems()"
-            :key="row.key"
+            :key="(row.key as string | number)"
             class="absolute top-0 left-0 w-full pb-3"
             :class="isGrid ? 'grid gap-3' : 'flex flex-col gap-3'"
             :style="{
@@ -575,6 +581,7 @@ import {
   ref,
   watch,
 } from "vue";
+import type { AcceptableValue } from "reka-ui";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -592,7 +599,6 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -631,6 +637,8 @@ import {
 } from "@/utils/dashboard/urlTimeParams";
 import type { MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
 import segment from "@/services/segment_analytics";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 /**
  * Card min width; drives the responsive column count.
@@ -665,7 +673,6 @@ export default defineComponent({
     OSearchInput,
     OSpinner,
     OEmptyState,
-    OTag,
     OTooltip,
     OToggleGroup,
     OToggleGroupItem,
@@ -794,7 +801,7 @@ export default defineComponent({
     const isGridMode = computed(
       () => mode.value === "explore" || mode.value === "workspace",
     );
-    const setMode = (v: string | number | undefined) => {
+    const setMode = (v: boolean | AcceptableValue | AcceptableValue[]) => {
       if (v !== "explore" && v !== "visualize" && v !== "workspace") return;
       // Pause BEFORE the mode flips, synchronously. The watcher below also keeps
       // `paused` in sync, but it runs after the DOM has begun tearing the grid
@@ -916,7 +923,7 @@ export default defineComponent({
     // shows; it never collapses to nothing. OToggleGroup emits `undefined` on a
     // re-click (it models a deselect); we IGNORE that so the active facet stays
     // put and the panel never blanks. Default is prefix (grid composable).
-    const selectRail = (id: string | number | undefined) => {
+    const selectRail = (id: boolean | AcceptableValue | AcceptableValue[]) => {
       if (!id) return;
       grid.activeRail.value = id as "prefix" | "suffix" | "type";
     };
@@ -999,7 +1006,7 @@ export default defineComponent({
       if (grid.showFavoritesOnly.value) {
         actions.push({
           id: "clear-favorites",
-          icon: "favorite",
+          icon: "star",
           titleKey: "metrics.explorer.emptyActions.clearFavorites",
           descriptionKey: "metrics.explorer.emptyActions.clearFavoritesDesc",
         });
@@ -1740,6 +1747,64 @@ export default defineComponent({
         grid.loadStreams(true);
       },
     );
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    // Registered here (not just in the editor Index.vue) because `/metrics`
+    // mounts THIS explorer — the editor lives at `/metrics/editor`. Keys and
+    // scope come from the "metrics" group in shortcutRegistry.ts.
+    useShortcuts([
+      {
+        // ⌘/Ctrl+Enter — run the query. In Visualize this re-runs the chart;
+        // in Explore/Workspace it refreshes the grid (there is no single query).
+        id: "metricsRunQuery",
+        handler: () => onRefresh({ manual: true }),
+      },
+      {
+        id: "metricsRefresh",
+        handler: () => {
+          if (isInputFocused()) return;
+          onRefresh({ manual: true });
+        },
+      },
+      {
+        id: "metricsFocusQuery",
+        handler: () => {
+          // Grid modes: the metric search box. Visualize: the PromQL editor.
+          const el = document.querySelector<HTMLElement>(
+            '[data-test="metrics-explorer-search"] input, [data-test="metrics-explorer-search"] textarea, [data-test="dashboard-panel-query-editor"] textarea, [data-test="dashboard-panel-query-editor"] .monaco-editor textarea',
+          );
+          el?.focus();
+        },
+      },
+      {
+        id: "metricsAddToDashboard",
+        handler: () => {
+          if (isInputFocused()) return;
+          // Visualize: add the single chart you built (validates first, then
+          // opens the add-to-dashboard dialog). Explore/Workspace: convert the
+          // pinned favourites into panels. In Explore with no favourites there
+          // is nothing to add, so this is a no-op — same as the toolbar, which
+          // shows the convert button only in Workspace with favourites.
+          if (mode.value === "visualize") {
+            visualizeRef.value?.onAddToDashboard?.();
+          } else {
+            openConvertToDashboard();
+          }
+        },
+      },
+      {
+        id: "metricsCopyUrl",
+        handler: () => {
+          if (isInputFocused()) return;
+          // Reuse ShareButton's short-URL + clipboard + toast flow.
+          document
+            .querySelector<HTMLElement>(
+              '[data-test="metrics-explorer-share-btn"]',
+            )
+            ?.click();
+        },
+      },
+    ]);
 
     return {
       t,

@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <slot name="output-content">
                   <div class="text-center text-sm font-semibold text-text-heading py-3 shrink-0">Output Messages</div>
                   <OSeparator class="mt-1 shrink-0" />
-                  <div class="error-report-container flex-1 min-h-0 overflow-auto">
+                  <div class="error-report-container flex-1 min-h-0 overflow-auto resize-none">
                     <div class="text-center p-3 text-text-muted">
                       No messages to display
                     </div>
@@ -196,11 +196,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import {
   defineComponent,
   ref,
-  reactive,
   watch,
   defineAsyncComponent,
   computed,
   onBeforeUnmount,
+  type PropType,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import axios from "axios";
@@ -235,9 +235,11 @@ export default defineComponent({
       type: String,
       required: true,
     },
-    // Tabs configuration
+    // Tabs configuration (shape matches AppTabs' Tab interface)
     tabs: {
-      type: Array,
+      type: Array as PropType<
+        { label: string; value: string; icon?: string; disabled?: boolean }[]
+      >,
       default: () => [
         {
           label: "File Upload / JSON",
@@ -544,13 +546,14 @@ export default defineComponent({
 });
 </script>
 
-<style>
-/* keep(scrollbar): cross-file shared scroll container. .error-report-container
-   supplies overflow scrolling to BaseImport, ImportAlert.vue and
-   ImportPipeline.vue (those two carry no local overflow utility), so the rule
-   must stay an unscoped global rather than be inlined here. */
-.error-report-container {
-  overflow: auto;
+<style scoped>
+/* keep(lib-override:monaco): fixed Monaco height for the URL import editor.
+   Previously inherited from ImportDashboard.vue's global .editor-container-url
+   rule; now owned locally (via :deep to Monaco's DOM), same value/props, so the
+   editor no longer depends on that view having been mounted first. */
+.editor-container-url :deep(.monaco-editor) {
+  height: calc(100vh - 17.8125rem) !important;
+  overflow: hidden;
   resize: none;
 }
 </style>

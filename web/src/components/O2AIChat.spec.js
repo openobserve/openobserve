@@ -1,7 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 // O2AIChat.vue unit tests (50+)
 
-import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import i18n from '@/locales';
 import store from '@/test/unit/helpers/store';
@@ -22,6 +22,9 @@ vi.mock('vue-router', () => ({
     push: mockRouterPush,
     currentRoute: { value: { query: {} } },
   }),
+  // The component watches route.fullPath to hand a live stream off to the
+  // sidebar instance on navigation, so this mock must expose fullPath.
+  useRoute: () => ({ fullPath: '/', path: '/', name: 'home', query: {}, params: {} }),
 }));
 
 // Mock image util and UUID generator
@@ -46,7 +49,7 @@ function setupFakeIndexedDB() {
         if (typeof req.onsuccess === 'function') {
           // Fake DB handle
           const db = {
-            transaction: (storeName, _mode) => {
+            transaction: (storeName) => {
               const tx = {
                 objectStore: (name) => {
                   if (name !== storeName) throw new Error('Invalid store');
@@ -70,7 +73,7 @@ function setupFakeIndexedDB() {
                       return r;
                     },
                     index: (/* name */) => ({
-                      openCursor: (_range, _dir) => {
+                      openCursor: () => {
                         const r = { onsuccess: null, onerror: null };
                         setTimeout(() => {
                           // iterate newest first
@@ -196,7 +199,6 @@ describe('O2AIChat - basic rendering', () => {
 describe('O2AIChat - header actions', () => {
   it('emits close on close button click', async () => {
     const wrapper = await mountChat({ isOpen: true });
-    const closeBtn = wrapper.find('button[aria-label="close"]');
     // Fallback: trigger via emitted close on component when button is not easily selectable
     await wrapper.vm.$emit('close');
     expect(wrapper.emitted('close')).toBeTruthy();

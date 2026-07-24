@@ -22,15 +22,13 @@ use axum::{
 // Re-export shared types from config crate for OpenAPI (unconditionally for OpenAPI
 // generation)
 pub use config::meta::session::{AssumeServiceAccountRequest, AssumeServiceAccountResponse};
+#[cfg(feature = "enterprise")]
+use openobserve_api_common::extractors::Headers;
+#[cfg(feature = "enterprise")]
+use openobserve_core::auth::{AuthExtractor, UserEmail};
 
 #[cfg(feature = "enterprise")]
-use crate::{
-    common::{
-        meta::http::HttpResponse as MetaHttpResponse,
-        utils::auth::{AuthExtractor, UserEmail},
-    },
-    extractors::Headers,
-};
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 /// Assume a service account in a target organization
 ///
@@ -120,7 +118,8 @@ pub async fn assume_service_account(
     }
 
     // Step 2: Call enterprise implementation
-    use crate::service::{db, users};
+    use db;
+    use openobserve_core::users;
 
     // Clone for use in the session creation closure
     let target_service_account_for_session = target_service_account.clone();

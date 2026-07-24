@@ -182,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 
 // @ts-nocheck
-import { defineComponent, ref, watch, onMounted, computed } from "vue";
+import { defineComponent, ref, watch, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -191,7 +191,6 @@ import { useI18n } from "vue-i18n";
 import organizationsService from "@/services/organizations";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
-import JoinOrganization from "./JoinOrganization.vue";
 import AddUpdateOrganization from "@/components/iam/organizations/AddUpdateOrganization.vue";
 import OrgCleanupTasksDialog from "@/components/iam/organizations/OrgCleanupTasksDialog.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -366,6 +365,9 @@ export default defineComponent({
         ? organizationsService.get_admin_org("_meta")
         : organizationsService.list(0, 1000000, "name", false, "");
       request.then((res) => {
+        // Sync Vuex so the header org selector updates without a page reload.
+        store.dispatch("setOrganizations", res.data.data);
+
         const billingPlans = {
           "0": "Free",
           "1": "Pay as you go",

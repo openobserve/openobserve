@@ -31,6 +31,7 @@ export interface ScheduledDashboardReport {
   created_at: string;
   orgId: string | number;
   isCached: boolean;
-  /** When true and report_type is PDF, a PNG screenshot is embedded inline in the email. */
-  imagePreview: boolean;
+  /** When true and report_type is PDF, a PNG screenshot is embedded inline in the email.
+   * Optional: list rows built in ScheduledDashboards.vue omit it. */
+  imagePreview?: boolean;
 }

@@ -16,6 +16,7 @@ ignore = [
 ]
 
 [licenses]
+private = { ignore = true }
 
 exceptions = [
     # We should probably NOT bundle CA certs but use the OS ones.
@@ -30,14 +31,15 @@ exceptions = [
     { name = "openobserve-core", allow = ["AGPL-3.0"] },
     { name = "openobserve-jobs", allow = ["AGPL-3.0"] },
     { name = "openobserve-mcp", allow = ["AGPL-3.0"] },
-    { name = "openobserve-vrl", allow = ["AGPL-3.0"] },
+    { name = "transform", allow = ["AGPL-3.0"] },
+    { name = "super_cluster_queue", allow = ["AGPL-3.0"] },
     { name = "search", allow = ["AGPL-3.0"] },
+    { name = "openobserve-cipher", allow = ["AGPL-3.0"] },
+    { name = "db", allow = ["AGPL-3.0"] },
     { name = "promql", allow = ["AGPL-3.0"] },
-    # Empty dependency-resolution stubs for the private enterprise crates.
-    { name = "o2_dex", allow = ["AGPL-3.0"] },
-    { name = "o2_enterprise", allow = ["AGPL-3.0"] },
-    { name = "o2_openfga", allow = ["AGPL-3.0"] },
-    { name = "o2_ratelimit", allow = ["AGPL-3.0"] },
+    { name = "audit", allow = ["AGPL-3.0"] },
+    { name = "search_service", allow = ["AGPL-3.0"] },
+    { name = "usage_reporting", allow = ["AGPL-3.0"] },
     { name = "vortex", allow = ["AGPL-3.0"] },
     { name = "vortex-datafusion", allow = ["AGPL-3.0"] },
     { name = "config", allow = ["AGPL-3.0"] },

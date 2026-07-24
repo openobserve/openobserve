@@ -243,7 +243,7 @@ import {
   getDashboard,
   getFoldersList,
 } from "../../../utils/commons";
-import { onMounted, onUnmounted } from "vue";
+import { onMounted } from "vue";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import DrilldownUserGuide from "@/components/dashboards/addPanel/DrilldownUserGuide.vue";
 import OFormCombobox from "@/lib/forms/Combobox/OFormCombobox.vue";
@@ -376,13 +376,25 @@ export default defineComponent({
 
     // Bridge the Monaco logsQuery + cascade resets + array-row mutations into the
     // single form.
+    const setField = form.setFieldValue as (
+      name: string,
+      val: unknown,
+    ) => void;
     const setFormField = (name: string, val: unknown) => {
-      form.setFieldValue(name, val);
+      setField(name, val);
     };
+    // Casts: array-field helpers need real array paths; this facade writes by
+    // field keys don't survive DeepKeysOfType and resolve to `never`.
     const addVariableRow = () =>
-      form.pushFieldValue("data.variables", { name: "", value: "" });
-    const removeVariableRow = (index: number) =>
-      form.removeFieldValue("data.variables", index);
+      (form.pushFieldValue as (field: string, value: unknown) => void)(
+        "data.variables",
+        { name: "", value: "" },
+      );
+    const removeVariableRow = (index: number | string) =>
+      (form.removeFieldValue as (field: string, index: number) => void)(
+        "data.variables",
+        Number(index),
+      );
 
     // Reactive read of the form values (form.useStore) — drives the v-if
     // (type/logsMode/folder/dashboard), the cascades, and the async loaders.

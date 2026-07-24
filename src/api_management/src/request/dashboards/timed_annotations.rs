@@ -21,11 +21,10 @@ use axum::{
 use config::meta::timed_annotations::{
     ListTimedAnnotationsQuery, TimedAnnotation, TimedAnnotationDelete, TimedAnnotationReq,
 };
+use db::dashboards as dashboards_db;
+use openobserve_core::dashboards::timed_annotations;
 
-use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse,
-    service::{dashboards::timed_annotations, db::dashboards as dashboards_db},
-};
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 async fn ensure_dashboard_in_org(org_id: &str, dashboard_id: &str) -> bool {
     dashboards_db::dashboard_in_org(org_id, dashboard_id).await
@@ -60,7 +59,11 @@ async fn ensure_dashboard_in_org(org_id: &str, dashboard_id: &str) -> bool {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create time annotations", "category": "dashboards"}))
+        ("x-o2-mcp" = json!({
+            "description": "Create time annotations",
+            "category": "dashboards",
+            "summary_fields": ["annotation_id", "title", "start_time", "end_time", "tags", "panels"]
+        }))
     )
 )]
 pub async fn create_annotations(
@@ -98,6 +101,8 @@ pub async fn create_annotations(
         ("Authorization" = [])
     ),
     params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("dashboard_id" = String, Path, description = "Dashboard id"),
         ListTimedAnnotationsQuery
     ),
     responses(
@@ -112,7 +117,11 @@ pub async fn create_annotations(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Dashboards", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "Get annotations", "category": "dashboards"}))
+        ("x-o2-mcp" = json!({
+            "description": "Get annotations",
+            "category": "dashboards",
+            "summary_fields": ["annotation_id", "title", "start_time", "end_time", "tags", "panels"]
+        }))
     )
 )]
 pub async fn get_annotations(

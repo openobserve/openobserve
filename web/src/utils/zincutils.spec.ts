@@ -32,8 +32,6 @@ import {
   formatTimeWithSuffix,
   formatDuration,
   timestampToTimezoneDate,
-  histogramDateTimezone,
-  convertToUtcTimestamp,
   mergeDeep,
   getUUID,
   getUUIDv7,
@@ -53,8 +51,6 @@ import {
   arraysMatch,
   deepCopy,
   getWebSocketUrl,
-  isWebSocketEnabled,
-  isStreamingEnabled,
   maxLengthCharValidation,
   validateUrl,
   convertUnixToDateFormat,
@@ -62,21 +58,11 @@ import {
   isAboveMinRefreshInterval,
   getDueDays,
   checkCallBackValues,
-  getIngestionURL,
   getEndPoint,
   getUserInfo,
   getDecodedAccessToken,
   useLocalOrganization,
   useLocalCurrentUser,
-  useLocalLogsObj,
-  useLocalLogFilterField,
-  useLocalTraceFilterField,
-  useLocalInterestingFields,
-  useLocalSavedView,
-  useLocalUserInfo,
-  useLocalTimezone,
-  useLocalWrapContent,
-  getDecodedUserInfo,
   getTimezonesByOffset,
 } from "./zincutils";
 
@@ -1209,7 +1195,7 @@ if .severity == "error" {
       it("should handle user data storage", () => {
         const userData = { id: 1, name: "John" };
         const userDataString = JSON.stringify(userData);
-        const result = useLocalCurrentUser(userDataString);
+        useLocalCurrentUser(userDataString);
         expect(localStorageMock.setItem).toHaveBeenCalledWith(
           "currentuser",
           expect.any(String),
