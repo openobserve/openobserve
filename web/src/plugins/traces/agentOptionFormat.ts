@@ -55,3 +55,28 @@ export function buildAgentSelectOptions(
   }
   return result;
 }
+
+/**
+ * Stream-picker options, each annotated with how many discovered agents the
+ * stream contains — e.g. `sre_agent_traces_production (2 agents)`. The count is
+ * shared across every AI page's Stream picker so they read identically. `value`
+ * stays the bare stream name; the label carries the count.
+ */
+export function buildStreamSelectOptions(
+  streams: string[],
+  agents: GenAiAgentListItem[],
+  t: (k: string) => string,
+): SelectOption[] {
+  const counts = new Map<string, number>();
+  for (const a of agents) {
+    counts.set(a.source_stream, (counts.get(a.source_stream) ?? 0) + 1);
+  }
+  return streams.map((s) => {
+    const n = counts.get(s) ?? 0;
+    const word =
+      n === 1
+        ? t("traces.agentCountSingular")
+        : t("traces.agentCountPlural");
+    return { label: `${s} (${n} ${word})`, value: s };
+  });
+}

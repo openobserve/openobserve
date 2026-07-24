@@ -92,6 +92,8 @@
       :source-stream="sourceStream"
       :start-time="startTime"
       :end-time="endTime"
+      :agent-env="agentEnv"
+      :agent-version="agentVersion"
     />
   </div>
 </template>
@@ -115,6 +117,9 @@ const props = defineProps<{
   sourceStream?: string;
   /** When set (Agent mode), show only this agent's signals; empty = all agents. */
   agentFilter?: string;
+  /** Selected agent's env/version (Agent mode) — surfaced in the detail drawer. */
+  agentEnv?: string | null;
+  agentVersion?: string | null;
 }>();
 
 const { t } = useI18n();

@@ -49,13 +49,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-if="filterMode === 'stream'"
         data-test="llm-insights-stream-selector"
-        class="w-56 flex-shrink-0"
+        class="w-64 flex-shrink-0"
       >
         <OSelect
           v-model="activeStream"
           :label="t('traces.sessionsList.streamLabel')"
           label-position="inside"
-          :options="availableStreams.map((s) => ({ label: s, value: s }))"
+          :options="streamSelectOptions"
           labelKey="label"
           valueKey="value"
           class="w-full rounded-default"
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-else
         data-test="llm-insights-agent-selector"
-        class="w-56 flex-shrink-0"
+        class="w-64 flex-shrink-0"
       >
         <!-- Hold a picker-shaped skeleton until the agents list lands the first
              time, so the dropdown doesn't flash an empty "Agent" picker before
@@ -81,8 +81,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           valueKey="value"
           class="w-full rounded-default"
           @update:model-value="onAgentChange"
-        />
+        >
+          <!-- On selection show the agent NAME only (or All Agents); env/version
+               are badges. Classes mirror OSelect's default label span. -->
+          <template #trigger>
+            <span
+              class="flex-1 text-start truncate text-xs leading-4 text-select-text"
+            >
+              {{ selectedAgent ? selectedAgent.name : t("traces.allAgents") }}
+            </span>
+          </template>
+        </OSelect>
       </div>
+      <!-- Scope chips: env/version — only in Agent mode with a specific agent. -->
+      <OAgentBadges
+        v-if="filterMode === 'agent' && selectedAgent"
+        :env="selectedAgent.env"
+        :version="selectedAgent.version"
+        data-test="llm-insights-scope-badges"
+      />
     </div>
 
     <!-- Full-page skeleton only until the stream list is known. Once we have a
@@ -299,7 +316,11 @@ import {
   agentOptionKey,
   buildAgentTraceFilter,
 } from "./llmAgentFilter";
-import { buildAgentSelectOptions } from "./agentOptionFormat";
+import {
+  buildAgentSelectOptions,
+  buildStreamSelectOptions,
+} from "./agentOptionFormat";
+import OAgentBadges from "@/components/shared/OAgentBadges.vue";
 
 const { getStreams } = useStreams();
 const { t } = useI18n();
@@ -360,17 +381,11 @@ const switching = ref(false);
 // Filter mode: "stream" = view a whole stream; "agent" = view a single agent,
 // whose source stream + trace filter both come from the agents API.
 const MODE_LS_KEY = "llmInsights_filterMode";
-// Default scope is "agent" — the AI module is agent-centric. Explicit choices
-// still win: a `?type=` URL param, then a saved localStorage preference; only
-// when neither is present do we fall back to the agent default.
+// Default scope is ALWAYS "agent" — the AI module is agent-centric and every AI
+// page lands on Agent for consistency. Only an explicit `?type=stream` URL param
+// overrides it (a stale saved preference must not silently land on Stream).
 const filterMode = ref<"stream" | "agent">(
-  urlType === "agent"
-    ? "agent"
-    : urlType === "stream"
-      ? "stream"
-      : localStorage.getItem(MODE_LS_KEY) === "stream"
-        ? "stream"
-        : "agent",
+  urlType === "stream" ? "stream" : "agent",
 );
 // An agent name from the URL we still need to resolve to a concrete agent once
 // the agents list loads (the URL carries the readable name, not the internal
@@ -384,6 +399,9 @@ const pendingAgentName = ref<string | null>(
 // not display name, so same-named agents in different streams don't collide.
 const agentSelectOptions = computed(() =>
   buildAgentSelectOptions(agents.value, t, { includeAllAgents: true }),
+);
+const streamSelectOptions = computed(() =>
+  buildStreamSelectOptions(availableStreams.value, agents.value, t),
 );
 
 // The full agent object behind the current selection (null when none).
