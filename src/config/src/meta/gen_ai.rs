@@ -50,12 +50,23 @@ pub const BUILTIN_AGENT_ID_FIELDS: &[&str] =
     &["agent.id", "agent_id", "llm.agent.id", "llm.agent_id"];
 
 /// Environment fallbacks. `deployment.environment.name` (current OTel semconv)
-/// is the standard tier; `deployment.environment` (legacy) is the built-in.
-pub const BUILTIN_ENV_FIELDS: &[&str] = &["deployment.environment"];
+/// is the standard tier (tried by the resolver first, not listed here). These
+/// built-ins cover the legacy OTel key plus the highest-frequency non-standard
+/// conventions: bare `env`/`environment` (ad-hoc instrumentation) and
+/// `k8s.namespace.name` (teams that use prod/staging namespaces AS the env).
+pub const BUILTIN_ENV_FIELDS: &[&str] = &[
+    "deployment.environment",
+    "env",
+    "environment",
+    "k8s.namespace.name",
+];
 
 /// Version fallbacks. `gen_ai.agent.version` (agent-specific) is the standard
-/// tier; `service.version` (service-wide) is the built-in.
-pub const BUILTIN_VERSION_FIELDS: &[&str] = &["service.version"];
+/// tier (tried first, not listed here). These built-ins cover the service-wide
+/// OTel version plus common non-standard conventions: `app.version` and
+/// `git.commit.sha` (git-SHA-as-version, i.e. deployment/canary tracking).
+pub const BUILTIN_VERSION_FIELDS: &[&str] =
+    &["service.version", "app.version", "git.commit.sha"];
 const TARGET_AGENT_FIELDS: &[&str] = &[
     "target_agent_name",
     "target_agent_id",
@@ -215,7 +226,14 @@ mod tests {
         assert!(BUILTIN_AGENT_NAME_FIELDS.contains(&"crewai.task.agent"));
         assert!(BUILTIN_AGENT_ID_FIELDS.contains(&"llm.agent.id"));
         assert!(BUILTIN_ENV_FIELDS.contains(&"deployment.environment"));
+        // Broadened built-in env coverage: bare env keys + k8s namespace.
+        assert!(BUILTIN_ENV_FIELDS.contains(&"env"));
+        assert!(BUILTIN_ENV_FIELDS.contains(&"environment"));
+        assert!(BUILTIN_ENV_FIELDS.contains(&"k8s.namespace.name"));
         assert!(BUILTIN_VERSION_FIELDS.contains(&"service.version"));
+        // Broadened built-in version coverage: app version + git SHA.
+        assert!(BUILTIN_VERSION_FIELDS.contains(&"app.version"));
+        assert!(BUILTIN_VERSION_FIELDS.contains(&"git.commit.sha"));
     }
 
     #[test]
