@@ -42,9 +42,17 @@ vi.mock("@/services/workflows", () => ({
   },
 }));
 
-vi.mock("@/plugins/workflows/useWorkflowCanvas", () => ({
-  hydrateWorkflow: (...a: any[]) => mockHydrate(...a),
-}));
+// Re-export the real trigger registry so triggerLabel() resolves kinds to labels
+// (the list mocks the canvas composable, but the registry is pure data).
+vi.mock("@/plugins/workflows/useWorkflowCanvas", async () => {
+  const triggers = await vi.importActual<any>(
+    "@/plugins/workflows/triggers",
+  );
+  return {
+    hydrateWorkflow: (...a: any[]) => mockHydrate(...a),
+    triggerDef: triggers.triggerDef,
+  };
+});
 
 
 vi.mock("@/components/workflows/WorkflowView.vue", () => ({
@@ -240,12 +248,12 @@ describe("WorkflowsList", () => {
     it("derives the Trigger label from the trigger node in the graph", async () => {
       wrapper = mountList();
       await flushPromises();
-      expect(rows(wrapper)[0].trigger).toBe(t("workflow.triggerAlertFired"));
+      expect(rows(wrapper)[0].trigger).toBe(t("workflow.triggerKind.alertFired.label"));
       // target the trigger tag explicitly: the header's Beta tag is also an
       // `.o-tag`, so a bare `.find(".o-tag")` would match that one instead.
       expect(
         wrapper.find('[data-test="workflow-list-trigger-tag"]').text(),
-      ).toBe(t("workflow.triggerAlertFired"));
+      ).toBe(t("workflow.triggerKind.alertFired.label"));
     });
 
     it("shows a dash when the graph has no trigger node", async () => {

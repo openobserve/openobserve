@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        placeholder is a sibling of — without it the card gets no chrome at all
        (the pipeline canvas has it on the container, so it inherits it there). -->
   <div
-    v-if="isCanvasEmpty && !readOnly"
+    v-if="needsTrigger && !readOnly"
     class="o2vf_node absolute top-32 left-1/2 -translate-x-1/2 z-10"
   >
     <!-- Scaled by the LIVE viewport zoom: real nodes are drawn inside
@@ -176,8 +176,17 @@ const vueFlowRef = ref<any>(null);
 // Read-only inspection canvas (the Runs view) — disables node drag/connect and,
 // via WorkflowNode, the hover add/delete + click-to-edit. Run overlays stay.
 const readOnly = computed(() => workflowObj.readOnly);
-const isCanvasEmpty = computed(
-  () => workflowObj.currentSelectedWorkflow.nodes.length === 0,
+// The "Choose a Trigger" start node shows whenever the workflow has NO TRIGGER —
+// not only when the canvas is empty. A workflow needs exactly one trigger, and
+// the trigger is now deletable (its kind can be swapped); if the user deletes it
+// while other steps remain they'd be stranded with no way to add one back.
+// Keying off "no workflow_trigger node" (the same test validate() uses) covers
+// both the empty canvas and the trigger-deleted-mid-graph case.
+const needsTrigger = computed(
+  () =>
+    !workflowObj.currentSelectedWorkflow.nodes.some(
+      (n: any) => n.data?.node_type === "workflow_trigger",
+    ),
 );
 
 // Center the trigger horizontally once nodes have measured dimensions — keep

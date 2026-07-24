@@ -345,6 +345,24 @@ describe("WorkflowCanvas", () => {
       expect(startNode(wrapper).exists()).toBe(true);
     });
 
+    it("re-shows the start node when the trigger is deleted mid-graph (steps remain)", async () => {
+      // Deleting the trigger while other steps are still on the canvas must
+      // bring back the picker — the workflow has no trigger, not an empty canvas.
+      wfObj.currentSelectedWorkflow.nodes = [
+        triggerNode(),
+        { id: "c1", position: { x: 0, y: 0 }, data: { node_type: "condition" } },
+      ];
+      wrapper = mountCanvas();
+      await nextTick();
+      expect(startNode(wrapper).exists()).toBe(false);
+      // drop only the trigger, keep the condition step
+      wfObj.currentSelectedWorkflow.nodes = [
+        { id: "c1", position: { x: 0, y: 0 }, data: { node_type: "condition" } },
+      ];
+      await nextTick();
+      expect(startNode(wrapper).exists()).toBe(true);
+    });
+
     it("is hidden on the read-only Runs canvas", async () => {
       wfObj.readOnly = true;
       wrapper = mountCanvas();

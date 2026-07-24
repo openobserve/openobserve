@@ -173,7 +173,9 @@ describe("WorkflowNodeDrawer", () => {
     it("renders the trigger title", () => {
       stageNode("workflow_trigger");
       wrapper = mountDrawer();
-      expect(drawerProps(wrapper).title).toBe(t("workflow.node.alertTrigger"));
+      expect(drawerProps(wrapper).title).toBe(
+        t("workflow.triggerKind.alertFired.node"),
+      );
     });
 
     it("falls back to the raw dialog name when the node type is unknown", () => {

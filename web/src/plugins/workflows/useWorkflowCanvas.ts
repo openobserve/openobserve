@@ -37,6 +37,7 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { detectCycle } from "@/composables/flow/detectCycle";
 import { makeEdge } from "@/composables/flow/makeEdge";
 import { getTruncatedConditions } from "@/utils/conditionPreview";
+import { DEFAULT_TRIGGER_KIND } from "./triggers";
 import workflowService from "@/services/workflows";
 
 export type WorkflowNodeCategory = "trigger" | "logic" | "action";
@@ -75,7 +76,7 @@ export const WORKFLOW_NODE_TYPES: Record<string, WorkflowNodeMeta> = {
   workflow_trigger: {
     category: "trigger",
     kindKey: "workflow.node.kindTrigger",
-    titleKey: "workflow.node.alertTrigger",
+    titleKey: "workflow.triggerKind.alertFired.node",
     descKey: "workflow.node.triggerBody",
     icon: "notifications-active",
     image: getImageURL("images/pipeline/input_stream.png"),
@@ -135,40 +136,17 @@ export const nodeConfigDetail = (data: any, maxLen = 28): string => {
   return "";
 };
 
-// Trigger kinds the user chooses from when creating a workflow. `key` maps to
-// the future backend WorkflowTriggerKind (B1). Only Alert Fired is enabled in
-// v1; the rest are shown as "coming soon" so the picker is clearly extensible.
-export interface WorkflowTriggerType {
-  key: string;
-  labelKey: string;
-  descKey: string;
-  icon: IconName;
-  enabled: boolean;
-}
-
-export const WORKFLOW_TRIGGER_TYPES: WorkflowTriggerType[] = [
-  {
-    key: "alert_fired",
-    labelKey: "workflow.triggerType.alertFired",
-    descKey: "workflow.triggerType.alertFiredDesc",
-    icon: "notifications-active",
-    enabled: true,
-  },
-  {
-    key: "schedule",
-    labelKey: "workflow.triggerType.schedule",
-    descKey: "workflow.triggerType.scheduleDesc",
-    icon: "schedule",
-    enabled: false,
-  },
-  {
-    key: "webhook",
-    labelKey: "workflow.triggerType.webhook",
-    descKey: "workflow.triggerType.webhookDesc",
-    icon: "webhook",
-    enabled: false,
-  },
-];
+// Trigger kinds live in the registry (./triggers) — the single place a kind is
+// described. Re-exported here so canvas consumers keep one import surface.
+export {
+  WORKFLOW_TRIGGERS,
+  DEFAULT_TRIGGER_KIND,
+  triggerDef,
+  triggerTypeForKind,
+  enabledTriggers,
+  buildTriggerSampleText,
+} from "./triggers";
+export type { WorkflowTriggerDef } from "./triggers";
 
 const defaultDialog = {
   show: false,
@@ -480,7 +458,9 @@ export const hydrateWorkflow = (wf: any) => {
       node.data = {
         ...node.data,
         trigger_kind:
-          node.meta.trigger_kind || node.data.trigger_kind || "alert_fired",
+          node.meta.trigger_kind ||
+          node.data.trigger_kind ||
+          DEFAULT_TRIGGER_KIND,
       };
     }
     return node;
@@ -573,18 +553,12 @@ export default function useWorkflowCanvas() {
   }
 
   // Ask before removing a node — opens the ConfirmDialog (rendered in
-  // WorkflowEditor) rather than deleting outright. The trigger anchors the
-  // workflow, so it's rejected here without a prompt.
+  // WorkflowEditor) rather than deleting outright. The trigger is deletable too:
+  // removing it brings back the "Choose a Trigger" start node so the user can
+  // pick a different kind. Any steps that followed it stay on the canvas (the
+  // user reconnects them to the new trigger), the same as deleting a source in
+  // the pipeline editor.
   function requestDeleteNode(nodeId: string) {
-    const wf = workflowObj.currentSelectedWorkflow;
-    const node = wf.nodes.find((n: any) => n.id === nodeId);
-    if (node?.data?.node_type === "workflow_trigger") {
-      toast({
-        message: "The trigger starts the workflow and can't be deleted",
-        variant: "warning",
-      });
-      return;
-    }
     workflowObj.deleteConfirm = { show: true, nodeId };
   }
   function cancelDeleteNode() {
@@ -593,15 +567,6 @@ export default function useWorkflowCanvas() {
 
   function deleteNode(nodeId: string) {
     const wf = workflowObj.currentSelectedWorkflow;
-    const node = wf.nodes.find((n: any) => n.id === nodeId);
-    // The trigger anchors the workflow and can't be removed.
-    if (node?.data?.node_type === "workflow_trigger") {
-      toast({
-        message: "The trigger starts the workflow and can't be deleted",
-        variant: "warning",
-      });
-      return;
-    }
     wf.nodes = wf.nodes.filter((n: any) => n.id !== nodeId);
     wf.edges = wf.edges.filter(
       (e: any) => e.source !== nodeId && e.target !== nodeId,

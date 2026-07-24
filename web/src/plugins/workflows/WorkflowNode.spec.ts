@@ -434,13 +434,18 @@ describe("WorkflowNode", () => {
   });
 
   describe("delete", () => {
-    it("does not offer delete on the trigger (it is fixed)", async () => {
+    it("offers delete on the trigger too (so its kind can be swapped)", async () => {
       wrapper = mountNode("t1", TRIGGER.data);
       await wrapper.trigger("mouseenter");
       const actions = wrapper.find(
         '[data-test="workflow-node-workflow_trigger-actions"]',
       );
-      expect(actions.element.style.display).toBe("none");
+      expect(actions.element.style.display).not.toBe("none");
+      await wrapper
+        .find('[data-test="workflow-node-workflow_trigger-delete-btn"]')
+        .trigger("click");
+      expect(workflowObj.deleteConfirm).toEqual({ show: true, nodeId: "t1" });
+      expect(toast).not.toHaveBeenCalled();
     });
 
     it("opens the delete confirmation for a non-trigger node", async () => {

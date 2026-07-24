@@ -228,7 +228,9 @@ import useWorkflowCanvas, {
   hydrateWorkflow,
   nodeMeta,
   ADDABLE_NODE_TYPES,
-  TRIGGER_NODE_TYPES,
+  enabledTriggers,
+  triggerTypeForKind,
+  DEFAULT_TRIGGER_KIND,
 } from "@/plugins/workflows/useWorkflowCanvas";
 import workflowService from "@/services/workflows";
 
@@ -301,36 +303,50 @@ const isTriggerStep = computed(
   () => workflowObj.stepPicker.mode === "trigger",
 );
 
-// Items for the shared step picker.
-const stepItems = computed(() =>
-  (isTriggerStep.value ? TRIGGER_NODE_TYPES : ADDABLE_NODE_TYPES).map(
-    (nt: string) => {
-      const m = nodeMeta(nt);
-      const img = m?.image;
-      return {
-        key: nt,
-        title: t(m?.titleKey || nt),
-        description: t(m?.descKey || ""),
-        icon: img ? `img:${img}` : m?.icon || "help",
-        iconTint:
-          m?.category === "action"
-            ? "bg-badge-success-soft-bg text-badge-success-soft-text"
-            : m?.category === "trigger"
-              ? "bg-badge-blue-soft-bg text-badge-blue-soft-text"
-              : "bg-badge-warning-soft-bg text-badge-warning-soft-text",
-        // v1 has one trigger kind; when more land they become their own
-        // TRIGGER_NODE_TYPES entries carrying their own kind.
-        trigger_kind: "alert_fired",
-      };
-    },
-  ),
-);
+// Items for the shared step picker. In "trigger" mode it offers the enabled
+// trigger KINDS (Alert Fired, Incident Event) — all the same node_type
+// ("workflow_trigger"), differing only in `trigger_kind`, which the picker keys
+// on. Disabled kinds (schedule/webhook — "coming soon") are omitted since the
+// popover has no disabled-row affordance. In "step" mode it offers the addable
+// node types.
+const stepItems = computed(() => {
+  if (isTriggerStep.value) {
+    return enabledTriggers().map((tr) => ({
+      key: tr.kind,
+      title: t(tr.labelKey),
+      description: t(tr.descKey),
+      icon: tr.icon,
+      iconTint: "bg-badge-blue-soft-bg text-badge-blue-soft-text",
+      nodeType: "workflow_trigger",
+      trigger_kind: tr.kind,
+    }));
+  }
+  return ADDABLE_NODE_TYPES.map((nt: string) => {
+    const m = nodeMeta(nt);
+    const img = m?.image;
+    return {
+      key: nt,
+      title: t(m?.titleKey || nt),
+      description: t(m?.descKey || ""),
+      icon: img ? `img:${img}` : m?.icon || "help",
+      iconTint:
+        m?.category === "action"
+          ? "bg-badge-success-soft-bg text-badge-success-soft-text"
+          : "bg-badge-warning-soft-bg text-badge-warning-soft-text",
+    };
+  });
+});
 
 const onStepPick = (item: any) => {
   const { source, handle, mode, position } = workflowObj.stepPicker;
   closeStepPicker();
   // The trigger has nothing before it, so it is placed rather than appended.
-  if (mode === "trigger") addTriggerNode(item.key, item.trigger_kind, position);
+  if (mode === "trigger")
+    addTriggerNode(
+      item.nodeType || "workflow_trigger",
+      item.trigger_kind,
+      position,
+    );
   else addNodeAfter(source, handle, item.key);
 };
 
@@ -416,12 +432,21 @@ const validate = (): boolean => {
 // still be sent for deserialization.
 const buildPayload = () => {
   const wf = workflowObj.currentSelectedWorkflow;
+  // Top-level `trigger_type` (AlertFired | IncidentEvent) is derived from the
+  // trigger node's kind (stored in data.trigger_kind, or meta.trigger_kind after
+  // a reload). Defaults to AlertFired when no trigger/kind is present.
+  const triggerNode = (wf.nodes || []).find(
+    (n: any) => n.data?.node_type === "workflow_trigger",
+  );
+  const triggerKind =
+    triggerNode?.data?.trigger_kind || triggerNode?.meta?.trigger_kind;
   return {
     id: wf.id || "",
     org_id: "",
     name: (wf.name || "").trim(),
     description: wf.description || "",
     enabled: wf.enabled ?? true,
+    trigger_type: triggerTypeForKind(triggerKind),
     created_at: wf.created_at || 0,
     updated_at: wf.updated_at || 0,
     created_by: "",
@@ -447,7 +472,7 @@ const serializeNode = (node: any) => {
   // Trigger: NodeData::WorkflowTrigger is a unit variant, so its kind can't live
   // in `data`; carry it in `meta` (strings survive serialization).
   if (nodeType === "workflow_trigger") {
-    meta.trigger_kind = data.trigger_kind || "alert_fired";
+    meta.trigger_kind = data.trigger_kind || DEFAULT_TRIGGER_KIND;
   }
 
   const out: any = {

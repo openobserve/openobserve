@@ -90,15 +90,20 @@ import WorkflowDestination from "@/plugins/workflows/nodes/WorkflowDestination.v
 import useWorkflowCanvas, {
   workflowObj,
   nodeMeta,
+  triggerDef,
 } from "@/plugins/workflows/useWorkflowCanvas";
 
 const { t } = useI18n();
 const { commitNode, cancelNodeDrawer, requestDeleteNode } = useWorkflowCanvas();
 
 const meta = computed(() => nodeMeta(workflowObj.dialog.name));
-const title = computed(() =>
-  meta.value ? t(meta.value.titleKey) : workflowObj.dialog.name,
-);
+const title = computed(() => {
+  // Trigger drawers title by KIND (registry), matching the canvas card; other
+  // nodes use their node-type title.
+  if (meta.value?.category === "trigger")
+    return t(triggerDef(workflowObj.currentSelectedNodeData?.data?.trigger_kind).nodeTitleKey);
+  return meta.value ? t(meta.value.titleKey) : workflowObj.dialog.name;
+});
 
 // Node types that have a real config form. The rest still show the placeholder.
 const BODY_COMPONENTS: Record<string, any> = {

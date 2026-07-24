@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="workflow-trigger-body" class="w-full flex flex-col">
     <p class="text-xs text-text-secondary leading-normal mb-3">
-      {{ t("workflow.node.triggerPayloadIntro") }}
+      {{ t(introKey) }}
     </p>
 
     <!-- Read-only Monaco instead of a hand-rolled schema tree: syntax
@@ -59,8 +59,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Kept from the old tree: without it the sample's job/level/log columns
-         read as guaranteed, when they actually come from the alert's query. -->
-    <p class="text-xs text-text-secondary leading-normal mt-2 italic">
+         read as guaranteed, when they actually come from the alert's query.
+         Incident payloads are `meta`-only (no query rows), so the note is
+         alert-specific. -->
+    <p
+      v-if="hasQueryRows"
+      class="text-xs text-text-secondary leading-normal mt-2 italic"
+    >
       {{ t("workflow.node.triggerDataExampleNote") }}
     </p>
   </div>
@@ -70,7 +75,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineAsyncComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { workflowObj } from "@/plugins/workflows/useWorkflowCanvas";
-import { buildTestSampleText } from "@/plugins/workflows/testSample";
+import {
+  triggerDef,
+  buildTriggerSampleText,
+  DEFAULT_TRIGGER_KIND,
+} from "@/plugins/workflows/triggers";
 
 // Async like every other QueryEditor consumer — Monaco is already on this route
 // (Function node, Test dialog, Step Result drawer), so this adds no new chunk.
@@ -81,9 +90,15 @@ const QueryEditor = defineAsyncComponent(
 const { t } = useI18n();
 
 const savedData = workflowObj.currentSelectedNodeData?.data || {};
-const triggerKind = savedData.trigger_kind || "alert_fired";
+const triggerKind = savedData.trigger_kind || DEFAULT_TRIGGER_KIND;
 
-const payloadText = buildTestSampleText();
+// Everything the read-only reference shows comes from the trigger registry, so a
+// new trigger kind needs no change here: its intro copy, sample payload, and
+// whether it carries alert-query `data[]` rows all resolve from the kind.
+const def = triggerDef(triggerKind);
+const payloadText = buildTriggerSampleText(triggerKind);
+const introKey = def.introKey;
+const hasQueryRows = !!def.hasQueryRows;
 
 // No editable fields — carry the trigger kind through (persisted in meta).
 const submit = () => ({ trigger_kind: triggerKind });
