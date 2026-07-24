@@ -163,7 +163,7 @@ describe("SyntheticsLocationForm", () => {
         id: "aws-us-east-1",
         provider: "aws",
         region: "us-east-1",
-        name: "AWS US East",
+        label: "AWS US East",
         enabled: false,
       },
     });
@@ -192,7 +192,7 @@ describe("SyntheticsLocationForm", () => {
         id: "datadog-us-west-1",
         provider: "datadog",
         region: "us-west-1",
-        name: "Datadog US West",
+        label: "Datadog US West",
         enabled: true,
       },
     });
@@ -224,7 +224,7 @@ describe("SyntheticsLocationForm", () => {
     // providerValue to "custom", which conditionally renders the input.
     wrapper = createWrapper({
       isEdit: true,
-      data: { provider: "datadog", region: "us-east-1", name: "Test" },
+      data: { provider: "datadog", region: "us-east-1", label: "Test" },
     });
 
     // providerValue is initialized from locationFormDefaults.provider = "custom"
@@ -252,7 +252,7 @@ describe("SyntheticsLocationForm", () => {
   it("hides customProvider when editing a known provider (aws)", () => {
     wrapper = createWrapper({
       isEdit: true,
-      data: { provider: "aws", region: "us-east-1", name: "Test" },
+      data: { provider: "aws", region: "us-east-1", label: "Test" },
     });
     expect(wrapper.vm.providerValue).toBe("aws");
 
@@ -355,7 +355,7 @@ describe("SyntheticsLocationForm", () => {
         id: "azure-eastus",
         provider: "azure",
         region: "eastus",
-        name: "Azure East US",
+        label: "Azure East US",
         enabled: true,
       },
     });
@@ -414,7 +414,7 @@ describe("SyntheticsLocationForm", () => {
 
     wrapper = createWrapper({
       isEdit: true,
-      data: { id: "aws-us-east-1", provider: "aws", region: "us-east-1", name: "Test" },
+      data: { id: "aws-us-east-1", provider: "aws", region: "us-east-1", label: "Test" },
     });
 
     await wrapper.vm.saveLocation({
@@ -441,7 +441,7 @@ describe("SyntheticsLocationForm", () => {
   it("renders the location ID label and container", () => {
     wrapper = createWrapper({
       isEdit: true,
-      data: { provider: "gcp", region: "us-central1", name: "GCP Central" },
+      data: { provider: "gcp", region: "us-central1", label: "GCP Central" },
     });
     // The "Location ID" label and the derived-id container are present.
     expect(wrapper.text()).toContain("Location ID");

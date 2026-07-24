@@ -47,9 +47,11 @@ use infra::{
     errors::{Error, Result},
     schema::{SchemaCache, get_partition_time_level},
 };
+use ingestion_common::IngestUser;
 use promql_parser::{label::MatchOp, parser};
 use prost::Message;
 use proto::prometheus_rpc;
+use schema::{check_for_schema, stream_schema_exists};
 use search_service;
 
 use super::native_histogram::{CLASSIC_HISTOGRAM_SUFFIXES, expand_native_histogram};
@@ -62,9 +64,7 @@ use crate::{
     ingestion::{
         TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id, write_file,
     },
-    ingestion_types::IngestUser,
     pipeline::batch_execution::ExecutablePipeline,
-    schema::{check_for_schema, stream_schema_exists},
 };
 
 pub async fn remote_write(
@@ -109,6 +109,10 @@ pub async fn remote_write(
 
     // records buffer
     let mut json_data_by_stream: HashMap<String, Vec<_>> = HashMap::new();
+
+    // check if stream is deleting from cache
+    let mut stream_delete_status: HashMap<String, bool> = HashMap::new();
+    let mut skipped_records: u32 = 0;
 
     // parse metadata
     for item in request.metadata {
@@ -295,6 +299,26 @@ pub async fn remote_write(
             None => continue,
         };
 
+        // check stream if it is deleting
+        let is_deleting = match stream_delete_status.get(&metric_name) {
+            Some(v) => *v,
+            None => {
+                let flag = db::compact::retention::is_deleting_stream(
+                    org_id,
+                    StreamType::Metrics,
+                    &metric_name,
+                    None,
+                );
+                stream_delete_status.insert(metric_name.clone(), flag);
+                flag
+            }
+        };
+
+        if is_deleting {
+            skipped_records += 1;
+            continue;
+        }
+
         // Note: All configurations (pipeline, UDS, schema, partition, alerts) are now pre-loaded
         // before the loop to avoid repeated async queries
 
@@ -408,6 +432,12 @@ pub async fn remote_write(
         }
         sample_processing_time += sample_start.elapsed().as_micros();
     }
+
+    // warn if any records were skipped due to streams being deleted
+    if skipped_records > 0 {
+        log::warn!("[METRICS:PROM] Skipped {skipped_records} records due to streams being deleted");
+    }
+
     let parse_timeseries_ms = step_start.elapsed().as_millis();
 
     // Detailed performance logging

@@ -373,13 +373,13 @@ const getWorkflows = async () => {
 };
 
 // --- navigation --------------------------------------------------------------
-// New Workflow -> editor with the chosen trigger seeded (PipelineEditor-style,
-// no dialog). The editor's seedTrigger reads `?trigger`. The workflow is created
-// on Save.
-const openCreateEditor = (trigger = "alert_fired") => {
+// New Workflow -> editor on an EMPTY canvas; the trigger is chosen there (the
+// canvas start node opens the trigger picker), so create carries no trigger
+// kind. The workflow is created on Save.
+const openCreateEditor = () => {
   router.push({
     name: "createWorkflow",
-    query: { org_identifier: orgId.value, trigger },
+    query: { org_identifier: orgId.value },
   });
 };
 

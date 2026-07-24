@@ -518,6 +518,79 @@ describe("PanelSchemaRenderer", () => {
 
       expect(wrapper.text()).not.toContain("No Data");
     });
+
+    // Regression: removing the required columns after a successful run clears
+    // the underlying data (noData => "No Data") but leaves the already-converted
+    // rows in panelData, because convertPanelDataCommon bails on validation and
+    // never refreshes it. tableRendererData must NOT re-serve those stale rows
+    // behind the empty state (mirrors chartRendererData's noData guard).
+    // NOTE: uses the default loader mock (no mockReturnValue override) so the
+    // real-ref shape doesn't leak into later tests via beforeEach's clearAllMocks.
+    it("clears stale table rows once required columns are removed (No Data)", async () => {
+      wrapper = createWrapper({
+        panelSchema: {
+          ...defaultProps.panelSchema,
+          type: "table",
+          // No First Column / Other Columns => validation fails, so
+          // convertPanelDataCommon leaves panelData untouched (stale).
+          queries: [
+            {
+              ...defaultProps.panelSchema.queries[0],
+              fields: { x: [], y: [], stream: "logs", stream_type: "logs" },
+            },
+          ],
+        },
+      });
+      await flushPromises();
+
+      // Default loader data has no usable rows => hasRawData falsy => "No Data".
+      // Simulate a prior successful run leaving converted rows in panelData.
+      wrapper.vm.panelData = {
+        chartType: "table",
+        rows: [{ a: 1 }, { a: 2 }],
+        columns: [{ name: "a", field: "a" }],
+      };
+      await flushPromises();
+
+      expect(wrapper.vm.noData).toBe("No Data");
+      expect(wrapper.vm.tableRendererData).toEqual({ rows: [], columns: [] });
+    });
+
+    // Guard must not over-trigger: with rows present the table keeps serving
+    // the converted data (unchanged fall-through behaviour).
+    // mockReturnValueOnce only overrides THIS mount, so the real-ref shape can't
+    // leak into later tests (unlike a persistent mockReturnValue).
+    it("serves converted table data while rows are present", async () => {
+      vi.mocked(usePanelDataLoader).mockReturnValueOnce({
+        data: ref([[{ a: 1 }]]), // loader has rows => hasRawData truthy
+        loading: ref(false),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({}),
+        resultMetaData: ref({}),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+      } as any);
+
+      wrapper = createWrapper({
+        panelSchema: { ...defaultProps.panelSchema, type: "table" },
+      });
+      await flushPromises();
+
+      const converted = {
+        chartType: "table",
+        rows: [{ a: 1 }],
+        columns: [{ name: "a", field: "a" }],
+      };
+      wrapper.vm.panelData = converted; // reactive: forces noData re-eval
+      await flushPromises();
+
+      expect(wrapper.vm.noData).toBe("");
+      expect(wrapper.vm.tableRendererData).toEqual(converted);
+    });
   });
 
   describe("Mouse Events", () => {

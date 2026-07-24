@@ -423,8 +423,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="mx-2">
         <div
-          class="flex justify-end gap-2 px-3 w-full py-2.5 bg-card-glass-bg sticky"
-          style="bottom: 0px; z-index: 2"
+          class="flex justify-end gap-2 px-3 w-full py-2.5 bg-card-glass-bg sticky bottom-0 z-2"
         >
           <OButton
             data-test="add-action-script-cancel-btn"

@@ -488,7 +488,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <span class="font-semibold text-text-secondary text-compact whitespace-nowrap">{{ t('alerts.queryConfig.onThese') }}</span>
                   <div
-                    class="flex items-center gap-1 cursor-pointer select-none filters-inline-toggle px-2 py-0.5 rounded-default transition-colors bg-surface-panel hover:bg-primary-50"
+                    class="flex items-center gap-1 cursor-pointer select-none filters-inline-toggle px-2 py-0.5 rounded-default transition-colors bg-surface-panel hover:bg-tabs-hover-bg"
                     @click="toggleFilters"
                   >
                     <OIcon
@@ -572,7 +572,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else class="mb-1 px-3">
             <div class="flex items-center gap-2 py-1">
               <div
-                class="flex items-center gap-1 cursor-pointer select-none filters-inline-toggle px-2 py-0.5 rounded-default transition-colors bg-surface-panel hover:bg-primary-50"
+                class="flex items-center gap-1 cursor-pointer select-none filters-inline-toggle px-2 py-0.5 rounded-default transition-colors bg-surface-panel hover:bg-tabs-hover-bg"
                 @click="toggleFilters"
               >
                 <OIcon

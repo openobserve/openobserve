@@ -316,7 +316,7 @@ async fn step_delete_stream(org_id: &str, type_and_name: &str) -> Result<(), any
     // file_list scan. It removes local-disk files, file_list rows, and dump files
     // over the canonical (BASE_TIME, now) range — avoiding the invalid/overflowing
     // (0, i64::MAX) range that query_for_dump rejects.
-    crate::compact::retention::delete_all(org_id, stream_type, stream_name).await?;
+    compaction::retention::delete_all(org_id, stream_type, stream_name).await?;
 
     // Delete the schema entry (delete_all removes data, not the stream definition).
     crate::db::schema::delete(org_id, stream_name, Some(stream_type)).await?;
@@ -518,7 +518,7 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     // so once the rows are gone the objects can no longer be located and would leak.
     // (search_jobs service is enterprise-only; OSS just drops the rows below.)
     #[cfg(feature = "enterprise")]
-    crate::search_jobs::delete_org_result_files(org_id)
+    search_service::search_jobs::delete_org_result_files(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/search_job_results: {e}"))?;
     infra::table::search_job::search_jobs::delete_by_org(org_id)

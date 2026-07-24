@@ -41,6 +41,7 @@ use config::{
     utils::{flatten, json, schema_ext::SchemaExt, time::now_micros, util::DISTINCT_STREAM_PREFIX},
 };
 use infra::schema::{SchemaCache, get_partition_time_level};
+use ingestion_common::IngestUser;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
     collector::trace::v1::{
@@ -49,6 +50,7 @@ use opentelemetry_proto::tonic::{
     trace::v1::{Status, status::StatusCode},
 };
 use prost::Message;
+use schema::{check_for_schema, stream_schema_exists};
 use serde_json::Map;
 
 pub mod agent_signals;
@@ -57,10 +59,10 @@ pub mod otel;
 pub mod service_graph;
 pub mod session;
 
+#[cfg(feature = "cloud")]
+use ::stream::get_stream;
 use config::utils::schema::format_stream_name;
 
-#[cfg(feature = "cloud")]
-use crate::stream::get_stream;
 use crate::{
     alerts::alert::AlertExt,
     common::meta::{
@@ -72,12 +74,10 @@ use crate::{
         TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id, grpc::get_val,
         write_file,
     },
-    ingestion_types::IngestUser,
     logs::O2IngestJsonData,
     metadata::{
         MetadataItem, MetadataType, distinct_values::DvItem, trace_list_index::TraceListItem, write,
     },
-    schema::{check_for_schema, stream_schema_exists},
     traces::otel::{OtelIngestionProcessor, is_llm_trace},
 };
 

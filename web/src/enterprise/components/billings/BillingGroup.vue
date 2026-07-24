@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex items-center justify-between gap-14 py-12 px-10 flex-wrap">
           <!-- Left: headline + CTA -->
           <div class="flex-1 min-w-70 max-w-120">
-            <div class="inline-flex items-center gap-1.5 text-xs font-semibold tracking-[0.4px] text-primary-600 bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] border border-[color-mix(in_srgb,var(--color-primary-600)_25%,transparent)] py-1 px-2.5 rounded-full mb-5">
+            <div class="inline-flex items-center gap-1.5 text-xs font-semibold tracking-[0.4px] text-accent bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] border border-[color-mix(in_srgb,var(--color-primary-600)_25%,transparent)] py-1 px-2.5 rounded-full mb-5">
               <OIcon name="verified" size="xs" />
               {{ t("billing.billingGroup.statusActive") }}
             </div>
@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Right: membership facts -->
           <div class="w-85 shrink-0 flex flex-col gap-3.5" data-test="org-group-child-details">
             <div class="og-feature flex items-start gap-4 py-4.5 px-5 rounded-default bg-surface-base border border-card-glass-border transition-all duration-200 hover:shadow-lg hover:-translate-y-px">
-              <div class="w-10 h-10 rounded-default shrink-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-primary-600">
+              <div class="w-10 h-10 rounded-default shrink-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-accent">
                 <OIcon name="person-add" />
               </div>
               <div class="flex-1 min-w-0">
@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div class="og-feature flex items-start gap-4 py-4.5 px-5 rounded-default bg-surface-base border border-card-glass-border transition-all duration-200 hover:shadow-lg hover:-translate-y-px">
-              <div class="w-10 h-10 rounded-default shrink-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-primary-600">
+              <div class="w-10 h-10 rounded-default shrink-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-accent">
                 <OIcon name="how-to-reg" />
               </div>
               <div class="flex-1 min-w-0">
@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div class="og-feature flex items-start gap-4 py-4.5 px-5 rounded-default bg-surface-base border border-card-glass-border transition-all duration-200 hover:shadow-lg hover:-translate-y-px">
-              <div class="w-10 h-10 rounded-default shrink-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-primary-600">
+              <div class="w-10 h-10 rounded-default shrink-0 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-accent">
                 <OIcon name="schedule" />
               </div>
               <div class="flex-1 min-w-0">
@@ -265,7 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="w-25 h-25 rounded-full border border-dashed border-[color-mix(in_srgb,var(--color-primary-600)_30%,transparent)] flex items-center justify-center mb-7">
             <div class="w-17 h-17 rounded-full bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] border-[1.5px] border-solid border-[color-mix(in_srgb,var(--color-primary-600)_24%,transparent)] flex items-center justify-center">
-              <OIcon name="group-add" size="lg" class="text-primary-600 opacity-85" />
+              <OIcon name="group-add" size="lg" class="text-accent opacity-85" />
             </div>
           </div>
 
