@@ -15,11 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col flex-1 min-h-0">
+  <div class="flex min-h-0 flex-1 flex-col">
     <!-- Loading state -->
     <div
       v-if="loading"
-      class="flex flex-col items-center justify-center h-full gap-3"
+      class="flex h-full flex-col items-center justify-center gap-3"
       data-test="rum-player-traces-tab-loading"
     >
       <OSpinner size="md" />
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Error state -->
     <div
       v-else-if="error"
-      class="flex flex-col items-center justify-center h-full gap-4 p-4"
+      class="flex h-full flex-col items-center justify-center gap-4 p-4"
       data-test="rum-player-traces-tab-error"
     >
       <OIcon name="error-outline" size="lg" class="text-status-error-text" />
@@ -47,22 +47,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Empty state -->
     <div
       v-else-if="correlatedViews.length === 0"
-      class="flex flex-col items-center justify-center h-full gap-3 p-4"
+      class="flex h-full flex-col items-center justify-center gap-3 p-4"
       data-test="rum-player-traces-tab-empty"
     >
       <OIcon name="info" size="lg" class="text-text-muted" />
-      <p class="text-center text-text-secondary">
+      <p class="text-text-secondary text-center">
         {{ t("rum.noCorrelatedTraces") }}
       </p>
     </div>
 
     <!-- Detail view: embedded TraceDetails -->
-    <div
-      v-else-if="selectedTrace"
-      class="flex flex-col h-full overflow-hidden"
-    >
+    <div v-else-if="selectedTrace" class="flex h-full flex-col overflow-hidden">
       <!-- Trace detail header -->
-      <div class="flex items-center gap-1 px-2 py-1.5 border-b border-solid border-card-glass-border">
+      <div
+        class="border-card-glass-border flex items-center gap-1 border-b border-solid px-2 py-1.5"
+      >
         <OButton
           variant="ghost"
           size="xs"
@@ -72,18 +71,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OIcon name="arrow-back" size="sm" />
         </OButton>
-        <code class="text-sm text-text-secondary truncate min-w-0 flex-1">{{ shortRoute(selectedTrace.route) || selectedTrace.label }}</code>
-        <div class="flex items-center gap-1.5 flex-shrink-0">
+        <code class="text-text-secondary min-w-0 flex-1 truncate text-sm">{{
+          shortRoute(selectedTrace.route) || selectedTrace.label
+        }}</code>
+        <div class="flex flex-shrink-0 items-center gap-1.5">
           <span
             v-if="selectedTrace.metadata?.errorCount > 0"
-            class="font-bold inline-flex items-center gap-1 px-1.5 py-0.5 rounded-default text-2xs bg-status-error-bg! text-status-error-text!"
+            class="rounded-default text-2xs bg-status-error-bg! text-status-error-text! inline-flex items-center gap-1 px-1.5 py-0.5 font-bold"
           >
             <OIcon name="error" size="xs" />
-            {{ selectedTrace.metadata.errorCount }} {{ selectedTrace.metadata.errorCount === 1 ? t("rum.error") : t("rum.errors") }}
+            {{ selectedTrace.metadata.errorCount }}
+            {{ selectedTrace.metadata.errorCount === 1 ? t("rum.error") : t("rum.errors") }}
           </span>
           <button
             v-if="selectedTrace.metadata?.start_time && props.startTime > 0"
-            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-default text-2xs bg-surface-accent text-text-body whitespace-nowrap cursor-pointer hover:bg-card-glass-border"
+            class="rounded-default text-2xs bg-surface-accent text-text-body hover:bg-card-glass-border inline-flex cursor-pointer items-center gap-1 px-1.5 py-0.5 whitespace-nowrap"
             :title="t('rum.seekToMoment')"
             data-test="rum-player-traces-tab-seek-btn"
             @click="seekToTrace(selectedTrace)"
@@ -93,17 +95,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </button>
           <span
             v-if="selectedTrace.metadata?.e2eDuration"
-            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-default text-2xs bg-surface-accent text-text-body whitespace-nowrap"
+            class="rounded-default text-2xs bg-surface-accent text-text-body inline-flex items-center gap-1 px-1.5 py-0.5 whitespace-nowrap"
           >
             <OIcon name="timer" size="xs" class="text-text-secondary" />
             {{ formatTimeWithSuffix(selectedTrace.metadata.e2eDuration * 1000) }}
           </span>
           <span
             v-if="selectedTrace.metadata?.spanCount"
-            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-default text-2xs bg-surface-accent text-text-body whitespace-nowrap"
+            class="rounded-default text-2xs bg-surface-accent text-text-body inline-flex items-center gap-1 px-1.5 py-0.5 whitespace-nowrap"
           >
             <OIcon name="lan" size="xs" class="text-text-secondary" />
-            {{ selectedTrace.metadata.spanCount }} {{ selectedTrace.metadata.spanCount === 1 ? t("rum.span") : t("rum.spans") }}
+            {{ selectedTrace.metadata.spanCount }}
+            {{ selectedTrace.metadata.spanCount === 1 ? t("rum.span") : t("rum.spans") }}
           </span>
           <OButton
             variant="outline"
@@ -142,26 +145,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- List view -->
-    <div v-else class="flex flex-col overflow-hidden h-full px-2">
+    <div v-else class="flex h-full flex-col overflow-hidden px-2">
       <!-- Filter bar -->
-      <div class="flex items-center pr-2 py-1  shrink-0 min-h-8">
+      <div class="flex min-h-8 shrink-0 items-center py-1 pr-2">
         <OTag
           type="logsResultChip"
           value="neutral"
           data-test="rum-player-traces-tab-count-badge"
           class="mr-[0.6rem]"
-        >{{ `${formatLargeNumber(correlatedViews.length)} ${t("menu.traces").toLowerCase()}` }}</OTag>
+          >{{
+            `${formatLargeNumber(correlatedViews.length)} ${t("menu.traces").toLowerCase()}`
+          }}</OTag
+        >
         <OTag
           v-if="totalErrorCount > 0"
           type="logsResultChip"
           value="error"
           data-test="rum-player-traces-tab-error-count-badge"
-        >{{ `${formatLargeNumber(totalErrorCount)} ${t("rum.errorTraces")}` }}</OTag>
+          >{{ `${formatLargeNumber(totalErrorCount)} ${t("rum.errorTraces")}` }}</OTag
+        >
       </div>
 
       <!-- Traces table -->
       <div
-        class="flex-1 min-h-0 overflow-hidden rounded-default"
+        class="rounded-default min-h-0 flex-1 overflow-hidden"
         data-test="rum-player-traces-tab-table"
       >
         <OTable
@@ -183,10 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </template>
           <template #cell-route="{ row }">
-            <span
-              class="truncate font-mono text-xs block"
-              :title="row.route"
-            >
+            <span class="block truncate font-mono text-xs" :title="row.route">
               {{ shortRoute(row.route) }}
             </span>
           </template>
@@ -256,11 +260,11 @@ const traceMetadata = ref<Record<string, any>>({});
 const metadataLoading = ref(false);
 const metadataError = ref<string | null>(null);
 
-const totalErrorCount = computed(() =>
-  correlatedViews.value.filter((v) => (v.metadata?.errorCount || 0) > 0).length,
+const totalErrorCount = computed(
+  () => correlatedViews.value.filter((v) => (v.metadata?.errorCount || 0) > 0).length,
 );
 
-const {fetchQueryDataWithHttpStream} = useHttpStreaming();
+const { fetchQueryDataWithHttpStream } = useHttpStreaming();
 
 // ── Table column definitions ────────────────────────────────
 const traceColumns = computed(() => [
@@ -328,7 +332,9 @@ function formatTraceTimestamp(startTimeNs: number): string {
   if (!startTimeNs || !props.startTime) return "—";
   const offsetMs = traceRelativeTimeMs(startTimeNs);
   const totalSec = Math.floor(offsetMs / 1000);
-  const mm = Math.floor(totalSec / 60).toString().padStart(2, "0");
+  const mm = Math.floor(totalSec / 60)
+    .toString()
+    .padStart(2, "0");
   const ss = (totalSec % 60).toString().padStart(2, "0");
   return `${mm}:${ss}`;
 }
@@ -337,27 +343,28 @@ function traceTimeOffset(startTimeNs: number): string {
   if (!props.startTime) return "";
   const offsetMs = traceRelativeTimeMs(startTimeNs);
   const totalSec = Math.floor(offsetMs / 1000);
-  const min = Math.floor(totalSec / 60).toString().padStart(2, "0");
+  const min = Math.floor(totalSec / 60)
+    .toString()
+    .padStart(2, "0");
   const sec = (totalSec % 60).toString().padStart(2, "0");
   return `${min}:${sec}`;
 }
 
 // ── Data fetching ───────────────────────────────────────────
-async function fetchTraceMetadata(
-  traceIds: string[],
-): Promise<Record<string, any>> {
+async function fetchTraceMetadata(traceIds: string[]): Promise<Record<string, any>> {
   if (traceIds.length === 0) return {};
 
   const orgId = store.state.selectedOrganization.identifier;
   const nowMs = Date.now();
-  const searchStartTime = (props.startTime || (nowMs - 86400000)) * 1000;
+  const searchStartTime = (props.startTime || nowMs - 86400000) * 1000;
   const searchEndTime = (props.endTime || nowMs) * 1000;
 
   // Build filter for multiple trace IDs
-  const safeTraceIds = traceIds.map(id => id.replace(/'/g, "''"));
-  const filter = safeTraceIds.length === 1
-    ? `trace_id='${safeTraceIds[0]}'`
-    : `trace_id IN (${safeTraceIds.map(id => `'${id}'`).join(',')})`;
+  const safeTraceIds = traceIds.map((id) => id.replace(/'/g, "''"));
+  const filter =
+    safeTraceIds.length === 1
+      ? `trace_id='${safeTraceIds[0]}'`
+      : `trace_id IN (${safeTraceIds.map((id) => `'${id}'`).join(",")})`;
 
   return new Promise<Record<string, any>>((resolve, reject) => {
     const traceId = generateTraceContext().traceId;
@@ -386,8 +393,8 @@ async function fetchTraceMetadata(
               spanCount: hit.spans?.[0] || 0,
               errorCount: hit.spans?.[1] || 0,
               serviceCount: hit.service_name?.length || 0,
-              rootService: hit.first_event?.service_name || 'unknown',
-              rootOperation: hit.first_event?.operation_name || 'unknown',
+              rootService: hit.first_event?.service_name || "unknown",
+              rootOperation: hit.first_event?.operation_name || "unknown",
               start_time: hit.start_time,
               end_time: hit.end_time,
             };
@@ -395,8 +402,8 @@ async function fetchTraceMetadata(
         },
         error: (_, error) => reject(error),
         complete: () => resolve(metadata),
-        reset: () => {}
-      }
+        reset: () => {},
+      },
     );
   });
 }
@@ -410,7 +417,7 @@ async function fetchTraces() {
   try {
     const orgId = store.state.selectedOrganization.identifier;
     const nowMs = Date.now();
-    const searchStartTime = (props.startTime || (nowMs - 86400000)) * 1000;
+    const searchStartTime = (props.startTime || nowMs - 86400000) * 1000;
     const searchEndTime = (props.endTime || nowMs) * 1000;
 
     const rumQuery = {
@@ -450,7 +457,10 @@ async function fetchTraces() {
         rumDate: hit._date || 0,
         route: viewUrl,
         label: viewUrl ? shortRoute(viewUrl).replace(/\/$/, "") || "/" : traceId,
-        kind: (hit._view_loading_type || hit.view_loading_type) === "initial_load" ? "load" : "route_change",
+        kind:
+          (hit._view_loading_type || hit.view_loading_type) === "initial_load"
+            ? "load"
+            : "route_change",
         viewId: hit._view_id || hit.view_id || "",
       });
     }
@@ -462,24 +472,25 @@ async function fetchTraces() {
     if (views.length > 0) {
       metadataLoading.value = true;
       try {
-        const metadata = await fetchTraceMetadata(views.map(v => v.traceId));
+        const metadata = await fetchTraceMetadata(views.map((v) => v.traceId));
 
         // Only keep views whose trace_id exists in the traces stream, sorted by start time
         filteredViews = views
-          .filter(view => metadata[view.traceId])
-          .map(view => {
+          .filter((view) => metadata[view.traceId])
+          .map((view) => {
             const meta = metadata[view.traceId];
-            const e2eDuration = view.rumDate && meta.end_time
-              ? Math.max(0, Math.floor(meta.end_time / 1_000_000) - view.rumDate)
-              : 0;
+            const e2eDuration =
+              view.rumDate && meta.end_time
+                ? Math.max(0, Math.floor(meta.end_time / 1_000_000) - view.rumDate)
+                : 0;
             return { ...view, metadata: { ...meta, e2eDuration: e2eDuration } };
           })
           .sort((a, b) => (a.metadata.start_time ?? 0) - (b.metadata.start_time ?? 0));
 
         traceMetadata.value = metadata;
       } catch (err: any) {
-        metadataError.value = err?.message || 'Failed to fetch trace metadata';
-        console.warn('Trace metadata fetch failed:', err);
+        metadataError.value = err?.message || "Failed to fetch trace metadata";
+        console.warn("Trace metadata fetch failed:", err);
       } finally {
         metadataLoading.value = false;
       }
@@ -497,7 +508,7 @@ function openTraceDetail(view: any) {
   selectedTrace.value = view;
 
   const nowMs = Date.now();
-  const fallbackStart = (props.startTime || (nowMs - 86400000)) * 1000;
+  const fallbackStart = (props.startTime || nowMs - 86400000) * 1000;
   const fallbackEnd = (props.endTime || nowMs) * 1000;
 
   const meta = traceMetadata.value[view.traceId];

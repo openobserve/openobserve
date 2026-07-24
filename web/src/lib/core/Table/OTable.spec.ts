@@ -534,9 +534,9 @@ describe("OTable", () => {
       });
 
       // Overlay rendered in cells
-      expect(
-        wrapper.findAll('[data-test^="o2-table-cell-hover-actions-"]').length,
-      ).toBeGreaterThan(0);
+      expect(wrapper.findAll('[data-test^="o2-table-cell-hover-actions-"]').length).toBeGreaterThan(
+        0,
+      );
       // Nothing active before hover
       expect(wrapper.findAll('.hover-act[data-active="true"]').length).toBe(0);
 
@@ -560,10 +560,7 @@ describe("OTable", () => {
       wrapper = mount(OTable, {
         props: {
           data: makeRows(1),
-          columns: [
-            ...makeColumns().slice(0, 1),
-            { id: "actions", header: "", isAction: true },
-          ],
+          columns: [...makeColumns().slice(0, 1), { id: "actions", header: "", isAction: true }],
         },
         slots: {
           "cell-actions": `<span data-test="col-actions">Edit</span>`,
@@ -572,9 +569,7 @@ describe("OTable", () => {
       // Per-column actions slot still renders
       expect(wrapper.find('[data-test="col-actions"]').exists()).toBe(true);
       // No generic hover overlay was created (that slot wasn't provided)
-      expect(
-        wrapper.findAll('[data-test^="o2-table-cell-hover-actions-"]').length,
-      ).toBe(0);
+      expect(wrapper.findAll('[data-test^="o2-table-cell-hover-actions-"]').length).toBe(0);
     });
   });
 
@@ -765,16 +760,10 @@ describe("OTable", () => {
         },
       });
       // Only the closable column gets a remove button
-      expect(
-        wrapper.find('[data-test="o2-table-th-remove-name-btn"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="o2-table-th-remove-id-btn"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="o2-table-th-remove-name-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-th-remove-id-btn"]').exists()).toBe(false);
 
-      await wrapper
-        .find('[data-test="o2-table-th-remove-name-btn"]')
-        .trigger("click");
+      await wrapper.find('[data-test="o2-table-th-remove-name-btn"]').trigger("click");
       const ev = wrapper.emitted("close-column");
       expect(ev).toBeTruthy();
       expect((ev![0][0] as OTableColumnDef).id).toBe("name");
@@ -1250,9 +1239,7 @@ describe("OTable", () => {
   // ── Per-column value filter (#2239.4) ────────────────────────
   describe("per-column value filter", () => {
     function filterableColumns(): OTableColumnDef<TestRow>[] {
-      return makeColumns().map((c) =>
-        c.id === "status" ? { ...c, filterable: true } : c,
-      );
+      return makeColumns().map((c) => (c.id === "status" ? { ...c, filterable: true } : c));
     }
 
     it("filters rows to the selected values through the column API", async () => {
@@ -1300,12 +1287,8 @@ describe("OTable", () => {
         },
       });
       await nextTick();
-      expect(
-        wrapper.find('[data-test="o2-table-column-filter-btn-status"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="o2-table-column-filter-btn-email"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="o2-table-column-filter-btn-status"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-column-filter-btn-email"]').exists()).toBe(false);
     });
 
     it("renders no filter buttons when enableColumnFilter is off", async () => {
@@ -1318,9 +1301,7 @@ describe("OTable", () => {
         },
       });
       await nextTick();
-      expect(
-        wrapper.find('[data-test="o2-table-column-filter-btn-status"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="o2-table-column-filter-btn-status"]').exists()).toBe(false);
     });
   });
 
@@ -1336,9 +1317,7 @@ describe("OTable", () => {
       await nextTick();
       // hideable must not imply closable — otherwise every table's headers show
       // a dead "x" (QA #2239.1, seen on the dashboards list).
-      expect(
-        wrapper.find('[data-test="o2-table-th-remove-name-btn"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="o2-table-th-remove-name-btn"]').exists()).toBe(false);
     });
 
     it("shows the close x only when a column opts in via meta.closable", async () => {
@@ -1349,12 +1328,8 @@ describe("OTable", () => {
         props: { data: makeRows(3), columns, pagination: "none", sorting: "none" },
       });
       await nextTick();
-      expect(
-        wrapper.find('[data-test="o2-table-th-remove-name-btn"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="o2-table-th-remove-email-btn"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="o2-table-th-remove-name-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-th-remove-email-btn"]').exists()).toBe(false);
     });
   });
 

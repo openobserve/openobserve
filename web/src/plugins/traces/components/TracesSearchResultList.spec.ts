@@ -53,14 +53,7 @@ vi.mock("@/composables/useTraces", () => ({
     updatedLocalLogFilterField: vi.fn(),
   }),
   DEFAULT_TRACE_COLUMNS: {
-    traces: [
-      "service_name",
-      "operation_name",
-      "duration",
-      "spans",
-      "status",
-      "service_latency",
-    ],
+    traces: ["service_name", "operation_name", "duration", "spans", "status", "service_latency"],
     spans: ["service_name", "operation_name", "duration", "span_status"],
   },
 }));
@@ -79,13 +72,7 @@ vi.mock("@/plugins/traces/composables/useTracesTableColumns", () => ({
 vi.mock("@/plugins/logs/data-table/CellActions.vue", () => ({
   default: {
     name: "CellActions",
-    props: [
-      "column",
-      "row",
-      "selectedStreamFields",
-      "hideSearchTermActions",
-      "hideAi",
-    ],
+    props: ["column", "row", "selectedStreamFields", "hideSearchTermActions", "hideAi"],
     emits: ["copy", "add-search-term", "send-to-ai-chat"],
     template: `<div data-test="stub-cell-actions" />`,
   },
@@ -120,12 +107,7 @@ vi.mock("@/lib/core/Table/OTable.vue", () => ({
       "showGlobalFilter",
       "selectedStreamFields",
     ],
-    emits: [
-      "row-click",
-      "sort-change",
-      "close-column",
-      "column-order-change",
-    ],
+    emits: ["row-click", "sort-change", "close-column", "column-order-change"],
     setup() {
       return { cellActionsColumn: cellActionsColumnRef };
     },
@@ -177,7 +159,6 @@ vi.mock("./SpanStatusCodeBadge.vue", () => ({
 
 import TracesSearchResultList from "./TracesSearchResultList.vue";
 
-
 const makeHit = (id: string, errors = 0) => ({
   trace_id: id,
   service_name: "frontend",
@@ -203,9 +184,7 @@ describe("TracesSearchResultList", () => {
     cellActionsColumnRef.id = undefined;
   });
 
-  const mount_ = (
-    props: { hits: any[]; loading: boolean } & Record<string, any>,
-  ) =>
+  const mount_ = (props: { hits: any[]; loading: boolean } & Record<string, any>) =>
     mount(TracesSearchResultList, {
       props: props as any,
       global: { plugins: [i18n, store] },
@@ -215,9 +194,7 @@ describe("TracesSearchResultList", () => {
   describe("loading state", () => {
     it("shows skeleton while loading", () => {
       wrapper = mount_({ hits: [], loading: true });
-      expect(
-        wrapper.find('[data-test="tenstack-table-skeleton-body"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="tenstack-table-skeleton-body"]').exists()).toBe(true);
     });
 
     // The component uses v-show="hasResults || loading" on the table wrapper, so
@@ -225,9 +202,7 @@ describe("TracesSearchResultList", () => {
     // It is only absent from the DOM when noResults is true (searchPerformed && !loading && empty).
     it.skip("hides the table wrapper while loading", () => {
       wrapper = mount_({ hits: [], loading: true });
-      expect(wrapper.find('[data-test="traces-table-wrapper"]').exists()).toBe(
-        false,
-      );
+      expect(wrapper.find('[data-test="traces-table-wrapper"]').exists()).toBe(false);
     });
 
     it("hides the empty state while loading", () => {
@@ -245,16 +220,14 @@ describe("TracesSearchResultList", () => {
 
     it("does not show spinner in empty state", () => {
       wrapper = mount_({ hits: [], loading: false, searchPerformed: true });
-      expect(
-        wrapper.find('[data-test="traces-search-result-loading-indicator"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="traces-search-result-loading-indicator"]').exists()).toBe(
+        false,
+      );
     });
 
     it("does not show the table in empty state", () => {
       wrapper = mount_({ hits: [], loading: false, searchPerformed: true });
-      expect(wrapper.find('[data-test="traces-table-wrapper"]').exists()).toBe(
-        false,
-      );
+      expect(wrapper.find('[data-test="traces-table-wrapper"]').exists()).toBe(false);
     });
 
     it("does not show no-results message when searchPerformed is false", () => {
@@ -269,16 +242,14 @@ describe("TracesSearchResultList", () => {
 
     it("shows the table wrapper when hits exist", () => {
       wrapper = mount_({ hits, loading: false, searchPerformed: true });
-      expect(wrapper.find('[data-test="traces-table-wrapper"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="traces-table-wrapper"]').exists()).toBe(true);
     });
 
     it("does not show spinner when hits exist", () => {
       wrapper = mount_({ hits, loading: false, searchPerformed: true });
-      expect(
-        wrapper.find('[data-test="traces-search-result-loading-indicator"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="traces-search-result-loading-indicator"]').exists()).toBe(
+        false,
+      );
     });
 
     it("does not show the no-results message when hits exist", () => {
@@ -353,9 +324,7 @@ describe("TracesSearchResultList", () => {
       });
       const table = wrapper.findComponent({ name: "OTable" });
       const rowClassFn = table.props("rowClass") as (row: any) => string;
-      expect(rowClassFn(makeSpanHit("s1", "ERROR"))).toBe(
-        "oz-table__row--error",
-      );
+      expect(rowClassFn(makeSpanHit("s1", "ERROR"))).toBe("oz-table__row--error");
     });
 
     it("returns empty string for non-error span_status in spans mode", () => {
@@ -378,9 +347,7 @@ describe("TracesSearchResultList", () => {
       const table = wrapper.findComponent({ name: "OTable" });
       const rowClassFn = table.props("rowClass") as (row: any) => string;
       // traces mode: errors > 0 triggers error class
-      expect(rowClassFn({ ...makeHit("t1", 2), span_status: "OK" })).toBe(
-        "oz-table__row--error",
-      );
+      expect(rowClassFn({ ...makeHit("t1", 2), span_status: "OK" })).toBe("oz-table__row--error");
     });
   });
 
@@ -404,11 +371,7 @@ describe("TracesSearchResultList", () => {
         { id: "duration" },
         { id: "span_status" },
       ];
-      sharedSearchObj.data.stream.selectedFields = [
-        "service_name",
-        "duration",
-        "span_status",
-      ];
+      sharedSearchObj.data.stream.selectedFields = ["service_name", "duration", "span_status"];
     });
 
     afterEach(() => {
@@ -428,10 +391,7 @@ describe("TracesSearchResultList", () => {
       await table.vm.$emit("close-column", { id: "span_status" });
 
       expect(wrapper.emitted("sort-change")).toBeTruthy();
-      expect(wrapper.emitted("sort-change")![0]).toEqual([
-        "start_time",
-        "desc",
-      ]);
+      expect(wrapper.emitted("sort-change")![0]).toEqual(["start_time", "desc"]);
     });
 
     it("should NOT emit sort-change when the closed column is NOT the active sort column", async () => {
@@ -459,14 +419,10 @@ describe("TracesSearchResultList", () => {
       const table = wrapper.findComponent({ name: "OTable" });
       await table.vm.$emit("close-column", { id: "span_status" });
 
-      expect(sharedSearchObj.data.stream.selectedFields).not.toContain(
-        "span_status",
+      expect(sharedSearchObj.data.stream.selectedFields).not.toContain("span_status");
+      expect(sharedSearchObj.data.resultGrid.columns.some((c: any) => c.id === "span_status")).toBe(
+        false,
       );
-      expect(
-        sharedSearchObj.data.resultGrid.columns.some(
-          (c: any) => c.id === "span_status",
-        ),
-      ).toBe(false);
     });
   });
 
@@ -488,9 +444,7 @@ describe("TracesSearchResultList", () => {
       wrapper = mount_({ hits: [makeSpanHit("s1")], loading: false } as any);
       const cell = wrapper.find('[data-test="stub-cell-span_status"]');
       expect(cell.exists()).toBe(true);
-      expect(cell.findComponent({ name: "SpanStatusPill" }).exists()).toBe(
-        true,
-      );
+      expect(cell.findComponent({ name: "SpanStatusPill" }).exists()).toBe(true);
     });
 
     it("passes item.span_status to SpanStatusPill in #cell-span_status slot", () => {
@@ -506,27 +460,19 @@ describe("TracesSearchResultList", () => {
       wrapper = mount_({ hits: [makeSpanHit("s1")], loading: false } as any);
       const cell = wrapper.find('[data-test="stub-cell-status"]');
       expect(cell.exists()).toBe(true);
-      expect(cell.findComponent({ name: "TraceStatusCell" }).exists()).toBe(
-        true,
-      );
+      expect(cell.findComponent({ name: "TraceStatusCell" }).exists()).toBe(true);
     });
 
     it("does NOT render SpanStatusPill inside #cell-status slot", () => {
       wrapper = mount_({ hits: [makeSpanHit("s1")], loading: false } as any);
       const statusCell = wrapper.find('[data-test="stub-cell-status"]');
-      expect(
-        statusCell.findComponent({ name: "SpanStatusPill" }).exists(),
-      ).toBe(false);
+      expect(statusCell.findComponent({ name: "SpanStatusPill" }).exists()).toBe(false);
     });
 
     it("does NOT render TraceStatusCell inside #cell-span_status slot", () => {
       wrapper = mount_({ hits: [makeSpanHit("s1")], loading: false } as any);
-      const spanStatusCell = wrapper.find(
-        '[data-test="stub-cell-span_status"]',
-      );
-      expect(
-        spanStatusCell.findComponent({ name: "TraceStatusCell" }).exists(),
-      ).toBe(false);
+      const spanStatusCell = wrapper.find('[data-test="stub-cell-span_status"]');
+      expect(spanStatusCell.findComponent({ name: "TraceStatusCell" }).exists()).toBe(false);
     });
   });
 
@@ -591,15 +537,8 @@ describe("TracesSearchResultList", () => {
       const cellActions = wrapper.findComponent({ name: "CellActions" });
       expect(cellActions.exists()).toBe(true);
       // value "2" maps to "Server"
-      await cellActions.vm.$emit(
-        "add-search-term",
-        "span_kind",
-        "2",
-        "include",
-      );
-      expect(sharedSearchObj.data.stream.addToFilter).toContain(
-        "span_kind = 'Server'",
-      );
+      await cellActions.vm.$emit("add-search-term", "span_kind", "2", "include");
+      expect(sharedSearchObj.data.stream.addToFilter).toContain("span_kind = 'Server'");
     });
 
     it("should include raw value in filter when field is span_kind and value is not in the map", async () => {
@@ -607,15 +546,8 @@ describe("TracesSearchResultList", () => {
       const cellActions = wrapper.findComponent({ name: "CellActions" });
       expect(cellActions.exists()).toBe(true);
       // value "99" has no mapping — raw string used in filter
-      await cellActions.vm.$emit(
-        "add-search-term",
-        "span_kind",
-        "99",
-        "include",
-      );
-      expect(sharedSearchObj.data.stream.addToFilter).toContain(
-        "span_kind = '99'",
-      );
+      await cellActions.vm.$emit("add-search-term", "span_kind", "99", "include");
+      expect(sharedSearchObj.data.stream.addToFilter).toContain("span_kind = '99'");
     });
 
     it("should include raw value without translation when field is not span_kind", async () => {
@@ -623,90 +555,48 @@ describe("TracesSearchResultList", () => {
       const cellActions = wrapper.findComponent({ name: "CellActions" });
       expect(cellActions.exists()).toBe(true);
       // non-span_kind field — no translation
-      await cellActions.vm.$emit(
-        "add-search-term",
-        "service_name",
-        "my-svc",
-        "include",
-      );
-      expect(sharedSearchObj.data.stream.addToFilter).toContain(
-        "service_name = 'my-svc'",
-      );
+      await cellActions.vm.$emit("add-search-term", "service_name", "my-svc", "include");
+      expect(sharedSearchObj.data.stream.addToFilter).toContain("service_name = 'my-svc'");
     });
 
     it("should use != operator for exclude action", async () => {
       wrapper = mount_({ hits: [hit], loading: false });
       const cellActions = wrapper.findComponent({ name: "CellActions" });
       expect(cellActions.exists()).toBe(true);
-      await cellActions.vm.$emit(
-        "add-search-term",
-        "span_kind",
-        "2",
-        "exclude",
-      );
-      expect(sharedSearchObj.data.stream.addToFilter).toContain(
-        "span_kind != 'Server'",
-      );
+      await cellActions.vm.$emit("add-search-term", "span_kind", "2", "exclude");
+      expect(sharedSearchObj.data.stream.addToFilter).toContain("span_kind != 'Server'");
     });
 
     it("should use fieldValue directly for start_time without needing a row shadow field", async () => {
       wrapper = mount_({ hits: [hit], loading: false });
       const cellActions = wrapper.findComponent({ name: "CellActions" });
       expect(cellActions.exists()).toBe(true);
-      await cellActions.vm.$emit(
-        "add-search-term",
-        "start_time",
-        "1700000000123456789",
-        "include",
-      );
-      expect(sharedSearchObj.data.stream.addToFilter).toBe(
-        "start_time = '1700000000123456789'",
-      );
+      await cellActions.vm.$emit("add-search-term", "start_time", "1700000000123456789", "include");
+      expect(sharedSearchObj.data.stream.addToFilter).toBe("start_time = '1700000000123456789'");
     });
 
     it("should use fieldValue directly for end_time without needing a row shadow field", async () => {
       wrapper = mount_({ hits: [hit], loading: false });
       const cellActions = wrapper.findComponent({ name: "CellActions" });
       expect(cellActions.exists()).toBe(true);
-      await cellActions.vm.$emit(
-        "add-search-term",
-        "end_time",
-        "1700000000987654321",
-        "include",
-      );
-      expect(sharedSearchObj.data.stream.addToFilter).toBe(
-        "end_time = '1700000000987654321'",
-      );
+      await cellActions.vm.$emit("add-search-term", "end_time", "1700000000987654321", "include");
+      expect(sharedSearchObj.data.stream.addToFilter).toBe("end_time = '1700000000987654321'");
     });
 
     it("should set is null filter when fieldValue is null for start_time", async () => {
       wrapper = mount_({ hits: [hit], loading: false });
       const cellActions = wrapper.findComponent({ name: "CellActions" });
       expect(cellActions.exists()).toBe(true);
-      await cellActions.vm.$emit(
-        "add-search-term",
-        "start_time",
-        "null",
-        "include",
-      );
-      expect(sharedSearchObj.data.stream.addToFilter).toBe(
-        "start_time is null",
-      );
+      await cellActions.vm.$emit("add-search-term", "start_time", "null", "include");
+      expect(sharedSearchObj.data.stream.addToFilter).toBe("start_time is null");
     });
 
     it("should set is null filter when fieldValue is null for a generic field", async () => {
       wrapper = mount_({ hits: [hit], loading: false });
       const cellActions = wrapper.findComponent({ name: "CellActions" });
       expect(cellActions.exists()).toBe(true);
-      await cellActions.vm.$emit(
-        "add-search-term",
-        "service_name",
-        "null",
-        "include",
-      );
-      expect(sharedSearchObj.data.stream.addToFilter).toBe(
-        "service_name is null",
-      );
+      await cellActions.vm.$emit("add-search-term", "service_name", "null", "include");
+      expect(sharedSearchObj.data.stream.addToFilter).toBe("service_name is null");
     });
   });
 });

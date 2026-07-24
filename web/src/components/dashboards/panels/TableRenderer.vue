@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="table-wrapper h-full w-full relative" data-test="dashboard-table-renderer-wrapper">
+  <div class="table-wrapper relative h-full w-full" data-test="dashboard-table-renderer-wrapper">
     <OTable
       ref="tableRef"
       :data="sortedRows"
@@ -40,13 +40,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :enable-column-reorder="false"
       :enable-cell-copy="true"
       data-test="dashboard-panel-table"
-      @row-click="(row: any, evt: MouseEvent) => $emit('row-click', evt ?? null, row, sortedRows.indexOf(row))"
+      @row-click="
+        (row: any, evt: MouseEvent) => $emit('row-click', evt ?? null, row, sortedRows.indexOf(row))
+      "
     >
       <!-- Pagination footer: forward parent's #bottom slot or show default pagination controls -->
       <template #bottom="scope">
         <slot name="bottom" v-bind="scope">
           <!-- Default: dashboard pagination controls -->
-          <div class="flex items-center w-full pr-2" data-test="dashboard-table-pagination">
+          <div class="flex w-full items-center pr-2" data-test="dashboard-table-pagination">
             <div class="flex-1" />
             <TablePaginationControls
               :show-pagination="showPagination"
@@ -75,10 +77,7 @@ import TablePaginationControls from "@/components/dashboards/addPanel/TablePagin
 import { TABLE_ROWS_PER_PAGE_DEFAULT_VALUE } from "@/utils/dashboard/constants";
 import { getColorForTable } from "@/utils/dashboard/colorPalette";
 import { isColorDark } from "@/utils/dashboard/chartColorUtils";
-import {
-  buildValueMappingCache,
-  lookupValueMappingFull,
-} from "@/utils/dashboard/tableConfigUtils";
+import { buildValueMappingCache, lookupValueMappingFull } from "@/utils/dashboard/tableConfigUtils";
 import { useStore } from "vuex";
 
 export default defineComponent({
@@ -130,14 +129,10 @@ export default defineComponent({
     // falling back to the default (QA #2239.3: rows-per-page not applying).
     const effectivePageSize = computed(() => {
       const n = Number(props.rowsPerPage);
-      return Number.isFinite(n) && n > 0
-        ? n
-        : TABLE_ROWS_PER_PAGE_DEFAULT_VALUE;
+      return Number.isFinite(n) && n > 0 ? n : TABLE_ROWS_PER_PAGE_DEFAULT_VALUE;
     });
 
-    const tableColumns = computed(
-      () => (props.data?.columns as any[]) || [],
-    );
+    const tableColumns = computed(() => (props.data?.columns as any[]) || []);
 
     // Map the pivot column config → OTableColumnDef. Original fields (name,
     // field, format, align, _isRowField, _isTotalColumn, …) are kept at the top
@@ -182,20 +177,25 @@ export default defineComponent({
     const autoColorCache = new Map<string, Map<string, string>>();
 
     // Value-mapping lookup cache, rebuilt only when the mappings change.
-    const valueMappingCache = computed(() =>
-      buildValueMappingCache(props.valueMapping),
-    );
+    const valueMappingCache = computed(() => buildValueMappingCache(props.valueMapping));
 
     const evalCondition = (val: number, op: string, threshold: number): boolean => {
       switch (op) {
-        case "<":  return val < threshold;
-        case ">":  return val > threshold;
-        case "<=": return val <= threshold;
-        case ">=": return val >= threshold;
+        case "<":
+          return val < threshold;
+        case ">":
+          return val > threshold;
+        case "<=":
+          return val <= threshold;
+        case ">=":
+          return val >= threshold;
         case "=":
-        case "==": return val === threshold;
-        case "!=": return val !== threshold;
-        default:   return false;
+        case "==":
+          return val === threshold;
+        case "!=":
+          return val !== threshold;
+        default:
+          return false;
       }
     };
 
@@ -222,8 +222,7 @@ export default defineComponent({
             const palette = getColorForTable(store.state.theme);
             const key = String(value);
             const colKey = col.field ?? col.name;
-            if (!autoColorCache.has(colKey))
-              autoColorCache.set(colKey, new Map<string, string>());
+            if (!autoColorCache.has(colKey)) autoColorCache.set(colKey, new Map<string, string>());
             const map = autoColorCache.get(colKey)!;
             if (!map.has(key)) map.set(key, palette[map.size % palette.length]);
             const hex = map.get(key) as string;
@@ -234,15 +233,8 @@ export default defineComponent({
           }
 
           // 2) Value-mapping color (valid hex only; else fall through).
-          const found = lookupValueMappingFull(
-            value,
-            valueMappingCache.value,
-            "color",
-          );
-          if (
-            found?.color &&
-            /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/i.test(found.color)
-          ) {
+          const found = lookupValueMappingFull(value, valueMappingCache.value, "color");
+          if (found?.color && /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/i.test(found.color)) {
             const hex = found.color;
             return {
               backgroundColor: hex,
@@ -257,8 +249,7 @@ export default defineComponent({
             if (!isNaN(numVal)) {
               let matched: any = null;
               for (const rule of conditionalRules) {
-                if (evalCondition(numVal, rule.operator, rule.threshold))
-                  matched = rule;
+                if (evalCondition(numVal, rule.operator, rule.threshold)) matched = rule;
               }
               if (matched) {
                 const style: Record<string, any> = {};
@@ -356,11 +347,7 @@ export default defineComponent({
 
     const downloadTableAsJSON = (title?: string) => {
       const rows = tableRef.value?.getRows() ?? [];
-      const content = JSON.stringify(
-        { columns: props.data?.columns, rows },
-        null,
-        2,
-      );
+      const content = JSON.stringify({ columns: props.data?.columns, rows }, null, 2);
       const blob = new Blob([content], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -460,7 +447,9 @@ export default defineComponent({
 }
 
 .table-wrapper :deep(.sticky-column.pivot-total-col) {
-  box-shadow: 0.25rem 0 0.5rem var(--color-actions-column-shadow), inset 0.25rem 0 0.375rem -0.125rem var(--color-actions-column-shadow) !important;
+  box-shadow:
+    0.25rem 0 0.5rem var(--color-actions-column-shadow),
+    inset 0.25rem 0 0.375rem -0.125rem var(--color-actions-column-shadow) !important;
 }
 
 @media print {

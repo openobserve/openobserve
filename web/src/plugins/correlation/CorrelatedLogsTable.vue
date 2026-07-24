@@ -1147,10 +1147,8 @@ const handleExpandRow = (row: any) => {
 
 // ── OTable logs rendering (migrated from the correlated-logs TenstackTable) ──
 // Same FTS pipeline as the logs grid: chunked colorized HTML rendered per cell.
-const {
-  processedResults: correlatedProcessed,
-  processHitsInChunks: correlatedProcessChunks,
-} = useLogsHighlighter();
+const { processedResults: correlatedProcessed, processHitsInChunks: correlatedProcessChunks } =
+  useLogsHighlighter();
 
 const correlatedTimestampCol = computed(
   () => store.state.zoConfig.timestamp_column || "_timestamp",
@@ -1181,8 +1179,14 @@ const reprocessCorrelatedHighlight = (clearCache: boolean) => {
     ftsFields.value || [],
   );
 };
-watch(() => tableColumns.value, () => reprocessCorrelatedHighlight(true));
-watch(() => (pagedResults as any)?.value, () => reprocessCorrelatedHighlight(false));
+watch(
+  () => tableColumns.value,
+  () => reprocessCorrelatedHighlight(true),
+);
+watch(
+  () => (pagedResults as any)?.value,
+  () => reprocessCorrelatedHighlight(false),
+);
 
 const getCorrelatedRowStatusColor = (row: any): string | undefined =>
   extractStatusFromLog(row)?.color;
@@ -1198,13 +1202,19 @@ const onCorrelatedExpandedIdsChange = (newIds: string[]) => {
   const prev = new Set(correlatedExpandedIds.value);
   const next = new Set(newIds);
   let toggled: string | null = null;
-  for (const k of next) if (!prev.has(k)) { toggled = k; break; }
+  for (const k of next)
+    if (!prev.has(k)) {
+      toggled = k;
+      break;
+    }
   if (toggled == null)
-    for (const k of prev) if (!next.has(k)) { toggled = k; break; }
+    for (const k of prev)
+      if (!next.has(k)) {
+        toggled = k;
+        break;
+      }
   if (toggled == null) return;
-  const row = pagedRows().find(
-    (r: any) => String(r?.[correlatedTimestampCol.value]) === toggled,
-  );
+  const row = pagedRows().find((r: any) => String(r?.[correlatedTimestampCol.value]) === toggled);
   if (row) handleExpandRow(row);
 };
 

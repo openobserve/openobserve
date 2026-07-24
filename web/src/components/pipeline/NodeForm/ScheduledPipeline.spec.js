@@ -16,7 +16,6 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(),
 }));
 
-
 // Mock services and composables
 vi.mock("@/services/search", () => ({
   default: {
@@ -40,7 +39,7 @@ vi.mock("@/composables/useStreams", () => ({
     }),
   }),
 }));
-vi.mock('@/composables/useParser', () => {
+vi.mock("@/composables/useParser", () => {
   return {
     default: () => ({
       sqlParser: async () => ({
@@ -49,16 +48,12 @@ vi.mock('@/composables/useParser', () => {
 
           if (lowerQuery.includes("select *")) {
             return {
-              columns: [
-                { expr: { column: "*" } }
-              ]
+              columns: [{ expr: { column: "*" } }],
             };
           }
           if (lowerQuery.includes("valid_column")) {
             return {
-              columns: [
-                { expr: { column: "valid_column" } }
-              ]
+              columns: [{ expr: { column: "valid_column" } }],
             };
           }
           if (lowerQuery.includes("default")) {
@@ -72,11 +67,10 @@ vi.mock('@/composables/useParser', () => {
         whiteListCheck: vi.fn(),
         exprToSQL: vi.fn(),
         parse: vi.fn(),
-      })
-    })
+      }),
+    }),
   };
 });
-
 
 vi.mock("@/composables/useLogs", () => ({
   default: () => ({
@@ -158,25 +152,25 @@ describe("ScheduledPipeline Component", () => {
           store: mockStore,
         },
         stubs: {
-          'OIcon': true,
-          'DateTime': true,
-          'FieldList': true,
-          'QueryEditor': true,
-          'UnifiedQueryEditor': {
+          OIcon: true,
+          DateTime: true,
+          FieldList: true,
+          QueryEditor: true,
+          UnifiedQueryEditor: {
             template: '<div data-test="scheduled-pipeline-sql-editor" />',
             methods: {
               getCursorIndex: () => -1,
-              getValue: () => '',
+              getValue: () => "",
               setValue: () => {},
               replaceRange: () => {},
               triggerAutoComplete: () => {},
             },
           },
-          'OTable': true,
-          'PreviewPromqlQuery': true,
-          'O2AIChat': true,
-          'FullViewContainer': true
-        }
+          OTable: true,
+          PreviewPromqlQuery: true,
+          O2AIChat: true,
+          FullViewContainer: true,
+        },
       },
     });
     return { w, f: innerForm };
@@ -186,29 +180,29 @@ describe("ScheduledPipeline Component", () => {
     // Setup mock store
     mockStore = {
       state: {
-        theme: 'light',
+        theme: "light",
         selectedOrganization: {
-          identifier: "test-org"
+          identifier: "test-org",
         },
         zoConfig: {
           min_auto_refresh_interval: 900,
           sql_base64_enabled: false,
           timestamp_column: "_timestamp",
-          all_fields_name: "_all"
+          all_fields_name: "_all",
         },
         isAiChatEnabled: false,
         organizationData: {
           functions: [
-            { name: 'avg', description: 'Average function', function: 'avg(value)' },
-            { name: 'sum', description: 'Sum function', function: 'sum(value)' }
-          ]
+            { name: "avg", description: "Average function", function: "avg(value)" },
+            { name: "sum", description: "Sum function", function: "sum(value)" },
+          ],
         },
         timezone: "UTC",
         userInfo: {
-          email: "test@example.com"
-        }
+          email: "test@example.com",
+        },
       },
-      dispatch: vi.fn()
+      dispatch: vi.fn(),
     };
 
     const mounted = mountHarness();
@@ -221,7 +215,7 @@ describe("ScheduledPipeline Component", () => {
       startTime: Date.now() - 3600000, // 1 hour ago
       endTime: Date.now(),
       relativeTimePeriod: "15m",
-      valueType: "relative"
+      valueType: "relative",
     };
 
     // Set up a mock editor ref so updateQueryValue does not throw when
@@ -362,7 +356,6 @@ describe("ScheduledPipeline Component", () => {
       await nextTick();
       expect(child.expandState.query).toBe(false);
     });
-
   });
 
   describe("Search and Results", () => {
@@ -371,8 +364,8 @@ describe("ScheduledPipeline Component", () => {
       child.query = "SELECT * FROM test_stream";
       searchService.search.mockResolvedValueOnce({
         data: {
-          hits: [{ _timestamp: 1234567890000, message: "test" }]
-        }
+          hits: [{ _timestamp: 1234567890000, message: "test" }],
+        },
       });
 
       await child.runQuery();
@@ -383,8 +376,8 @@ describe("ScheduledPipeline Component", () => {
     it("handles empty search results", async () => {
       searchService.search.mockResolvedValueOnce({
         data: {
-          hits: []
-        }
+          hits: [],
+        },
       });
 
       await child.runQuery();
@@ -405,7 +398,7 @@ describe("ScheduledPipeline Component", () => {
         getCursorIndex: vi.fn().mockReturnValue(7),
         getValue: vi.fn().mockReturnValue("SELECT "),
         setValue: vi.fn(),
-        replaceRange: vi.fn()
+        replaceRange: vi.fn(),
       };
       child.pipelineEditorRef = mockEditorRef;
       child.tab = "custom";
@@ -431,7 +424,7 @@ describe("ScheduledPipeline Component", () => {
       await child.handleSidebarEvent("add-field", "service='api'");
 
       expect(mockEditorRef.setValue).toHaveBeenCalledWith(
-        'SELECT max(_timestamp), count(*) FROM "stream1" where service=\'api\' GROUP BY histogram(_timestamp)',
+        "SELECT max(_timestamp), count(*) FROM \"stream1\" where service='api' GROUP BY histogram(_timestamp)",
       );
     });
 
@@ -441,7 +434,7 @@ describe("ScheduledPipeline Component", () => {
         getValue: vi
           .fn()
           .mockReturnValue(
-            'SELECT max(_timestamp), count(*) FROM "stream1" WHERE level=\'error\' GROUP BY histogram(_timestamp)',
+            "SELECT max(_timestamp), count(*) FROM \"stream1\" WHERE level='error' GROUP BY histogram(_timestamp)",
           ),
         setValue: vi.fn(),
       };
@@ -451,7 +444,7 @@ describe("ScheduledPipeline Component", () => {
       await child.handleSidebarEvent("add-field", "service='api'");
 
       expect(mockEditorRef.setValue).toHaveBeenCalledWith(
-        'SELECT max(_timestamp), count(*) FROM "stream1" WHERE level=\'error\' AND service=\'api\' GROUP BY histogram(_timestamp)',
+        "SELECT max(_timestamp), count(*) FROM \"stream1\" WHERE level='error' AND service='api' GROUP BY histogram(_timestamp)",
       );
     });
 
@@ -461,7 +454,7 @@ describe("ScheduledPipeline Component", () => {
         getValue: vi
           .fn()
           .mockReturnValue(
-            'SELECT max(_timestamp), count(*) FROM "stream1" WHERE level=\'error\' AND service=\'api\' GROUP BY histogram(_timestamp)',
+            "SELECT max(_timestamp), count(*) FROM \"stream1\" WHERE level='error' AND service='api' GROUP BY histogram(_timestamp)",
           ),
         setValue: vi.fn(),
       };
@@ -471,7 +464,7 @@ describe("ScheduledPipeline Component", () => {
       await child.handleSidebarEvent("remove-field", "service");
 
       expect(mockEditorRef.setValue).toHaveBeenCalledWith(
-        'SELECT max(_timestamp), count(*) FROM "stream1" WHERE level=\'error\' GROUP BY histogram(_timestamp)',
+        "SELECT max(_timestamp), count(*) FROM \"stream1\" WHERE level='error' GROUP BY histogram(_timestamp)",
       );
     });
   });
@@ -481,9 +474,9 @@ describe("ScheduledPipeline Component", () => {
       // Reset the store's functions
       mockStore.state.organizationData = {
         functions: [
-          { name: 'avg', description: 'Average function', function: 'avg(value)' },
-          { name: 'sum', description: 'Sum function', function: 'sum(value)' }
-        ]
+          { name: "avg", description: "Average function", function: "avg(value)" },
+          { name: "sum", description: "Sum function", function: "sum(value)" },
+        ],
       };
       await nextTick();
     });
@@ -491,15 +484,14 @@ describe("ScheduledPipeline Component", () => {
     it("initializes with correct functions list", () => {
       expect(child.functionsList).toBeDefined();
       expect(child.functionsList.length).toBe(2);
-      expect(child.functionsList[0].name).toBe('avg');
+      expect(child.functionsList[0].name).toBe("avg");
     });
-
 
     it("handles function selection", async () => {
       const testFunction = {
-        name: 'avg',
-        description: 'Average function',
-        function: 'avg(value)'
+        name: "avg",
+        description: "Average function",
+        function: "avg(value)",
       };
 
       // Initialize the component's state
@@ -511,7 +503,7 @@ describe("ScheduledPipeline Component", () => {
       await nextTick();
 
       // Verify the state changes
-      expect(child.selectedFunction).toBe('avg');
+      expect(child.selectedFunction).toBe("avg");
     });
   });
 
@@ -599,7 +591,7 @@ describe("ScheduledPipeline Component", () => {
       await flushPromises();
       // Set the template ref after the promql preview has rendered.
       child.previewPromqlQueryRef = {
-        refreshData: mockRefreshData
+        refreshData: mockRefreshData,
       };
 
       await child.runQuery();
@@ -774,7 +766,7 @@ describe("ScheduledPipeline Component", () => {
       // Fix #4: First click should work with nextTick
       const mockRefreshData = vi.fn();
       child.previewPromqlQueryRef = {
-        refreshData: mockRefreshData
+        refreshData: mockRefreshData,
       };
 
       await child.runQuery();
@@ -790,16 +782,16 @@ describe("ScheduledPipeline Component", () => {
       child.query = "SELECT * FROM traces_stream";
 
       searchService.search.mockResolvedValueOnce({
-        data: { hits: [] }
+        data: { hits: [] },
       });
 
       await child.runQuery();
 
       expect(searchService.search).toHaveBeenCalledWith(
         expect.objectContaining({
-          page_type: "traces"
+          page_type: "traces",
         }),
-        expect.any(String)
+        expect.any(String),
       );
     });
   });
@@ -853,9 +845,7 @@ describe("ScheduledPipeline Component", () => {
       wrapper
         .findAllComponents(OFormSelect)
         .filter((c) =>
-          String(c.props("name") || "").startsWith(
-            "query_condition.aggregation.group_by",
-          ),
+          String(c.props("name") || "").startsWith("query_condition.aggregation.group_by"),
         );
     const renderedGroupByValues = () =>
       groupBySelects().map((c) => c.findComponent(OSelect).props("modelValue"));
@@ -879,9 +869,7 @@ describe("ScheduledPipeline Component", () => {
       await nextTick();
 
       // the form-owned array shifted
-      expect(
-        form.state.values.query_condition.aggregation.group_by,
-      ).toEqual(["col_a", "col_c"]);
+      expect(form.state.values.query_condition.aggregation.group_by).toEqual(["col_a", "col_c"]);
 
       // and the RENDERED selects shifted: row 1 now shows col_c, NOT the stale
       // col_b — one fewer row, values tracking the array (no row-reuse glitch).
@@ -902,14 +890,11 @@ describe("ScheduledPipeline Component", () => {
       await nextTick();
 
       // the removed manual error div must not exist any more
-      expect(
-        wrapper.find('[data-test="scheduled-pipeline-frequency-error-text"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="scheduled-pipeline-frequency-error-text"]').exists()).toBe(
+        false,
+      );
       // before first submit: revalidateLogic keeps the cron field error empty
-      expect(
-        form.getFieldMeta("trigger_condition.cron")?.errors ?? [],
-      ).toHaveLength(0);
+      expect(form.getFieldMeta("trigger_condition.cron")?.errors ?? []).toHaveLength(0);
 
       await form.handleSubmit();
       await flushPromises();
@@ -917,9 +902,7 @@ describe("ScheduledPipeline Component", () => {
       // on submit: the schema's cron superRefine routes the error to the field
       // (the OFormInput renders it) and blocks the submit — single source.
       expect(form.state.isValid).toBe(false);
-      expect(
-        (form.getFieldMeta("trigger_condition.cron")?.errors ?? []).length,
-      ).toBeGreaterThan(0);
+      expect((form.getFieldMeta("trigger_condition.cron")?.errors ?? []).length).toBeGreaterThan(0);
     });
   });
 
@@ -931,9 +914,7 @@ describe("ScheduledPipeline Component", () => {
   // NOT catch a broken Enter — these exercise the NATIVE submit path.
   describe("R4: Enter submits via a type=submit Save button (native form submit)", () => {
     it("renders the Save button as type=submit so Enter can submit the form", () => {
-      const saveBtn = wrapper.find(
-        '[data-test="stream-routing-query-save-btn"]',
-      );
+      const saveBtn = wrapper.find('[data-test="stream-routing-query-save-btn"]');
       expect(saveBtn.exists()).toBe(true);
       expect(saveBtn.attributes("type")).toBe("submit");
     });
@@ -996,9 +977,7 @@ describe("ScheduledPipeline Component", () => {
       await f.handleSubmit();
       await flushPromises();
 
-      const err = w.find(
-        '[data-test="scheduled-pipeline-period-error-text"]',
-      );
+      const err = w.find('[data-test="scheduled-pipeline-period-error-text"]');
       expect(err.exists()).toBe(true);
       expect(err.text().length).toBeGreaterThan(0);
       // the empty #error slot suppresses the inline message row inside the group
@@ -1013,13 +992,9 @@ describe("ScheduledPipeline Component", () => {
   // control change → form value (no local mirror, no @update bridge).
   describe("R1-strict: promql / stream / aggregation / trigger controls are form-owned", () => {
     const formSelectByName = (w, name) =>
-      w
-        .findAllComponents(OFormSelect)
-        .find((c) => c.props("name") === name);
+      w.findAllComponents(OFormSelect).find((c) => c.props("name") === name);
     const formInputByName = (w, name) =>
-      w
-        .findAllComponents(OFormInput)
-        .find((c) => c.props("name") === name);
+      w.findAllComponents(OFormInput).find((c) => c.props("name") === name);
 
     it("group 1 — promql operator/value bind query_condition.promql_condition.*", async () => {
       form.setFieldValue("query_condition.promql_condition", {
@@ -1031,14 +1006,8 @@ describe("ScheduledPipeline Component", () => {
       await nextTick();
       await flushPromises();
 
-      const op = formSelectByName(
-        wrapper,
-        "query_condition.promql_condition.operator",
-      );
-      const val = formInputByName(
-        wrapper,
-        "query_condition.promql_condition.value",
-      );
+      const op = formSelectByName(wrapper, "query_condition.promql_condition.operator");
+      const val = formInputByName(wrapper, "query_condition.promql_condition.value");
       expect(op).toBeTruthy();
       expect(val).toBeTruthy();
 
@@ -1049,12 +1018,8 @@ describe("ScheduledPipeline Component", () => {
       op.findComponent(OSelect).vm.$emit("update:model-value", ">");
       val.findComponent(OInput).vm.$emit("update:model-value", 42);
       await nextTick();
-      expect(
-        form.state.values.query_condition.promql_condition.operator,
-      ).toBe(">");
-      expect(
-        form.state.values.query_condition.promql_condition.value,
-      ).toBe(42);
+      expect(form.state.values.query_condition.promql_condition.operator).toBe(">");
+      expect(form.state.values.query_condition.promql_condition.value).toBe(42);
     });
 
     it("group 4 — stream type/name bind stream_type / stream_name", async () => {
@@ -1106,10 +1071,7 @@ describe("ScheduledPipeline Component", () => {
       await flushPromises();
 
       const fn = formSelectByName(w, "query_condition.aggregation.function");
-      const havingVal = formInputByName(
-        w,
-        "query_condition.aggregation.having.value",
-      );
+      const havingVal = formInputByName(w, "query_condition.aggregation.having.value");
       expect(fn).toBeTruthy();
       expect(havingVal).toBeTruthy();
       // form → view
