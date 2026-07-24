@@ -34,3 +34,5 @@ stats.html
 
 # Fetched AI data-source content (regenerated at build; see scripts/fetch-datasource-content.mjs)
 src/assets/ai-datasource-content/generated/
+# Storybook build output
+storybook-static

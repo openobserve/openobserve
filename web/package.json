@@ -28,7 +28,9 @@
     "lint:tokens": "node scripts/check-css-tokens.mjs",
     "lint:token-purity": "node scripts/check-token-purity.mjs",
     "lint:design": "node scripts/check-design-consistency.mjs",
-    "lint:design:strict": "node scripts/check-design-consistency.mjs --strict"
+    "lint:design:strict": "node scripts/check-design-consistency.mjs --strict",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
   },
   "dependencies": {
     "@esbuild-plugins/node-globals-polyfill": "^0.2.3",
@@ -97,6 +99,8 @@
     "@iconify-json/octicon": "^1.2.25",
     "@iconify-json/si": "^1.2.17",
     "@rushstack/eslint-patch": "^1.15.0",
+    "@storybook/addon-themes": "^10.5.3",
+    "@storybook/vue3-vite": "^10.5.3",
     "@tailwindcss/postcss": "^4.1.18",
     "@tailwindcss/typography": "^0.5.19",
     "@tailwindcss/vite": "^4.1.18",
@@ -140,6 +144,7 @@
     "sass": "^1.97.1",
     "sass-loader": "^16.0.6",
     "start-server-and-test": "^2.1.3",
+    "storybook": "^10.5.3",
     "stylelint": "^17.14.0",
     "tailwindcss": "^4.1.18",
     "typescript": "~5.9.3",
