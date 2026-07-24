@@ -202,9 +202,6 @@ export default defineComponent({
           _isRowField: col._isRowField,
           _isTotalColumn: col._isTotalColumn,
           _totalColRightIndex: col._totalColRightIndex,
-          // Pivot: draw a left divider on this column's body cells so the body
-          // vertical dividers line up with the header group boundaries.
-          _pivotGroupBorder: col._pivotGroupBorder,
         },
       })),
     );
@@ -445,6 +442,17 @@ export default defineComponent({
 /* Dashboard table cells should not use the monospace font from tenstack-table.scss */
 .table-wrapper :deep(td) {
   font-family: var(--font-sans);
+}
+
+/* Subtle vertical divider on every column (header + body) so the panel table
+   has the same column separators other tables show — those come from the
+   column-resize handles the panel table intentionally doesn't enable. Uses the
+   same subtle token as the horizontal row dividers; the last column is skipped
+   so there's no trailing line at the right edge. Applies to both the regular
+   (border-collapse) and pivot (border-separate) layouts. */
+.table-wrapper :deep(thead th:not(:last-child)),
+.table-wrapper :deep(tbody td:not(:last-child)) {
+  border-right: 1px solid var(--color-table-row-divider);
 }
 
 /* Pivot table styles */

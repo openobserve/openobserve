@@ -270,13 +270,6 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
             'border-b-table-header-border border-b': level.isLeaf || cell._isTotalHeader,
           },
           {
-            // Same divider token as the body cells (border-table-row-divider)
-            // so vertical group dividers match header-to-body and align with the
-            // horizontal row dividers.
-            'border-l-table-row-divider border-l':
-              cell.hasBorder && !(stickyColTotals && cell._isTotalHeader),
-          },
-          {
             'cursor-pointer': cell._sortColumn,
           },
         ]"
