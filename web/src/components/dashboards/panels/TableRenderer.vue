@@ -260,6 +260,13 @@ export default defineComponent({
           const col = colById.value.get(params.columnId);
           const value = params.value;
 
+          // Number / timestamp columns render in a monospace font so digits align
+          // and are easier to scan. The type is already reflected in the column's
+          // alignment (numbers right, timestamps formatted); `mono` is the same
+          // type signal, set by the table converters. Merge it into every style
+          // branch below so it composes with color/value-mapping/conditional rules.
+          const base: Record<string, any> = col?.mono ? { fontFamily: "var(--font-mono)" } : {};
+
           // 1) Auto color mode — stable palette per distinct string value.
           if (col?.colorMode === "auto") {
             const palette = getColorForTable(store.state.theme);
@@ -270,6 +277,7 @@ export default defineComponent({
             if (!map.has(key)) map.set(key, palette[map.size % palette.length]);
             const hex = map.get(key) as string;
             return {
+              ...base,
               backgroundColor: hex,
               color: isColorDark(hex) ? "#ffffff" : "#000000",
             };
@@ -280,6 +288,7 @@ export default defineComponent({
           if (found?.color && /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/i.test(found.color)) {
             const hex = found.color;
             return {
+              ...base,
               backgroundColor: hex,
               color: isColorDark(hex) ? "#ffffff" : "#000000",
             };
@@ -295,23 +304,23 @@ export default defineComponent({
                 if (evalCondition(numVal, rule.operator, rule.threshold)) matched = rule;
               }
               if (matched) {
-                const style: Record<string, any> = {};
+                const style: Record<string, any> = { ...base };
                 if (matched.bgColor) style.backgroundColor = matched.bgColor;
                 if (matched.textColor) style.color = matched.textColor;
-                if (Object.keys(style).length) return style;
+                if (Object.keys(style).length > Object.keys(base).length) return style;
               }
             }
           }
 
           // 4) Column-level text / background color override.
           if (col?.bgColor || col?.textColor) {
-            const style: Record<string, any> = {};
+            const style: Record<string, any> = { ...base };
             if (col.bgColor) style.backgroundColor = col.bgColor;
             if (col.textColor) style.color = col.textColor;
             return style;
           }
 
-          return {};
+          return base;
         },
     );
 
