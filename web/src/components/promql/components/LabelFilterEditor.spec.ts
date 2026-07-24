@@ -111,8 +111,10 @@ describe("LabelFilterEditor", () => {
     it("should display correct label text for each filter", () => {
       wrapper = createWrapper();
       const text = wrapper.text();
-      expect(text).toContain("method = GET");
-      expect(text).toContain("status = 200");
+      // Chip label now renders structured spans (field / op / value) with the
+      // operator spacing supplied via CSS padding rather than literal spaces.
+      expect(text).toContain("method=GET");
+      expect(text).toContain("status=200");
     });
   });
 
@@ -192,8 +194,10 @@ describe("LabelFilterEditor", () => {
 
       // Act / Assert
       const text = wrapper.text();
-      expect(text).toContain("method = GET");
-      expect(text).toContain("status = 200");
+      // Chip label now renders structured spans (field / op / value) with the
+      // operator spacing supplied via CSS padding rather than literal spaces.
+      expect(text).toContain("method=GET");
+      expect(text).toContain("status=200");
     });
 
     it("emits the full updated list when a new empty filter is added, preserving existing selections", () => {
