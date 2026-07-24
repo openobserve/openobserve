@@ -490,8 +490,9 @@ export default defineComponent({
 
     const copyToken = (token: string) => {
       if (!token) return;
-      copyToClipboard(token);
-      toast({ variant: "success", message: t("synthetics.tokens.copiedToast"), timeout: 2000 });
+      // Single toast: let the clipboard util own the notification with the
+      // token-specific message, instead of firing a second generic one.
+      copyToClipboard(token, { successMessage: t("synthetics.tokens.copiedToast") });
     };
 
     const copyCommand = () => {
