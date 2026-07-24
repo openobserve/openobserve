@@ -198,6 +198,28 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
     boxShadow: "-2px 0 4px -2px var(--color-border-default)",
   };
 }
+
+// Single-level pivots (1 breakdown + 1 Y) render the STANDARD header, not the
+// multi-row pivot header — so the sticky total column header must be positioned
+// here too. Without this the body total column sticks to the right while its
+// header scrolls away, leaving the header misaligned over a different column
+// (QA: "header has issue with sticky"). Mirrors the multi-level header + body
+// total-cell styles exactly (offset, fixed width, subtle separator).
+function getStandardStickyTotalStyle(header: any): Record<string, any> {
+  const m = header.column.columnDef.meta as any;
+  if (!props.stickyColTotals || !m?._isTotalColumn) return {};
+  const rightOffset = (m._totalColRightIndex ?? 0) * PIVOT_TABLE_TOTAL_COLUMN_WIDTH;
+  return {
+    position: "sticky",
+    right: `${rightOffset}px`,
+    zIndex: 20,
+    width: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
+    minWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
+    maxWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
+    backgroundColor: "var(--color-table-header-bg)",
+    boxShadow: "-2px 0 4px -2px var(--color-border-default)",
+  };
+}
 </script>
 
 <template>
@@ -425,6 +447,8 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
                 boxShadow: '-2px 0 4px -2px var(--color-border-default)',
               }
             : {}),
+          // Sticky pivot total column in single-level pivots (last, so it wins).
+          ...getStandardStickyTotalStyle(header),
         }"
       >
         <div
@@ -699,6 +723,8 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
                 boxShadow: '-2px 0 4px -2px var(--color-border-default)',
               }
             : {}),
+          // Sticky pivot total column in single-level pivots (last, so it wins).
+          ...getStandardStickyTotalStyle(header),
         }"
       >
         <div

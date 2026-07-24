@@ -116,7 +116,11 @@ const pivotTotalStyle = computed<Record<string, any>>(() => {
     position: "sticky",
     right: `${rightOffset}px`,
     zIndex: 2,
+    // Pin the width (not just `width`) so the total column can't diverge from the
+    // fixed-width sticky header under table-auto/w-full and misalign.
     width: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
+    minWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
+    maxWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     backgroundColor: "var(--color-table-cell-bg)",
     // Carry the same subtle left-edge separator the sticky total header uses so
     // the shadow runs down the whole column, not just the header.

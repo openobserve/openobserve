@@ -531,7 +531,11 @@ function pivotTotalColumnStyle(col: OTableColumnDef<TData>): Record<string, any>
     position: "sticky",
     right: `${rightOffset}px`,
     zIndex: 2,
+    // Pin the width so the grand-total column cell stays aligned with the fixed
+    // sticky header/body total column under table-auto/w-full.
     width: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
+    minWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
+    maxWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     // Match the sticky total header/body: the same subtle left-edge separator so
     // the shadow is continuous down the whole total column.
     boxShadow: "-2px 0 4px -2px var(--color-border-default)",
