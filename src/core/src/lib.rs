@@ -65,7 +65,6 @@ pub mod stream;
 pub mod stream_utils;
 pub mod synthetics;
 pub mod system_settings;
-pub mod tls;
 pub mod traces;
 #[cfg(feature = "cloud")]
 pub mod trial_quota;

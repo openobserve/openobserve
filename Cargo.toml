@@ -259,6 +259,7 @@ members = [
     "src/builtins",
     "src/org_storage",
     "src/sourcemaps",
+    "src/tls",
     "src/common",
     "src/core",
     "src/transform",
@@ -307,6 +308,7 @@ enrichment-data = { path = "src/enrichment_data" }
 openobserve-builtins = { path = "src/builtins" }
 openobserve-org-storage = { path = "src/org_storage" }
 openobserve-sourcemaps = { path = "src/sourcemaps" }
+openobserve-tls = { path = "src/tls" }
 web = { path = "src/web" }
 openobserve-core = { path = "src/core" }
 common = { path = "src/common" }

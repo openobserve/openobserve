@@ -34,6 +34,7 @@ exceptions = [
     { name = "openobserve-mcp", allow = ["AGPL-3.0"] },
     { name = "openobserve-org-storage", allow = ["AGPL-3.0"] },
     { name = "openobserve-sourcemaps", allow = ["AGPL-3.0"] },
+    { name = "openobserve-tls", allow = ["AGPL-3.0"] },
     { name = "transform", allow = ["AGPL-3.0"] },
     { name = "super_cluster_queue", allow = ["AGPL-3.0"] },
     { name = "search", allow = ["AGPL-3.0"] },
