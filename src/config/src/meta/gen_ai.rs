@@ -22,6 +22,40 @@ use utoipa::ToSchema;
 
 const MAX_AGENT_MAPPING_FIELDS: usize = 10;
 const MAX_AGENT_MAPPING_FIELD_LEN: usize = 256;
+
+// ---------------------------------------------------------------------------
+// Built-in agent-discovery field lists — the SINGLE SOURCE OF TRUTH.
+//
+// Both the OTel span extractor (OSS `core/traces/otel/extractors/agent.rs`) and
+// the Gen-AI agent registry (enterprise `agent_registry.rs`) reference these so
+// the "known" fields are defined in exactly one place. Spec-canonical fields
+// (`gen_ai.agent.name`, `gen_ai.agent.id`, `gen_ai.agent.version`,
+// `deployment.environment.name`) are the always-tried standard tier and are NOT
+// duplicated here — these are the framework/legacy fallbacks. The resolver tries
+// each in raw, dot-flattened, and `service_`-prefixed resource forms.
+// ---------------------------------------------------------------------------
+
+/// Framework agent-name conventions: Google ADK (`gcp.vertex.agent.name`),
+/// CrewAI (`crewai.task.agent`), OpenInference/generic (`agent.name`,
+/// `llm.agent.name`).
+pub const BUILTIN_AGENT_NAME_FIELDS: &[&str] = &[
+    "agent.name",
+    "llm.agent.name",
+    "gcp.vertex.agent.name",
+    "crewai.task.agent",
+];
+
+/// Framework agent-id conventions.
+pub const BUILTIN_AGENT_ID_FIELDS: &[&str] =
+    &["agent.id", "agent_id", "llm.agent.id", "llm.agent_id"];
+
+/// Environment fallbacks. `deployment.environment.name` (current OTel semconv)
+/// is the standard tier; `deployment.environment` (legacy) is the built-in.
+pub const BUILTIN_ENV_FIELDS: &[&str] = &["deployment.environment"];
+
+/// Version fallbacks. `gen_ai.agent.version` (agent-specific) is the standard
+/// tier; `service.version` (service-wide) is the built-in.
+pub const BUILTIN_VERSION_FIELDS: &[&str] = &["service.version"];
 const TARGET_AGENT_FIELDS: &[&str] = &[
     "target_agent_name",
     "target_agent_id",
@@ -52,6 +86,17 @@ pub struct GenAiAgentMappingConfig {
 }
 
 impl GenAiAgentMappingConfig {
+    /// True when every configured fallback list is empty — i.e. the org has no
+    /// meaningful custom mapping. Used to decide precedence (a saved-but-empty
+    /// org config falls through to fetched/embedded defaults), mirroring how
+    /// semantic field groups treat `!groups.is_empty()`.
+    pub fn is_all_empty(&self) -> bool {
+        self.agent_name_fields.is_empty()
+            && self.agent_id_fields.is_empty()
+            && self.env_fields.is_empty()
+            && self.version_fields.is_empty()
+    }
+
     /// Trim configured field names on save and validate the public API contract.
     pub fn normalize_and_validate(mut self) -> Result<Self, String> {
         self.agent_name_fields = normalize_fields(self.agent_name_fields);
@@ -144,6 +189,34 @@ fn is_safe_mapping_field(field: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_is_all_empty() {
+        assert!(GenAiAgentMappingConfig::default().is_all_empty());
+        assert!(
+            !GenAiAgentMappingConfig {
+                agent_name_fields: vec!["x".to_string()],
+                ..Default::default()
+            }
+            .is_all_empty()
+        );
+        assert!(
+            !GenAiAgentMappingConfig {
+                version_fields: vec!["v".to_string()],
+                ..Default::default()
+            }
+            .is_all_empty()
+        );
+    }
+
+    #[test]
+    fn test_builtin_field_consts_present() {
+        assert!(BUILTIN_AGENT_NAME_FIELDS.contains(&"gcp.vertex.agent.name"));
+        assert!(BUILTIN_AGENT_NAME_FIELDS.contains(&"crewai.task.agent"));
+        assert!(BUILTIN_AGENT_ID_FIELDS.contains(&"llm.agent.id"));
+        assert!(BUILTIN_ENV_FIELDS.contains(&"deployment.environment"));
+        assert!(BUILTIN_VERSION_FIELDS.contains(&"service.version"));
+    }
 
     #[test]
     fn test_agent_mapping_normalizes_env_and_version_fields() {

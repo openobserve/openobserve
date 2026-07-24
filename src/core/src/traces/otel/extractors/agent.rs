@@ -17,9 +17,18 @@
 
 use std::collections::HashMap;
 
-use config::{meta::gen_ai::GenAiAgentMappingConfig, utils::json};
+use config::{
+    meta::gen_ai::{
+        BUILTIN_AGENT_ID_FIELDS, BUILTIN_AGENT_NAME_FIELDS, BUILTIN_ENV_FIELDS,
+        BUILTIN_VERSION_FIELDS, GenAiAgentMappingConfig,
+    },
+    utils::json,
+};
 
 use crate::traces::otel::attributes::GenAiAttributes;
+
+/// Standard (spec) environment attribute — current OTel semconv.
+const STANDARD_ENV_FIELD: &str = "deployment.environment.name";
 
 pub struct AgentExtractor;
 
@@ -27,6 +36,8 @@ pub struct AgentExtractor;
 pub struct AgentIdentity {
     pub name: Option<String>,
     pub id: Option<String>,
+    pub env: Option<String>,
+    pub version: Option<String>,
 }
 
 impl AgentExtractor {
@@ -36,54 +47,39 @@ impl AgentExtractor {
         resource_attributes: &HashMap<String, json::Value>,
         config: &GenAiAgentMappingConfig,
     ) -> AgentIdentity {
+        // Built-in field lists come from the single source of truth in the OSS
+        // config crate (config::meta::gen_ai::BUILTIN_*), shared with the agent
+        // registry so both paths agree on the known fields.
+        let resolve = |standard: &str, built_in: &[&str], configured: &[String]| {
+            first_non_empty_string(attributes, standard, built_in, configured).or_else(|| {
+                first_non_empty_resource_string(resource_attributes, standard, built_in, configured)
+            })
+        };
         AgentIdentity {
-            name: first_non_empty_string(
-                attributes,
+            name: resolve(
                 GenAiAttributes::AGENT_NAME,
-                BUILT_IN_AGENT_NAME_FIELDS,
+                BUILTIN_AGENT_NAME_FIELDS,
                 &config.agent_name_fields,
-            )
-            .or_else(|| {
-                first_non_empty_resource_string(
-                    resource_attributes,
-                    GenAiAttributes::AGENT_NAME,
-                    BUILT_IN_AGENT_NAME_FIELDS,
-                    &config.agent_name_fields,
-                )
-            }),
-            id: first_non_empty_string(
-                attributes,
+            ),
+            id: resolve(
                 GenAiAttributes::AGENT_ID,
-                BUILT_IN_AGENT_ID_FIELDS,
+                BUILTIN_AGENT_ID_FIELDS,
                 &config.agent_id_fields,
-            )
-            .or_else(|| {
-                first_non_empty_resource_string(
-                    resource_attributes,
-                    GenAiAttributes::AGENT_ID,
-                    BUILT_IN_AGENT_ID_FIELDS,
-                    &config.agent_id_fields,
-                )
-            }),
+            ),
+            env: resolve(STANDARD_ENV_FIELD, BUILTIN_ENV_FIELDS, &config.env_fields),
+            version: resolve(
+                GenAiAttributes::AGENT_VERSION,
+                BUILTIN_VERSION_FIELDS,
+                &config.version_fields,
+            ),
         }
     }
 }
 
-// Built-in agent-name keys across the tracing conventions OpenObserve documents,
-// so agent nodes render out-of-the-box regardless of framework:
-//  - Gen-AI / OpenInference: agent.name, llm.agent.name
-//  - Google ADK (Vertex):    gcp.vertex.agent.name
-//  - CrewAI (traceloop):     crewai.task.agent
-// service.name is deliberately NOT here — it is the app tier, not agent identity
-// (guarded by test_service_name_is_not_span_agent_fallback).
-const BUILT_IN_AGENT_NAME_FIELDS: &[&str] = &[
-    "agent.name",
-    "llm.agent.name",
-    "gcp.vertex.agent.name",
-    "crewai.task.agent",
-];
-
-const BUILT_IN_AGENT_ID_FIELDS: &[&str] = &["agent.id", "agent_id", "llm.agent.id", "llm.agent_id"];
+// Built-in field lists now live in config::meta::gen_ai::BUILTIN_* (single
+// source of truth, shared with the agent registry). service.name is deliberately
+// NOT among the name fields — it is the app tier, not agent identity (guarded by
+// test_service_name_is_not_span_agent_fallback).
 
 fn first_non_empty_string(
     attributes: &HashMap<String, json::Value>,
@@ -248,6 +244,32 @@ mod tests {
 
         assert_eq!(identity.name, Some("agent-a".to_string()));
         assert_eq!(identity.id, Some("agent-1".to_string()));
+    }
+
+    #[test]
+    fn test_extracts_env_and_version_from_resource() {
+        let extractor = AgentExtractor;
+        let attrs = make_attributes(vec![("gen_ai.agent.name", json::json!("a"))]);
+        // env/version live on resource attributes (with the extractor's
+        // service_-prefixed resource fallback for the flattened forms).
+        let resource_attrs = make_attributes(vec![
+            ("deployment.environment.name", json::json!("production")),
+            ("gen_ai.agent.version", json::json!("1.2.0")),
+        ]);
+        let identity =
+            extractor.extract(&attrs, &resource_attrs, &GenAiAgentMappingConfig::default());
+        assert_eq!(identity.env.as_deref(), Some("production"));
+        assert_eq!(identity.version.as_deref(), Some("1.2.0"));
+    }
+
+    #[test]
+    fn test_version_falls_back_to_service_version() {
+        let extractor = AgentExtractor;
+        let attrs = make_attributes(vec![("gen_ai.agent.name", json::json!("a"))]);
+        let resource_attrs = make_attributes(vec![("service.version", json::json!("0.1.0"))]);
+        let identity =
+            extractor.extract(&attrs, &resource_attrs, &GenAiAgentMappingConfig::default());
+        assert_eq!(identity.version.as_deref(), Some("0.1.0"));
     }
 
     #[test]

@@ -134,7 +134,9 @@ pub async fn get_agent_mapping(
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
 
-        let config = db::system_settings::get_gen_ai_agent_mapping_config(&org_id).await;
+        // Settings editor shows the user's SAVED config (empty when none) — not
+        // the effective defaults; "Apply defaults" fetches the template separately.
+        let config = db::system_settings::get_saved_gen_ai_agent_mapping_config(&org_id).await;
         MetaHttpResponse::json(config)
     }
 

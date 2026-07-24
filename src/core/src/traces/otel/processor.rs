@@ -551,6 +551,19 @@ impl OtelIngestionProcessor {
             span_attributes.insert(GenAiAttributes::AGENT_ID.to_string(), json::json!(agent_id));
         }
 
+        // Environment and version, normalized to their canonical span keys so
+        // downstream consumers see one field regardless of source convention.
+        if let Some(ref env) = extracted.agent.env {
+            span_attributes.insert("deployment.environment.name".to_string(), json::json!(env));
+        }
+
+        if let Some(ref version) = extracted.agent.version {
+            span_attributes.insert(
+                GenAiAttributes::AGENT_VERSION.to_string(),
+                json::json!(version),
+            );
+        }
+
         // Evaluation scores and metadata.
         let evaluation = &extracted.evaluation;
         if evaluation.has_any() {

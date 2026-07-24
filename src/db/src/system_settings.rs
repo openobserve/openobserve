@@ -416,27 +416,53 @@ pub async fn get_gen_ai_agent_mapping_config(
         gen_ai::GenAiAgentMappingConfig, system_settings::keys::GEN_AI_AGENT_MAPPING,
     };
 
-    match get(&SettingScope::Org, Some(org_id), None, GEN_AI_AGENT_MAPPING).await {
-        Ok(Some(setting)) => {
-            match serde_json::from_value::<GenAiAgentMappingConfig>(setting.setting_value) {
-                Ok(config) => match config.normalize_and_validate() {
-                    Ok(config) => config,
-                    Err(e) => {
-                        log::warn!(
-                            "Ignoring invalid Gen-AI agent mapping config for org {org_id}: {e}"
-                        );
-                        GenAiAgentMappingConfig::default()
-                    }
-                },
-                Err(e) => {
-                    log::warn!(
-                        "Ignoring malformed Gen-AI agent mapping config for org {org_id}: {e}"
-                    );
-                    GenAiAgentMappingConfig::default()
-                }
-            }
-        }
-        _ => GenAiAgentMappingConfig::default(),
+    // Precedence, mirroring `get_semantic_field_groups`: a MEANINGFUL per-org
+    // config (saved and not all-empty) wins; otherwise fall through to the
+    // fetched-or-embedded enterprise defaults. A saved-but-empty config is
+    // treated as "no override" so the defaults apply — same as semantic groups'
+    // `!groups.is_empty()`.
+    if let Ok(Some(setting)) =
+        get(&SettingScope::Org, Some(org_id), None, GEN_AI_AGENT_MAPPING).await
+        && let Ok(config) = serde_json::from_value::<GenAiAgentMappingConfig>(setting.setting_value)
+        && let Ok(config) = config.normalize_and_validate()
+        && !config.is_all_empty()
+    {
+        return config;
+    }
+
+    get_default_gen_ai_agent_mapping_config()
+}
+
+/// The RAW per-org saved Gen-AI agent-mapping config (no defaults filled in) —
+/// returns exactly what the user saved, empty when nothing is saved. Used by the
+/// settings GET so the editor reflects the user's own config, not the effective
+/// defaults. Discovery uses `get_gen_ai_agent_mapping_config` (with precedence).
+pub async fn get_saved_gen_ai_agent_mapping_config(
+    org_id: &str,
+) -> config::meta::gen_ai::GenAiAgentMappingConfig {
+    use config::meta::{
+        gen_ai::GenAiAgentMappingConfig, system_settings::keys::GEN_AI_AGENT_MAPPING,
+    };
+    if let Ok(Some(setting)) =
+        get(&SettingScope::Org, Some(org_id), None, GEN_AI_AGENT_MAPPING).await
+        && let Ok(config) = serde_json::from_value::<GenAiAgentMappingConfig>(setting.setting_value)
+        && let Ok(config) = config.normalize_and_validate()
+    {
+        return config;
+    }
+    GenAiAgentMappingConfig::default()
+}
+
+/// Fetched-or-embedded Gen-AI agent-mapping defaults (enterprise), used when an
+/// org has no meaningful per-org config. Mirrors `get_default_semantic_field_groups`.
+pub fn get_default_gen_ai_agent_mapping_config() -> config::meta::gen_ai::GenAiAgentMappingConfig {
+    #[cfg(feature = "enterprise")]
+    {
+        o2_enterprise::enterprise::common::gen_ai_mappings_config::load_defaults_from_file()
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        config::meta::gen_ai::GenAiAgentMappingConfig::default()
     }
 }
 
