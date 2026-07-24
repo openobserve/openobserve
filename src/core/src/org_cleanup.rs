@@ -40,6 +40,12 @@ const ORDER_DELETE_ORG_RECORD: i32 = 900;
 ///
 /// The cleanup workflow owns orchestration and schema removal, while the binary
 /// wires in the data-lifecycle implementation used by its compactor.
+///
+/// Implementations must remove local-disk files, file_list rows, and dump files
+/// over the canonical (BASE_TIME, now) range — not a hand-rolled file_list scan
+/// with (0, i64::MAX), which query_for_dump rejects as invalid/overflowing.
+/// The compactor's `compaction::retention::delete_all` is the reference
+/// implementation.
 #[async_trait]
 pub trait StreamDataCleanup: Send + Sync {
     async fn delete_stream_data(
