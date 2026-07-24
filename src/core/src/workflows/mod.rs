@@ -22,15 +22,18 @@ use config::meta::{
 use db::{
     self,
     authz::{remove_ownership, set_ownership},
+    workflows::AssociationDeleteEvent,
 };
-use infra::table::workflows::{self, Workflow, WorkflowError, WorkflowRunData, WorkflowRunErrors};
+use infra::table::workflows::{
+    self, Workflow, WorkflowAssociation, WorkflowError, WorkflowRunData, WorkflowRunErrors,
+};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::{
-    common::{infra::config::ALERTS, meta::authz::Authz, utils::get_nats_lock},
+    common::{meta::authz::Authz, utils::get_nats_lock},
     pipeline::batch_execution::{ExecutablePipeline, WorkflowResult},
     self_reporting::publish_triggers_usage,
 };
@@ -362,6 +365,13 @@ pub async fn get_workflow_by_id(org_id: &str, id: &str) -> Result<Option<Workflo
     Ok(ret)
 }
 
+pub async fn get_workflow_associations(
+    org_id: &str,
+    id: &str,
+) -> Result<Vec<WorkflowAssociation>, anyhow::Error> {
+    db::workflows::get_workflow_associations(org_id, id).await
+}
+
 fn is_permitted(workflow_id: &str, org_id: &str, permitted: Option<&Vec<String>>) -> bool {
     match permitted {
         Some(permitted) => {
@@ -373,18 +383,20 @@ fn is_permitted(workflow_id: &str, org_id: &str, permitted: Option<&Vec<String>>
 }
 
 pub async fn delete_workflow(org_id: &str, id: &str) -> Result<(), anyhow::Error> {
-    // TODO YJDoc2: later sometime, figure out a better scheme dot this check,
-    // as we support more and more places to add workflow, this might become infeasible
-    // to check for all cases
-    let cacher = ALERTS.read().await;
-    for (stream_key, (_, alert)) in cacher.iter() {
-        if stream_key.starts_with(&format!("{org_id}/"))
-            && alert.workflows.contains(&id.to_string())
-        {
-            return Err(anyhow::anyhow!("workflow is used by alert {}", alert.name));
-        }
+    let associations = db::workflows::get_workflow_associations(&org_id, &id).await?;
+    if associations
+        .iter()
+        .any(|a| a.trigger_type != WorkflowTriggerType::IncidentEvent.to_string())
+    {
+        return Err(anyhow::anyhow!(
+            "workflow is still associated with entities, must remove the connection first",
+        ));
     }
-
+    let associations = AssociationDeleteEvent::Workflow {
+        org_id: org_id.to_string(),
+        workflow_id: id.to_string(),
+    };
+    db::workflows::delete_workflow_association(associations).await?;
     db::workflows::delete_workflow_record(id).await?;
     remove_ownership(org_id, "workflows", Authz::new(id)).await;
     db::workflows::notify_workflow_delete(id).await?;

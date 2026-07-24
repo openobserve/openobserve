@@ -523,3 +523,42 @@ pub async fn delete_workflow_association(
         .await?;
     Ok(())
 }
+
+pub async fn delete_association_by_workflow(org_id: &str, id: &str) -> Result<(), anyhow::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = get_lock().await;
+
+    workflow_associations::Entity::delete_many()
+        .filter(workflow_associations::Column::OrgId.eq(org_id))
+        .filter(workflow_associations::Column::WorkflowId.eq(id))
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
+pub async fn delete_association_by_trigger(
+    org_id: &str,
+    trigger: &str,
+) -> Result<(), anyhow::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = get_lock().await;
+
+    workflow_associations::Entity::delete_many()
+        .filter(workflow_associations::Column::OrgId.eq(org_id))
+        .filter(workflow_associations::Column::TriggerType.eq(trigger))
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
+pub async fn delete_association_by_entity(org_id: &str, entity: &str) -> Result<(), anyhow::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = get_lock().await;
+
+    workflow_associations::Entity::delete_many()
+        .filter(workflow_associations::Column::OrgId.eq(org_id))
+        .filter(workflow_associations::Column::EntityId.eq(entity))
+        .exec(client)
+        .await?;
+    Ok(())
+}

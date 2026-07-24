@@ -30,7 +30,7 @@ use config::{
     },
     utils::time::now_micros,
 };
-use infra::table::workflows::{Workflow, WorkflowRunErrors};
+use infra::table::workflows::{Workflow, WorkflowAssociation, WorkflowRunErrors};
 use openobserve_api_management::request::alerts::history::escape_like;
 use openobserve_core::auth::UserEmail;
 use search_service::{self as SearchService, query_range::get_settings_max_query_range};
@@ -96,6 +96,12 @@ struct WorkflowHistoryRow {
 pub struct WorkflowErrorResponse {
     errors: Option<WorkflowRunErrors>,
     data: Option<InputMap>,
+}
+
+#[derive(Serialize)]
+pub struct WorkflowListItem {
+    workflow: Workflow,
+    associations: Vec<WorkflowAssociation>,
 }
 
 /// CreateWorkflow
@@ -202,7 +208,24 @@ pub async fn list_workflows(
         Ok(workflows) => workflows,
         Err(e) => return MetaHttpResponse::internal_error(e),
     };
-    MetaHttpResponse::json(workflows)
+    let mut ret = Vec::with_capacity(workflows.len());
+    for w in workflows {
+        let associations = match workflows::get_workflow_associations(&org_id, &w.id).await {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!(
+                    "error getting workflow associations for {org_id}/{} : {e}",
+                    w.id
+                );
+                continue;
+            }
+        };
+        ret.push(WorkflowListItem {
+            workflow: w,
+            associations,
+        });
+    }
+    MetaHttpResponse::json(ret)
 }
 
 /// DeleteWorkflows
@@ -230,7 +253,6 @@ pub async fn list_workflows(
     )
 )]
 pub async fn delete_workflows(Path((org_id, id)): Path<(String, String)>) -> Response {
-    // TODO YJDoc2: check for workflow associations
     match workflows::delete_workflow(&org_id, &id).await {
         Ok(_) => MetaHttpResponse::ok("deleted successfully"),
         Err(e) => {

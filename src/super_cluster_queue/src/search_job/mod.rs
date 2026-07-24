@@ -18,7 +18,10 @@ pub mod search_job_results;
 pub mod search_jobs;
 
 use config::utils::json;
-use db::{sourcemaps::SOURCEMAP_PREFIX, workflows::WORKFLOWS_PREFIX};
+use db::{
+    sourcemaps::SOURCEMAP_PREFIX,
+    workflows::{AssociationDeleteEvent, WORKFLOWS_PREFIX},
+};
 use infra::{
     coordinator::get_coordinator,
     errors::{Error, Result},
@@ -238,32 +241,22 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
         }
 
         MessageType::WorkflowAssociationDelete => {
-            let key = msg.value.unwrap();
-            let key = String::from_utf8_lossy(&key);
-            let parts: Vec<_> = key.split("/").collect();
-            if parts.len() < 3 {
-                log::error!("invalid key received in workflow association delete message : {key}");
-                return Ok(());
-            }
-            let org_id = parts[0];
-            let entity_id = parts[1];
-            let workflow_id = parts[2];
-            match infra::table::workflows::delete_workflow_association(
-                org_id,
-                workflow_id,
-                entity_id,
-            )
-            .await
-            {
-                Ok(_) => {
-                    log::info!(
-                        "successfully handled workflow association delete notification for {org_id} entity_id {entity_id} workflow_id {workflow_id}"
-                    );
+            let event: AssociationDeleteEvent = json::from_slice(&msg.value.unwrap())?;
+            match &event {
+                AssociationDeleteEvent::Entity { org_id, entity_id } => {
+                    infra::table::workflows::delete_association_by_entity(&org_id, &entity_id)
+                        .await?;
                 }
-                Err(e) => {
-                    log::info!(
-                        "error in handling workflow association delete notification for {org_id} entity_id {entity_id} workflow_id {workflow_id}: {e}"
-                    );
+                AssociationDeleteEvent::Workflow {
+                    org_id,
+                    workflow_id,
+                } => {
+                    infra::table::workflows::delete_association_by_workflow(&org_id, &workflow_id)
+                        .await?;
+                }
+                AssociationDeleteEvent::Trigger { org_id, trigger } => {
+                    infra::table::workflows::delete_association_by_trigger(&org_id, &trigger)
+                        .await?;
                 }
             }
         }
