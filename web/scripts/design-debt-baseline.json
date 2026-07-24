@@ -4,8 +4,7 @@
     "rawVarInComponent": 585,
     "arbZ": 34,
     "darkMechanism": 20,
-    "unscopedStyle": 7,
-    "stylePxUnit": 90
+    "unscopedStyle": 7
   },
   "files": {
     "components/CodeQueryEditor.vue": {
@@ -154,7 +153,6 @@
       "rawProjectRamp": 2
     },
     "components/pipeline/PipelineView.vue": {
-      "stylePxUnit": 6,
       "rawVarInComponent": 15
     },
     "components/rum/PlayerTracesTab.vue": {
@@ -270,57 +268,6 @@
     "lib/core/EmptyState/EmptyStateIngestionChip.vue": {
       "rawProjectRamp": 3,
       "rawVarInComponent": 5
-    },
-    "lib/core/EmptyState/illustrations/EmptyAlert.vue": {
-      "stylePxUnit": 2
-    },
-    "lib/core/EmptyState/illustrations/EmptyAllClear.vue": {
-      "stylePxUnit": 4
-    },
-    "lib/core/EmptyState/illustrations/EmptyBoard.vue": {
-      "stylePxUnit": 1
-    },
-    "lib/core/EmptyState/illustrations/EmptyBrokenPanel.vue": {
-      "stylePxUnit": 3
-    },
-    "lib/core/EmptyState/illustrations/EmptyBuilder.vue": {
-      "stylePxUnit": 12
-    },
-    "lib/core/EmptyState/illustrations/EmptyConnect.vue": {
-      "stylePxUnit": 15
-    },
-    "lib/core/EmptyState/illustrations/EmptyError.vue": {
-      "stylePxUnit": 8
-    },
-    "lib/core/EmptyState/illustrations/EmptyExplorer.vue": {
-      "stylePxUnit": 7
-    },
-    "lib/core/EmptyState/illustrations/EmptyFunction.vue": {
-      "stylePxUnit": 5
-    },
-    "lib/core/EmptyState/illustrations/EmptyHistory.vue": {
-      "stylePxUnit": 4
-    },
-    "lib/core/EmptyState/illustrations/EmptyHourglass.vue": {
-      "stylePxUnit": 1
-    },
-    "lib/core/EmptyState/illustrations/EmptyPipeline.vue": {
-      "stylePxUnit": 2
-    },
-    "lib/core/EmptyState/illustrations/EmptyReport.vue": {
-      "stylePxUnit": 3
-    },
-    "lib/core/EmptyState/illustrations/EmptySchedule.vue": {
-      "stylePxUnit": 2
-    },
-    "lib/core/EmptyState/illustrations/EmptyServiceGraph.vue": {
-      "stylePxUnit": 12
-    },
-    "lib/core/EmptyState/illustrations/EmptyTrace.vue": {
-      "stylePxUnit": 1
-    },
-    "lib/core/EmptyState/illustrations/EmptyWaiting.vue": {
-      "stylePxUnit": 2
     },
     "lib/core/Navbar/ONavGroup.vue": {
       "rawProjectRamp": 1

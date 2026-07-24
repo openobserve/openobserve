@@ -16,8 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!--
   EmptyPipeline — object-only "no pipelines" illustration: a small flow of nodes
-  with a packet travelling along it, ending at a dashed "add" node. CSS motion
-  gated by `animated` + prefers-reduced-motion.
+  with a packet travelling along it, ending at a dashed "add" node. Pure SMIL
+  motion gated behind `animated` (prefers-reduced-motion; OEmptyState wires this
+  up automatically).
 -->
 <template>
   <svg
@@ -27,7 +28,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     xmlns="http://www.w3.org/2000/svg"
     role="img"
     aria-label="Create your first pipeline"
-    :class="['es-root', { 'es-static': !animated }]"
   >
     <ellipse cx="120" cy="150" rx="74" ry="9" fill="var(--color-primary-900)" opacity="0.1" />
     <g fill="var(--color-border-default)" opacity="0.5">
@@ -59,7 +59,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <rect x="48" y="110" width="4" height="6" rx="1.5" fill="var(--color-primary-400)" /><rect x="55" y="106" width="4" height="10" rx="1.5" fill="var(--color-primary-500)" /><rect x="62" y="108" width="4" height="8" rx="1.5" fill="var(--color-primary-600)" />
 
     <!-- travelling packet -->
-    <circle class="es-packet" cx="60" cy="70" r="4" fill="var(--color-primary-600)" />
+    <circle cx="60" cy="70" r="4" fill="var(--color-primary-600)">
+      <animateTransform v-if="animated" attributeName="transform" type="translate" values="0 0; 44 0; 104 0; 104 0" keyTimes="0;0.45;0.75;1" dur="3s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1; 0.42 0 0.58 1" />
+      <animate v-if="animated" attributeName="opacity" values="0;1;1;0;0" keyTimes="0;0.15;0.6;0.75;1" dur="3s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1; 0.42 0 0.58 1; 0.42 0 0.58 1" />
+    </circle>
   </svg>
 </template>
 
@@ -69,44 +72,3 @@ withDefaults(
   { width: 260, animated: true },
 );
 </script>
-
-<style scoped>
-/* keep(keyframes): SVG illustration animation. Scoped on purpose (W2.b): the
-   20 illustrations reused generic keyframe names (es-pulse, es-twinkle, …) with
-   DIFFERENT bodies from unscoped blocks — a global name collision where the
-   last-loaded illustration hijacked the others' animations. Vue rewrites scoped
-   keyframe names per component, which ends the collision. All selectors and the
-   es-static gate live in this file's own template. */
-.es-packet {
-  transform-box: view-box;
-  animation: es-travel 3s ease-in-out infinite;
-}
-@keyframes es-travel {
-  0% {
-    transform: translateX(0);
-    opacity: 0;
-  }
-  15% {
-    opacity: 1;
-  }
-  45% {
-    transform: translateX(44px);
-  }
-  60% {
-    opacity: 1;
-  }
-  75%,
-  100% {
-    transform: translateX(104px);
-    opacity: 0;
-  }
-}
-.es-static :where(.es-packet) {
-  animation: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  :where(.es-packet) {
-    animation: none;
-  }
-}
-</style>

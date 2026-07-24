@@ -18,8 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   EmptyExplorer — a hand-built, detailed flat-style scene for "no data / lost":
   an analyst holding a tablet, scratching their head at a "no-signal" bubble,
   beside a signpost. Brand-recoloured (steel-blue palette), neutral skin/hair so
-  it reads in light AND dark. Motion is subtle CSS (float + parallax + twinkle),
-  gated by `animated` and prefers-reduced-motion. Scales by `width` (4:3 viewBox).
+  it reads in light AND dark. Pure SMIL motion gated behind `animated`
+  (prefers-reduced-motion; OEmptyState wires this up automatically). Scales by
+  `width` (4:3 viewBox).
 -->
 <template>
   <svg
@@ -29,18 +30,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     xmlns="http://www.w3.org/2000/svg"
     role="img"
     aria-label="No data found"
-    :class="['es-root', { 'es-static': !animated }]"
   >
-    <!-- backdrop blob (slow parallax drift) -->
-    <g class="es-blob">
+    <!-- backdrop blob (slow parallax drift + faint breathe). The translate folds
+         in the scale-about-centre compensation (fill-box centre 191.2,131): its
+         peak = (5,-4) + centre·(1-1.02) = (1.18,-6.62), keeping the 1.02 scale
+         centred instead of drifting from the origin. -->
+    <g>
+      <animateTransform v-if="animated" attributeName="transform" type="translate" values="0 0; 1.18 -6.62; 0 0" keyTimes="0;0.5;1" dur="15s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" additive="sum" />
+      <animateTransform v-if="animated" attributeName="transform" type="scale" values="1; 1.02; 1" keyTimes="0;0.5;1" dur="15s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" additive="sum" />
       <path
         d="M188 30 C262 24 330 52 332 122 C334 182 308 220 244 228 C188 235 126 238 84 210 C36 178 42 104 84 68 C120 36 132 36 188 30 Z"
         fill="var(--color-surface-subtle)"
       />
     </g>
 
-    <!-- ground shadow (breathes with the float) -->
-    <ellipse class="es-shadow" cx="180" cy="252" rx="104" ry="13" fill="var(--color-primary-900)" opacity="0.14" />
+    <!-- ground shadow -->
+    <ellipse cx="180" cy="252" rx="104" ry="13" fill="var(--color-primary-900)" opacity="0.14" />
 
     <!-- signpost -->
     <g>
@@ -56,8 +61,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <path d="M86 198 H50 L40 207 L50 216 H86 Z" fill="var(--color-primary-300)" />
     </g>
 
-    <!-- character (gentle vertical float) -->
-    <g class="es-char">
+    <!-- character -->
+    <g>
       <!-- back leg -->
       <path d="M182 176 L196 176 L192 246 L181 246 Z" fill="var(--color-grey-800)" />
       <path d="M178 244 Q178 251 187 251 L198 251 Q201 250 199 245 L192 244 Z" fill="var(--color-grey-900)" />
@@ -87,7 +92,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <ellipse cx="183" cy="186" rx="5.5" ry="4.5" fill="var(--color-illustration-tan)" transform="rotate(-12 183 186)" />
 
       <!-- head (3/4 facing the bubble) — subtle "thinking" tilt -->
-      <g class="es-head">
+      <g>
+        <animateTransform v-if="animated" attributeName="transform" type="rotate" values="1.2 200 134; -1.2 200 134; 1.2 200 134" keyTimes="0;0.5;1" dur="3.6s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />
         <!-- neck -->
         <rect x="192" y="132" width="12" height="14" rx="4" fill="var(--color-illustration-tan)" />
         <ellipse cx="200" cy="114" rx="19" ry="21" fill="var(--color-illustration-sand)" />
@@ -103,7 +109,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </g>
 
       <!-- raised arm — actually scratches the head (rubs back and forth) -->
-      <g class="es-scratch">
+      <g>
+        <animateTransform v-if="animated" attributeName="transform" type="rotate" values="-3 209 150; 5.5 209 150; -3 209 150" keyTimes="0;0.5;1" dur="0.75s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />
         <path d="M206 150 Q224 146 230 124 Q232 116 226 114 Q220 113 218 121 Q214 138 200 144 Z" fill="var(--color-primary-500)" />
         <!-- sleeve shade -->
         <path d="M226 114 Q232 116 230 124 Q227 134 222 140 L219 132 Q224 124 222 116 Z" fill="var(--color-primary-600)" opacity="0.5" />
@@ -114,9 +121,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </g>
 
     <!-- floating accents -->
-    <circle class="es-dot es-dot-a" cx="298" cy="150" r="5" fill="var(--color-primary-400)" />
-    <circle class="es-dot es-dot-b" cx="120" cy="92" r="4" fill="var(--color-primary-300)" />
-    <g class="es-dot es-dot-c" transform="translate(140 72)">
+    <circle cx="298" cy="150" r="5" fill="var(--color-primary-400)">
+      <animateTransform v-if="animated" attributeName="transform" type="translate" values="0 0; 0 -6; 0 0" keyTimes="0;0.5;1" dur="3.4s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />
+    </circle>
+    <circle cx="120" cy="92" r="4" fill="var(--color-primary-300)">
+      <animateTransform v-if="animated" attributeName="transform" type="translate" values="0 0; 0 -6; 0 0" keyTimes="0;0.5;1" dur="4.2s" begin="-0.8s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />
+    </circle>
+    <g transform="translate(140 72)">
+      <animateTransform v-if="animated" attributeName="transform" type="scale" values="0.7; 1.1; 0.7" keyTimes="0;0.5;1" dur="2.8s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" additive="sum" />
+      <animate v-if="animated" attributeName="opacity" values="0.35; 1; 0.35" keyTimes="0;0.5;1" dur="2.8s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />
       <path d="M0 -7 L1.6 -1.6 L7 0 L1.6 1.6 L0 7 L-1.6 1.6 L-7 0 L-1.6 -1.6 Z" fill="var(--color-primary-400)" />
     </g>
   </svg>
@@ -128,102 +141,3 @@ withDefaults(
   { width: 300, animated: true },
 );
 </script>
-
-<style scoped>
-/* keep(keyframes): SVG illustration animation. Scoped on purpose (W2.b): the
-   20 illustrations reused generic keyframe names (es-pulse, es-twinkle, …) with
-   DIFFERENT bodies from unscoped blocks — a global name collision where the
-   last-loaded illustration hijacked the others' animations. Vue rewrites scoped
-   keyframe names per component, which ends the collision. All selectors and the
-   es-static gate live in this file's own template. */
-/* Subtle, looping motion. transform-box/origin keep scale + translate sane on
-   SVG groups. All gated behind `animated` (es-static) and the OS reduce-motion
-   preference. */
-.es-blob,
-.es-dot {
-  transform-box: fill-box;
-  transform-origin: center;
-}
-/* pivot in viewBox units so the arm/head rotate about a real joint */
-.es-scratch {
-  transform-box: view-box;
-  transform-origin: 209px 150px;
-  animation: es-scratch 0.75s ease-in-out infinite;
-}
-.es-head {
-  transform-box: view-box;
-  transform-origin: 200px 134px;
-  animation: es-headtilt 3.6s ease-in-out infinite;
-}
-.es-blob {
-  animation: es-drift 15s ease-in-out infinite;
-}
-.es-dot-a {
-  animation: es-bob 3.4s ease-in-out infinite;
-}
-.es-dot-b {
-  animation: es-bob 4.2s ease-in-out infinite;
-  animation-delay: -0.8s;
-}
-.es-dot-c {
-  animation: es-twinkle 2.8s ease-in-out infinite;
-}
-
-@keyframes es-scratch {
-  0%,
-  100% {
-    transform: rotate(-3deg);
-  }
-  50% {
-    transform: rotate(5.5deg);
-  }
-}
-@keyframes es-headtilt {
-  0%,
-  100% {
-    transform: rotate(1.2deg);
-  }
-  50% {
-    transform: rotate(-1.2deg);
-  }
-}
-@keyframes es-bob {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-6px);
-  }
-}
-@keyframes es-drift {
-  0%,
-  100% {
-    transform: translate(0, 0) scale(1);
-  }
-  50% {
-    transform: translate(5px, -4px) scale(1.02);
-  }
-}
-@keyframes es-twinkle {
-  0%,
-  100% {
-    transform: scale(0.7);
-    opacity: 0.35;
-  }
-  50% {
-    transform: scale(1.1);
-    opacity: 1;
-  }
-}
-
-/* honour explicit opt-out and the OS preference */
-.es-static :where(.es-scratch, .es-head, .es-blob, .es-dot) {
-  animation: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  :where(.es-scratch, .es-head, .es-blob, .es-dot) {
-    animation: none;
-  }
-}
-</style>

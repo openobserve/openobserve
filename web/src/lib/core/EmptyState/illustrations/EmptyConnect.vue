@@ -25,8 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   elbow's vertices exactly (down → across → down), so motion still tracks
   its path precisely — the same discipline that made the earlier straight
   version safe, just with more stops. No +/add glyphs (they read as
-  buttons). Landing dots pulse opacity-only as each packet arrives. CSS
-  motion gated by `animated` + prefers-reduced-motion.
+  buttons). Landing dots pulse opacity-only as each packet arrives. Pure SMIL
+  motion gated behind `animated` (prefers-reduced-motion; OEmptyState wires
+  this up automatically).
 -->
 <template>
   <svg
@@ -36,7 +37,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     xmlns="http://www.w3.org/2000/svg"
     role="img"
     aria-label="Connect a data source to create your first stream"
-    :class="['es-root', { 'es-static': !animated }]"
   >
     <circle cx="120" cy="86" r="72" fill="var(--color-primary-500)" opacity="0.05" />
     <ellipse cx="120" cy="169" rx="48" ry="6" fill="var(--color-primary-900)" opacity="0.1" />
@@ -80,21 +80,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <path d="M88 143 A32 7.5 0 0 0 152 143" stroke="var(--color-border-default)" stroke-width="1.5" opacity="0.7" />
     <ellipse cx="120" cy="112" rx="32" ry="7.5" fill="var(--color-surface-subtle)" stroke="var(--color-border-strong)" stroke-width="2.25" />
 
-    <!-- landing dots on the database rim, pulsing as packets arrive -->
-    <circle class="es-in es-in-a" cx="104" cy="107" r="2.25" fill="var(--color-primary-400)" />
-    <circle class="es-in es-in-b" cx="120" cy="105" r="2.25" fill="var(--color-primary-400)" />
-    <circle class="es-in es-in-c" cx="136" cy="107" r="2.25" fill="var(--color-primary-400)" />
+    <!-- landing dots on the database rim, pulsing as packets arrive. Base
+         opacity 0.6 = the frozen rest state (was es-static opacity: 0.6). -->
+    <circle cx="104" cy="107" r="2.25" fill="var(--color-primary-400)" opacity="0.6">
+      <animate v-if="animated" attributeName="opacity" values="0.3;0.3;1;0.3" keyTimes="0;0.75;0.92;1" dur="2.1s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1; 0.42 0 0.58 1" />
+    </circle>
+    <circle cx="120" cy="105" r="2.25" fill="var(--color-primary-400)" opacity="0.6">
+      <animate v-if="animated" attributeName="opacity" values="0.3;0.3;1;0.3" keyTimes="0;0.75;0.92;1" dur="2.1s" begin="-0.7s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1; 0.42 0 0.58 1" />
+    </circle>
+    <circle cx="136" cy="107" r="2.25" fill="var(--color-primary-400)" opacity="0.6">
+      <animate v-if="animated" attributeName="opacity" values="0.3;0.3;1;0.3" keyTimes="0;0.75;0.92;1" dur="2.1s" begin="-1.4s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1; 0.42 0 0.58 1" />
+    </circle>
 
-    <!-- packets travelling from each source down to the database -->
-    <circle class="es-pk es-pk-a" cx="52" cy="46" r="3" fill="var(--color-primary-500)" />
-    <circle class="es-pk es-pk-b" cx="120" cy="38" r="3" fill="var(--color-primary-600)" />
-    <circle class="es-pk es-pk-c" cx="188" cy="46" r="3" fill="var(--color-primary-500)" />
+    <!-- packets travelling from each source down to the database. Base
+         opacity 0 = frozen/hidden rest state (was es-static opacity: 0). -->
+    <circle cx="52" cy="46" r="3" fill="var(--color-primary-500)" opacity="0">
+      <animateTransform v-if="animated" attributeName="transform" type="translate" values="0 0; 0 24; 52 24; 52 58; 52 58" keyTimes="0;0.28;0.62;0.84;1" dur="2.1s" repeatCount="indefinite" />
+      <animate v-if="animated" attributeName="opacity" values="0;1;1;0" keyTimes="0;0.1;0.84;1" dur="2.1s" repeatCount="indefinite" />
+    </circle>
+    <circle cx="120" cy="38" r="3" fill="var(--color-primary-600)" opacity="0">
+      <animateTransform v-if="animated" attributeName="transform" type="translate" values="0 0; 0 62" keyTimes="0;1" dur="2.1s" begin="-0.7s" repeatCount="indefinite" />
+      <animate v-if="animated" attributeName="opacity" values="0;1;1;0" keyTimes="0;0.12;0.82;1" dur="2.1s" begin="-0.7s" repeatCount="indefinite" />
+    </circle>
+    <circle cx="188" cy="46" r="3" fill="var(--color-primary-500)" opacity="0">
+      <animateTransform v-if="animated" attributeName="transform" type="translate" values="0 0; 0 24; -52 24; -52 58; -52 58" keyTimes="0;0.28;0.62;0.84;1" dur="2.1s" begin="-1.4s" repeatCount="indefinite" />
+      <animate v-if="animated" attributeName="opacity" values="0;1;1;0" keyTimes="0;0.1;0.84;1" dur="2.1s" begin="-1.4s" repeatCount="indefinite" />
+    </circle>
 
-    <!-- ambient sparkles -->
-    <g class="es-spark es-spark-a" transform="translate(206 118)">
+    <!-- ambient sparkles: scale twinkle about their own centre (additive="sum"
+         composes with each group's translate) -->
+    <g transform="translate(206 118)">
+      <animateTransform v-if="animated" attributeName="transform" type="scale" values="0.6;1.1;0.6" keyTimes="0;0.5;1" dur="2.6s" additive="sum" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />
+      <animate v-if="animated" attributeName="opacity" values="0.35;1;0.35" keyTimes="0;0.5;1" dur="2.6s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />
       <path d="M0 -6 L1.4 -1.4 L6 0 L1.4 1.4 L0 6 L-1.4 1.4 L-6 0 L-1.4 -1.4 Z" fill="var(--color-primary-400)" />
     </g>
-    <g class="es-spark es-spark-b" transform="translate(36 116)">
+    <g transform="translate(36 116)">
+      <animateTransform v-if="animated" attributeName="transform" type="scale" values="0.6;1.1;0.6" keyTimes="0;0.5;1" dur="3.1s" begin="-1.1s" additive="sum" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />
+      <animate v-if="animated" attributeName="opacity" values="0.35;1;0.35" keyTimes="0;0.5;1" dur="3.1s" begin="-1.1s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />
       <path d="M0 -5 L1.2 -1.2 L5 0 L1.2 1.2 L0 5 L-1.2 1.2 L-5 0 L-1.2 -1.2 Z" fill="var(--color-primary-300)" />
     </g>
   </svg>
@@ -106,161 +128,3 @@ withDefaults(
   { width: 260, animated: true },
 );
 </script>
-
-<style scoped>
-/* keep(keyframes): SVG illustration animation. Scoped on purpose (W2.b): the
-   20 illustrations reused generic keyframe names (es-pulse, es-twinkle, …) with
-   DIFFERENT bodies from unscoped blocks — a global name collision where the
-   last-loaded illustration hijacked the others' animations. Vue rewrites scoped
-   keyframe names per component, which ends the collision. All selectors and the
-   es-static gate live in this file's own template. */
-/* packets — straight-line translate along each connector (per-line deltas) */
-.es-pk {
-  transform-box: fill-box;
-  transform-origin: center;
-}
-.es-pk-a {
-  animation: es-pk-a 2.1s linear infinite;
-}
-.es-pk-b {
-  animation: es-pk-b 2.1s linear infinite;
-  animation-delay: -0.7s;
-}
-.es-pk-c {
-  animation: es-pk-c 2.1s linear infinite;
-  animation-delay: -1.4s;
-}
-@keyframes es-pk-a {
-  0% {
-    transform: translate(0, 0);
-    opacity: 0;
-  }
-  10% {
-    opacity: 1;
-  }
-  28% {
-    transform: translate(0, 24px);
-  }
-  62% {
-    transform: translate(52px, 24px);
-  }
-  84% {
-    transform: translate(52px, 58px);
-    opacity: 1;
-  }
-  100% {
-    transform: translate(52px, 58px);
-    opacity: 0;
-  }
-}
-@keyframes es-pk-b {
-  0% {
-    transform: translate(0, 0);
-    opacity: 0;
-  }
-  12% {
-    opacity: 1;
-  }
-  82% {
-    opacity: 1;
-  }
-  100% {
-    transform: translate(0, 62px);
-    opacity: 0;
-  }
-}
-@keyframes es-pk-c {
-  0% {
-    transform: translate(0, 0);
-    opacity: 0;
-  }
-  10% {
-    opacity: 1;
-  }
-  28% {
-    transform: translate(0, 24px);
-  }
-  62% {
-    transform: translate(-52px, 24px);
-  }
-  84% {
-    transform: translate(-52px, 58px);
-    opacity: 1;
-  }
-  100% {
-    transform: translate(-52px, 58px);
-    opacity: 0;
-  }
-}
-/* landing dots pulse opacity-only, offset to match each packet's arrival */
-.es-in {
-  animation: es-land 2.1s ease-in-out infinite;
-}
-.es-in-a {
-  animation-delay: 0s;
-}
-.es-in-b {
-  animation-delay: -0.7s;
-}
-.es-in-c {
-  animation-delay: -1.4s;
-}
-@keyframes es-land {
-  0%,
-  75% {
-    opacity: 0.3;
-  }
-  92% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0.3;
-  }
-}
-.es-spark {
-  transform-box: fill-box;
-  transform-origin: center;
-}
-.es-spark-a {
-  animation: es-twinkle 2.6s ease-in-out infinite;
-}
-.es-spark-b {
-  animation: es-twinkle 3.1s ease-in-out infinite;
-  animation-delay: -1.1s;
-}
-@keyframes es-twinkle {
-  0%,
-  100% {
-    transform: scale(0.6);
-    opacity: 0.35;
-  }
-  50% {
-    transform: scale(1.1);
-    opacity: 1;
-  }
-}
-.es-static :where(.es-pk) {
-  animation: none;
-  opacity: 0;
-}
-.es-static :where(.es-in) {
-  animation: none;
-  opacity: 0.6;
-}
-.es-static :where(.es-spark) {
-  animation: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  :where(.es-pk) {
-    animation: none;
-    opacity: 0;
-  }
-  :where(.es-in) {
-    animation: none;
-    opacity: 0.6;
-  }
-  :where(.es-spark) {
-    animation: none;
-  }
-}
-</style>

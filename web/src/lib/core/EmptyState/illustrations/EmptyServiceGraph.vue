@@ -18,7 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   EmptyServiceGraph — object-only "no service graph" illustration: one root
   service node on the left calling two downstream nodes on the right (horizontal
   tree topology). Animated packets travel each branch in alternating sequence.
-  CSS motion gated by `animated` + prefers-reduced-motion.
+  Pure SMIL motion gated behind `animated`
+  (prefers-reduced-motion; OEmptyState wires this up automatically).
 -->
 <template>
   <svg
@@ -28,7 +29,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     xmlns="http://www.w3.org/2000/svg"
     role="img"
     aria-label="No service graph data"
-    :class="['es-root', { 'es-static': !animated }]"
   >
     <!-- Ground shadow -->
     <ellipse cx="120" cy="156" rx="66" ry="9" fill="var(--color-primary-900)" opacity="0.1" />
@@ -63,10 +63,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <circle cx="168" cy="128" r="3" fill="var(--color-primary-500)" />
 
     <!-- Animated packets -->
-    <!-- Packet toward top-right child: delta (59, -24) -->
-    <circle class="es-packet-top" cx="94" cy="82" r="4" fill="var(--color-primary-600)" />
-    <!-- Packet toward bottom-right child: delta (59, 24), offset 1.5 s -->
-    <circle class="es-packet-bottom" cx="94" cy="98" r="4" fill="var(--color-primary-400)" />
+    <!-- Packet toward top-right child: travels delta (59, -24) in user units -->
+    <circle cx="94" cy="82" r="4" fill="var(--color-primary-600)">
+      <animateTransform v-if="animated" attributeName="transform" type="translate" values="0 0; 59 -24; 59 -24" keyTimes="0;0.5;1" dur="3s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />
+      <animate v-if="animated" attributeName="opacity" values="0;1;1;0;0" keyTimes="0;0.1;0.5;0.65;1" dur="3s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1; 0.42 0 0.58 1; 0.42 0 0.58 1" />
+    </circle>
+    <!-- Packet toward bottom-right child: delta (59, 24), 1.5s phase offset -->
+    <circle cx="94" cy="98" r="4" fill="var(--color-primary-400)">
+      <animateTransform v-if="animated" attributeName="transform" type="translate" values="0 0; 59 24; 59 24" keyTimes="0;0.5;1" dur="3s" begin="1.5s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />
+      <animate v-if="animated" attributeName="opacity" values="0;1;1;0;0" keyTimes="0;0.1;0.5;0.65;1" dur="3s" begin="1.5s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1; 0.42 0 0.58 1; 0.42 0 0.58 1" />
+    </circle>
   </svg>
 </template>
 
@@ -76,49 +82,3 @@ withDefaults(
   { width: 260, animated: true },
 );
 </script>
-
-<style scoped>
-/* keep(keyframes): SVG illustration animation. Scoped on purpose (W2.b): the
-   illustrations reuse generic keyframe names (es-pulse, es-twinkle, …) with
-   DIFFERENT bodies, so an unscoped block lets the last-loaded illustration
-   hijack the others' animations. Vue rewrites scoped keyframe names per
-   component, which ends the collision. All selectors and the es-static gate
-   live in this file's own template.
-   The px in these keyframes are SVG USER-SPACE units (viewBox), not layout px:
-   each translate lands the packet on a vertex of the connector path drawn in
-   the template. They must stay px — rem is font-relative, so it would decouple
-   the motion from the fixed-unit path geometry whenever the root font-size is
-   not the browser default. */
-.es-packet-top {
-  transform-box: view-box;
-  animation: es-packet-top 3s ease-in-out infinite;
-}
-@keyframes es-packet-top {
-  0% { transform: translateX(0) translateY(0); opacity: 0; }
-  10% { opacity: 1; }
-  50% { transform: translateX(59px) translateY(-24px); opacity: 1; }
-  65% { transform: translateX(59px) translateY(-24px); opacity: 0; }
-  100% { transform: translateX(59px) translateY(-24px); opacity: 0; }
-}
-
-.es-packet-bottom {
-  transform-box: view-box;
-  animation: es-packet-bottom 3s ease-in-out infinite 1.5s;
-}
-@keyframes es-packet-bottom {
-  0% { transform: translateX(0) translateY(0); opacity: 0; }
-  10% { opacity: 1; }
-  50% { transform: translateX(59px) translateY(24px); opacity: 1; }
-  65% { transform: translateX(59px) translateY(24px); opacity: 0; }
-  100% { transform: translateX(59px) translateY(24px); opacity: 0; }
-}
-
-.es-static :where(.es-packet-top, .es-packet-bottom) {
-  animation: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  :where(.es-packet-top, .es-packet-bottom) {
-    animation: none;
-  }
-}
-</style>

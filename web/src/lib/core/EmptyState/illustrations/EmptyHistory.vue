@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!--
   EmptyHistory — object-only "no history yet" illustration: a clock encircled by
-  a rewind arrow, hands ticking. CSS motion gated by `animated` +
-  prefers-reduced-motion.
+  a rewind arrow, hands ticking. Pure SMIL motion gated behind `animated`
+  (prefers-reduced-motion; OEmptyState wires this up automatically).
 -->
 <template>
   <svg
@@ -27,7 +27,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     xmlns="http://www.w3.org/2000/svg"
     role="img"
     aria-label="No history yet"
-    :class="['es-root', { 'es-static': !animated }]"
   >
     <circle cx="120" cy="88" r="58" fill="var(--color-primary-500)" opacity="0.05" />
     <ellipse cx="120" cy="152" rx="52" ry="8" fill="var(--color-primary-900)" opacity="0.1" />
@@ -35,8 +34,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <circle cx="34" cy="52" r="2" /><circle cx="206" cy="118" r="2" /><circle cx="202" cy="48" r="1.6" />
     </g>
 
-    <!-- rewind arrow around the clock -->
-    <g class="es-rewind">
+    <!-- rewind arrow around the clock: gentle opacity pulse -->
+    <g>
+      <animate v-if="animated" attributeName="opacity" values="0.7;1;0.7" keyTimes="0;0.5;1" dur="3s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />
       <path d="M150 46 A48 48 0 1 1 120 40" stroke="var(--color-primary-400)" stroke-width="2.5" fill="none" stroke-linecap="round" />
       <path d="M120 40 l9 -5 -1 11 z" fill="var(--color-primary-500)" />
     </g>
@@ -48,7 +48,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </g>
     <!-- hands -->
     <line x1="120" y1="88" x2="120" y2="70" stroke="var(--color-text-heading)" stroke-width="3" stroke-linecap="round" opacity="0.75" />
-    <line class="es-hand" x1="120" y1="88" x2="138" y2="88" stroke="var(--color-primary-600)" stroke-width="2.5" stroke-linecap="round" />
+    <!-- minute hand sweeps a full turn (linear). Pivot 120 88 = clock centre,
+         in user units — replaces the old transform-origin: 120px 88px. -->
+    <line x1="120" y1="88" x2="138" y2="88" stroke="var(--color-primary-600)" stroke-width="2.5" stroke-linecap="round">
+      <animateTransform v-if="animated" attributeName="transform" type="rotate" values="0 120 88; 360 120 88" keyTimes="0;1" dur="8s" repeatCount="indefinite" />
+    </line>
     <circle cx="120" cy="88" r="3.5" fill="var(--color-primary-600)" />
   </svg>
 </template>
@@ -59,44 +63,3 @@ withDefaults(
   { width: 260, animated: true },
 );
 </script>
-
-<style scoped>
-/* keep(keyframes): SVG illustration animation. Scoped on purpose (W2.b): the
-   20 illustrations reused generic keyframe names (es-pulse, es-twinkle, …) with
-   DIFFERENT bodies from unscoped blocks — a global name collision where the
-   last-loaded illustration hijacked the others' animations. Vue rewrites scoped
-   keyframe names per component, which ends the collision. All selectors and the
-   es-static gate live in this file's own template. */
-.es-hand {
-  transform-box: view-box;
-  transform-origin: 120px 88px;
-  animation: es-tick 8s linear infinite;
-}
-.es-rewind {
-  transform-box: view-box;
-  transform-origin: 120px 88px;
-  animation: es-pulse 3s ease-in-out infinite;
-}
-@keyframes es-tick {
-  to {
-    transform: rotate(360deg);
-  }
-}
-@keyframes es-pulse {
-  0%,
-  100% {
-    opacity: 0.7;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-.es-static :where(.es-hand, .es-rewind) {
-  animation: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  :where(.es-hand, .es-rewind) {
-    animation: none;
-  }
-}
-</style>

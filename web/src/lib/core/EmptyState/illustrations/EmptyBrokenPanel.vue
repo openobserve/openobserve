@@ -17,7 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!--
   EmptyBrokenPanel — clean, object-only "something went wrong" illustration: a
   cracked panel with a pulsing warning sign and a loose bolt that wobbles free.
-  No character. CSS motion gated by `animated` + prefers-reduced-motion.
+  No character. Pure SMIL motion gated behind `animated` (prefers-reduced-motion;
+  OEmptyState wires this up automatically).
 -->
 <template>
   <svg
@@ -27,7 +28,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     xmlns="http://www.w3.org/2000/svg"
     role="img"
     aria-label="Something went wrong"
-    :class="['es-root', { 'es-static': !animated }]"
   >
     <ellipse cx="120" cy="156" rx="66" ry="9" fill="var(--color-primary-900)" opacity="0.1" />
 
@@ -47,13 +47,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <path d="M78 112 L94 112 L104 112 M138 104 L154 104 L166 104" stroke="var(--color-error-400)" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.8" />
 
     <!-- loose bolt (wobbles) -->
-    <g class="es-bolt" transform="translate(170 136)">
+    <!-- drawn around 0,0 and placed by the base translate(170 136); the wobble
+         rotates around that local origin and adds a 2-unit bob, composed onto the
+         base via additive="sum" (replaces the old view-box origin 170px 136px). -->
+    <g transform="translate(170 136)">
+      <animateTransform v-if="animated" attributeName="transform" type="rotate" values="-8 0 0; 8 0 0; -8 0 0" keyTimes="0;0.5;1" dur="2.6s" repeatCount="indefinite" additive="sum" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />
+      <animateTransform v-if="animated" attributeName="transform" type="translate" values="0 0; 0 2; 0 0" keyTimes="0;0.5;1" dur="2.6s" repeatCount="indefinite" additive="sum" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />
       <circle r="6" fill="var(--color-surface-subtle)" stroke="var(--color-border-strong)" stroke-width="1.75" />
       <path d="M-2.4 -2.4 L2.4 2.4 M2.4 -2.4 L-2.4 2.4" stroke="var(--color-border-strong)" stroke-width="1.5" stroke-linecap="round" />
     </g>
 
     <!-- warning (pulses) -->
-    <g class="es-warn">
+    <!-- scales around its own centre (120 40): a compensating translate holds the
+         centre fixed while it scales, reproducing the old fill-box
+         transform-origin: center; opacity breathes in step. -->
+    <g>
+      <animate v-if="animated" attributeName="opacity" values="0.92;1;0.92" keyTimes="0;0.5;1" dur="2.2s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />
+      <animateTransform v-if="animated" attributeName="transform" type="translate" values="0 0; -7.2 -2.4; 0 0" keyTimes="0;0.5;1" dur="2.2s" repeatCount="indefinite" additive="sum" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />
+      <animateTransform v-if="animated" attributeName="transform" type="scale" values="1;1.06;1" keyTimes="0;0.5;1" dur="2.2s" repeatCount="indefinite" additive="sum" calcMode="spline" keySplines="0.42 0 0.58 1; 0.42 0 0.58 1" />
       <path d="M120 18 L146 62 H94 Z" fill="var(--color-warning-100)" stroke="var(--color-warning-500)" stroke-width="2.5" stroke-linejoin="round" />
       <line x1="120" y1="34" x2="120" y2="48" stroke="var(--color-warning-700)" stroke-width="3.5" stroke-linecap="round" />
       <circle cx="120" cy="55" r="2.2" fill="var(--color-warning-700)" />
@@ -67,52 +78,3 @@ withDefaults(
   { width: 260, animated: true },
 );
 </script>
-
-<style scoped>
-/* keep(keyframes): SVG illustration animation. Scoped on purpose (W2.b): the
-   20 illustrations reused generic keyframe names (es-pulse, es-twinkle, …) with
-   DIFFERENT bodies from unscoped blocks — a global name collision where the
-   last-loaded illustration hijacked the others' animations. Vue rewrites scoped
-   keyframe names per component, which ends the collision. All selectors and the
-   es-static gate live in this file's own template. */
-.es-warn {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: es-pulse 2.2s ease-in-out infinite;
-}
-.es-bolt {
-  transform-box: view-box;
-  transform-origin: 170px 136px;
-  animation: es-wobble 2.6s ease-in-out infinite;
-}
-
-@keyframes es-pulse {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 0.92;
-  }
-  50% {
-    transform: scale(1.06);
-    opacity: 1;
-  }
-}
-@keyframes es-wobble {
-  0%,
-  100% {
-    transform: rotate(-8deg) translateY(0);
-  }
-  50% {
-    transform: rotate(8deg) translateY(2px);
-  }
-}
-
-.es-static :where(.es-warn, .es-bolt) {
-  animation: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  :where(.es-warn, .es-bolt) {
-    animation: none;
-  }
-}
-</style>
