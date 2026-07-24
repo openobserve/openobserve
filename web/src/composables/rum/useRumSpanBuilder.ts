@@ -18,7 +18,15 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 import searchService from "@/services/search";
-import { SPAN_KIND_CLIENT, SPAN_KIND_UNSPECIFIED } from "@/utils/traces/constants";
+import {
+  rumField,
+  hasRumField,
+  rumFieldEqualsSql,
+} from "@/utils/rum/fields";
+import {
+  SPAN_KIND_CLIENT,
+  SPAN_KIND_UNSPECIFIED,
+} from "@/utils/traces/constants";
 
 const ACTION_PROXIMITY_MS = 10_000; // ±10s — actions beyond this are collapsed
 
@@ -162,20 +170,25 @@ export default function useRumSpanBuilder(logStreams: Ref<string[]>, searchObj: 
       }
 
       const rumStream = await getStream("_rumdata", "logs", true);
-      const hasTraceIdField = rumStream?.schema?.some(
-        (field: any) => field.name === "_oo_trace_id",
+      // Match the trace id under whichever spellings this stream actually carries.
+      // Naming a column the stream lacks fails the entire query, so the predicate is
+      // built from the schema rather than assuming one namespace.
+      const traceIdPredicate = rumFieldEqualsSql(
+        rumStream?.schema,
+        "trace_id",
+        sanitizeTraceId(traceId),
       );
-      if (!hasTraceIdField) return empty;
+      if (!traceIdPredicate) return empty;
 
       const orgId = getOrgId();
 
-      // Query 1: Find the traced resource(s) by _oo_trace_id
+      // Query 1: Find the traced resource(s) by trace id (either namespace)
       const tracedRes = await searchService.search(
         {
           org_identifier: orgId,
           query: {
             query: {
-              sql: `SELECT * FROM "_rumdata" WHERE _oo_trace_id = '${sanitizeTraceId(traceId)}' ORDER BY ${store.state.zoConfig.timestamp_column} ASC`,
+              sql: `SELECT * FROM "_rumdata" WHERE ${traceIdPredicate} ORDER BY ${store.state.zoConfig.timestamp_column} ASC`,
               // +/- 60s around trace window to capture the RUM resource that bridges
               // the trace to the RUM session (view/action hierarchy)
               start_time: startTime - RUM_TIME_BUFFER_US,
@@ -249,7 +262,7 @@ export default function useRumSpanBuilder(logStreams: Ref<string[]>, searchObj: 
     const eventDate = event.date || 0;
     const duration =
       event.resource_duration / 1000000 || event[`${event.type}_duration`] / 1000000 || 0;
-    const isTraced = !!event._oo_trace_id;
+    const isTraced = hasRumField(event, "trace_id");
 
     let operationName = "Unknown RUM Event";
     if (event.type === "resource") {
@@ -266,10 +279,10 @@ export default function useRumSpanBuilder(logStreams: Ref<string[]>, searchObj: 
       end_time: (eventDate + duration) * 1_000_000,
       duration: duration * 1000,
       span_id: isTraced
-        ? String(event._oo_span_id)
+        ? String(rumField(event, "span_id"))
         : `rum_${event.type}_${event[`${event.type}_id`] || event.date}`,
       reference_parent_span_id: parentSpanId,
-      trace_id: event._oo_trace_id || undefined,
+      trace_id: rumField(event, "trace_id") || undefined,
       operation_name: operationName,
       service_name: event.service || "Frontend",
       span_status:
@@ -543,7 +556,7 @@ export default function useRumSpanBuilder(logStreams: Ref<string[]>, searchObj: 
     if (!allViewEvents.length) return [];
 
     const firstTracedResource = tracedResources[0];
-    const traceId = firstTracedResource?._oo_trace_id || "";
+    const traceId = rumField<string>(firstTracedResource, "trace_id") || "";
     const tracedTimestamp = firstTracedResource?.date || 0;
 
     const { staticAssets, apiCalls, errors, longTasks } = classifyLeafEvents(allViewEvents);
