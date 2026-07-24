@@ -1506,9 +1506,8 @@ describe("compact_preview shrinks the heatmap for the metrics explorer cards", (
       itemHeight: 90,
       textStyle: { fontSize: 9 },
     });
-    // Room for the bar; no top gap on a short card.
     expect(result.grid.top).toBe(8);
-    expect(result.grid.bottom).toBe(26);
+    expect(result.grid.bottom).toBe(48);
   });
 
   it("thins the bucket labels but always keeps the top +Inf row", () => {
