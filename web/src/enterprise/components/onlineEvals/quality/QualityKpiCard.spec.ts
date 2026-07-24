@@ -7,7 +7,7 @@ import en from "@/locales/languages/en-US.json";
 import type { KpiCard } from "../composables/useQualityData";
 import QualityKpiCard from "./QualityKpiCard.vue";
 
-function mountCard(kpi: KpiCard) {
+function mountCard(kpi: KpiCard, clickable = false) {
   const i18n = createI18n({
     legacy: false,
     locale: "en",
@@ -15,7 +15,7 @@ function mountCard(kpi: KpiCard) {
   });
 
   return mount(QualityKpiCard, {
-    props: { kpi, delta: null },
+    props: { kpi, delta: null, clickable },
     global: {
       plugins: [i18n],
       stubs: { KpiSparkline: true },
@@ -53,5 +53,27 @@ describe("QualityKpiCard", () => {
 
     expect(wrapper.text()).toContain("Scorer Success");
     expect(wrapper.find('[data-test="quality-kpi-scope-breakdown"]').exists()).toBe(false);
+  });
+
+  it("activates a clickable KPI with pointer and keyboard input", async () => {
+    const wrapper = mountCard(
+      {
+        id: "scorerFailures",
+        value: 2,
+        prevValue: 0,
+        sparkline: [],
+        healthyDirection: "down",
+        format: "count",
+      },
+      true,
+    );
+
+    expect(wrapper.attributes("role")).toBe("button");
+    expect(wrapper.attributes("tabindex")).toBe("0");
+
+    await wrapper.trigger("click");
+    await wrapper.trigger("keydown", { key: "Enter" });
+
+    expect(wrapper.emitted("activate")).toHaveLength(2);
   });
 });

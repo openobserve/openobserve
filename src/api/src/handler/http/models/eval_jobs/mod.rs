@@ -367,6 +367,8 @@ mod tests {
     fn test_manual_eval_job_request_camel_case_deserialization() {
         let json = r#"{
             "targetId": "trace-1",
+            "startTime": 1000,
+            "endTime": 2000,
             "traceId": "trace-1",
             "sessionId": "session-1",
             "variables": { "input": "hello" },
@@ -376,6 +378,8 @@ mod tests {
         let body: ManualEvalJobRequestBody = serde_json::from_str(json).unwrap();
 
         assert_eq!(body.target_id, "trace-1");
+        assert_eq!(body.start_time, 1000);
+        assert_eq!(body.end_time, 2000);
         assert_eq!(body.trace_id.as_deref(), Some("trace-1"));
         assert_eq!(body.session_id.as_deref(), Some("session-1"));
         assert_eq!(body.variables["input"], serde_json::json!("hello"));

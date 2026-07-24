@@ -44,6 +44,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </template>
 
+      <template #actions>
+        <OButton
+          v-if="canManualEvaluate"
+          variant="primary"
+          size="sm"
+          icon-left="play-circle"
+          data-test="session-detail-evaluate-btn"
+          @click="manualEvaluationOpen = true"
+        >
+          {{ t("onlineEvals.manualEvaluation.titles.session") }}
+        </OButton>
+      </template>
+
       <!-- Scrollable body — owns its own scroll so the header above stays fixed.
          Pads itself horizontally (the card has no px) so focus rings on edge
          controls aren't clipped by the scroll container's overflow. -->
@@ -872,11 +885,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </div>
     </OPageLayout>
+    <ManualEvaluationDialog
+      v-if="canManualEvaluate"
+      v-model:open="manualEvaluationOpen"
+      :org-id="orgIdentifier"
+      :stream="streamName"
+      target-scope="session"
+      :target-id="sessionId"
+      :start-time="sessionEvaluationRange.startTime"
+      :end-time="sessionEvaluationRange.endTime"
+    />
   </div>
 </template>
 
 <script lang="ts" setup>
-import { ref, reactive, onMounted, nextTick, computed } from "vue";
+import {
+  ref,
+  reactive,
+  onMounted,
+  nextTick,
+  computed,
+  defineAsyncComponent,
+} from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -905,9 +935,17 @@ import TurnPreviewCard from "./TurnPreviewCard.vue";
 import SessionRibbon from "./SessionRibbon.vue";
 import ThreadView from "./ThreadView.vue";
 import ThreadToolCalls from "./ThreadToolCalls.vue";
+import config from "@/aws-exports";
 
 import { splitNumberWithUnit, splitDuration } from "./llmInsightsDashboard.utils";
 import { renderMarkdown } from "./markdown";
+
+const ManualEvaluationDialog = defineAsyncComponent(
+  () =>
+    import(
+      "@/enterprise/components/onlineEvals/ManualEvaluationDialog.vue"
+    ),
+);
 
 const { t } = useI18n();
 const route = useRoute();
@@ -929,7 +967,56 @@ const streamName = computed(() =>
 const startTime = computed(() =>
   typeof route.query.from === "string" ? Number(route.query.from) : 0,
 );
-const endTime = computed(() => (typeof route.query.to === "string" ? Number(route.query.to) : 0));
+const endTime = computed(() =>
+  typeof route.query.to === "string" ? Number(route.query.to) : 0,
+);
+const orgIdentifier = computed(
+  () =>
+    (typeof route.query.org_identifier === "string"
+      ? route.query.org_identifier
+      : "") || store.state.selectedOrganization?.identifier || "",
+);
+const sessionEvaluationRange = computed(() => {
+  const firstSeenNanos = Number(detail.value?.firstSeenMicros);
+  const durationNanos = Number(detail.value?.durationNanos);
+  if (
+    Number.isFinite(firstSeenNanos) &&
+    Number.isFinite(durationNanos) &&
+    firstSeenNanos >= 0 &&
+    durationNanos > 0
+  ) {
+    // Preserve the session boundary despite nanosecond values exceeding
+    // JavaScript's exact integer range.
+    return {
+      startTime: Math.max(0, Math.floor(firstSeenNanos / 1_000) - 1),
+      endTime: Math.ceil((firstSeenNanos + durationNanos) / 1_000) + 1,
+    };
+  }
+  return {
+    startTime: startTime.value,
+    endTime: endTime.value,
+  };
+});
+// The session detail endpoint is keyed by gen_ai_conversation_id, so a
+// populated response is authoritative evidence that this is an LLM session.
+const hasLlmSessionData = computed(
+  () => detail.value !== null && traces.value.length > 0,
+);
+const canManualEvaluate = computed(() => {
+  const range = sessionEvaluationRange.value;
+  return (
+    hasLlmSessionData.value &&
+    (config.isEnterprise === "true" || config.isCloud === "true") &&
+    Boolean(store.state.zoConfig?.online_evals_enabled) &&
+    Boolean(orgIdentifier.value) &&
+    Boolean(streamName.value) &&
+    Boolean(sessionId.value) &&
+    Number.isFinite(range.startTime) &&
+    Number.isFinite(range.endTime) &&
+    range.endTime > range.startTime
+  );
+});
+const manualEvaluationOpen = ref(false);
 
 // Per-turn rollups used by the KPI sub-lines. All values are measured from the
 // real trace rows returned by the session-detail API.

@@ -318,92 +318,6 @@
             </dl>
           </section>
 
-          <!-- Manual evaluation -->
-          <section class="flex flex-col gap-2 px-5">
-            <h4
-              class="text-compact text-text-heading m-0 inline-flex items-center gap-[0.375rem] border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-[0.375rem] leading-[1.5] font-semibold"
-            >
-              {{ t("onlineEvals.job.detail.manualSection") }}
-            </h4>
-            <p class="text-text-secondary m-0 text-xs">
-              {{ t("onlineEvals.job.detail.manualHelp") }}
-            </p>
-            <OForm :form="manualEvalForm" class="flex flex-col gap-3" v-slot="{ isSubmitting }">
-              <div class="grid grid-cols-2 gap-3 max-[45rem]:grid-cols-1">
-                <OFormInput
-                  name="targetId"
-                  :label="t('onlineEvals.job.detail.manualTargetIdLabel')"
-                  size="sm"
-                  :placeholder="manualTargetPlaceholder"
-                  required
-                  data-test="eval-job-manual-target-id-input"
-                />
-                <OFormInput
-                  v-if="targetScope === 'span'"
-                  name="spanId"
-                  :label="t('onlineEvals.job.detail.manualSpanIdLabel')"
-                  size="sm"
-                  :placeholder="
-                    manualFormValues.targetId || t('onlineEvals.job.detail.manualSpanIdPlaceholder')
-                  "
-                  data-test="eval-job-manual-span-id-input"
-                />
-                <OFormInput
-                  name="traceId"
-                  :label="t('onlineEvals.job.detail.manualTraceIdLabel')"
-                  size="sm"
-                  :placeholder="
-                    targetScope === 'trace'
-                      ? manualFormValues.targetId ||
-                        t('onlineEvals.job.detail.manualTraceIdPlaceholder')
-                      : t('onlineEvals.job.detail.manualTraceIdPlaceholder')
-                  "
-                  data-test="eval-job-manual-trace-id-input"
-                />
-                <OFormInput
-                  v-if="targetScope !== 'trace'"
-                  name="sessionId"
-                  :label="t('onlineEvals.job.detail.manualSessionIdLabel')"
-                  size="sm"
-                  :placeholder="
-                    targetScope === 'session'
-                      ? manualFormValues.targetId ||
-                        t('onlineEvals.job.detail.manualSessionIdPlaceholder')
-                      : t('onlineEvals.job.detail.manualSessionIdPlaceholder')
-                  "
-                  data-test="eval-job-manual-session-id-input"
-                />
-                <OFormInput
-                  name="reason"
-                  :label="t('onlineEvals.job.detail.manualReasonLabel')"
-                  size="sm"
-                  :placeholder="t('onlineEvals.job.detail.manualReasonPlaceholder')"
-                  class="col-span-2 max-[45rem]:col-span-1"
-                  data-test="eval-job-manual-reason-input"
-                />
-                <OFormTextarea
-                  name="variablesJson"
-                  :label="t('onlineEvals.job.detail.manualVariablesLabel')"
-                  size="sm"
-                  :rows="4"
-                  class="col-span-2 max-[45rem]:col-span-1"
-                  data-test="eval-job-manual-variables-input"
-                />
-              </div>
-              <div class="flex justify-end">
-                <OButton
-                  type="submit"
-                  variant="primary"
-                  size="sm-action"
-                  :loading="isSubmitting"
-                  data-test="eval-job-manual-submit-btn"
-                >
-                  {{ t("onlineEvals.job.detail.manualSubmit") }}
-                </OButton>
-              </div>
-            </OForm>
-          </section>
-
           <!-- Metadata -->
           <section class="flex flex-col gap-2 px-5">
             <h4
@@ -458,6 +372,7 @@
             show-index
             width="100%"
             class="w-full"
+            @row-click="openEvaluationRun"
           >
             <template #cell-timestampMs="{ row }">
               <span class="text-text-secondary">{{ relativeTime(row.timestampMs) }}</span>
@@ -510,6 +425,7 @@
             show-index
             width="100%"
             class="w-full"
+            @row-click="openEvaluationRun"
           >
             <template #cell-timestampMs="{ row }">
               <span class="text-text-secondary">{{ relativeTime(row.timestampMs) }}</span>
@@ -548,13 +464,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OForm from "@/lib/forms/Form/OForm.vue";
-import { useOForm } from "@/lib/forms/Form/useOForm";
-import OFormInput from "@/lib/forms/Input/OFormInput.vue";
-import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -567,9 +480,6 @@ import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import KpiCardsSkeleton from "./KpiCardsSkeleton.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
-import onlineEvalsService from "@/services/online-evals.service";
-import { toast } from "@/lib/feedback/Toast/useToast";
-import { showError } from "../utils/evalFormat";
 import type {
   EvalJob,
   EvalTargetScope,
@@ -587,7 +497,6 @@ import {
   agentFilterLabel,
   type AgentFilterSelection,
 } from "../utils/agentFilterSql";
-import { makeManualEvalSchema, type ManualEvalForm } from "./EvalJobDetail.schema";
 
 const props = defineProps<{
   row: EvalJob;
@@ -611,6 +520,7 @@ function handleOpenChange(value: boolean) {
 }
 
 const { t } = useI18n();
+const router = useRouter();
 const store = useStore();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "default");
 
@@ -645,73 +555,6 @@ const completionWindow = computed<{
     maxAgeSecs: Number(valueOf<any>(cfg, "maxAgeSecs", "max_age_secs") ?? 0),
   };
 });
-
-const manualEvalDefaults = (): ManualEvalForm => ({
-  targetId: "",
-  spanId: "",
-  traceId: "",
-  sessionId: "",
-  reason: "",
-  variablesJson: "{}",
-});
-const manualEvalForm = useOForm<ManualEvalForm>({
-  defaultValues: manualEvalDefaults(),
-  schema: makeManualEvalSchema(t),
-  onSubmit: submitManualEval,
-});
-const manualFormValues = manualEvalForm.useStore((state: any) => state.values as ManualEvalForm);
-
-const manualTargetPlaceholder = computed(() => {
-  if (targetScope.value === "trace") {
-    return t("onlineEvals.job.detail.manualTraceIdPlaceholder");
-  }
-  if (targetScope.value === "session") {
-    return t("onlineEvals.job.detail.manualSessionIdPlaceholder");
-  }
-  return t("onlineEvals.job.detail.manualSpanIdPlaceholder");
-});
-
-function resetManualForm() {
-  manualEvalForm.reset(manualEvalDefaults());
-}
-
-async function submitManualEval(value: ManualEvalForm) {
-  const targetId = value.targetId.trim();
-  try {
-    const variables = value.variablesJson.trim() ? JSON.parse(value.variablesJson) : {};
-    const payload = {
-      targetId,
-      spanId: targetScope.value === "span" ? value.spanId.trim() || targetId : null,
-      traceId:
-        targetScope.value === "trace"
-          ? value.traceId.trim() || targetId
-          : value.traceId.trim() || null,
-      sessionId:
-        targetScope.value === "session"
-          ? value.sessionId.trim() || targetId
-          : value.sessionId.trim() || null,
-      variables,
-      reason: value.reason.trim() || null,
-    };
-    const result = await onlineEvalsService.jobs.manualEval(
-      orgId.value,
-      String(props.row.id),
-      payload,
-    );
-    toast({
-      variant: "success",
-      message: t("onlineEvals.job.detail.manualSuccess", {
-        count: result.tasksCreated,
-      }),
-    });
-    resetManualForm();
-    await refreshRunsData();
-  } catch (err: any) {
-    showError(err, t("onlineEvals.job.detail.manualError"));
-  }
-}
-
-watch(() => props.row.id, resetManualForm);
 
 const normalizedFilter = computed(() => {
   const raw = valueOf<any>(props.row, "filterCondition", "filter_condition");
@@ -964,6 +807,26 @@ const {
   isLoading: isLoadingRuns,
   refresh: refreshRunsData,
 } = useEvalJobRuns(jobIdRef, dateWindow, tableEnabled, selectedAgent);
+
+function openEvaluationRun(run: JobRunRow) {
+  if (!run.evaluatorTraceId) return;
+  const timestampUs = run.timestampMs > 0 ? run.timestampMs * 1000 : 0;
+  router
+    .push({
+      name: "traceDetails",
+      query: {
+        stream: "_evaluator",
+        trace_id: run.evaluatorTraceId,
+        span_id: run.id,
+        from: timestampUs
+          ? Math.max(0, timestampUs - 60_000_000)
+          : dateWindow.value.startUs,
+        to: timestampUs ? timestampUs + 3_600_000_000 : dateWindow.value.endUs,
+        org_identifier: orgId.value,
+      },
+    })
+    .catch(() => {});
+}
 
 // Global refresh — re-syncs the shared window then re-queries everything
 // (KPI strip + Runs + Failures), since one picker drives the whole view.

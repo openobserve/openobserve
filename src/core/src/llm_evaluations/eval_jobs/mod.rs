@@ -62,6 +62,10 @@ pub enum EvalJobError {
 #[serde(rename_all = "camelCase")]
 pub struct ManualEvalJobRequestBody {
     pub target_id: String,
+    /// Inclusive source telemetry window start, in microseconds.
+    pub start_time: i64,
+    /// Exclusive source telemetry window end, in microseconds.
+    pub end_time: i64,
     #[serde(default)]
     pub span_id: Option<String>,
     #[serde(default)]
@@ -118,6 +122,20 @@ fn normalize_manual_target_id(target_id: &str) -> Result<String, EvalJobError> {
     }
 
     Ok(target_id.to_string())
+}
+
+fn validate_manual_query_window(start_time: i64, end_time: i64) -> Result<(), EvalJobError> {
+    if start_time < 0 {
+        return Err(EvalJobError::InvalidJob(
+            "startTime must not be negative".to_string(),
+        ));
+    }
+    if end_time <= start_time {
+        return Err(EvalJobError::InvalidJob(
+            "endTime must be greater than startTime".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 async fn validate_source_stream(
@@ -320,6 +338,7 @@ pub async fn manual_evaluate(
     validate_source_stream(org_id, &job).await?;
 
     let target_id = normalize_manual_target_id(&body.target_id)?;
+    validate_manual_query_window(body.start_time, body.end_time)?;
     let target =
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::manual::ManualEvaluationTarget {
             target_id: target_id.clone(),
@@ -335,7 +354,11 @@ pub async fn manual_evaluate(
                 .session_id
                 .map(|value| value.trim().to_string())
                 .filter(|value| !value.is_empty()),
-            variables: body.variables,
+            query_window:
+                o2_enterprise::enterprise::llm_evaluations::eval_jobs::tasks::EvaluationQueryWindow {
+                    start_us: body.start_time,
+                    end_us: body.end_time,
+                },
             reason: body
                 .reason
                 .map(|value| value.trim().to_string())
@@ -487,6 +510,23 @@ mod tests {
         assert_eq!(
             error.to_string(),
             "Invalid eval job: targetId must not be empty"
+        );
+    }
+
+    #[test]
+    fn manual_query_window_must_be_non_negative_and_ordered() {
+        assert!(validate_manual_query_window(1_000, 2_000).is_ok());
+        assert_eq!(
+            validate_manual_query_window(-1, 2_000)
+                .unwrap_err()
+                .to_string(),
+            "Invalid eval job: startTime must not be negative"
+        );
+        assert_eq!(
+            validate_manual_query_window(2_000, 2_000)
+                .unwrap_err()
+                .to_string(),
+            "Invalid eval job: endTime must be greater than startTime"
         );
     }
 }

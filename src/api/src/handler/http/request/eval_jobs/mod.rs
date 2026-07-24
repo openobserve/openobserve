@@ -365,7 +365,7 @@ pub async fn archive_eval_job(Path((org_id, job_id)): Path<(String, String)>) ->
     tag = "EvalJobs",
     operation_id = "ManualEvalJob",
     summary = "Manually evaluate a target",
-    description = "Creates durable evaluation tasks for an explicit target, bypassing automatic target sampling.",
+    description = "Creates durable evaluation tasks for an explicit target, bypassing automatic target sampling. The worker hydrates source telemetry using the request's authoritative microsecond time range.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
