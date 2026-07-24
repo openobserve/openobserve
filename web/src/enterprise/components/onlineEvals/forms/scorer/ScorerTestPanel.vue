@@ -28,7 +28,6 @@
         </div>
       </div>
       <div v-else class="eval-test-panel__empty text-text-secondary text-xs py-2.5 px-3 border border-border-default rounded-default bg-surface-base [&_code]:font-mono [&_code]:font-semibold [&_code]:text-text-body">
-        <!-- eslint-disable-next-line local/no-bare-bound-text-props, vue/no-bare-strings-in-template -- literal "{{ input }}" is documented template syntax shown in a <code> block, not translatable text -->
         {{ t("onlineEvals.scorer.testPanel.emptyPrefix") }}<code v-text="'{{ input }}'" />{{ t("onlineEvals.scorer.testPanel.emptySuffix") }}
       </div>
 

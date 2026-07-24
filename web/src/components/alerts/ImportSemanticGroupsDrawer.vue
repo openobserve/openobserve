@@ -180,7 +180,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     mod.proposed.display
                   }}</span>
                   <span class="block text-xs text-muted-foreground">
-                    <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- decorative arrow separator, not language-specific text -->
                     {{ mod.proposed.id }} • {{ mod.current.fields.length }} →
                     {{ mod.proposed.fields.length }} {{ t('correlation.fieldsCount') }}
                   </span>

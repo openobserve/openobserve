@@ -240,7 +240,6 @@
                 >
                   {{ resultTotal }} {{ t("search_history.results") }}
                 </div>
-                <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- static numeric literal (max record limit), digits are locale-invariant and not translatable text -->
                 <div class="ml-auto mr-2">{{ t('logs.searchHistory.maxLimit') }} <b>1000</b></div>
               </div>
             </template>

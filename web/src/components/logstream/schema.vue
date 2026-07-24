@@ -47,7 +47,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="text-xs font-semibold text-text-body"
           >
             {{ indexData.stats.doc_time_min }}
-            <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- decorative arrow separator between timestamps, not language-specific text -->
             <span class="text-base leading-none">→</span>
             {{ indexData.stats.doc_time_max }}
           </div>

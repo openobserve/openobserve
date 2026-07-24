@@ -555,7 +555,6 @@ function fireConfetti() {
               :icon="step.chip.kind === 'terminal' ? undefined : chipIcon(step.chip.kind)"
             >
               <template v-if="step.chip.kind === 'terminal'" #icon>
-                <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- terminal-prompt glyph, not translatable text -->
                 <span class="step-tag-glyph">$_</span>
               </template>
               {{ step.chip.label }}
@@ -868,7 +867,6 @@ function fireConfetti() {
             </template>
             <template v-if="extras.envVars?.length">
               <div class="mt-3">
-                <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- relative file path, must not be translated -->
                 {{ t('ingestion.setupCard.writesTheseKeysTo') }} <code>./.env</code> {{ t('ingestion.setupCard.idempotentSuffix') }}
               </div>
               <div class="pill-list mt-2">

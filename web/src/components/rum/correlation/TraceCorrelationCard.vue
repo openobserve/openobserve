@@ -100,7 +100,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex items-center mb-1">
               <div class="w-5/12 text-text-label">{{ t('traces.correlation.totalDuration') }}</div>
               <div class="w-7/12 font-bold">
-                <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- "ms" is the milliseconds unit abbreviation, kept identical across locales -->
                 {{ performanceData.total_duration_ms }}ms
               </div>
             </div>
@@ -110,7 +109,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="w-5/12 text-text-label">{{ t('traces.correlation.browserLabel') }}</div>
               <div class="w-7/12">
-                <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- "ms" is the milliseconds unit abbreviation, kept identical across locales -->
                 {{ performanceData.browser_duration_ms }}ms
                 <span class="text-text-secondary"
                   >({{
@@ -128,7 +126,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="w-5/12 text-text-label">{{ t('traces.correlation.networkLabel') }}</div>
               <div class="w-7/12">
-                <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- "ms" is the milliseconds unit abbreviation, kept identical across locales -->
                 {{ performanceData.network_latency_ms }}ms
                 <span class="text-text-secondary"
                   >({{
@@ -146,7 +143,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="w-5/12 text-text-label">{{ t('traces.correlation.backendLabel') }}</div>
               <div class="w-7/12">
-                <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- "ms" is the milliseconds unit abbreviation, kept identical across locales -->
                 {{ performanceData.backend_duration_ms }}ms
                 <span class="text-text-secondary"
                   >({{

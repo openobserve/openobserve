@@ -264,7 +264,6 @@ defineExpose({ applyTemplate, previewTemplate });
           {{ t("alerts.alertSettings.helpLegendSample") }}
         </span>
         <span class="help-legend__item">
-          <!-- eslint-disable-next-line local/no-bare-bound-text-props -- "{rows}" is a literal token name shown as documentation, not translatable text -->
           <span class="help-legend__swatch help-legend__swatch--opaque">{{ "{rows}" }}</span>
           <span class="help-legend__sep">=</span>
           {{ t("alerts.alertSettings.helpLegendOpaque") }}

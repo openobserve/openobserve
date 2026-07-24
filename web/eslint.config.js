@@ -96,6 +96,34 @@ const TEXT_ATTRS = [
 ];
 const TEXT_ATTR_SET = new Set(TEXT_ATTRS);
 
+// Non-translatable literal tokens — code/syntax/units that must stay identical in
+// every language (a CSS unit, a fixed filename, a documented template-variable token).
+// Fed to BOTH i18n rules so they pass WITHOUT a scattered inline eslint-disable
+// comment. Keep this curated and reasoned — NEVER add real UI text here.
+const NON_TRANSLATABLE = [
+  // Units / symbols — language-agnostic, appended to numbers or used as bare glyphs.
+  // (The rule strips these, so a token only passes when it is the WHOLE text — e.g.
+  // "settings" is NOT allowed by "s", only a bare "s" node is.)
+  "px", "s", "ms", "×", "→", "$", "fx",
+  // Decorative glyphs / emoji — visual only, no language content.
+  "●", "🕑", "$_",
+  // Specific literal tokens shown to the user as documentation / code.
+  "1000",         // hardcoded record-limit value
+  "./.env",       // relative config-file path shown in setup steps
+  "trace.zip",    // fixed download-artifact filename
+  "{rows}",       // literal template-variable token shown as documentation
+  "{field_name}", // literal template-variable placeholder token shown as documentation
+  "{{ input }}",  // documented template syntax rendered inside a <code> block
+];
+const NON_TRANSLATABLE_SET = new Set(NON_TRANSLATABLE);
+
+// The built-in rule's DEFAULT allowlist (punctuation it always ignores). Supplying an
+// `allowlist` REPLACES this default, so we spread it back in alongside NON_TRANSLATABLE.
+const BARE_STRING_DEFAULT_ALLOWLIST = [
+  "(", ")", ",", ".", "&", "+", "-", "=", "*", "/", "#", "%", "!", "?", ":", "[", "]",
+  "{", "}", "<", ">", "·", "•", "‐", "–", "—", "−", "|",
+];
+
 // Bans hardcoded text left directly in a <template> that the built-in
 // `vue/no-bare-strings-in-template` (STATIC attrs + text nodes only) can't see:
 //   • a BOUND text prop        — :label="'Save'" / :label=`Go`
@@ -121,7 +149,8 @@ noLegacyO2Tokens.rules["no-bare-bound-text-props"] = {
       if (expr.type === "Literal" && typeof expr.value === "string") text = expr.value;
       else if (expr.type === "TemplateLiteral" && expr.expressions.length === 0)
         text = expr.quasis[0].value.cooked;
-      return text != null && /\p{L}/u.test(text) ? text : null;
+      if (text == null || NON_TRANSLATABLE_SET.has(text.trim())) return null;
+      return /\p{L}/u.test(text) ? text : null;
     };
     return ps.defineTemplateBodyVisitor({
       VAttribute(node) {
@@ -236,7 +265,7 @@ export default [
       // just native title/alt/placeholder, are covered. Bound props (:label="'x'")
       // are caught by the local rule below. (@intlify's own `no-raw-text` is NOT
       // used — it flags ~1800 literals/punctuation and is too noisy to gate.)
-      "vue/no-bare-strings-in-template": ["error", { attributes: { "/.+/": TEXT_ATTRS } }],
+      "vue/no-bare-strings-in-template": ["error", { attributes: { "/.+/": TEXT_ATTRS }, allowlist: [...BARE_STRING_DEFAULT_ALLOWLIST, ...NON_TRANSLATABLE] }],
       // The bound-prop half of the same rule (see TEXT_ATTRS above).
       "local/no-bare-bound-text-props": "error",
 

@@ -343,14 +343,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ t('pipeline.evaluationTimeLabel') }}
                   </div>
                   <div class="text-sm">
-                    <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- SI unit abbreviation for seconds, appended directly to a numeric value; not natural-language text -->
                     {{ selectedRow.evaluation_took_in_secs.toFixed(2) }}s
                   </div>
                 </div>
                 <div v-if="selectedRow.query_took" class="w-1/3">
                   <div class="text-xs text-text-label mb-1">{{ t('pipeline.queryTimeLabel') }}</div>
                   <div class="text-sm">
-                    <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- SI unit abbreviation for milliseconds, appended directly to a numeric value; not natural-language text -->
                     {{ (selectedRow.query_took / 1000).toFixed(2) }}ms
                   </div>
                 </div>
@@ -360,7 +358,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div v-if="selectedRow.delay_in_secs" class="w-1/3">
                   <div class="text-xs text-text-label mb-1">{{ t('pipeline.delay') }}</div>
-                  <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- SI unit abbreviation for seconds, appended directly to a numeric value; not natural-language text -->
                   <div class="text-sm">{{ selectedRow.delay_in_secs }}s</div>
                 </div>
                 <div

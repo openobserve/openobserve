@@ -101,9 +101,7 @@ function fmtDuration(ms: number) {
                 class="inline-flex items-center gap-1 text-xs font-medium text-text-link border border-current rounded-default px-2 py-1 hover:opacity-80"
               >
                 <OIcon name="download" size="xs" />
-                <!-- eslint-disable vue/no-bare-strings-in-template -- fixed artifact filename, not translatable text -->
                 trace.zip
-                <!-- eslint-enable vue/no-bare-strings-in-template -->
               </a>
               <OButton
                 variant="ghost"

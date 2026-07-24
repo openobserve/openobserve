@@ -173,7 +173,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                 </OTooltip>
               </OIcon>
-              <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- "×" is a language-agnostic multiplier symbol, not translatable text -->
               <span class="text-xs ml-1">×{{ row.group_size || 1 }}</span>
             </div>
             <div v-else class="text-status-positive flex items-center justify-center">
@@ -187,7 +186,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                 </OTooltip>
               </OIcon>
-              <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- "×" is a language-agnostic multiplier symbol, not translatable text -->
               <span v-if="row.dedup_count && row.dedup_count > 1" class="text-xs ml-1">
                 ×{{ row.dedup_count }}
               </span>
@@ -321,7 +319,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ t('alerts.evaluationTime') }}
                     </div>
                     <div class="text-sm">
-                      <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- "s" is the seconds unit abbreviation, kept identical across locales -->
                       {{ selectedRow.evaluation_took_in_secs.toFixed(2) }}s
                     </div>
                   </div>
@@ -330,7 +327,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ t('alerts.queryTime') }}
                     </div>
                     <div class="text-sm">
-                      <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- "ms" is the milliseconds unit abbreviation, kept identical across locales -->
                       {{ (selectedRow.query_took / 1000).toFixed(2) }}ms
                     </div>
                   </div>

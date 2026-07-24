@@ -357,9 +357,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'inactive'
                 }`"
               >
-                <!-- eslint-disable vue/no-bare-strings-in-template -- "px" is the pixel unit abbreviation, kept identical across locales -->
                 px
-                <!-- eslint-enable vue/no-bare-strings-in-template -->
               </OButton>
               <OButton
                 @click="setUnit('%')"
@@ -411,9 +409,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'inactive'
                 }`"
               >
-                <!-- eslint-disable vue/no-bare-strings-in-template -- "px" is the pixel unit abbreviation, kept identical across locales -->
                 px
-                <!-- eslint-enable vue/no-bare-strings-in-template -->
               </OButton>
               <OButton
                 @click="setHeightUnit('%')"
@@ -633,7 +629,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :content="t('dashboard.multiSqlQueryLabelHint')"
             />
           </div>
-          <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- template placeholder variable name, must stay identical in every language -->
           <OInput placeholder="{field_name}"
             v-model="
               dashboardPanelDataModel.data.queries[

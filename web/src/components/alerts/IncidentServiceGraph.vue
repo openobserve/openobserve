@@ -32,23 +32,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div class="font-semibold text-sm mb-2.5">{{ t('alerts.serviceGraphLegendTitle') }}</div>
         <div class="graph-legend__row flex items-center gap-2 py-1">
-          <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- decorative color-dot symbol, identical in every locale -->
           <span class="graph-legend__dot text-sm leading-none w-3.5 text-center shrink-0 text-status-negative">●</span>
           {{ t('alerts.serviceGraphRootCause') }}
         </div>
         <div class="graph-legend__row flex items-center gap-2 py-1">
-          <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- decorative color-dot symbol, identical in every locale -->
           <span class="graph-legend__dot text-sm leading-none w-3.5 text-center shrink-0 text-status-warning-text">●</span>
           {{ t('alerts.serviceGraphHighFrequency') }}
         </div>
         <div class="graph-legend__row flex items-center gap-2 py-1">
-          <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- decorative color-dot symbol, identical in every locale -->
           <span class="graph-legend__dot text-sm leading-none w-3.5 text-center shrink-0 text-text-link">●</span>
           {{ t('alerts.serviceGraphNormal') }}
         </div>
         <div class="graph-legend__divider h-px bg-border-default my-2 dark:bg-[color-mix(in_srgb,var(--color-white)_15%,transparent)]" />
         <div class="graph-legend__row flex items-center gap-2 py-1">
-          <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- decorative arrow symbol, identical in every locale -->
           <span class="graph-legend__dot text-sm leading-none w-3.5 text-center shrink-0 text-badge-purple-ol-text">→</span>
           {{ t('alerts.serviceGraphTemporalFlow') }}
         </div>

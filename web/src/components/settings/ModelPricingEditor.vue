@@ -337,7 +337,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`model-pricing-price-value-input-${idx}-${entryIdx}`"
                       >
                         <template #icon-left>
-                          <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- currency symbol glyph, identical in every language -->
                           <span class="price-dollar text-xs pb-0.5">$</span></template
                         >
                       </OFormInput>
@@ -392,7 +391,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`model-pricing-add-price-value-input-${idx}`"
                       >
                         <template #icon-left>
-                          <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- currency symbol glyph, identical in every language -->
                           <span class="price-dollar text-xs pb-0.5">$</span></template
                         >
                       </OFormInput>
