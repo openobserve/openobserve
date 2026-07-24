@@ -319,7 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="histogram-skeleton__y-label" style="width: 2.25rem" />
                 <div class="histogram-skeleton__y-label" style="width: 1rem" />
               </div>
-              <div class="histogram-skeleton__plot border-l border-b border-card-glass-border">
+              <div class="histogram-skeleton__plot border-card-glass-border border-b border-l">
                 <div class="histogram-skeleton__bars">
                   <div
                     v-for="h in skeletonBarHeights"

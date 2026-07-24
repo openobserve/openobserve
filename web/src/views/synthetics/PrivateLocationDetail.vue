@@ -272,7 +272,12 @@ const openMonitor = (row: { id: string; name: string }) => {
   router.push({
     name: "synthetic-monitor-results",
     params: { id: row.id },
-    query: { name: row.name, ...(typeof orgIdentifier === "string" && orgIdentifier ? { org_identifier: orgIdentifier } : {}) },
+    query: {
+      name: row.name,
+      ...(typeof orgIdentifier === "string" && orgIdentifier
+        ? { org_identifier: orgIdentifier }
+        : {}),
+    },
   });
 };
 

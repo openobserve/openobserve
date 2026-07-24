@@ -590,7 +590,9 @@
   --color-switch-border-off: var(--color-primary-500);
   --color-switch-thumb-off: var(--color-primary-500);
   --color-switch-thumb-on: var(--color-primary-500);
-  --color-switch-track-on: var(--color-primary-500); /* ON-track fill — solid primary-500, fixed both themes (matches switch-border) */
+  --color-switch-track-on: var(
+    --color-primary-500
+  ); /* ON-track fill — solid primary-500, fixed both themes (matches switch-border) */
   --color-switch-disabled-border: var(--color-grey-300);
   --color-switch-disabled-thumb: var(--color-grey-300);
 

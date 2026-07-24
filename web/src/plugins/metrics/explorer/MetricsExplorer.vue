@@ -95,10 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="() => onRefresh()"
         >
           {{ t("metrics.explorer.refresh") }}
-          <OTooltip
-            :content="t('metrics.explorer.refresh')"
-            shortcut-id="metricsRefresh"
-          />
+          <OTooltip :content="t('metrics.explorer.refresh')" shortcut-id="metricsRefresh" />
         </OButton>
         <ShareButton
           v-if="shareUrl"
@@ -1710,11 +1707,7 @@ export default defineComponent({
         handler: () => {
           if (isInputFocused()) return;
           // Reuse ShareButton's short-URL + clipboard + toast flow.
-          document
-            .querySelector<HTMLElement>(
-              '[data-test="metrics-explorer-share-btn"]',
-            )
-            ?.click();
+          document.querySelector<HTMLElement>('[data-test="metrics-explorer-share-btn"]')?.click();
         },
       },
     ]);
