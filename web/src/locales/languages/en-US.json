@@ -10138,6 +10138,7 @@
         "agentsSubtitle": "Agents self-register from your infrastructure and are read-only here.",
         "agentName": "Agent",
         "recoverAgent": "Recover this agent — copy a setup command pre-filled with its name",
+        "restartConfig": "Restart config — copy this agent's setup command to re-run install / docker restart (e.g. after a token rotation)",
         "noAgents": "No agents have registered for this location yet.",
         "checksTitle": "Checks running from this location",
         "checkName": "Name",
