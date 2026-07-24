@@ -252,9 +252,15 @@ the Free Software Foundation, either version 3 of the License, or
         </div>
       </section>
 
+      <!-- Kept mounted (no v-if) and driven by :open so ODialog can play its
+           close animation on dismiss; a v-if would unmount it and cut it short. -->
       <ScorerTypeDialog
-        v-if="scorerTypeDialog"
-        @close="closeScorerTypeDialog"
+        :open="scorerTypeDialog"
+        @update:open="
+          (v: boolean) => {
+            if (!v) closeScorerTypeDialog();
+          }
+        "
         @select="selectScorerType"
       />
 

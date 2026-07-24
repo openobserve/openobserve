@@ -20,21 +20,8 @@
       <template #title>
         <span data-test="scorer-form-title">{{ titleText }}</span>
       </template>
-      <template #actions>
-        <OButton
-          variant="ghost"
-          size="icon-sm"
-          icon-left="close"
-          :aria-label="t('onlineEvals.buttons.cancel')"
-          :title="t('onlineEvals.buttons.cancel')"
-          data-test="scorer-form-close-btn"
-          :disabled="isSubmitting"
-          @click="$emit('cancel')"
-        />
-      </template>
-
       <div
-        class="grid min-h-0 flex-1 grid-cols-[minmax(0,1.6fr)_minmax(20rem,0.9fr)] gap-2.5 overflow-hidden max-[68.75rem]:grid-cols-1"
+        class="grid min-h-0 flex-1 grid-cols-[minmax(0,1.6fr)_minmax(20rem,0.9fr)] gap-0 overflow-hidden max-[68.75rem]:grid-cols-1"
       >
         <!-- Plain scroll column, no card chrome: the sections inside are the
            cards now, so a bordered wrapper would frame them twice. Matches
@@ -46,7 +33,7 @@
             data-test="scorer-form-identity-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.identitySection")
               }}</span>
@@ -89,7 +76,7 @@
 
                 <div
                   v-if="selectedScoreConfig"
-                  class="rounded-default text-text-body mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 border border-[color-mix(in_srgb,var(--color-status-info-text)_25%,transparent)] bg-[color-mix(in_srgb,var(--color-status-info-text)_8%,transparent)] px-3 py-2 text-xs"
+                  class="border-status-info-text rounded-default bg-status-info-bg text-text-body mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 border px-3 py-2 text-xs"
                 >
                   <span class="bg-status-info-text h-2 w-2 shrink-0 rounded-full" />
                   <span class="font-medium">
@@ -125,7 +112,7 @@
             data-test="scorer-form-judge-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.judgeSection")
               }}</span>
@@ -156,7 +143,7 @@
 
                 <div
                   v-if="selectedProvider"
-                  class="rounded-default text-text-body mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 border border-[color-mix(in_srgb,var(--color-status-info-text)_25%,transparent)] bg-[color-mix(in_srgb,var(--color-status-info-text)_8%,transparent)] px-3 py-2 text-xs"
+                  class="border-status-info-text rounded-default bg-status-info-bg text-text-body mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 border px-3 py-2 text-xs"
                 >
                   <span class="bg-status-info-text h-2 w-2 shrink-0 rounded-full" />
                   <span class="text-text-secondary">
@@ -330,7 +317,7 @@
             data-test="scorer-form-endpoint-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.endpointSection")
               }}</span>
@@ -400,7 +387,7 @@
             data-test="scorer-form-auth-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.authSection")
               }}</span>
@@ -503,7 +490,7 @@
             data-test="scorer-form-headers-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.headersSection")
               }}</span>
@@ -574,7 +561,7 @@
             data-test="scorer-form-body-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.requestBodySection")
               }}</span>
@@ -596,7 +583,7 @@
                   <span
                     v-for="v in promptVariables"
                     :key="v"
-                    class="rounded-default text-2xs text-text-body bg-[color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] px-1.5 py-px font-mono"
+                    class="rounded-default text-2xs bg-surface-subtle text-text-body px-1.5 py-px font-mono"
                     >{{ formatTemplateVariable(v) }}</span
                   >
                 </div>
@@ -654,7 +641,7 @@
           {{ schemaPreviewError }}
         </p>
         <pre
-          class="rounded-default bg-card-bg border-border-default text-text-body m-0 max-h-[60vh] overflow-auto border p-3 font-(family-name:--font-mono) text-xs font-normal whitespace-pre [tab-size:2]"
+          class="rounded-default bg-card-bg border-border-default text-text-body m-0 max-h-[60vh] overflow-auto border p-3 font-mono text-xs font-normal whitespace-pre [tab-size:2]"
           v-else
           >{{ schemaPreview }}</pre
         >

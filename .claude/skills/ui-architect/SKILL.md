@@ -219,6 +219,23 @@ both themes. Never branch on `store.state.appTheme` around an O2 component; if
 something looks wrong in dark mode, the fix is a token value in `dark.css`, not a
 per-component conditional.
 
+## Colour that means something — the "Calm Signal" language
+
+`design-tokens.md` (rule 5) is *how* to colour; this is *when* and *what*. One
+rule: **colour is information, never decoration** — a calm neutral canvas, with
+saturated colour spent only on the one signal each screen exists to surface.
+Which signal that is changes by page type (**monitoring** = state/severity;
+**catalog** = category/recency/ownership; **access** = role; **forms** =
+progress/validity), and you colour it with the shared toolkit — `OStatStrip` /
+`OStatCard` summary tiles (optionally filter tiles, via `OTable`'s `#subheader`
+slot), `OTag` chips from `badgeGroups.ts`, a row state rail + light
+exception-only highlight, recency-aware `OTimeCell`, `OUserCell` avatars. Keep
+everything else quiet: highlight exceptions not the norm, muted `0`/`—`,
+border-not-fill selection, one primary action, no layout shift. Full playbook +
+per-archetype recipes: [references/calm-signal.md](references/calm-signal.md).
+Reference implementation: the Alerts list
+(`web/src/components/alerts/AlertList.vue`).
+
 ## Pick a component
 
 The **scenario → component** index and the per-file catalog (what each `O*` is,
@@ -293,6 +310,12 @@ considering the UI done:
       keyframes, `color-mix`, `calc`, SVG `fill`/`stroke`, `v-html`). No raw
       Tailwind palette (`bg-gray-*`) and no raw `grey-*`/`primary-*` ramp — use a
       semantic token.
+- [ ] **Calm Signal** — the screen's *primary signal* is coloured (state /
+      category / role / progress) via the shared toolkit (`OStatStrip`/`OStatCard`,
+      `OTag` chips, row rail + exception tint, relative `OTimeCell`), and the rest
+      stays calm: exceptions highlighted not the norm, muted `0`/`—`,
+      border-not-fill selection, no layout shift. See
+      [references/calm-signal.md](references/calm-signal.md).
 - [ ] `cd web && npm run lint:design:strict` passes (the strict ratchet — no new
       raw-token bypass anywhere, even in files with existing debt).
 - [ ] **No `--o2-*` anywhere** — no `var(--o2-*)`, no new `--o2-*` definition, no

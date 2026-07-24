@@ -53,29 +53,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="sessions-list-stream-selector"
         class="w-56 flex-shrink-0"
       >
-        <OSkeleton type="text" v-if="!streamsLoaded" class="h-8.5 w-full" />
         <OSelect
-          v-else
-          v-model="activeStream"
+          :model-value="streamsLoaded ? activeStream : ''"
           :label="t('traces.sessionsList.streamLabel')"
           label-position="inside"
           :options="availableStreams.map((s) => ({ label: s, value: s }))"
           labelKey="label"
           valueKey="value"
+          :loading="!streamsLoaded"
+          :placeholder="streamsLoaded ? undefined : t('traces.sessionsList.loadingStreams')"
           class="rounded-default w-full"
           @update:model-value="onStreamChange"
         />
       </div>
       <div v-else data-test="sessions-list-agent-selector" class="w-56 flex-shrink-0">
-        <OSkeleton type="text" v-if="!agentsLoaded" class="h-8.5 w-full" />
         <OSelect
-          v-else
-          v-model="activeAgent"
+          :model-value="agentsLoaded ? activeAgent : ''"
           :label="t('traces.sessionsList.agent')"
           label-position="inside"
           :options="agentSelectOptions"
           labelKey="label"
           valueKey="value"
+          :loading="!agentsLoaded"
+          :placeholder="agentsLoaded ? undefined : t('traces.sessionsList.loadingAgents')"
           class="rounded-default w-full"
           @update:model-value="onAgentChange"
         />
@@ -110,6 +110,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       width="100%"
       class="h-full w-full"
       data-test="sessions-list-table"
+      :get-row-style="sessionRowStyle"
+      :row-class="sessionRowClass"
       @row-click="(row: any) => handleRowClick(row)"
       @pagination-change="onPaginationChange"
     >
@@ -142,11 +144,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OEmptyState size="hero" preset="no-llm-sessions" @action="onEmptyAction" />
         </div>
       </template>
-      <!-- Timestamp -->
+      <!-- Timestamp — relative recency ("5 min ago"), full datetime on hover. -->
       <template #cell-firstSeenNanos="{ row }">
-        <span class="text-xs tabular-nums">
-          {{ formatTimestamp(row.firstSeenNanos) }}
-        </span>
+        <OTimeCell :value="row.firstSeenNanos" unit="ns" mode="relative" empty-label="—" />
       </template>
 
       <!-- Session ID -->
@@ -210,11 +210,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </template>
 
-      <!-- Status (derived from error_count) -->
+      <!-- Status (derived from error_count) — the error count rides INSIDE the
+             chip as a trailing segment (hidden when 0), so the count is the
+             primary signal without a second element beside the pill. -->
       <template #cell-status="{ row }">
         <OTag
           type="sessionStatus"
           :value="row.status"
+          :count="row.errorCount"
+          hide-zero-count
           :data-test="`sessions-list-status-${row.sessionId}`"
         />
       </template>
@@ -226,11 +230,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { formatDate } from "@/utils/date";
 import { useI18n } from "vue-i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import useStreams from "@/composables/useStreams";
 import { useSessions, type SessionRow } from "./composables/useSessions";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -238,7 +242,6 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import type { AcceptableValue } from "reka-ui";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -468,10 +471,18 @@ const tableColumns = computed(() =>
   })),
 );
 
-function formatTimestamp(nanos: number): string {
-  if (!nanos) return "—";
-  // Backend ships timestamps as nanoseconds — formatDate wants ms.
-  return formatDate(Math.floor(nanos / 1_000_000), "YYYY-MM-DD HH:mm:ss");
+// Exception-only rail: paint the extreme-left edge red on sessions that errored
+// (errorCount > 0), leaving clean sessions unmarked — so a failed session pops
+// out of a long list at a glance. Mirrors the Alerts / Incidents row rail.
+function sessionRowStyle(row: SessionRow): Record<string, string> {
+  if (!row || (row.errorCount ?? 0) <= 0) return {};
+  return { boxShadow: "inset 0.25rem 0 0 0 var(--color-error-500)" };
+}
+
+// Light exception wash on the whole row for errored sessions (matches the Alerts
+// list) — clean sessions stay unwashed, so attention goes to the failures.
+function sessionRowClass(row: SessionRow): string {
+  return row && (row.errorCount ?? 0) > 0 ? "!bg-status-error-bg" : "";
 }
 
 function formatDuration(nanos: number): string {
@@ -622,7 +633,8 @@ async function loadSessions(startTime?: number, endTime?: number, force = false)
 
 // Filter / pagination changes are deliberate user actions — force a re-fetch
 // so they bypass the "already loaded" cache guard.
-function onStreamChange() {
+function onStreamChange(val?: AcceptableValue | AcceptableValue[] | boolean) {
+  activeStream.value = typeof val === "string" ? val : "";
   currentPage.value = 1;
   loadSessions(undefined, undefined, true);
 }
@@ -636,7 +648,8 @@ function onFilterModeChange(mode?: AcceptableValue | AcceptableValue[] | boolean
   loadSessions(undefined, undefined, true);
 }
 
-function onAgentChange() {
+function onAgentChange(val?: AcceptableValue | AcceptableValue[] | boolean) {
+  activeAgent.value = typeof val === "string" ? val : ALL_AGENTS_VALUE;
   currentPage.value = 1;
   loadSessions(undefined, undefined, true);
 }
