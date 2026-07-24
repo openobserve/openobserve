@@ -144,7 +144,7 @@ async fn get_event_metadata(
         } => {
             metadata.push(("event_type", "ai_analysis_failed".into()));
             metadata.push(("reason", reason.into()));
-            metadata.push(("analysis_trigger_tpe", trigger_type.to_string().into()));
+            metadata.push(("analysis_trigger_type", trigger_type.to_string().into()));
             metadata.push(("error_details", error_details.unwrap_or_default().into()));
         }
     }
