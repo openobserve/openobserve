@@ -19,7 +19,7 @@ import OForm from '@/lib/forms/Form/OForm.vue';
 import { z } from 'zod';
 
 const meta: Meta<typeof OFormSwitch> = {
-  title: 'Forms/OFormSwitch',
+  title: 'Forms/Switch/OFormSwitch',
   component: OFormSwitch,
   tags: ['autodocs'],
   argTypes: {

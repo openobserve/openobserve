@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import ONumberCell from '@/lib/core/Table/cells/ONumberCell.vue';
 
 const meta: Meta<typeof ONumberCell> = {
-  title: 'Core/Table/ONumberCell',
+  title: 'Core/Table/Cells/ONumberCell',
   component: ONumberCell,
   tags: ['autodocs'],
   argTypes: {

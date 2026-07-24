@@ -19,7 +19,7 @@ import OCheckboxGroup from '@/lib/forms/Checkbox/OCheckboxGroup.vue';
 import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
 
 const meta: Meta<typeof OCheckboxGroup> = {
-  title: 'Forms/OCheckboxGroup',
+  title: 'Forms/Checkbox/OCheckboxGroup',
   component: OCheckboxGroup,
   tags: ['autodocs'],
   args: {

@@ -18,7 +18,7 @@ import { ref } from 'vue';
 import OInput from '@/lib/forms/Input/OInput.vue';
 
 const meta: Meta<typeof OInput> = {
-  title: 'Forms/OInput',
+  title: 'Forms/Input/OInput',
   component: OInput,
   tags: ['autodocs'],
   args: {

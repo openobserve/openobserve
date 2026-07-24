@@ -19,7 +19,7 @@ import OTab from '@/lib/navigation/Tabs/OTab.vue';
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue';
 
 const meta: Meta<typeof OTab> = {
-  title: 'Navigation/OTab',
+  title: 'Navigation/Tabs/OTab',
   component: OTab,
   tags: ['autodocs'],
   args: {

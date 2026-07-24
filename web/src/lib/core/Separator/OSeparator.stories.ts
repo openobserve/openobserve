@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const meta: Meta<typeof OSeparator> = {
-  title: 'Core/OSeparator',
+  title: 'Core/Separator/OSeparator',
   component: OSeparator,
   tags: ['autodocs'],
   args: {

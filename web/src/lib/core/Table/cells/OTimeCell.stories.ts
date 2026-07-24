@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OTimeCell from '@/lib/core/Table/cells/OTimeCell.vue';
 
 const meta: Meta<typeof OTimeCell> = {
-  title: 'Core/Table/OTimeCell',
+  title: 'Core/Table/Cells/OTimeCell',
   component: OTimeCell,
   tags: ['autodocs'],
   argTypes: {

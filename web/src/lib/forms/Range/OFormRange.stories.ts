@@ -19,7 +19,7 @@ import OForm from '@/lib/forms/Form/OForm.vue';
 import { z } from 'zod';
 
 const meta: Meta<typeof OFormRange> = {
-  title: 'Forms/OFormRange',
+  title: 'Forms/Range/OFormRange',
   component: OFormRange,
   tags: ['autodocs'],
   argTypes: {

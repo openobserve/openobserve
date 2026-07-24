@@ -19,7 +19,7 @@ import OForm from '@/lib/forms/Form/OForm.vue';
 import { z } from 'zod';
 
 const meta: Meta<typeof OFormColor> = {
-  title: 'Forms/OFormColor',
+  title: 'Forms/Color/OFormColor',
   component: OFormColor,
   tags: ['autodocs'],
   argTypes: {

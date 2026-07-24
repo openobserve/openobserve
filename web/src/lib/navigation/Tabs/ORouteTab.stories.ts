@@ -19,7 +19,7 @@ import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue';
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue';
 
 const meta: Meta<typeof ORouteTab> = {
-  title: 'Navigation/ORouteTab',
+  title: 'Navigation/Tabs/ORouteTab',
   component: ORouteTab,
   tags: ['autodocs'],
   args: {

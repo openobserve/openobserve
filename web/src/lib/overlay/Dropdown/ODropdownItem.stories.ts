@@ -20,7 +20,7 @@ import ODropdown from '@/lib/overlay/Dropdown/ODropdown.vue';
 import OButton from '@/lib/core/Button/OButton.vue';
 
 const meta: Meta<typeof ODropdownItem> = {
-  title: 'Overlay/ODropdownItem',
+  title: 'Overlay/Dropdown/ODropdownItem',
   component: ODropdownItem,
   tags: ['autodocs'],
   args: {

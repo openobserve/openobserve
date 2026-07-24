@@ -19,7 +19,7 @@ import OForm from '@/lib/forms/Form/OForm.vue';
 import { z } from 'zod';
 
 const meta: Meta<typeof OFormTagInput> = {
-  title: 'Forms/OFormTagInput',
+  title: 'Forms/TagInput/OFormTagInput',
   component: OFormTagInput,
   tags: ['autodocs'],
   argTypes: {

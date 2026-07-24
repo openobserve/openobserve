@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OBadge from '@/lib/core/Badge/OBadge.vue';
 
 const meta: Meta<typeof OBadge> = {
-  title: 'Core/OBadge',
+  title: 'Core/Badge/OBadge',
   component: OBadge,
   tags: ['autodocs'],
   args: {

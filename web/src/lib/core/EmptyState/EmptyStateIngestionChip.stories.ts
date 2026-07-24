@@ -14,24 +14,21 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { Meta, StoryObj } from '@storybook/vue3-vite';
-import OTimeline from '@/lib/data/Timeline/OTimeline.vue';
-import OTimelineItem from '@/lib/data/Timeline/OTimelineItem.vue';
+import EmptyStateIngestionChip from './EmptyStateIngestionChip.vue';
 
-const meta: Meta<typeof OTimeline> = {
-  title: 'Data/Timeline/OTimeline',
-  component: OTimeline,
+const meta: Meta<typeof EmptyStateIngestionChip> = {
+  title: 'Core/EmptyState/Building Blocks/EmptyStateIngestionChip',
+  component: EmptyStateIngestionChip,
   tags: ['autodocs'],
+  args: { icon: 'terminal' },
 };
-
 export default meta;
-type Story = StoryObj<typeof OTimeline>;
+type Story = StoryObj<typeof EmptyStateIngestionChip>;
 
 export const Playground: Story = {
   render: (args) => ({
-    components: { OTimeline, OTimelineItem },
-    setup() {
-      return { args };
-    },
-    template: `<OTimeline v-bind="args"><OTimelineItem title="Created" subtitle="09:00" /><OTimelineItem title="Updated" subtitle="10:30" /></OTimeline>`,
+    components: { EmptyStateIngestionChip },
+    setup: () => ({ args }),
+    template: `<EmptyStateIngestionChip v-bind="args">cURL</EmptyStateIngestionChip>`,
   }),
 };

@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import ONavGroup from '@/lib/core/Navbar/ONavGroup.vue';
 
 const meta: Meta<typeof ONavGroup> = {
-  title: 'Core/ONavGroup',
+  title: 'Core/Navbar/ONavGroup',
   component: ONavGroup,
   tags: ['autodocs'],
   argTypes: {

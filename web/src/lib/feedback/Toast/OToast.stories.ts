@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OToast from '@/lib/feedback/Toast/OToast.vue';
 
 const meta: Meta<typeof OToast> = {
-  title: 'Feedback/OToast',
+  title: 'Feedback/Toast/OToast',
   component: OToast,
   tags: ['autodocs'],
   args: {

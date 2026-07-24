@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OInnerLoading from '@/lib/feedback/InnerLoading/OInnerLoading.vue';
 
 const meta: Meta<typeof OInnerLoading> = {
-  title: 'Feedback/OInnerLoading',
+  title: 'Feedback/InnerLoading/OInnerLoading',
   component: OInnerLoading,
   tags: ['autodocs'],
   args: {

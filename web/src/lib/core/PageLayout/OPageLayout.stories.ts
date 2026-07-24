@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OPageLayout from '@/lib/core/PageLayout/OPageLayout.vue';
 
 const meta: Meta<typeof OPageLayout> = {
-  title: 'Core/OPageLayout',
+  title: 'Core/PageLayout/OPageLayout',
   component: OPageLayout,
   tags: ['autodocs'],
   argTypes: {

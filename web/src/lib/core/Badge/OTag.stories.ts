@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OTag from '@/lib/core/Badge/OTag.vue';
 
 const meta: Meta<typeof OTag> = {
-  title: 'Core/OTag',
+  title: 'Core/Badge/OTag',
   component: OTag,
   tags: ['autodocs'],
   args: {

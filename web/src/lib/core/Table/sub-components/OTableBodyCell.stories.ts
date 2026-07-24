@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OTableBodyCell from '@/lib/core/Table/sub-components/OTableBodyCell.vue';
 
 const meta: Meta<typeof OTableBodyCell> = {
-  title: 'Core/Table/OTableBodyCell',
+  title: 'Core/Table/Internals/OTableBodyCell',
   component: OTableBodyCell,
   tags: ['autodocs'],
   argTypes: {

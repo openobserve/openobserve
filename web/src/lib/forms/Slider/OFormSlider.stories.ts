@@ -19,7 +19,7 @@ import OForm from '@/lib/forms/Form/OForm.vue';
 import { z } from 'zod';
 
 const meta: Meta<typeof OFormSlider> = {
-  title: 'Forms/OFormSlider',
+  title: 'Forms/Slider/OFormSlider',
   component: OFormSlider,
   tags: ['autodocs'],
   argTypes: {

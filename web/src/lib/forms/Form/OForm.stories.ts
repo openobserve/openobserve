@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OForm from '@/lib/forms/Form/OForm.vue';
 
 const meta: Meta<typeof OForm> = {
-  title: 'Forms/OForm',
+  title: 'Forms/Form/OForm',
   component: OForm,
   tags: ['autodocs'],
   argTypes: {

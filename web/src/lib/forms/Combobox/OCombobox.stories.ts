@@ -18,7 +18,7 @@ import { ref } from 'vue';
 import OCombobox from '@/lib/forms/Combobox/OCombobox.vue';
 
 const meta: Meta<typeof OCombobox> = {
-  title: 'Forms/OCombobox',
+  title: 'Forms/Combobox/OCombobox',
   component: OCombobox,
   tags: ['autodocs'],
   args: {

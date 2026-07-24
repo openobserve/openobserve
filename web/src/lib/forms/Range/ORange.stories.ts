@@ -18,7 +18,7 @@ import { ref } from 'vue';
 import ORange from '@/lib/forms/Range/ORange.vue';
 
 const meta: Meta<typeof ORange> = {
-  title: 'Forms/ORange',
+  title: 'Forms/Range/ORange',
   component: ORange,
   tags: ['autodocs'],
   args: {

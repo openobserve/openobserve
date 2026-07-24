@@ -19,7 +19,7 @@ import OStepper from '@/lib/navigation/Stepper/OStepper.vue';
 import OStep from '@/lib/navigation/Stepper/OStep.vue';
 
 const meta: Meta<typeof OStepper> = {
-  title: 'Navigation/OStepper',
+  title: 'Navigation/Stepper/OStepper',
   component: OStepper,
   tags: ['autodocs'],
   args: {

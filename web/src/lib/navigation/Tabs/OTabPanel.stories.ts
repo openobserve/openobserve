@@ -19,7 +19,7 @@ import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue';
 import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue';
 
 const meta: Meta<typeof OTabPanel> = {
-  title: 'Navigation/OTabPanel',
+  title: 'Navigation/Tabs/OTabPanel',
   component: OTabPanel,
   tags: ['autodocs'],
   args: {

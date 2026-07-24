@@ -20,7 +20,7 @@ import OForm from '@/lib/forms/Form/OForm.vue';
 import { z } from 'zod';
 
 const meta: Meta<typeof OFormToggleGroup> = {
-  title: 'Core/OFormToggleGroup',
+  title: 'Core/ToggleGroup/OFormToggleGroup',
   component: OFormToggleGroup,
   tags: ['autodocs'],
   argTypes: {

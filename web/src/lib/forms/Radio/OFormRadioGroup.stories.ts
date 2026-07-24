@@ -20,7 +20,7 @@ import OForm from '@/lib/forms/Form/OForm.vue';
 import { z } from 'zod';
 
 const meta: Meta<typeof OFormRadioGroup> = {
-  title: 'Forms/OFormRadioGroup',
+  title: 'Forms/Radio/OFormRadioGroup',
   component: OFormRadioGroup,
   tags: ['autodocs'],
   argTypes: {

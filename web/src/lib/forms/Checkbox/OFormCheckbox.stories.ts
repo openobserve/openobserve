@@ -19,7 +19,7 @@ import OForm from '@/lib/forms/Form/OForm.vue';
 import { z } from 'zod';
 
 const meta: Meta<typeof OFormCheckbox> = {
-  title: 'Forms/OFormCheckbox',
+  title: 'Forms/Checkbox/OFormCheckbox',
   component: OFormCheckbox,
   tags: ['autodocs'],
   argTypes: {

@@ -18,7 +18,7 @@ import { ref } from 'vue';
 import OSwitch from '@/lib/forms/Switch/OSwitch.vue';
 
 const meta: Meta<typeof OSwitch> = {
-  title: 'Forms/OSwitch',
+  title: 'Forms/Switch/OSwitch',
   component: OSwitch,
   tags: ['autodocs'],
   args: {

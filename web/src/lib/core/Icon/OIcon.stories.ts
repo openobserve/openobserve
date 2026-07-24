@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OIcon from '@/lib/core/Icon/OIcon.vue';
 
 const meta: Meta<typeof OIcon> = {
-  title: 'Core/OIcon',
+  title: 'Core/Icon/OIcon',
   component: OIcon,
   tags: ['autodocs'],
   args: {

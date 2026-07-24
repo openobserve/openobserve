@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OTableLoading from '@/lib/core/Table/sub-components/OTableLoading.vue';
 
 const meta: Meta<typeof OTableLoading> = {
-  title: 'Core/Table/OTableLoading',
+  title: 'Core/Table/Internals/OTableLoading',
   component: OTableLoading,
   tags: ['autodocs'],
   argTypes: {

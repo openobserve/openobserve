@@ -18,7 +18,7 @@ import OTreeNode from '@/lib/data/Tree/OTreeNode.vue';
 import OTree from '@/lib/data/Tree/OTree.vue';
 
 const meta: Meta<typeof OTreeNode> = {
-  title: 'Data/OTreeNode',
+  title: 'Data/Tree/OTreeNode',
   component: OTreeNode,
   tags: ['autodocs'],
   argTypes: {

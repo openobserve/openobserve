@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import ORefreshButton from '@/lib/core/RefreshButton/ORefreshButton.vue';
 
 const meta: Meta<typeof ORefreshButton> = {
-  title: 'Core/ORefreshButton',
+  title: 'Core/RefreshButton/ORefreshButton',
   component: ORefreshButton,
   tags: ['autodocs'],
   args: {

@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import ODimensionChip from '@/lib/core/Badge/ODimensionChip.vue';
 
 const meta: Meta<typeof ODimensionChip> = {
-  title: 'Core/ODimensionChip',
+  title: 'Core/Badge/ODimensionChip',
   component: ODimensionChip,
   tags: ['autodocs'],
   argTypes: {

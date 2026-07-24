@@ -19,7 +19,7 @@ import OSelectItem from '@/lib/forms/Select/OSelectItem.vue';
 import OSelect from '@/lib/forms/Select/OSelect.vue';
 
 const meta: Meta<typeof OSelectGroup> = {
-  title: 'Forms/OSelectGroup',
+  title: 'Forms/Select/OSelectGroup',
   component: OSelectGroup,
   tags: ['autodocs'],
   argTypes: {

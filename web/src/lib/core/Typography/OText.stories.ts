@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OText from '@/lib/core/Typography/OText.vue';
 
 const meta: Meta<typeof OText> = {
-  title: 'Core/OText',
+  title: 'Core/Typography/OText',
   component: OText,
   tags: ['autodocs'],
   args: {

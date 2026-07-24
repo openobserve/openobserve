@@ -18,7 +18,7 @@ import { ref } from 'vue';
 import OColor from '@/lib/forms/Color/OColor.vue';
 
 const meta: Meta<typeof OColor> = {
-  title: 'Forms/OColor',
+  title: 'Forms/Color/OColor',
   component: OColor,
   tags: ['autodocs'],
   args: {

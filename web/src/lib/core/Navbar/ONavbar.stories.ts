@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import ONavbar from '@/lib/core/Navbar/ONavbar.vue';
 
 const meta: Meta<typeof ONavbar> = {
-  title: 'Core/ONavbar',
+  title: 'Core/Navbar/ONavbar',
   component: ONavbar,
   tags: ['autodocs'],
   args: {

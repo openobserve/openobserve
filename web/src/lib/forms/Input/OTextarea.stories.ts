@@ -18,7 +18,7 @@ import { ref } from 'vue';
 import OTextarea from '@/lib/forms/Input/OTextarea.vue';
 
 const meta: Meta<typeof OTextarea> = {
-  title: 'Forms/OTextarea',
+  title: 'Forms/Input/OTextarea',
   component: OTextarea,
   tags: ['autodocs'],
   args: {

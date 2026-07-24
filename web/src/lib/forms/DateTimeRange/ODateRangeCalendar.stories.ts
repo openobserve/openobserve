@@ -18,7 +18,7 @@ import { ref } from 'vue';
 import ODateRangeCalendar from '@/lib/forms/DateTimeRange/ODateRangeCalendar.vue';
 
 const meta: Meta<typeof ODateRangeCalendar> = {
-  title: 'Forms/ODateRangeCalendar',
+  title: 'Forms/DateTimeRange/ODateRangeCalendar',
   component: ODateRangeCalendar,
   tags: ['autodocs'],
   argTypes: {

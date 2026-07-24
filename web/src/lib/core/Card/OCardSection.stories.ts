@@ -18,7 +18,7 @@ import OCardSection from '@/lib/core/Card/OCardSection.vue';
 import OCard from '@/lib/core/Card/OCard.vue';
 
 const meta: Meta<typeof OCardSection> = {
-  title: 'Core/OCardSection',
+  title: 'Core/Card/OCardSection',
   component: OCardSection,
   tags: ['autodocs'],
   args: {

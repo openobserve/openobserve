@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OCodeBlock from '@/lib/core/Code/OCodeBlock.vue';
 
 const meta: Meta<typeof OCodeBlock> = {
-  title: 'Core/OCodeBlock',
+  title: 'Core/Code/OCodeBlock',
   component: OCodeBlock,
   tags: ['autodocs'],
   args: {

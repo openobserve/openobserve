@@ -18,7 +18,7 @@ import OButtonGroup from '@/lib/core/Button/OButtonGroup.vue';
 import OButton from '@/lib/core/Button/OButton.vue';
 
 const meta: Meta<typeof OButtonGroup> = {
-  title: 'Core/OButtonGroup',
+  title: 'Core/Button/OButtonGroup',
   component: OButtonGroup,
   tags: ['autodocs'],
   args: {

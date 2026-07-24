@@ -19,7 +19,7 @@ import OForm from '@/lib/forms/Form/OForm.vue';
 import { z } from 'zod';
 
 const meta: Meta<typeof OFormCombobox> = {
-  title: 'Forms/OFormCombobox',
+  title: 'Forms/Combobox/OFormCombobox',
   component: OFormCombobox,
   tags: ['autodocs'],
   argTypes: {

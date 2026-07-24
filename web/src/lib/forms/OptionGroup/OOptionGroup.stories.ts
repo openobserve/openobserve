@@ -18,7 +18,7 @@ import { ref } from 'vue';
 import OOptionGroup from '@/lib/forms/OptionGroup/OOptionGroup.vue';
 
 const meta: Meta<typeof OOptionGroup> = {
-  title: 'Forms/OOptionGroup',
+  title: 'Forms/OptionGroup/OOptionGroup',
   component: OOptionGroup,
   tags: ['autodocs'],
   args: {

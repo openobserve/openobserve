@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OProgressBar from '@/lib/data/ProgressBar/OProgressBar.vue';
 
 const meta: Meta<typeof OProgressBar> = {
-  title: 'Data/OProgressBar',
+  title: 'Data/ProgressBar/OProgressBar',
   component: OProgressBar,
   tags: ['autodocs'],
   args: {

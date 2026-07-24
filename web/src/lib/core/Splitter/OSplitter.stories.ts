@@ -18,7 +18,7 @@ import { ref } from 'vue';
 import OSplitter from '@/lib/core/Splitter/OSplitter.vue';
 
 const meta: Meta<typeof OSplitter> = {
-  title: 'Core/OSplitter',
+  title: 'Core/Splitter/OSplitter',
   component: OSplitter,
   tags: ['autodocs'],
   args: {

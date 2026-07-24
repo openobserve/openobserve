@@ -19,7 +19,7 @@ import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
 import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
 
 const meta: Meta<typeof OToggleGroup> = {
-  title: 'Core/OToggleGroup',
+  title: 'Core/ToggleGroup/OToggleGroup',
   component: OToggleGroup,
   tags: ['autodocs'],
   args: {

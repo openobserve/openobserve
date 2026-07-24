@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OBanner from '@/lib/feedback/Banner/OBanner.vue';
 
 const meta: Meta<typeof OBanner> = {
-  title: 'Feedback/OBanner',
+  title: 'Feedback/Banner/OBanner',
   component: OBanner,
   tags: ['autodocs'],
   args: {

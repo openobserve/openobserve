@@ -18,7 +18,7 @@ import { ref } from 'vue';
 import OFile from '@/lib/forms/File/OFile.vue';
 
 const meta: Meta<typeof OFile> = {
-  title: 'Forms/OFile',
+  title: 'Forms/File/OFile',
   component: OFile,
   tags: ['autodocs'],
   args: {

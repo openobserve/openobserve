@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OUserCell from '@/lib/core/Table/cells/OUserCell.vue';
 
 const meta: Meta<typeof OUserCell> = {
-  title: 'Core/Table/OUserCell',
+  title: 'Core/Table/Cells/OUserCell',
   component: OUserCell,
   tags: ['autodocs'],
   argTypes: {

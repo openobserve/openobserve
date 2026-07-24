@@ -18,7 +18,7 @@ import { ref } from 'vue';
 import OSearchInput from '@/lib/forms/SearchInput/OSearchInput.vue';
 
 const meta: Meta<typeof OSearchInput> = {
-  title: 'Forms/OSearchInput',
+  title: 'Forms/SearchInput/OSearchInput',
   component: OSearchInput,
   tags: ['autodocs'],
   args: {

@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OFieldLabel from '@/lib/lists/FieldList/OFieldLabel.vue';
 
 const meta: Meta<typeof OFieldLabel> = {
-  title: 'Lists/OFieldLabel',
+  title: 'Lists/FieldList/OFieldLabel',
   component: OFieldLabel,
   tags: ['autodocs'],
   args: {

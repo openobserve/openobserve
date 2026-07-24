@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OVirtualScroll from '@/lib/core/VirtualScroll/OVirtualScroll.vue';
 
 const meta: Meta<typeof OVirtualScroll> = {
-  title: 'Core/OVirtualScroll',
+  title: 'Core/VirtualScroll/OVirtualScroll',
   component: OVirtualScroll,
   tags: ['autodocs'],
   args: {

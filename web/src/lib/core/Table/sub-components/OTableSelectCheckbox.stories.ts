@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OTableSelectCheckbox from '@/lib/core/Table/sub-components/OTableSelectCheckbox.vue';
 
 const meta: Meta<typeof OTableSelectCheckbox> = {
-  title: 'Core/Table/OTableSelectCheckbox',
+  title: 'Core/Table/Internals/OTableSelectCheckbox',
   component: OTableSelectCheckbox,
   tags: ['autodocs'],
   argTypes: {

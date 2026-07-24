@@ -19,7 +19,7 @@ import ORadio from '@/lib/forms/Radio/ORadio.vue';
 import ORadioGroup from '@/lib/forms/Radio/ORadioGroup.vue';
 
 const meta: Meta<typeof ORadio> = {
-  title: 'Forms/ORadio',
+  title: 'Forms/Radio/ORadio',
   component: ORadio,
   tags: ['autodocs'],
   args: {

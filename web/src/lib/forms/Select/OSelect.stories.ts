@@ -18,7 +18,7 @@ import { ref } from 'vue';
 import OSelect from '@/lib/forms/Select/OSelect.vue';
 
 const meta: Meta<typeof OSelect> = {
-  title: 'Forms/OSelect',
+  title: 'Forms/Select/OSelect',
   component: OSelect,
   tags: ['autodocs'],
   args: {

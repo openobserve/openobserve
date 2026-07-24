@@ -18,7 +18,7 @@ import OTimelineItem from '@/lib/data/Timeline/OTimelineItem.vue';
 import OTimeline from '@/lib/data/Timeline/OTimeline.vue';
 
 const meta: Meta<typeof OTimelineItem> = {
-  title: 'Data/OTimelineItem',
+  title: 'Data/Timeline/OTimelineItem',
   component: OTimelineItem,
   tags: ['autodocs'],
   args: {

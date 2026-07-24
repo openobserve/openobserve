@@ -18,7 +18,7 @@ import { ref } from 'vue';
 import OPagination from '@/lib/navigation/Pagination/OPagination.vue';
 
 const meta: Meta<typeof OPagination> = {
-  title: 'Navigation/OPagination',
+  title: 'Navigation/Pagination/OPagination',
   component: OPagination,
   tags: ['autodocs'],
   args: {

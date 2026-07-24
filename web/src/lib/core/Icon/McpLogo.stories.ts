@@ -14,24 +14,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { Meta, StoryObj } from '@storybook/vue3-vite';
-import OTimeline from '@/lib/data/Timeline/OTimeline.vue';
-import OTimelineItem from '@/lib/data/Timeline/OTimelineItem.vue';
+import McpLogo from './McpLogo.vue';
 
-const meta: Meta<typeof OTimeline> = {
-  title: 'Data/Timeline/OTimeline',
-  component: OTimeline,
+const meta: Meta<typeof McpLogo> = {
+  title: 'Core/Icon/McpLogo',
+  component: McpLogo,
   tags: ['autodocs'],
 };
-
 export default meta;
-type Story = StoryObj<typeof OTimeline>;
+type Story = StoryObj<typeof McpLogo>;
 
 export const Playground: Story = {
-  render: (args) => ({
-    components: { OTimeline, OTimelineItem },
-    setup() {
-      return { args };
-    },
-    template: `<OTimeline v-bind="args"><OTimelineItem title="Created" subtitle="09:00" /><OTimelineItem title="Updated" subtitle="10:30" /></OTimeline>`,
-  }),
+  render: () => ({ components: { McpLogo }, template: `<McpLogo />` }),
 };

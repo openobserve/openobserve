@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import ODataBarCell from '@/lib/core/Table/cells/ODataBarCell.vue';
 
 const meta: Meta<typeof ODataBarCell> = {
-  title: 'Core/Table/ODataBarCell',
+  title: 'Core/Table/Cells/ODataBarCell',
   component: ODataBarCell,
   tags: ['autodocs'],
   argTypes: {

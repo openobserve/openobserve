@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OSpinner from '@/lib/feedback/Spinner/OSpinner.vue';
 
 const meta: Meta<typeof OSpinner> = {
-  title: 'Feedback/OSpinner',
+  title: 'Feedback/Spinner/OSpinner',
   component: OSpinner,
   tags: ['autodocs'],
   args: {

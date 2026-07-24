@@ -19,7 +19,7 @@ import OForm from '@/lib/forms/Form/OForm.vue';
 import { z } from 'zod';
 
 const meta: Meta<typeof OFormTextarea> = {
-  title: 'Forms/OFormTextarea',
+  title: 'Forms/Input/OFormTextarea',
   component: OFormTextarea,
   tags: ['autodocs'],
   argTypes: {

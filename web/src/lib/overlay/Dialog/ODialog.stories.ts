@@ -19,7 +19,7 @@ import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import OButton from '@/lib/core/Button/OButton.vue';
 
 const meta: Meta<typeof ODialog> = {
-  title: 'Overlay/ODialog',
+  title: 'Overlay/Dialog/ODialog',
   component: ODialog,
   tags: ['autodocs'],
   args: {

@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OEmptyState from '@/lib/core/EmptyState/OEmptyState.vue';
 
 const meta: Meta<typeof OEmptyState> = {
-  title: 'Core/OEmptyState',
+  title: 'Core/EmptyState/OEmptyState',
   component: OEmptyState,
   tags: ['autodocs'],
   argTypes: {

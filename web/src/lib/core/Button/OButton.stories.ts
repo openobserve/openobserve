@@ -36,7 +36,7 @@ const VARIANTS: ButtonVariant[] = [
 const SIZES: ButtonSize[] = ["xs", "sm", "md", "lg"];
 
 const meta: Meta<typeof OButton> = {
-  title: "Core/OButton",
+  title: "Core/Button/OButton",
   component: OButton,
   tags: ["autodocs"],
   args: {

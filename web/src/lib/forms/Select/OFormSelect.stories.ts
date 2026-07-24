@@ -19,7 +19,7 @@ import OForm from '@/lib/forms/Form/OForm.vue';
 import { z } from 'zod';
 
 const meta: Meta<typeof OFormSelect> = {
-  title: 'Forms/OFormSelect',
+  title: 'Forms/Select/OFormSelect',
   component: OFormSelect,
   tags: ['autodocs'],
   args: {

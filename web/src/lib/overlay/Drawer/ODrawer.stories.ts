@@ -19,7 +19,7 @@ import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
 import OButton from '@/lib/core/Button/OButton.vue';
 
 const meta: Meta<typeof ODrawer> = {
-  title: 'Overlay/ODrawer',
+  title: 'Overlay/Drawer/ODrawer',
   component: ODrawer,
   tags: ['autodocs'],
   args: {

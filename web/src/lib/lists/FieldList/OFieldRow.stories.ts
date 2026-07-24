@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OFieldRow from '@/lib/lists/FieldList/OFieldRow.vue';
 
 const meta: Meta<typeof OFieldRow> = {
-  title: 'Lists/OFieldRow',
+  title: 'Lists/FieldList/OFieldRow',
   component: OFieldRow,
   tags: ['autodocs'],
   argTypes: {

@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OSkeleton from '@/lib/feedback/Skeleton/OSkeleton.vue';
 
 const meta: Meta<typeof OSkeleton> = {
-  title: 'Feedback/OSkeleton',
+  title: 'Feedback/Skeleton/OSkeleton',
   component: OSkeleton,
   tags: ['autodocs'],
   args: {

@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OContent from '@/lib/core/Content/OContent.vue';
 
 const meta: Meta<typeof OContent> = {
-  title: 'Core/OContent',
+  title: 'Core/Content/OContent',
   component: OContent,
   tags: ['autodocs'],
   argTypes: {

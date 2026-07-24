@@ -19,7 +19,7 @@ import OPopover from '@/lib/overlay/Popover/OPopover.vue';
 import OButton from '@/lib/core/Button/OButton.vue';
 
 const meta: Meta<typeof OPopover> = {
-  title: 'Overlay/OPopover',
+  title: 'Overlay/Popover/OPopover',
   component: OPopover,
   tags: ['autodocs'],
   argTypes: {

@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OCollapsible from '@/lib/core/Collapsible/OCollapsible.vue';
 
 const meta: Meta<typeof OCollapsible> = {
-  title: 'Core/OCollapsible',
+  title: 'Core/Collapsible/OCollapsible',
   component: OCollapsible,
   tags: ['autodocs'],
   args: {

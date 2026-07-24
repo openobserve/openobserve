@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OTree from '@/lib/data/Tree/OTree.vue';
 
 const meta: Meta<typeof OTree> = {
-  title: 'Data/OTree',
+  title: 'Data/Tree/OTree',
   component: OTree,
   tags: ['autodocs'],
   args: {

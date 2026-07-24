@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OTableColumnToggle from '@/lib/core/Table/sub-components/OTableColumnToggle.vue';
 
 const meta: Meta<typeof OTableColumnToggle> = {
-  title: 'Core/Table/OTableColumnToggle',
+  title: 'Core/Table/Internals/OTableColumnToggle',
   component: OTableColumnToggle,
   tags: ['autodocs'],
   argTypes: {

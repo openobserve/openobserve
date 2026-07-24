@@ -18,7 +18,7 @@ import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 import OButton from '@/lib/core/Button/OButton.vue';
 
 const meta: Meta<typeof OTooltip> = {
-  title: 'Overlay/OTooltip',
+  title: 'Overlay/Tooltip/OTooltip',
   component: OTooltip,
   tags: ['autodocs'],
   args: {

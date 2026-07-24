@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OTableEmpty from '@/lib/core/Table/sub-components/OTableEmpty.vue';
 
 const meta: Meta<typeof OTableEmpty> = {
-  title: 'Core/Table/OTableEmpty',
+  title: 'Core/Table/Internals/OTableEmpty',
   component: OTableEmpty,
   tags: ['autodocs'],
   argTypes: {

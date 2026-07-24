@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OTableHeader from '@/lib/core/Table/sub-components/OTableHeader.vue';
 
 const meta: Meta<typeof OTableHeader> = {
-  title: 'Core/Table/OTableHeader',
+  title: 'Core/Table/Internals/OTableHeader',
   component: OTableHeader,
   tags: ['autodocs'],
   argTypes: {

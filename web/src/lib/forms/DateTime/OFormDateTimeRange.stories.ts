@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OFormDateTimeRange from '@/lib/forms/DateTime/OFormDateTimeRange.vue';
 
 const meta: Meta<typeof OFormDateTimeRange> = {
-  title: 'Forms/OFormDateTimeRange',
+  title: 'Forms/DateTime/OFormDateTimeRange',
   component: OFormDateTimeRange,
   tags: ['autodocs'],
   argTypes: {

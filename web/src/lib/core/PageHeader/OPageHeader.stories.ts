@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OPageHeader from '@/lib/core/PageHeader/OPageHeader.vue';
 
 const meta: Meta<typeof OPageHeader> = {
-  title: 'Core/OPageHeader',
+  title: 'Core/PageHeader/OPageHeader',
   component: OPageHeader,
   tags: ['autodocs'],
   argTypes: {

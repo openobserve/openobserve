@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OTablePagination from '@/lib/core/Table/sub-components/OTablePagination.vue';
 
 const meta: Meta<typeof OTablePagination> = {
-  title: 'Core/Table/OTablePagination',
+  title: 'Core/Table/Internals/OTablePagination',
   component: OTablePagination,
   tags: ['autodocs'],
   argTypes: {

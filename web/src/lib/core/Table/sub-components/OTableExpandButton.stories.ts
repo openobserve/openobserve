@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OTableExpandButton from '@/lib/core/Table/sub-components/OTableExpandButton.vue';
 
 const meta: Meta<typeof OTableExpandButton> = {
-  title: 'Core/Table/OTableExpandButton',
+  title: 'Core/Table/Internals/OTableExpandButton',
   component: OTableExpandButton,
   tags: ['autodocs'],
   argTypes: {

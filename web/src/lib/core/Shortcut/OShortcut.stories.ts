@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OShortcut from '@/lib/core/Shortcut/OShortcut.vue';
 
 const meta: Meta<typeof OShortcut> = {
-  title: 'Core/OShortcut',
+  title: 'Core/Shortcut/OShortcut',
   component: OShortcut,
   tags: ['autodocs'],
   args: {

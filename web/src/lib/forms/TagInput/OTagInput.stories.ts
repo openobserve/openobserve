@@ -18,7 +18,7 @@ import { ref } from 'vue';
 import OTagInput from '@/lib/forms/TagInput/OTagInput.vue';
 
 const meta: Meta<typeof OTagInput> = {
-  title: 'Forms/OTagInput',
+  title: 'Forms/TagInput/OTagInput',
   component: OTagInput,
   tags: ['autodocs'],
   args: {

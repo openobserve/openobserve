@@ -19,7 +19,7 @@ import OButton from '@/lib/core/Button/OButton.vue';
 import OCard from '@/lib/core/Card/OCard.vue';
 
 const meta: Meta<typeof OCardActions> = {
-  title: 'Core/OCardActions',
+  title: 'Core/Card/OCardActions',
   component: OCardActions,
   tags: ['autodocs'],
   args: {

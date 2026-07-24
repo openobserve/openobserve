@@ -18,7 +18,7 @@ import { ref } from 'vue';
 import OSlider from '@/lib/forms/Slider/OSlider.vue';
 
 const meta: Meta<typeof OSlider> = {
-  title: 'Forms/OSlider',
+  title: 'Forms/Slider/OSlider',
   component: OSlider,
   tags: ['autodocs'],
   args: {

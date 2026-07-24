@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OCard from '@/lib/core/Card/OCard.vue';
 
 const meta: Meta<typeof OCard> = {
-  title: 'Core/OCard',
+  title: 'Core/Card/OCard',
   component: OCard,
   tags: ['autodocs'],
 };

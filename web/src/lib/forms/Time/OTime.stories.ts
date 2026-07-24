@@ -18,7 +18,7 @@ import { ref } from 'vue';
 import OTime from '@/lib/forms/Time/OTime.vue';
 
 const meta: Meta<typeof OTime> = {
-  title: 'Forms/OTime',
+  title: 'Forms/Time/OTime',
   component: OTime,
   tags: ['autodocs'],
   args: {

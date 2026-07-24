@@ -18,7 +18,7 @@ import { ref } from 'vue';
 import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
 
 const meta: Meta<typeof OCheckbox> = {
-  title: 'Forms/OCheckbox',
+  title: 'Forms/Checkbox/OCheckbox',
   component: OCheckbox,
   tags: ['autodocs'],
   args: {

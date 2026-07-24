@@ -19,7 +19,7 @@ import OForm from '@/lib/forms/Form/OForm.vue';
 import { z } from 'zod';
 
 const meta: Meta<typeof OFormDate> = {
-  title: 'Forms/OFormDate',
+  title: 'Forms/Date/OFormDate',
   component: OFormDate,
   tags: ['autodocs'],
   argTypes: {

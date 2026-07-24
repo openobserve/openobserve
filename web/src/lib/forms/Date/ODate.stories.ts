@@ -18,7 +18,7 @@ import { ref } from 'vue';
 import ODate from '@/lib/forms/Date/ODate.vue';
 
 const meta: Meta<typeof ODate> = {
-  title: 'Forms/ODate',
+  title: 'Forms/Date/ODate',
   component: ODate,
   tags: ['autodocs'],
   args: {

@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OCodeCell from '@/lib/core/Table/cells/OCodeCell.vue';
 
 const meta: Meta<typeof OCodeCell> = {
-  title: 'Core/Table/OCodeCell',
+  title: 'Core/Table/Cells/OCodeCell',
   component: OCodeCell,
   tags: ['autodocs'],
   argTypes: {

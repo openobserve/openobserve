@@ -17,7 +17,7 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import OTableError from '@/lib/core/Table/sub-components/OTableError.vue';
 
 const meta: Meta<typeof OTableError> = {
-  title: 'Core/Table/OTableError',
+  title: 'Core/Table/Internals/OTableError',
   component: OTableError,
   tags: ['autodocs'],
   argTypes: {
