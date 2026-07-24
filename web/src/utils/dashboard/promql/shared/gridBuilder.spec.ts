@@ -53,7 +53,7 @@ describe("gridBuilder", () => {
       expect(result).toEqual({
         left: "3%",
         right: "4%",
-        top: "3%",
+        top: 16,
         bottom: "3%",
         containLabel: true,
       });
@@ -205,7 +205,7 @@ describe("gridBuilder", () => {
       expect(result).toEqual({
         left: "3%",
         right: "4%",
-        top: "3%",
+        top: 16,
         bottom: "3%",
         containLabel: true,
       });

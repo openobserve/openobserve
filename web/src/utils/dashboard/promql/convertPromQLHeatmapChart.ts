@@ -162,9 +162,7 @@ function applyCompactPreview(options: any): any {
       precision: 2,
       textStyle: { fontSize: 9 },
     };
-    // Pull the plot to the top edge (no default top inset on a short card) and
-    // leave room for the bar below the x-axis labels.
-    options.grid = { ...(options.grid ?? {}), top: 8, bottom: 26 };
+    options.grid = { ...(options.grid ?? {}), top: 8, bottom: 48 };
   }
 
   const yAxis = Array.isArray(options.yAxis) ? options.yAxis[0] : options.yAxis;

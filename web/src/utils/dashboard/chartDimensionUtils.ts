@@ -110,6 +110,9 @@ export const calculateOptimalFontSize = (
   return optimalFontSize; // Return the largest font size that fits
 };
 
+// x-axis tick-label band below the plot edge (12px font + 8px axisLabel margin)
+export const X_AXIS_TICK_LABEL_BAND = 20;
+
 /**
  * Widens the ECharts grid's left inset to the measured pixel width of the
  * widest formatted y-axis label. ECharts' containLabel under-measures rendered
@@ -144,6 +147,9 @@ export const applyMeasuredYAxisLeftInset = (options: any): void => {
 
   if (widest > 0) {
     options.grid.left = widest;
+    if (grid.containLabel === true && typeof grid.bottom === "number") {
+      grid.bottom += X_AXIS_TICK_LABEL_BAND;
+    }
     options.grid.containLabel = false;
   }
 };
