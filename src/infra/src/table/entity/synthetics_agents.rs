@@ -28,6 +28,8 @@ pub struct Model {
     pub version: Option<String>,
     /// Self-reported support: `{"types": [...], "icmp": bool, "max_concurrency": n}`.
     pub capabilities: Option<Json>,
+    /// Probe token this agent last authenticated with (stamped at register).
+    pub token_id: Option<String>,
     /// Refreshed by register and every lease; stale ⇒ location down.
     pub last_seen_at: i64,
     pub created_at: i64,

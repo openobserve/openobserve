@@ -242,6 +242,7 @@ interface AgentToken {
   token: string;
   is_default: boolean;
   enabled: boolean;
+  agents: number;
   created_by: string;
   created_at: number;
 }
@@ -295,6 +296,15 @@ export default defineComponent({
         hideable: true,
         size: 120,
         meta: { align: "left" },
+      },
+      {
+        id: "agents",
+        header: t("synthetics.tokens.agentsColumn"),
+        accessorKey: "agents",
+        sortable: true,
+        hideable: true,
+        size: 90,
+        meta: { align: "right" },
       },
       {
         id: "created_by",

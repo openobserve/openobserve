@@ -1149,6 +1149,23 @@ async fn probe_token_org(headers: &axum::http::HeaderMap) -> Option<String> {
         .map(|t| t.org_id)
 }
 
+/// Resolves the id of the `o2syn_` token in a Basic Authorization header — used
+/// at register to stamp `synthetics_agents.token_id` ("N agents on this token").
+#[cfg(feature = "enterprise")]
+async fn probe_token_id(headers: &axum::http::HeaderMap) -> Option<String> {
+    let auth = headers
+        .get(axum::http::header::AUTHORIZATION)?
+        .to_str()
+        .ok()?;
+    let decoded = config::utils::base64::decode(auth.strip_prefix("Basic ")?).ok()?;
+    let token = decoded.split_once(':')?.1;
+    infra::table::synthetics_probe_tokens::find_global(token)
+        .await
+        .ok()
+        .flatten()
+        .map(|t| t.id)
+}
+
 /// Authorizes a probe request against the `{org_id}` in the path: the Basic
 /// `o2syn_` token must exist and belong to that org. Returns Ok(()) when the
 /// token org matches, Err(response) otherwise — this is the tenant boundary for
@@ -1197,7 +1214,8 @@ pub async fn agent_register(
             Ok(r) => r,
             Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
         };
-        match o2_enterprise::enterprise::synthetics::agent::register(req, &org_id).await {
+        let token_id = probe_token_id(&headers).await;
+        match o2_enterprise::enterprise::synthetics::agent::register(req, &org_id, token_id).await {
             Ok(resp) => MetaHttpResponse::json(resp),
             Err(e) => {
                 let msg = e.to_string();

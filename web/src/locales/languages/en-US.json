@@ -9305,6 +9305,7 @@
       "tokenNamePlaceholder": "us-east",
       "tokenNameHint": "Name it after the region or site, then embed it in that region's agents via the setup command.",
       "tokenColumn": "Token",
+      "agentsColumn": "Agents",
       "createdBy": "Created by",
       "createTokenTitle": "Create synthetics token",
       "newTokenRevealed": "New token — copy it now",

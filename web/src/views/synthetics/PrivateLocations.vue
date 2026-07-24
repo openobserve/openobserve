@@ -178,11 +178,10 @@ const filteredLocations = computed(() => {
 const statusVariant = (status: string) =>
   status === "online" ? "success" : status === "offline" ? "error" : "default";
 
-/** Live agent name(s) when any are online; otherwise the last known agent's
- *  name (still visible offline) so a dead location doesn't hide who to
- *  recover, without opening the detail page. */
+/** Live agent name(s), shown on hover over the agent-count cell. Full agent
+ *  detail (incl. offline agents) lives on the location detail page. */
 const agentSubtext = (row: SyntheticLocation) =>
-  row.agent_names?.length ? row.agent_names.join(", ") : row.last_agent_name || null;
+  row.agent_names?.length ? row.agent_names.join(", ") : null;
 
 const columns = computed<OTableColumnDef[]>(() => [
   {

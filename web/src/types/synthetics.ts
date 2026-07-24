@@ -368,8 +368,6 @@ export interface SyntheticLocation {
   agents_total: number
   status: 'online' | 'offline' | 'pending'
   version?: string
-  /** Name of the most recently seen agent, live or stale. */
-  last_agent_name?: string
   last_seen_at?: number
   monitors_count: number
   checks_per_min: number
