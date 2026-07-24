@@ -57,10 +57,19 @@
         </div>
       </template>
 
-      <!-- Agents: name(s), live if any are online else the last known one.
-           Pool health (live/total) is on the detail page, not repeated here. -->
+      <!-- Agents: live/total count (a location is a pool of interchangeable
+           agents). Names/health are on the detail page; shown here on hover. -->
       <template #cell-agents="{ row }">
-        <span class="truncate">{{ agentSubtext(row as any) || "—" }}</span>
+        <div class="flex flex-col min-w-0" :title="agentSubtext(row as any) || ''">
+          <span class="truncate">{{ (row as any).live_agents ?? 0 }}<span class="text-text-muted">/{{ (row as any).agents_total ?? 0 }}</span></span>
+          <span v-if="(row as any).version" class="truncate text-xs text-text-muted">v{{ (row as any).version }}</span>
+        </div>
+      </template>
+
+      <!-- Checks per minute -->
+      <template #cell-cmin="{ row }">
+        <span v-if="(row as any).checks_per_min != null">~{{ (row as any).checks_per_min }}</span>
+        <span v-else class="text-text-muted">—</span>
       </template>
 
       <!-- Capability type chips -->
@@ -205,7 +214,7 @@ const columns = computed<OTableColumnDef[]>(() => [
   {
     id: "agents",
     header: t("synthetics.privateLocations.table.agents"),
-    accessorKey: "last_agent_name",
+    accessorKey: "live_agents",
     size: 100,
     minSize: 80,
     sortable: true,
@@ -223,6 +232,16 @@ const columns = computed<OTableColumnDef[]>(() => [
     id: "monitors",
     header: t("synthetics.privateLocations.table.checks"),
     accessorKey: "monitors_count",
+    size: 90,
+    minSize: 70,
+    sortable: true,
+    meta: { align: "right" },
+    hideable: true,
+  },
+  {
+    id: "cmin",
+    header: t("synthetics.privateLocations.table.checksPerMin"),
+    accessorKey: "checks_per_min",
     size: 90,
     minSize: 70,
     sortable: true,

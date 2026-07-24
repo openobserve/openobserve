@@ -162,20 +162,15 @@ const platform = ref<string | number>("docker");
 const draftLocation = ref("");
 const draftAgentName = ref("");
 
-/** A non-empty starting point for the org-level composer — never blank, so a
- *  user who copies without editing still gets a usable command. Regenerated
- *  on every fresh open (not sticky), so two agents set up back-to-back don't
- *  default to the same location name. */
-function generateDefaultLocationName(): string {
-  const suffix = Math.floor(1000 + Math.random() * 9000);
-  return `private-location-${suffix}`;
-}
-
 watch(
   () => props.open,
   (open) => {
     if (!open) return;
-    draftLocation.value = props.locationName || (props.locationId ? "" : generateDefaultLocationName());
+    // Start BLANK (not an auto-generated `private-location-XXXX`) so the operator
+    // deliberately names the location — and reuses that name across agents (a
+    // location is a pool of interchangeable agents, not one location per agent).
+    // `required` on the input + the copy guard below stop a blank from shipping.
+    draftLocation.value = props.locationName || "";
     draftAgentName.value = props.agentName || "";
   },
 );
