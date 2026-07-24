@@ -1216,4 +1216,22 @@ export const applyLegendConfiguration = (
     const { chartWidth, chartHeight } = getChartDimensions(chartPanelRef);
     applyPieDonutChartAlignment(panelSchema, options, chartWidth, chartHeight);
   }
+
+  // truncate the rotated y-axis name to the final plot height so it never spills past the plot
+  const yAxis = options.yAxis;
+  if (
+    yAxis &&
+    !Array.isArray(yAxis) &&
+    yAxis.name &&
+    !["h-bar", "h-stacked"].includes(panelSchema.type)
+  ) {
+    const { chartHeight } = getChartDimensions(chartPanelRef);
+    const gridTop = typeof options.grid?.top === "number" ? options.grid.top : 16;
+    const gridBottom = typeof options.grid?.bottom === "number" ? options.grid.bottom : 60;
+    yAxis.nameTruncate = {
+      ...yAxis.nameTruncate,
+      maxWidth: Math.max(30, chartHeight - gridTop - gridBottom - 30),
+      ellipsis: "..",
+    };
+  }
 };

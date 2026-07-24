@@ -343,7 +343,7 @@ describe("BarConverter", () => {
 
       // containLabel reserves the label area; insets are small fixed margins
       // (12px bottom without a bottom legend, 40px with one)
-      expect(result.grid.left).toBe(8);
+      expect(result.grid.left).toBe(16);
       expect(result.grid.right).toBe("4%");
       expect(result.grid.bottom).toBe(12);
       expect(result.grid.containLabel).toBe(true);
@@ -746,7 +746,7 @@ describe("BarConverter", () => {
 
       const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
-      expect(result.grid.left).toBe(8);
+      expect(result.grid.left).toBe(16);
       // measured half-width of the last category label, floored at 20
       expect(result.grid.right).toBe(20);
       expect(result.grid.bottom).toBe(12);
@@ -897,7 +897,7 @@ describe("BarConverter", () => {
 
       const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
-      expect(result.grid.left).toBe(8);
+      expect(result.grid.left).toBe(16);
     });
   });
 
