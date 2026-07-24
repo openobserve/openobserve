@@ -223,7 +223,13 @@ pub async fn lease_batch<C: ConnectionTrait>(
         return Ok(vec![]);
     }
 
-    // Step 2: mark them leased.
+    // Step 2: atomically claim. The `status = 0` guard makes this safe when
+    // multiple agents lease the SAME pool concurrently (the HA case — many
+    // agents per private location). Two agents can pick the same candidate id
+    // in step 1, but only ONE UPDATE flips a given row 0→1: the racing UPDATE
+    // blocks on the row lock, then re-evaluates `status = 0` (now false) and
+    // claims nothing for that row. Without this guard both would "win" the row
+    // and run the check twice (duplicate results).
     Entity::update_many()
         .col_expr(Column::Status, Expr::value(1i32))
         .col_expr(Column::ClaimedBy, Expr::value(claimed_by))
@@ -234,12 +240,18 @@ pub async fn lease_batch<C: ConnectionTrait>(
             Expr::col(Column::DispatchAttempts).add(1i32),
         )
         .filter(Column::Id.is_in(ids.clone()))
+        .filter(Column::Status.eq(0i32))
         .exec(conn)
         .await?;
 
-    // Step 3: return the leased rows (dispatch_attempts already incremented).
+    // Step 3: return ONLY the rows THIS call actually won — pinned by our
+    // (claimed_by, claimed_at) stamp. A racing agent that lost the guard above
+    // shares the candidate `ids` but did not stamp these rows, so it won't
+    // re-return them. (dispatch_attempts already incremented.)
     let models = Entity::find()
         .filter(Column::Id.is_in(ids))
+        .filter(Column::ClaimedBy.eq(claimed_by))
+        .filter(Column::ClaimedAt.eq(now_us))
         .all(conn)
         .await?;
 
