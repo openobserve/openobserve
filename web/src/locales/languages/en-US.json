@@ -5453,7 +5453,7 @@
       "modeWorkspace": "Favorites",
       "workspace": {
         "emptyScratchpadTitle": "You have no favorites yet",
-        "emptyScratchpadDesc": "Add metrics to your favorites in Explore (the ♥ on a card) to collect them here. When you want to keep them, Convert to a dashboard."
+        "emptyScratchpadDesc": "Add metrics to your favorites in Explore (the ★ on a card) to collect them here. When you want to keep them, Convert to a dashboard."
       },
       "visualizePlaceholder": "Visualize is coming soon — build a chart from a PromQL query, right here.",
       "railsAriaLabel": "Metric filters",
