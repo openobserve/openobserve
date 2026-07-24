@@ -202,6 +202,9 @@ export default defineComponent({
           _isRowField: col._isRowField,
           _isTotalColumn: col._isTotalColumn,
           _totalColRightIndex: col._totalColRightIndex,
+          // Pivot: draw a left divider on this column's body cells so the body
+          // vertical dividers line up with the header group boundaries.
+          _pivotGroupBorder: col._pivotGroupBorder,
         },
       })),
     );
