@@ -61,6 +61,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+// Explicit name so <keep-alive :include> in RealUserMonitoring.vue matches this
+// view. Without it the name is inferred from the FILENAME, so renaming the file
+// would silently drop it from the cache and bring back the refetch-on-return.
+defineOptions({ name: "ErrorViewer" });
+
 import { computed, onActivated, ref } from "vue";
 import ErrorHeader from "@/components/rum/errorTracking/view/ErrorHeader.vue";
 import ErrorTags from "@/components/rum/errorTracking/view/ErrorTags.vue";

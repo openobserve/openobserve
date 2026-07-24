@@ -415,10 +415,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+// Explicit name so <keep-alive :include> in RealUserMonitoring.vue matches this
+// view. Without it the name is inferred from the FILENAME, so renaming the file
+// would silently drop it from the cache and bring back the refetch-on-return.
+defineOptions({ name: "AppSessions" });
+
 import {
   ref,
   onMounted,
   onBeforeUnmount,
+  onActivated,
+  onDeactivated,
   type Ref,
   onBeforeMount,
   defineAsyncComponent,
@@ -745,10 +752,34 @@ onMounted(async () => {
 // server holds a slot in its per-user/per-org work-group concurrency queue until each
 // request completes, so an abandoned fan-out keeps starving the tab the user just moved
 // to — which then queues, gets cancelled, and surfaces as HTTP 429.
-onBeforeUnmount(() => {
+function releaseInFlightSearches() {
   inFlightLoad?.abort();
   inFlightLoad = null;
   cancelPendingActivityQueries();
+}
+
+onBeforeUnmount(releaseInFlightSearches);
+
+// This view is kept alive, so navigating to a session detail page DEACTIVATES it rather
+// than unmounting it — onBeforeUnmount does not run. Without this the searches started
+// here would keep holding work-group slots while the detail page runs its own.
+onDeactivated(releaseInFlightSearches);
+
+// Returning from a session detail page: show what is already on screen. The rows, the
+// KPI strip and the scroll position all survived in the cache, so re-querying would only
+// spend the user's search budget to repaint the same thing. Reload only when the last
+// attempt did not leave a usable result (first activation, or a failed/aborted load).
+// Vue fires onActivated on the FIRST mount as well as on every return from the cache.
+// onMounted already owns the initial load (it must await getStreamFields first), so the
+// first activation is skipped — otherwise entering the tab would fire the query chain
+// twice, which is exactly the duplicate load this page was just fixed for.
+let activatedBefore = false;
+onActivated(() => {
+  if (!activatedBefore) {
+    activatedBefore = true;
+    return;
+  }
+  if (!hasCompleteResult.value) getSessions();
 });
 
 const getStreamFields = () => {
@@ -841,6 +872,11 @@ const getStreamFields = () => {
 // a genuine re-query (date change, refresh) correct — newest wins, rather than being
 // dropped by an "is something in flight?" guard.
 let inFlightLoad: AbortController | null = null;
+
+// True once a load has produced a usable result. Drives the keep-alive return path: the
+// view is cached now, so coming back from a session detail page must SHOW what was
+// already fetched rather than re-running the whole query chain.
+const hasCompleteResult = ref(false);
 
 // Aborting rejects every pending request; those are OUR cancellations, not failures, so
 // they must not raise error toasts or paint SQL error squiggles.
@@ -954,6 +990,7 @@ const getSessions = () => {
     .then((res) => {
       const hits = res.data.hits;
 
+      hasCompleteResult.value = true;
       if (hits.length === 0) {
         rows.value = [];
         // Nothing matched the window and filter, so every follow-up query is answerable
@@ -991,6 +1028,8 @@ const getSessions = () => {
       // A superseded load is not a failure — leave the rows and the editor alone so the
       // load that replaced it can paint its own results.
       if (isAbortError(err)) return;
+      // A failed load leaves nothing worth restoring, so allow a retry on re-activation.
+      hasCompleteResult.value = false;
       rows.value = [];
       toast({
         message: err.response?.data?.message || "Error while fetching sessions",

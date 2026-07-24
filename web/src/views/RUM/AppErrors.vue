@@ -223,12 +223,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+// Explicit name so <keep-alive :include> in RealUserMonitoring.vue matches this
+// view. Without it the name is inferred from the FILENAME, so renaming the file
+// would silently drop it from the cache and bring back the refetch-on-return.
+defineOptions({ name: "AppErrors" });
+
 import {
   computed,
   nextTick,
   onBeforeMount,
   onMounted,
   onBeforeUnmount,
+  onActivated,
+  onDeactivated,
   ref,
   type Ref,
   defineAsyncComponent,
@@ -580,6 +587,24 @@ onMounted(async () => {
 // and come back cancelled as HTTP 429.
 onBeforeUnmount(() => {
   cancelAll();
+});
+
+// This view is kept alive, so leaving it DEACTIVATES rather than unmounts —
+// onBeforeUnmount does not fire and its searches would keep holding work-group slots.
+onDeactivated(() => {
+  cancelAll();
+});
+
+// Returning from an error detail page shows the issues already fetched instead of
+// re-running the five-query chain. onActivated also fires on the first mount, where
+// onMounted already owns the initial load, so that first call is skipped.
+let activatedBefore = false;
+onActivated(() => {
+  if (!activatedBefore) {
+    activatedBefore = true;
+    return;
+  }
+  if (!issues.value?.length) runQuery();
 });
 
 
