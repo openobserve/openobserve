@@ -1431,7 +1431,7 @@ async fn get_super_cluster_nodes(regions: &[String]) -> Result<NodeListResponse,
         let cluster_name = cluster.get_cluster();
 
         // Fetch child nodes from this cluster
-        match openobserve_core::node::get_node_list(&trace_id, cluster).await {
+        match openobserve_node::node::get_node_list(&trace_id, cluster).await {
             Ok(cluster_nodes) => {
                 for node in cluster_nodes {
                     response.add_node(node.clone(), region.clone(), cluster_name.clone());
@@ -1502,7 +1502,7 @@ async fn get_super_cluster_info(regions: &[String]) -> Result<ClusterInfoRespons
         let cluster_name = cluster.get_cluster();
 
         // Fetch cluster info from this cluster node
-        match openobserve_core::cluster_info::get_super_cluster_info(&trace_id, cluster).await {
+        match openobserve_node::cluster_info::get_super_cluster_info(&trace_id, cluster).await {
             Ok(cluster_info_obj) => {
                 response.add_cluster_info(cluster_info_obj, cluster_name.clone(), region.clone());
             }
