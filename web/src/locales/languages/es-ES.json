@@ -2222,6 +2222,7 @@
       "linkPartial": "Vinculado a {ok} alerta(s), {failed} fallaron",
       "linkError": "No se pueden vincular las alertas."
     },
+    "chooseTrigger": "Elige un disparador",
     "node": {
       "kindTrigger": "Disparador",
       "kindLogic": "Lógica",
@@ -2378,6 +2379,11 @@
     "deleteNodeTitle": "Eliminar nodo",
     "deleteNodeLlmEvalConfirm": "¿Está seguro de que desea eliminar este nodo de evaluación de LLM?",
     "cancel": "Cancelar",
+    "collapseNodes": "Contraer nodos",
+    "openNodes": "Abrir nodos",
+    "chooseSource": "Elige una fuente",
+    "sourceStreamDesc": "Procesa datos en tiempo real según se ingieren en un flujo",
+    "sourceQueryDesc": "Ejecuta una consulta programada y procesa sus resultados",
     "promqlOnlyForMetrics": "PromQL solo está disponible para el tipo de flujo de métricas",
     "invalidCronExpression": "Expresión cron no válida",
     "cronRequired": "La expresión cron es obligatoria",
@@ -3326,6 +3332,8 @@
     "seriesName": "Nombre de la serie",
     "seriesValue": "Valor de la serie",
     "axisValue": "Valor del eje",
+    "expandAllSections": "Expandir todas las secciones",
+    "collapseAllSections": "Contraer todas las secciones",
     "configSectionGeneral": "General",
     "configSectionPromqlTable": "Modo de tabla PromQL",
     "configSectionGeographic": "Configuración geográfica",
@@ -7730,7 +7738,11 @@
     "agentGraph": {
       "allAgents": "Todos los agentes",
       "stream": "Stream",
-      "agent": "Agente"
+      "agent": "Agente",
+      "noAgentsTitle": "No se encontraron agentes",
+      "noAgentsDescription": "No se descubrieron agentes en este rango de tiempo. Intenta ampliar el rango de tiempo o verifica que tus trazas incluyan atributos de agente gen_ai.",
+      "agentCountSingular": "agente",
+      "agentCountPlural": "agentes"
     },
     "kpi": {
       "totalCost": "Coste total",
@@ -9381,6 +9393,8 @@
     "dialog": {
       "bulkDeleteBody": "¿Está seguro de que desea eliminar {count} verificación(es)? Esta acción no se puede deshacer.",
       "bulkDeleteTitle": "Eliminar verificaciones",
+      "deleteSingleBody": "¿Estás seguro de que quieres eliminar \"{name}\"? Esta acción no se puede deshacer.",
+      "deleteSingleTitle": "Eliminar verificación",
       "duplicateTitle": "Duplicar verificación"
     },
     "empty": {
@@ -9574,6 +9588,7 @@
       "httpDesc": "Verificar endpoints, códigos de estado y cuerpos de respuesta",
       "leave": "Salir",
       "loadEditFailed": "Error al cargar la verificación para editar — el formulario muestra valores predeterminados, no guarde",
+      "notFoundInOrg": "Esta verificación no existe en la organización actual.",
       "modalSubtitle": "Elija lo que desea monitorear",
       "modalTitle": "Crear una verificación",
       "pageTitle": "Nueva verificación {label}",
@@ -9693,6 +9708,7 @@
       "failed": "Falló",
       "failedRuns": "Ejecuaciones fallidas",
       "jumpToLastRun": "Ir a la última ejecución",
+      "jumpToLatestData": "Ir a los datos más recientes",
       "lastRun": "Última ejecución",
       "location": "Ubicación",
       "monitors": "Monitores",
@@ -10022,7 +10038,8 @@
       "nameRequired": "El nombre es obligatorio",
       "selectorRequired": "El selector es obligatorio para \"{step}\"",
       "urlInvalid": "Ingrese una URL válida que comience con http:// o https://",
-      "urlRequired": "La URL de inicio es obligatoria"
+      "urlRequired": "La URL de inicio es obligatoria",
+      "fixHighlightedFields": "Corrige los campos resaltados antes de guardar"
     },
     "privateLocations": {
       "searchPlaceholder": "Buscar ubicaciones...",
@@ -10209,6 +10226,8 @@
       "panelEditorQueryInspector": "Abrir inspector de consultas",
       "metricsRunQuery": "Ejecute la consulta PromQL",
       "metricsRefresh": "Refrescar",
+      "metricsAddToDashboard": "Añadir al panel",
+      "metricsCopyUrl": "Copiar enlace de compartir",
       "tracesSearch": "Rastros de búsqueda",
       "tracesRefresh": "Refrescar",
       "alertsCreate": "Crear nueva alerta",

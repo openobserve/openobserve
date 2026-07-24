@@ -2222,6 +2222,7 @@
       "linkPartial": "Đã liên kết với {ok} cảnh báo, {failed} thất bại",
       "linkError": "Không thể liên kết cảnh báo."
     },
+    "chooseTrigger": "Chọn một trình kích hoạt",
     "node": {
       "kindTrigger": "Trình kích hoạt",
       "kindLogic": "Logic",
@@ -2378,6 +2379,11 @@
     "deleteNodeTitle": "Xóa nút",
     "deleteNodeLlmEvalConfirm": "Bạn có chắc chắn muốn xóa nút đánh giá LLM này?",
     "cancel": "Hủy",
+    "collapseNodes": "Thu gọn các nút",
+    "openNodes": "Mở các nút",
+    "chooseSource": "Chọn một nguồn",
+    "sourceStreamDesc": "Xử lý dữ liệu theo thời gian thực khi nó được đưa vào luồng",
+    "sourceQueryDesc": "Chạy truy vấn theo lịch và xử lý kết quả",
     "promqlOnlyForMetrics": "PromQL chỉ khả dụng cho loại luồng số liệu",
     "invalidCronExpression": "Biểu thức cron không hợp lệ",
     "cronRequired": "Yêu cầu biểu thức cron",
@@ -3326,6 +3332,8 @@
     "seriesName": "Tên chuỗi",
     "seriesValue": "Giá trị chuỗi",
     "axisValue": "Giá trị trục",
+    "expandAllSections": "Mở rộng tất cả các phần",
+    "collapseAllSections": "Thu gọn tất cả các phần",
     "configSectionGeneral": "Chung",
     "configSectionPromqlTable": "Chế độ bảng PromQL",
     "configSectionGeographic": "Cấu hình địa lý",
@@ -7730,7 +7738,11 @@
     "agentGraph": {
       "allAgents": "Tất cả tác nhân",
       "stream": "Luồng",
-      "agent": "Tác nhân"
+      "agent": "Tác nhân",
+      "noAgentsTitle": "Không tìm thấy tác nhân nào",
+      "noAgentsDescription": "Không có tác nhân nào được phát hiện trong khoảng thời gian này. Hãy thử mở rộng khoảng thời gian hoặc kiểm tra xem dấu vết của bạn có bao gồm các thuộc tính tác nhân gen_ai không.",
+      "agentCountSingular": "tác nhân",
+      "agentCountPlural": "các tác nhân"
     },
     "kpi": {
       "totalCost": "Tổng chi phí",
@@ -9381,6 +9393,8 @@
     "dialog": {
       "bulkDeleteBody": "Bạn có chắc chắn muốn xóa {count} (các) kiểm tra? Hành động này không thể hoàn tác.",
       "bulkDeleteTitle": "Xóa kiểm tra",
+      "deleteSingleBody": "Bạn có chắc chắn muốn xóa \"{name}\"? Hành động này không thể hoàn tác.",
+      "deleteSingleTitle": "Xóa kiểm tra",
       "duplicateTitle": "Nhân bản kiểm tra"
     },
     "empty": {
@@ -9574,6 +9588,7 @@
       "httpDesc": "Kiểm tra điểm cuối, mã trạng thái và nội dung phản hồi",
       "leave": "Rời đi",
       "loadEditFailed": "Không thể tải kiểm tra để chỉnh sửa — biểu mẫu hiển thị mặc định, không lưu",
+      "notFoundInOrg": "Kiểm tra này không tồn tại trong tổ chức hiện tại.",
       "modalSubtitle": "Chọn những gì bạn muốn giám sát",
       "modalTitle": "Tạo kiểm tra",
       "pageTitle": "Kiểm tra {label} mới",
@@ -9693,6 +9708,7 @@
       "failed": "Thất bại",
       "failedRuns": "Các lần chạy thất bại",
       "jumpToLastRun": "Chuyển đến lần chạy cuối",
+      "jumpToLatestData": "Chuyển đến dữ liệu mới nhất",
       "lastRun": "Lần chạy cuối",
       "location": "Vị trí",
       "monitors": "Theo dõi",
@@ -10022,7 +10038,8 @@
       "nameRequired": "Tên là bắt buộc",
       "selectorRequired": "Bộ chọn là bắt buộc cho \"{step}\"",
       "urlInvalid": "Nhập URL hợp lệ bắt đầu bằng http:// hoặc https://",
-      "urlRequired": "URL bắt đầu là bắt buộc"
+      "urlRequired": "URL bắt đầu là bắt buộc",
+      "fixHighlightedFields": "Sửa các trường được đánh dấu trước khi lưu"
     },
     "privateLocations": {
       "searchPlaceholder": "Tìm kiếm vị trí...",
@@ -10209,6 +10226,8 @@
       "panelEditorQueryInspector": "Mở trình kiểm tra truy vấn",
       "metricsRunQuery": "Chạy truy vấn PromQL",
       "metricsRefresh": "Làm mới",
+      "metricsAddToDashboard": "Thêm vào bảng điều khiển",
+      "metricsCopyUrl": "Sao chép liên kết chia sẻ",
       "tracesSearch": "Chạy truy vấn",
       "tracesRefresh": "Làm mới",
       "alertsCreate": "Tạo cảnh báo mới",

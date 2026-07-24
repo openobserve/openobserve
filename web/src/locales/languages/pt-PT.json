@@ -2071,7 +2071,7 @@
   "workflow": {
     "header": "Fluxos de trabalho",
     "subtitle": "Automatize ações com gatilhos, lógica e destinos",
-    "create": "Novo fluxo de trabalho",
+    "create": "Novo workflow",
     "createTitle": "Criar fluxo de trabalho",
     "createConfirm": "Criar",
     "createSuccess": "Fluxo de trabalho criado com sucesso",
@@ -2222,6 +2222,7 @@
       "linkPartial": "Vinculado a {ok} alerta(s), {failed} falhou",
       "linkError": "Não foi possível vincular os alertas."
     },
+    "chooseTrigger": "Escolher um Gatilho",
     "node": {
       "kindTrigger": "Gatilho",
       "kindLogic": "Lógica",
@@ -2378,6 +2379,11 @@
     "deleteNodeTitle": "Excluir Node",
     "deleteNodeLlmEvalConfirm": "Tem certeza de que deseja excluir esse nó de avaliação do LLM?",
     "cancel": "Cancelar",
+    "collapseNodes": "Recolher Nós",
+    "openNodes": "Abrir Nós",
+    "chooseSource": "Escolher uma Fonte",
+    "sourceStreamDesc": "Processar dados em tempo real conforme são ingeridos em um stream",
+    "sourceQueryDesc": "Executar uma consulta em um cronograma e processar seus resultados",
     "promqlOnlyForMetrics": "O ProMQL só está disponível para o tipo de fluxo de métricas",
     "invalidCronExpression": "Expressão cron inválida",
     "cronRequired": "A expressão cron é obrigatória",
@@ -3326,6 +3332,8 @@
     "seriesName": "Nome da série",
     "seriesValue": "Valor da série",
     "axisValue": "Valor do eixo",
+    "expandAllSections": "Expandir todas as seções",
+    "collapseAllSections": "Recolher todas as seções",
     "configSectionGeneral": "Geral",
     "configSectionPromqlTable": "Modo de tabela ProMQL",
     "configSectionGeographic": "Configuração geográfica",
@@ -7730,7 +7738,11 @@
     "agentGraph": {
       "allAgents": "Todos os agentes",
       "stream": "Stream",
-      "agent": "Agente"
+      "agent": "Agente",
+      "noAgentsTitle": "Nenhum agente encontrado",
+      "noAgentsDescription": "Nenhum agente foi descoberto neste intervalo de tempo. Tente ampliar o intervalo ou verifique se seus traces incluem atributos de agente gen_ai.",
+      "agentCountSingular": "agente",
+      "agentCountPlural": "agentes"
     },
     "kpi": {
       "totalCost": "Custo total",
@@ -9381,6 +9393,8 @@
     "dialog": {
       "bulkDeleteBody": "Tem certeza de que deseja excluir {count} verificação(ões)? Esta ação não pode ser desfeita.",
       "bulkDeleteTitle": "Excluir verificações",
+      "deleteSingleBody": "Tem certeza de que deseja excluir \"{name}\"? Esta ação não pode ser desfeita.",
+      "deleteSingleTitle": "Excluir Verificação",
       "duplicateTitle": "Duplicar verificação"
     },
     "empty": {
@@ -9574,6 +9588,7 @@
       "httpDesc": "Verifique endpoints, códigos de status e corpos de resposta",
       "leave": "Sair",
       "loadEditFailed": "Falha ao carregar a verificação para edição — o formulário mostra valores padrão, não salve",
+      "notFoundInOrg": "Esta verificação não existe na organização atual.",
       "modalSubtitle": "Escolha o que deseja monitorar",
       "modalTitle": "Criar uma verificação",
       "pageTitle": "Nova verificação {label}",
@@ -9693,6 +9708,7 @@
       "failed": "Falhou",
       "failedRuns": "Execuções com falha",
       "jumpToLastRun": "Ir para última execução",
+      "jumpToLatestData": "Ir para os dados mais recentes",
       "lastRun": "Última corrida",
       "location": "Localização",
       "monitors": "Monitores",
@@ -10022,7 +10038,8 @@
       "nameRequired": "O nome é obrigatório",
       "selectorRequired": "Seletor é obrigatório para \"{step}\"",
       "urlInvalid": "Insira uma URL válida começando com http:// ou https://",
-      "urlRequired": "A URL inicial é obrigatória"
+      "urlRequired": "A URL inicial é obrigatória",
+      "fixHighlightedFields": "Corrija os campos destacados antes de salvar"
     },
     "privateLocations": {
       "searchPlaceholder": "Pesquisar localizações...",
@@ -10209,6 +10226,8 @@
       "panelEditorQueryInspector": "Abra o inspetor de consultas",
       "metricsRunQuery": "Executar consulta ProMQL",
       "metricsRefresh": "Atualizar",
+      "metricsAddToDashboard": "Adicionar ao painel",
+      "metricsCopyUrl": "Copiar link de compartilhamento",
       "tracesSearch": "Traços de pesquisa",
       "tracesRefresh": "Atualizar",
       "alertsCreate": "Criar novo alerta",

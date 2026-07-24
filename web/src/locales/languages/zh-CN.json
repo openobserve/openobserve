@@ -2222,6 +2222,7 @@
       "linkPartial": "已链接到 {ok} 个告警，{failed} 个失败",
       "linkError": "无法链接告警。"
     },
+    "chooseTrigger": "选择触发器",
     "node": {
       "kindTrigger": "触发器",
       "kindLogic": "逻辑",
@@ -2378,6 +2379,11 @@
     "deleteNodeTitle": "删除节点",
     "deleteNodeLlmEvalConfirm": "您确定要删除此 LLM 评估节点吗？",
     "cancel": "取消",
+    "collapseNodes": "折叠节点",
+    "openNodes": "展开节点",
+    "chooseSource": "选择数据源",
+    "sourceStreamDesc": "在数据被摄入流时实时处理",
+    "sourceQueryDesc": "按计划运行查询并处理其结果",
     "promqlOnlyForMetrics": "PromQL 仅适用于指标流类型",
     "invalidCronExpression": "无效的 cron 表达式",
     "cronRequired": "Cron 表达式为必填项",
@@ -3326,6 +3332,8 @@
     "seriesName": "系列名称",
     "seriesValue": "系列价值",
     "axisValue": "轴值",
+    "expandAllSections": "展开所有部分",
+    "collapseAllSections": "折叠所有部分",
     "configSectionGeneral": "普通的",
     "configSectionPromqlTable": "PromQL 表格模式",
     "configSectionGeographic": "地理配置",
@@ -7730,7 +7738,11 @@
     "agentGraph": {
       "allAgents": "所有代理",
       "stream": "流",
-      "agent": "代理"
+      "agent": "代理",
+      "noAgentsTitle": "未找到代理",
+      "noAgentsDescription": "在此时间范围内未发现任何代理。请尝试扩大时间范围，或检查您的追踪是否包含 gen_ai 代理属性。",
+      "agentCountSingular": "代理",
+      "agentCountPlural": "代理"
     },
     "kpi": {
       "totalCost": "总成本",
@@ -9381,6 +9393,8 @@
     "dialog": {
       "bulkDeleteBody": "确定要删除 {count} 个检查吗？此操作无法撤消。",
       "bulkDeleteTitle": "删除检查",
+      "deleteSingleBody": "您确定要删除“{name}”吗？此操作无法撤销。",
+      "deleteSingleTitle": "删除检查",
       "duplicateTitle": "复制检查"
     },
     "empty": {
@@ -9574,6 +9588,7 @@
       "httpDesc": "检查端点、状态码和响应体",
       "leave": "离开",
       "loadEditFailed": "加载检查进行编辑失败 — 表单显示默认值，请勿保存",
+      "notFoundInOrg": "此检查在当前组织中不存在。",
       "modalSubtitle": "选择您要监控的内容",
       "modalTitle": "创建检查",
       "pageTitle": "新建 {label} 检查",
@@ -9693,6 +9708,7 @@
       "failed": "失败",
       "failedRuns": "运行失败",
       "jumpToLastRun": "跳转到上次运行",
+      "jumpToLatestData": "跳转到最新数据",
       "lastRun": "最后一次运行",
       "location": "地点",
       "monitors": "显示器",
@@ -10022,7 +10038,8 @@
       "nameRequired": "名称是必填项",
       "selectorRequired": "“{step}”需要选择器",
       "urlInvalid": "输入以 http:// 或 https:// 开头的有效 URL",
-      "urlRequired": "起始 URL 是必填项"
+      "urlRequired": "起始 URL 是必填项",
+      "fixHighlightedFields": "保存前请修正高亮字段"
     },
     "privateLocations": {
       "searchPlaceholder": "搜索位置...",
@@ -10209,6 +10226,8 @@
       "panelEditorQueryInspector": "打开查询检查器",
       "metricsRunQuery": "运行 PromQL 查询",
       "metricsRefresh": "刷新",
+      "metricsAddToDashboard": "添加到仪表盘",
+      "metricsCopyUrl": "复制共享链接",
       "tracesSearch": "搜索痕迹",
       "tracesRefresh": "刷新",
       "alertsCreate": "创建新警报",
