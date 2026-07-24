@@ -1,6 +1,6 @@
 <template>
-  <aside class="eval-form-page__side eval-form-page__side--test p-0 max-[60rem]:border-l-0 max-[60rem]:border-t max-[60rem]:border-border-default">
-    <section class="eval-test-panel min-h-full p-5 bg-surface-base rounded-default border border-border-default">
+  <aside class="eval-form-page__side eval-form-page__side--test p-0 border-l border-border-default max-[68.75rem]:border-l-0 max-[68.75rem]:border-t max-[68.75rem]:border-border-default">
+    <section class="eval-test-panel min-h-full p-5">
       <!-- Header -->
       <div class="flex flex-col gap-1">
         <h3 class="m-0 text-text-heading text-sm font-bold">{{ t("onlineEvals.scorer.testPanel.title") }}</h3>

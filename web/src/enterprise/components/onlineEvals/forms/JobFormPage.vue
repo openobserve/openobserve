@@ -21,21 +21,8 @@
           }}
         </span>
       </template>
-      <template #actions>
-        <OButton
-          variant="ghost"
-          size="icon-sm"
-          icon-left="close"
-          :aria-label="t('onlineEvals.buttons.cancel')"
-          :title="t('onlineEvals.buttons.cancel')"
-          data-test="job-form-close-btn"
-          :disabled="isSubmitting"
-          @click="$emit('cancel')"
-        />
-      </template>
-
     <div
-      class="flex min-h-0 flex-1 gap-2 overflow-hidden max-[68.75rem]:flex-col"
+      class="flex min-h-0 flex-1 gap-0 overflow-hidden max-[68.75rem]:flex-col"
     >
       <div
         class="flex min-h-0 min-w-0 flex-[6.5] flex-col gap-2 overflow-auto p-2 [&_textarea]:max-h-50 [&_textarea]:overflow-y-auto max-[68.75rem]:flex-[1_1_auto]"

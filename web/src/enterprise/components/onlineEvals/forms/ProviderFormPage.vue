@@ -18,19 +18,6 @@
           {{ mode === "create" ? t("onlineEvals.provider.createTitle") : t("onlineEvals.provider.editTitle") }}
         </span>
       </template>
-      <template #actions>
-        <OButton
-          variant="ghost"
-          size="icon-sm"
-          icon-left="close"
-          :aria-label="t('onlineEvals.buttons.cancel')"
-          :title="t('onlineEvals.buttons.cancel')"
-          data-test="provider-form-close-btn"
-          :disabled="isSubmitting"
-          @click="$emit('cancel')"
-        />
-      </template>
-
     <div class="py-4.5 [&_textarea]:max-h-55 [&_textarea]:overflow-y-auto [&_textarea]:font-mono">
       <section class="mb-6">
         <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">

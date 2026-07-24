@@ -20,20 +20,7 @@
       <template #title>
         <span data-test="scorer-form-title">{{ titleText }}</span>
       </template>
-      <template #actions>
-        <OButton
-          variant="ghost"
-          size="icon-sm"
-          icon-left="close"
-          :aria-label="t('onlineEvals.buttons.cancel')"
-          :title="t('onlineEvals.buttons.cancel')"
-          data-test="scorer-form-close-btn"
-          :disabled="isSubmitting"
-          @click="$emit('cancel')"
-        />
-      </template>
-
-    <div class="flex-1 min-h-0 overflow-hidden grid grid-cols-[minmax(0,1.6fr)_minmax(20rem,0.9fr)] max-[68.75rem]:grid-cols-1 gap-2.5">
+    <div class="flex-1 min-h-0 overflow-hidden grid grid-cols-[minmax(0,1.6fr)_minmax(20rem,0.9fr)] max-[68.75rem]:grid-cols-1 gap-0">
       <!-- Plain scroll column, no card chrome: the sections inside are the
            cards now, so a bordered wrapper would frame them twice. Matches
            JobFormPage's left column. -->

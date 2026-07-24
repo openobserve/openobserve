@@ -1,5 +1,5 @@
 <template>
-  <aside class="flex-[3.5] min-w-0 overflow-auto p-2 bg-surface-base rounded-default border border-border-default">
+  <aside class="flex-[3.5] min-w-0 overflow-auto p-3 border-l border-border-default max-[68.75rem]:border-l-0 max-[68.75rem]:border-t max-[68.75rem]:border-border-default">
     <section
       class="py-3.5 px-4 mb-3 border border-dialog-header-border rounded-default"
       data-test="job-preview-matched-targets"
