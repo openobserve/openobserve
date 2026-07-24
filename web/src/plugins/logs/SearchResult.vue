@@ -265,12 +265,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <!-- Combined scroll area: histogram + logs/patterns scroll together -->
-      <div class="flex-1 overflow-auto" ref="scrollContainerRef">
+      <!-- The histogram is pinned in the logs view: this strip does not scroll,
+        the OTable below owns both scrollbars, so scrolling the log lines
+        sideways can never drag the chart out from under the toolbar. The
+        patterns view has no table of its own, so it keeps the older combined
+        scroll where the histogram scrolls away with the list. -->
+      <div
+        ref="scrollContainerRef"
+        :class="[
+          'flex-1 min-h-0',
+          searchObj.meta.logsVisualizeToggle === 'patterns'
+            ? 'overflow-auto'
+            : 'flex flex-col overflow-hidden',
+        ]"
+      >
         <div
           ref="histogramRef"
           :class="[
-            'histogram-container',
+            'histogram-container shrink-0',
             searchObj.meta.showHistogram
               ? 'histogram-container--visible'
               : 'histogram-container--hidden',
@@ -361,7 +373,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           :class="[
-            'histogram-container',
+            'histogram-container shrink-0',
             searchObj.meta.showHistogram
               ? 'histogram-container--visible'
               : 'histogram-container--hidden',
@@ -482,8 +494,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :row-key="logsTimestampCol"
             :row-height="24"
             virtual-scroll
-            :fill-height="false"
-            :scroll-el="scrollContainerRef"
+            :fill-height="true"
             :horizontal-scroll="true"
             :scroll-margin="0"
             :default-columns="false"
@@ -498,13 +509,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             expansion="multiple"
             :expanded-ids="expandedLogIds"
             data-test="logs-search-result-logs-table"
-            class="logs-results-otable w-full"
-            :class="[
-              !searchObj.meta.showHistogram ||
-              (searchObj.meta.showHistogram && searchObj.data.histogram.errorCode == -1)
-                ? 'min-h-full!'
-                : 'min-h-[calc(100%-6.25rem)]!',
-            ]"
+            class="logs-results-otable w-full flex-1 min-h-0"
             @update:columnSizes="handleColumnSizesUpdate"
             @column-order-change="handleColumnOrderUpdate"
             @close-column="closeColumn"
@@ -531,9 +536,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-hover-actions="{ row, column, active }">
               <O2AIContextAddBtn
                 v-if="active && column.id === logsTimestampCol"
-                size="icon-xs-circle"
-                image-height="14px"
-                image-width="14px"
                 data-test="logs-search-result-ai-btn"
                 @send-to-ai-chat="sendToAiChat(JSON.stringify(row), true)"
               />
@@ -1763,7 +1765,14 @@ export default defineComponent({
       return window.innerWidth - (leftSidebarMenu + fieldList) - 5;
     });
 
+    // In the logs view the OTable scrolls itself (the histogram above it is
+    // pinned), so a page change has to reset the table's own scroll element
+    // rather than the pane. The patterns view still scrolls as a whole.
     const scrollTableToTop = (value: number) => {
+      if (searchObj.meta.logsVisualizeToggle !== "patterns") {
+        searchTableRef.value?.scrollToTop?.();
+        return;
+      }
       scrollContainerRef.value?.scrollTo({ top: value });
     };
 
