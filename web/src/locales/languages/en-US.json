@@ -8113,7 +8113,6 @@
       "archived": "Archived"
     },
     "summaryAll": "All",
-    "comingSoon": "Soon",
     "buttons": {
       "cancel": "Cancel",
       "close": "Close",
@@ -8124,17 +8123,13 @@
     },
     "scorerTypeDialog": {
       "title": "Create a New Scorer",
-      "intro": "Choose the scorer type. All three are first-class options — pick whichever fits how you want to author and run it.",
+      "intro": "Choose the scorer type. Both are first-class options — pick whichever fits how you want to author and run it.",
       "llmJudgeTitle": "LLM Judge",
       "llmJudgeDescription": "Use a language model — via a Provider you've configured — to evaluate semantically.",
       "llmJudgeCta": "Configure Judge",
       "remoteTitle": "Remote",
       "remoteDescription": "Call your own HTTP endpoint — keep evaluation logic inside your environment.",
-      "remoteCta": "Configure Endpoint",
-      "codeTitle": "Code",
-      "codeDescription": "Write a Python or JavaScript scoring function and push it from your local environment.",
-      "codeCta": "Available in a future release",
-      "comingSoonBadge": "Coming Soon"
+      "remoteCta": "Configure Endpoint"
     },
     "provider": {
       "backTo": "Back to Providers",
@@ -8417,7 +8412,6 @@
       "backTo": "Back to Scorers",
       "badgeRemote": "Remote",
       "badgeLlm": "LLM Judge",
-      "badgeCode": "Code",
       "createTitleRemote": "New Remote Scorer",
       "createTitleLlm": "New LLM Judge Scorer",
       "editTitleRemote": "Update Remote Scorer",

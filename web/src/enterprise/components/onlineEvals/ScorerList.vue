@@ -341,17 +341,6 @@ const summaryStats = computed<StatItem[]>(() => {
       max: share,
       dataTest: "scorer-summary-remote",
     },
-    // Code scorers are on the roadmap — shown as a muted, non-clickable preview
-    // tile ("Soon") so the type is visible without pretending to be a filter yet.
-    {
-      key: "code",
-      label: t("onlineEvals.scorer.badgeCode"),
-      value: t("onlineEvals.comingSoon"),
-      icon: "code",
-      tone: "neutral",
-      selectable: false,
-      dataTest: "scorer-summary-code",
-    },
     {
       key: "all",
       label: t("onlineEvals.summaryAll"),

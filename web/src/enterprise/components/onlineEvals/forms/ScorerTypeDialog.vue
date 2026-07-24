@@ -34,7 +34,7 @@
 
       <p class="m-0 mb-4 text-text-secondary text-compact leading-normal">{{ t("onlineEvals.scorerTypeDialog.intro") }}</p>
 
-      <div class="grid grid-cols-3 max-[720px]:grid-cols-1 gap-3">
+      <div class="grid grid-cols-2 max-[720px]:grid-cols-1 gap-3">
         <button
           type="button"
           class="relative flex flex-col items-start gap-2.5 min-h-45 py-4 px-4 pb-3.5 border border-(--color-dialog-header-border,var(--color-border-default)) rounded-default bg-card-bg text-(--color-text-heading,currentColor) text-left cursor-pointer transition-[border-color,background,box-shadow] duration-[120ms] hover:border-(--color-primary-600,#3F7994) hover:bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))] hover:shadow-[0_0_0_3px_color-mix(in_srgb,var(--color-primary-600)_12%,transparent)]"
@@ -77,28 +77,6 @@
           </div>
         </button>
 
-        <button
-          type="button"
-          class="relative flex flex-col items-start gap-2.5 min-h-45 py-4 px-4 pb-3.5 border border-(--color-dialog-header-border,var(--color-border-default)) rounded-default bg-card-bg text-(--color-text-heading,currentColor) text-left cursor-not-allowed opacity-60 transition-[border-color,background,box-shadow] duration-[120ms]"
-          data-test="scorer-type-code"
-          disabled
-        >
-          <span class="absolute top-3 right-3 py-0.5 px-2 rounded-default text-2xs font-semibold leading-normal bg-[color-mix(in_srgb,var(--color-status-warning-text)_14%,transparent)] text-status-warning-text">
-            {{ t("onlineEvals.scorerTypeDialog.comingSoonBadge") }}
-          </span>
-          <div class="inline-flex items-center justify-center w-9 h-9 rounded-default bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] text-(--color-primary-600,#3F7994)">
-            <OIcon name="code" size="md" />
-          </div>
-          <div class="text-sm font-semibold text-(--color-text-heading,currentColor)">
-            {{ t("onlineEvals.scorerTypeDialog.codeTitle") }}
-          </div>
-          <div class="flex-1 text-xs leading-normal text-(--color-text-secondary,var(--color-text-secondary))">
-            {{ t("onlineEvals.scorerTypeDialog.codeDescription") }}
-          </div>
-          <div class="inline-flex items-center gap-1 mt-auto text-xs font-semibold text-(--color-text-secondary,var(--color-text-secondary))">
-            {{ t("onlineEvals.scorerTypeDialog.codeCta") }}
-          </div>
-        </button>
       </div>
     </div>
   </div>
