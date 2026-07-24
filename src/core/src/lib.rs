@@ -51,7 +51,6 @@ pub mod pipeline;
 pub mod providers;
 #[cfg(feature = "enterprise")]
 pub mod ratelimit;
-pub mod schema_watcher;
 use search_service as search;
 pub mod self_reporting;
 pub mod service;
