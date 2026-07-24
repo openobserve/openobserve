@@ -50,6 +50,7 @@ search.workspace = true
 search_service.workspace = true
 tantivy_utils.workspace = true
 anyhow.workspace = true
+async-trait.workspace = true
 arrow.workspace = true
 arrow-schema.workspace = true
 bytes.workspace = true

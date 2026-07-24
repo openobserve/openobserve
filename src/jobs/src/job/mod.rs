@@ -65,6 +65,20 @@ mod service_graph;
 mod session_cleanup;
 mod stats;
 
+struct CompactionStreamDataCleanup;
+
+#[async_trait::async_trait]
+impl openobserve_core::org_cleanup::StreamDataCleanup for CompactionStreamDataCleanup {
+    async fn delete_stream_data(
+        &self,
+        org_id: &str,
+        stream_type: config::meta::stream::StreamType,
+        stream_name: &str,
+    ) -> Result<(), anyhow::Error> {
+        compaction::retention::delete_all(org_id, stream_type, stream_name).await
+    }
+}
+
 #[cfg(feature = "enterprise")]
 async fn patch_sre_readonly_alerts_incidents() {
     use bytes::Bytes;
@@ -1046,7 +1060,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         // to fetch tasks and a per-task CAS guards execution; the promotion sweep uses
         // an atomic status CAS — so multiple compactors remain safe, just less
         // contended. (The org_status cache watch loop stays on every node — see below.)
-        tokio::task::spawn(openobserve_core::org_cleanup::run());
+        tokio::task::spawn(openobserve_core::org_cleanup::run(std::sync::Arc::new(
+            CompactionStreamDataCleanup,
+        )));
         tokio::task::spawn(openobserve_core::org_cleanup::run_promotion_scheduler());
     }
 

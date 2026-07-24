@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::spawn_pausable_job;
+use std::sync::Arc;
+
+use async_trait::async_trait;
+use config::{meta::stream::StreamType, spawn_pausable_job};
 use infra::{dist_lock, table::org_cleanup_tasks};
 
 const LOCK_KEY: &str = "/org_cleanup/worker_lock";
@@ -32,6 +35,20 @@ const ORDER_DELETE_SCHEDULER_TRIGGERS: i32 = 400;
 const ORDER_DELETE_USERS: i32 = 600;
 // Final step: remove the org record + OFGA tuples via the canonical delete path.
 const ORDER_DELETE_ORG_RECORD: i32 = 900;
+
+/// Deletes the physical data for a stream during organization cleanup.
+///
+/// The cleanup workflow owns orchestration and schema removal, while the binary
+/// wires in the data-lifecycle implementation used by its compactor.
+#[async_trait]
+pub trait StreamDataCleanup: Send + Sync {
+    async fn delete_stream_data(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+    ) -> Result<(), anyhow::Error>;
+}
 
 /// Grace-period length in days. Enterprise config; OSS builds have no grace period
 /// (deletion is cloud-only). `0` = delete immediately (legacy behavior).
@@ -72,7 +89,7 @@ pub fn fixed_steps(org_id: &str, org_name: &str) -> Vec<org_cleanup_tasks::NewCl
     .collect()
 }
 
-pub async fn run() -> Result<(), anyhow::Error> {
+pub async fn run(stream_data_cleanup: Arc<dyn StreamDataCleanup>) -> Result<(), anyhow::Error> {
     // A compactor that crashed mid-step leaves its task marked 'running'. Since
     // list_pending only returns pending/failed rows, such a task would never be
     // re-picked and the deletion would stall forever. Reset stale 'running' rows
@@ -88,12 +105,12 @@ pub async fn run() -> Result<(), anyhow::Error> {
     }
 
     spawn_pausable_job!("org_cleanup_worker", POLL_INTERVAL_SECS, {
-        run_once().await;
+        run_once(Arc::clone(&stream_data_cleanup)).await;
     });
     Ok(())
 }
 
-async fn run_once() {
+async fn run_once(stream_data_cleanup: Arc<dyn StreamDataCleanup>) {
     let locker = match dist_lock::lock(LOCK_KEY, 0).await {
         Ok(l) => l,
         Err(e) => {
@@ -125,7 +142,10 @@ async fn run_once() {
         .into_values()
         .map(|mut org_tasks| {
             org_tasks.sort_by_key(|t| t.step_order);
-            tokio::spawn(process_org_tasks(org_tasks))
+            tokio::spawn(process_org_tasks(
+                org_tasks,
+                Arc::clone(&stream_data_cleanup),
+            ))
         })
         .collect();
 
@@ -138,7 +158,10 @@ async fn run_once() {
     }
 }
 
-async fn process_org_tasks(tasks: Vec<org_cleanup_tasks::CleanupTask>) {
+async fn process_org_tasks(
+    tasks: Vec<org_cleanup_tasks::CleanupTask>,
+    stream_data_cleanup: Arc<dyn StreamDataCleanup>,
+) {
     for task in &tasks {
         let predecessors_done =
             match org_cleanup_tasks::list_by_org_status(&task.org_id, None).await {
@@ -198,7 +221,13 @@ async fn process_org_tasks(tasks: Vec<org_cleanup_tasks::CleanupTask>) {
             task.attempts + 1
         );
 
-        let result = execute_step(&task.org_id, &task.org_name, &task.step).await;
+        let result = execute_step(
+            &task.org_id,
+            &task.org_name,
+            &task.step,
+            stream_data_cleanup.as_ref(),
+        )
+        .await;
 
         match result {
             Ok(()) => {
@@ -258,11 +287,16 @@ async fn emit_failed_alert(org_id: &str, _step: &str) {
     }
 }
 
-async fn execute_step(org_id: &str, org_name: &str, step: &str) -> Result<(), anyhow::Error> {
+async fn execute_step(
+    org_id: &str,
+    org_name: &str,
+    step: &str,
+    stream_data_cleanup: &dyn StreamDataCleanup,
+) -> Result<(), anyhow::Error> {
     if step == "delete_streams" {
         step_delete_streams(org_id, org_name).await
     } else if let Some(rest) = step.strip_prefix("delete_stream:") {
-        step_delete_stream(org_id, rest).await
+        step_delete_stream(org_id, rest, stream_data_cleanup).await
     } else if step == "delete_file_list" {
         step_delete_file_list(org_id).await
     } else if step == "delete_db_resources" {
@@ -303,22 +337,22 @@ async fn step_delete_streams(org_id: &str, org_name: &str) -> Result<(), anyhow:
     Ok(())
 }
 
-async fn step_delete_stream(org_id: &str, type_and_name: &str) -> Result<(), anyhow::Error> {
-    use config::meta::stream::StreamType;
-
+async fn step_delete_stream(
+    org_id: &str,
+    type_and_name: &str,
+    stream_data_cleanup: &dyn StreamDataCleanup,
+) -> Result<(), anyhow::Error> {
     let (stream_type_str, stream_name) = type_and_name
         .split_once('/')
         .ok_or_else(|| anyhow::anyhow!("invalid stream key: {type_and_name}"))?;
 
     let stream_type = StreamType::from(stream_type_str);
 
-    // Reuse the compactor's stream-deletion primitive instead of hand-rolling a
-    // file_list scan. It removes local-disk files, file_list rows, and dump files
-    // over the canonical (BASE_TIME, now) range — avoiding the invalid/overflowing
-    // (0, i64::MAX) range that query_for_dump rejects.
-    compaction::retention::delete_all(org_id, stream_type, stream_name).await?;
+    stream_data_cleanup
+        .delete_stream_data(org_id, stream_type, stream_name)
+        .await?;
 
-    // Delete the schema entry (delete_all removes data, not the stream definition).
+    // Delete the schema entry after the injected cleanup removes the stream data.
     crate::db::schema::delete(org_id, stream_name, Some(stream_type)).await?;
 
     Ok(())
@@ -859,6 +893,20 @@ pub async fn run_promotion_scheduler() -> Result<(), anyhow::Error> {
 mod tests {
     use super::*;
 
+    struct FailingStreamDataCleanup;
+
+    #[async_trait]
+    impl StreamDataCleanup for FailingStreamDataCleanup {
+        async fn delete_stream_data(
+            &self,
+            _org_id: &str,
+            _stream_type: StreamType,
+            _stream_name: &str,
+        ) -> Result<(), anyhow::Error> {
+            Err(anyhow::anyhow!("stream cleanup failed"))
+        }
+    }
+
     #[test]
     fn test_grace_period_days_non_negative() {
         assert!(grace_period_days() >= 0);
@@ -944,6 +992,14 @@ mod tests {
         const { assert!(ORDER_DELETE_SCHEDULER_TRIGGERS < ORDER_DELETE_USERS) };
         // delete_org_record (OFGA + org record + billing-free precondition) runs last.
         const { assert!(ORDER_DELETE_USERS < ORDER_DELETE_ORG_RECORD) };
+    }
+
+    #[tokio::test]
+    async fn test_delete_stream_propagates_data_cleanup_error() {
+        let err = step_delete_stream("org", "logs/stream", &FailingStreamDataCleanup)
+            .await
+            .unwrap_err();
+        assert_eq!(err.to_string(), "stream cleanup failed");
     }
 
     #[cfg(feature = "enterprise")]
