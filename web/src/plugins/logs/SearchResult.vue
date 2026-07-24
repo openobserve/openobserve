@@ -2272,6 +2272,9 @@ export default defineComponent({
    "On Logs font style is changed". */
 .logs-results-otable :deep(td[data-test^="o2-table-cell-"]) {
   font-family: var(--font-mono);
+  /* Match main's log cell size (--text-xs). OTable cells set no explicit size,
+     so they'd otherwise inherit a larger ambient font and read as too big. */
+  font-size: var(--text-xs);
 }
 
 /* keep(generated-content): pin-breakdown tooltip. The rows are built from data
