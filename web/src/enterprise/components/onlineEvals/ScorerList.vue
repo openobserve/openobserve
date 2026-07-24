@@ -366,7 +366,9 @@ const summaryStats = computed<StatItem[]>(() => {
 // the "All" tile clears the facet but is never itself the active tile.
 const selectedStatKey = computed(() => typeFilter.value);
 function onStatSelect(key: string) {
-  typeFilter.value = key === "all" ? null : (key as ScorerType);
+  // Re-clicking the active tile clears the filter (toggle), matching the Alerts strip.
+  typeFilter.value =
+    key === "all" || typeFilter.value === key ? null : (key as ScorerType);
 }
 
 // When the org has no providers AND no scorers yet, surface a dedicated

@@ -453,7 +453,9 @@ export default defineComponent({
     // Total clears the severity filter (and is never highlighted, like Alerts);
     // the severity tiles set the facet.
     const onSeveritySelect = (key: string) => {
-      severityFilter.value = key === "total" ? "all" : key;
+      // Re-clicking the active severity clears back to "all" (toggle), like the Alerts strip.
+      severityFilter.value =
+        key === "total" || severityFilter.value === key ? "all" : key;
     };
 
     // Extreme-left rail coloured by severity (P1 red … P4 blue); resolved rows

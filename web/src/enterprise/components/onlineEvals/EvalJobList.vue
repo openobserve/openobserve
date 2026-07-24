@@ -413,7 +413,9 @@ const summaryStats = computed<StatItem[]>(() => {
 // the "All" tile clears the facet but is never itself the active tile.
 const selectedStatKey = computed(() => statusFilter.value);
 function onStatSelect(key: string) {
-  statusFilter.value = key === "all" ? null : (key as EvalJobStatus);
+  // Re-clicking the active tile clears the filter (toggle), matching the Alerts strip.
+  statusFilter.value =
+    key === "all" || statusFilter.value === key ? null : (key as EvalJobStatus);
 }
 
 // Extreme-left status rail (mirrors the Incidents rail) — reads "does this job
