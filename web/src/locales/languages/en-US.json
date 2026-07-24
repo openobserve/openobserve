@@ -4603,7 +4603,6 @@
     "lastSuccessfulAt": "Last Successfull At",
     "lastTrainedAt": "Last Trained At",
     "status": "Status",
-    "state": "State",
     "stateActive": "Active",
     "statePaused": "Paused",
     "stateFailed": "Failed",

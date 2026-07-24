@@ -433,6 +433,8 @@ export interface OTableSlots<TData = any> {
   toolbar?: () => any;
   /** Trailing toolbar actions rendered AFTER the auto-injected column toggle (e.g. a refresh button). */
   "toolbar-trailing"?: () => any;
+  /** Full-width content between the toolbar and the table body (e.g. a summary-stat strip). */
+  subheader?: () => any;
   /** Content below the table (above pagination). Scoped with pagination state. */
   bottom?: (props: {
     currentPage: number;
