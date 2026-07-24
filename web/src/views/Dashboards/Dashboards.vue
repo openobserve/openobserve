@@ -1215,8 +1215,7 @@ export default defineComponent({
     const dashboards = computed(function () {
       // Favorites view is folder-independent, but yield to an active
       // cross-folder search so results from all folders show.
-      const crossFolderSearchActive =
-        searchAcrossFolders.value && searchQuery.value !== "";
+      const crossFolderSearchActive = searchAcrossFolders.value && searchQuery.value !== "";
       if (showFavoritesOnly.value && !crossFolderSearchActive) {
         const folderNames = new Map(
           (store.state.organizationData?.folders ?? []).map((f: any) => [f.folderId, f.name]),
