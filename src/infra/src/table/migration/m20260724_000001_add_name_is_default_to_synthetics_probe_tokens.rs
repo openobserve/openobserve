@@ -23,7 +23,7 @@
 //! `m20260707_000004`) becomes `name='default'`, `is_default=true`, so existing
 //! agents keep authenticating unchanged after the upgrade.
 
-use sea_orm::sea_query::Query;
+use sea_orm::ConnectionTrait;
 use sea_orm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]
@@ -63,15 +63,29 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // Backfill: every existing row is the org's sole (default) token. `name`
-        // already defaulted to 'default' via the column default; flip is_default.
+        // Backfill — must be safe for orgs that already hold MORE than one probe
+        // token (the pre-migration create-many model allowed several, all
+        // unnamed). Naming them all 'default' would violate the unique
+        // (org_id, name) index below with "could not create unique index".
+        //
+        //   1. Give every row a guaranteed-unique name = its id (the KSUID PK),
+        //      so no two rows in an org collide.
+        //   2. Promote the oldest token per org (MIN(id) — KSUIDs sort by
+        //      creation time) back to the canonical name='default'/is_default so
+        //      agent-setup and the dispatcher keep resolving a default token, and
+        //      existing agents (which authenticate by token string, unchanged)
+        //      keep working.
+        //
+        // The derived-table wrap in step 2 keeps the self-referential UPDATE
+        // legal on MySQL (error 1093), and is valid on Postgres and SQLite too.
         let db = manager.get_connection();
-        let builder = db.get_database_backend();
-        let stmt = Query::update()
-            .table(SyntheticsProbeTokens::Table)
-            .value(SyntheticsProbeTokens::IsDefault, true)
-            .to_owned();
-        db.execute(builder.build(&stmt)).await?;
+        db.execute_unprepared("UPDATE synthetics_probe_tokens SET name = id")
+            .await?;
+        db.execute_unprepared(
+            "UPDATE synthetics_probe_tokens SET name = 'default', is_default = true \
+             WHERE id IN (SELECT id FROM (SELECT MIN(id) AS id FROM synthetics_probe_tokens GROUP BY org_id) AS t)",
+        )
+        .await?;
 
         // Unique (org_id, name) so named tokens can't collide within an org.
         manager
