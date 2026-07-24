@@ -34,15 +34,6 @@
             clearable
             @update:model-value="$emit('update:search', $event as string)"
           />
-          <OSelect
-            v-model="typeFilter"
-            :options="typeOptions"
-            :placeholder="t('onlineEvals.scorer.allTypes')"
-            size="md"
-            width="sm"
-            class="shrink-0"
-            data-test="scorer-list-type-filter"
-          />
         </template>
 
         <template #toolbar-trailing>
@@ -56,6 +47,23 @@
           >
             <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="scorersRefresh" />
           </OButton>
+        </template>
+
+        <!-- Type breakdown (catalog signal) — doubles as a filter synced to the
+             type dropdown; Total last, never itself the active tile. -->
+        <template #subheader>
+          <div
+            class="px-page-edge py-1.5 border-b border-table-row-divider"
+            data-test="scorer-list-summary"
+          >
+            <OStatStrip
+              :items="summaryStats"
+              :loading="loading"
+              selectable
+              :selected-key="selectedStatKey"
+              @select="onStatSelect"
+            />
+          </div>
         </template>
 
         <template #empty>
@@ -170,9 +178,10 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import OTable from "@/lib/core/Table/OTable.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import type {
   EvalJob,
@@ -220,12 +229,6 @@ function handleBulkExport() {
   selectedIds.value = [];
   emit("export-bulk", ids);
 }
-
-const typeOptions = computed(() => [
-  { label: t("onlineEvals.scorer.allTypes"), value: null },
-  { label: t("onlineEvals.scorer.badgeLlm"), value: "llm_judge" },
-  { label: t("onlineEvals.scorer.badgeRemote"), value: "remote" },
-]);
 
 const columns = computed(() => [
   {
@@ -300,6 +303,71 @@ const filteredRows = computed(() =>
 );
 
 const numberedRows = useNumberedRows(filteredRows);
+
+// Type breakdown for the summary strip (over all scorers, so the counts stay
+// stable as you filter). Tiles double as filters wired to `typeFilter`.
+const typeCounts = computed(() => {
+  const rows = props.rows || [];
+  let llm = 0;
+  let remote = 0;
+  for (const r of rows) {
+    const ty = scorerTypeOf(r);
+    if (ty === "llm_judge") llm += 1;
+    else if (ty === "remote") remote += 1;
+  }
+  return { llm, remote, total: rows.length };
+});
+const summaryStats = computed<StatItem[]>(() => {
+  const c = typeCounts.value;
+  const has = c.total > 0;
+  const v = (n: number): string | number => (has ? n : "—");
+  const share = has ? c.total : undefined;
+  return [
+    {
+      key: "llm_judge",
+      label: t("onlineEvals.scorer.badgeLlm"),
+      value: v(c.llm),
+      icon: "auto-awesome",
+      tone: "info",
+      max: share,
+      dataTest: "scorer-summary-llm",
+    },
+    {
+      key: "remote",
+      label: t("onlineEvals.scorer.badgeRemote"),
+      value: v(c.remote),
+      icon: "cloud",
+      tone: "orange",
+      max: share,
+      dataTest: "scorer-summary-remote",
+    },
+    // Code scorers are on the roadmap — shown as a muted, non-clickable preview
+    // tile ("Soon") so the type is visible without pretending to be a filter yet.
+    {
+      key: "code",
+      label: t("onlineEvals.scorer.badgeCode"),
+      value: t("onlineEvals.comingSoon"),
+      icon: "code",
+      tone: "neutral",
+      selectable: false,
+      dataTest: "scorer-summary-code",
+    },
+    {
+      key: "all",
+      label: t("onlineEvals.summaryAll"),
+      value: v(c.total),
+      icon: "format-list-bulleted",
+      tone: "primary",
+      dataTest: "scorer-summary-all",
+    },
+  ];
+});
+// Nothing is highlighted while viewing all rows (like the Incidents/Alerts strip);
+// the "All" tile clears the facet but is never itself the active tile.
+const selectedStatKey = computed(() => typeFilter.value);
+function onStatSelect(key: string) {
+  typeFilter.value = key === "all" ? null : (key as ScorerType);
+}
 
 // When the org has no providers AND no scorers yet, surface a dedicated
 // provider-onboarding screen instead of the standard empty state. LLM Judge

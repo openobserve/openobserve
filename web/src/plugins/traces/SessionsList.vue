@@ -112,6 +112,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       width="100%"
       class="w-full h-full"
       data-test="sessions-list-table"
+      :get-row-style="sessionRowStyle"
+      :row-class="sessionRowClass"
       @row-click="(row: any) => handleRowClick(row)"
       @pagination-change="onPaginationChange"
     >
@@ -149,11 +151,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OEmptyState size="hero" preset="no-llm-sessions" @action="onEmptyAction" />
         </div>
       </template>
-        <!-- Timestamp -->
+        <!-- Timestamp — relative recency ("5 min ago"), full datetime on hover. -->
         <template #cell-firstSeenNanos="{ row }">
-          <span class="text-xs tabular-nums">
-            {{ formatTimestamp(row.firstSeenNanos) }}
-          </span>
+          <OTimeCell
+            :value="row.firstSeenNanos"
+            unit="ns"
+            mode="relative"
+            empty-label="—"
+          />
         </template>
 
         <!-- Session ID -->
@@ -210,11 +215,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="text-xs">${{ row.cost.toFixed(4) }}</span>
         </template>
 
-        <!-- Status (derived from error_count) -->
+        <!-- Status (derived from error_count) — the error count rides INSIDE the
+             chip as a trailing segment (hidden when 0), so the count is the
+             primary signal without a second element beside the pill. -->
         <template #cell-status="{ row }">
           <OTag
             type="sessionStatus"
             :value="row.status"
+            :count="row.errorCount"
+            hide-zero-count
             :data-test="`sessions-list-status-${row.sessionId}`"
           />
         </template>
@@ -226,11 +235,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { formatDate } from "@/utils/date";
 import { useI18n } from "vue-i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import useStreams from "@/composables/useStreams";
 import { useSessions, type SessionRow } from "./composables/useSessions";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -475,10 +484,18 @@ const tableColumns = computed(() => [
   hideable: c.id !== "sessionId",
 })));
 
-function formatTimestamp(nanos: number): string {
-  if (!nanos) return "—";
-  // Backend ships timestamps as nanoseconds — formatDate wants ms.
-  return formatDate(Math.floor(nanos / 1_000_000), "YYYY-MM-DD HH:mm:ss");
+// Exception-only rail: paint the extreme-left edge red on sessions that errored
+// (errorCount > 0), leaving clean sessions unmarked — so a failed session pops
+// out of a long list at a glance. Mirrors the Alerts / Incidents row rail.
+function sessionRowStyle(row: SessionRow): Record<string, string> {
+  if (!row || (row.errorCount ?? 0) <= 0) return {};
+  return { boxShadow: "inset 0.25rem 0 0 0 var(--color-error-500)" };
+}
+
+// Light exception wash on the whole row for errored sessions (matches the Alerts
+// list) — clean sessions stay unwashed, so attention goes to the failures.
+function sessionRowClass(row: SessionRow): string {
+  return row && (row.errorCount ?? 0) > 0 ? "!bg-status-error-bg" : "";
 }
 
 

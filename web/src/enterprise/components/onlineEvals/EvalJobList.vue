@@ -23,6 +23,8 @@
         table-id="eval-job-list"
         width="100%"
         class="w-full h-full"
+        :get-row-style="evalJobRowStyle"
+        :row-class="evalJobRowClass"
         @row-click="(row: any) => $emit('view', row)"
       >
         <template #toolbar>
@@ -33,15 +35,6 @@
             data-test="eval-job-list-search-input"
             clearable
             @update:model-value="$emit('update:search', $event as string)"
-          />
-          <OSelect
-            v-model="statusFilter"
-            :options="statusOptions"
-            :placeholder="t('onlineEvals.job.allStatuses')"
-            size="md"
-            width="sm"
-            class="shrink-0"
-            data-test="eval-job-list-status-filter"
           />
         </template>
 
@@ -183,7 +176,6 @@ import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
@@ -250,15 +242,6 @@ watch(
     if (pruned.length !== selectedIds.value.length) selectedIds.value = pruned;
   },
 );
-
-const statusOptions = computed(() => [
-  { label: t("onlineEvals.job.allStatuses"), value: null },
-  { label: t("onlineEvals.jobStatus.draft"), value: "draft" },
-  { label: t("onlineEvals.jobStatus.active"), value: "active" },
-  { label: t("onlineEvals.jobStatus.paused"), value: "paused" },
-  { label: t("onlineEvals.jobStatus.degraded"), value: "degraded" },
-  { label: t("onlineEvals.jobStatus.archived"), value: "archived" },
-]);
 
 const columns = computed(() => [
   {
@@ -349,14 +332,22 @@ const statusCounts = computed(() => {
   let active = 0;
   let paused = 0;
   let degraded = 0;
+  let draft = 0;
+  let archived = 0;
   for (const r of rows) {
     const s = statusOf(r);
     if (s === "active") active += 1;
     else if (s === "paused") paused += 1;
     else if (s === "degraded") degraded += 1;
+    else if (s === "draft") draft += 1;
+    else if (s === "archived") archived += 1;
   }
-  return { active, paused, degraded, total: rows.length };
+  return { active, paused, degraded, draft, archived, total: rows.length };
 });
+// The strip is the ONLY status filter (the redundant dropdown was removed), so it
+// carries every backend status. Attention-first order (degraded, paused, active,
+// then the inert draft/archived), "All" last — matching the Alerts / Incidents
+// strip. Tones echo the evalStatus chip exactly (degraded = orange, not red).
 const summaryStats = computed<StatItem[]>(() => {
   const c = statusCounts.value;
   const has = c.total > 0;
@@ -364,21 +355,13 @@ const summaryStats = computed<StatItem[]>(() => {
   const share = has ? c.total : undefined;
   return [
     {
-      key: "all",
-      label: t("alerts.summaryTotal"),
-      value: v(c.total),
-      icon: "format-list-bulleted",
-      tone: "primary",
-      dataTest: "eval-job-summary-total",
-    },
-    {
-      key: "active",
-      label: t("onlineEvals.jobStatus.active"),
-      value: v(c.active),
-      icon: "play-arrow",
-      tone: "success",
+      key: "degraded",
+      label: t("onlineEvals.jobStatus.degraded"),
+      value: v(c.degraded),
+      icon: "error-outline",
+      tone: "orange",
       max: share,
-      dataTest: "eval-job-summary-active",
+      dataTest: "eval-job-summary-degraded",
     },
     {
       key: "paused",
@@ -390,19 +373,73 @@ const summaryStats = computed<StatItem[]>(() => {
       dataTest: "eval-job-summary-paused",
     },
     {
-      key: "degraded",
-      label: t("onlineEvals.jobStatus.degraded"),
-      value: v(c.degraded),
-      icon: "error-outline",
-      tone: "error",
+      key: "active",
+      label: t("onlineEvals.jobStatus.active"),
+      value: v(c.active),
+      icon: "play-arrow",
+      tone: "success",
       max: share,
-      dataTest: "eval-job-summary-degraded",
+      dataTest: "eval-job-summary-active",
+    },
+    {
+      key: "draft",
+      label: t("onlineEvals.jobStatus.draft"),
+      value: v(c.draft),
+      icon: "edit-note",
+      tone: "neutral",
+      max: share,
+      dataTest: "eval-job-summary-draft",
+    },
+    {
+      key: "archived",
+      label: t("onlineEvals.jobStatus.archived"),
+      value: v(c.archived),
+      icon: "archive",
+      tone: "neutral",
+      max: share,
+      dataTest: "eval-job-summary-archived",
+    },
+    {
+      key: "all",
+      label: t("onlineEvals.summaryAll"),
+      value: v(c.total),
+      icon: "format-list-bulleted",
+      tone: "primary",
+      dataTest: "eval-job-summary-all",
     },
   ];
 });
-const selectedStatKey = computed(() => statusFilter.value ?? "all");
+// Nothing is highlighted while viewing all rows (like the Incidents/Alerts strip);
+// the "All" tile clears the facet but is never itself the active tile.
+const selectedStatKey = computed(() => statusFilter.value);
 function onStatSelect(key: string) {
   statusFilter.value = key === "all" ? null : (key as EvalJobStatus);
+}
+
+// Extreme-left status rail (mirrors the Incidents rail) — reads "does this job
+// need attention?": degraded=orange, paused=amber, active=green, and the inert
+// states (draft/archived) a quiet grey. Tones match the status tiles + chip.
+function evalJobRowStyle(row: EvalJob): Record<string, string> {
+  const s = statusOf(row);
+  const color =
+    s === "active"
+      ? "var(--color-success-500)"
+      : s === "degraded"
+        ? "var(--color-orange-500)"
+        : s === "paused"
+          ? "var(--color-warning-500)"
+          : "var(--color-grey-400)";
+  return { boxShadow: `inset 0.25rem 0 0 0 ${color}` };
+}
+
+// Light exception wash (matches the Alerts list) — degraded jobs (failing) get a
+// warm wash, paused a muted grey; healthy/active/draft/archived stay clean so
+// attention goes to what's off, not the norm.
+function evalJobRowClass(row: EvalJob): string {
+  const s = statusOf(row);
+  if (s === "degraded") return "!bg-status-warning-bg";
+  if (s === "paused") return "!bg-surface-panel";
+  return "";
 }
 
 // Whether the user has narrowed the list with the search box or the status

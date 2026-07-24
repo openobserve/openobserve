@@ -18,7 +18,8 @@
   <ODrawer
     :open="open"
     side="right"
-    :width="55"
+    size="xl"
+    bleed
     :title="title"
     data-test="agent-signal-detail-panel"
     @update:open="(v: boolean) => emit('update:open', v)"
@@ -34,13 +35,13 @@
       </div>
     </template>
 
-    <section
-      class="flex flex-col gap-3 px-5 pt-4 pb-6 min-h-full overflow-auto"
+    <div
+      class="flex flex-col min-h-full"
       data-test="agent-signal-detail-body"
     >
       <!-- Headline: the finding, stated plainly -->
       <div
-        class="flex items-start gap-2"
+        class="flex items-start gap-2 px-page-edge pt-4 pb-3"
         data-test="agent-signal-detail-headline"
       >
         <OIcon
@@ -61,27 +62,21 @@
         </div>
       </div>
 
-      <!-- FAILURE: the real error messages (the "read it, know the fix" section) -->
-      <section
-        v-if="signalType === 'failure'"
-        class="card-container py-3 px-3.5 pb-3.5 bg-surface-base border border-border-default rounded-surface"
-      >
-        <header class="mb-1.5 flex items-center gap-1.5">
-          <OIcon
-            name="error-outline"
-            size="xs"
-            class="text-badge-error-soft-text"
-          />
-          <h4 class="m-0 text-compact font-semibold text-text-heading">
-            {{ t("aiObservability.behavior.detail.errorsTitle") }}
-          </h4>
-        </header>
+      <!-- FAILURE: the real error messages behind the class -->
+      <template v-if="signalType === 'failure'">
+        <PanelSectionHeader
+          :title="t('aiObservability.behavior.detail.errorsTitle')"
+        />
         <OTable
           data-test="agent-signal-detail-errors"
           :data="errorRows"
           :columns="errorColumns"
           :default-columns="false"
           :frame="false"
+          :show-global-filter="false"
+          :loading="loading"
+          :footer-title="t('aiObservability.behavior.detail.footerErrors')"
+          :empty-message="t('aiObservability.behavior.detail.noErrors')"
           wrap
         >
           <!-- Show the condensed one-liner; reveal the full raw error on demand
@@ -110,35 +105,28 @@
             </div>
           </template>
         </OTable>
-        <OEmptyState
-          v-if="!loading && errorRows.length === 0"
-          preset="no-data"
-          :title="t('aiObservability.behavior.detail.noErrors')"
-        />
-      </section>
+      </template>
 
-      <!-- LOOP / COST: the worst traces, ranked by what makes them bad -->
-      <section
-        class="card-container py-3 px-3.5 pb-3.5 bg-surface-base border border-border-default rounded-surface"
+      <!-- Worst traces first, ranked by what makes them bad -->
+      <PanelSectionHeader
+        :title="tracesTitle"
+        :hint="t('aiObservability.behavior.detail.tracesHint')"
+      />
+      <OTable
+        data-test="agent-signal-detail-traces"
+        :data="traceRows"
+        :columns="traceColumns"
+        :default-columns="false"
+        :frame="false"
+        :show-global-filter="false"
+        :loading="loading"
+        :footer-title="t('aiObservability.behavior.detail.footerTraces')"
+        :empty-message="t('aiObservability.behavior.detail.noTraces')"
+        pagination="client"
+        :page-size="10"
+        :page-size-options="[10, 20, 50]"
+        @row-click="openTrace"
       >
-        <header class="mb-1.5 flex items-center justify-between gap-2">
-          <h4 class="m-0 text-compact font-semibold text-text-heading">
-            {{ tracesTitle }}
-          </h4>
-          <span class="text-2xs text-text-secondary">
-            {{ t("aiObservability.behavior.detail.tracesHint") }}
-          </span>
-        </header>
-        <OTable
-          data-test="agent-signal-detail-traces"
-          :data="traceRows"
-          :columns="traceColumns"
-          :default-columns="false"
-          :frame="false"
-          pagination="client"
-          :page-size="10"
-          @row-click="openTrace"
-        >
           <!-- Trace id renders with an "open in new tab" icon so it's clear the
                row opens the trace in a new browser tab, not in place. -->
           <template #cell-trace_id="{ row }">
@@ -146,18 +134,12 @@
               class="inline-flex items-center gap-1 text-text-link hover:underline"
               :title="t('aiObservability.behavior.detail.openInNewTab')"
             >
-              <OIcon name="open-in-new" size="xs" class="opacity-70" />
               <span class="font-mono truncate">{{ row.trace_id }}</span>
+              <OIcon name="open-in-new" size="xs" class="opacity-70 shrink-0" />
             </span>
           </template>
         </OTable>
-        <OEmptyState
-          v-if="!loading && traceRows.length === 0"
-          preset="no-data"
-          :title="t('aiObservability.behavior.detail.noTraces')"
-        />
-      </section>
-    </section>
+    </div>
   </ODrawer>
 </template>
 
@@ -169,9 +151,9 @@ import { useRouter } from "vue-router";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import PanelSectionHeader from "./PanelSectionHeader.vue";
 import searchService from "@/services/search";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
 
@@ -232,10 +214,12 @@ const signalType = computed(() => props.row?.signalType);
 
 // Signal-type iconography — a distinct icon + accent per drawer so the subject
 // (looping / failing / costly) reads at a glance.
+// Same glyph the Looping-patterns / Failures summary tiles and table headers use,
+// so the drawer visibly belongs to the row/section it opened from.
 const signalIcon = computed(() => {
-  if (signalType.value === "loop") return "autorenew";
+  if (signalType.value === "loop") return "restart-alt";
   if (signalType.value === "cost") return "attach-money";
-  return "warning"; // failure
+  return "error-outline"; // failure
 });
 const signalIconColor = computed(() => {
   if (signalType.value === "loop") return "text-badge-warning-soft-text";

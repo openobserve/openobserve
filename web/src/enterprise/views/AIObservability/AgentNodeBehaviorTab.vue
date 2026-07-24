@@ -87,7 +87,11 @@
         :page-size="5"
         :empty-message="t('aiObservability.behavior.noFailures')"
         @row-click="(r: any) => openDetail('failure', r)"
-      />
+      >
+        <template #cell-failClass="{ row }">
+          <OTag variant="warning-soft" size="sm">{{ row.failClass }}</OTag>
+        </template>
+      </OTable>
     </div>
 
     <div
@@ -114,6 +118,7 @@ import { ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import AgentSignalDetailPanel from "./AgentSignalDetailPanel.vue";
 import agentSignalsService, {
