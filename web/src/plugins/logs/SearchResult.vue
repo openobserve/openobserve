@@ -265,12 +265,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <!-- Combined scroll area: histogram + logs/patterns scroll together -->
-      <div class="flex-1 overflow-auto" ref="scrollContainerRef">
+      <!-- The histogram is pinned: in the logs view this strip does not scroll,
+        the table below owns both scrollbars, so scrolling the log lines
+        sideways can never drag the chart out from under the toolbar. The
+        patterns view has no such table of its own, so it keeps the older
+        combined scroll where the histogram scrolls away with the list. -->
+      <div
+        ref="scrollContainerRef"
+        :class="[
+          'min-h-0 flex-1',
+          searchObj.meta.logsVisualizeToggle === 'patterns'
+            ? 'overflow-auto'
+            : 'flex flex-col overflow-hidden',
+        ]"
+      >
         <div
           ref="histogramRef"
           :class="[
-            'histogram-container',
+            'histogram-container shrink-0',
             searchObj.meta.showHistogram
               ? 'histogram-container--visible'
               : 'histogram-container--hidden',
@@ -361,7 +373,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           :class="[
-            'histogram-container',
+            'histogram-container shrink-0',
             searchObj.meta.showHistogram
               ? 'histogram-container--visible'
               : 'histogram-container--hidden',
@@ -448,7 +460,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :columns="getColumns || []"
             :rows="searchObj.data.queryResults?.hits || []"
             :wrap="searchObj.meta.toggleSourceWrap"
-            :width="getTableWidth"
             :err-msg="searchObj.data.missingStreamMessage"
             :loading="searchObj.loading"
             :loadingProgressPercentage="searchObj.loadingProgressPercentage || 0"
@@ -458,16 +469,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :selected-stream-fts-keys="selectedStreamFullTextSearchKeys"
             :highlight-query="searchObj.data.highlightQuery"
             :default-columns="!searchObj.data.stream.selectedFields.length"
-            class="w-full"
             :selectedStreamFields="searchObj.data.stream.selectedStreamFields"
-            :scroll-el="scrollContainerRef"
-            :scroll-margin="0"
-            :class="[
-              !searchObj.meta.showHistogram ||
-              (searchObj.meta.showHistogram && searchObj.data.histogram.errorCode == -1)
-                ? 'min-h-full!'
-                : 'min-h-[calc(100%-6.25rem)]!',
-            ]"
+            class="min-h-0 w-full flex-1"
             @update:columnSizes="handleColumnSizesUpdate"
             @update:columnOrder="handleColumnOrderUpdate"
             @copy="copyLogToClipboard"
@@ -1653,8 +1656,12 @@ export default defineComponent({
       return window.innerWidth - (leftSidebarMenu + fieldList) - 5;
     });
 
+    // In the logs view the table scrolls itself (the histogram above it is
+    // pinned), so a page change has to reset that element rather than the
+    // pane. The patterns view still scrolls as a whole.
     const scrollTableToTop = (value: number) => {
-      scrollContainerRef.value?.scrollTo({ top: value });
+      const logsTableScrollEl = searchTableRef.value?.parentRef;
+      (logsTableScrollEl ?? scrollContainerRef.value)?.scrollTo({ top: value });
     };
 
     const getColumns = computed(() => {

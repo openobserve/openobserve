@@ -40,15 +40,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="logs-table w-full table-auto"
           @contextmenu.capture="handleTableContextMenu"
           :style="{
-            minWidth: '100%',
+            minWidth: tableMinWidth,
             ...columnSizeVars,
-            width: !defaultColumns
-              ? table.getCenterTotalSize() + 'px'
-              : wrap
-                ? width
-                  ? width - 12 + 'px'
-                  : '100%'
-                : '100%',
+            width: !defaultColumns ? table.getCenterTotalSize() + 'px' : '100%',
           }"
         >
           <thead
@@ -68,15 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 // OTable uses): background band + full-width underline on the row.
                 'bg-table-header-bg border-table-header-border border-b',
               ]"
-              :style="{
-                width:
-                  defaultColumns && wrap
-                    ? width - 12 + 'px'
-                    : defaultColumns
-                      ? tableRowSize + 'px'
-                      : '100%',
-                minWidth: '100%',
-              }"
+              :style="{ width: '100%', minWidth: '100%' }"
               tag="tr"
               @start="(event) => handleDragStart(event)"
               @end="() => handleDragEnd()"
@@ -87,20 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :key="header.id"
                 :id="header.id"
                 class="table-head relative px-2 text-ellipsis"
-                :style="
-                  !defaultColumns && headerIndex === headerGroup.headers.length - 1
-                    ? {
-                        flex: '1 1 auto',
-                        minWidth: `calc(var(--header-${header?.id}-size) * 1px)`,
-                        width: 'auto',
-                        overflow: 'hidden',
-                      }
-                    : {
-                        width: `calc(var(--header-${header?.id}-size) * 1px)`,
-                        minWidth: `calc(var(--header-${header?.id}-size) * 1px)`,
-                        flexShrink: '0',
-                      }
-                "
+                :style="columnStyle(header, headerIndex, headerGroup.headers.length, 'header')"
                 :data-test="`log-search-result-table-th-${header.id}`"
               >
                 <!-- Column separator / resize handle. The separator LINE renders on
@@ -269,11 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :style="{
                   transform: `translateY(${virtualRow.start}px)`,
                   minWidth: '100%',
-                  width:
-                    !defaultColumns &&
-                    !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
-                      ? '100%'
-                      : undefined,
+                  width: '100%',
                 }"
                 :data-index="virtualRow.index"
                 :data-expanded="formattedRows?.[virtualRow.index]?.original?.isExpandedRow"
@@ -282,15 +251,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 :ref="(node: any) => node && rowVirtualizer.measureElement(node)"
                 :class="[
-                  'absolute flex w-max items-center justify-start border-b',
+                  'absolute flex w-full items-center justify-start border-b',
                   !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
                     ? 'cursor-pointer'
                     : 'cursor-default',
-                  defaultColumns &&
-                  !wrap &&
-                  !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
-                    ? 'table-row'
-                    : 'flex break-all',
+                  wrap || (formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
+                    ? 'break-all'
+                    : '',
                   (tableRows[virtualRow.index] as any)[store.state.zoConfig.timestamp_column] ===
                     highlightTimestamp &&
                   !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
@@ -354,34 +321,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="
                       'log-table-column-' + virtualRow.index + '-' + cell.column.columnDef.id
                     "
-                    class="py-none relative flex table-cell items-center justify-start px-2"
+                    class="py-none relative flex items-center justify-start px-2"
                     :class="[...tableCellClass, { 'pl-4': cellIndex === 0 }]"
                     :style="
-                      !defaultColumns &&
-                      cellIndex === formattedRows[virtualRow.index].getVisibleCells().length - 1
-                        ? {
-                            flex: '1 1 auto',
-                            minWidth: `calc(var(--col-${cell.column.columnDef.id}-size) * 1px)`,
-                            width: 'auto',
-                            overflow: 'hidden',
-                            height: wrap ? '100%' : '20px',
-                          }
-                        : {
-                            width:
-                              cell.column.columnDef.id !== 'source' ||
-                              cell.column.columnDef.enableResizing
-                                ? `calc(var(--col-${cell.column.columnDef.id}-size) * 1px)`
-                                : wrap
-                                  ? width - 260 - 12 + 'px'
-                                  : 'auto',
-                            minWidth:
-                              cell.column.columnDef.id !== 'source' ||
-                              cell.column.columnDef.enableResizing
-                                ? `calc(var(--col-${cell.column.columnDef.id}-size) * 1px)`
-                                : undefined,
-                            flexShrink: '0',
-                            height: wrap ? '100%' : '20px',
-                          }
+                      columnStyle(
+                        cell,
+                        cellIndex,
+                        formattedRows[virtualRow.index].getVisibleCells().length,
+                        'col',
+                      )
                     "
                     @contextmenu="handleCellContextMenu(cell)"
                   >
@@ -406,13 +354,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ]
                       "
                       :key="`${cell.column.id}_${calculateActualIndex(virtualRow.index)}`"
+                      :class="cellContentClass(cell)"
                       v-html="
                         processedResultsMap[
                           `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
                         ]
                       "
                     />
-                    <span v-else>
+                    <span v-else :class="cellContentClass(cell)">
                       {{ cell.renderValue() }}
                     </span>
                   </td>
@@ -545,10 +494,6 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-  width: {
-    type: Number,
-    default: 56,
-  },
   loading: {
     type: Boolean,
     default: false,
@@ -654,8 +599,6 @@ const tableBodyRef = ref<any>(null);
 
 const columnResizeMode = "onChange";
 
-const tableRowSize = ref(0);
-
 const columnOrder = ref<any>([]);
 
 const tableRows = ref([...props.rows]);
@@ -724,8 +667,6 @@ watch(
         selectedStreamFtsKeys.value,
       );
     }
-
-    if (props.defaultColumns) updateTableWidth();
   },
   {
     deep: true,
@@ -757,9 +698,6 @@ watch(
     // Clear actual index cache when rows change
     actualIndexCache.value.clear();
     setExpandedRows();
-
-    await nextTick();
-    if (props.defaultColumns) updateTableWidth();
   },
   {
     deep: true,
@@ -844,6 +782,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  if (measureFrame) cancelAnimationFrame(measureFrame);
   tableRows.value.length = 0;
   tableRows.value = [];
   tableBodyRef.value = null;
@@ -851,40 +790,121 @@ onBeforeUnmount(() => {
   table = null;
 });
 
-const hasDefaultSourceColumn = computed(
-  () => props.defaultColumns && columnOrder.value.includes("source"),
-);
+const tableCellClass = computed(() => [
+  !props.wrap ? "overflow-hidden whitespace-nowrap" : "",
+  props.wrap ? "break-all" : "",
+]);
 
-const tableCellClass = ref<string[]>([]);
-
-watch(
-  () => [hasDefaultSourceColumn.value, props.wrap],
-  () => {
-    tableCellClass.value = [
-      hasDefaultSourceColumn.value && !props.wrap ? "table-cell" : "block",
-      !props.wrap ? "overflow-hidden text-ellipsis whitespace-nowrap" : "",
-      props.wrap ? "break-all" : "",
-    ];
-  },
-  {
-    immediate: true,
-    deep: true,
-  },
-);
-
-const updateTableWidth = async () => {
-  tableRowSize.value = tableBodyRef?.value?.children[0]?.scrollWidth;
-
-  setTimeout(() => {
-    let max = 0;
-    let width = max;
-    for (let i = 0; i < tableRows.value.length; i++) {
-      width = tableBodyRef?.value?.children[i]?.scrollWidth;
-      if (width > max) max = width;
-    }
-    tableRowSize.value = max;
-  }, 0);
+// Cells are flex containers, so the ellipsis has to live on the inline content
+// itself — `text-ellipsis` on a flex parent never applies to a child flex item.
+// `min-w-0` lets that item shrink below its text width so the clip can happen.
+// The unwrapped source cell is the exception: it is sized *by* this text, so it
+// stays at its natural width and the table scrolls to reach the rest.
+const cellContentClass = (cell: any) => {
+  if (props.wrap) return "min-w-0 flex-1 break-all";
+  if (isFillColumn(cell?.column)) return "whitespace-nowrap";
+  return "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap";
 };
+
+// The default "source" column carries no configured size — it is the one that
+// holds the log line. Unwrapped it keeps its full text and lets the table scroll
+// sideways; wrapped it fills the container and the text breaks onto more lines.
+const isFillColumn = (column: any) =>
+  column?.columnDef?.id === "source" && !column?.columnDef?.enableResizing;
+
+// Shared width rules for header cells and body cells so the two stay aligned.
+// `kind` selects the CSS variable family the sizes come from (--header-* for
+// the head row, --col-* for the body).
+const columnStyle = (
+  entry: any,
+  index: number | string,
+  count: number,
+  kind: "header" | "col",
+): Record<string, string> => {
+  const id = kind === "header" ? entry?.id : entry?.column?.columnDef?.id;
+  const size = `calc(var(--${kind}-${id}-size) * 1px)`;
+
+  let style: Record<string, string>;
+
+  if (isFillColumn(entry?.column)) {
+    // Header: no text of its own to size against, so it just takes the room the
+    // fixed columns leave — which is the full row width, since the row is as
+    // wide as the widest log line.
+    // Body, unwrapped: sized by its own text so nothing is cut off.
+    style =
+      kind === "col" && !props.wrap
+        ? { width: "auto", flexShrink: "0" }
+        : { flex: "1 1 0", minWidth: "0", width: "auto", overflow: "hidden" };
+  } else if (!props.defaultColumns && Number(index) === count - 1) {
+    // Last column of a selected-columns table: takes any spare room but never
+    // shrinks below its own size.
+    style = {
+      flex: "1 1 auto",
+      minWidth: size,
+      width: "auto",
+      overflow: "hidden",
+    };
+  } else {
+    style = { width: size, minWidth: size, flexShrink: "0" };
+  }
+
+  if (kind === "col") style.height = props.wrap ? "100%" : "1.25rem";
+
+  return style;
+};
+
+// Virtual rows are position:absolute, so they contribute nothing to the table's
+// own width — the table has to be told how wide the widest rendered row is, or
+// it stays at container width and every row's bottom border stops at the end of
+// its own text. Measuring the cells (not the row) keeps this from feeding back
+// on itself: cells never shrink, so their widths do not depend on the width we
+// derive from them.
+const rowsContentWidth = ref(0);
+let measureFrame = 0;
+
+const measureRowsContentWidth = () => {
+  const rows: HTMLCollection | undefined = tableBodyRef.value?.children;
+  if (!rows) return;
+
+  let widest = 0;
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i] as HTMLElement;
+    // Expanded rows hold a full-width JSON preview, not columns.
+    if (row?.dataset?.expanded === "true") continue;
+    let rowWidth = 0;
+    for (let c = 0; c < row.children.length; c++) {
+      const cell = row.children[c] as HTMLElement;
+      if (cell.tagName === "TD") rowWidth += cell.offsetWidth;
+    }
+    if (rowWidth > widest) widest = rowWidth;
+  }
+
+  // Grow only while the same result set is on screen: rows that scroll into
+  // view may be longer than anything measured so far, and a table that
+  // narrowed again mid-scroll would shift every row under the pointer.
+  if (widest > rowsContentWidth.value) rowsContentWidth.value = Math.ceil(widest);
+};
+
+// Reads layout, so it runs once per frame at most rather than on every
+// scroll-driven re-render of the virtual window.
+const scheduleRowsMeasure = () => {
+  if (measureFrame) return;
+  measureFrame = requestAnimationFrame(() => {
+    measureFrame = 0;
+    measureRowsContentWidth();
+  });
+};
+
+const resetRowsContentWidth = () => {
+  rowsContentWidth.value = 0;
+  scheduleRowsMeasure();
+};
+
+// max() rather than a bare pixel value: the table must still fill the container
+// when the rows are narrower than it.
+const tableMinWidth = computed(() =>
+  rowsContentWidth.value > 0 ? `max(100%, ${rowsContentWidth.value}px)` : "100%",
+);
 
 const debouncedUpdate = debounce((newColSizes) => {
   emits("update:columnSizes", newColSizes);
@@ -979,6 +999,15 @@ const rowVirtualizerOptions = computed(() => {
 const rowVirtualizer = useVirtualizer(rowVirtualizerOptions);
 
 const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems());
+
+// Rows entering the virtual window can be longer than anything measured so far.
+watch(virtualRows, scheduleRowsMeasure, { flush: "post" });
+
+// A new result set, a wrap toggle or a column change invalidates the measured
+// width outright — start over instead of keeping the old high-water mark.
+watch(() => [props.rows, props.columns, props.wrap, props.defaultColumns], resetRowsContentWidth, {
+  flush: "post",
+});
 
 // +22 adds bottom padding so the last virtual row isn't clipped by the container
 const totalSize = computed(() => rowVirtualizer.value.getTotalSize() + 30);

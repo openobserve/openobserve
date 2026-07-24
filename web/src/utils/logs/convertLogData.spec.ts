@@ -88,7 +88,7 @@ describe("convertLogData.ts", () => {
         containLabel: true,
         left: "20",
         right: "20",
-        top: "5",
+        top: "8",
         bottom: "5",
       });
     });
