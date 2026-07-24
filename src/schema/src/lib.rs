@@ -753,12 +753,8 @@ pub async fn handle_diff_schema(
                     json::to_string(&stream_setting).unwrap(),
                 );
             }
-            Err(StreamSettingsError::StreamDeleting(message))
-            | Err(StreamSettingsError::BadRequest(message))
-            | Err(StreamSettingsError::NotFound(message)) => {
-                log::warn!(
-                    "skip auto UDS settings [{org_id}/{stream_type}/{stream_name}]: {message}"
-                );
+            Err(e) => {
+                log::warn!("skip auto UDS settings [{org_id}/{stream_type}/{stream_name}]: {e}");
             }
         }
     }
