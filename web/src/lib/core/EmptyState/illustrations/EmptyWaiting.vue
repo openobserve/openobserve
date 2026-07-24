@@ -19,7 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   hero, sand trickling through, while a SMALL person sits at its base gazing up.
   Object-led, strong scale contrast — reads nothing like a centred figure.
   Micro-anim: sand grains fall through the neck on a loop; the seated person
-  breathes. CSS motion gated by `animated` + prefers-reduced-motion.
+  breathes. Pure SMIL motion gated behind `animated` (prefers-reduced-motion;
+  OEmptyState wires this up automatically).
 -->
 <template>
   <svg
@@ -29,7 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     xmlns="http://www.w3.org/2000/svg"
     role="img"
     aria-label="Waiting for data to arrive"
-    :class="['es-root', { 'es-static': !animated }]"
   >
     <!-- soft halo + dots -->
     <circle cx="138" cy="138" r="96" fill="var(--color-primary-500)" opacity="0.05" />
@@ -98,26 +98,83 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- collected sand (bottom pile) -->
       <path d="M110 208 L166 208 L138 182 Z" fill="var(--color-warning-400)" />
       <!-- falling grains -->
-      <circle
-        class="es-grain es-grain-a"
-        cx="138"
-        cy="138"
-        r="2.4"
-        fill="var(--color-warning-500)"
-      />
-      <circle class="es-grain es-grain-b" cx="138" cy="138" r="2" fill="var(--color-warning-500)" />
-      <circle
-        class="es-grain es-grain-c"
-        cx="138"
-        cy="138"
-        r="2.4"
-        fill="var(--color-warning-600)"
-      />
+      <circle cx="138" cy="138" r="2.4" fill="var(--color-warning-500)">
+        <animateTransform
+          v-if="animated"
+          attributeName="transform"
+          type="translate"
+          values="0 0; 0 46"
+          keyTimes="0;1"
+          dur="1.6s"
+          repeatCount="indefinite"
+        />
+        <animate
+          v-if="animated"
+          attributeName="opacity"
+          values="0;1;1;0"
+          keyTimes="0;0.2;0.85;1"
+          dur="1.6s"
+          repeatCount="indefinite"
+        />
+      </circle>
+      <circle cx="138" cy="138" r="2" fill="var(--color-warning-500)">
+        <animateTransform
+          v-if="animated"
+          attributeName="transform"
+          type="translate"
+          values="0 0; 0 46"
+          keyTimes="0;1"
+          dur="1.6s"
+          repeatCount="indefinite"
+          begin="-0.55s"
+        />
+        <animate
+          v-if="animated"
+          attributeName="opacity"
+          values="0;1;1;0"
+          keyTimes="0;0.2;0.85;1"
+          dur="1.6s"
+          repeatCount="indefinite"
+          begin="-0.55s"
+        />
+      </circle>
+      <circle cx="138" cy="138" r="2.4" fill="var(--color-warning-600)">
+        <animateTransform
+          v-if="animated"
+          attributeName="transform"
+          type="translate"
+          values="0 0; 0 46"
+          keyTimes="0;1"
+          dur="1.6s"
+          repeatCount="indefinite"
+          begin="-1.1s"
+        />
+        <animate
+          v-if="animated"
+          attributeName="opacity"
+          values="0;1;1;0"
+          keyTimes="0;0.2;0.85;1"
+          dur="1.6s"
+          repeatCount="indefinite"
+          begin="-1.1s"
+        />
+      </circle>
     </g>
 
     <!-- SMALL person seated at the base, gazing up -->
     <ellipse cx="252" cy="248" rx="32" ry="6" fill="var(--color-primary-900)" opacity="0.1" />
-    <g class="es-sit">
+    <g>
+      <animateTransform
+        v-if="animated"
+        attributeName="transform"
+        type="translate"
+        values="0 0; 0 -2; 0 0"
+        keyTimes="0;0.5;1"
+        dur="4s"
+        repeatCount="indefinite"
+        calcMode="spline"
+        keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"
+      />
       <!-- folded legs / lap -->
       <path
         d="M230 236 Q230 224 252 224 Q274 224 274 236 L274 242 Q274 246 268 246 L236 246 Q230 246 230 240 Z"
@@ -137,7 +194,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <ellipse cx="247" cy="210" rx="4" ry="3.5" fill="var(--color-illustration-sand)" />
       <!-- head tilted up toward the hourglass -->
-      <g class="es-head">
+      <g>
+        <animateTransform
+          v-if="animated"
+          attributeName="transform"
+          type="rotate"
+          values="-1.5 250 206; 2 250 206; -1.5 250 206"
+          keyTimes="0;0.5;1"
+          dur="5s"
+          repeatCount="indefinite"
+          calcMode="spline"
+          keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"
+        />
         <ellipse
           cx="250"
           cy="200"
@@ -166,97 +234,3 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 withDefaults(defineProps<{ width?: number; animated?: boolean }>(), { width: 300, animated: true });
 </script>
-
-<style scoped>
-/* keep(keyframes): SVG illustration animation. Scoped on purpose (W2.b): the
-   20 illustrations reused generic keyframe names (es-pulse, es-twinkle, …) with
-   DIFFERENT bodies from unscoped blocks — a global name collision where the
-   last-loaded illustration hijacked the others' animations. Vue rewrites scoped
-   keyframe names per component, which ends the collision. All selectors and the
-   es-static gate live in this file's own template. */
-@keyframes es-grain {
-  0% {
-    transform: translateY(0);
-    opacity: 0;
-  }
-  20% {
-    opacity: 1;
-  }
-  85% {
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(46px);
-    opacity: 0;
-  }
-}
-@keyframes es-breathe {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-2px);
-  }
-}
-@keyframes es-gaze {
-  0%,
-  100% {
-    transform: rotate(-1.5deg);
-  }
-  50% {
-    transform: rotate(2deg);
-  }
-}
-
-/* Animations MUST start from this block, not from a template arbitrary utility:
-   Vue's scoped compiler rewrites `@keyframes es-grain` -> `es-grain-<hash>` and
-   rewrites `animation:` in THIS block to match, but it cannot rewrite a class
-   string in the template — an `[animation:es-grain_1.6s_...]` utility there would
-   reference a name that no longer exists, silently killing the motion. The
-   transform-box / transform-origin declarations live here for the same reason:
-   in the template they sat OUTSIDE `class=""` as bare attributes, so they were
-   never classes at all and never applied. transform-box is load-bearing — it
-   picks the reference box these SVG transforms resolve against. */
-.es-grain {
-  transform-box: view-box;
-  transform-origin: center;
-  animation: es-grain 1.6s linear infinite;
-}
-.es-grain-b {
-  animation-delay: -0.55s;
-}
-.es-grain-c {
-  animation-delay: -1.1s;
-}
-.es-sit {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: es-breathe 4s ease-in-out infinite;
-}
-.es-head {
-  transform-box: view-box;
-  /* The intended pivot is viewBox point (250 206). With transform-box: view-box the
-     reference box IS the viewBox (360x280), and percentages resolve against it, so
-     250/360 and 206/280 are that exact point expressed without a px unit. */
-  transform-origin: 69.4444% 73.5714%;
-  animation: es-gaze 5s ease-in-out infinite;
-}
-
-/* Gates must out-specify the rules above. `:where()` adds 0 specificity, so a
-   `:where(.es-grain, …)` gate would score only (0,1,0) from the scoped attribute
-   and LOSE to `.es-grain[data-v]` (0,2,0) — plain lists score (0,2,0) / (0,3,0)
-   and win. */
-.es-static .es-grain,
-.es-static .es-sit,
-.es-static .es-head {
-  animation: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  .es-grain,
-  .es-sit,
-  .es-head {
-    animation: none;
-  }
-}
-</style>

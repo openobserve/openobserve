@@ -77,10 +77,29 @@ const TS_HEX_ALLOWLIST = [
 // chartTheme are the JS *consumption* seams; themeManager is the theme *applier* — it
 // resolves store.state.theme into the mode to apply (upstream of every token, so it
 // cannot consume a token without circularity).
+//   • ThemeSwitcher.vue is the toggle control — can't be written without naming
+//     "dark" (a `darkMode` flag or `theme === 'dark'` compare), so it's the one
+//     canonical home for that decision, not the fragmentation the category targets.
+//   • convertLogData.ts reads --color-theme-accent to paint an ECharts canvas bar.
+//     applyThemeColors (utils/theme.ts) sets that token on document.body in dark and
+//     document.documentElement in light, so the consumer must know which element
+//     carries it — a var() can't resolve on a <canvas>.
 const DARK_SEAM_ALLOWLIST = [
   "composables/useTheme.ts",
   "utils/chartTheme.ts",
   "utils/themeManager.ts",
+  "components/ThemeSwitcher.vue",
+  "utils/logs/convertLogData.ts",
+];
+
+// Files allowed to keep an UNSCOPED <style> block. Unscoped leaks globally so it's
+// debt by default — but a few blocks must reach past the component's own subtree,
+// which `scoped` physically can't:
+//   • ViewDashboard.vue: its @media print / fullscreen rules target external ancestors
+//     (.o2-app-root, main, .o2-content-scroll, .scroll) outside the SFC — unscoped on
+//     purpose (carries a keep(complex-state) note).
+const UNSCOPED_STYLE_ALLOWLIST = [
+  "views/Dashboards/ViewDashboard.vue",
 ];
 
 // Files allowed to carry a literal font stack. Email markup renders inside a mail
@@ -162,11 +181,8 @@ const WHOLE = {
 const STYLE_ONLY = {
   styleBlockHex: /#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/g,
   stylePxUnit: /\b(?:[2-9]|[0-9]{2,})(?:\.[0-9]+)?px\b/g, // 1px hairlines exempt
-  // Raw `var(--color-*)` inside a component style block (F.6). The consumption
-  // ladder wants colours reached via a registered utility, not a raw var() in a
-  // <style> block; ~84% of these already have a utility (AUDIT §7). Ratcheted so
-  // the count can only shrink — the biggest previously-unmeasured debt surface.
-  rawVarInComponent: /var\(\s*--color-[a-z0-9-]+/g,
+  // NOTE: rawVarInComponent (F.6) is NOT a flat regex — it is context-aware and
+  // computed by countRawVarInComponent() below. See that function for why.
 };
 
 function walk(dir, files = []) {
@@ -186,6 +202,69 @@ function styleBlocks(text) {
   let m;
   while ((m = re.exec(text)) !== null) out.push(m[1]);
   return out.join("\n");
+}
+
+// ── rawVarInComponent (F.6), CONTEXT-AWARE ─────────────────────────────────
+// A raw `var(--color-*)` in a component <style> block is debt ONLY where a
+// registered utility (bg-x / text-x / border-x) could replace it. In a few CSS
+// positions a utility physically cannot, so the raw var() is correct — like the
+// TS_HEX / DARK_SEAM allowlists above. We skip an occurrence when it is:
+//   • inside :deep(…)             — a child's internal DOM; no parent class reaches it
+//   • inside color-mix()/gradient — a utility can't be a mix input / colour stop
+//   • a pseudo-element rule (::before/::after/::-webkit-scrollbar/::placeholder…)
+//   • inside @keyframes           — animated colour steps have no utility form
+//   • a CSS custom-property def (--x: var(…)) — a utility can't DEFINE a var
+// Judged PER-OCCURRENCE, not by the block's keep() comment: keep() is mandatory on
+// every surviving block (see countUnjustifiedBlocks), so a block-level exemption
+// would zero the category. A block kept for one keyframe can still carry an
+// avoidable raw var() in a plain rule — this counts that, not the block.
+
+// selector-nesting stack (raw selector texts, incl. leading comments) at `target`
+function selectorStackAt(css, target) {
+  const stack = [];
+  let pending = 0;
+  for (let i = 0; i < target && i < css.length; i++) {
+    const ch = css[i];
+    if (ch === "{") { stack.push(css.slice(pending, i)); pending = i + 1; }
+    else if (ch === "}") { stack.pop(); pending = i + 1; }
+    else if (ch === ";") pending = i + 1;
+  }
+  return stack.join(" ");
+}
+
+// is the occurrence inside an unclosed color-mix()/…gradient() in its declaration?
+function insideColourFn(css, idx) {
+  let s = idx;
+  while (s > 0 && !";{}".includes(css[s - 1])) s--;
+  const chunk = css.slice(s, idx);
+  const k = chunk.search(/(?:color-mix|[a-z-]*gradient)\(/);
+  if (k === -1) return false;
+  let bal = 0;
+  for (let i = chunk.indexOf("(", k); i < chunk.length; i++) {
+    if (chunk[i] === "(") bal++;
+    else if (chunk[i] === ")") bal--;
+  }
+  return bal > 0;
+}
+
+function countRawVarInComponent(styleText) {
+  let n = 0;
+  const reVar = /var\(\s*--color-[a-z0-9-]+/g;
+  let m;
+  while ((m = reVar.exec(styleText)) !== null) {
+    const idx = m.index;
+    // CSS custom-property definition: the declaration key starts with `--`
+    let s = idx;
+    while (s > 0 && !";{}".includes(styleText[s - 1])) s--;
+    if (/^\s*--[\w-]+\s*:/.test(styleText.slice(s, idx))) continue;
+    if (insideColourFn(styleText, idx)) continue;
+    const sel = selectorStackAt(styleText, idx);
+    if (/:deep\(/.test(sel)) continue;   // child component internals
+    if (/::[a-z-]/.test(sel)) continue;  // pseudo-element
+    if (/@keyframes/.test(sel)) continue; // keyframe step
+    n++;
+  }
+  return n;
 }
 
 // Every surviving <style> block must justify its own existence: it opens with
@@ -217,12 +296,22 @@ function countFile(file, rel) {
   const isSpec = rel.includes(".spec.");
 
   if (isVue) {
+    // Per-category sanctioned exceptions (like the .ts allowlists): a file may carry
+    // ONE specific bypass the category can't express, while every OTHER category
+    // still applies in full.
+    //   • darkMechanism → DARK_SEAM_ALLOWLIST (ThemeSwitcher, the toggle control).
+    //   • unscopedStyle → UNSCOPED_STYLE_ALLOWLIST (selectors that must reach external
+    //     ancestors — print / fullscreen — can't be scoped).
+    const skip = (k) =>
+      (k === "darkMechanism" && DARK_SEAM_ALLOWLIST.some((p) => rel.endsWith(p))) ||
+      (k === "unscopedStyle" && UNSCOPED_STYLE_ALLOWLIST.some((p) => rel.endsWith(p)));
     // A component `shape="rounded"` prop (BadgeShape = "pill" | "rounded" |
     // "square") is a first-class API value, NOT a bare Tailwind `rounded` radius
     // class — strip these prop bindings before scanning so bareRounded doesn't
     // false-match them. Real `class="… rounded …"` violations are untouched.
     const scan = text.replace(/:?\bshape=(["'])[^"']*\1/g, "");
     for (const [k, re] of Object.entries(WHOLE)) {
+      if (skip(k)) continue;
       const n = (scan.match(re) || []).length;
       if (n) counts[k] = n;
     }
@@ -231,6 +320,8 @@ function countFile(file, rel) {
       const n = (sb.match(re) || []).length;
       if (n) counts[k] = n;
     }
+    const rawVar = countRawVarInComponent(sb);
+    if (rawVar) counts.rawVarInComponent = rawVar;
     const unjustified = countUnjustifiedBlocks(text);
     if (unjustified) counts.styleKeepComment = unjustified;
   } else {

@@ -1,16 +1,10 @@
 {
   "totals": {
-    "rawVarInComponent": 539,
-    "darkMechanism": 2,
-    "stylePxUnit": 84,
-    "unscopedStyle": 1
+    "rawVarInComponent": 103
   },
   "files": {
-    "components/alerts/AddAlert.vue": {
+    "components/O2AIChat.vue": {
       "rawVarInComponent": 1
-    },
-    "components/alerts/AlertHistoryTimeline.vue": {
-      "rawVarInComponent": 7
     },
     "components/alerts/AlertInsightsContextMenu.vue": {
       "rawVarInComponent": 2
@@ -18,267 +12,59 @@
     "components/alerts/AlertSettingsHelpDrawer.vue": {
       "rawVarInComponent": 49
     },
-    "components/alerts/AlertSummary.vue": {
-      "rawVarInComponent": 14
-    },
     "components/alerts/DestinationPreview.vue": {
       "rawVarInComponent": 4
     },
-    "components/alerts/FilterGroup.vue": {
-      "rawVarInComponent": 4
-    },
-    "components/alerts/ImportSemanticGroups.vue": {
-      "rawVarInComponent": 5
-    },
-    "components/alerts/IncidentRCAAnalysis.vue": {
-      "rawVarInComponent": 36
-    },
-    "components/alerts/SemanticFieldGroupsConfig.vue": {
-      "rawVarInComponent": 1
-    },
-    "components/anomaly_detection/AnomalySummary.vue": {
-      "rawVarInComponent": 7
-    },
-    "components/CodeQueryEditor.vue": {
-      "rawVarInComponent": 2
-    },
-    "components/dashboards/addPanel/DrilldownUserGuide.vue": {
-      "rawVarInComponent": 2
-    },
-    "components/dashboards/panels/TableRenderer.vue": {
-      "rawVarInComponent": 8
-    },
-    "components/dashboards/QueryInspector.vue": {
-      "rawVarInComponent": 4
-    },
-    "components/functions/FunctionList.vue": {
-      "rawVarInComponent": 2
-    },
-    "components/Header.vue": {
-      "rawVarInComponent": 2
-    },
     "components/ingestion/ai/content/AIIntegrationCard.vue": {
-      "rawVarInComponent": 2
-    },
-    "components/ingestion/setupCard/SetupCardRenderer.vue": {
-      "rawVarInComponent": 17
-    },
-    "components/logstream/schema.vue": {
-      "rawVarInComponent": 2
-    },
-    "components/O2AIChat.vue": {
-      "rawVarInComponent": 50
-    },
-    "components/OrganizationSelector.vue": {
-      "rawVarInComponent": 2
-    },
-    "components/pipeline/PipelineView.vue": {
-      "rawVarInComponent": 15
-    },
-    "components/RichTextInput.vue": {
-      "rawVarInComponent": 18
+      "rawVarInComponent": 1
     },
     "components/rum/errorTracking/view/ErrorEvents.vue": {
-      "rawVarInComponent": 7
-    },
-    "components/rum/PlayerTracesTab.vue": {
-      "rawVarInComponent": 1
-    },
-    "components/settings/License.vue": {
-      "rawVarInComponent": 4
+      "rawVarInComponent": 5
     },
     "components/settings/Nodes.vue": {
-      "rawVarInComponent": 6
-    },
-    "components/TenstackTable.vue": {
       "rawVarInComponent": 3
     },
-    "components/ThemeSwitcher.vue": {
-      "darkMechanism": 1
-    },
     "enterprise/components/onlineEvals/forms/ScoreConfigDetail.vue": {
-      "rawVarInComponent": 4
+      "rawVarInComponent": 1
     },
     "enterprise/components/onlineEvals/forms/ScoreConfigDialog.vue": {
-      "rawVarInComponent": 6
+      "rawVarInComponent": 2
     },
     "enterprise/components/onlineEvals/forms/ScorerDetail.vue": {
-      "rawVarInComponent": 29
+      "rawVarInComponent": 5
     },
     "enterprise/components/onlineEvals/forms/ScorerFormPage.vue": {
       "rawVarInComponent": 1
     },
     "lib/core/Code/OCodeBlock.vue": {
-      "rawVarInComponent": 13
+      "rawVarInComponent": 2
     },
     "lib/core/EmptyState/EmptyStateIngestionCard.vue": {
-      "rawVarInComponent": 12
+      "rawVarInComponent": 7
     },
     "lib/core/EmptyState/EmptyStateIngestionChip.vue": {
-      "rawVarInComponent": 5
-    },
-    "lib/core/EmptyState/illustrations/EmptyAlert.vue": {
-      "stylePxUnit": 2
-    },
-    "lib/core/EmptyState/illustrations/EmptyAllClear.vue": {
-      "stylePxUnit": 4
-    },
-    "lib/core/EmptyState/illustrations/EmptyBoard.vue": {
-      "stylePxUnit": 1
-    },
-    "lib/core/EmptyState/illustrations/EmptyBrokenPanel.vue": {
-      "stylePxUnit": 3
-    },
-    "lib/core/EmptyState/illustrations/EmptyBuilder.vue": {
-      "stylePxUnit": 12
-    },
-    "lib/core/EmptyState/illustrations/EmptyConnect.vue": {
-      "stylePxUnit": 15
-    },
-    "lib/core/EmptyState/illustrations/EmptyError.vue": {
-      "stylePxUnit": 8
-    },
-    "lib/core/EmptyState/illustrations/EmptyExplorer.vue": {
-      "stylePxUnit": 7
-    },
-    "lib/core/EmptyState/illustrations/EmptyFunction.vue": {
-      "stylePxUnit": 5
-    },
-    "lib/core/EmptyState/illustrations/EmptyHistory.vue": {
-      "stylePxUnit": 4
-    },
-    "lib/core/EmptyState/illustrations/EmptyHourglass.vue": {
-      "stylePxUnit": 1
-    },
-    "lib/core/EmptyState/illustrations/EmptyPipeline.vue": {
-      "stylePxUnit": 2
-    },
-    "lib/core/EmptyState/illustrations/EmptyReport.vue": {
-      "stylePxUnit": 3
-    },
-    "lib/core/EmptyState/illustrations/EmptySchedule.vue": {
-      "stylePxUnit": 2
-    },
-    "lib/core/EmptyState/illustrations/EmptyServiceGraph.vue": {
-      "stylePxUnit": 12
-    },
-    "lib/core/EmptyState/illustrations/EmptyTrace.vue": {
-      "stylePxUnit": 1
-    },
-    "lib/core/EmptyState/illustrations/EmptyWaiting.vue": {
-      "stylePxUnit": 2
-    },
-    "lib/core/Navbar/ONavbar.vue": {
-      "rawVarInComponent": 1
-    },
-    "lib/core/Splitter/OSplitter.vue": {
-      "rawVarInComponent": 1
-    },
-    "lib/core/Table/OTable.vue": {
-      "rawVarInComponent": 1
+      "rawVarInComponent": 3
     },
     "lib/core/Table/sub-components/OTableBody.vue": {
       "rawVarInComponent": 2
     },
-    "lib/core/Table/sub-components/OTableBodyCell.vue": {
-      "rawVarInComponent": 3
-    },
-    "lib/core/Table/sub-components/OTableBodyRow.vue": {
-      "rawVarInComponent": 1
-    },
-    "lib/feedback/Skeleton/OSkeleton.vue": {
-      "rawVarInComponent": 1
-    },
-    "lib/forms/DateTimeRange/ODateRangeCalendar.vue": {
-      "rawVarInComponent": 2
-    },
-    "lib/lists/FieldList/OFieldList.vue": {
-      "rawVarInComponent": 1
-    },
-    "plugins/logs/DetailTable.vue": {
-      "rawVarInComponent": 2
-    },
-    "plugins/logs/IndexList.vue": {
-      "rawVarInComponent": 1
-    },
-    "plugins/logs/patterns/PatternList.vue": {
-      "rawVarInComponent": 6
-    },
     "plugins/logs/SearchBar.vue": {
       "rawVarInComponent": 1
     },
-    "plugins/logs/SearchResult.vue": {
-      "rawVarInComponent": 16
-    },
     "plugins/logs/TenstackTable.vue": {
-      "rawVarInComponent": 5
-    },
-    "plugins/pipelines/CustomNode.vue": {
-      "rawVarInComponent": 10
-    },
-    "plugins/traces/components/TraceErrorTab.vue": {
-      "rawVarInComponent": 14
-    },
-    "plugins/traces/Index.vue": {
       "rawVarInComponent": 2
-    },
-    "plugins/traces/IndexList.vue": {
-      "rawVarInComponent": 2
-    },
-    "plugins/traces/LLMContentRenderer.vue": {
-      "rawVarInComponent": 7
-    },
-    "plugins/traces/LLMInsightsSkeleton.vue": {
-      "rawVarInComponent": 3
-    },
-    "plugins/traces/metrics/TracesAnalysisDashboard.vue": {
-      "rawVarInComponent": 1
-    },
-    "plugins/traces/SearchResult.vue": {
-      "rawVarInComponent": 1
-    },
-    "plugins/traces/ServiceGraphNodeSidePanel.vue": {
-      "rawVarInComponent": 9
-    },
-    "plugins/traces/SessionDetails.vue": {
-      "rawVarInComponent": 9
     },
     "plugins/traces/ThreadToolCalls.vue": {
-      "rawVarInComponent": 28
-    },
-    "plugins/traces/ThreadView.vue": {
-      "rawVarInComponent": 9
-    },
-    "plugins/traces/TraceDAG.vue": {
-      "rawVarInComponent": 1
+      "rawVarInComponent": 6
     },
     "plugins/traces/TraceDetails.vue": {
       "rawVarInComponent": 2
     },
     "plugins/traces/TraceDetailsSidebar.vue": {
-      "rawVarInComponent": 17
-    },
-    "plugins/traces/TraceTree.vue": {
-      "rawVarInComponent": 2
-    },
-    "utils/logs/convertLogData.ts": {
-      "darkMechanism": 1
-    },
-    "views/Dashboards/DashboardSettings.vue": {
       "rawVarInComponent": 3
     },
-    "views/Dashboards/RenderDashboardCharts.vue": {
-      "rawVarInComponent": 4
-    },
-    "views/Dashboards/ScheduledDashboards.vue": {
-      "rawVarInComponent": 5
-    },
     "views/Dashboards/ViewDashboard.vue": {
-      "unscopedStyle": 1,
       "rawVarInComponent": 1
-    },
-    "views/HomeView.vue": {
-      "rawVarInComponent": 18
     }
   }
 }

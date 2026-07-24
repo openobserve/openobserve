@@ -440,7 +440,7 @@ function fireConfetti() {
       <!-- Hero -->
       <div class="c-hero">
         <div class="c-hero-head">
-          <span class="ds-mono xl" :class="{ logo: logoSrc }">
+          <span class="ds-mono xl text-white" :class="{ logo: logoSrc }">
             <img
               v-if="logoSrc"
               :src="logoSrc"
@@ -942,8 +942,6 @@ function fireConfetti() {
   place-items: center;
   font-weight: 800;
   font-size: var(--text-xs);
-  /* The tile is filled with the theme accent, so the monogram is always knocked out. */
-  color: var(--color-white);
   letter-spacing: -0.02em;
   background: var(--clay-bright);
 }

@@ -18,8 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   EmptyError — "something went wrong". Composition: a person slumped low on the
   floor, head in hands, under a BIG leaning cracked panel that looms over them —
   a compact, low, dejected layout unlike any upright scene. Micro-anim: the
-  warning pulses, the panel creaks (tiny tilt), shards drift. CSS motion gated by
-  `animated` + prefers-reduced-motion.
+  warning pulses, the panel creaks (tiny tilt), shards drift. Pure SMIL motion
+  gated behind `animated` (prefers-reduced-motion; OEmptyState wires this up
+  automatically).
 -->
 <template>
   <svg
@@ -29,7 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     xmlns="http://www.w3.org/2000/svg"
     role="img"
     aria-label="Something went wrong"
-    :class="['es-root', { 'es-static': !animated }]"
   >
     <!-- jagged backdrop -->
     <path
@@ -39,18 +39,97 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- floating shards -->
-    <path class="es-frag es-frag-a" d="M286 120 l10 4 -4 9 z" fill="var(--color-primary-300)" />
-    <path
-      class="es-frag es-frag-b"
-      d="M256 70 l8 -5 4 9 z"
-      fill="var(--color-error-400)"
-      opacity="0.7"
-    />
+    <path d="M286 120 l10 4 -4 9 z" fill="var(--color-primary-300)">
+      <animateTransform
+        v-if="animated"
+        attributeName="transform"
+        type="translate"
+        values="0 0; 0 -9; 0 0"
+        keyTimes="0;0.5;1"
+        dur="5s"
+        repeatCount="indefinite"
+        calcMode="spline"
+        keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"
+        additive="sum"
+      />
+      <animateTransform
+        v-if="animated"
+        attributeName="transform"
+        type="rotate"
+        values="0 291 126.5; 35 291 126.5; 0 291 126.5"
+        keyTimes="0;0.5;1"
+        dur="5s"
+        repeatCount="indefinite"
+        calcMode="spline"
+        keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"
+        additive="sum"
+      />
+      <animate
+        v-if="animated"
+        attributeName="opacity"
+        values="0.6; 1; 0.6"
+        keyTimes="0;0.5;1"
+        dur="5s"
+        repeatCount="indefinite"
+        calcMode="spline"
+        keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"
+      />
+    </path>
+    <path d="M256 70 l8 -5 4 9 z" fill="var(--color-error-400)" opacity="0.7">
+      <animateTransform
+        v-if="animated"
+        attributeName="transform"
+        type="translate"
+        values="0 0; 0 -9; 0 0"
+        keyTimes="0;0.5;1"
+        dur="6.2s"
+        begin="-2s"
+        repeatCount="indefinite"
+        calcMode="spline"
+        keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"
+        additive="sum"
+      />
+      <animateTransform
+        v-if="animated"
+        attributeName="transform"
+        type="rotate"
+        values="0 262 69.5; 35 262 69.5; 0 262 69.5"
+        keyTimes="0;0.5;1"
+        dur="6.2s"
+        begin="-2s"
+        repeatCount="indefinite"
+        calcMode="spline"
+        keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"
+        additive="sum"
+      />
+      <animate
+        v-if="animated"
+        attributeName="opacity"
+        values="0.6; 1; 0.6"
+        keyTimes="0;0.5;1"
+        dur="6.2s"
+        begin="-2s"
+        repeatCount="indefinite"
+        calcMode="spline"
+        keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"
+      />
+    </path>
 
     <ellipse cx="186" cy="252" rx="120" ry="11" fill="var(--color-primary-900)" opacity="0.12" />
 
     <!-- big leaning cracked panel (looms over) -->
-    <g class="es-panel">
+    <g>
+      <animateTransform
+        v-if="animated"
+        attributeName="transform"
+        type="rotate"
+        values="-6 103 198; -7.5 103 198; -6 103 198"
+        keyTimes="0;0.5;1"
+        dur="5s"
+        repeatCount="indefinite"
+        calcMode="spline"
+        keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"
+      />
       <rect
         x="42"
         y="74"
@@ -96,8 +175,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </g>
 
-    <!-- warning (pulses) -->
-    <g class="es-warn">
+    <!-- warning (pulses): scale about centre (214 107); the paired translate keeps it in place -->
+    <g>
+      <animateTransform
+        v-if="animated"
+        attributeName="transform"
+        type="translate"
+        values="0 0; -12.84 -6.42; 0 0"
+        keyTimes="0;0.5;1"
+        dur="2.2s"
+        repeatCount="indefinite"
+        calcMode="spline"
+        keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"
+        additive="sum"
+      />
+      <animateTransform
+        v-if="animated"
+        attributeName="transform"
+        type="scale"
+        values="1; 1.06; 1"
+        keyTimes="0;0.5;1"
+        dur="2.2s"
+        repeatCount="indefinite"
+        calcMode="spline"
+        keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"
+        additive="sum"
+      />
+      <animate
+        v-if="animated"
+        attributeName="opacity"
+        values="0.92; 1; 0.92"
+        keyTimes="0;0.5;1"
+        dur="2.2s"
+        repeatCount="indefinite"
+        calcMode="spline"
+        keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"
+      />
       <path
         d="M214 86 L238 128 H190 Z"
         fill="var(--color-warning-100)"
@@ -118,7 +231,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </g>
 
     <!-- slumped person (head in hands) -->
-    <g class="es-slump">
+    <g>
+      <animateTransform
+        v-if="animated"
+        attributeName="transform"
+        type="translate"
+        values="0 0; 0 2; 0 0"
+        keyTimes="0;0.5;1"
+        dur="4.6s"
+        repeatCount="indefinite"
+        calcMode="spline"
+        keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"
+      />
       <!-- bent legs / knees up -->
       <path
         d="M176 244 L176 214 Q176 204 188 204 L210 210 Q218 212 218 222 L218 244 Z"
@@ -150,7 +274,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <!-- bowed head, face hidden in hands -->
-      <g class="es-head">
+      <g>
+        <animateTransform
+          v-if="animated"
+          attributeName="transform"
+          type="translate"
+          values="0 0; 0 2; 0 0"
+          keyTimes="0;0.5;1"
+          dur="4.6s"
+          repeatCount="indefinite"
+          calcMode="spline"
+          keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"
+        />
         <ellipse
           cx="198"
           cy="184"
@@ -188,92 +323,3 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 withDefaults(defineProps<{ width?: number; animated?: boolean }>(), { width: 300, animated: true });
 </script>
-
-<style scoped>
-/* keep(keyframes): SVG illustration animation. Scoped on purpose (W2.b): the
-   20 illustrations reused generic keyframe names (es-pulse, es-twinkle, …) with
-   DIFFERENT bodies from unscoped blocks — a global name collision where the
-   last-loaded illustration hijacked the others' animations. Vue rewrites scoped
-   keyframe names per component, which ends the collision. All selectors and the
-   es-static gate live in this file's own template. */
-.es-warn,
-.es-frag {
-  transform-box: fill-box;
-  transform-origin: center;
-}
-.es-warn {
-  animation: es-pulse 2.2s ease-in-out infinite;
-}
-.es-panel {
-  transform-box: view-box;
-  transform-origin: 103px 198px;
-  animation: es-creak 5s ease-in-out infinite;
-}
-.es-slump {
-  transform-box: view-box;
-  transform-origin: 198px 244px;
-  animation: es-sigh 4.6s ease-in-out infinite;
-}
-.es-head {
-  transform-box: view-box;
-  transform-origin: 198px 198px;
-  animation: es-sigh 4.6s ease-in-out infinite;
-}
-.es-frag-a {
-  animation: es-frag 5s ease-in-out infinite;
-}
-.es-frag-b {
-  animation: es-frag 6.2s ease-in-out infinite;
-  animation-delay: -2s;
-}
-
-@keyframes es-pulse {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 0.92;
-  }
-  50% {
-    transform: scale(1.06);
-    opacity: 1;
-  }
-}
-@keyframes es-creak {
-  0%,
-  100% {
-    transform: rotate(-6deg);
-  }
-  50% {
-    transform: rotate(-7.5deg);
-  }
-}
-@keyframes es-sigh {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(2px);
-  }
-}
-@keyframes es-frag {
-  0%,
-  100% {
-    transform: translateY(0) rotate(0deg);
-    opacity: 0.6;
-  }
-  50% {
-    transform: translateY(-9px) rotate(35deg);
-    opacity: 1;
-  }
-}
-
-.es-static :where(.es-warn, .es-panel, .es-slump, .es-head, .es-frag) {
-  animation: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  :where(.es-warn, .es-panel, .es-slump, .es-head, .es-frag) {
-    animation: none;
-  }
-}
-</style>

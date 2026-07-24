@@ -18,8 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   EmptyAllClear — "you're all caught up". Composition: a fully RECLINED figure
   kicked back on a beanbag, feet up, hands behind head — a horizontal/diagonal
   body axis that contrasts with every upright scene. Micro-anim: sun-rays rotate,
-  the check badge pops + draws, sparkles twinkle. CSS motion gated by `animated`
-  + prefers-reduced-motion.
+  the check badge pops + draws, sparkles twinkle. Pure SMIL motion gated behind
+  `animated` (prefers-reduced-motion; OEmptyState wires this up automatically).
 -->
 <template>
   <svg
@@ -29,17 +29,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     xmlns="http://www.w3.org/2000/svg"
     role="img"
     aria-label="You're all caught up"
-    :class="['es-root', { 'es-static': !animated }]"
   >
     <!-- glow + slow rays (upper right) -->
     <circle cx="262" cy="92" r="58" fill="var(--color-warning-300)" opacity="0.12" />
-    <g
-      class="es-rays"
-      stroke="var(--color-warning-400)"
-      stroke-width="3"
-      stroke-linecap="round"
-      opacity="0.5"
-    >
+    <g stroke="var(--color-warning-400)" stroke-width="3" stroke-linecap="round" opacity="0.5">
+      <animateTransform
+        v-if="animated"
+        attributeName="transform"
+        type="rotate"
+        values="0 262 92; 360 262 92"
+        keyTimes="0;1"
+        dur="22s"
+        repeatCount="indefinite"
+      />
       <line x1="262" y1="30" x2="262" y2="18" />
       <line x1="262" y1="154" x2="262" y2="166" />
       <line x1="200" y1="92" x2="188" y2="92" />
@@ -51,7 +53,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </g>
 
     <!-- check badge (pops) -->
-    <g class="es-badge">
+    <!-- scale about centre (262 92); the paired translate keeps that centre fixed -->
+    <g>
+      <animateTransform
+        v-if="animated"
+        attributeName="transform"
+        type="translate"
+        values="0 0; 0 0; -18.34 -6.44; 0 0; 0 0"
+        keyTimes="0;0.46;0.54;0.66;1"
+        dur="3.4s"
+        repeatCount="indefinite"
+        additive="sum"
+        calcMode="spline"
+        keySplines="0.42 0 0.58 1; 0.42 0 0.58 1; 0.42 0 0.58 1; 0.42 0 0.58 1"
+      />
+      <animateTransform
+        v-if="animated"
+        attributeName="transform"
+        type="scale"
+        values="1;1;1.07;1;1"
+        keyTimes="0;0.46;0.54;0.66;1"
+        dur="3.4s"
+        repeatCount="indefinite"
+        additive="sum"
+        calcMode="spline"
+        keySplines="0.42 0 0.58 1; 0.42 0 0.58 1; 0.42 0 0.58 1; 0.42 0 0.58 1"
+      />
       <circle cx="262" cy="92" r="26" fill="var(--color-success-100)" />
       <circle
         cx="262"
@@ -62,22 +89,80 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         stroke-width="2.5"
       />
       <path
-        class="es-check"
         d="M251 93 L259 101 L275 84"
         fill="none"
         stroke="var(--color-success-700)"
         stroke-width="5"
         stroke-linecap="round"
         stroke-linejoin="round"
-      />
+        stroke-dasharray="40"
+      >
+        <animate
+          v-if="animated"
+          attributeName="stroke-dashoffset"
+          values="40;40;0;0"
+          keyTimes="0;0.4;0.6;1"
+          dur="3.4s"
+          repeatCount="indefinite"
+          calcMode="spline"
+          keySplines="0.42 0 0.58 1; 0.42 0 0.58 1; 0.42 0 0.58 1"
+        />
+      </path>
     </g>
-    <g class="es-spark es-spark-a" transform="translate(300 120)">
+    <!-- twinkling sparkles: star drawn around 0,0, additive scale twinkles in place; b's negative begin desyncs it from a -->
+    <g transform="translate(300 120)">
+      <animate
+        v-if="animated"
+        attributeName="opacity"
+        values="0.35;1;0.35"
+        keyTimes="0;0.5;1"
+        dur="2.4s"
+        repeatCount="indefinite"
+        calcMode="spline"
+        keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"
+      />
+      <animateTransform
+        v-if="animated"
+        attributeName="transform"
+        type="scale"
+        values="0.6;1.1;0.6"
+        additive="sum"
+        keyTimes="0;0.5;1"
+        dur="2.4s"
+        repeatCount="indefinite"
+        calcMode="spline"
+        keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"
+      />
       <path
         d="M0 -6 L1.4 -1.4 L6 0 L1.4 1.4 L0 6 L-1.4 1.4 L-6 0 L-1.4 -1.4 Z"
         fill="var(--color-success-500)"
       />
     </g>
-    <g class="es-spark es-spark-b" transform="translate(224 60)">
+    <g transform="translate(224 60)">
+      <animate
+        v-if="animated"
+        attributeName="opacity"
+        values="0.35;1;0.35"
+        keyTimes="0;0.5;1"
+        dur="3s"
+        begin="-1s"
+        repeatCount="indefinite"
+        calcMode="spline"
+        keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"
+      />
+      <animateTransform
+        v-if="animated"
+        attributeName="transform"
+        type="scale"
+        values="0.6;1.1;0.6"
+        additive="sum"
+        keyTimes="0;0.5;1"
+        dur="3s"
+        begin="-1s"
+        repeatCount="indefinite"
+        calcMode="spline"
+        keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"
+      />
       <path
         d="M0 -5 L1.2 -1.2 L5 0 L1.2 1.2 L0 5 L-1.2 1.2 L-5 0 L-1.2 -1.2 Z"
         fill="var(--color-primary-400)"
@@ -104,8 +189,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       stroke-width="2"
     />
 
-    <!-- reclined character -->
-    <g class="es-recline">
+    <!-- reclined character (breathes with a gentle rotate about 150 210) -->
+    <g>
+      <animateTransform
+        v-if="animated"
+        attributeName="transform"
+        type="rotate"
+        values="-0.8 150 210; 0.8 150 210; -0.8 150 210"
+        keyTimes="0;0.5;1"
+        dur="5.5s"
+        repeatCount="indefinite"
+        calcMode="spline"
+        keySplines="0.42 0 0.58 1; 0.42 0 0.58 1"
+      />
       <!-- legs extended onto the pouf, ankles crossed -->
       <path
         d="M150 206 L226 196 L250 200 L250 207 L228 205 L152 216 Z"
@@ -183,99 +279,3 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 withDefaults(defineProps<{ width?: number; animated?: boolean }>(), { width: 300, animated: true });
 </script>
-
-<style scoped>
-/* keep(keyframes): SVG illustration animation. Scoped on purpose (W2.b): the
-   20 illustrations reused generic keyframe names (es-pulse, es-twinkle, …) with
-   DIFFERENT bodies from unscoped blocks — a global name collision where the
-   last-loaded illustration hijacked the others' animations. Vue rewrites scoped
-   keyframe names per component, which ends the collision. All selectors and the
-   es-static gate live in this file's own template. */
-.es-badge,
-.es-spark {
-  transform-box: fill-box;
-  transform-origin: center;
-}
-.es-rays {
-  transform-box: view-box;
-  transform-origin: 262px 92px;
-  animation: es-rays 22s linear infinite;
-}
-.es-badge {
-  animation: es-pop 3.4s ease-in-out infinite;
-}
-.es-check {
-  stroke-dasharray: 40;
-  animation: es-draw 3.4s ease-in-out infinite;
-}
-.es-recline {
-  transform-box: view-box;
-  transform-origin: 150px 210px;
-  animation: es-rest 5.5s ease-in-out infinite;
-}
-.es-spark-a {
-  animation: es-twinkle 2.4s ease-in-out infinite;
-}
-.es-spark-b {
-  animation: es-twinkle 3s ease-in-out infinite;
-  animation-delay: -1s;
-}
-
-@keyframes es-rays {
-  to {
-    transform: rotate(360deg);
-  }
-}
-@keyframes es-pop {
-  0%,
-  46%,
-  100% {
-    transform: scale(1);
-  }
-  54% {
-    transform: scale(1.07);
-  }
-  66% {
-    transform: scale(1);
-  }
-}
-@keyframes es-draw {
-  0%,
-  40% {
-    stroke-dashoffset: 40;
-  }
-  60%,
-  100% {
-    stroke-dashoffset: 0;
-  }
-}
-@keyframes es-rest {
-  0%,
-  100% {
-    transform: rotate(-0.8deg);
-  }
-  50% {
-    transform: rotate(0.8deg);
-  }
-}
-@keyframes es-twinkle {
-  0%,
-  100% {
-    transform: scale(0.6);
-    opacity: 0.35;
-  }
-  50% {
-    transform: scale(1.1);
-    opacity: 1;
-  }
-}
-
-.es-static :where(.es-rays, .es-badge, .es-check, .es-recline, .es-spark) {
-  animation: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  :where(.es-rays, .es-badge, .es-check, .es-recline, .es-spark) {
-    animation: none;
-  }
-}
-</style>
