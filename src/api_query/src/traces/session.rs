@@ -1464,10 +1464,11 @@ fn extract_first_user_message(value: &json::Value, max_len: usize) -> Option<Str
                 return extract_first_user_message(messages, max_len);
             }
 
-            if let Some(role) = value.get("role").and_then(|value| value.as_str()) {
-                if !role.eq_ignore_ascii_case("user") && !role.eq_ignore_ascii_case("human") {
-                    return None;
-                }
+            if let Some(role) = value.get("role").and_then(|value| value.as_str())
+                && !role.eq_ignore_ascii_case("user")
+                && !role.eq_ignore_ascii_case("human")
+            {
+                return None;
             }
 
             any_value_to_text(&json::Value::Object(value.clone()))

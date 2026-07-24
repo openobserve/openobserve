@@ -268,9 +268,7 @@ function messageFromAnyValue(value: unknown, defaultRole: Role): Message | null 
   const role = normalizeRole(record?.role ?? defaultRole);
   const hasMessageContent =
     record !== null && ("content" in record || "text" in record || "parts" in record);
-  const rawContent = hasMessageContent
-    ? (record.content ?? record.text ?? record.parts)
-    : value;
+  const rawContent = hasMessageContent ? (record.content ?? record.text ?? record.parts) : value;
   const content = hasMessageContent ? extractContent(rawContent) : anyValueToText(rawContent);
 
   if (!content.trim()) return null;

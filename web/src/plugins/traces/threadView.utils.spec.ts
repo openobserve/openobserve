@@ -463,9 +463,7 @@ describe("messagesFromInput", () => {
     expect(messagesFromInput("plain text")).toEqual([
       { role: "user", content: "plain text", sig: "user::plain text" },
     ]);
-    expect(messagesFromInput(42)).toEqual([
-      { role: "user", content: "42", sig: "user::42" },
-    ]);
+    expect(messagesFromInput(42)).toEqual([{ role: "user", content: "42", sig: "user::42" }]);
     expect(messagesFromInput(false)).toEqual([
       { role: "user", content: "false", sig: "user::false" },
     ]);
