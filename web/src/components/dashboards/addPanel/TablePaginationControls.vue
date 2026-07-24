@@ -139,12 +139,24 @@ export default defineComponent({
       return `${start}-${end} of ${totalRows}`;
     });
 
-    const formattedPaginationOptions = computed(() =>
-      props.paginationOptions.map((opt) => ({
+    const formattedPaginationOptions = computed(() => {
+      const opts = [...props.paginationOptions];
+      // Include the active page size (e.g. a custom "Records per page" typed in
+      // the panel config) when it isn't one of the presets, so the dropdown
+      // reflects it instead of rendering blank. Inserted in ascending position
+      // among the positive options; the existing order (incl. any 0 = "All") is
+      // otherwise left untouched.
+      const current = props.pagination?.rowsPerPage;
+      if (current != null && current > 0 && !opts.includes(current)) {
+        const idx = opts.findIndex((o) => o !== 0 && o > current);
+        if (idx === -1) opts.push(current);
+        else opts.splice(idx, 0, current);
+      }
+      return opts.map((opt) => ({
         label: opt === 0 ? "All" : String(opt),
         value: opt,
-      })),
-    );
+      }));
+    });
 
     return {
       countDisplay,
