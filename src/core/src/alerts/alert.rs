@@ -51,11 +51,12 @@ use db::{
     self,
     authz::{remove_ownership, set_ownership},
     folders,
+    workflows::AssociationDeleteEvent,
 };
 use infra::{
     db::{ORM_CLIENT, connect_to_orm},
     schema::unwrap_stream_settings,
-    table,
+    table::{self, workflows::WorkflowTriggerEntity},
 };
 use itertools::Itertools;
 use lettre::{AsyncTransport, Message, message::MultiPart};
@@ -630,6 +631,59 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     let stream_name = alert.stream_name.clone();
 
     prepare_alert(org_id, &stream_name, &alert_name, &mut alert, false, false).await?;
+
+    if let Some(ref id) = alert.id {
+        let (_, old_alert) = get_by_id(conn, org_id, id.to_owned()).await?;
+        let old_workflows = old_alert.workflows;
+
+        if old_workflows != alert.workflows {
+            let mut removed = Vec::new();
+            let mut added = Vec::new();
+            for w in &old_workflows {
+                if !alert.workflows.contains(w) {
+                    removed.push(w.clone());
+                }
+            }
+            for w in &alert.workflows {
+                if !old_workflows.contains(w) {
+                    added.push(w.clone());
+                }
+            }
+
+            for r in removed {
+                if let Err(e) =
+                    db::workflows::delete_workflow_association(AssociationDeleteEvent::Specific {
+                        org_id: org_id.to_string(),
+                        entity_id: id.to_string(),
+                        workflow_id: r.clone(),
+                    })
+                    .await
+                {
+                    log::error!(
+                        "error updating workflow association for alert update : error removing old workflow association of {org_id}/{r} for alert {} : {e}",
+                        id
+                    );
+                }
+            }
+
+            for a in added {
+                if let Err(e) = db::workflows::associate_workflow(
+                    org_id,
+                    &a,
+                    &id.to_string(),
+                    WorkflowTriggerEntity::Alert.to_string(),
+                    WorkflowTriggerType::AlertFired.to_string(),
+                )
+                .await
+                {
+                    log::error!(
+                        "error updating workflow association for alert update : error adding new workflow association of {org_id}/{a} for alert {} : {e}",
+                        id
+                    );
+                }
+            }
+        }
+    }
 
     let alert = db::alerts::alert::update(conn, org_id, dst_folder_id_info, alert).await?;
     #[cfg(feature = "enterprise")]

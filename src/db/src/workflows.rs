@@ -28,9 +28,23 @@ use tokio::sync::RwLock;
 
 #[derive(Serialize, Deserialize)]
 pub enum AssociationDeleteEvent {
-    Workflow { org_id: String, workflow_id: String },
-    Entity { org_id: String, entity_id: String },
-    Trigger { org_id: String, trigger: String },
+    Workflow {
+        org_id: String,
+        workflow_id: String,
+    },
+    Entity {
+        org_id: String,
+        entity_id: String,
+    },
+    Trigger {
+        org_id: String,
+        trigger: String,
+    },
+    Specific {
+        org_id: String,
+        entity_id: String,
+        workflow_id: String,
+    },
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
@@ -285,6 +299,17 @@ pub async fn delete_workflow_association(
             org = org_id;
             trigger_type = trigger;
             infra::table::workflows::delete_association_by_trigger(&org_id, &trigger).await?;
+        }
+        AssociationDeleteEvent::Specific {
+            org_id,
+            entity_id,
+            workflow_id,
+        } => {
+            org = org_id;
+            entity = entity_id;
+            workflow = workflow_id;
+            infra::table::workflows::delete_workflow_association(org_id, workflow_id, entity_id)
+                .await?;
         }
     }
 
