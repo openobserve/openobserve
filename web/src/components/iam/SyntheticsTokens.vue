@@ -189,15 +189,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="mb-1 text-xs font-medium text-text-label">
         {{ t('synthetics.tokens.rawTokenLabel') }}
       </div>
-      <div class="p-2.5 border border-dashed rounded-default border-border-default mb-1 bg-surface-subtle">
+      <div class="p-2.5 border border-dashed rounded-default border-border-default mb-3 bg-surface-subtle">
         <code class="break-all font-mono text-sm">{{ revealedToken?.token }}</code>
       </div>
-      <div class="mb-3 text-xs text-text-secondary">
+
+      <!-- Ready-to-run install command with the named token baked in. -->
+      <template v-if="installCommand">
+        <div class="mb-1 text-xs font-medium text-text-label">
+          {{ t('synthetics.tokens.installCmdLabel') }}
+        </div>
+        <div class="relative mb-1">
+          <pre
+            class="bg-surface-subtle border border-border-default rounded-default p-3 text-xs font-mono overflow-x-auto whitespace-pre"
+            data-test="synthetics-token-install-cmd"
+            >{{ installCommand }}</pre
+          >
+          <OButton
+            variant="ghost"
+            size="icon-sm"
+            icon-left="content-copy"
+            class="absolute top-1 right-1"
+            :title="t('common.copy')"
+            data-test="synthetics-token-copy-cmd-btn"
+            @click="copyCommand"
+          />
+        </div>
+        <div class="mb-3 text-xs text-text-secondary">
+          {{ t('synthetics.tokens.installCmdHint') }}
+        </div>
+      </template>
+      <div v-else class="mb-3 text-xs text-text-secondary">
         {{ t('synthetics.tokens.installHint') }}
       </div>
-      <div class="flex justify-end">
+
+      <div class="flex justify-end gap-2">
         <OButton
-          variant="primary"
+          :variant="installCommand ? 'outline' : 'primary'"
           size="sm-action"
           icon="content-copy"
           data-test="synthetics-token-copy-btn"
@@ -205,13 +232,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t('synthetics.tokens.copyTokenBtn') }}
         </OButton>
+        <OButton
+          v-if="installCommand"
+          variant="primary"
+          size="sm-action"
+          icon="content-copy"
+          data-test="synthetics-token-copy-cmd-primary-btn"
+          @click="copyCommand"
+        >
+          {{ t('synthetics.tokens.copyCmdBtn') }}
+        </OButton>
       </div>
     </ODialog>
   </OPageLayout>
 </template>
 
 <script lang="ts">
-import { ref, defineComponent, onBeforeMount } from "vue";
+import { ref, computed, defineComponent, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -236,6 +273,7 @@ import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import syntheticsService from "@/services/synthetics";
+import type { AgentSetup } from "@/types/synthetics";
 
 interface AgentToken {
   name: string;
@@ -265,6 +303,27 @@ export default defineComponent({
     const showCreateForm = ref(false);
     const showRevealedDialog = ref(false);
     const revealedToken = ref<{ name: string; token: string } | null>(null);
+    // Install-command ingredients (script/o2 url, org) — fetched once so a
+    // freshly revealed token can ship as a ready-to-run command, not just a raw
+    // string the operator has to splice into a setup flow themselves.
+    const agentSetup = ref<AgentSetup | null>(null);
+
+    // A ready-to-run docker install command with THIS token baked in. Empty
+    // until the setup ingredients load (falls back to the plain paste hint).
+    // `<location-name>` stays a placeholder — a token isn't tied to a location.
+    const installCommand = computed(() => {
+      const s = agentSetup.value;
+      const tok = revealedToken.value?.token;
+      if (!s || !s.script_url || !s.o2_url || !tok) return "";
+      return [
+        `curl -sSL ${s.script_url} | bash -s -- \\`,
+        `  --platform=docker \\`,
+        `  --o2-url=${s.o2_url} \\`,
+        `  --org=${s.org} \\`,
+        `  --token=${tok} \\`,
+        `  --location="<location-name>"`,
+      ].join("\n");
+    });
 
     const columns: OTableColumnDef<AgentToken>[] = [
       {
@@ -423,8 +482,25 @@ export default defineComponent({
       copyToClipboard(token);
     };
 
+    const copyCommand = () => {
+      if (installCommand.value) copyToClipboard(installCommand.value);
+    };
+
+    const fetchAgentSetup = async () => {
+      try {
+        const res = await syntheticsService.getAgentSetup(
+          store.state.selectedOrganization.identifier,
+        );
+        agentSetup.value = (res.data ?? null) as AgentSetup | null;
+      } catch {
+        // Non-fatal — the reveal dialog falls back to the plain token + hint.
+        agentSetup.value = null;
+      }
+    };
+
     onBeforeMount(() => {
       fetchTokens();
+      fetchAgentSetup();
     });
 
     return {
@@ -436,6 +512,8 @@ export default defineComponent({
       showCreateForm,
       showRevealedDialog,
       revealedToken,
+      installCommand,
+      copyCommand,
       fetchTokens,
       createToken,
       createTokenSchema,
