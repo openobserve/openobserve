@@ -7366,6 +7366,7 @@ dependencies = [
  "openobserve-core",
  "openobserve-mcp",
  "openobserve-sourcemaps",
+ "openobserve-tls",
  "opentelemetry",
  "opentelemetry-proto",
  "parking_lot 0.12.5",
@@ -7576,11 +7577,8 @@ dependencies = [
  "prost-wkt-types",
  "proto",
  "rand 0.10.1",
- "rcgen",
  "regex",
  "reqwest 0.13.2",
- "rustls",
- "rustls-native-certs",
  "schema",
  "sea-orm",
  "search",
@@ -7603,8 +7601,6 @@ dependencies = [
  "utoipa",
  "version-compare",
  "vrl",
- "webpki-roots 1.0.6",
- "x509-parser",
 ]
 
 [[package]]
@@ -7711,6 +7707,22 @@ dependencies = [
  "tokio",
  "tonic",
  "zip 8.2.0",
+]
+
+[[package]]
+name = "openobserve-tls"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "config",
+ "itertools 0.14.0",
+ "log",
+ "rcgen",
+ "reqwest 0.13.2",
+ "rustls",
+ "rustls-native-certs",
+ "webpki-roots 1.0.6",
+ "x509-parser",
 ]
 
 [[package]]

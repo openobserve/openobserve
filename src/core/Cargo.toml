@@ -93,9 +93,6 @@ proto.workspace = true
 rand.workspace = true
 regex.workspace = true
 reqwest.workspace = true
-rustls.workspace = true
-rustls-native-certs.workspace = true
-webpki-roots.workspace = true
 sea-orm.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -111,7 +108,6 @@ tracing-opentelemetry.workspace = true
 url.workspace = true
 utoipa.workspace = true
 version-compare.workspace = true
-x509-parser.workspace = true
 config.workspace = true
 infra.workspace = true
 ingester.workspace = true
@@ -121,4 +117,3 @@ futures-util.workspace = true
 
 [dev-dependencies]
 multer.workspace = true
-rcgen.workspace = true
