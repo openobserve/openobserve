@@ -96,6 +96,13 @@ const useErrorIssuesData = () => {
 
   // Supersede in-flight runs: only the latest fetchAll may commit results.
   let runId = 0;
+  // runId only discards STALE RESULTS — the requests behind them still run to completion
+  // and still hold slots in the server's per-user work-group concurrency queue. Entering
+  // this tab fires 5 concurrent searches (issues, chart, kpis, denominators, deploys) plus
+  // a lazy trend fetch per visible row, so abandoned runs are what leave the queue full
+  // for the next tab, whose overflow then gets cancelled and returns HTTP 429.
+  // This aborts them for real.
+  let runController = new AbortController();
 
   const issuesTruncated = computed(
     () => issues.value.length >= ISSUES_LIMIT,
@@ -138,6 +145,7 @@ const useErrorIssuesData = () => {
     params: FetchIssuesParams,
     size: number,
     rangeOverride?: { startTime: number; endTime: number },
+    signal?: AbortSignal,
   ): Promise<any[]> => {
     const range = rangeOverride ?? params;
     const req = buildQueryPayload({
@@ -160,6 +168,7 @@ const useErrorIssuesData = () => {
           org_identifier: store.state.selectedOrganization.identifier,
           query: req,
           page_type: "logs",
+          signal,
         },
         "RUM",
       )
@@ -211,6 +220,10 @@ const useErrorIssuesData = () => {
     if (inFlight) return inFlight;
 
     const currentRun = runId;
+    // Capture the controller for THIS run: fetchAll swaps in a new one, and a trend
+    // request must observe the run it belongs to, not whichever is current when its
+    // queued slot finally frees.
+    const trendSignal = runController.signal;
     const { ctx, params, interval, intervalMicros } = trendContext;
     const sql = buildTrendsSql(ctx, interval, [issue.error_message ?? ""]);
     if (!sql) {
@@ -220,8 +233,8 @@ const useErrorIssuesData = () => {
 
     const request = acquireTrendSlot()
       .then(() => {
-        if (currentRun !== runId) return [];
-        return runSearch(sql, params, 2000);
+        if (currentRun !== runId || trendSignal.aborted) return [];
+        return runSearch(sql, params, 2000, undefined, trendSignal);
       })
       .then((hits) => {
         if (currentRun !== runId) return;
@@ -253,6 +266,10 @@ const useErrorIssuesData = () => {
 
   const fetchAll = async (params: FetchIssuesParams): Promise<void> => {
     const currentRun = ++runId;
+    // Supersede whatever the previous run left in flight before starting.
+    runController.abort();
+    runController = new AbortController();
+    const signal = runController.signal;
     const ctx: IssueQueryContext = {
       streamName: "_rumdata",
       timestampColumn: store.state.zoConfig.timestamp_column || "_timestamp",
@@ -275,11 +292,17 @@ const useErrorIssuesData = () => {
 
     const [issuesR, chartR, kpisR, denomR, deploysR] =
       await Promise.allSettled([
-        runSearch(buildIssuesSql(ctx), params, ISSUES_LIMIT),
-        runSearch(buildErrorsHistogramSql(ctx, interval), params, 2000),
-        runSearch(buildErrorKpisSql(ctx), params, 10),
-        runSearch(buildDenominatorsSql(ctx), params, 10),
-        runSearch(buildDeploysSql(ctx), params, 10),
+        runSearch(buildIssuesSql(ctx), params, ISSUES_LIMIT, undefined, signal),
+        runSearch(
+          buildErrorsHistogramSql(ctx, interval),
+          params,
+          2000,
+          undefined,
+          signal,
+        ),
+        runSearch(buildErrorKpisSql(ctx), params, 10, undefined, signal),
+        runSearch(buildDenominatorsSql(ctx), params, 10, undefined, signal),
+        runSearch(buildDeploysSql(ctx), params, 10, undefined, signal),
       ]);
     if (currentRun !== runId) return;
 
@@ -391,6 +414,19 @@ const useErrorIssuesData = () => {
     isLoadingKpis,
     fetchAll,
     fetchTrend,
+    /**
+     * Abort every search this composable has in flight. Call on unmount: the server
+     * keeps a work-group slot reserved until each request completes, so an abandoned
+     * run starves whichever view the user opened next.
+     */
+    cancelAll: () => {
+      runController.abort();
+      runController = new AbortController();
+      trendInFlight.clear();
+      isLoadingIssues.value = false;
+      isLoadingChart.value = false;
+      isLoadingKpis.value = false;
+    },
     // Raw server error from the last issues search (for editor highlighting).
     lastQueryError,
     // Exposed for callers needing the users-field fallback (e.g. columns).

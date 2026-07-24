@@ -228,6 +228,7 @@ import {
   nextTick,
   onBeforeMount,
   onMounted,
+  onBeforeUnmount,
   ref,
   type Ref,
   defineAsyncComponent,
@@ -354,6 +355,7 @@ const {
   isLoadingChart,
   isLoadingKpis,
   fetchAll,
+  cancelAll,
   fetchTrend,
   lastQueryError,
 } = useErrorIssuesData();
@@ -570,6 +572,14 @@ onMounted(async () => {
   isMounted.value = true;
   await getStreamFields();
   runQuery();
+});
+
+// Leaving the tab frees the searches it started. Error tracking fans out 5 concurrent
+// searches per load plus a trend fetch per visible row; abandoning them leaves the
+// server's per-user work-group queue full, so the next tab's queries queue behind them
+// and come back cancelled as HTTP 429.
+onBeforeUnmount(() => {
+  cancelAll();
 });
 
 

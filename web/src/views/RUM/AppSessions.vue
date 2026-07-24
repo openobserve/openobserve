@@ -418,6 +418,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import {
   ref,
   onMounted,
+  onBeforeUnmount,
   type Ref,
   onBeforeMount,
   defineAsyncComponent,
@@ -461,6 +462,7 @@ import SessionActivitySparkline from "@/components/rum/sessionReplay/SessionActi
 import {
   holdActivityQueries,
   releaseActivityQueries,
+  cancelPendingActivityQueries,
 } from "@/composables/useSessionActivity";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -739,6 +741,16 @@ onMounted(async () => {
   }
 });
 
+// Leaving the tab must free the searches it started. They are not cheap to abandon: the
+// server holds a slot in its per-user/per-org work-group concurrency queue until each
+// request completes, so an abandoned fan-out keeps starving the tab the user just moved
+// to — which then queues, gets cancelled, and surfaces as HTTP 429.
+onBeforeUnmount(() => {
+  inFlightLoad?.abort();
+  inFlightLoad = null;
+  cancelPendingActivityQueries();
+});
+
 const getStreamFields = () => {
   isLoading.value.push(true);
   return new Promise((resolve) => {
@@ -812,7 +824,40 @@ const getStreamFields = () => {
   });
 };
 
+// One load fans out ~5 concurrent searches (page query + up to 4 window aggregates),
+// then a replay-times query, then activity sparklines. Entering the tab asks for that
+// load TWICE: onMounted calls getSessions(), and DateTime emits `on:date-change` from
+// its own onMounted, which lands in updateDateChange and calls it again. The dedupe
+// guard there cannot catch it — for a relative range DateTime recomputes startTime/
+// endTime to "now" on every emit, so the payload never equals the stored one.
+//
+// The server caps concurrent searches per user/org in a work-group queue; overflow
+// waits in that queue, and a queued search that is then cancelled surfaces as HTTP 429
+// (ErrorCodes::SearchCancelQuery maps to 429 — the "429 + auto cancel" is one event,
+// not two). Doubling the fan-out is what pushes a single tab open over the limit.
+//
+// So each load supersedes the previous one: abort whatever is still running before
+// starting. That collapses the duplicate entry load to a single live fan-out, and keeps
+// a genuine re-query (date change, refresh) correct — newest wins, rather than being
+// dropped by an "is something in flight?" guard.
+let inFlightLoad: AbortController | null = null;
+
+// Aborting rejects every pending request; those are OUR cancellations, not failures, so
+// they must not raise error toasts or paint SQL error squiggles.
+function isAbortError(err: any): boolean {
+  return (
+    err?.code === "ERR_CANCELED" ||
+    err?.name === "CanceledError" ||
+    err?.name === "AbortError"
+  );
+}
+
 const getSessions = () => {
+  inFlightLoad?.abort();
+  const loadController = new AbortController();
+  inFlightLoad = loadController;
+  const signal = loadController.signal;
+
   sessionState.data.sessions = {};
   sqlErrorRanges.value = [];
 
@@ -874,7 +919,7 @@ const getSessions = () => {
 
   // Window-level aggregates (KPI totals, deltas, insights) run in parallel
   // with the page query and share its WHERE clause + time range.
-  const aggregatesSettled = fetchWindowAggregates(req, whereClause);
+  const aggregatesSettled = fetchWindowAggregates(req, whereClause, signal);
 
   // Query 1: Get sessions with all metrics from _rumdata (supports usr_email, usr_id, session_id filters)
   req.query.sql = `
@@ -903,6 +948,7 @@ const getSessions = () => {
         org_identifier: store.state.selectedOrganization.identifier,
         query: req,
         page_type: "logs",
+        signal,
       },
       "RUM",
     )
@@ -935,9 +981,12 @@ const getSessions = () => {
       const sessionIds = hits.map((hit: any) => hit.session_id);
 
       // Query 2: Get start/end times from _sessionreplay
-      return getSessionTimeFromReplay(req, sessionIds);
+      return getSessionTimeFromReplay(req, sessionIds, signal);
     })
     .catch((err) => {
+      // A superseded load is not a failure — leave the rows and the editor alone so the
+      // load that replaced it can paint its own results.
+      if (isAbortError(err)) return;
       rows.value = [];
       toast({
         message: err.response?.data?.message || "Error while fetching sessions",
@@ -967,7 +1016,11 @@ const getSessions = () => {
 };
 
 // Query 2: Get start/end times from _sessionreplay for the sessions
-const getSessionTimeFromReplay = (req: any, sessionIds: string[]) => {
+const getSessionTimeFromReplay = (
+  req: any,
+  sessionIds: string[],
+  signal?: AbortSignal,
+) => {
   if (sessionIds.length === 0) {
     rows.value = [];
     isLoading.value.pop();
@@ -1011,6 +1064,7 @@ const getSessionTimeFromReplay = (req: any, sessionIds: string[]) => {
         org_identifier: store.state.selectedOrganization.identifier,
         query: req,
         page_type: "logs",
+        signal,
       },
       "RUM",
     )
@@ -1033,6 +1087,7 @@ const getSessionTimeFromReplay = (req: any, sessionIds: string[]) => {
       rows.value = Object.values(sessionState.data.sessions);
     })
     .catch((err) => {
+      if (isAbortError(err)) return;
       toast({
         message:
           err.response?.data?.message ||
@@ -1062,13 +1117,14 @@ const buildAggregateReq = (
   return clone;
 };
 
-const runAggregateQuery = (req: any) =>
+const runAggregateQuery = (req: any, signal?: AbortSignal) =>
   searchService
     .search(
       {
         org_identifier: store.state.selectedOrganization.identifier,
         query: req,
         page_type: "logs",
+        signal,
       },
       "RUM",
     )
@@ -1076,7 +1132,11 @@ const runAggregateQuery = (req: any) =>
 
 // Returns a promise that settles when ALL aggregate queries finish — used to
 // release the activity-sparkline gate so those queries go last.
-const fetchWindowAggregates = (baseReq: any, whereClause: string) => {
+const fetchWindowAggregates = (
+  baseReq: any,
+  whereClause: string,
+  signal?: AbortSignal,
+) => {
   windowTotals.value = null;
   previousWindowTotals.value = null;
   frustrationCluster.value = null;
@@ -1109,7 +1169,7 @@ const fetchWindowAggregates = (baseReq: any, whereClause: string) => {
   });
 
   pending.push(
-    runAggregateQuery(buildAggregateReq(baseReq, summarySql))
+    runAggregateQuery(buildAggregateReq(baseReq, summarySql), signal)
       .then((hits) => {
         windowTotals.value = hits.length ? toTotals(hits[0]) : null;
       })
@@ -1126,6 +1186,7 @@ const fetchWindowAggregates = (baseReq: any, whereClause: string) => {
           startTime: baseReq.query.start_time - windowLengthUs,
           endTime: baseReq.query.start_time,
         }),
+        signal,
       )
         .then((hits) => {
           previousWindowTotals.value = hits.length ? toTotals(hits[0]) : null;
@@ -1151,7 +1212,7 @@ const fetchWindowAggregates = (baseReq: any, whereClause: string) => {
       ORDER BY sessions_count DESC
       LIMIT 1`;
     pending.push(
-      runAggregateQuery(buildAggregateReq(baseReq, clusterSql))
+      runAggregateQuery(buildAggregateReq(baseReq, clusterSql), signal)
         .then((hits) => {
           frustrationCluster.value = hits.length
             ? {
@@ -1181,7 +1242,7 @@ const fetchWindowAggregates = (baseReq: any, whereClause: string) => {
       ORDER BY sessions_count DESC
       LIMIT 1`;
     pending.push(
-      runAggregateQuery(buildAggregateReq(baseReq, errorSql))
+      runAggregateQuery(buildAggregateReq(baseReq, errorSql), signal)
         .then((hits) => {
           errorCluster.value = hits.length
             ? {
