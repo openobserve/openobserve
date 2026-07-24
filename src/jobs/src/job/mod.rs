@@ -500,7 +500,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("short url cache failed");
 
     // initialize metadata watcher
-    tokio::task::spawn(openobserve_core::schema_watcher::watch());
+    let schema_watcher = schema::create_watcher()?;
+    tokio::task::spawn(schema_watcher);
     tokio::task::spawn(db::functions::watch());
     tokio::task::spawn(db::compact::retention::watch());
     tokio::task::spawn(db::metrics::watch_prom_cluster_leader());

@@ -13,14 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Runtime watcher for schema cache updates.
+//! Runtime watcher for schema cache updates and stream-local cache cleanup.
 
 use std::{
-    sync::{Arc, atomic::Ordering},
+    future::Future,
+    pin::Pin,
+    sync::{Arc, OnceLock, atomic::Ordering},
     time::Duration,
 };
 
 use arrow_schema::Schema;
+use async_trait::async_trait;
+use common::infra::config::ORGANIZATIONS;
 use config::{
     cluster::LOCAL_NODE_ID,
     get_config,
@@ -29,7 +33,6 @@ use config::{
     meta::stream::StreamType,
     utils::{json, time::now_micros},
 };
-use db;
 use infra::{
     cache,
     schema::{
@@ -37,17 +40,35 @@ use infra::{
         SchemaCache, unwrap_stream_settings,
     },
 };
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 
-use crate::{common::infra::config::ORGANIZATIONS, organization::check_and_create_org};
+#[async_trait]
+pub trait OrganizationProvisioner: Send + Sync + 'static {
+    fn should_auto_create_missing_orgs(&self) -> bool;
 
-pub async fn watch() -> Result<(), anyhow::Error> {
-    #[cfg(feature = "enterprise")]
-    let audit_enabled = get_o2_config().common.audit_enabled;
-    #[cfg(not(feature = "enterprise"))]
-    let audit_enabled = false;
-    let cfg = get_config();
+    async fn ensure_org_exists(&self, org_id: &str) -> Result<(), anyhow::Error>;
+}
+
+static ORGANIZATION_PROVISIONER: OnceLock<Arc<dyn OrganizationProvisioner>> = OnceLock::new();
+
+pub type SchemaWatcher = Pin<Box<dyn Future<Output = Result<(), anyhow::Error>> + Send + 'static>>;
+
+pub fn set_organization_provisioner(
+    provisioner: Arc<dyn OrganizationProvisioner>,
+) -> Result<(), Arc<dyn OrganizationProvisioner>> {
+    ORGANIZATION_PROVISIONER.set(provisioner)
+}
+
+pub fn create_watcher() -> Result<SchemaWatcher, anyhow::Error> {
+    let organization_provisioner = ORGANIZATION_PROVISIONER
+        .get()
+        .cloned()
+        .ok_or_else(|| anyhow::anyhow!("organization provisioner is not initialized"))?;
+    Ok(Box::pin(watch(organization_provisioner)))
+}
+
+async fn watch(
+    organization_provisioner: Arc<dyn OrganizationProvisioner>,
+) -> Result<(), anyhow::Error> {
     let key = "/schema/";
     let cluster_coordinator = infra::db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
@@ -175,16 +196,11 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let keys = item_key.split('/').collect::<Vec<&str>>();
                 let org_id = keys[0];
 
-                #[cfg(feature = "enterprise")]
-                let usage_enabled = true;
-                #[cfg(not(feature = "enterprise"))]
-                let usage_enabled = cfg.common.usage_enabled;
-
                 // if create_org_through_ingestion is enabled, we need to create the org
                 // if it doesn't exist. Hence, we need to check if the org exists in the cache
-                if (cfg.common.create_org_through_ingestion || usage_enabled || audit_enabled)
+                if organization_provisioner.should_auto_create_missing_orgs()
                     && !ORGANIZATIONS.read().await.contains_key(org_id)
-                    && let Err(e) = check_and_create_org(org_id).await
+                    && let Err(e) = organization_provisioner.ensure_org_exists(org_id).await
                 {
                     log::error!("Failed to save organization in database: {e}");
                 }
