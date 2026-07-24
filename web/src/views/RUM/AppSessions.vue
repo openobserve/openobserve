@@ -860,6 +860,9 @@ const getSessions = () => {
 
   sessionState.data.sessions = {};
   sqlErrorRanges.value = [];
+  // Aggregates are now stage 3, so clear the strip here rather than when they start —
+  // otherwise it keeps showing the PREVIOUS window's numbers while the new list loads.
+  clearWindowAggregates();
 
   const interval = getTimeInterval(
     dateTime.value.startTime,
@@ -913,13 +916,9 @@ const getSessions = () => {
     whereClause += " AND (" + sessionState.data.editorValue.trim() + ")";
   }
 
-  // Activity sparklines are the lowest-priority calls — hold them until the
-  // page query, replay query, and all window aggregates have settled.
+  // Activity sparklines are the lowest-priority calls — hold them until the session
+  // list and the window aggregates above it have finished.
   holdActivityQueries();
-
-  // Window-level aggregates (KPI totals, deltas, insights) run in parallel
-  // with the page query and share its WHERE clause + time range.
-  const aggregatesSettled = fetchWindowAggregates(req, whereClause, signal);
 
   // Query 1: Get sessions with all metrics from _rumdata (supports usr_email, usr_id, session_id filters)
   req.query.sql = `
@@ -957,7 +956,12 @@ const getSessions = () => {
 
       if (hits.length === 0) {
         rows.value = [];
-        return;
+        // Nothing matched the window and filter, so every follow-up query is answerable
+        // without asking the server: the aggregates share this exact WHERE clause and
+        // time range (they would return 0), and activity sparklines are per-row. Zero the
+        // KPI state directly instead of spending 4 more searches to be told the same.
+        clearWindowAggregates();
+        return "empty";
       }
 
       // Store all session data from _rumdata
@@ -1009,11 +1013,45 @@ const getSessions = () => {
       isLoading.value.pop();
     });
 
-  // Everything settled (success or failure) → let activity queries through.
-  Promise.allSettled([pageQuerySettled, aggregatesSettled]).finally(() => {
-    releaseActivityQueries();
-  });
+  // ── Staged loading ────────────────────────────────────────────────────────
+  // The server allows a user only O2_WORK_GROUP_USER_SHORT_MAX_CONCURRENCY concurrent
+  // searches — 4 by default. This page used to fire the page query and all four window
+  // aggregates AT ONCE: 5 concurrent, over the limit on a single clean load. The
+  // overflow waits in the work-group queue, and a queued search that is then cancelled
+  // is reported as HTTP 429 (ErrorCodes::SearchCancelQuery maps to 429).
+  //
+  // So the page loads in priority order instead, never exceeding the cap:
+  //   1. session list      (1 search)  — what the user actually came for
+  //   2. replay start/end  (1 search)  — chained inside the page query, completes the rows
+  //   3. window aggregates (<=4)       — KPI strip and insight banner above the table
+  //   4. activity sparklines           — already capped at 4 concurrent internally
+  //
+  // Each stage waits for the previous one, so the KPI strip fills in a moment after the
+  // table rather than competing with it for slots.
+  pageQuerySettled
+    .then((outcome) => {
+      // Nothing above the table to fill when there were no sessions, or when a newer
+      // load has already replaced this one.
+      if (outcome === "empty" || inFlightLoad !== loadController) return;
+      return fetchWindowAggregates(req, whereClause, signal);
+    })
+    .finally(() => {
+      // Stage 4 last. Gate the release on still being the current load rather than on
+      // `signal.aborted`: holdActivityQueries() is a no-op while the gate is already
+      // held, so if a superseded load released it here, the load that replaced it would
+      // run its aggregates with activity queries competing for the same 4 slots. The
+      // newer load owns the gate and will release it when its own stages finish.
+      if (inFlightLoad === loadController) releaseActivityQueries();
+    });
 };
+
+// Reset the KPI strip and insight banner to an explicit empty state without querying.
+function clearWindowAggregates() {
+  windowTotals.value = null;
+  previousWindowTotals.value = null;
+  frustrationCluster.value = null;
+  errorCluster.value = null;
+}
 
 // Query 2: Get start/end times from _sessionreplay for the sessions
 const getSessionTimeFromReplay = (
@@ -1137,10 +1175,7 @@ const fetchWindowAggregates = (
   whereClause: string,
   signal?: AbortSignal,
 ) => {
-  windowTotals.value = null;
-  previousWindowTotals.value = null;
-  frustrationCluster.value = null;
-  errorCluster.value = null;
+  clearWindowAggregates();
 
   const pending: Promise<unknown>[] = [];
 
