@@ -5,8 +5,10 @@
   scrim, close button, Esc/overlay-dismiss and open animation all come from
   ODialog, so this only supplies the intro + the selectable type cards.
 
-  Parent contract is preserved: mounted via `v-if`, emits `close` on dismiss and
-  `select` with the chosen ScorerType.
+  Controlled component: the parent keeps it mounted and drives `open` (v-model),
+  so ODialog can play its close animation on dismiss — a `v-if` would unmount the
+  panel synchronously and cut the exit animation. Emits `select` with the chosen
+  ScorerType.
 -->
 <template>
   <ODialog
@@ -14,7 +16,7 @@
     :title="t('onlineEvals.scorerTypeDialog.title')"
     size="lg"
     data-test="scorer-type-dialog"
-    @update:open="onOpenChange"
+    @update:open="(v: boolean) => emit('update:open', v)"
   >
     <div class="flex flex-col gap-4">
       <p class="m-0 text-text-secondary text-compact leading-normal">
@@ -50,28 +52,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { ScorerType } from "@/services/online-evals.service";
 
+defineProps<{ open?: boolean }>();
+
 const emit = defineEmits<{
-  (e: "close"): void;
+  (e: "update:open", value: boolean): void;
   (e: "select", type: ScorerType): void;
 }>();
 
 const { t } = useI18n();
-
-// Parent mounts this with `v-if`, so it is always open on mount; ODialog drives
-// its own dismiss (× / overlay / Esc) and reports it via update:open.
-const open = ref(true);
-
-function onOpenChange(value: boolean) {
-  open.value = value;
-  if (!value) emit("close");
-}
 
 function select(type: ScorerType) {
   emit("select", type);
