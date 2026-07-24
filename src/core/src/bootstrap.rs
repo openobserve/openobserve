@@ -16,14 +16,45 @@
 use std::sync::Arc;
 
 use ::common::infra::wal;
-use config::{cache_instance_id, ider};
+use config::{cache_instance_id, get_config, ider};
 use db::metas;
 
 #[cfg(feature = "enterprise")]
 use crate::self_reporting::CoreAuditPublisher;
 use crate::self_reporting::persistence::CoreBatchPublisher;
 
+struct CoreOrganizationProvisioner;
+
+#[async_trait::async_trait]
+impl schema::OrganizationProvisioner for CoreOrganizationProvisioner {
+    fn should_auto_create_missing_orgs(&self) -> bool {
+        let cfg = get_config();
+
+        #[cfg(feature = "enterprise")]
+        let usage_enabled = true;
+        #[cfg(not(feature = "enterprise"))]
+        let usage_enabled = cfg.common.usage_enabled;
+
+        #[cfg(feature = "enterprise")]
+        let audit_enabled = o2_enterprise::enterprise::common::config::get_config()
+            .common
+            .audit_enabled;
+        #[cfg(not(feature = "enterprise"))]
+        let audit_enabled = false;
+
+        cfg.common.create_org_through_ingestion || usage_enabled || audit_enabled
+    }
+
+    async fn ensure_org_exists(&self, org_id: &str) -> Result<(), anyhow::Error> {
+        crate::organization::check_and_create_org(org_id)
+            .await
+            .map(|_| ())
+    }
+}
+
 pub async fn init() -> Result<(), anyhow::Error> {
+    schema::set_organization_provisioner(Arc::new(CoreOrganizationProvisioner))
+        .map_err(|_| anyhow::anyhow!("organization provisioner is already initialized"))?;
     usage_reporting::set_batch_publisher(Arc::new(CoreBatchPublisher))
         .map_err(|_| anyhow::anyhow!("usage batch publisher is already initialized"))?;
     #[cfg(feature = "enterprise")]

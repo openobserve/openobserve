@@ -7187,6 +7187,7 @@ dependencies = [
  "async-recursion",
  "async-stream",
  "async-trait",
+ "audit",
  "aws-sdk-sns",
  "axum",
  "axum-client-ip",
@@ -7245,6 +7246,7 @@ dependencies = [
  "openobserve-core",
  "openobserve-jobs",
  "openobserve-mcp",
+ "openobserve-node",
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry-proto",
@@ -7307,6 +7309,7 @@ dependencies = [
  "transform",
  "uaparser",
  "url",
+ "usage_reporting",
  "utoipa",
  "utoipa-swagger-ui",
  "version-compare",
@@ -7365,7 +7368,9 @@ dependencies = [
  "openobserve-cipher",
  "openobserve-core",
  "openobserve-mcp",
+ "openobserve-node",
  "openobserve-sourcemaps",
+ "openobserve-tls",
  "opentelemetry",
  "opentelemetry-proto",
  "parking_lot 0.12.5",
@@ -7395,6 +7400,7 @@ dependencies = [
  "tracing-opentelemetry",
  "transform",
  "url",
+ "usage_reporting",
  "utoipa",
  "utoipa-swagger-ui",
  "zip 8.2.0",
@@ -7436,6 +7442,7 @@ dependencies = [
  "o2_openfga",
  "openobserve-api-common",
  "openobserve-core",
+ "openobserve-node",
  "openobserve-org-storage",
  "regex",
  "reqwest 0.13.2",
@@ -7450,6 +7457,7 @@ dependencies = [
  "tracing",
  "transform",
  "url",
+ "usage_reporting",
  "utoipa",
  "vrl",
 ]
@@ -7565,6 +7573,7 @@ dependencies = [
  "o2_dex",
  "o2_enterprise",
  "o2_openfga",
+ "openobserve-node",
  "opentelemetry",
  "opentelemetry-proto",
  "parking_lot 0.12.5",
@@ -7576,11 +7585,8 @@ dependencies = [
  "prost-wkt-types",
  "proto",
  "rand 0.10.1",
- "rcgen",
  "regex",
  "reqwest 0.13.2",
- "rustls",
- "rustls-native-certs",
  "schema",
  "sea-orm",
  "search",
@@ -7603,8 +7609,6 @@ dependencies = [
  "utoipa",
  "version-compare",
  "vrl",
- "webpki-roots 1.0.6",
- "x509-parser",
 ]
 
 [[package]]
@@ -7634,6 +7638,7 @@ dependencies = [
  "o2_openfga",
  "openobserve-builtins",
  "openobserve-core",
+ "openobserve-node",
  "openobserve-org-storage",
  "prometheus",
  "promql-service",
@@ -7650,6 +7655,7 @@ dependencies = [
  "tokio",
  "tonic",
  "transform",
+ "usage_reporting",
  "wal",
 ]
 
@@ -7670,6 +7676,22 @@ dependencies = [
  "tokio",
  "url",
  "utoipa",
+]
+
+[[package]]
+name = "openobserve-node"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "common",
+ "config",
+ "db",
+ "infra",
+ "log",
+ "prometheus",
+ "proto",
+ "tokio",
+ "tonic",
 ]
 
 [[package]]
@@ -7711,6 +7733,22 @@ dependencies = [
  "tokio",
  "tonic",
  "zip 8.2.0",
+]
+
+[[package]]
+name = "openobserve-tls"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "config",
+ "itertools 0.14.0",
+ "log",
+ "rcgen",
+ "reqwest 0.13.2",
+ "rustls",
+ "rustls-native-certs",
+ "webpki-roots 1.0.6",
+ "x509-parser",
 ]
 
 [[package]]
@@ -10138,13 +10176,16 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "arrow-schema",
+ "async-trait",
  "common",
  "config",
  "dashmap",
  "db",
  "hashbrown 0.16.1",
  "infra",
+ "ingester",
  "ingestion-common",
+ "itertools 0.14.0",
  "log",
  "serde_json",
  "tokio",

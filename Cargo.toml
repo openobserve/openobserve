@@ -24,12 +24,14 @@ publish = false
 [features]
 default = []
 enterprise = [
+    "audit/enterprise",
     "openobserve-api/enterprise",
     "openobserve-core/enterprise",
     "openobserve-jobs/enterprise",
     "super_cluster_queue/enterprise",
     "search_service/enterprise",
     "enrichment-data/enterprise",
+    "usage_reporting/enterprise",
 ]
 vectorscan = [
     "openobserve-api/vectorscan",
@@ -215,10 +217,12 @@ pin-project-lite.workspace = true
 flight.workspace = true
 async-stream.workspace = true
 sourcemap.workspace = true
+audit.workspace = true
 openobserve-api.workspace = true
 web.workspace = true
 openobserve-api-management.workspace = true
 openobserve-core.workspace = true
+openobserve-node.workspace = true
 ingestion-common.workspace = true
 compaction.workspace = true
 enrichment-data.workspace = true
@@ -227,6 +231,7 @@ db.workspace = true
 search.workspace = true
 search_service.workspace = true
 super_cluster_queue.workspace = true
+usage_reporting.workspace = true
 openobserve-jobs.workspace = true
 openobserve-mcp.workspace = true
 
@@ -259,8 +264,10 @@ members = [
     "src/builtins",
     "src/org_storage",
     "src/sourcemaps",
+    "src/tls",
     "src/common",
     "src/core",
+    "src/node",
     "src/transform",
     "src/super_cluster_queue",
     "src/search",
@@ -307,8 +314,10 @@ enrichment-data = { path = "src/enrichment_data" }
 openobserve-builtins = { path = "src/builtins" }
 openobserve-org-storage = { path = "src/org_storage" }
 openobserve-sourcemaps = { path = "src/sourcemaps" }
+openobserve-tls = { path = "src/tls" }
 web = { path = "src/web" }
 openobserve-core = { path = "src/core" }
+openobserve-node = { path = "src/node" }
 common = { path = "src/common" }
 transform = { path = "src/transform" }
 super_cluster_queue = { path = "src/super_cluster_queue" }

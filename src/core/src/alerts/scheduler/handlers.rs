@@ -44,6 +44,7 @@ use infra::{
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::recommendations::service::QueryRecommendationService;
 use proto::cluster_rpc;
+use usage_reporting::publish_triggers_usage;
 
 #[cfg(feature = "enterprise")]
 use crate::alerts::scheduler::query_optimization_recommendation::QueryOptimizerContext;
@@ -58,7 +59,6 @@ use crate::{
     db::{self, alerts::alert::set_without_updating_trigger},
     ingestion::ingestion_service,
     pipeline::batch_execution::ExecutablePipeline,
-    self_reporting::publish_triggers_usage,
 };
 
 pub async fn handle_triggers(
@@ -161,7 +161,7 @@ async fn handle_anomaly_detection_triggers(
         trigger.status = db::scheduler::TriggerStatus::Waiting;
         db::scheduler::update_trigger(trigger.clone(), true, "").await?;
 
-        crate::self_reporting::publish_triggers_usage(TriggerData {
+        usage_reporting::publish_triggers_usage(TriggerData {
             _timestamp: now_micros(),
             org: trigger.org.clone(),
             module: TriggerDataType::AnomalyDetection,
@@ -221,7 +221,7 @@ async fn handle_anomaly_detection_triggers(
     // Publish trigger run record to the triggers stream (same as alerts).
     let interval_us = parse_detection_interval_to_micros(&config.schedule_interval);
     let next_run = now_micros() + interval_us;
-    crate::self_reporting::publish_triggers_usage(TriggerData {
+    usage_reporting::publish_triggers_usage(TriggerData {
         _timestamp: run_start_us,
         org: trigger.org.clone(),
         module: TriggerDataType::AnomalyDetection,
@@ -2155,7 +2155,7 @@ async fn handle_derived_stream_triggers(
                 error: Some(err_msg),
                 node_errors: HashMap::new(),
             };
-            crate::self_reporting::publish_error(ErrorData {
+            usage_reporting::publish_error(ErrorData {
                 _timestamp: Utc::now().timestamp_micros(),
                 stream_params: pipeline.get_source_stream_params(),
                 error_source: ErrorSource::Pipeline(pipeline_error),
@@ -2303,7 +2303,7 @@ async fn handle_derived_stream_triggers(
                         error: Some(err),
                         node_errors: HashMap::new(),
                     };
-                    crate::self_reporting::publish_error(ErrorData {
+                    usage_reporting::publish_error(ErrorData {
                         _timestamp: Utc::now().timestamp_micros(),
                         stream_params: pipeline.get_source_stream_params(),
                         error_source: ErrorSource::Pipeline(pipeline_error),
@@ -2400,7 +2400,7 @@ async fn handle_derived_stream_triggers(
             error: Some(err_msg),
             node_errors: HashMap::new(),
         };
-        crate::self_reporting::publish_error(ErrorData {
+        usage_reporting::publish_error(ErrorData {
             _timestamp: Utc::now().timestamp_micros(),
             stream_params: pipeline.get_source_stream_params(),
             error_source: ErrorSource::Pipeline(pipeline_error),

@@ -44,7 +44,7 @@ impl EvaluatorTraceExporter {
             }
         };
 
-        let (_addr, channel) = match crate::grpc::get_ingester_channel().await {
+        let (_addr, channel) = match openobserve_node::grpc::get_ingester_channel().await {
             Ok(v) => v,
             Err(e) => {
                 log::error!(
