@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ? t('dashboard.searchAcross')
                         : t('dashboard.search')
                     "
-                    :clearable="searchAcrossFolders"
+                    clearable
                     @clear="clearSearchHistory"
                     data-test="dashboard-search"
                     class="w-full"
@@ -1270,11 +1270,11 @@ export default defineComponent({
     });
 
     const dashboards = computed(function () {
-      // The favorites view is folder-independent: rows come from the stored
-      // favorites themselves (each carries its folderId), enriched from any
-      // folder list already cached in the store. A favorite whose folder
-      // hasn't been visited yet still shows via its stored label.
-      if (showFavoritesOnly.value) {
+      // Favorites view is folder-independent, but yield to an active
+      // cross-folder search so results from all folders show.
+      const crossFolderSearchActive =
+        searchAcrossFolders.value && searchQuery.value !== "";
+      if (showFavoritesOnly.value && !crossFolderSearchActive) {
         const folderNames = new Map(
           (store.state.organizationData?.folders ?? []).map((f: any) => [
             f.folderId,
@@ -1502,7 +1502,9 @@ export default defineComponent({
         : activeFolderId.value;
     });
     const clearSearchHistory = () => {
+      // Clear both scope models (searchQuery/filterQuery) so clear works in either mode.
       searchQuery.value = "";
+      filterQuery.value = "";
       filteredResults.value = [];
     };
     const filteredFolders = computed(() => {
