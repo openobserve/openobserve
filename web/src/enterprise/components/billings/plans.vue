@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </div>
     <template v-else>
-      <trial-period class="mb-3" currentPage="billing"></trial-period>
+      <TrialPeriod class="mb-3" currentPage="billing"></TrialPeriod>
       <!-- AI Credits card -->
       <div v-if="aiUsage" class="mb-4 grid w-full grid-cols-1 gap-4">
         <div
@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSpinner size="md" class="mx-auto mt-3 block text-center" />
       </div>
       <div v-else class="mt-3 grid grid-cols-2 gap-3">
-        <pro-plan
+        <ProPlan
           :planType="planType"
           :billingProvider="billingProvider"
           :subscriptionType="subscriptionType"
@@ -156,11 +156,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :pricingError="pricingError"
           @update:proSubscription="onLoadSubscription(config.paidPlan)"
           @update:cancelSubscription="onUnsubscribe"
-        ></pro-plan>
-        <enterprise-plan
+        ></ProPlan>
+        <EnterprisePlan
           :features="enterprisePlanFeatures"
           :pricingError="pricingError"
-        ></enterprise-plan>
+        ></EnterprisePlan>
       </div>
     </template>
   </div>

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <base-import
+  <BaseImport
     ref="baseImportRef"
     title="Import Pipeline"
     test-prefix="pipeline"
@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ errorMessage.message }}
                     <div>
-                      <query-editor
+                      <QueryEditor
                         class="w-full"
                         style="height: 200px"
                         data-test="pipeline-import-sql-query-input"
@@ -374,7 +374,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </template>
-  </base-import>
+  </BaseImport>
 
   <!-- Actions live in the pipeline shell's OPageHeader (Functions.vue), next
        to the "Pipelines › Import" breadcrumb — the shell owns the single header

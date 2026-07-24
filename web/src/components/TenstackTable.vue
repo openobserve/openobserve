@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="headerGroup in table.getHeaderGroups()"
           :key="headerGroup.id"
         >
-          <vue-draggable
+          <VueDraggable
             v-model="columnOrder"
             :element="'table'"
             :animation="200"
@@ -383,7 +383,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </th>
-          </vue-draggable>
+          </VueDraggable>
 
           <!-- Loading row: only rendered when the parent supplies a custom
             #loading slot. With no slot, the shimmer skeleton <tbody> below

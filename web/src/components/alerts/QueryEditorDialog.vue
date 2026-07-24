@@ -309,7 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="!sqlEditorMaximized && vrlContentMounted"
                     class="relative min-h-0 flex-1"
                   >
-                    <unified-query-editor
+                    <UnifiedQueryEditor
                       data-test="scheduled-alert-vrl-function-editor"
                       data-test-prefix="alert-dialog-vrl"
                       ref="fnEditorRef"

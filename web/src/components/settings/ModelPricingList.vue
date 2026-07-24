@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #toolbar>
             <div class="flex w-full items-center gap-2">
               <div class="app-tabs-container h-9">
-                <app-tabs
+                <AppTabs
                   class="tabs-selection-container"
                   :tabs="tabOptions"
                   v-model:active-tab="selectedTab"
@@ -460,7 +460,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </ODrawer>
 
-    <confirm-dialog
+    <ConfirmDialog
       v-model="confirmDialogMeta.show"
       :title="confirmDialogMeta.title"
       :message="confirmDialogMeta.message"

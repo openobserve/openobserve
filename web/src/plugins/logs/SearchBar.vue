@@ -569,14 +569,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div ref="toolbarRightRef" class="flex flex-shrink-0 items-center gap-1">
         <template v-if="searchObj.meta.showTransformEditor && !shouldMoveShareToMenu">
-          <transform-selector
+          <TransformSelector
             v-if="isActionsEnabled"
             :function-options="functionOptions"
             :hide-toggle="true"
             @select:function="populateFunctionImplementation"
             @save:function="fnSavedFunctionDialog"
           />
-          <function-selector
+          <FunctionSelector
             v-else
             :function-options="functionOptions"
             :hide-toggle="true"
@@ -611,7 +611,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="p-2"
             data-test="logs-search-bar-menu-share-link-btn"
           >
-            <share-button
+            <ShareButton
               :url="shareURL"
               variant="outline"
               size="sm-action"
@@ -805,7 +805,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </ODropdownItem>
           </ODropdownGroup>
         </ODropdown>
-        <share-button
+        <ShareButton
           v-if="!shouldMoveShareToMenu"
           data-test="logs-search-bar-share-link-btn"
           :url="shareURL"
@@ -832,7 +832,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
 
         <div class="order-1 mr-1">
-          <date-time
+          <DateTime
             ref="dateTimeRef"
             auto-apply
             menu-align="end"
@@ -1254,7 +1254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </p>
               </ODropdown>
               <!-- Compact Auto Refresh Button -->
-              <auto-refresh-interval
+              <AutoRefreshInterval
                 class="ml-1"
                 v-model="searchObj.meta.refreshInterval"
                 :trigger="true"
@@ -1312,7 +1312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
             >
               <!-- Unified Query Editor (with built-in AI bar) -->
-              <unified-query-editor
+              <UnifiedQueryEditor
                 v-if="router.currentRoute.value.name === 'logs'"
                 ref="queryEditorRef"
                 :query="searchObj.data.query"
@@ -1368,7 +1368,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="relative h-full w-full">
                   <div class="relative h-full">
                     <!-- Unified Query Editor (with built-in AI bar) -->
-                    <unified-query-editor
+                    <UnifiedQueryEditor
                       v-if="router.currentRoute.value.name === 'logs'"
                       data-test="logs-vrl-function-editor"
                       ref="fnEditorRef"
@@ -1415,7 +1415,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
               <template v-else-if="searchObj.data.transformType === 'action'">
-                <code-query-editor
+                <CodeQueryEditor
                   v-if="router.currentRoute.value.name === 'logs'"
                   data-test="logs-vrl-function-editor"
                   ref="fnEditorRef"

@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="rounded-default min-h-0 flex-1 overflow-y-auto"
         >
           <div v-show="permissionsUiType === 'table'">
-            <permissions-table
+            <PermissionsTable
               ref="permissionTableRef"
               :rows="permissionsState.permissions"
               :customFilteredPermissions="filteredPermissions"
@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="flex flex-nowrap">
               <div :style="isHelpOpen ? { width: 'calc(100% - 350px)' } : { width: '100%' }">
-                <query-editor
+                <QueryEditor
                   data-test="logs-vrl-function-editor"
                   editor-id="add-function-editor"
                   class="mt-2"
