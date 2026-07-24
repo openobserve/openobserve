@@ -131,45 +131,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- LEFT column wrapper (flex: 6.5) -->
       <div class="flex-[6.5] min-w-0 min-h-0 flex flex-col gap-2 py-2">
 
-      <!-- Stream Name & Stream Type -->
-      <div class="bg-card-glass-bg shrink-0 stream-config-card [container-type:inline-size] [container-name:stream-config]">
+      <!-- Stream Name & Stream Type — simple/anomaly only. A composite has no
+           single top-level stream (each term picks its own in the builder below),
+           so the whole card is omitted in composite mode. -->
+      <div v-if="!isComposite" class="bg-card-glass-bg shrink-0 stream-config-card [container-type:inline-size] [container-name:stream-config]">
         <div class="flex items-center gap-0 py-2.5 px-3 border-b border-border-default">
           <div class="w-0.75 h-4 rounded-default mr-2 shrink-0 bg-theme-accent" />
-          <span class="text-compact font-semibold tracking-[0.01em]">{{ isComposite ? t('alerts.composite.mode') : t('alerts.streamConfig') }} <span v-if="!isComposite" class="text-text-body">*</span></span>
+          <span class="text-compact font-semibold tracking-[0.01em]">{{ t('alerts.streamConfig') }} <span class="text-text-body">*</span></span>
         </div>
         <div class="flex items-center gap-4 px-3 py-2">
-        <!-- Simple | Composite mode toggle -->
-        <div v-if="!isAnomalyMode" class="flex items-center gap-1.5">
-          <OToggleGroup
-            :model-value="isComposite ? 'composite' : 'simple'"
-            :disabled="beingUpdated || anomalyEditMode"
-            @update:model-value="(val) => toggleComposite(val as string)"
-          >
-            <OToggleGroupItem value="simple" size="sm" data-test="add-alert-mode-simple">
-              {{ t('alerts.composite.simple') }}
-            </OToggleGroupItem>
-            <OToggleGroupItem value="composite" size="sm" data-test="add-alert-mode-composite">
-              {{ t('alerts.composite.composite') }}
-            </OToggleGroupItem>
-          </OToggleGroup>
-          <template v-if="isComposite">
-            <OIcon
-              name="info"
-              size="sm"
-              class="cursor-pointer text-text-secondary hover:text-text-heading"
-              data-test="add-alert-mode-info"
-              @click="setCompositeInfoDismissed(!compositeInfoDismissed)"
-            />
-            <OTooltip
-              side="bottom"
-              align="start"
-              :max-width="'320px'"
-              :content="t('alerts.composite.toggleInfo')"
-            />
-          </template>
-        </div>
         <!-- Stream Type -->
-        <div v-if="!isComposite" class="flex items-center gap-1.5">
+        <div class="flex items-center gap-1.5">
           <div class="text-xs font-semibold whitespace-nowrap text-text-heading">{{ t("alerts.streamType") }} <span class="text-text-body">*</span></div>
           <OFormSelect
             ref="streamTypeRef"
@@ -184,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Stream Name -->
-        <div v-if="!isComposite" class="flex items-center gap-1.5">
+        <div class="flex items-center gap-1.5">
           <div class="text-xs font-semibold whitespace-nowrap text-text-heading">{{ t("alerts.stream_name") }} <span class="text-text-body">*</span></div>
           <OFormSelect
             ref="streamNameRef"
@@ -199,8 +171,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip v-if="!formData.stream_type" :content="t('alerts.selectStreamTypeFirst')" />
         </div>
 
-        <!-- Alert Type -->
-        <div v-if="!isComposite" class="flex items-center gap-1.5">
+        <!-- Alert Type (Scheduled / Real-Time) — hidden in anomaly mode; the
+             kind (composite/anomaly) is chosen at creation, not switched here. -->
+        <div v-if="!isAnomalyMode" class="flex items-center gap-1.5">
           <div class="text-xs font-semibold whitespace-nowrap text-text-heading">{{ t("alerts.alertType") }}</div>
           <OFormSelect
             data-test="add-alert-type-select-dropdown"
@@ -239,8 +212,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroupItem>
         </OToggleGroup>
 
-        <!-- Tab Content -->
-        <div class="flex-1 overflow-auto">
+        <!-- Tab Content — pt gives every pane a gap below the tab bar. Bottom gap
+             lives on each pane (scroll-container padding-bottom is dropped). -->
+        <div class="flex-1 overflow-auto pt-3">
           <!-- Alert Rules Tab (Conditions + Alert Settings merged) -->
           <!-- data-tab-pane: lets focusOnFirstError find the tab owning an
                invalid field and bring it forward before focusing it. -->
@@ -249,7 +223,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <CompositeAlert
               v-if="isComposite"
               :composite="composite"
-              :triggerCondition="compositeTrigger"
               :destinations="getFormattedDestinations"
               :folderId="activeFolderId"
               :selfId="formData.id || ''"
@@ -613,10 +586,6 @@ export default defineComponent({
     // editors (QueryEditorDialog / QueryConfig) via inject.
     provide("alertSqlErrorRanges", alertForm.sqlErrorRanges);
 
-    const isAnomalyDetectionEnabled = computed(
-      () => alertForm.store.state.zoConfig.anomaly_detection_enabled === true,
-    );
-
     // Auto-expand preview when stream name is selected, collapse when cleared
     watch(
       () => alertForm.formData.value.stream_name,
@@ -643,12 +612,9 @@ export default defineComponent({
 
     // Composite alerts: a self-scheduled alert owning an ordered set of terms.
     // State lives in useAlertForm on a local mutable model (the OForm read-view
-    // is immutable), exposed here for the Simple|Composite toggle.
+    // is immutable), exposed here for the read-only type badge. The kind is
+    // chosen at creation (Add-alert type picker), not switched inside the form.
     const isComposite = alertForm.isComposite;
-    const toggleComposite = (mode: string) => {
-      if (mode === "composite") alertForm.enableComposite();
-      else alertForm.disableComposite();
-    };
 
     // Info banner visibility, persisted so repeat authors aren't shown it. The
     // banner lives in CompositeAlert but is re-opened from the info icon here.
@@ -671,12 +637,11 @@ export default defineComponent({
         /* ignore storage failures */
       }
     };
+    // Simple alerts choose Scheduled vs Real-Time here. Anomaly is no longer an
+    // in-form option — it's a distinct kind chosen from the Add-alert type picker.
     const alertTypeOptions = computed(() => [
       { label: alertForm.t("alerts.scheduled"), value: "false" },
       { label: alertForm.t("alerts.realTime"), value: "true" },
-      ...(isAnomalyDetectionEnabled.value
-        ? [{ label: alertForm.t("alerts.anomalyDetection"), value: "anomaly" }]
-        : []),
     ]);
 
     const alertTabs = computed(() => {
@@ -718,7 +683,6 @@ export default defineComponent({
 
     return {
       ...alertForm,
-      isAnomalyDetectionEnabled,
       alertTypeOptions,
       alertTabs,
       activeFolderName,
@@ -726,7 +690,6 @@ export default defineComponent({
       onStreamTypeChange,
       activeEvaluationStatus,
       isComposite,
-      toggleComposite,
       compositeInfoDismissed,
       setCompositeInfoDismissed,
     };

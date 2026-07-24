@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="composite-alert flex flex-col gap-4 pt-3" data-test="composite-alert">
+  <div class="composite-alert flex flex-col gap-3" data-test="composite-alert">
     <!-- Info: what a composite alert is + what you can do. Dismissible; re-opened
          from the info icon beside the Simple | Composite toggle (parent). -->
     <div v-if="!infoDismissed" class="relative">
@@ -44,196 +44,242 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OBanner>
     </div>
 
-    <!-- Terms -->
-    <div ref="termsListRef" class="flex flex-col gap-3">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <span class="text-sm font-semibold">{{ t("alerts.composite.terms") }}</span>
-          <OTag type="default" :value="`${composite.terms.length}/${MAX_TERMS}`" />
+    <!-- Terms — each term is a query in this one alert. A horizontal tab strip
+         (mirrors the dashboard panel query tabs) with one full editor per term. -->
+    <div class="rounded-default bg-surface-overlay border border-border-default overflow-hidden">
+      <div class="section-header flex items-center py-2.5 px-3 border-b border-border-default">
+        <div class="section-header-accent w-0.75 h-4 rounded-default mr-2 shrink-0 bg-theme-accent" />
+        <span class="section-header-title text-compact font-semibold tracking-[0.01em] text-text-heading">{{ t("alerts.composite.terms") }}</span>
+        <OTag type="countChip" value="primary" class="ml-2">{{ composite.terms.length }}/{{ MAX_TERMS }}</OTag>
+      </div>
+
+      <!-- Query-tab strip: one tab per term (alias), + to add, × on a tab to remove. -->
+      <div class="flex items-center gap-1 px-2 pt-1.5 border-b border-border-default">
+        <div class="flex-1 min-w-0 overflow-hidden">
+          <OTabs
+            :model-value="activeTermIndex"
+            dense
+            mobile-arrows
+            data-test="composite-term-tabs"
+            @update:model-value="(v) => (activeTermIndex = Number(v))"
+          >
+            <!-- Fixed names (alert_1…) + an always-visible × to remove, like the
+                 dashboard query tabs. Dimmed at the 2-term minimum (can't remove). -->
+            <OTab
+              v-for="(term, idx) in composite.terms"
+              :key="idx"
+              :name="idx"
+              :data-test="`composite-term-tab-${idx}`"
+            >
+              <span class="inline-flex items-center gap-1.5">
+                <span
+                  class="font-semibold text-xs whitespace-nowrap"
+                  :data-test="`composite-term-tab-name-${idx}`"
+                >{{ termLabel(term.name) }}</span>
+                <!-- Icon + tooltip wrapped in a relative span so the tooltip
+                     scopes to just the ×, not the whole tab. -->
+                <span class="inline-flex items-center relative">
+                  <OIcon
+                    name="close"
+                    size="sm"
+                    class="transition-opacity"
+                    :class="composite.terms.length > 2
+                      ? 'opacity-60 hover:opacity-100 cursor-pointer'
+                      : 'opacity-30 cursor-not-allowed'"
+                    :data-test="`composite-term-tab-remove-${idx}`"
+                    @click.stop.prevent="removeTerm(idx)"
+                  />
+                  <OTooltip
+                    :content="composite.terms.length > 2
+                      ? t('alerts.composite.removeTerm')
+                      : t('alerts.composite.minTermsError')"
+                  />
+                </span>
+              </span>
+            </OTab>
+          </OTabs>
         </div>
         <OButton
-          variant="outline"
-          size="sm"
+          variant="ghost"
+          size="icon"
           icon-left="add"
           :disabled="composite.terms.length >= MAX_TERMS"
           data-test="composite-add-term-btn"
           @click="addTerm"
-        >
-          {{ t("alerts.composite.addTerm") }}
-        </OButton>
+        />
       </div>
 
-      <CompositeTermCard
-        v-for="(term, idx) in composite.terms"
-        :key="idx"
-        :term="term"
-        :memberOptions="memberOptions"
-        :loadingMembers="loadingMembers"
-        :canRemove="composite.terms.length > 2"
-        :beingUpdated="beingUpdated"
-        @remove="removeTerm(idx)"
-        @open-member="openMember"
-      />
+      <!-- Active term editor (full-width, like a normal alert's query builder). -->
+      <div class="px-3 py-3">
+        <CompositeTermCard
+          v-if="activeTerm"
+          :key="activeTermIndex"
+          :term="activeTerm"
+          :memberOptions="memberOptions"
+          :loadingMembers="loadingMembers"
+          :beingUpdated="beingUpdated"
+          @open-member="openMember"
+        />
+      </div>
     </div>
 
-    <!-- Expression -->
-    <div class="card-container border border-border-default rounded-surface p-3 flex flex-col gap-2">
-      <div class="flex items-center gap-2">
-        <span class="text-sm font-semibold">{{ t("alerts.composite.expression") }} <span class="text-text-body">*</span></span>
-        <OTooltip :content="t('alerts.composite.expressionHelp')" />
+    <!-- Fires when — visual boolean builder (pills + AND/OR joiners + groups). -->
+    <div class="rounded-default bg-surface-overlay border border-border-default overflow-hidden">
+      <div class="section-header flex items-center py-2.5 px-3 border-b border-border-default">
+        <div class="section-header-accent w-0.75 h-4 rounded-default mr-2 shrink-0 bg-theme-accent" />
+        <span class="section-header-title text-compact font-semibold tracking-[0.01em] text-text-heading">{{ t("alerts.composite.firesWhen") }} <span class="text-text-body">*</span></span>
+        <span class="ml-1.5 inline-flex"><OTooltip :content="t('alerts.composite.expressionHelp')" /></span>
       </div>
-      <OInput
-        :model-value="composite.expression"
-        @update:model-value="setExpression"
-        data-test="composite-expression-input"
-        :placeholder="t('alerts.composite.expressionPlaceholder')"
-        class="text-sm"
-        :class="expressionResult.valid ? '' : 'field-error'"
-      />
-      <!-- Term chips (exact aliases; click to insert into the expression) -->
-      <div class="flex items-center gap-1.5 flex-wrap">
-        <span class="text-xs text-text-secondary">{{ t("alerts.composite.availableTerms") }}:</span>
-        <span
-          v-for="term in composite.terms"
-          :key="term.name"
-          class="cursor-pointer"
-          :class="chipClass"
-          :data-test="`composite-expr-chip-${term.name}`"
-          @click="insertTerm(term.name)"
-        >{{ term.name || "—" }}</span>
-      </div>
-      <div
-        v-if="!expressionResult.valid && composite.expression"
-        class="flex items-center gap-1 text-compact font-medium text-negative"
-        data-test="composite-expression-error"
-      >
-        <OIcon name="error-outline" size="xs" />
-        {{ expressionResult.error }}
+      <div class="px-3 py-2">
+        <CompositeExpressionBuilder
+          :expression="composite.expression"
+          :terms="composite.terms"
+          :error="expressionResult.valid || !composite.expression ? '' : (expressionResult.error || '')"
+          @update:expression="setExpression"
+        />
       </div>
     </div>
 
     <!-- Shared evaluation schedule -->
-    <div class="card-container border border-border-default rounded-surface p-3 flex flex-col gap-3">
-      <span class="text-sm font-semibold">{{ t("alerts.composite.schedule") }}</span>
-      <div class="flex items-center gap-4 flex-wrap">
-        <div class="flex items-center gap-1.5">
-          <span class="text-xs font-semibold whitespace-nowrap">{{ t("alerts.composite.period") }}</span>
-          <OInput
-            :model-value="triggerCondition.period"
-            @update:model-value="(v) => setSchedule('period', v)"
-            type="number"
-            :min="1"
-            class="w-22.5 h-7! min-h-7!"
-            data-test="composite-period-input"
-          />
-          <span class="text-xs text-text-secondary">{{ t("alerts.composite.minutes") }}</span>
+    <div class="rounded-default bg-surface-overlay border border-border-default overflow-hidden">
+      <div class="section-header flex items-center py-2.5 px-3 border-b border-border-default">
+        <div class="section-header-accent w-0.75 h-4 rounded-default mr-2 shrink-0 bg-theme-accent" />
+        <span class="section-header-title text-compact font-semibold tracking-[0.01em] text-text-heading">{{ t("alerts.composite.schedule") }}</span>
+      </div>
+      <!-- Schedule fields REUSE the form's trigger_condition + the simple-alert
+           field styling (label + tooltip + addon unit). Stacked vertically. -->
+      <div class="px-3 py-3 flex flex-col gap-4">
+        <!-- Period -->
+        <div class="flex items-start">
+          <div class="font-semibold flex items-center w-47.5 h-7 text-text-heading text-compact">
+            {{ t("alerts.period") }} <span class="text-text-body ml-0.5">*</span>
+            <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
+            <OTooltip :content="t('alerts.alertSettings.periodTooltip')" side="right" />
+          </div>
+          <div class="flex items-center">
+            <div class="w-21.75">
+              <OFormInput name="trigger_condition.period" type="number" min="1" data-test="composite-period-input">
+                <template #error />
+              </OFormInput>
+            </div>
+            <div class="flex justify-center items-center bg-input-addon-bg text-input-addon-text min-w-22.5 h-8.5 text-compact">
+              {{ t("alerts.minutes") }}
+            </div>
+          </div>
         </div>
-        <div class="flex items-center gap-1.5">
-          <span class="text-xs font-semibold whitespace-nowrap">{{ t("alerts.composite.frequency") }}</span>
-          <OInput
-            :model-value="triggerCondition.frequency"
-            @update:model-value="(v) => setSchedule('frequency', v)"
-            type="number"
-            :min="1"
-            class="w-22.5 h-7! min-h-7!"
-            data-test="composite-frequency-input"
-          />
-          <span class="text-xs text-text-secondary">{{ t("alerts.composite.minutes") }}</span>
+        <!-- Check every -->
+        <div class="flex items-start">
+          <div class="font-semibold flex items-center w-47.5 h-7 text-text-heading text-compact">
+            {{ t("alerts.composite.frequency") }}
+            <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
+            <OTooltip :content="t('alerts.alertSettings.frequencyTooltipMinutes')" side="right" />
+          </div>
+          <div class="flex items-center">
+            <div class="w-21.75">
+              <OFormInput name="trigger_condition.frequency" type="number" min="1" data-test="composite-frequency-input">
+                <template #error />
+              </OFormInput>
+            </div>
+            <div class="flex justify-center items-center bg-input-addon-bg text-input-addon-text min-w-22.5 h-8.5 text-compact">
+              {{ t("alerts.minutes") }}
+            </div>
+          </div>
         </div>
-        <div class="flex items-center gap-1.5">
-          <span class="text-xs font-semibold whitespace-nowrap">{{ t("alerts.composite.silence") }}</span>
-          <OInput
-            :model-value="triggerCondition.silence"
-            @update:model-value="(v) => setSchedule('silence', v)"
-            type="number"
-            :min="0"
-            class="w-22.5 h-7! min-h-7!"
-            data-test="composite-silence-input"
-          />
-          <span class="text-xs text-text-secondary">{{ t("alerts.composite.minutes") }}</span>
+        <!-- Silence / cooldown -->
+        <div class="flex items-start">
+          <div class="font-semibold flex items-center w-47.5 h-7 text-text-heading text-compact">
+            {{ t("alerts.composite.silence") }} <span class="text-text-body ml-0.5">*</span>
+            <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
+            <OTooltip :content="t('alerts.alertSettings.cooldownTooltip')" side="right" />
+          </div>
+          <div class="flex items-center">
+            <div class="w-21.75">
+              <OFormInput name="trigger_condition.silence" type="number" min="0" data-test="composite-silence-input">
+                <template #error />
+              </OFormInput>
+            </div>
+            <div class="flex justify-center items-center bg-input-addon-bg text-input-addon-text min-w-22.5 h-8.5 text-compact">
+              {{ t("alerts.minutes") }}
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Notifications -->
-    <div class="card-container border border-border-default rounded-surface p-3 flex flex-col gap-3">
-      <span class="text-sm font-semibold">{{ t("alerts.composite.notifications") }}</span>
-
-      <!-- Composite-level destinations (required) -->
-      <div class="flex items-center gap-2 flex-wrap">
-        <span class="text-xs font-semibold whitespace-nowrap min-w-32.5">
-          {{ t("alerts.composite.onComposite") }} <span class="text-text-body">*</span>
-        </span>
-        <OSelect
-          :model-value="composite.notify.on_composite"
-          :options="destinations"
-          multiple
-          class="min-w-65 h-7! min-h-7!"
-          data-test="composite-on-composite-select"
-          :class="composite.notify.on_composite.length ? '' : 'field-error'"
-          @update:model-value="setOnComposite"
-        />
-        <OButton
-          variant="ghost"
-          size="xs"
-          icon-left="refresh"
-          data-test="composite-refresh-destinations"
-          @click="$emit('refresh:destinations')"
-        />
+    <div class="rounded-default bg-surface-overlay border border-border-default overflow-hidden">
+      <div class="section-header flex items-center py-2.5 px-3 border-b border-border-default">
+        <div class="section-header-accent w-0.75 h-4 rounded-default mr-2 shrink-0 bg-theme-accent" />
+        <span class="section-header-title text-compact font-semibold tracking-[0.01em] text-text-heading">{{ t("alerts.composite.notifications") }}</span>
       </div>
+      <div class="px-3 py-3 flex flex-col gap-4">
 
-      <!-- Per-term destinations (optional) -->
-      <div class="flex flex-col gap-2">
-        <span class="text-xs text-text-secondary">{{ t("alerts.composite.onTermHelp") }}</span>
-        <div
-          v-for="term in composite.terms"
-          :key="`onterm-${term.name}`"
-          class="flex items-center gap-2 flex-wrap"
-        >
-          <span :class="chipClass">{{ term.name }}</span>
-          <OSelect
-            :model-value="composite.notify.on_term[term.name] || []"
-            :options="destinations"
-            multiple
-            class="min-w-65 h-7! min-h-7!"
-            :data-test="`composite-on-term-${term.name}-select`"
-            @update:model-value="(val) => setOnTerm(term.name, val)"
+      <!-- Composite-level destinations — reuses the simple-alert destination
+           picker (inline refresh + add-destination). Side label like the simple
+           alert; not reddened until a save is attempted (validateCompositeAlert). -->
+      <div class="flex items-start">
+        <div class="font-semibold flex items-center w-47.5 h-7 text-text-heading text-compact">
+          {{ t("alerts.destination") }} <span class="text-text-body ml-0.5">*</span>
+          <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
+          <OTooltip :content="t('alerts.alertSettings.destinationsTooltip')" side="right" />
+        </div>
+        <div class="flex flex-col flex-1 min-w-0">
+          <AlertTargetsSelect
+            :destinations="composite.notify.on_composite"
+            :workflows="[]"
+            :destination-options="destinations"
+            :workflow-options="[]"
+            :workflows-enabled="false"
+            @update:destinations="setOnComposite"
+            @refresh="$emit('refresh:destinations')"
+            @create-destination="onCreateDestination"
           />
         </div>
       </div>
 
       <!-- On-error policy -->
-      <div class="flex items-center gap-2">
-        <span class="text-xs font-semibold whitespace-nowrap min-w-32.5">{{ t("alerts.composite.onError") }}</span>
+      <div class="flex items-start">
+        <div class="font-semibold flex items-center w-47.5 h-7 text-text-heading text-compact">{{ t("alerts.composite.onError") }}</div>
         <OSelect
           :model-value="composite.on_error"
           :options="onErrorOptions"
           :searchable="false"
-          class="min-w-55 h-7! min-h-7!"
+          class="w-75! h-7! min-h-7!"
           data-test="composite-on-error-select"
           @update:model-value="setOnError"
         />
+      </div>
       </div>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, ref, nextTick, onMounted, watch } from "vue";
+import { defineComponent, computed, ref, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import CompositeTermCard from "@/components/alerts/composite/CompositeTermCard.vue";
+import CompositeExpressionBuilder from "@/components/alerts/composite/CompositeExpressionBuilder.vue";
 import { validateCompositeExpression } from "@/utils/alerts/compositeExpression";
+import {
+  parseToAst,
+  serializeAst,
+  addTermAtPath,
+  pruneAlias,
+} from "@/utils/alerts/compositeExpressionAst";
 import alertsService from "@/services/alerts";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import AlertTargetsSelect from "@/components/alerts/AlertTargetsSelect.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 
 /** Keep in sync with `MAX_TERMS` in the back-end (config composite.rs). */
 const MAX_TERMS = 10;
@@ -275,7 +321,7 @@ export const makeMemberDraft = () => ({
  */
 export const makeCompositeTerm = (name: string) => ({
   name, // alias / expression identifier ([A-Za-z0-9_])
-  mode: "existing", // "existing" | "new"
+  mode: "new", // "new" (define a query — the goal: multiple queries in one alert) | "existing"
   alert_id: "", // referenced alert id (existing mode)
   member_name: "", // display name of the referenced alert
   draft: makeMemberDraft(), // inline query (new mode)
@@ -283,23 +329,18 @@ export const makeCompositeTerm = (name: string) => ({
 
 /** The default composite spec attached when switching to composite mode. */
 export const makeDefaultComposite = () => ({
-  terms: [makeCompositeTerm("A"), makeCompositeTerm("B")],
-  expression: "A && B",
+  terms: [makeCompositeTerm("alert_1"), makeCompositeTerm("alert_2")],
+  expression: "alert_1 && alert_2",
   notify: { on_composite: [], on_term: {} },
   on_error: "suppress",
 });
 
 export default defineComponent({
   name: "CompositeAlert",
-  components: { CompositeTermCard, OSelect, OInput, OButton, OTag, OTooltip, OBanner, OIcon },
+  components: { CompositeTermCard, CompositeExpressionBuilder, AlertTargetsSelect, OSelect, OFormInput, OButton, OTag, OTooltip, OBanner, OIcon, OTabs, OTab },
   props: {
     /** The reactive composite spec (mutated in place). */
     composite: {
-      type: Object as any,
-      required: true,
-    },
-    /** The shared composite schedule (parent trigger_condition). */
-    triggerCondition: {
       type: Object as any,
       required: true,
     },
@@ -339,20 +380,28 @@ export default defineComponent({
     // through these computed aliases keeps the same reference, so in-place writes
     // propagate exactly as before while satisfying vue/no-mutating-props.
     const composite = computed(() => props.composite);
-    const triggerCondition = computed(() => props.triggerCondition);
 
-    // Exact-alias chip styling (soft-primary badge, mono). Utility string kept in
-    // one place instead of a scoped-CSS class.
-    const chipClass =
-      "inline-flex items-center rounded-default px-1.5 py-px text-xs font-medium font-mono bg-badge-primary-soft-bg text-badge-primary-soft-text whitespace-nowrap";
+    // Open the destination create page (reuses the simple-alert affordance).
+    const onCreateDestination = () => {
+      const url = router.resolve({
+        name: "alertDestinations",
+        query: {
+          action: "add",
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      }).href;
+      window.open(url, "_blank");
+    };
+
+    // Friendly display label derived from the identifier: "alert_1" → "Alert 1".
+    // The identifier (term.name) stays the expression token; only display changes.
+    const termLabel = (name: string): string =>
+      (name || "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
     // Template write handlers — mutate the parent-owned model via the computed
     // aliases (script mutation), keeping the template free of prop mutations.
     const setExpression = (val: string | number) => {
       composite.value.expression = String(val ?? "");
-    };
-    const setSchedule = (key: "period" | "frequency" | "silence", val: any) => {
-      triggerCondition.value[key] = Number(val);
     };
     const setOnComposite = (val: SelectModelValue) => {
       composite.value.notify.on_composite = Array.isArray(val)
@@ -363,7 +412,11 @@ export default defineComponent({
       composite.value.on_error = Array.isArray(val) ? val[0] : val;
     };
 
-    const termsListRef = ref<HTMLElement | null>(null);
+    // The term currently open in the tab strip.
+    const activeTermIndex = ref(0);
+    const activeTerm = computed(
+      () => composite.value.terms[activeTermIndex.value] || null,
+    );
 
     // Open a member alert's edit form in a new tab (deep-link into the alert
     // list, which loads the alert by id when action=update).
@@ -452,55 +505,69 @@ export default defineComponent({
     );
 
     /** Next unused single-letter term name (A, B, C, ...). */
+    // Fixed, sequential names (alert_1, alert_2, …) — the expression identifier
+    // and the tab label (shown as "Alert 1"), not user-edited.
     const nextTermName = (): string => {
       const used = new Set(composite.value.terms.map((tm: any) => tm.name));
-      for (let i = 0; i < 26; i++) {
-        const name = String.fromCharCode(65 + i);
+      for (let i = 1; i <= MAX_TERMS + 10; i++) {
+        const name = `alert_${i}`;
         if (!used.has(name)) return name;
       }
-      return `T${composite.value.terms.length}`;
+      return `alert_${composite.value.terms.length + 1}`;
+    };
+
+    // Keep the expression in sync with the query list: a new query joins the
+    // root group (AND by default); a removed query is pruned from the tree.
+    const addAliasToExpression = (name: string) => {
+      const expr = (composite.value.expression || "").trim();
+      if (!expr) {
+        composite.value.expression = name;
+        return;
+      }
+      try {
+        const tree = parseToAst(expr);
+        addTermAtPath(tree, [], name);
+        composite.value.expression = serializeAst(tree);
+      } catch {
+        composite.value.expression = `${expr} && ${name}`;
+      }
+    };
+    const removeAliasFromExpression = (name: string) => {
+      const expr = (composite.value.expression || "").trim();
+      if (!expr) return;
+      try {
+        const tree = parseToAst(expr);
+        pruneAlias(tree, name);
+        composite.value.expression = serializeAst(tree);
+      } catch {
+        /* leave an unparseable expression for the author to fix in text mode */
+      }
     };
 
     const addTerm = () => {
       if (composite.value.terms.length >= MAX_TERMS) return;
-      // Mark as added this session so its Existing/New toggle stays editable in
-      // update mode (already-saved terms stay locked — see CompositeTermCard).
-      composite.value.terms.push({ ...makeCompositeTerm(nextTermName()), _isNew: true });
-      // Move focus to the new term so the author sees where it was added.
-      nextTick(() => {
-        const cards = termsListRef.value?.querySelectorAll(".composite-term-card");
-        const last = cards && (cards[cards.length - 1] as HTMLElement | undefined);
-        if (last) {
-          last.scrollIntoView({ behavior: "smooth", block: "center" });
-          // Focus the first focusable control (stream-type select) of the card.
-          const focusable = last.querySelector<HTMLElement>(
-            "input, select, button, [tabindex]",
-          );
-          focusable?.focus();
-        }
-      });
+      // Mark as added this session so its mode/query stays editable in update
+      // mode (already-saved terms stay locked — see CompositeTermCard).
+      const name = nextTermName();
+      composite.value.terms.push({ ...makeCompositeTerm(name), _isNew: true });
+      addAliasToExpression(name);
+      // Open the new term's tab.
+      activeTermIndex.value = composite.value.terms.length - 1;
     };
 
     const removeTerm = (idx: number | string) => {
       if (composite.value.terms.length <= 2) return;
-      const [removed] = composite.value.terms.splice(Number(idx), 1);
+      const i = Number(idx);
+      const [removed] = composite.value.terms.splice(i, 1);
       if (removed && composite.value.notify.on_term[removed.name]) {
         delete composite.value.notify.on_term[removed.name];
       }
-    };
-
-    const setOnTerm = (name: string, val: SelectModelValue) => {
-      const arr = Array.isArray(val) ? (val as string[]) : [];
-      if (arr.length === 0) {
-        delete composite.value.notify.on_term[name];
-      } else {
-        composite.value.notify.on_term[name] = arr;
-      }
-    };
-
-    const insertTerm = (name: string) => {
-      const expr = composite.value.expression || "";
-      composite.value.expression = expr ? `${expr} ${name}` : name;
+      if (removed) removeAliasFromExpression(removed.name);
+      // Keep the open tab valid: shift left if a tab before it went away, and
+      // clamp if the last tab was the one removed.
+      const last = composite.value.terms.length - 1;
+      if (activeTermIndex.value > i) activeTermIndex.value -= 1;
+      else if (activeTermIndex.value > last) activeTermIndex.value = last;
     };
 
     onMounted(loadMembers);
@@ -513,9 +580,11 @@ export default defineComponent({
 
     return {
       t,
-      chipClass,
+      termLabel,
+      onCreateDestination,
       MAX_TERMS,
-      termsListRef,
+      activeTermIndex,
+      activeTerm,
       memberOptions,
       loadingMembers,
       openMember,
@@ -523,12 +592,9 @@ export default defineComponent({
       expressionResult,
       addTerm,
       removeTerm,
-      setOnTerm,
       setExpression,
-      setSchedule,
       setOnComposite,
       setOnError,
-      insertTerm,
     };
   },
 });

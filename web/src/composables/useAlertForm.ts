@@ -59,6 +59,12 @@ import {
 } from "@/utils/alerts/alertValidation";
 import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import {
+  parseToAst,
+  serializeAst,
+  addTermAtPath,
+  usedAliases,
+} from "@/utils/alerts/compositeExpressionAst";
+import {
   getAlertPayload as getAlertPayloadUtil,
   prepareAndSaveAlert as prepareAndSaveAlertUtil,
   transformCompositeTermsForSave,
@@ -350,22 +356,22 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // OForm: the form read-view is immutable (its nested fields can't be mutated
   // by the composite child components), and a composite has no top-level
   // stream/query for the composed schema to own. `composite` holds the spec
-  // (terms/expression/notify/on_error); `compositeTrigger` holds its shared
-  // schedule (period/frequency/silence). Both are seeded on edit-load and
-  // injected into the payload at save.
+  // (terms/expression/notify/on_error). Its shared schedule now REUSES the
+  // form's own `trigger_condition` (same OFormInput fields as a simple alert):
+  // `compositeTrigger` is just a read-view of it, so Preview/Summary keep working
+  // while the schedule inputs write straight to the form.
   const composite = ref<any>(null);
-  const compositeTrigger = ref<any>(null);
+  const compositeTrigger = computed(() => formData.value.trigger_condition);
   const isComposite = computed(() => composite.value != null);
   const enableComposite = (): void => {
     if (composite.value) return;
     composite.value = makeDefaultComposite();
-    compositeTrigger.value = { ...defaultAlertValue().trigger_condition };
-    // A composite is scheduled and has no single top-level stream.
+    // A composite is scheduled and has no single top-level stream. The schedule
+    // lives on the form's trigger_condition (already default-seeded).
     setF("is_real_time", "false");
   };
   const disableComposite = (): void => {
     composite.value = null;
-    compositeTrigger.value = null;
   };
 
   /** Reset the whole form (edit-prefill / post-save reset) to a complete alert
@@ -2424,6 +2430,28 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     // the top-level stream/query for a composite.
     if (composite.value) {
       payload.composite = cloneDeep(composite.value);
+      // The back-end requires every query to appear in "Fires when". Rather than
+      // nagging while the author edits, keep the saved expression valid by
+      // appending any query they left out (default AND). Truly-invalid syntax is
+      // left untouched for the normal validation to catch.
+      const names: string[] = (payload.composite.terms || []).map(
+        (tm: any) => tm.name,
+      );
+      const raw = (payload.composite.expression || "").trim();
+      if (!raw) {
+        payload.composite.expression = names.join(" && ");
+      } else {
+        try {
+          const tree = parseToAst(raw);
+          const refd = usedAliases(tree);
+          names.forEach((n) => {
+            if (!refd.has(n)) addTermAtPath(tree, [], n);
+          });
+          payload.composite.expression = serializeAst(tree);
+        } catch {
+          /* leave an unparseable expression for validation to surface */
+        }
+      }
       payload.is_real_time = false;
       const ct = compositeTrigger.value || {};
       payload.trigger_condition = {
@@ -2733,11 +2761,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     if (data.composite) {
       composite.value = cloneDeep(data.composite);
       rehydrateCompositeTerms(composite.value);
-      compositeTrigger.value = cloneDeep(data.trigger_condition);
+      // The schedule is seeded into the form's trigger_condition by resetForm(data)
+      // below; compositeTrigger reads it, so nothing else to seed here.
       delete data.composite;
     } else {
       composite.value = null;
-      compositeTrigger.value = null;
     }
 
     // Seed the ONE form (single source of truth) with the fully-transformed obj.
@@ -3076,6 +3104,16 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     // Pre-set anomaly mode
     if (router.currentRoute.value.name === "addAnomalyDetection") {
       setF("is_real_time", "anomaly");
+    }
+
+    // Pre-set composite mode when the entry type-picker chose "Composite"
+    // (?kind=composite on the add route). Guarded to the add flow so an edit of
+    // a simple alert never trips it; a saved composite hydrates from data.composite.
+    if (
+      router.currentRoute.value.query.action === "add" &&
+      router.currentRoute.value.query.kind === "composite"
+    ) {
+      enableComposite();
     }
 
     // Load anomaly detection config when editing

@@ -173,7 +173,8 @@ export function validateCompositeExpression(
     return { valid: false, error: e.message || "Invalid expression", referencedTerms: [] };
   }
 
-  // Every referenced identifier must be a defined term.
+  // Every referenced identifier must be a defined term (referencing a query
+  // that doesn't exist is a real error).
   const undefinedRef = referencedTerms.find((r) => !definedTermNames.includes(r));
   if (undefinedRef) {
     return {
@@ -182,15 +183,11 @@ export function validateCompositeExpression(
       referencedTerms,
     };
   }
-  // Every defined term must be referenced (no silently-dead term).
-  const unreferenced = definedTermNames.find((n) => !referencedTerms.includes(n));
-  if (unreferenced) {
-    return {
-      valid: false,
-      error: `Term '${unreferenced}' is not used in the expression`,
-      referencedTerms,
-    };
-  }
+  // NOTE: we intentionally do NOT flag a defined query that isn't referenced in
+  // the expression — that's the author's choice while editing, not an error to
+  // nag about. (The back-end still requires all queries to be referenced; if a
+  // query is left out we keep it in sync so the save stays valid — see
+  // CompositeAlert add/remove handling.)
 
   return { valid: true, error: null, referencedTerms };
 }

@@ -14,116 +14,37 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
+<!--
+  CompositeTermCard — the editor for ONE term of a composite alert, shown one at
+  a time inside the Terms tab strip (mirrors the dashboard panel query tabs). A
+  term is either a query defined here (like a normal alert) or a reference to an
+  existing alert. The query builder gets the full panel — never crammed into a row.
+-->
 <template>
   <div
-    class="composite-term-card card-container border border-border-default rounded-surface"
-    :data-test="`composite-term-card-${term.name}`"
+    class="composite-term-editor flex flex-col gap-3"
+    :data-test="`composite-term-editor-${term.name}`"
   >
-    <!-- Header: collapse + alias + mode toggle + remove -->
-    <div
-      class="flex items-center gap-3 px-3 py-2 flex-wrap"
-      :class="collapsed ? '' : 'border-b border-border-default'"
-    >
-      <button
-        type="button"
-        class="shrink-0 cursor-pointer text-text-secondary hover:text-text-body flex items-center"
-        :data-test="`composite-term-${term.name}-collapse`"
-        @click="collapsed = !collapsed"
-      >
-        <OIcon :name="collapsed ? 'chevron-right' : 'expand-more'" size="sm" />
-      </button>
-
-      <div class="flex items-center gap-1.5">
-        <span class="text-xs font-semibold whitespace-nowrap">{{ t("alerts.composite.alias") }} <span class="text-text-body">*</span></span>
-        <OInput
-          :model-value="term.name"
-          placeholder="A"
-          class="w-22.5 h-7! min-h-7!"
-          :data-test="`composite-term-${term.name}-alias`"
-          @update:model-value="onAliasInput"
-        />
-      </div>
-
-      <OToggleGroup
-        :model-value="term.mode"
-        :disabled="locked"
-        @update:model-value="(val) => onModeChange(val as string)"
-      >
-        <OToggleGroupItem value="existing" size="sm" :data-test="`composite-term-${term.name}-mode-existing`">
-          {{ t("alerts.composite.useExisting") }}
-        </OToggleGroupItem>
-        <OToggleGroupItem value="new" size="sm" :data-test="`composite-term-${term.name}-mode-new`">
-          {{ t("alerts.composite.createNew") }}
-        </OToggleGroupItem>
-      </OToggleGroup>
-
-      <!-- Compact summary when collapsed -->
-      <span
-        v-if="collapsed"
-        class="text-xs text-text-secondary truncate max-w-70"
-        :title="collapsedSummary"
-      >
-        {{ collapsedSummary }}
-      </span>
-
-      <div class="flex-1" />
-
-      <OButton
-        v-if="canRemove"
-        variant="ghost-destructive"
-        size="xs"
-        icon-left="delete"
-        :data-test="`composite-term-${term.name}-remove`"
-        @click="$emit('remove')"
-      >
-        {{ t("alerts.composite.removeTerm") }}
-      </OButton>
-    </div>
-
-    <div v-show="!collapsed">
-    <!-- Existing: pick an alert from this folder -->
-    <div v-if="term.mode === 'existing'" class="px-3 py-2.5 flex flex-col gap-2">
-      <div class="flex items-center gap-1.5">
-        <span class="text-xs font-semibold whitespace-nowrap">{{ t("alerts.composite.memberAlert") }} <span class="text-text-body">*</span></span>
-        <OSelect
-          :model-value="term.alert_id"
-          :options="memberOptions"
-          :loading="loadingMembers"
-          searchable
-          :placeholder="t('alerts.composite.selectMember')"
-          class="flex-1 min-w-55 h-7! min-h-7!"
-          :data-test="`composite-term-${term.name}-member`"
-          @update:model-value="onMemberSelect"
-        />
-      </div>
-
-      <!-- Selected member: plain-English trigger description + edit link -->
-      <div
-        v-if="selectedMember"
-        class="flex items-center gap-2 text-xs text-text-secondary pl-1"
-        :data-test="`composite-term-${term.name}-member-summary`"
-      >
-        <OIcon name="info" size="xs" class="shrink-0" />
-        <span class="min-w-0">
-          {{ t("alerts.composite.memberTriggersWhen") }}
-          <span class="text-text-body font-medium">{{ operatorText }} {{ selectedMember.threshold }}</span>
-        </span>
-        <div class="flex-1" />
-        <button
-          type="button"
-          class="flex items-center gap-1 text-accent hover:underline cursor-pointer shrink-0"
-          :data-test="`composite-term-${term.name}-open-member`"
-          @click="$emit('open-member', term.alert_id)"
-        >
-          {{ t("alerts.composite.editMember") }}
-          <OIcon name="open-in-new" size="xs" />
-        </button>
-      </div>
-    </div>
-
-    <!-- New: build the query (destination/schedule/name inherited from composite) -->
-    <template v-else>
-      <div class="flex items-center gap-4 px-3 py-2 flex-wrap">
+    <!-- Top row: the term's source on the left, reuse toggle + remove on the
+         right. Define mode → stream type/name inline; reuse mode → alert
+         selector. Keeping them on one row removes the empty gap under the tabs. -->
+    <div class="flex items-center gap-4 flex-wrap">
+      <template v-if="term.mode === 'existing'">
+        <div class="flex items-center gap-1.5">
+          <span class="text-xs font-semibold whitespace-nowrap">{{ t("alerts.composite.memberAlert") }} <span class="text-text-body">*</span></span>
+          <OSelect
+            :model-value="term.alert_id"
+            :options="memberOptions"
+            :loading="loadingMembers"
+            searchable
+            :placeholder="t('alerts.composite.selectMember')"
+            class="w-80! h-7! min-h-7!"
+            :data-test="`composite-term-${term.name}-member`"
+            @update:model-value="onMemberSelect"
+          />
+        </div>
+      </template>
+      <template v-else>
         <div class="flex items-center gap-1.5">
           <span class="text-xs font-semibold whitespace-nowrap">{{ t("alerts.streamType") }} <span class="text-text-body">*</span></span>
           <OSelect
@@ -131,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="streamTypes"
             :searchable="false"
             :disabled="locked"
-            class="h-7! min-h-7!"
+            class="w-40! h-7! min-h-7!"
             @update:model-value="onStreamTypeChange"
           />
         </div>
@@ -142,44 +63,79 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="streamNameOptions"
             :loading="isFetchingStreams"
             :disabled="locked || !term.draft.stream_type"
-            class="h-7! min-h-7! min-w-40"
+            class="w-52! h-7! min-h-7!"
             @update:model-value="onStreamNameChange"
           />
         </div>
-        <span class="text-xs text-text-secondary">{{ t("alerts.composite.newMemberHint") }}</span>
-      </div>
-      <div class="p-3 pt-0">
-        <QueryConfig
-          :tab="term.draft.query_condition.type || 'custom'"
-          :multiTimeRange="term.draft.query_condition.multi_time_range || []"
-          :columns="columns"
-          :streamFieldsMap="streamFieldsMap"
-          :generatedSqlQuery="''"
-          :inputData="term.draft.query_condition"
-          :streamType="term.draft.stream_type"
-          :isRealTime="'false'"
-          :sqlQuery="term.draft.query_condition.sql"
-          :promqlQuery="term.draft.query_condition.promql"
-          :vrlFunction="term.draft.query_condition.vrl_function || ''"
-          :streamName="term.draft.stream_name"
-          :isAggregationEnabled="isAggregationEnabled"
-          :beingUpdated="locked"
-          :promqlCondition="term.draft.query_condition.promql_condition"
-          :triggerCondition="mergedTrigger"
-          :hideSchedule="true"
-          @update:tab="(val) => setDraftQc('type', val)"
-          @input:update="() => {}"
-          @update:sqlQuery="(val) => setDraftQc('sql', val)"
-          @update:promqlQuery="(val) => setDraftQc('promql', val)"
-          @update:vrlFunction="(val) => setDraftQc('vrl_function', val)"
-          @update:isAggregationEnabled="(val) => (isAggregationEnabled = val)"
-          @update:aggregation="(val) => setDraftQc('aggregation', val)"
-          @update:promqlCondition="(val) => setDraftQc('promql_condition', val)"
-          @update:triggerCondition="onTriggerConditionUpdate"
-        />
-      </div>
-    </template>
-    </div><!-- /v-show collapse body -->
+      </template>
+
+      <div class="flex-1" />
+
+      <!-- Secondary opt-in (house pattern, cf. FunctionPicker/DestinationPicker):
+           OFF (default) = define a query here, ON = reuse an existing alert.
+           (Removing a term is the × on its tab, not a button here.) -->
+      <OSwitch
+        :model-value="term.mode === 'existing'"
+        :label="t('alerts.composite.reuseExisting')"
+        :disabled="locked"
+        :data-test="`composite-term-${term.name}-reuse-toggle`"
+        @update:model-value="(v) => onModeChange(v ? 'existing' : 'new')"
+      />
+    </div>
+
+    <!-- Reuse mode: the referenced alert's trigger summary + edit link -->
+    <div
+      v-if="term.mode === 'existing' && selectedMember"
+      class="flex items-center gap-2 text-xs text-text-secondary"
+      :data-test="`composite-term-${term.name}-member-summary`"
+    >
+      <OIcon name="info" size="xs" class="shrink-0" />
+      <span class="min-w-0">
+        {{ t("alerts.composite.memberTriggersWhen") }}
+        <span class="text-text-body font-medium">{{ operatorText }} {{ selectedMember.threshold }}</span>
+      </span>
+      <div class="flex-1" />
+      <button
+        type="button"
+        class="flex items-center gap-1 text-accent hover:underline cursor-pointer shrink-0"
+        :data-test="`composite-term-${term.name}-open-member`"
+        @click="$emit('open-member', term.alert_id)"
+      >
+        {{ t("alerts.composite.editMember") }}
+        <OIcon name="open-in-new" size="xs" />
+      </button>
+    </div>
+
+    <!-- Define mode: the full query builder -->
+    <QueryConfig
+      v-if="term.mode === 'new'"
+      :tab="term.draft.query_condition.type || 'custom'"
+      :multiTimeRange="term.draft.query_condition.multi_time_range || []"
+      :columns="columns"
+      :streamFieldsMap="streamFieldsMap"
+      :generatedSqlQuery="''"
+      :inputData="term.draft.query_condition"
+      :streamType="term.draft.stream_type"
+      :isRealTime="'false'"
+      :sqlQuery="term.draft.query_condition.sql"
+      :promqlQuery="term.draft.query_condition.promql"
+      :vrlFunction="term.draft.query_condition.vrl_function || ''"
+      :streamName="term.draft.stream_name"
+      :isAggregationEnabled="isAggregationEnabled"
+      :beingUpdated="locked"
+      :promqlCondition="term.draft.query_condition.promql_condition"
+      :triggerCondition="mergedTrigger"
+      :hideSchedule="true"
+      @update:tab="(val) => setDraftQc('type', val)"
+      @input:update="() => {}"
+      @update:sqlQuery="(val) => setDraftQc('sql', val)"
+      @update:promqlQuery="(val) => setDraftQc('promql', val)"
+      @update:vrlFunction="(val) => setDraftQc('vrl_function', val)"
+      @update:isAggregationEnabled="(val) => (isAggregationEnabled = val)"
+      @update:aggregation="(val) => setDraftQc('aggregation', val)"
+      @update:promqlCondition="(val) => setDraftQc('promql_condition', val)"
+      @update:triggerCondition="onTriggerConditionUpdate"
+    />
   </div>
 </template>
 
@@ -190,24 +146,12 @@ import useStreams from "@/composables/useStreams";
 import QueryConfig from "@/components/alerts/steps/QueryConfig.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
-import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-
-/** Slugifies an alert name into a valid alias, e.g. "Checkout Errors" -> "checkout_errors". */
-export const slugifyAlias = (name: string): string =>
-  (name || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9_]+/g, "_")
-    .replace(/^_+|_+$/g, "")
-    .slice(0, 40) || "term";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 
 export default defineComponent({
   name: "CompositeTermCard",
-  components: { QueryConfig, OSelect, OInput, OButton, OIcon, OToggleGroup, OToggleGroupItem },
+  components: { QueryConfig, OSelect, OIcon, OSwitch },
   props: {
     /** The term object (mutated in place; the parent owns the reactive array). */
     term: {
@@ -229,28 +173,22 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
-    canRemove: {
-      type: Boolean,
-      default: true,
-    },
     beingUpdated: {
       type: Boolean,
       default: false,
     },
   },
-  emits: ["remove", "open-member"],
+  emits: ["open-member"],
   setup(props) {
     const { t } = useI18n();
     const { getStreams, getStream } = useStreams();
 
     // Alias the parent-owned `term` prop (the parent mutates the composite's
-    // terms array it owns; the card edits its slice in place). Writing through
-    // this computed keeps the same reference, so edits propagate as before while
-    // satisfying vue/no-mutating-props.
+    // terms array it owns; the editor edits its slice in place). Writing through
+    // this computed keeps the same reference, satisfying vue/no-mutating-props.
     const term = computed(() => props.term);
 
-    // The member-alert option matching the currently referenced alert_id, if
-    // it has resolved in the parent's option list.
+    // The member-alert option matching the currently referenced alert_id.
     const selectedMember = computed(() =>
       term.value.mode === "existing" && term.value.alert_id
         ? props.memberOptions.find((o) => o.value === term.value.alert_id)
@@ -273,17 +211,6 @@ export default defineComponent({
         "=": "=",
       };
       return map[selectedMember.value?.operator || ""] || selectedMember.value?.operator || "≥";
-    });
-
-    const collapsed = ref(false);
-    const collapsedSummary = computed(() => {
-      if (term.value.mode === "existing") {
-        return term.value.member_name || t("alerts.composite.selectMember");
-      }
-      const d = term.value.draft || {};
-      return d.stream_name
-        ? `${d.stream_type} / ${d.stream_name}`
-        : t("alerts.composite.newMemberShort");
     });
 
     const streamTypes = ["logs", "metrics", "traces"];
@@ -318,17 +245,13 @@ export default defineComponent({
       term.value.draft.threshold = val.threshold;
     };
 
-    // Only [A-Za-z0-9_] in the alias (it's the expression identifier).
-    const onAliasInput = (val: string | number) => {
-      term.value.name = String(val ?? "").replace(/[^A-Za-z0-9_]/g, "");
-    };
-
     const onModeChange = (mode: string) => {
       term.value.mode = mode;
-      // Switching modes clears the previous reference/draft binding.
+      // Switching to "define a query" clears the previous reference binding.
       if (mode === "new") {
         term.value.alert_id = "";
         term.value.member_name = "";
+        if (term.value.draft?.stream_type) loadStreamNames(term.value.draft.stream_type);
       }
     };
 
@@ -337,9 +260,6 @@ export default defineComponent({
       term.value.alert_id = id;
       const opt = props.memberOptions.find((o) => o.value === id);
       term.value.member_name = opt?.label || "";
-      if (!term.value.name || /^[A-Za-z]$/.test(term.value.name)) {
-        term.value.name = slugifyAlias(opt?.label || term.value.name);
-      }
     };
 
     const loadStreamNames = async (streamType: string) => {
@@ -387,15 +307,14 @@ export default defineComponent({
       loadStreamFields(sn);
     };
 
-    // Write a single query_condition field of the draft (New-mode term) through
-    // the computed alias, keeping the QueryConfig event bindings prop-mutation
-    // free (vue/no-mutating-props).
+    // Write a single query_condition field of the draft through the computed
+    // alias, keeping the QueryConfig event bindings prop-mutation free.
     const setDraftQc = (key: string, val: any) => {
       term.value.draft.query_condition[key] = val;
     };
 
     onMounted(() => {
-      if (term.value.mode === "new" && term.value.draft.stream_type) {
+      if (term.value.mode === "new" && term.value.draft?.stream_type) {
         loadStreamNames(term.value.draft.stream_type);
         if (term.value.draft.stream_name) loadStreamFields(term.value.draft.stream_name);
       }
@@ -404,7 +323,7 @@ export default defineComponent({
     watch(
       () => term.value.mode,
       (mode) => {
-        if (mode === "new" && term.value.draft.stream_type && !streamNameOptions.value.length) {
+        if (mode === "new" && term.value.draft?.stream_type && !streamNameOptions.value.length) {
           loadStreamNames(term.value.draft.stream_type);
         }
       },
@@ -415,8 +334,6 @@ export default defineComponent({
       locked,
       selectedMember,
       operatorText,
-      collapsed,
-      collapsedSummary,
       streamTypes,
       streamNameOptions,
       columns,
@@ -425,7 +342,6 @@ export default defineComponent({
       isAggregationEnabled,
       mergedTrigger,
       onTriggerConditionUpdate,
-      onAliasInput,
       onModeChange,
       onMemberSelect,
       onStreamTypeChange,

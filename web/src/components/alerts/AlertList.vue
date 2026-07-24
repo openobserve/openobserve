@@ -40,26 +40,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-if="!isCompactToolbar">{{ t(`dashboard.import`) }}</template>
               <OTooltip v-if="isCompactToolbar" :content="t('dashboard.import')" side="bottom" shortcut-id="alertsImport" />
             </OButton>
-            <!-- Add button — routes to anomaly creation on anomaly tab, alert creation otherwise -->
+            <!-- Add button — opens the alert-type picker (Simple / Composite / Anomaly) -->
             <OButton
               data-test="alert-list-add-alert-btn"
               variant="primary"
               size="sm"
               :disabled="!destinations.length || !templates.length"
               :title="!destinations.length ? t('alerts.noDestinations') : ''"
-              @click="
-                activeTab === 'anomalyDetection'
-                  ? router.push({
-                      name: 'addAnomalyDetection',
-                      query: {
-                        org_identifier:
-                          store.state.selectedOrganization.identifier,
-                        folder: activeFolderId,
-                        tab: activeTab,
-                      },
-                    })
-                  : showAddUpdateFn({})
-              "
+              @click="showAlertTypePicker = true"
             >{{ t(`alerts.add`) }}</OButton>
           </template>
 
@@ -570,6 +558,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </template>
 
+    <!-- Alert-type picker — the "what kind of alert" choice at creation -->
+    <ODialog
+      v-model:open="showAlertTypePicker"
+      :title="t('alerts.newAlert.modalTitle')"
+      size="sm"
+      data-test="alert-list-type-picker-dialog"
+    >
+      <AlertTypePicker
+        variant="modal"
+        layout="row"
+        :disabled-types="disabledAlertTypes"
+        data-test="alert-list-type-picker"
+        @select="onAlertTypeSelected"
+      />
+    </ODialog>
+
     <ConfirmDialog
       title="Delete Alert"
       message="Are you sure you want to delete this alert?"
@@ -685,6 +689,8 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import ImportAlert from "@/components/alerts/ImportAlert.vue";
+import AlertTypePicker from "@/components/alerts/AlertTypePicker.vue";
+import type { AlertKind } from "@/constants/alerts";
 import {
   getImageURL,
   getUUID,
@@ -733,6 +739,7 @@ export default defineComponent({
     OEmptyState,
     ConfirmDialog,
     ImportAlert,
+    AlertTypePicker,
     FolderList,
     MoveAcrossFolders,
     OToggleGroup,
@@ -775,6 +782,34 @@ export default defineComponent({
         !!savedAlertListFilters.searchAcrossFolders,
     );
     const showAddAlertDialog: any = ref(false);
+    const showAlertTypePicker = ref(false);
+    // Composite/anomaly are enterprise capabilities; disable those picker cards
+    // in OSS so users only see kinds they can actually create.
+    const disabledAlertTypes = computed<AlertKind[]>(() => {
+      const enterprise =
+        config.isEnterprise === "true" || config.isCloud === "true";
+      const disabled: AlertKind[] = [];
+      if (!enterprise) disabled.push("composite");
+      if (!isAnomalyDetectionEnabled.value) disabled.push("anomaly");
+      return disabled;
+    });
+    // Route the chosen kind to the right create flow. Anomaly keeps its own
+    // route; simple/composite open the shared form (composite pre-set via kind).
+    const onAlertTypeSelected = (kind: AlertKind) => {
+      showAlertTypePicker.value = false;
+      if (kind === "anomaly") {
+        router.push({
+          name: "addAnomalyDetection",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+            folder: activeFolderId.value,
+            tab: activeTab.value,
+          },
+        });
+        return;
+      }
+      showAddUpdateFn({ compositeMode: kind === "composite" });
+    };
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
@@ -1526,6 +1561,10 @@ export default defineComponent({
               org_identifier: store.state.selectedOrganization.identifier,
               folder: activeFolderId.value,
               alert_type: activeTab.value,
+              // `kind=composite` tells the form to open in composite mode
+              // (mirrors how the anomaly route pre-sets its mode). Absent for
+              // simple alerts so the param never lingers.
+              ...(props.compositeMode ? { kind: "composite" } : { kind: undefined }),
             },
           });
         } else {
@@ -1584,9 +1623,14 @@ export default defineComponent({
           }
         }
 
-        // Handle add action
+        // Handle add action — preserve the composite intent from the URL so the
+        // re-entry doesn't wipe ?kind=composite (which would open the simple form).
         if (action === "add") {
-          showAddUpdateFn({ row: undefined });
+          showAddUpdateFn({
+            row: undefined,
+            compositeMode:
+              router.currentRoute.value.query.kind === "composite",
+          });
         }
 
         // Handle import action
@@ -2660,6 +2704,9 @@ export default defineComponent({
       showDeleteDialogFn,
       duplicateAlert,
       showAddAlertDialog,
+      showAlertTypePicker,
+      disabledAlertTypes,
+      onAlertTypeSelected,
       showForm,
       toBeCloneAlertName,
       toBeClonedIsAnomaly,
