@@ -51,6 +51,7 @@ use search::datafusion::{
     exec::TableBuilder,
     merge::{self, MergeParquetResult},
 };
+use tantivy_utils::index_builder::create_tantivy_index;
 use tokio::{
     fs::remove_file,
     sync::{Mutex, RwLock},
@@ -69,7 +70,7 @@ use {
     tokio::sync::mpsc,
 };
 
-use crate::{common::infra::wal, service::tantivy::create_tantivy_index};
+use crate::common::infra::wal;
 
 static PROCESSING_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
 

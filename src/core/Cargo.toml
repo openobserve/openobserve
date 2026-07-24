@@ -20,7 +20,6 @@ enterprise = [
     "dep:o2_openfga",
     "common/enterprise",
     "config/enterprise",
-    "tantivy_utils/enterprise",
     "promql/enterprise",
     "promql-service/enterprise",
     "search/enterprise",
@@ -132,8 +131,6 @@ ingester.workspace = true
 wal.workspace = true
 chromiumoxide.workspace = true
 lettre.workspace = true
-tantivy.workspace = true
-tantivy_utils.workspace = true
 zip.workspace = true
 futures-util.workspace = true
 sourcemap.workspace = true

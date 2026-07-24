@@ -20,6 +20,7 @@ enterprise = [
     "promql-service/enterprise",
     "search_service/enterprise",
     "stream/enterprise",
+    "tantivy_utils/enterprise",
 ]
 cloud = [
     "enterprise",
@@ -47,6 +48,7 @@ enrichment-data.workspace = true
 promql-service.workspace = true
 search.workspace = true
 search_service.workspace = true
+tantivy_utils.workspace = true
 anyhow.workspace = true
 arrow.workspace = true
 arrow-schema.workspace = true
