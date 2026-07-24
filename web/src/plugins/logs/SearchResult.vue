@@ -425,7 +425,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <div
             v-if="pinnedTooltip.visible"
-            class="oo-pin-tooltip"
+            class="oo-pin-tooltip bg-surface-base border border-border-default text-text-heading"
             :style="{
               top: pinnedTooltip.y + 'px',
               left: pinnedTooltip.x + 'px',
@@ -451,13 +451,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}</span>
               <span class="oo-pin-tooltip__row-actions">
                 <span
-                  class="oo-pin-tooltip__action oo-pin-tooltip__action--include"
+                  class="oo-pin-tooltip__action oo-pin-tooltip__action--include text-status-info-text"
                   :title="t('logs.searchResult.include')"
                   @click.stop="applyPinnedFilter(row.rawValue, 'include')"
                   >=</span
                 >
                 <span
-                  class="oo-pin-tooltip__action oo-pin-tooltip__action--exclude"
+                  class="oo-pin-tooltip__action oo-pin-tooltip__action--exclude text-status-error-text"
                   :title="t('logs.searchResult.exclude')"
                   @click.stop="applyPinnedFilter(row.rawValue, 'exclude')"
                   >≠</span
@@ -2161,13 +2161,10 @@ export default defineComponent({
   max-height: 20vh;
   overflow-y: auto;
   overflow-x: hidden;
-  background: var(--color-surface-base);
-  border: 1px solid var(--color-border-default);
   border-radius: var(--radius-surface);
   box-shadow: var(--shadow-lg);
   padding: 0.5rem 0;
   font-size: var(--text-xs);
-  color: var(--color-text-heading);
   outline: none;
 
   &__time {
@@ -2231,7 +2228,6 @@ export default defineComponent({
 
     &--include {
       background: color-mix(in srgb, var(--color-status-info-text) 12%, transparent);
-      color: var(--color-status-info-text);
 
       &:hover {
         background: color-mix(in srgb, var(--color-status-info-text) 25%, transparent);
@@ -2240,7 +2236,6 @@ export default defineComponent({
 
     &--exclude {
       background: color-mix(in srgb, var(--color-status-error-text) 8%, transparent);
-      color: var(--color-status-error-text);
 
       &:hover {
         background: color-mix(in srgb, var(--color-status-error-text) 20%, transparent);

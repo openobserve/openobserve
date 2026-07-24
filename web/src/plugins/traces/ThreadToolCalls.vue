@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="thread-tool"
         :class="{ 'thread-tool--open': expandedTools.has(tool.span_id) }"
       >
-        <div class="thread-tool-row" @click="toggleTool(tool.span_id)">
+        <div class="thread-tool-row text-text-secondary" @click="toggleTool(tool.span_id)">
           <span class="thread-tool-row__caret text-text-secondary">{{
             expandedTools.has(tool.span_id) ? "▾" : "▸"
           }}</span>
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             · {{ formatDuration(tool.duration) }}
           </span>
           <button
-            class="thread-tool-row__view"
+            class="thread-tool-row__view text-text-secondary"
             @click.stop="emit('span-selected', tool.span_id)"
             :title="t('traces.threadToolCalls.openSpanDetails')"
           >
@@ -84,21 +84,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </button>
         </div>
 
-        <div v-if="expandedTools.has(tool.span_id)" class="thread-tool-body">
+        <div v-if="expandedTools.has(tool.span_id)" class="thread-tool-body bg-surface-base border-t border-dashed border-border-default">
           <div class="thread-tool-body__section">
-            <div class="thread-tool-body__label">{{ t('traces.threadToolCalls.arguments') }}</div>
-            <pre class="thread-tool-body__pre">{{
+            <div class="thread-tool-body__label text-text-secondary">{{ t('traces.threadToolCalls.arguments') }}</div>
+            <pre class="thread-tool-body__pre bg-surface-base border border-border-default text-text-body">{{
               formatToolPayload(getInputRaw(tool) || tool.tool_args)
             }}</pre>
           </div>
           <div class="thread-tool-body__section">
-            <div class="thread-tool-body__label">
+            <div class="thread-tool-body__label text-text-secondary">
               {{ t('traces.threadToolCalls.result') }}
               <span v-if="tool.span_status === 'ERROR'" class="text-error-600">
                 · ERROR
               </span>
             </div>
-            <pre class="thread-tool-body__pre">{{
+            <pre class="thread-tool-body__pre bg-surface-base border border-border-default text-text-body">{{
               formatToolPayload(getOutputRaw(tool)) ||
               tool.status_message ||
               t('traces.threadToolCalls.empty')
@@ -278,7 +278,6 @@ function formatDuration(ns: number): string {
   padding: 0.45rem 0.5rem 0.45rem 0.75rem;
   font-size: var(--text-xs);
   cursor: pointer;
-  color: var(--color-text-secondary);
   transition: background 120ms ease;
 
   &:hover {
@@ -315,7 +314,6 @@ function formatDuration(ns: number): string {
     border-radius: 0.25rem;
     background: transparent;
     border: none;
-    color: var(--color-text-secondary);
     cursor: pointer;
     line-height: 1;
     flex-shrink: 0;
@@ -355,8 +353,6 @@ function formatDuration(ns: number): string {
 
 .thread-tool-body {
   padding: 0.5rem 0.75rem 0.75rem;
-  background: var(--color-surface-base);
-  border-top: 1px dashed var(--color-border-default);
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -371,18 +367,14 @@ function formatDuration(ns: number): string {
     font-size: var(--text-3xs);
     font-weight: 700;
     letter-spacing: 0.06rem;
-    color: var(--color-text-secondary);
   }
 
   &__pre {
     margin: 0;
     padding: 0.5rem 0.625rem;
-    background: var(--color-surface-base);
-    border: 1px solid var(--color-border-default);
     border-radius: 0.25rem;
     font-family: var(--font-mono);
     font-size: var(--text-xs);
-    color: var(--color-text-body);
     line-height: 1.45;
     white-space: pre-wrap;
     word-break: break-word;

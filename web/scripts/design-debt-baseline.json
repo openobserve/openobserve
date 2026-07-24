@@ -1,6 +1,6 @@
 {
   "totals": {
-    "rawVarInComponent": 539
+    "rawVarInComponent": 517
   },
   "files": {
     "components/CodeQueryEditor.vue": {
@@ -97,7 +97,7 @@
       "rawVarInComponent": 6
     },
     "enterprise/components/onlineEvals/forms/ScorerDetail.vue": {
-      "rawVarInComponent": 29
+      "rawVarInComponent": 20
     },
     "enterprise/components/onlineEvals/forms/ScorerFormPage.vue": {
       "rawVarInComponent": 1
@@ -148,7 +148,7 @@
       "rawVarInComponent": 1
     },
     "plugins/logs/SearchResult.vue": {
-      "rawVarInComponent": 16
+      "rawVarInComponent": 11
     },
     "plugins/logs/TenstackTable.vue": {
       "rawVarInComponent": 5
@@ -181,7 +181,7 @@
       "rawVarInComponent": 9
     },
     "plugins/traces/ThreadToolCalls.vue": {
-      "rawVarInComponent": 28
+      "rawVarInComponent": 20
     },
     "plugins/traces/ThreadView.vue": {
       "rawVarInComponent": 9
