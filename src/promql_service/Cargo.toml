@@ -17,7 +17,6 @@ enterprise = [
     "search_service/enterprise",
 ]
 vectorscan = ["search/vectorscan", "search_service/vectorscan"]
-vortex = ["config/vortex", "search/vortex", "search_service/vortex"]
 
 [dependencies]
 arrow.workspace = true

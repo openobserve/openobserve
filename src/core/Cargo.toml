@@ -46,16 +46,6 @@ vectorscan = [
     "promql-service/vectorscan",
     "stream/vectorscan",
 ]
-vortex = [
-    "dep:vortex",
-    "config/vortex",
-    "tantivy_utils/vortex",
-    "o2_enterprise?/vortex",
-    "search/vortex",
-    "search_service/vortex",
-    "compaction/vortex",
-    "promql-service/vortex",
-]
 
 [dependencies]
 db.workspace = true
@@ -94,7 +84,6 @@ arrow-json.workspace = true
 arrow-schema.workspace = true
 parquet.workspace = true
 object_store.workspace = true
-vortex = { workspace = true, optional = true }
 flate2.workspace = true
 futures.workspace = true
 hashbrown.workspace = true

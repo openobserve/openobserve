@@ -23,11 +23,6 @@ vectorscan = [
     "promql-service/vectorscan",
     "search_service/vectorscan",
 ]
-vortex = [
-    "openobserve-core/vortex",
-    "promql-service/vortex",
-    "search_service/vortex",
-]
 
 [dependencies]
 common.workspace = true
