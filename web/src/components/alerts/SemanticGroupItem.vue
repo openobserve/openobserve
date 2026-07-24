@@ -15,11 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="semantic-group-item p-3 mb-2 rounded-default transition-all duration-200 w-full max-w-full bg-card-glass-bg border border-card-glass-border">
+  <div
+    class="semantic-group-item rounded-default bg-card-glass-bg border-card-glass-border mb-2 w-full max-w-full border p-3 transition-all duration-200"
+  >
     <OForm :form="form">
-      <div class="grid grid-cols-[200px_1fr_auto] gap-4 items-start w-full overflow-hidden">
+      <div class="grid w-full grid-cols-[200px_1fr_auto] items-start gap-4 overflow-hidden">
         <!-- Left Column: Display Name only (ID is internal/read-only) -->
-        <div class="flex flex-col gap-1 min-w-0 justify-center">
+        <div class="flex min-w-0 flex-col justify-center gap-1">
           <div class="input-wrapper">
             <OFormInput
               name="display"
@@ -31,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <!-- Show ID as read-only caption for existing groups -->
-          <div v-if="currentId" class="text-xs text-text-secondary">
+          <div v-if="currentId" class="text-text-secondary text-xs">
             {{ t("common.id") }}: {{ currentId }}
           </div>
           <OFormSwitch
@@ -44,18 +46,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Right Column: Field Names spanning both rows -->
-        <div class="flex flex-col h-full min-w-0 overflow-hidden">
-          <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
-            <OFormTagInput
-              name="fields"
-              :placeholder="t('correlation.fieldNamePlaceholder')"
-            />
+        <div class="flex h-full min-w-0 flex-col overflow-hidden">
+          <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
+            <OFormTagInput name="fields" :placeholder="t('correlation.fieldNamePlaceholder')" />
           </div>
         </div>
 
-
         <!-- Actions Column: Delete -->
-        <div class="flex flex-col justify-between min-h-full">
+        <div class="flex min-h-full flex-col justify-between">
           <div class="flex justify-end">
             <OButton
               data-test="semantic-group-remove-group-btn"
@@ -66,7 +64,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="!isProtected && emit('delete')"
             >
               <OIcon name="delete" size="sm" />
-              <OTooltip :content="isProtected ? t('correlation.serviceGroupProtected') : t('correlation.removeSemanticGroup')" />
+              <OTooltip
+                :content="
+                  isProtected
+                    ? t('correlation.serviceGroupProtected')
+                    : t('correlation.removeSemanticGroup')
+                "
+              />
             </OButton>
           </div>
         </div>
@@ -118,7 +122,13 @@ const isProtected = computed(() => props.group.id === "service");
 const currentId = ref<string>(props.group.id);
 
 const slugify = (s: string): string =>
-  s.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "").replace(/-+/g, "-").replace(/^-|-$/g, "");
+  s
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
 
 // Generate ID as "{category-slug}-{display-slug}" for new groups
 const generateIdFromDisplay = (display: string): string => {

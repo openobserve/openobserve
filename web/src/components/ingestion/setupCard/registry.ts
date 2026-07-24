@@ -43,9 +43,7 @@ import gcp from "./content/gcp";
 import otlpTraces from "./content/otlpTraces";
 
 /** Given per-org substitutions, returns a data source's setup-card content. */
-export type DataSourceCardBuilder = (
-  subs: CardSubstitutions,
-) => RichCardContent;
+export type DataSourceCardBuilder = (subs: CardSubstitutions) => RichCardContent;
 
 const registry: Record<string, DataSourceCardBuilder> = {
   sqlServer,

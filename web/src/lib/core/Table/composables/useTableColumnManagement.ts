@@ -50,9 +50,7 @@ export function useTableColumnManagement(
       props.columnOrder.value.includes(props.pinnedFirstColumn) &&
       props.columnOrder.value[0] !== props.pinnedFirstColumn
     ) {
-      const newOrder = props.columnOrder.value.filter(
-        (id) => id !== props.pinnedFirstColumn,
-      );
+      const newOrder = props.columnOrder.value.filter((id) => id !== props.pinnedFirstColumn);
       newOrder.unshift(props.pinnedFirstColumn);
       props.columnOrder.value = [...newOrder];
     }
@@ -67,9 +65,7 @@ export function useTableColumnManagement(
   }
 
   const visibleColumnCount = computed(() => {
-    return props.columnOrder.value.filter(
-      (id) => props.columnVisibility?.[id] !== false,
-    ).length;
+    return props.columnOrder.value.filter((id) => props.columnVisibility?.[id] !== false).length;
   });
 
   return {

@@ -23,42 +23,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
     :scroll="false"
   >
-      <template #actions>
-        <date-time
-          ref="dateTimeRef"
-          auto-apply
-          menu-align="end"
-          :default-type="dateState.valueType"
-          :default-absolute-time="{
-            startTime: dateState.startTime ?? 0,
-            endTime: dateState.endTime ?? 0,
-          }"
-          :default-relative-time="dateState.relativeTimePeriod ?? ''"
-          data-test="ai-llm-insights-date-time"
-          class="h-8"
-          @on:date-change="onDateChange"
-        />
-        <!-- Whole-page last-refresh + refresh control (logs-style): relative
+    <template #actions>
+      <DateTime
+        ref="dateTimeRef"
+        auto-apply
+        menu-align="end"
+        :default-type="dateState.valueType"
+        :default-absolute-time="{
+          startTime: dateState.startTime ?? 0,
+          endTime: dateState.endTime ?? 0,
+        }"
+        :default-relative-time="dateState.relativeTimePeriod ?? ''"
+        data-test="ai-llm-insights-date-time"
+        class="h-8"
+        @on:date-change="onDateChange"
+      />
+      <!-- Whole-page last-refresh + refresh control (logs-style): relative
              time + freshness dot, ticking on its own. -->
-        <div
-          class="inline-flex items-center border border-border-default rounded-default px-1 h-8 overflow-hidden"
-        >
-          <ORefreshButton
-            :last-run-at="dashboardLastRunAt"
-            :loading="isLoading"
-            :disabled="isLoading"
-            data-test="ai-llm-insights-refresh-btn"
-            @click="refresh"
-          />
-        </div>
-      </template>
+      <div
+        class="border-border-default rounded-default inline-flex h-8 items-center overflow-hidden border px-1"
+      >
+        <ORefreshButton
+          :last-run-at="dashboardLastRunAt"
+          :loading="isLoading"
+          :disabled="isLoading"
+          data-test="ai-llm-insights-refresh-btn"
+          @click="refresh"
+        />
+      </div>
+    </template>
 
     <LLMInsightsDashboard
       ref="dashboardRef"
       :stream-name="streamName"
       :start-time="timeRange.startTime"
       :end-time="timeRange.endTime"
-      class="flex-1 min-h-0"
+      class="min-h-0 flex-1"
     />
   </OPageLayout>
 </template>
@@ -72,10 +72,7 @@ import LLMInsightsDashboard from "@/plugins/traces/LLMInsightsDashboard.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
-import {
-  useAiDateRange,
-  resolveAiDateWindow,
-} from "@/enterprise/composables/useAiDateRange";
+import { useAiDateRange, resolveAiDateWindow } from "@/enterprise/composables/useAiDateRange";
 
 defineOptions({ name: "AILLMInsightsPage" });
 
@@ -100,12 +97,8 @@ const isRefreshing = ref(false);
 // `lastRunAt` when its KPI fetch settles and exposes its own `loading`; we OR in
 // the page-level `isRefreshing` so the button spins from the moment of click
 // (covering the relative-window re-anchor before the dashboard load starts).
-const dashboardLastRunAt = computed<number | null>(
-  () => dashboardRef.value?.lastRunAt ?? null,
-);
-const isLoading = computed(
-  () => isRefreshing.value || dashboardRef.value?.loading || false,
-);
+const dashboardLastRunAt = computed<number | null>(() => dashboardRef.value?.lastRunAt ?? null);
+const isLoading = computed(() => isRefreshing.value || dashboardRef.value?.loading || false);
 
 function applyRelative(period: string) {
   const range = getConsumableRelativeTime(period);
@@ -207,10 +200,7 @@ async function refresh() {
       writeToUrl();
     }
     await nextTick();
-    await dashboardRef.value?.refresh?.(
-      timeRange.value.startTime,
-      timeRange.value.endTime,
-    );
+    await dashboardRef.value?.refresh?.(timeRange.value.startTime, timeRange.value.endTime);
   } finally {
     isRefreshing.value = false;
   }

@@ -97,9 +97,7 @@ describe("FlowEdge.vue", () => {
 
     it("passes markerEnd prop to BaseEdge", () => {
       wrapper = createWrapper({ markerEnd: "url(#arrow)" });
-      expect(wrapper.findComponent({ name: "BaseEdge" }).props("markerEnd")).toBe(
-        "url(#arrow)",
-      );
+      expect(wrapper.findComponent({ name: "BaseEdge" }).props("markerEnd")).toBe("url(#arrow)");
     });
 
     it("works without optional props (data, markerEnd, style, isInView)", () => {
@@ -116,9 +114,7 @@ describe("FlowEdge.vue", () => {
   describe("computed: path", () => {
     it("passes the path[0] bezier string to BaseEdge", () => {
       wrapper = createWrapper({ sourceX: 0, sourceY: 0, targetX: 100, targetY: 100 });
-      expect(typeof wrapper.findComponent({ name: "BaseEdge" }).props("path")).toBe(
-        "string",
-      );
+      expect(typeof wrapper.findComponent({ name: "BaseEdge" }).props("path")).toBe("string");
     });
   });
 

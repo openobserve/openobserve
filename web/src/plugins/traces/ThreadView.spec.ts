@@ -61,12 +61,8 @@ function makeLLMSpan(overrides: Record<string, unknown> = {}): Record<string, un
     span_id: "span-llm-001",
     span_kind: "2",
     gen_ai_operation_name: "chat",
-    gen_ai_input_messages: JSON.stringify([
-      { role: "user", content: "Hello, world!" },
-    ]),
-    gen_ai_output_messages: JSON.stringify([
-      { role: "assistant", content: "Hi there!" },
-    ]),
+    gen_ai_input_messages: JSON.stringify([{ role: "user", content: "Hello, world!" }]),
+    gen_ai_output_messages: JSON.stringify([{ role: "assistant", content: "Hi there!" }]),
     gen_ai_response_model: "gpt-4",
     gen_ai_usage_cost: "0.002",
     gen_ai_usage_total_tokens: "150",
@@ -353,9 +349,7 @@ describe("ThreadView", () => {
       const llm2 = makeLLMSpan({
         span_id: "llm-b",
         start_time: BASE_TIME_NS + 1_000_000_000,
-        gen_ai_input_messages: JSON.stringify([
-          { role: "user", content: "Follow-up?" },
-        ]),
+        gen_ai_input_messages: JSON.stringify([{ role: "user", content: "Follow-up?" }]),
       });
       wrapper = mountThreadView({ spans: [llm1, llm2] });
       const turns = wrapper.findAll(".thread-turn");

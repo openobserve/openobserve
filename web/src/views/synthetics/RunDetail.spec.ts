@@ -72,7 +72,17 @@ const mockRunDetail = {
 
 vi.mock("@/composables/useSyntheticResults", () => ({
   default: () => ({
-    kpi: { value: { uptimePct: 0, p95Ms: 0, failedRuns: 0, totalRuns: 0, retriedRuns: 0, lastRunStatus: null, lastRunAt: null } },
+    kpi: {
+      value: {
+        uptimePct: 0,
+        p95Ms: 0,
+        failedRuns: 0,
+        totalRuns: 0,
+        retriedRuns: 0,
+        lastRunStatus: null,
+        lastRunAt: null,
+      },
+    },
     buckets: { value: [] },
     runs: { value: [] },
     runDetail: { value: { ...mockRunDetail } },
@@ -92,31 +102,11 @@ describe("RunDetail", () => {
     wrapper = mount(RunDetail, {
       global: {
         stubs: {
-          OTabs: {
-            template:
-              '<div class="otabs-stub"><slot /></div>',
-            props: ["modelValue"],
-          },
-          OTab: {
-            template: '<div class="otab-stub"><slot /></div>',
-            props: ["name"],
-          },
-          OTabPanels: {
-            template:
-              '<div class="otabpanels-stub"><slot /></div>',
-            props: ["modelValue"],
-          },
-          OTabPanel: {
-            template: '<div class="otabpanel-stub"><slot /></div>',
-            props: ["name"],
-          },
           OCard: {
-            template:
-              '<div class="ocard-stub"><slot /></div>',
+            template: '<div class="ocard-stub"><slot /></div>',
           },
           OCardSection: {
-            template:
-              '<div class="ocardsection-stub"><slot /></div>',
+            template: '<div class="ocardsection-stub"><slot /></div>',
             props: ["role"],
           },
           OSeparator: {
@@ -132,14 +122,8 @@ describe("RunDetail", () => {
             props: ["name"],
           },
           OBadge: {
-            template:
-              '<span class="obadge-stub"><slot /></span>',
+            template: '<span class="obadge-stub"><slot /></span>',
             props: ["variant", "size", "icon"],
-          },
-          OEmptyState: {
-            template:
-              '<div class="oemptystate-stub"><slot name="title" /><slot name="description" /></div>',
-            props: ["preset"],
           },
         },
       },
@@ -152,93 +136,36 @@ describe("RunDetail", () => {
   });
 
   it("should render the run detail page shell", () => {
-    expect(
-      wrapper.find('[data-test="synthetics-run-detail"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="synthetics-run-detail"]').exists()).toBe(true);
   });
 
   it("should render the page title", () => {
-    const title = wrapper.find(
-      '[data-test="synthetics-run-detail-title"]',
-    );
+    const title = wrapper.find('[data-test="synthetics-run-detail-title"]');
     expect(title.exists()).toBe(true);
     expect(title.text()).toBe("Test Monitor");
   });
 
   it("should render the status badge", () => {
-    expect(
-      wrapper.find('[data-test="synthetics-run-detail-status-badge"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="synthetics-run-detail-status-badge"]').exists()).toBe(true);
   });
 
   it("should render the info bar with 5 chips", () => {
-    const infoBar = wrapper.find(
-      '[data-test="synthetics-run-detail-info-bar"]',
-    );
+    const infoBar = wrapper.find('[data-test="synthetics-run-detail-info-bar"]');
     expect(infoBar.exists()).toBe(true);
-    const chips = infoBar.findAll(
-      ":scope > div",
-    );
+    const chips = infoBar.findAll(":scope > div");
     expect(chips.length).toBe(5);
   });
 
-  it("should render the summary tab by default", () => {
-    expect(
-      wrapper.find(
-        '[data-test="synthetics-run-detail-summary-tab"]',
-      ).exists(),
-    ).toBe(true);
-  });
-
   it("should render prev/next navigation buttons", () => {
-    expect(
-      wrapper.find(
-        '[data-test="synthetics-run-detail-prev-btn"]',
-      ).exists(),
-    ).toBe(true);
-    expect(
-      wrapper.find(
-        '[data-test="synthetics-run-detail-next-btn"]',
-      ).exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="synthetics-run-detail-prev-btn"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="synthetics-run-detail-next-btn"]').exists()).toBe(true);
   });
 
   it("should render action buttons", () => {
-    expect(
-      wrapper.find(
-        '[data-test="synthetics-run-detail-trace-btn"]',
-      ).exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="synthetics-run-detail-trace-btn"]').exists()).toBe(true);
   });
 
   it("should render the back button", () => {
-    expect(
-      wrapper.find(
-        '[data-test="synthetics-run-detail-back-btn"]',
-      ).exists(),
-    ).toBe(true);
-  });
-
-  it("should render three placeholder tabs with correct states", () => {
-    expect(
-      wrapper.find(
-        '[data-test="synthetics-run-detail-tab-summary"]',
-      ).exists(),
-    ).toBe(true);
-    expect(
-      wrapper.find(
-        '[data-test="synthetics-run-detail-tab-logs"]',
-      ).exists(),
-    ).toBe(true);
-    expect(
-      wrapper.find(
-        '[data-test="synthetics-run-detail-tab-traces"]',
-      ).exists(),
-    ).toBe(true);
-    expect(
-      wrapper.find(
-        '[data-test="synthetics-run-detail-tab-rum"]',
-      ).exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="synthetics-run-detail-back-btn"]').exists()).toBe(true);
   });
 });

@@ -16,10 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OPageLayout
-      :title="t('invitation.pendingInvitations')"
-      :subtitle="t('iam.invitationList.subtitle')"
-      icon="mail" bleed>
-    <div class="w-full flex-1 min-h-0 overflow-hidden">
+    :title="t('invitation.pendingInvitations')"
+    :subtitle="t('iam.invitationList.subtitle')"
+    icon="mail"
+    bleed
+  >
+    <div class="min-h-0 w-full flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <OTable
           :data="invitations"
@@ -39,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           table-id="iam-invitations-list"
         >
           <template #toolbar>
-            <div class="flex items-center gap-2 w-full">
+            <div class="flex w-full items-center gap-2">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('invitation.search')"
@@ -57,7 +59,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="invitation-list-refresh-btn"
               @click="fetchPendingInvitations"
             >
-              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="iamInvitationsRefresh" />
+              <OTooltip
+                side="bottom"
+                :content="t('common.refresh')"
+                shortcut-id="iamInvitationsRefresh"
+              />
             </OButton>
           </template>
           <template #empty>
@@ -92,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="acceptInvitation(row)"
                 :data-test="`accept-invitation-${row.token}`"
               >
-                {{ t('invitation.accept') }}
+                {{ t("invitation.accept") }}
               </OButton>
               <OButton
                 variant="secondary"
@@ -100,20 +106,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="rejectInvitation(row)"
                 :data-test="`reject-invitation-${row.token}`"
               >
-                {{ t('invitation.reject') }}
+                {{ t("invitation.reject") }}
               </OButton>
             </div>
           </template>
           <template #bottom>
             <span class="text-xs font-normal">
-              {{ resultTotal }} {{ t('invitation.pendingInvitations') }}
+              {{ resultTotal }} {{ t("invitation.pendingInvitations") }}
             </span>
           </template>
         </OTable>
       </div>
     </div>
 
-    <ODialog data-test="invitation-list-accept-dialog"
+    <ODialog
+      data-test="invitation-list-accept-dialog"
       v-model:open="confirmAccept"
       size="xs"
       :title="t('invitation.confirmAcceptHead')"
@@ -122,10 +129,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="confirmAccept = false"
       @click:primary="confirmAcceptInvitation"
     >
-      <p>{{ t('invitation.confirmAcceptMsg', { org: selectedInvitation?.org_name }) }}</p>
+      <p>{{ t("invitation.confirmAcceptMsg", { org: selectedInvitation?.org_name }) }}</p>
     </ODialog>
 
-    <ODialog data-test="invitation-list-reject-dialog"
+    <ODialog
+      data-test="invitation-list-reject-dialog"
       v-model:open="confirmReject"
       size="xs"
       :title="t('invitation.confirmRejectHead')"
@@ -134,13 +142,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="confirmReject = false"
       @click:primary="confirmRejectInvitation"
     >
-      <p>{{ t('invitation.confirmRejectMsg', { org: selectedInvitation?.org_name }) }}</p>
+      <p>{{ t("invitation.confirmRejectMsg", { org: selectedInvitation?.org_name }) }}</p>
     </ODialog>
   </OPageLayout>
 </template>
 
 <script lang="ts">
-
 import { defineComponent, ref, onMounted } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -269,8 +276,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: t("iam.invitationList.loadingPending"),
-              timeout: 0,
-});
+        timeout: 0,
+      });
 
       loading.value = true;
       try {
@@ -286,9 +293,7 @@ export default defineComponent({
         const e = error as { response?: { data?: { message?: string } } };
         dismiss();
         toast({
-          message:
-            e.response?.data?.message ||
-            t("iam.invitationList.failedLoadPending"),
+          message: e.response?.data?.message || t("iam.invitationList.failedLoadPending"),
           variant: "error",
         });
       } finally {
@@ -301,9 +306,7 @@ export default defineComponent({
       try {
         const expiry = new Date(expiryMicroseconds / 1000);
         const now = new Date();
-        const daysLeft = Math.ceil(
-          (expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
-        );
+        const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
         if (daysLeft < 0) {
           return t("invitation.expired");
@@ -335,15 +338,11 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: t("iam.invitationList.accepting"),
-              timeout: 0,
-});
+        timeout: 0,
+      });
 
       try {
-        await organizationsService.process_subscription(
-          selected.token,
-          "confirm",
-          selected.org_id,
-        );
+        await organizationsService.process_subscription(selected.token, "confirm", selected.org_id);
 
         // Refresh the organizations list in the store
         const orgResponse = await organizationsService.list(0, 1000000, "name", false, "");
@@ -370,8 +369,7 @@ export default defineComponent({
         const e = error as { response?: { data?: { message?: string } } };
         dismiss();
         toast({
-          message:
-            e.response?.data?.message || t("iam.invitationList.failedAccept"),
+          message: e.response?.data?.message || t("iam.invitationList.failedAccept"),
           variant: "error",
         });
       }
@@ -385,13 +383,11 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: t("iam.invitationList.rejecting"),
-              timeout: 0,
-});
+        timeout: 0,
+      });
 
       try {
-        await organizationsService.decline_subscription(
-          selected.token,
-        );
+        await organizationsService.decline_subscription(selected.token);
         dismiss();
         toast({
           message: t("iam.invitationList.rejectedSuccess"),
@@ -399,9 +395,7 @@ export default defineComponent({
         });
 
         // Remove from list
-        invitations.value = invitations.value.filter(
-          (inv) => inv.token !== selected.token,
-        );
+        invitations.value = invitations.value.filter((inv) => inv.token !== selected.token);
 
         // If no more invitations, emit to parent
         if (invitations.value.length === 0) {
@@ -411,15 +405,19 @@ export default defineComponent({
         const e = error as { response?: { data?: { message?: string } } };
         dismiss();
         toast({
-          message:
-            e.response?.data?.message || t("iam.invitationList.failedReject"),
+          message: e.response?.data?.message || t("iam.invitationList.failedReject"),
           variant: "error",
         });
       }
     };
 
     useShortcuts([
-      { id: "iamInvitationsRefresh", handler: () => { if (!isInputFocused()) fetchPendingInvitations(); } },
+      {
+        id: "iamInvitationsRefresh",
+        handler: () => {
+          if (!isInputFocused()) fetchPendingInvitations();
+        },
+      },
     ]);
 
     return {

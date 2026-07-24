@@ -52,12 +52,9 @@ const props = defineProps<{
 const { t } = useI18n();
 const store = useStore();
 const router = useRouter();
-const { generate, generating, error: genError, credential, canGenerate } =
-  useMcpCredential();
+const { generate, generating, error: genError, credential, canGenerate } = useMcpCredential();
 
-const endpoint = computed(
-  () => `${props.subs.url}/api/${props.subs.org}/mcp`,
-);
+const endpoint = computed(() => `${props.subs.url}/api/${props.subs.org}/mcp`);
 
 // "oauth" (default, recommended) | "token".
 const authMode = ref<"oauth" | "token">("oauth");
@@ -69,22 +66,16 @@ const authMode = ref<"oauth" | "token">("oauth");
 // OAuth mode passes null so build() omits the header entirely.
 const tokenAuthValue = computed(() => {
   if (credential.value) {
-    return `Basic ${b64EncodeStandard(
-      `${credential.value.email}:${credential.value.token}`,
-    )}`;
+    return `Basic ${b64EncodeStandard(`${credential.value.email}:${credential.value.token}`)}`;
   }
   return "Basic [BASIC_PASSCODE]";
 });
-const authValue = computed(() =>
-  authMode.value === "oauth" ? null : tokenAuthValue.value,
-);
+const authValue = computed(() => (authMode.value === "oauth" ? null : tokenAuthValue.value));
 
 // The `Basic <base64>` line for the generated credential's reveal + download.
 const credentialHeader = computed(() =>
   credential.value
-    ? `Basic ${b64EncodeStandard(
-        `${credential.value.email}:${credential.value.token}`,
-      )}`
+    ? `Basic ${b64EncodeStandard(`${credential.value.email}:${credential.value.token}`)}`
     : "",
 );
 
@@ -103,13 +94,13 @@ const mcpServersUrl = (ep: string, auth: string | null) => `{
   "mcpServers": {
     "openobserve": {
       "url": "${ep}"${
-  auth
-    ? `,
+        auth
+          ? `,
       "headers": {
         "Authorization": "${auth}"
       }`
-    : ``
-}
+          : ``
+      }
     }
   }
 }`;
@@ -161,13 +152,13 @@ http_headers = { "Authorization" = "${auth}" }`
     "openobserve": {
       "type": "http",
       "url": "${ep}"${
-      auth
-        ? `,
+        auth
+          ? `,
       "headers": {
         "Authorization": "${auth}"
       }`
-        : ``
-    }
+          : ``
+      }
     }
   }
 }`,
@@ -199,13 +190,13 @@ Authentication: OAuth (sign in when prompted)`,
   "mcpServers": {
     "openobserve": {
       "serverUrl": "${ep}"${
-      auth
-        ? `,
+        auth
+          ? `,
       "headers": {
         "Authorization": "${auth}"
       }`
-        : ``
-    }
+          : ``
+      }
     }
   }
 }`,
@@ -269,9 +260,7 @@ const selectedClient = ref("claudeCode");
 const activeClient = computed(
   () => CLIENTS.find((c) => c.id === selectedClient.value) ?? CLIENTS[0],
 );
-const activeConfig = computed(() =>
-  activeClient.value.build(endpoint.value, authValue.value),
-);
+const activeConfig = computed(() => activeClient.value.build(endpoint.value, authValue.value));
 const activeDeepLink = computed(
   () => activeClient.value.deepLink?.(endpoint.value, authValue.value) ?? null,
 );
@@ -320,7 +309,7 @@ const openDocs = () => {
     <div class="flex flex-col gap-1">
       <h2 class="text-lg font-semibold">{{ t("ingestion.mcp.name") }}</h2>
       <p class="text-text-secondary">{{ t("ingestion.mcp.tagline") }}</p>
-      <div class="flex items-center gap-1 text-text-secondary">
+      <div class="text-text-secondary flex items-center gap-1">
         <OIcon name="workspace-premium" size="sm" />
         <span>{{ t("ingestion.mcp.enterpriseNote") }}</span>
       </div>
@@ -355,7 +344,7 @@ const openDocs = () => {
     <!-- Token mode: credential management -->
     <div
       v-if="authMode === 'token'"
-      class="rounded-surface border border-border-default bg-surface-panel p-3 flex flex-col gap-3"
+      class="rounded-surface border-border-default bg-surface-panel flex flex-col gap-3 border p-3"
       data-test="ai-integrations-mcp-credential"
     >
       <!-- Before generation: quick-start note + generate button -->
@@ -468,7 +457,7 @@ const openDocs = () => {
     <!-- Security note (token mode only) -->
     <div
       v-if="authMode === 'token'"
-      class="rounded-surface border border-border-default bg-surface-panel p-3 flex gap-2"
+      class="rounded-surface border-border-default bg-surface-panel flex gap-2 border p-3"
       data-test="ai-integrations-mcp-security"
     >
       <OIcon name="shield" size="sm" class="mt-0.5 shrink-0" />

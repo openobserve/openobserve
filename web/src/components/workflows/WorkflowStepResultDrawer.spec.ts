@@ -120,12 +120,14 @@ const errorResult = (extra: Record<string, any> = {}) => ({
   ...extra,
 });
 
-const setup = (opts: {
-  nodeId?: string;
-  input?: string;
-  result?: any;
-  nodes?: any[];
-} = {}) => {
+const setup = (
+  opts: {
+    nodeId?: string;
+    input?: string;
+    result?: any;
+    nodes?: any[];
+  } = {},
+) => {
   workflowObj.currentSelectedWorkflow = {
     id: "wf1",
     name: "wf",
@@ -202,9 +204,7 @@ describe("WorkflowStepResultDrawer", () => {
       const wrapper = mountDrawer();
       const badge = wrapper.find(".o-badge");
       expect(badge.attributes("data-variant")).toBe("error-soft");
-      expect(badge.text()).toBe(
-        i18n.global.t("workflow.test.stepResult.status.error"),
-      );
+      expect(badge.text()).toBe(i18n.global.t("workflow.test.stepResult.status.error"));
     });
 
     it("renders each NodeErrors message as the Output — first tuple element only", () => {
@@ -224,7 +224,9 @@ describe("WorkflowStepResultDrawer", () => {
         },
       });
       const wrapper = mountDrawer();
-      expect(wrapper.find("[data-test='workflow-step-result-error-line']").text()).toBe("flat message");
+      expect(wrapper.find("[data-test='workflow-step-result-error-line']").text()).toBe(
+        "flat message",
+      );
     });
 
     it("shows the no-output placeholder when the node has no error entries", () => {
@@ -238,12 +240,16 @@ describe("WorkflowStepResultDrawer", () => {
 
     it("tolerates a null result and a malformed errors entry", () => {
       setup({ result: null });
-      expect(mountDrawer().find("[data-test='workflow-step-result-no-output']").exists()).toBe(true);
+      expect(mountDrawer().find("[data-test='workflow-step-result-no-output']").exists()).toBe(
+        true,
+      );
 
       setup({
         result: { errors: { f1: { errors: "not-an-array" } } },
       });
-      expect(mountDrawer().find("[data-test='workflow-step-result-no-output']").exists()).toBe(true);
+      expect(mountDrawer().find("[data-test='workflow-step-result-no-output']").exists()).toBe(
+        true,
+      );
     });
   });
 
@@ -272,7 +278,9 @@ describe("WorkflowStepResultDrawer", () => {
 
     it("treats a non-array payload as invalid", () => {
       setup({ input: '{"a":1}' });
-      expect(mountDrawer().find("[data-test='workflow-step-result-input-error']").exists()).toBe(true);
+      expect(mountDrawer().find("[data-test='workflow-step-result-input-error']").exists()).toBe(
+        true,
+      );
     });
 
     it("treats an empty payload as invalid (nothing to replay)", () => {
@@ -283,7 +291,9 @@ describe("WorkflowStepResultDrawer", () => {
     });
 
     it("hides the invalid-JSON hint for a valid array", () => {
-      expect(mountDrawer().find("[data-test='workflow-step-result-input-error']").exists()).toBe(false);
+      expect(mountDrawer().find("[data-test='workflow-step-result-input-error']").exists()).toBe(
+        false,
+      );
     });
   });
 
@@ -327,7 +337,9 @@ describe("WorkflowStepResultDrawer", () => {
 
     it("still shows the error output for the past run", () => {
       setup({ result: historyResult() });
-      expect(mountDrawer().findAll("[data-test='workflow-step-result-error-line']")).toHaveLength(2);
+      expect(mountDrawer().findAll("[data-test='workflow-step-result-error-line']")).toHaveLength(
+        2,
+      );
     });
   });
 
@@ -458,9 +470,7 @@ describe("WorkflowStepResultDrawer", () => {
 
   describe("fullscreen", () => {
     const fsButtons = (w: any) =>
-      w.findAll(
-        `[title="${i18n.global.t("workflow.test.stepResult.enterFullscreen")}"]`,
-      );
+      w.findAll(`[title="${i18n.global.t("workflow.test.stepResult.enterFullscreen")}"]`);
 
     it("toggles the Input+Output container as one unit", async () => {
       const wrapper = mountDrawer();
@@ -472,16 +482,11 @@ describe("WorkflowStepResultDrawer", () => {
 
     it("logs (and does not throw) when the browser rejects the request", async () => {
       const spy = vi.spyOn(console, "error").mockImplementation(() => {});
-      mockToggleFullscreen.mockReturnValueOnce(
-        Promise.reject(new Error("denied")) as any,
-      );
+      mockToggleFullscreen.mockReturnValueOnce(Promise.reject(new Error("denied")) as any);
       const wrapper = mountDrawer();
       await fsButtons(wrapper)[0].trigger("click");
       await flushPromises();
-      expect(spy).toHaveBeenCalledWith(
-        "Failed to toggle fullscreen:",
-        expect.any(Error),
-      );
+      expect(spy).toHaveBeenCalledWith("Failed to toggle fullscreen:", expect.any(Error));
       spy.mockRestore();
     });
 
@@ -499,9 +504,7 @@ describe("WorkflowStepResultDrawer", () => {
 
       expect(wrapper.findAll('[data-icon="fullscreen-exit"]')).toHaveLength(2);
       expect(
-        wrapper.findAll(
-          `[title="${i18n.global.t("workflow.test.stepResult.exitFullscreen")}"]`,
-        ),
+        wrapper.findAll(`[title="${i18n.global.t("workflow.test.stepResult.exitFullscreen")}"]`),
       ).toHaveLength(2);
 
       // leaving fullscreen flips it back

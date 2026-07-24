@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :href="href"
       target="_blank"
       rel="noopener noreferrer"
-      class="text-text-link hover:text-text-link-hover underline font-medium"
+      class="text-text-link hover:text-text-link-hover font-medium underline"
       >here</a
     ><slot> to check further documentation.</slot>
   </div>

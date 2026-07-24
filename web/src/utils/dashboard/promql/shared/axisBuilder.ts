@@ -75,12 +75,9 @@ export function buildTooltip(
       // Sort by value and hoist the hovered series, matching SQL tooltips
       const hoveredName = hoveredSeriesState?.value?.hoveredSeriesName;
       params.sort(
-        (a: any, b: any) =>
-          ((b.value?.[1] ?? b.value) || 0) - ((a.value?.[1] ?? a.value) || 0),
+        (a: any, b: any) => ((b.value?.[1] ?? b.value) || 0) - ((a.value?.[1] ?? a.value) || 0),
       );
-      const hoveredIndex = params.findIndex(
-        (it: any) => it.seriesName === hoveredName,
-      );
+      const hoveredIndex = params.findIndex((it: any) => it.seriesName === hoveredName);
       if (hoveredIndex > 0) {
         params.unshift(params.splice(hoveredIndex, 1)[0]);
       }
@@ -92,14 +89,10 @@ export function buildTooltip(
           const value = param.value?.[1] ?? param.value;
 
           // Apply unit formatting
-          const formattedValue = formatUnitValue(
-            getUnitValue(value, unit, unitCustom, decimals),
-          );
+          const formattedValue = formatUnitValue(getUnitValue(value, unit, unitCustom, decimals));
 
           const row = `${marker} ${param.seriesName}: ${formattedValue}`;
-          tooltipItems.push(
-            param.seriesName === hoveredName ? `<strong>${row}</strong>` : row,
-          );
+          tooltipItems.push(param.seriesName === hoveredName ? `<strong>${row}</strong>` : row);
         }
       });
 
@@ -116,11 +109,7 @@ export function buildTooltip(
  * @param hasData - Whether the chart has any data to display
  * @returns X-axis configuration object for ECharts
  */
-export function buildXAxis(
-  panelSchema: any,
-  store: any,
-  hasData: boolean = true,
-): any {
+export function buildXAxis(panelSchema: any, store: any, hasData: boolean = true): any {
   const config = panelSchema.config || {};
   const showGridlines = config.show_grid !== false; // Default to true
 
@@ -154,11 +143,7 @@ export function buildXAxis(
  * @param queryIndex - Index of the query (for multi-query support)
  * @returns Y-axis configuration object for ECharts
  */
-export function buildYAxis(
-  panelSchema: any,
-  queryIndex: number = 0,
-  store?: any,
-): any {
+export function buildYAxis(panelSchema: any, queryIndex: number = 0, store?: any): any {
   const config = panelSchema.config || {};
   const showGridlines = config.show_grid !== false; // Default to true
 
@@ -174,12 +159,7 @@ export function buildYAxis(
       // Add unit formatting to Y-axis labels
       formatter: (value: any) => {
         return formatUnitValue(
-          getUnitValue(
-            value,
-            config?.unit,
-            config?.unit_custom,
-            config?.decimals,
-          ),
+          getUnitValue(value, config?.unit, config?.unit_custom, config?.decimals),
         );
       },
     },
@@ -200,12 +180,7 @@ export function buildYAxis(
         // Preserve unit formatter when axis_width is set
         formatter: (value: any) => {
           return formatUnitValue(
-            getUnitValue(
-              value,
-              config?.unit,
-              config?.unit_custom,
-              config?.decimals,
-            ),
+            getUnitValue(value, config?.unit, config?.unit_custom, config?.decimals),
           );
         },
       },
@@ -241,11 +216,7 @@ export function buildYAxis(
  * @param panelSchema - Panel configuration schema
  * @returns Category X-axis configuration object for ECharts
  */
-export function buildCategoryXAxis(
-  categories: string[],
-  panelSchema: any,
-  store?: any,
-): any {
+export function buildCategoryXAxis(categories: string[], panelSchema: any, store?: any): any {
   const config = panelSchema.config || {};
   const showGridlines = config.show_grid !== false;
 
@@ -278,11 +249,7 @@ export function buildCategoryXAxis(
  * @param panelSchema - Panel configuration schema
  * @returns Category Y-axis configuration object for ECharts
  */
-export function buildCategoryYAxis(
-  categories: string[],
-  panelSchema: any,
-  store?: any,
-): any {
+export function buildCategoryYAxis(categories: string[], panelSchema: any, store?: any): any {
   const config = panelSchema.config || {};
   const showGridlines = config.show_grid !== false;
 
@@ -326,12 +293,7 @@ export function buildValueAxis(panelSchema: any, store?: any): any {
       // Add unit formatting to value axis labels
       formatter: (value: any) => {
         return formatUnitValue(
-          getUnitValue(
-            value,
-            config?.unit,
-            config?.unit_custom,
-            config?.decimals,
-          ),
+          getUnitValue(value, config?.unit, config?.unit_custom, config?.decimals),
         );
       },
     },

@@ -21,11 +21,21 @@ vi.mock(import("vue"), async (importOriginal) => {
   return {
     ...actual,
     getCurrentInstance: vi.fn().mockReturnValue({}), // return truthy to trigger lifecycle registration
-    onUnmounted: vi.fn().mockImplementation((callback: any) => { onUnmountedCallback.current = callback; }),
-    onDeactivated: vi.fn().mockImplementation((callback: any) => { onDeactivatedCallback.current = callback; }),
-    onActivated: vi.fn().mockImplementation((callback: any) => { onActivatedCallback.current = callback; }),
-    onMounted: vi.fn().mockImplementation((callback: any) => { onMountedCallback.current = callback; }),
-    onBeforeUnmount: vi.fn().mockImplementation((callback: any) => { onBeforeUnmountCallback.current = callback; }),
+    onUnmounted: vi.fn().mockImplementation((callback: any) => {
+      onUnmountedCallback.current = callback;
+    }),
+    onDeactivated: vi.fn().mockImplementation((callback: any) => {
+      onDeactivatedCallback.current = callback;
+    }),
+    onActivated: vi.fn().mockImplementation((callback: any) => {
+      onActivatedCallback.current = callback;
+    }),
+    onMounted: vi.fn().mockImplementation((callback: any) => {
+      onMountedCallback.current = callback;
+    }),
+    onBeforeUnmount: vi.fn().mockImplementation((callback: any) => {
+      onBeforeUnmountCallback.current = callback;
+    }),
   };
 });
 
@@ -47,7 +57,7 @@ describe("useCustomDebouncer", () => {
     const initialValue = "test";
     const delay = 500;
     const { valueRef } = useCustomDebouncer(initialValue, delay);
-    
+
     expect(valueRef.value).toBe(initialValue);
   });
 
@@ -56,9 +66,9 @@ describe("useCustomDebouncer", () => {
     const newValue = "immediate";
     const delay = 500;
     const { valueRef, setImmediateValue } = useCustomDebouncer(initialValue, delay);
-    
+
     setImmediateValue(newValue);
-    
+
     expect(valueRef.value).toBe(newValue);
   });
 
@@ -67,15 +77,15 @@ describe("useCustomDebouncer", () => {
     const newValue = "debounced";
     const delay = 500;
     const { valueRef, setDebounceValue } = useCustomDebouncer(initialValue, delay);
-    
+
     setDebounceValue(newValue);
-    
+
     // Value should not change immediately
     expect(valueRef.value).toBe(initialValue);
-    
+
     // Fast-forward time
     vi.advanceTimersByTime(delay);
-    
+
     // Value should now be updated
     expect(valueRef.value).toBe(newValue);
   });
@@ -86,27 +96,27 @@ describe("useCustomDebouncer", () => {
     const secondValue = "second";
     const delay = 500;
     const { valueRef, setDebounceValue } = useCustomDebouncer(initialValue, delay);
-    
+
     setDebounceValue(firstValue);
-    
+
     // Fast-forward time partially
     vi.advanceTimersByTime(200);
-    
+
     // Value should still be initial
     expect(valueRef.value).toBe(initialValue);
-    
+
     // Set another value (this should reset the timeout)
     setDebounceValue(secondValue);
-    
+
     // Fast-forward time partially again
     vi.advanceTimersByTime(200);
-    
+
     // Value should still be initial
     expect(valueRef.value).toBe(initialValue);
-    
+
     // Fast-forward remaining time
     vi.advanceTimersByTime(300);
-    
+
     // Value should be the second value (latest one)
     expect(valueRef.value).toBe(secondValue);
   });
@@ -115,15 +125,18 @@ describe("useCustomDebouncer", () => {
     const initialValue = "initial";
     const newValue = "new";
     const delay = 500;
-    const { valueRef, setImmediateValue, setDebounceValue } = useCustomDebouncer(initialValue, delay);
-    
+    const { valueRef, setImmediateValue, setDebounceValue } = useCustomDebouncer(
+      initialValue,
+      delay,
+    );
+
     // Simulate component deactivation
     onDeactivatedCallback.current();
-    
+
     // Try to set immediate value
     setImmediateValue(newValue);
     expect(valueRef.value).toBe(initialValue); // Should not change
-    
+
     // Try to set debounced value
     setDebounceValue(newValue);
     vi.advanceTimersByTime(delay);
@@ -135,17 +148,17 @@ describe("useCustomDebouncer", () => {
     const newValue = "activated";
     const delay = 500;
     const { valueRef, setImmediateValue } = useCustomDebouncer(initialValue, delay);
-    
+
     // Simulate deactivation first
     onDeactivatedCallback.current();
-    
+
     // Try to set value (should not work)
     setImmediateValue(newValue);
     expect(valueRef.value).toBe(initialValue);
-    
+
     // Simulate activation
     onActivatedCallback.current();
-    
+
     // Now value changes should work
     setImmediateValue(newValue);
     expect(valueRef.value).toBe(newValue);
@@ -156,10 +169,10 @@ describe("useCustomDebouncer", () => {
     const newValue = "mounted";
     const delay = 500;
     const { valueRef, setImmediateValue } = useCustomDebouncer(initialValue, delay);
-    
+
     // Simulate mount
     onMountedCallback.current();
-    
+
     // Value changes should work after mount
     setImmediateValue(newValue);
     expect(valueRef.value).toBe(newValue);
@@ -169,20 +182,23 @@ describe("useCustomDebouncer", () => {
     const initialValue = "initial";
     const newValue = "beforeUnmount";
     const delay = 500;
-    const { valueRef, setDebounceValue, setImmediateValue } = useCustomDebouncer(initialValue, delay);
-    
+    const { valueRef, setDebounceValue, setImmediateValue } = useCustomDebouncer(
+      initialValue,
+      delay,
+    );
+
     // Set a debounced value
     setDebounceValue(newValue);
-    
+
     // Simulate beforeUnmount
     onBeforeUnmountCallback.current();
-    
+
     // Fast-forward time
     vi.advanceTimersByTime(delay);
-    
+
     // Value should not change due to beforeUnmount clearing timeout
     expect(valueRef.value).toBe(initialValue);
-    
+
     // Try immediate value after beforeUnmount
     setImmediateValue(newValue);
     expect(valueRef.value).toBe(initialValue); // Should not change
@@ -192,20 +208,23 @@ describe("useCustomDebouncer", () => {
     const initialValue = "initial";
     const newValue = "unmount";
     const delay = 500;
-    const { valueRef, setDebounceValue, setImmediateValue } = useCustomDebouncer(initialValue, delay);
-    
+    const { valueRef, setDebounceValue, setImmediateValue } = useCustomDebouncer(
+      initialValue,
+      delay,
+    );
+
     // Set a debounced value
     setDebounceValue(newValue);
-    
+
     // Simulate unmount
     onUnmountedCallback.current();
-    
+
     // Fast-forward time
     vi.advanceTimersByTime(delay);
-    
+
     // Value should not change due to unmount clearing timeout
     expect(valueRef.value).toBe(initialValue);
-    
+
     // Try immediate value after unmount
     setImmediateValue(newValue);
     expect(valueRef.value).toBe(initialValue); // Should not change
@@ -216,11 +235,11 @@ describe("useCustomDebouncer", () => {
     const newValue = "immediate";
     const delay = 500;
     const { valueRef, setImmediateValue } = useCustomDebouncer(initialValue, delay);
-    
+
     // Call setImmediateValue twice (second call should call resetTimeout when timeout is null)
     setImmediateValue(newValue);
     expect(valueRef.value).toBe(newValue);
-    
+
     setImmediateValue("second");
     expect(valueRef.value).toBe("second");
   });
@@ -230,15 +249,15 @@ describe("useCustomDebouncer", () => {
     const newValue = "zero-delay";
     const delay = 0;
     const { valueRef, setDebounceValue } = useCustomDebouncer(initialValue, delay);
-    
+
     setDebounceValue(newValue);
-    
+
     // Even with zero delay, setTimeout is still async
     expect(valueRef.value).toBe(initialValue);
-    
+
     // Advance timers
     vi.advanceTimersByTime(0);
-    
+
     expect(valueRef.value).toBe(newValue);
   });
 
@@ -247,16 +266,19 @@ describe("useCustomDebouncer", () => {
     const immediateValue = "immediate";
     const debouncedValue = "debounced";
     const delay = 500;
-    const { valueRef, setImmediateValue, setDebounceValue } = useCustomDebouncer(initialValue, delay);
-    
+    const { valueRef, setImmediateValue, setDebounceValue } = useCustomDebouncer(
+      initialValue,
+      delay,
+    );
+
     // Set debounced value first
     setDebounceValue(debouncedValue);
     expect(valueRef.value).toBe(initialValue);
-    
+
     // Set immediate value (should clear debounced timeout and set immediately)
     setImmediateValue(immediateValue);
     expect(valueRef.value).toBe(immediateValue);
-    
+
     // Advance time - debounced value should not apply
     vi.advanceTimersByTime(delay);
     expect(valueRef.value).toBe(immediateValue);
@@ -264,23 +286,32 @@ describe("useCustomDebouncer", () => {
 
   it("should work with different types of initial values", () => {
     // Test with number
-    const { valueRef: numberRef, setImmediateValue: setNumberImmediate } = useCustomDebouncer(0, 100);
+    const { valueRef: numberRef, setImmediateValue: setNumberImmediate } = useCustomDebouncer(
+      0,
+      100,
+    );
     expect(numberRef.value).toBe(0);
     setNumberImmediate(42);
     expect(numberRef.value).toBe(42);
-    
+
     // Test with object
     const initialObj = { key: "value" };
     const newObj = { key: "newValue" };
-    const { valueRef: objRef, setImmediateValue: setObjImmediate } = useCustomDebouncer(initialObj, 100);
+    const { valueRef: objRef, setImmediateValue: setObjImmediate } = useCustomDebouncer(
+      initialObj,
+      100,
+    );
     expect(objRef.value).toEqual(initialObj);
     setObjImmediate(newObj);
     expect(objRef.value).toEqual(newObj);
-    
+
     // Test with array
     const initialArray = [1, 2, 3];
     const newArray = [4, 5, 6];
-    const { valueRef: arrayRef, setImmediateValue: setArrayImmediate } = useCustomDebouncer(initialArray, 100);
+    const { valueRef: arrayRef, setImmediateValue: setArrayImmediate } = useCustomDebouncer(
+      initialArray,
+      100,
+    );
     expect(arrayRef.value).toEqual(initialArray);
     setArrayImmediate(newArray);
     expect(arrayRef.value).toEqual(newArray);
@@ -291,25 +322,25 @@ describe("useCustomDebouncer", () => {
     const debouncedValue = "debounced";
     const delay = 500;
     const { valueRef, setDebounceValue } = useCustomDebouncer(initialValue, delay);
-    
+
     // Set debounced value
     setDebounceValue(debouncedValue);
     expect(valueRef.value).toBe(initialValue);
-    
+
     // Trigger deactivation during debounce
     onDeactivatedCallback.current();
-    
+
     // Advance time
     vi.advanceTimersByTime(delay);
-    
+
     // Value should not change due to component being inactive
     expect(valueRef.value).toBe(initialValue);
-    
+
     // Reactivate and try again
     onActivatedCallback.current();
     setDebounceValue(debouncedValue);
     vi.advanceTimersByTime(delay);
-    
+
     // Now it should work
     expect(valueRef.value).toBe(debouncedValue);
   });

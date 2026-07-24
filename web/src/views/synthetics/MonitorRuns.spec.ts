@@ -23,11 +23,7 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 
 const $t = (key: string) => key;
 
-const {
-  mockFetchAll,
-  mockRun,
-  mockSyntheticsServiceGetLocations,
-} = vi.hoisted(() => ({
+const { mockFetchAll, mockRun, mockSyntheticsServiceGetLocations } = vi.hoisted(() => ({
   mockFetchAll: vi.fn().mockResolvedValue(undefined),
   mockRun: vi.fn().mockResolvedValue({}),
   mockSyntheticsServiceGetLocations: vi.fn().mockResolvedValue({ data: { locations: [] } }),
@@ -51,8 +47,24 @@ vi.mock("@/composables/useSyntheticResults", () => {
         lastRunAt: Date.now() - 120_000,
       }),
       buckets: ref([
-        { tsMs: 1_700_000_000_000, avgMs: 1500, p95Ms: 2000, uptimePct: 100, warningRuns: 0, failedRuns: 0, errorRuns: 0 },
-        { tsMs: 1_700_003_600_000, avgMs: 1600, p95Ms: 2100, uptimePct: 99, warningRuns: 0, failedRuns: 1, errorRuns: 0 },
+        {
+          tsMs: 1_700_000_000_000,
+          avgMs: 1500,
+          p95Ms: 2000,
+          uptimePct: 100,
+          warningRuns: 0,
+          failedRuns: 0,
+          errorRuns: 0,
+        },
+        {
+          tsMs: 1_700_003_600_000,
+          avgMs: 1600,
+          p95Ms: 2100,
+          uptimePct: 99,
+          warningRuns: 0,
+          failedRuns: 1,
+          errorRuns: 0,
+        },
       ]),
       runs: ref([
         {
@@ -136,7 +148,11 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 
 vi.mock("@/composables/synthetics/syntheticResultsSchema", () => {
   const deviceIconName = vi.fn((v: string) => {
-    const map: Record<string, string> = { Desktop: "computer", Tablet: "tablet", Mobile: "phone_iphone" };
+    const map: Record<string, string> = {
+      Desktop: "computer",
+      Tablet: "tablet",
+      Mobile: "phone_iphone",
+    };
     return map[v] || "devices";
   });
   const deviceLabel = vi.fn((v: string) => {
@@ -149,70 +165,88 @@ vi.mock("@/composables/synthetics/syntheticResultsSchema", () => {
   };
 });
 
+vi.mock("vuex", () => ({
+  useStore: () => ({
+    state: {
+      selectedOrganization: { identifier: "test-org" },
+    },
+  }),
+}));
+
+vi.mock("vue-router", () => ({
+  useRoute: () => ({
+    query: {},
+  }),
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+  }),
+}));
+
 import MonitorRuns from "./MonitorRuns.vue";
 
 // ── Stubs for every child component ─────────────────────────────────────
 const baseStubs = {
   OTabs: {
-    template:
-      '<div data-test="monitor-runs-tabs"><slot /></div>',
+    template: '<div data-test="monitor-runs-tabs"><slot /></div>',
     props: ["modelValue", "class"],
   },
   OTab: {
-    template:
-      '<button :data-test="$attrs[\'data-test\']"><slot /></button>',
+    template: "<button :data-test=\"$attrs['data-test']\"><slot /></button>",
     props: ["name"],
     inheritAttrs: true,
   },
   OTabPanels: {
-    template: '<div><slot /></div>',
+    template: "<div><slot /></div>",
     props: ["modelValue", "grow", "scroll", "class"],
   },
   OTabPanel: {
-    template: '<div v-if="$attrs[\'data-test\'] === \'monitor-runs-tabpanel-overview\' || true"><slot /></div>',
+    template:
+      "<div v-if=\"$attrs['data-test'] === 'monitor-runs-tabpanel-overview' || true\"><slot /></div>",
     props: ["name"],
     inheritAttrs: true,
   },
   OCard: {
-    template: '<div><slot /></div>',
+    template: "<div><slot /></div>",
     props: ["class", "key"],
   },
   OCardSection: {
-    template: '<div><slot /></div>',
+    template: "<div><slot /></div>",
     props: [],
   },
   OSeparator: {
-    template: '<hr />',
+    template: "<hr />",
     props: ["orientation", "class"],
   },
   OIcon: {
-    template: '<span />',
+    template: "<span />",
     props: ["name", "size", "class"],
   },
   OTimeCell: {
-    template: '<span />',
+    template: "<span />",
     props: ["value", "unit", "mode", "emptyLabel"],
   },
+  OTooltip: {
+    template: "<span><slot /></span>",
+    props: ["content", "class"],
+  },
   OBadge: {
-    template: '<span :data-test="$attrs[\'data-test\']"><slot /></span>',
+    template: "<span :data-test=\"$attrs['data-test']\"><slot /></span>",
     props: ["variant", "size", "dot", "class"],
     inheritAttrs: true,
   },
   OEmptyState: {
-    template:
-      '<div :data-test="$attrs[\'data-test\']"><slot name="actions" /></div>',
+    template: '<div :data-test="$attrs[\'data-test\']"><slot name="actions" /></div>',
     props: ["size", "illustration", "title", "description", "preset"],
     inheritAttrs: true,
   },
   EmptyStateActionCard: {
-    template:
-      '<div :data-test="$attrs[\'data-test\']"><slot /></div>',
+    template: "<div :data-test=\"$attrs['data-test']\"><slot /></div>",
     props: ["icon", "label", "sublabel"],
     inheritAttrs: true,
   },
   OTable: {
-    template:
-      '<table data-test="monitor-runs-runs-table" />',
+    template: '<table data-test="monitor-runs-runs-table" />',
     props: [
       "columns",
       "data",
@@ -227,7 +261,7 @@ const baseStubs = {
     ],
   },
   OToggleGroup: {
-    template: '<div><slot /></div>',
+    template: "<div><slot /></div>",
     props: ["modelValue", "variant"],
   },
   OToggleGroupItem: {
@@ -235,35 +269,43 @@ const baseStubs = {
     props: ["value", "size"],
   },
   OSelect: {
-    template: '<select :data-test="$attrs[\'data-test\']" />',
+    template: "<select :data-test=\"$attrs['data-test']\" />",
     props: ["modelValue", "options", "iconKey", "size", "class"],
     inheritAttrs: true,
   },
   OInput: {
-    template: '<input :data-test="$attrs[\'data-test\']" />',
+    template: "<input :data-test=\"$attrs['data-test']\" />",
     props: ["modelValue", "size", "placeholder", "class"],
     inheritAttrs: true,
   },
   OButton: {
-    template:
-      '<button :data-test="$attrs[\'data-test\']"><slot /></button>',
+    template: "<button :data-test=\"$attrs['data-test']\"><slot /></button>",
     props: ["variant", "size", "class", "loading"],
     inheritAttrs: true,
   },
   MonitorStatusTimeline: {
+    name: "MonitorStatusTimeline",
     template: '<div data-test="monitor-status-timeline" />',
-    props: ["segments", "failCount", "passCount", "mixedCount", "startLabel", "endLabel", "isBrowser"],
+    props: [
+      "segments",
+      "failCount",
+      "passCount",
+      "mixedCount",
+      "startLabel",
+      "endLabel",
+      "isBrowser",
+    ],
   },
   ChartRenderer: {
     template: '<div data-test="chart-renderer" />',
     props: ["data", "height"],
   },
   SkeletonBox: {
-    template: '<div />',
+    template: "<div />",
     props: ["width", "height", "rounded", "customRadius"],
   },
   Teleport: {
-    template: '<div><slot /></div>',
+    template: "<div><slot /></div>",
   },
 };
 
@@ -271,10 +313,17 @@ const baseStubs = {
 // The above stub shows all panels — we can use a keyed approach.
 // But the simplest way is to just show all content.
 
-function mountRuns(props: { monitorId: string; monitorName: string; monitorStatus?: string } = {
-  monitorId: "mon-1",
-  monitorName: "Test Monitor",
-}) {
+function mountRuns(
+  props: {
+    monitorId: string;
+    monitorName: string;
+    monitorStatus?: string;
+    checkType?: string;
+  } = {
+    monitorId: "mon-1",
+    monitorName: "Test Monitor",
+  },
+) {
   return mount(MonitorRuns, {
     props,
     global: {
@@ -298,39 +347,25 @@ describe("MonitorRuns", () => {
     it("should render the runs dashboard shell", () => {
       wrapper = mountRuns();
       expect(wrapper.exists()).toBe(true);
-      expect(
-        wrapper.find('[data-test="synthetics-monitor-runs"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-monitor-runs"]').exists()).toBe(true);
     });
 
     it("should render the tab switcher with Overview and Steps tabs", () => {
       wrapper = mountRuns();
-      expect(
-        wrapper.find('[data-test="monitor-runs-tab-overview"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="monitor-runs-tab-steps"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="monitor-runs-tab-overview"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="monitor-runs-tab-steps"]').exists()).toBe(true);
     });
 
     it("should render filter controls for browser, device, and location", () => {
       wrapper = mountRuns();
-      expect(
-        wrapper.find('[data-test="monitor-runs-filter-browser"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="monitor-runs-filter-device"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="monitor-runs-filter-location"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="monitor-runs-filter-browser"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="monitor-runs-filter-device"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="monitor-runs-filter-location"]').exists()).toBe(true);
     });
 
     it("should render the runs table", () => {
       wrapper = mountRuns();
-      expect(
-        wrapper.find('[data-test="monitor-runs-runs-table"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="monitor-runs-runs-table"]').exists()).toBe(true);
     });
   });
 
@@ -373,6 +408,174 @@ describe("MonitorRuns", () => {
       wrapper = mountRuns();
       wrapper.vm.$emit("refresh");
       expect(wrapper.emitted("refresh")).toBeTruthy();
+    });
+  });
+
+  describe("breakdown cards visibility", () => {
+    it("should render device breakdown card when checkType is browser", () => {
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "browser",
+      });
+      expect(wrapper.text()).toContain("synthetics.runs.passRateByDevice");
+    });
+
+    it("should not render device breakdown card when checkType is not browser", () => {
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "http",
+      });
+      expect(wrapper.text()).not.toContain("synthetics.runs.passRateByDevice");
+    });
+
+    it("should render protocol duration by location card when checkType is not browser", () => {
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "http",
+      });
+      expect(wrapper.text()).toContain("synthetics.runs.durationByLocation");
+    });
+
+    it("should not render protocol duration by location card when checkType is browser", () => {
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "browser",
+      });
+      expect(wrapper.text()).not.toContain("synthetics.runs.durationByLocation");
+    });
+
+    it("should render browser and device filters when checkType is browser", () => {
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "browser",
+      });
+      expect(wrapper.find('[data-test="monitor-runs-filter-browser"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="monitor-runs-filter-device"]').exists()).toBe(true);
+    });
+
+    it("should not render browser and device filters when checkType is not browser", () => {
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "http",
+      });
+      expect(wrapper.find('[data-test="monitor-runs-filter-browser"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="monitor-runs-filter-device"]').exists()).toBe(false);
+    });
+  });
+
+  describe("steps tab visibility", () => {
+    it("should render steps tab when checkType is browser", () => {
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "browser",
+      });
+      expect(wrapper.find('[data-test="monitor-runs-tab-steps"]').exists()).toBe(true);
+    });
+
+    it("should not render steps tab when checkType is not browser", () => {
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "http",
+      });
+      expect(wrapper.find('[data-test="monitor-runs-tab-steps"]').exists()).toBe(false);
+    });
+  });
+
+  describe("location label resolution", () => {
+    it("should resolve location labels in locationDurationBreakdown when locations are loaded", async () => {
+      mockSyntheticsServiceGetLocations.mockResolvedValue({
+        data: {
+          locations: [
+            { id: "us-east-1", label: "US East", region: "N. Virginia" },
+            { id: "eu-west-1", label: "EU West", region: "Ireland" },
+            { id: "ap-south-1", label: "AP South", region: "Mumbai" },
+          ],
+        },
+      });
+
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "http",
+      });
+      await flushPromises();
+
+      // locationDisplayLabel produces "Name (region)" — check that the DOM
+      // contains resolved labels rather than raw IDs like "us-east-1"
+      // Mock data has runs only from us-east-1 and eu-west-1
+      const text = wrapper.text();
+      expect(text).toContain("US East (N. Virginia)");
+      expect(text).toContain("EU West (Ireland)");
+    });
+
+    it("should resolve location labels in pass rate by location breakdown", async () => {
+      mockSyntheticsServiceGetLocations.mockResolvedValue({
+        data: {
+          locations: [
+            { id: "us-east-1", label: "US East", region: "N. Virginia" },
+            { id: "eu-west-1", label: "EU West", region: "Ireland" },
+          ],
+        },
+      });
+
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "browser",
+      });
+      await flushPromises();
+
+      const text = wrapper.text();
+      expect(text).toContain("US East (N. Virginia)");
+      expect(text).toContain("EU West (Ireland)");
+    });
+
+    it("should resolve location labels in timeline segments when locations are loaded", async () => {
+      mockSyntheticsServiceGetLocations.mockResolvedValue({
+        data: {
+          locations: [
+            { id: "us-east-1", label: "US East", region: "N. Virginia" },
+            { id: "eu-west-1", label: "EU West", region: "Ireland" },
+          ],
+        },
+      });
+
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        checkType: "browser",
+      });
+      await flushPromises();
+
+      const timeline = wrapper.findComponent({ name: "MonitorStatusTimeline" });
+      expect(timeline.exists()).toBe(true);
+
+      const segments = timeline.props("segments") as any[];
+      expect(segments.length).toBeGreaterThan(0);
+
+      // Collect all execution locations from timeline segments
+      const allLocations = new Set<string>();
+      for (const seg of segments) {
+        for (const exec of seg.executions) {
+          allLocations.add(exec.location as string);
+        }
+      }
+
+      // Should contain only resolved display labels, not raw IDs
+      expect(allLocations.has("US East (N. Virginia)")).toBe(true);
+      expect(allLocations.has("EU West (Ireland)")).toBe(true);
+
+      // Should NOT contain raw IDs (locationLabel resolves them)
+      expect(allLocations.has("us-east-1")).toBe(false);
+      expect(allLocations.has("eu-west-1")).toBe(false);
     });
   });
 });

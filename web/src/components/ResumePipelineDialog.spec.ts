@@ -4,7 +4,6 @@ import ResumePipelineDialog from "@/components/ResumePipelineDialog.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 vi.mock("@/utils/zincutils", () => ({
   convertUnixToDateFormat: vi.fn(() => "2023-01-01 10:00:00"),
 }));

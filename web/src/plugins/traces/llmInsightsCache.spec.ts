@@ -18,9 +18,7 @@ import { selectionKey, createSelectionCache } from "./llmInsightsCache";
 
 describe("selectionKey", () => {
   it("composes stream + agent + window into a stable string", () => {
-    expect(selectionKey("default", "_stream", 100, 200)).toBe(
-      "default::_stream::100-200",
-    );
+    expect(selectionKey("default", "_stream", 100, 200)).toBe("default::_stream::100-200");
   });
 
   it("differs by selection and by window", () => {

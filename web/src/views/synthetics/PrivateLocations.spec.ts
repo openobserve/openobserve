@@ -110,7 +110,7 @@ const OTableStub = {
 };
 
 const OButtonStub = {
-  template: '<button @click="$emit(\'click\')"><slot /></button>',
+  template: "<button @click=\"$emit('click')\"><slot /></button>",
   props: ["variant", "size", "iconLeft", "loading", "title"],
   emits: ["click"],
 };
@@ -174,26 +174,20 @@ describe("PrivateLocations", () => {
     it("renders the table with the correct data-test attribute", () => {
       wrapper = makeWrapper({ locations: [makeLocation()] });
 
-      expect(
-        wrapper.find('[data-test="synthetics-private-locations-table"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-private-locations-table"]').exists()).toBe(true);
     });
 
     it("renders the search input in the toolbar", () => {
       wrapper = makeWrapper({ locations: [makeLocation()] });
 
-      const input = wrapper.find(
-        '[data-test="synthetics-private-locations-search-input"]',
-      );
+      const input = wrapper.find('[data-test="synthetics-private-locations-search-input"]');
       expect(input.exists()).toBe(true);
     });
 
     it("renders the refresh button in the toolbar-trailing", () => {
       wrapper = makeWrapper({ locations: [makeLocation()] });
 
-      const refreshBtn = wrapper.find(
-        '[data-test="synthetics-private-locations-refresh-btn"]',
-      );
+      const refreshBtn = wrapper.find('[data-test="synthetics-private-locations-refresh-btn"]');
       expect(refreshBtn.exists()).toBe(true);
     });
 
@@ -238,9 +232,7 @@ describe("PrivateLocations", () => {
 
     it("shows 0/0 when no agent has ever registered", () => {
       wrapper = makeWrapper({
-        locations: [
-          makeLocation({ live_agents: 0, agents_total: 0, agent_names: [] }),
-        ],
+        locations: [makeLocation({ live_agents: 0, agents_total: 0, agent_names: [] })],
       });
 
       const agentsCell = wrapper.find(".otable-cell-agents");
@@ -285,10 +277,7 @@ describe("PrivateLocations", () => {
 
     it("renders copy and delete action buttons for each row", () => {
       wrapper = makeWrapper({
-        locations: [
-          makeLocation({ id: "loc-a" }),
-          makeLocation({ id: "loc-b" }),
-        ],
+        locations: [makeLocation({ id: "loc-a" }), makeLocation({ id: "loc-b" })],
       });
 
       expect(
@@ -320,18 +309,16 @@ describe("PrivateLocations", () => {
       wrapper = makeWrapper({ loading: true, locations: [] });
       // The OTable stub is rendered; verify the empty slot doesn't
       // show OEmptyState when loading is true (v-if="!loading")
-      expect(
-        wrapper.find('[data-test="synthetics-private-locations-empty-state"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="synthetics-private-locations-empty-state"]').exists()).toBe(
+        false,
+      );
     });
 
     it("passes loading false to OTable", () => {
       wrapper = makeWrapper({ loading: false });
       // With loading false and no data, the empty state should appear
       // This is tested in the empty state section
-      expect(
-        wrapper.find('[data-test="synthetics-private-locations-table"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-private-locations-table"]').exists()).toBe(true);
     });
   });
 
@@ -398,9 +385,7 @@ describe("PrivateLocations", () => {
     });
 
     it("shows no rows when search matches nothing", async () => {
-      const locations = [
-        makeLocation({ id: "loc-1", label: "US East" }),
-      ];
+      const locations = [makeLocation({ id: "loc-1", label: "US East" })];
       wrapper = makeWrapper({ locations });
 
       const input = wrapper.find("input");
@@ -431,9 +416,7 @@ describe("PrivateLocations", () => {
     it('emits "refresh" when refresh button is clicked', async () => {
       wrapper = makeWrapper({ locations: [makeLocation()] });
 
-      const refreshBtn = wrapper.find(
-        '[data-test="synthetics-private-locations-refresh-btn"]',
-      );
+      const refreshBtn = wrapper.find('[data-test="synthetics-private-locations-refresh-btn"]');
       await refreshBtn.trigger("click");
 
       expect(wrapper.emitted("refresh")).toBeTruthy();
@@ -444,9 +427,7 @@ describe("PrivateLocations", () => {
       const loc = makeLocation({ id: "loc-abc", label: "Test Location" });
       wrapper = makeWrapper({ locations: [loc] });
 
-      const copyBtn = wrapper.find(
-        '[data-test="synthetics-private-locations-copy-btn-loc-abc"]',
-      );
+      const copyBtn = wrapper.find('[data-test="synthetics-private-locations-copy-btn-loc-abc"]');
       await copyBtn.trigger("click");
 
       expect(wrapper.emitted("copy-setup")).toBeTruthy();
@@ -510,27 +491,21 @@ describe("PrivateLocations", () => {
     it("shows OEmptyState when locations is empty and not loading", () => {
       wrapper = makeWrapper({ locations: [], loading: false });
 
-      const emptyState = wrapper.find(
-        '[data-test="synthetics-private-locations-empty-state"]',
-      );
+      const emptyState = wrapper.find('[data-test="synthetics-private-locations-empty-state"]');
       expect(emptyState.exists()).toBe(true);
     });
 
     it("does not show OEmptyState when loading is true (even with empty locations)", () => {
       wrapper = makeWrapper({ locations: [], loading: true });
 
-      const emptyState = wrapper.find(
-        '[data-test="synthetics-private-locations-empty-state"]',
-      );
+      const emptyState = wrapper.find('[data-test="synthetics-private-locations-empty-state"]');
       expect(emptyState.exists()).toBe(false);
     });
 
     it("does not show OEmptyState when locations has items", () => {
       wrapper = makeWrapper({ locations: [makeLocation()], loading: false });
 
-      const emptyState = wrapper.find(
-        '[data-test="synthetics-private-locations-empty-state"]',
-      );
+      const emptyState = wrapper.find('[data-test="synthetics-private-locations-empty-state"]');
       expect(emptyState.exists()).toBe(false);
     });
   });
@@ -598,9 +573,7 @@ describe("PrivateLocations", () => {
       const buttons = trailing.findAll("button");
       // Only the refresh button should exist in toolbar-trailing
       expect(buttons).toHaveLength(1);
-      expect(
-        buttons[0]?.attributes("data-test"),
-      ).toBe("synthetics-private-locations-refresh-btn");
+      expect(buttons[0]?.attributes("data-test")).toBe("synthetics-private-locations-refresh-btn");
     });
   });
 });

@@ -19,7 +19,6 @@ import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 
-
 vi.mock("@/services/backfill", () => ({
   default: {
     updateBackfillJob: vi.fn().mockResolvedValue({ message: "updated" }),
@@ -30,7 +29,13 @@ vi.mock("@/services/backfill", () => ({
 vi.mock("@/components/DateTime.vue", () => ({
   default: {
     template: '<div data-test="time-range-picker" />',
-    props: ["defaultType", "defaultAbsoluteTime", "defaultRelativeTime", "disableRelative", "minDate"],
+    props: [
+      "defaultType",
+      "defaultAbsoluteTime",
+      "defaultRelativeTime",
+      "disableRelative",
+      "minDate",
+    ],
     emits: ["on:date-change"],
     methods: {
       setCustomDate: vi.fn(),
@@ -111,7 +116,7 @@ function createWrapper(props: Record<string, unknown> = {}) {
       stubs: {
         ODialog: ODialogStub,
         OCollapsible: {
-          template: '<div><slot /></div>',
+          template: "<div><slot /></div>",
           props: ["modelValue", "icon", "label"],
         },
       },
@@ -148,9 +153,7 @@ describe("EditBackfillJobDialog", () => {
 
     it("renders ODrawer with data-test='edit-backfill-job-dialog'", () => {
       const wrapper = createWrapper();
-      expect(
-        wrapper.find('[data-test="edit-backfill-job-dialog"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="edit-backfill-job-dialog"]').exists()).toBe(true);
     });
 
     it("passes title 'Edit Backfill Job' to ODrawer", () => {
@@ -173,23 +176,17 @@ describe("EditBackfillJobDialog", () => {
 
     it("renders data-test='time-range-picker' inside drawer body", () => {
       const wrapper = createWrapper();
-      expect(wrapper.find('[data-test="time-range-picker"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="time-range-picker"]').exists()).toBe(true);
     });
 
     it("renders data-test='advanced-options-expansion'", () => {
       const wrapper = createWrapper();
-      expect(
-        wrapper.find('[data-test="advanced-options-expansion"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="advanced-options-expansion"]').exists()).toBe(true);
     });
 
     it("renders data-test='chunk-period-input'", () => {
       const wrapper = createWrapper();
-      expect(wrapper.find('[data-test="chunk-period-input"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="chunk-period-input"]').exists()).toBe(true);
     });
 
     it("renders ODrawer with open=true when modelValue is true", () => {
@@ -212,12 +209,8 @@ describe("EditBackfillJobDialog", () => {
       expect(formVals(wrapper).timerange.from).toBe(mockJob.start_time);
       expect(formVals(wrapper).timerange.to).toBe(mockJob.end_time);
       expect(formVals(wrapper).chunkPeriodMinutes).toBe(mockJob.chunk_period_minutes);
-      expect(formVals(wrapper).delayBetweenChunks).toBe(
-        mockJob.delay_between_chunks_secs,
-      );
-      expect(formVals(wrapper).deleteBeforeBackfill).toBe(
-        mockJob.delete_before_backfill,
-      );
+      expect(formVals(wrapper).delayBetweenChunks).toBe(mockJob.delay_between_chunks_secs);
+      expect(formVals(wrapper).deleteBeforeBackfill).toBe(mockJob.delete_before_backfill);
     });
 
     it("does not populate form time range when job is null", async () => {
@@ -334,9 +327,7 @@ describe("EditBackfillJobDialog", () => {
         response: { data: { error: "Job not found" } },
         message: "Request failed",
       };
-      vi.mocked(backfillService.updateBackfillJob).mockRejectedValueOnce(
-        apiError,
-      );
+      vi.mocked(backfillService.updateBackfillJob).mockRejectedValueOnce(apiError);
 
       const wrapper = createWrapper({ modelValue: true, job: mockJob });
       await flushPromises();
@@ -367,9 +358,7 @@ describe("EditBackfillJobDialog", () => {
       await submitForm(wrapper);
 
       expect((wrapper.vm as any).form.state.isValid).toBe(false);
-      expect((wrapper.vm as any).timerangeError).toBe(
-        "Please select a valid time range",
-      );
+      expect((wrapper.vm as any).timerangeError).toBe("Please select a valid time range");
       expect(wrapper.text()).toContain("Please select a valid time range");
       expect(backfillService.updateBackfillJob).not.toHaveBeenCalled();
     });
@@ -382,9 +371,7 @@ describe("EditBackfillJobDialog", () => {
       await submitForm(wrapper);
 
       expect((wrapper.vm as any).form.state.isValid).toBe(false);
-      expect((wrapper.vm as any).timerangeError).toBe(
-        "Start time must be before end time",
-      );
+      expect((wrapper.vm as any).timerangeError).toBe("Start time must be before end time");
       expect(backfillService.updateBackfillJob).not.toHaveBeenCalled();
     });
   });
@@ -487,8 +474,7 @@ describe("EditBackfillJobDialog", () => {
       await flushPromises();
       setField(wrapper, field, value);
       await submitForm(wrapper);
-      const called =
-        vi.mocked(backfillService.updateBackfillJob).mock.calls.length > 0;
+      const called = vi.mocked(backfillService.updateBackfillJob).mock.calls.length > 0;
       wrapper.unmount();
       return called;
     };
@@ -570,7 +556,10 @@ describe("EditBackfillJobDialog", () => {
     it("form.isSubmitting is true while the (awaited) save is in flight", async () => {
       let resolveFn: (val: any) => void = () => {};
       vi.mocked(backfillService.updateBackfillJob).mockImplementationOnce(
-        () => new Promise((res) => { resolveFn = res; }),
+        () =>
+          new Promise((res) => {
+            resolveFn = res;
+          }),
       );
 
       const wrapper = createWrapper({ modelValue: true, job: mockJob });
@@ -580,15 +569,11 @@ describe("EditBackfillJobDialog", () => {
       // bridge mirrors onto the ODialog footer spinner) true for the whole save.
       (wrapper.vm as any).form.handleSubmit();
       // The schema validates asynchronously — wait for the save to actually fire.
-      await vi.waitFor(() =>
-        expect(backfillService.updateBackfillJob).toHaveBeenCalled(),
-      );
+      await vi.waitFor(() => expect(backfillService.updateBackfillJob).toHaveBeenCalled());
       expect((wrapper.vm as any).form.state.isSubmitting).toBe(true);
 
       resolveFn({ message: "updated" });
-      await vi.waitFor(() =>
-        expect((wrapper.vm as any).form.state.isSubmitting).toBe(false),
-      );
+      await vi.waitFor(() => expect((wrapper.vm as any).form.state.isSubmitting).toBe(false));
     });
   });
 });

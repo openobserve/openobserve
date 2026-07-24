@@ -39,9 +39,7 @@ const reports = {
     return http().get(`/api/${org_identifier}/reports?${query}`);
   },
   getReport: (org_identifier: string, reportName: string) => {
-    return http().get(
-      `/api/${org_identifier}/reports/${encodeURIComponent(reportName)}`,
-    );
+    return http().get(`/api/${org_identifier}/reports/${encodeURIComponent(reportName)}`);
   },
   createReport: (org_identifier: string, payload: any, folder_id?: string) => {
     let url = `/api/${org_identifier}/reports`;
@@ -55,27 +53,17 @@ const reports = {
     );
   },
   deleteReport: (org_identifier: string, reportName: string) => {
-    return http().delete(
-      `/api/${org_identifier}/reports/${encodeURIComponent(reportName)}`,
-    );
+    return http().delete(`/api/${org_identifier}/reports/${encodeURIComponent(reportName)}`);
   },
   bulkDelete: (org_identifier: string, data: any) => {
     return http().delete(`/api/${org_identifier}/reports/bulk`, { data });
   },
   triggerReport: (org_identifier: string, reportName: string) => {
-    return http().put(
-      `/api/${org_identifier}/reports/${encodeURIComponent(reportName)}/trigger`,
-    );
+    return http().put(`/api/${org_identifier}/reports/${encodeURIComponent(reportName)}/trigger`);
   },
-  toggleReportState: (
-    org_identifier: string,
-    reportName: string,
-    state: boolean,
-  ) => {
+  toggleReportState: (org_identifier: string, reportName: string, state: boolean) => {
     return http().put(
-      `/api/${org_identifier}/reports/${encodeURIComponent(
-        reportName,
-      )}/enable?value=${state}`,
+      `/api/${org_identifier}/reports/${encodeURIComponent(reportName)}/enable?value=${state}`,
     );
   },
 
@@ -88,7 +76,12 @@ const reports = {
     if (folder_id) url += `?folder=${encodeURIComponent(folder_id)}`;
     return http().post(url, payload);
   },
-  updateReportById: (org_identifier: string, report_id: string, payload: any, new_folder_id?: string) => {
+  updateReportById: (
+    org_identifier: string,
+    report_id: string,
+    payload: any,
+    new_folder_id?: string,
+  ) => {
     let url = `/api/v2/${org_identifier}/reports/${report_id}`;
     if (new_folder_id) url += `?folder=${encodeURIComponent(new_folder_id)}`;
     return http().put(url, payload);
@@ -115,18 +108,10 @@ const reports = {
     return http().delete(`/api/v2/${org_identifier}/reports/bulk`, { data });
   },
   triggerReportById: (org_identifier: string, report_id: string) => {
-    return http().put(
-      `/api/v2/${org_identifier}/reports/${report_id}/trigger`,
-    );
+    return http().put(`/api/v2/${org_identifier}/reports/${report_id}/trigger`);
   },
-  toggleReportStateById: (
-    org_identifier: string,
-    report_id: string,
-    state: boolean,
-  ) => {
-    return http().patch(
-      `/api/v2/${org_identifier}/reports/${report_id}/enable?value=${state}`,
-    );
+  toggleReportStateById: (org_identifier: string, report_id: string, state: boolean) => {
+    return http().patch(`/api/v2/${org_identifier}/reports/${report_id}/enable?value=${state}`);
   },
 };
 

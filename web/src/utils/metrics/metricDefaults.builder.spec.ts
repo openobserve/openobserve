@@ -62,10 +62,7 @@ const FIXTURES: Array<{
     type: "Counter",
     ctx: {
       familyType: "histogram",
-      streamNames: new Set([
-        "http_duration_seconds_bucket",
-        "http_duration_seconds_count",
-      ]),
+      streamNames: new Set(["http_duration_seconds_bucket", "http_duration_seconds_count"]),
     },
   },
   {
@@ -74,10 +71,7 @@ const FIXTURES: Array<{
     type: "Counter",
     ctx: {
       familyType: "histogram",
-      streamNames: new Set([
-        "http_duration_seconds_sum",
-        "http_duration_seconds_count",
-      ]),
+      streamNames: new Set(["http_duration_seconds_sum", "http_duration_seconds_count"]),
     },
   },
   {

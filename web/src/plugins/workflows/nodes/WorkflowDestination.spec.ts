@@ -54,8 +54,7 @@ function createWrapper() {
   });
 }
 
-const picker = (wrapper: any) =>
-  wrapper.findComponent({ name: "DestinationPicker" });
+const picker = (wrapper: any) => wrapper.findComponent({ name: "DestinationPicker" });
 
 describe("WorkflowDestination", () => {
   beforeEach(() => {
@@ -70,9 +69,7 @@ describe("WorkflowDestination", () => {
   describe("props passed to the shared DestinationPicker", () => {
     it("renders the body and the shared picker", () => {
       const wrapper = createWrapper();
-      expect(
-        wrapper.find('[data-test="workflow-destination-body"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="workflow-destination-body"]').exists()).toBe(true);
       expect(picker(wrapper).exists()).toBe(true);
     });
 
@@ -130,9 +127,10 @@ describe("WorkflowDestination", () => {
         template_override: null,
       });
       // the picker's org_id is NOT carried into the workflow node payload
-      expect(
-        Object.keys(await (wrapper.vm as any).submit()),
-      ).toEqual(["destination_id", "template_override"]);
+      expect(Object.keys(await (wrapper.vm as any).submit())).toEqual([
+        "destination_id",
+        "template_override",
+      ]);
     });
 
     it("preserves an existing template_override from the saved node data", async () => {

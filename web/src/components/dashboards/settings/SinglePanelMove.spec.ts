@@ -25,9 +25,8 @@ vi.mock("../../../utils/commons", () => ({
 // Resolve keys against the REAL app messages so migrated i18n keys render
 // their real English text (e.g. "Move"), instead of leaking the key path.
 vi.mock("vue-i18n", async () => {
-  const en: Record<string, any> = (
-    (await vi.importActual("@/locales/languages/en-US.json")) as any
-  ).default;
+  const en: Record<string, any> = ((await vi.importActual("@/locales/languages/en-US.json")) as any)
+    .default;
   const resolve = (key: string): unknown =>
     key.split(".").reduce<any>((o, k) => (o == null ? undefined : o[k]), en);
   return {
@@ -121,7 +120,6 @@ const ODialogStub = {
     </div>
   `,
 };
-
 
 describe("SinglePanelMove", () => {
   let wrapper: VueWrapper<any>;
@@ -305,9 +303,7 @@ describe("SinglePanelMove", () => {
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
 
-      const selectElement = wrapper.find(
-        '[data-test="dashboard-tab-move-select"]',
-      );
+      const selectElement = wrapper.find('[data-test="dashboard-tab-move-select"]');
       expect(selectElement.exists()).toBe(true);
     });
 
@@ -362,9 +358,7 @@ describe("SinglePanelMove", () => {
 
       expect(wrapper.vm.moveTabOptions).toHaveLength(0);
 
-      const selectElement = wrapper.find(
-        '[data-test="dashboard-tab-move-select"]',
-      );
+      const selectElement = wrapper.find('[data-test="dashboard-tab-move-select"]');
       expect(selectElement.exists()).toBe(true);
     });
   });
@@ -373,18 +367,14 @@ describe("SinglePanelMove", () => {
     it("should render add tab button", () => {
       wrapper = createWrapper();
 
-      const addTabBtn = wrapper.find(
-        '[data-test="dashboard-tab-move-add-tab-btn"]',
-      );
+      const addTabBtn = wrapper.find('[data-test="dashboard-tab-move-add-tab-btn"]');
       expect(addTabBtn.exists()).toBe(true);
     });
 
     it("should show add tab drawer when add button is clicked", async () => {
       wrapper = createWrapper();
 
-      const addTabBtn = wrapper.find(
-        '[data-test="dashboard-tab-move-add-tab-btn"]',
-      );
+      const addTabBtn = wrapper.find('[data-test="dashboard-tab-move-add-tab-btn"]');
       await addTabBtn.trigger("click");
 
       expect(wrapper.vm.showAddTabDialog).toBe(true);
@@ -403,15 +393,11 @@ describe("SinglePanelMove", () => {
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
 
-      const addTabBtn = wrapper.find(
-        '[data-test="dashboard-tab-move-add-tab-btn"]',
-      );
+      const addTabBtn = wrapper.find('[data-test="dashboard-tab-move-add-tab-btn"]');
       await addTabBtn.trigger("click");
 
       expect(wrapper.vm.isTabEditMode).toBe(false);
-      expect(wrapper.vm.currentDashboardData.data.dashboardId).toBe(
-        "test-dashboard-id",
-      );
+      expect(wrapper.vm.currentDashboardData.data.dashboardId).toBe("test-dashboard-id");
     });
 
     it("closes the add-tab dialog when AddTab emits update:open false", async () => {
@@ -607,9 +593,7 @@ describe("SinglePanelMove", () => {
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.currentDashboardData.data).toBeDefined();
-      expect(wrapper.vm.currentDashboardData.data.dashboardId).toBe(
-        "test-dashboard-id",
-      );
+      expect(wrapper.vm.currentDashboardData.data.dashboardId).toBe("test-dashboard-id");
     });
 
     it("should update selectedMoveTabId when tab options change", async () => {
@@ -629,9 +613,7 @@ describe("SinglePanelMove", () => {
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
 
-      const addTabBtn = wrapper.find(
-        '[data-test="dashboard-tab-move-add-tab-btn"]',
-      );
+      const addTabBtn = wrapper.find('[data-test="dashboard-tab-move-add-tab-btn"]');
       await addTabBtn.trigger("click");
 
       wrapper.vm.showAddTabDialog = false;
@@ -647,9 +629,7 @@ describe("SinglePanelMove", () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
 
       const dialog = wrapper.findComponent(ODialogStub);
-      const addTabBtn = wrapper.find(
-        '[data-test="dashboard-tab-move-add-tab-btn"]',
-      );
+      const addTabBtn = wrapper.find('[data-test="dashboard-tab-move-add-tab-btn"]');
 
       for (let i = 0; i < 5; i++) {
         await addTabBtn.trigger("click");

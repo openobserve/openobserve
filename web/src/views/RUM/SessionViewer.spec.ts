@@ -113,10 +113,7 @@ function createTestI18n() {
   return createI18n({ legacy: false, locale: "en", messages: { en: {} } });
 }
 
-function mountSessionViewer(
-  router = createTestRouter(),
-  i18n = createTestI18n(),
-) {
+function mountSessionViewer(router = createTestRouter(), i18n = createTestI18n()) {
   return mount(SessionViewer, {
     global: {
       plugins: [router, i18n],
@@ -125,14 +122,7 @@ function mountSessionViewer(
         VideoPlayer: { template: '<div data-test="stub-video-player" />' },
         PlayerEventsSidebar: {
           template: '<div data-test="stub-player-events-sidebar" />',
-          props: [
-            "events",
-            "sessionDetails",
-            "sessionId",
-            "currentTime",
-            "startTime",
-            "endTime",
-          ],
+          props: ["events", "sessionDetails", "sessionId", "currentTime", "startTime", "endTime"],
         },
         EventDetailDrawer: {
           template: '<div data-test="stub-event-detail-drawer" />',
@@ -200,16 +190,12 @@ describe("SessionViewer.vue", () => {
 
     it("should render VideoPlayer inside the OSplitter before slot", () => {
       const splitter = wrapper.find('[data-test="stub-osplitter"]');
-      expect(splitter.find('[data-test="stub-video-player"]').exists()).toBe(
-        true,
-      );
+      expect(splitter.find('[data-test="stub-video-player"]').exists()).toBe(true);
     });
 
     it("should render PlayerEventsSidebar inside the OSplitter after slot", () => {
       const splitter = wrapper.find('[data-test="stub-osplitter"]');
-      expect(
-        splitter.find('[data-test="stub-player-events-sidebar"]').exists(),
-      ).toBe(true);
+      expect(splitter.find('[data-test="stub-player-events-sidebar"]').exists()).toBe(true);
     });
 
     it("should initialise splitterSize to 600px", () => {
@@ -263,9 +249,7 @@ describe("SessionViewer.vue", () => {
   // -------------------------------------------------------------------------
   describe("frustration signals", () => {
     it("should not display frustration summary when segmentEvents is empty", () => {
-      const summary = wrapper.find(
-        '[data-test="session-viewer-frustration-summary"]',
-      );
+      const summary = wrapper.find('[data-test="session-viewer-frustration-summary"]');
       expect(summary.exists()).toBe(false);
     });
 
@@ -287,9 +271,7 @@ describe("SessionViewer.vue", () => {
       ];
       await wrapper.vm.$nextTick();
 
-      const summary = wrapper.find(
-        '[data-test="session-viewer-frustration-summary"]',
-      );
+      const summary = wrapper.find('[data-test="session-viewer-frustration-summary"]');
       expect(summary.exists()).toBe(true);
     });
 
@@ -300,9 +282,7 @@ describe("SessionViewer.vue", () => {
       ];
       await wrapper.vm.$nextTick();
 
-      const summary = wrapper.find(
-        '[data-test="session-viewer-frustration-summary"]',
-      );
+      const summary = wrapper.find('[data-test="session-viewer-frustration-summary"]');
       expect(summary.exists()).toBe(false);
     });
 
@@ -339,9 +319,7 @@ describe("SessionViewer.vue", () => {
       ];
       await wrapper.vm.$nextTick();
 
-      const summaryText = wrapper.find(
-        '[data-test="frustration-summary-text"]',
-      );
+      const summaryText = wrapper.find('[data-test="frustration-summary-text"]');
       expect(summaryText.exists()).toBe(true);
       expect(summaryText.text()).toBe("1 Frustration");
     });
@@ -363,9 +341,7 @@ describe("SessionViewer.vue", () => {
       ];
       await wrapper.vm.$nextTick();
 
-      const summaryText = wrapper.find(
-        '[data-test="frustration-summary-text"]',
-      );
+      const summaryText = wrapper.find('[data-test="frustration-summary-text"]');
       expect(summaryText.exists()).toBe(true);
       expect(summaryText.text()).toBe("2 Frustrations");
     });
@@ -381,12 +357,8 @@ describe("SessionViewer.vue", () => {
       ];
       await wrapper.vm.$nextTick();
 
-      const summary = wrapper.find(
-        '[data-test="session-viewer-frustration-summary"]',
-      );
-      expect(summary.attributes("title")).toBe(
-        "1 frustration signal detected",
-      );
+      const summary = wrapper.find('[data-test="session-viewer-frustration-summary"]');
+      expect(summary.attributes("title")).toBe("1 frustration signal detected");
     });
 
     it("should display plural title tooltip when frustration count is greater than 1", async () => {
@@ -406,12 +378,8 @@ describe("SessionViewer.vue", () => {
       ];
       await wrapper.vm.$nextTick();
 
-      const summary = wrapper.find(
-        '[data-test="session-viewer-frustration-summary"]',
-      );
-      expect(summary.attributes("title")).toBe(
-        "2 frustration signals detected",
-      );
+      const summary = wrapper.find('[data-test="session-viewer-frustration-summary"]');
+      expect(summary.attributes("title")).toBe("2 frustration signals detected");
     });
   });
 

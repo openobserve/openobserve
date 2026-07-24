@@ -21,16 +21,15 @@ import store from "@/test/unit/helpers/store";
 
 // Mock i18n translations
 const mockTranslations = {
-  "search.syntaxGuideLabel": "Syntax Guide"
+  "search.syntaxGuideLabel": "Syntax Guide",
 };
 
 const i18n = createI18n({
   locale: "en",
   messages: {
-    en: mockTranslations
-  }
+    en: mockTranslations,
+  },
 });
-
 
 describe("SyntaxGuide.vue", () => {
   let wrapper: any;
@@ -39,11 +38,8 @@ describe("SyntaxGuide.vue", () => {
     return mount(SyntaxGuide, {
       props,
       global: {
-        plugins: [
-          i18n,
-          store
-        ]
-      }
+        plugins: [i18n, store],
+      },
     });
   };
 
@@ -73,7 +69,7 @@ describe("SyntaxGuide.vue", () => {
   it("should accept and react to sqlmode prop", async () => {
     wrapper = createWrapper({ sqlmode: true });
     expect(wrapper.props().sqlmode).toBe(true);
-    
+
     await wrapper.setProps({ sqlmode: false });
     expect(wrapper.props().sqlmode).toBe(false);
   });
@@ -200,10 +196,10 @@ describe("SyntaxGuide.vue", () => {
   it("should have different template content based on sqlmode", () => {
     wrapper = createWrapper({ sqlmode: false });
     const normalModeComponent = wrapper.html();
-    
+
     wrapper = createWrapper({ sqlmode: true });
     const sqlModeComponent = wrapper.html();
-    
+
     // Both should have button but with different classes
     expect(normalModeComponent).toContain("normal-mode");
     expect(sqlModeComponent).toContain("sql-mode");
@@ -232,7 +228,7 @@ describe("SyntaxGuide.vue", () => {
     expect(() => {
       wrapper = createWrapper({ sqlmode: false });
     }).not.toThrow();
-    
+
     expect(() => {
       wrapper = createWrapper({ sqlmode: true });
     }).not.toThrow();
@@ -365,7 +361,7 @@ describe("SyntaxGuide.vue", () => {
   it("should have undefined label when noBorder is true and no label prop given", () => {
     wrapper = createWrapper({ noBorder: true });
     // OButton renders label as slot text; the component prop 'label' defaults to ''
-    expect(wrapper.props().label).toBe('');
+    expect(wrapper.props().label).toBe("");
   });
 
   // Test 36: button renders in dark theme with normal mode

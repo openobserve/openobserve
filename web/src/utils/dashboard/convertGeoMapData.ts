@@ -61,10 +61,7 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
       if (isNaN(getDataValue(item, query.fields.longitude.alias))) {
         throw new Error("All longitude values should be numeric value.");
       }
-      if (
-        query.fields.weight &&
-        isNaN(getDataValue(item, query.fields.weight.alias))
-      ) {
+      if (query.fields.weight && isNaN(getDataValue(item, query.fields.weight.alias))) {
         throw new Error("All weight values should be numeric value.");
       }
     });
@@ -75,10 +72,7 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
     lmap: {
       // See https://leafletjs.com/reference.html#map-option for details
       // NOTE: note that this order is reversed from Leaflet's [lat, lng]!
-      center: [
-        panelSchema.config.map_view.lng,
-        panelSchema.config.map_view.lat,
-      ], // [lng, lat]
+      center: [panelSchema.config.map_view.lng, panelSchema.config.map_view.lat], // [lng, lat]
       zoom: panelSchema.config.map_view.zoom,
       roam: true,
       resizeEnable: true, // automatically handles browser window resize.
@@ -194,17 +188,12 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
       }),
       symbolSize: function (val: any) {
         const normalizedSize = normalizeValue(val[2], minValue, maxValue);
-        const minSymbolSize =
-          panelSchema.config?.map_symbol_style?.size_by_value?.min ?? 1;
-        const maxSymbolSize =
-          panelSchema.config?.map_symbol_style?.size_by_value?.max ?? 100;
-        const mapSymbolStyleSelected =
-          panelSchema.config?.map_symbol_style?.size ?? "by Value";
+        const minSymbolSize = panelSchema.config?.map_symbol_style?.size_by_value?.min ?? 1;
+        const maxSymbolSize = panelSchema.config?.map_symbol_style?.size_by_value?.max ?? 100;
+        const mapSymbolStyleSelected = panelSchema.config?.map_symbol_style?.size ?? "by Value";
 
         if (mapSymbolStyleSelected === "by Value") {
-          return (
-            minSymbolSize + normalizedSize * (maxSymbolSize - minSymbolSize)
-          );
+          return minSymbolSize + normalizedSize * (maxSymbolSize - minSymbolSize);
         } else if (mapSymbolStyleSelected === "fixed") {
           return panelSchema.config?.map_symbol_style?.size_fixed ?? 2;
         }
@@ -222,11 +211,11 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
     return;
   }
   //min max for symbol size
-  const seriesData = options.series.flatMap((series: any) => series.data); 
-  
+  const seriesData = options.series.flatMap((series: any) => series.data);
+
   // Calculate min/max values once +
-  const values = seriesData.map((item: any) => item[2]); 
-  const minValue = Math.min(...values); 
+  const values = seriesData.map((item: any) => item[2]);
+  const minValue = Math.min(...values);
   const maxValue = Math.max(...values);
 
   if (seriesData.length > 0) {

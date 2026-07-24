@@ -58,7 +58,10 @@ describe("OTag dot rendering", () => {
   });
 
   it("manual badge with a value but no type renders NO dot", () => {
-    const html = mount(OTag, { props: { variant: "primary-soft", value: "x" }, slots: { default: "x" } }).html();
+    const html = mount(OTag, {
+      props: { variant: "primary-soft", value: "x" },
+      slots: { default: "x" },
+    }).html();
     expect(html.includes(DOT_CLASS)).toBe(false);
   });
 });
@@ -85,7 +88,10 @@ describe("OTag shape", () => {
     expect(html.includes("!bg-transparent")).toBe(true);
   });
   it("manual badge defaults to pill", () => {
-    const html = mount(OTag, { props: { variant: "default-soft" }, slots: { default: "5" } }).html();
+    const html = mount(OTag, {
+      props: { variant: "default-soft" },
+      slots: { default: "5" },
+    }).html();
     expect(html.includes("rounded-full")).toBe(true);
   });
 });
@@ -93,7 +99,10 @@ describe("OTag shape", () => {
 describe("OTag size", () => {
   it("typed and untyped badges both default to sm (matching height)", () => {
     const typed = mount(OTag, { props: { type: "userRole", value: "admin" } }).html();
-    const untyped = mount(OTag, { props: { value: "custom" }, slots: { default: "Custom" } }).html();
+    const untyped = mount(OTag, {
+      props: { value: "custom" },
+      slots: { default: "Custom" },
+    }).html();
     expect(typed.includes("py-1.5")).toBe(true);
     expect(untyped.includes("py-1.5")).toBe(true);
     expect(typed.includes("py-2")).toBe(false);

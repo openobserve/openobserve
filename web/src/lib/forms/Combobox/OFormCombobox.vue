@@ -14,9 +14,7 @@ const props = defineProps<FormComboboxProps>();
 const form = inject(FORM_CONTEXT_KEY, null);
 
 if (import.meta.env.DEV && !form) {
-  console.warn(
-    "[OFormCombobox] must be rendered inside <OForm>. No form context found.",
-  );
+  console.warn("[OFormCombobox] must be rendered inside <OForm>. No form context found.");
 }
 
 // Forward OCombobox's imperative `clear()` (resets reka-ui's internal
@@ -50,9 +48,7 @@ defineExpose({ clear: () => comboboxRef.value?.clear() });
         :model-value="field.state.value"
         :error="field.state.meta.errors.length > 0"
         :error-message="
-          field.state.meta.errors.length > 0
-            ? firstFieldError(field.state.meta.errors)
-            : undefined
+          field.state.meta.errors.length > 0 ? firstFieldError(field.state.meta.errors) : undefined
         "
         @update:model-value="(val: string) => field.handleChange(val)"
       >

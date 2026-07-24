@@ -1,5 +1,5 @@
 // Copyright 2026 OpenObserve Inc.
-import http from './http'
+import http from "./http";
 
 const STREAM_NAME = "synthetics_results";
 
@@ -25,79 +25,90 @@ export interface GetRunPayload {
 
 const syntheticsService = {
   create: (orgIdentifier: string, payload: unknown, folderId?: string) => {
-    const params = folderId ? `?folder=${folderId}` : ''
-    return http().post(`/api/${orgIdentifier}/synthetics${params}`, payload)
+    const params = folderId ? `?folder=${folderId}` : "";
+    return http().post(`/api/${orgIdentifier}/synthetics${params}`, payload);
   },
 
   update: (orgIdentifier: string, id: string, payload: unknown, folderId?: string) => {
-    const params = folderId ? `?folder=${folderId}` : ''
-    return http().put(`/api/${orgIdentifier}/synthetics/${id}${params}`, payload)
+    const params = folderId ? `?folder=${folderId}` : "";
+    return http().put(`/api/${orgIdentifier}/synthetics/${id}${params}`, payload);
   },
 
   // folderId is the check's folder (name), passed as ?folder= so RBAC can
   // resolve folder-scoped grants — mirrors alerts' per-item routes.
   get: (orgIdentifier: string, id: string, folderId?: string) => {
-    const params = folderId ? `?folder=${folderId}` : ''
-    return http().get(`/api/${orgIdentifier}/synthetics/${id}${params}`)
+    const params = folderId ? `?folder=${folderId}` : "";
+    return http().get(`/api/${orgIdentifier}/synthetics/${id}${params}`);
   },
 
-  list: (orgIdentifier: string) =>
-    http().get(`/api/${orgIdentifier}/synthetics`),
+  list: (orgIdentifier: string) => http().get(`/api/${orgIdentifier}/synthetics`),
 
   listByFolderId: (orgIdentifier: string, folderId?: string) => {
-    const params = folderId && folderId !== 'all' ? `?folder=${folderId}` : ''
-    return http().get(`/api/${orgIdentifier}/synthetics${params}`)
+    const params = folderId && folderId !== "all" ? `?folder=${folderId}` : "";
+    return http().get(`/api/${orgIdentifier}/synthetics${params}`);
   },
 
   delete: (orgIdentifier: string, id: string, folderId?: string) => {
-    const params = folderId ? `?folder=${folderId}` : ''
-    return http().delete(`/api/${orgIdentifier}/synthetics/${id}${params}`)
+    const params = folderId ? `?folder=${folderId}` : "";
+    return http().delete(`/api/${orgIdentifier}/synthetics/${id}${params}`);
   },
 
   bulkDelete: (orgIdentifier: string, payload: { ids: string[] }, folderId?: string) => {
-    const params = folderId ? `?folder=${folderId}` : ''
-    return http().delete(`/api/${orgIdentifier}/synthetics${params}`, { data: payload })
+    const params = folderId ? `?folder=${folderId}` : "";
+    return http().delete(`/api/${orgIdentifier}/synthetics${params}`, { data: payload });
   },
 
   enable: (orgIdentifier: string, id: string, payload: unknown, folderId?: string) => {
-    const params = folderId ? `?folder=${folderId}` : ''
-    return http().put(`/api/${orgIdentifier}/synthetics/${id}/enable${params}`, payload)
+    const params = folderId ? `?folder=${folderId}` : "";
+    return http().put(`/api/${orgIdentifier}/synthetics/${id}/enable${params}`, payload);
   },
 
   run: (orgIdentifier: string, id: string, payload: unknown, folderId?: string) => {
-    const params = folderId ? `?folder=${folderId}` : ''
-    return http().post(`/api/${orgIdentifier}/synthetics/${id}/run${params}`, payload)
+    const params = folderId ? `?folder=${folderId}` : "";
+    return http().post(`/api/${orgIdentifier}/synthetics/${id}/run${params}`, payload);
   },
 
-  getRuns: (orgIdentifier: string, id: string, params?: Record<string, string | number>, folderId?: string) =>
+  getRuns: (
+    orgIdentifier: string,
+    id: string,
+    params?: Record<string, string | number>,
+    folderId?: string,
+  ) =>
     http().get(`/api/${orgIdentifier}/synthetics/${id}/runs`, {
       params: folderId ? { ...(params ?? {}), folder: folderId } : params,
     }),
 
   getRun: (orgIdentifier: string, id: string, runId: string, folderId?: string) => {
-    const params = folderId ? `?folder=${folderId}` : ''
-    return http().get(`/api/${orgIdentifier}/synthetics/${id}/runs/${runId}${params}`)
+    const params = folderId ? `?folder=${folderId}` : "";
+    return http().get(`/api/${orgIdentifier}/synthetics/${id}/runs/${runId}${params}`);
   },
 
   artifactUrl: (orgIdentifier: string, key: string, folderId?: string) => {
     // Fallback proxy URL. key format:
     // synthetics/{org}/{synthetics_id}/{yyyy}/{mm}/{dd}/{run_id}/{execution_id|job_id}/{filename}
-    const parts = key.split('/')
-    const synthetics_id = parts[2] ?? '_'
-    const folderParam = folderId ? `&folder=${folderId}` : ''
-    return `/api/${orgIdentifier}/synthetics/${synthetics_id}/artifact?key=${encodeURIComponent(key)}${folderParam}`
+    const parts = key.split("/");
+    const synthetics_id = parts[2] ?? "_";
+    const folderParam = folderId ? `&folder=${folderId}` : "";
+    return `/api/${orgIdentifier}/synthetics/${synthetics_id}/artifact?key=${encodeURIComponent(key)}${folderParam}`;
   },
 
   // Batch-sign artifact download URLs. Returns { mode: "presigned" | "proxy",
   // expires_in, urls: [{key, url}] }. mode is decided by the backend from its
   // storage config (local disk → proxy, S3/MinIO/Azure → presigned).
-  presignArtifacts: (orgIdentifier: string, syntheticsId: string, keys: string[], folderId?: string) => {
-    const params = folderId ? `?folder=${folderId}` : ''
-    return http().post(`/api/${orgIdentifier}/synthetics/${syntheticsId}/artifacts/presign${params}`, { keys })
+  presignArtifacts: (
+    orgIdentifier: string,
+    syntheticsId: string,
+    keys: string[],
+    folderId?: string,
+  ) => {
+    const params = folderId ? `?folder=${folderId}` : "";
+    return http().post(
+      `/api/${orgIdentifier}/synthetics/${syntheticsId}/artifacts/presign${params}`,
+      { keys },
+    );
   },
 
-  getLocations: (orgIdentifier: string) =>
-    http().get(`/api/${orgIdentifier}/synthetics/locations`),
+  getLocations: (orgIdentifier: string) => http().get(`/api/${orgIdentifier}/synthetics/locations`),
 
   // ── Private locations ──────────────────────────────────────────────────
   getAgentSetup: (orgIdentifier: string) =>
@@ -114,7 +125,9 @@ const syntheticsService = {
     http().post(`/api/${orgIdentifier}/synthetics/agent-tokens/rotate`, name ? { name } : {}),
 
   setAgentTokenEnabled: (orgIdentifier: string, name: string, enabled: boolean) =>
-    http().patch(`/api/${orgIdentifier}/synthetics/agent-tokens/${encodeURIComponent(name)}`, { enabled }),
+    http().patch(`/api/${orgIdentifier}/synthetics/agent-tokens/${encodeURIComponent(name)}`, {
+      enabled,
+    }),
 
   getLocation: (orgIdentifier: string, id: string) =>
     http().get(`/api/${orgIdentifier}/synthetics/locations/${id}`),
@@ -131,11 +144,7 @@ const syntheticsService = {
   bulkDeleteLocations: (orgIdentifier: string, ids: string[]) =>
     http().delete(`/api/${orgIdentifier}/synthetics/locations`, { data: { ids } }),
 
-  listRunsPayload(
-    monitorId: string,
-    startTime: number,
-    endTime: number,
-  ): ListRunsPayload {
+  listRunsPayload(monitorId: string, startTime: number, endTime: number): ListRunsPayload {
     const sql = `SELECT * FROM "${STREAM_NAME}" WHERE synthetics_id = '${monitorId}' ORDER BY _timestamp DESC LIMIT 500`;
     return {
       query: {
@@ -165,6 +174,6 @@ const syntheticsService = {
       },
     };
   },
-}
+};
 
-export default syntheticsService
+export default syntheticsService;

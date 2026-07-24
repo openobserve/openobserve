@@ -2,10 +2,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "../Button/OButton.vue";
-import type {
-  RefreshButtonProps,
-  RefreshButtonEmits,
-} from "./ORefreshButton.types";
+import type { RefreshButtonProps, RefreshButtonEmits } from "./ORefreshButton.types";
 
 const { t } = useI18n();
 
@@ -88,16 +85,13 @@ function handleClick(e: MouseEvent) {
   <div class="inline-flex items-center gap-1.5">
     <!-- staleness dot -->
     <span
-      :class="[
-        'size-2 rounded-full shrink-0 transition-colors duration-700',
-        dotColor,
-      ]"
+      :class="['size-2 shrink-0 rounded-full transition-colors duration-700', dotColor]"
       :title="dotTitle"
     />
     <!-- relative timestamp -->
     <span
       v-if="lastRunAt"
-      class="text-xs text-text-secondary tabular-nums whitespace-nowrap select-none"
+      class="text-text-secondary text-xs whitespace-nowrap tabular-nums select-none"
       :title="exactTime"
     >
       {{ relativeTime || t("refreshButton.justNow") }}

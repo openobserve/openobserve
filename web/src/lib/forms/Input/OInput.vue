@@ -3,16 +3,7 @@
 
 import type { InputProps, InputEmits, InputSlots } from "./OInput.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import {
-  computed,
-  nextTick,
-  onBeforeUnmount,
-  onMounted,
-  ref,
-  useAttrs,
-  useId,
-  watch,
-} from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useAttrs, useId, watch } from "vue";
 
 // Forward the consumer's `data-test` from <OInput data-test="…"> onto the
 // root wrapper so E2E selectors can scope to the specific field instance
@@ -250,8 +241,10 @@ const wrapperClasses = computed(() => [
       v-if="(label || $slots.tooltip) && labelPosition !== 'inside'"
       :for="inputId"
       :class="[
-        'o-input-label text-compact leading-tight flex items-center gap-1',
-        props.disabled ? 'font-normal text-input-label-text-disabled' : 'font-medium text-input-label-text',
+        'o-input-label text-compact flex items-center gap-1 leading-tight',
+        props.disabled
+          ? 'text-input-label-text-disabled font-normal'
+          : 'text-input-label-text font-medium',
       ]"
     >
       {{ label }}<span v-if="required" aria-hidden="true" class="select-none">*</span>
@@ -261,7 +254,8 @@ const wrapperClasses = computed(() => [
         size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
         class="cursor-help"
-      ><slot name="tooltip" /></OIcon>
+        ><slot name="tooltip"
+      /></OIcon>
     </label>
 
     <!-- Input row -->
@@ -269,13 +263,14 @@ const wrapperClasses = computed(() => [
       <!-- Inside label: floating mini-label at the top of the input border -->
       <span
         v-if="label && labelPosition === 'inside' && !isTextarea"
-        class="absolute top-1 start-3 end-7 text-2xs font-medium leading-none text-text-secondary select-none pointer-events-none whitespace-nowrap overflow-hidden text-ellipsis"
-      >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></span>
+        class="text-2xs text-text-secondary pointer-events-none absolute start-3 end-7 top-1 overflow-hidden leading-none font-medium text-ellipsis whitespace-nowrap select-none"
+        >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></span
+      >
 
       <!-- Icon-left slot (inside border, left — matches OButton #icon-left pattern) -->
       <span
         v-if="$slots['icon-left']"
-        class="flex items-center ps-2 text-input-addon-text shrink-0 select-none"
+        class="text-input-addon-text flex shrink-0 items-center ps-2 select-none"
       >
         <slot name="icon-left" />
       </span>
@@ -283,7 +278,7 @@ const wrapperClasses = computed(() => [
       <!-- Prefix slot (inside border) -->
       <span
         v-if="$slots.prefix || prefix"
-        class="flex items-center ps-3 text-input-addon-text text-sm shrink-0 select-none"
+        class="text-input-addon-text flex shrink-0 items-center ps-3 text-sm select-none"
       >
         <slot name="prefix">{{ prefix }}</slot>
       </span>
@@ -307,9 +302,9 @@ const wrapperClasses = computed(() => [
         :tabindex="inputTabindex"
         :style="autogrow ? { overflow: 'hidden' } : undefined"
         :class="[
-          'flex-1 min-w-0 bg-transparent outline-none rounded-[inherit]',
+          'min-w-0 flex-1 rounded-[inherit] bg-transparent outline-none',
           'text-input-text placeholder:text-input-placeholder',
-          'disabled:cursor-not-allowed disabled:text-input-disabled-text',
+          'disabled:text-input-disabled-text disabled:cursor-not-allowed',
           'py-2',
           $slots['icon-left'] || $slots.prefix || prefix ? 'ps-2' : 'ps-3',
           $slots['icon-right'] || $slots.suffix || suffix || clearable ? 'pe-2' : 'pe-3',
@@ -344,12 +339,14 @@ const wrapperClasses = computed(() => [
         :tabindex="inputTabindex"
         :aria-invalid="hasError || undefined"
         :class="[
-          'flex-1 min-w-0 bg-transparent outline-none rounded-[inherit]',
+          'min-w-0 flex-1 rounded-[inherit] bg-transparent outline-none',
           'text-input-text placeholder:text-input-placeholder',
-          'disabled:cursor-not-allowed disabled:text-input-disabled-text',
+          'disabled:text-input-disabled-text disabled:cursor-not-allowed',
           'h-full',
           // Inside-label: push text down to leave room for the floating mini-label
-          labelPosition === 'inside' && label ? 'pt-3 pb-0.5 text-xs font-semibold' : textSizeClasses[size ?? 'md'],
+          labelPosition === 'inside' && label
+            ? 'pt-3 pb-0.5 text-xs font-semibold'
+            : textSizeClasses[size ?? 'md'],
           $slots['icon-left'] || $slots.prefix || prefix ? 'ps-2' : 'ps-3',
           $slots['icon-right'] || $slots.suffix || suffix || clearable ? 'pe-2' : 'pe-3',
         ]"
@@ -364,17 +361,12 @@ const wrapperClasses = computed(() => [
 
       <!-- Clear button -->
       <button
-        v-if="
-          clearable &&
-          modelValue !== '' &&
-          modelValue !== undefined &&
-          modelValue !== null
-        "
+        v-if="clearable && modelValue !== '' && modelValue !== undefined && modelValue !== null"
         type="button"
         tabindex="-1"
         aria-label="Clear"
         :data-test="parentDataTest ? `${parentDataTest}-clear` : undefined"
-        class="flex items-center pe-2 text-input-clear-btn hover:text-input-clear-btn-hover transition-colors"
+        class="text-input-clear-btn hover:text-input-clear-btn-hover flex items-center pe-2 transition-colors"
         @click="handleClear"
       >
         <svg
@@ -393,7 +385,7 @@ const wrapperClasses = computed(() => [
       <!-- Suffix slot (inside border — text) -->
       <span
         v-if="$slots.suffix || suffix"
-        class="flex items-center pe-3 text-input-addon-text text-sm shrink-0 select-none"
+        class="text-input-addon-text flex shrink-0 items-center pe-3 text-sm select-none"
       >
         <slot name="suffix">{{ suffix }}</slot>
       </span>
@@ -401,7 +393,7 @@ const wrapperClasses = computed(() => [
       <!-- Icon-right slot (inside border, right — matches OButton #icon-right pattern) -->
       <span
         v-if="$slots['icon-right']"
-        class="flex items-center pe-2 text-input-addon-text shrink-0 select-none"
+        class="text-input-addon-text flex shrink-0 items-center pe-2 select-none"
       >
         <slot name="icon-right" />
       </span>
@@ -420,15 +412,12 @@ const wrapperClasses = computed(() => [
         v-if="effectiveError && effectiveError.trim()"
         :data-test="parentDataTest ? `${parentDataTest}-error` : undefined"
         :data-test-error-text="effectiveError"
-        class="text-xs text-input-error-text leading-none"
+        class="text-input-error-text text-xs leading-none"
         role="alert"
       >
         {{ effectiveError }}
       </span>
-      <span
-        v-else-if="helpText"
-        class="text-xs text-input-hint leading-none"
-      >
+      <span v-else-if="helpText" class="text-input-hint text-xs leading-none">
         {{ helpText }}
       </span>
       <span v-else class="flex-1" />
@@ -436,10 +425,8 @@ const wrapperClasses = computed(() => [
       <span
         v-if="maxlength"
         :class="[
-          'text-xs leading-none tabular-nums shrink-0',
-          charCount > maxlength
-            ? 'text-input-error-text'
-            : 'text-input-hint',
+          'shrink-0 text-xs leading-none tabular-nums',
+          charCount > maxlength ? 'text-input-error-text' : 'text-input-hint',
         ]"
       >
         {{ charCount }}/{{ maxlength }}

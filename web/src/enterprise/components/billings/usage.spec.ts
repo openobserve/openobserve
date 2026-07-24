@@ -23,7 +23,6 @@ import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
 import { nextTick } from "vue";
 
-
 // Mock the billings service
 vi.mock("@/services/billings", () => ({
   default: {
@@ -42,13 +41,13 @@ vi.mock("@/services/organizations", () => ({
 const mockRouter = {
   currentRoute: {
     value: {
-      query: {}
-    }
-  }
+      query: {},
+    },
+  },
 };
 
 vi.mock("@/router", () => ({
-  default: mockRouter
+  default: mockRouter,
 }));
 
 vi.mock("vue-router", async (importOriginal) => {
@@ -118,13 +117,19 @@ describe("Usage Component", () => {
         data: [
           { event: "INGESTION", value: "10.50" },
           { event: "SEARCH", value: "5.25" },
-          { event: "FUNCTIONS", value: "2.75" }
-        ]
-      }
+          { event: "FUNCTIONS", value: "2.75" },
+        ],
+      },
     };
     mockBillingService.get_data_usage.mockResolvedValue(mockResponse);
     mockBillingService.get_ai_usage.mockResolvedValue({
-      data: { mode: "free", credits_used: 0, credits_limit: 1000, credits_remaining: 1000, requires_additional_credits: false },
+      data: {
+        mode: "free",
+        credits_used: 0,
+        credits_limit: 1000,
+        credits_remaining: 1000,
+        requires_additional_credits: false,
+      },
     });
 
     wrapper = mount(Usage, {
@@ -176,7 +181,7 @@ describe("Usage Component", () => {
   it("should initialize reactive data correctly", async () => {
     expect(wrapper.vm.lastUsageUpdated).toBe(0);
     expect(wrapper.vm.pipelinesPanelDataKey).toBe(0);
-    expect(wrapper.vm.elapsedText).toBe('Just now');
+    expect(wrapper.vm.elapsedText).toBe("Just now");
     // After mounted hook completes, dataLoading should be false
     await flushPromises();
     expect(wrapper.vm.dataLoading).toBe(false);
@@ -193,7 +198,7 @@ describe("Usage Component", () => {
       functions: "2.75",
       pipeline: "0.00",
       remotepipeline: "0.00",
-      ai_credits: "0.00"
+      ai_credits: "0.00",
     });
   });
 
@@ -204,12 +209,8 @@ describe("Usage Component", () => {
     };
     await nextTick();
 
-    expect(
-      wrapper.find('[data-test="contract-ai-credits-exhausted"]').exists(),
-    ).toBe(true);
-    expect(wrapper.text()).toContain(
-      "Contact your account manager to add more AI credits",
-    );
+    expect(wrapper.find('[data-test="contract-ai-credits-exhausted"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain("Contact your account manager to add more AI credits");
   });
 
   // Test 5: Chart data initial state
@@ -283,7 +284,7 @@ describe("Usage Component", () => {
     wrapper.vm.usageData = {
       ingestion: "10.50",
       search: "5.25",
-      functions: "2.75"
+      functions: "2.75",
     };
     wrapper.vm.dataLoading = false;
     await nextTick();
@@ -297,7 +298,7 @@ describe("Usage Component", () => {
     wrapper.vm.usageData = {
       ingestion: "10.50",
       search: "5.25",
-      functions: "2.75"
+      functions: "2.75",
     };
     wrapper.vm.dataLoading = false;
     await nextTick();
@@ -337,7 +338,6 @@ describe("Usage Component", () => {
     expect(ai.unit).toBe("Credits");
   });
 
-
   // Test 19: GetUsage function call with notification
   it("should call getUsage and show notification", async () => {
     const mockResponse = {
@@ -345,9 +345,9 @@ describe("Usage Component", () => {
         data: [
           { event: "INGESTION", value: "15.50" },
           { event: "SEARCH", value: "7.25" },
-          { event: "FUNCTIONS", value: "3.75" }
-        ]
-      }
+          { event: "FUNCTIONS", value: "3.75" },
+        ],
+      },
     };
 
     // The notification should have been called during component mounting
@@ -369,9 +369,9 @@ describe("Usage Component", () => {
         data: [
           { event: "INGESTION", value: "10.50" },
           { event: "SEARCH", value: "5.25" },
-          { event: "FUNCTIONS", value: "2.75" }
-        ]
-      }
+          { event: "FUNCTIONS", value: "2.75" },
+        ],
+      },
     };
 
     mockBillingService.get_data_usage.mockResolvedValue(mockResponse);
@@ -386,7 +386,7 @@ describe("Usage Component", () => {
       pipeline: "0.00",
       remotepipeline: "0.00",
       dataretention: "0.00",
-      ai_credits: "0.00"
+      ai_credits: "0.00",
     });
   });
 
@@ -411,13 +411,11 @@ describe("Usage Component", () => {
 
   // Test 22: SelectUsageDate function resets chart data
   it("should reset chart data when selectUsageDate is called", async () => {
-    // Mock the API response first 
+    // Mock the API response first
     const mockResponse = {
       data: {
-        data: [
-          { event: "INGESTION", value: "10.50" },
-        ]
-      }
+        data: [{ event: "INGESTION", value: "10.50" }],
+      },
     };
     mockBillingService.get_data_usage.mockResolvedValue(mockResponse);
 
@@ -535,8 +533,8 @@ describe("Usage Component", () => {
         data: [
           { event: "INGESTION", value: "10.567" },
           { event: "SEARCH", value: "5.234" },
-        ]
-      }
+        ],
+      },
     };
 
     mockBillingService.get_data_usage.mockResolvedValue(mockResponse);
@@ -555,9 +553,9 @@ describe("Usage Component", () => {
         data: [
           { event: "ingestion", value: "10.50" },
           { event: "SEARCH", value: "5.25" },
-          { event: "Functions", value: "2.75" }
-        ]
-      }
+          { event: "Functions", value: "2.75" },
+        ],
+      },
     };
 
     mockBillingService.get_data_usage.mockResolvedValue(mockResponse);
@@ -575,10 +573,8 @@ describe("Usage Component", () => {
     // Mock the API response first
     const mockResponse = {
       data: {
-        data: [
-          { event: "INGESTION", value: "10.50" },
-        ]
-      }
+        data: [{ event: "INGESTION", value: "10.50" }],
+      },
     };
     mockBillingService.get_data_usage.mockResolvedValue(mockResponse);
 
@@ -592,13 +588,13 @@ describe("Usage Component", () => {
       orgIdentifier,
       "30days",
       "gb",
-      undefined
+      undefined,
     );
   });
 
   // Test 37: Loading state during API call
   it("should set loading state during API call", async () => {
-    const mockPromise = new Promise(() => { }); // Never resolves
+    const mockPromise = new Promise(() => {}); // Never resolves
     mockBillingService.get_data_usage.mockReturnValue(mockPromise);
 
     wrapper.vm.getUsage();
@@ -618,21 +614,23 @@ describe("Usage Component", () => {
   // Test 39: Hidden action script tiles
   it("should not display action script tiles when v-if is false", () => {
     const actionScriptTiles = wrapper.findAll('[data-test="billings-usage-tile-title"]');
-    const actionScriptExists = actionScriptTiles.some((tile: any) => tile.text().includes('Action Scripts'));
+    const actionScriptExists = actionScriptTiles.some((tile: any) =>
+      tile.text().includes("Action Scripts"),
+    );
     expect(actionScriptExists).toBe(false);
   });
 
   // Test 40: Hidden error tracking tiles
   it("should not display error tracking tiles when v-if is false", () => {
     const tiles = wrapper.findAll('[data-test="billings-usage-tile-title"]');
-    const errorTrackingExists = tiles.some((tile: any) => tile.text().includes('Error Tracking'));
+    const errorTrackingExists = tiles.some((tile: any) => tile.text().includes("Error Tracking"));
     expect(errorTrackingExists).toBe(false);
   });
 
   // Test 41: Hidden RUM session tiles
   it("should not display RUM session tiles when v-if is false", () => {
     const tiles = wrapper.findAll('[data-test="billings-usage-tile-title"]');
-    const rumSessionExists = tiles.some((tile: any) => tile.text().includes('RUM Session'));
+    const rumSessionExists = tiles.some((tile: any) => tile.text().includes("RUM Session"));
     expect(rumSessionExists).toBe(false);
   });
 
@@ -645,10 +643,10 @@ describe("Usage Component", () => {
     const usageTiles = wrapper.findAll('[data-test="billings-usage-tile-title"]');
     const tileTexts = usageTiles.map((tile: any) => tile.text());
 
-    expect(tileTexts).toContain('Ingestion');
-    expect(tileTexts).toContain('Search');
+    expect(tileTexts).toContain("Ingestion");
+    expect(tileTexts).toContain("Search");
     // Functions card was removed (not a billable line item).
-    expect(tileTexts).not.toContain('Functions');
+    expect(tileTexts).not.toContain("Functions");
   });
 
   // Test 43: Usage tiles hidden when loading
@@ -658,7 +656,7 @@ describe("Usage Component", () => {
     await nextTick();
 
     const tiles = wrapper.findAll('[data-test="billings-usage-tile-title"]');
-    const ingestionExists = tiles.some((tile: any) => tile.text().includes('Ingestion'));
+    const ingestionExists = tiles.some((tile: any) => tile.text().includes("Ingestion"));
     expect(ingestionExists).toBe(false);
   });
 
@@ -669,7 +667,7 @@ describe("Usage Component", () => {
     await nextTick();
 
     const tiles = wrapper.findAll('[data-test="billings-usage-tile-title"]');
-    const ingestionExists = tiles.some((tile: any) => tile.text().includes('Ingestion'));
+    const ingestionExists = tiles.some((tile: any) => tile.text().includes("Ingestion"));
     expect(ingestionExists).toBe(false);
   });
 
@@ -684,11 +682,10 @@ describe("Usage Component", () => {
   it("should have correct container styling", () => {
     const container = wrapper.find('[style="height: calc(100vh - 130px);"]');
     expect(container.exists()).toBe(true);
-    expect(container.attributes('style')).toContain('height: calc(100vh - 130px)');
+    expect(container.attributes("style")).toContain("height: calc(100vh - 130px)");
     // width is now applied via the w-full utility class rather than inline style
-    expect(container.classes()).toContain('w-full');
+    expect(container.classes()).toContain("w-full");
   });
-
 
   // Test 48: No data section visibility
   it("should show no data section when usage data is empty", async () => {
@@ -743,8 +740,8 @@ describe("Usage Component", () => {
         data: [
           { event: "INGESTION", value: "invalid" },
           { event: "SEARCH", value: "5.25" },
-        ]
-      }
+        ],
+      },
     };
 
     mockBillingService.get_data_usage.mockResolvedValue(mockResponse);
@@ -775,18 +772,14 @@ describe("Usage Component", () => {
       store.state.organizationData.organizationSettings.usage_stream_enabled = false;
       await nextTick();
       expect(wrapper.vm.usageStreamEnabled).toBe(false);
-      expect(wrapper.find('[data-test="usage-daily-chart"]').exists()).toBe(
-        false,
-      );
+      expect(wrapper.find('[data-test="usage-daily-chart"]').exists()).toBe(false);
     });
 
     it("shows the daily chart when self-usage is on", async () => {
       store.state.organizationData.organizationSettings.usage_stream_enabled = true;
       await nextTick();
       expect(wrapper.vm.usageStreamEnabled).toBe(true);
-      expect(wrapper.find('[data-test="usage-daily-chart"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="usage-daily-chart"]').exists()).toBe(true);
     });
 
     it("builds one combined line panel over the org's usage stream", async () => {
@@ -886,9 +879,7 @@ describe("Usage Component", () => {
           usage_stream_enabled: true,
         }),
       );
-      expect(
-        store.state.organizationData.organizationSettings.usage_stream_enabled,
-      ).toBe(true);
+      expect(store.state.organizationData.organizationSettings.usage_stream_enabled).toBe(true);
     });
 
     it("shows the waiting-for-data graphic when the usage stream is missing", async () => {
@@ -898,25 +889,17 @@ describe("Usage Component", () => {
       const wrapper = mountUsage();
       await flushPromises();
       // No error yet → no overlay.
-      expect(wrapper.find('[data-test="usage-waiting-for-data"]').exists()).toBe(
-        false,
-      );
+      expect(wrapper.find('[data-test="usage-waiting-for-data"]').exists()).toBe(false);
       // Chart search errors because the org's usage stream doesn't exist yet.
       wrapper
         .findComponent({ name: "PanelSchemaRenderer" })
         .vm.$emit("error", { message: "Search stream not found: usage" });
       await flushPromises();
-      expect(wrapper.find('[data-test="usage-waiting-for-data"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="usage-waiting-for-data"]').exists()).toBe(true);
       // When data lands the error clears → overlay goes away.
-      wrapper
-        .findComponent({ name: "PanelSchemaRenderer" })
-        .vm.$emit("error", null);
+      wrapper.findComponent({ name: "PanelSchemaRenderer" }).vm.$emit("error", null);
       await flushPromises();
-      expect(wrapper.find('[data-test="usage-waiting-for-data"]').exists()).toBe(
-        false,
-      );
+      expect(wrapper.find('[data-test="usage-waiting-for-data"]').exists()).toBe(false);
     });
 
     it("does not show the waiting graphic for unrelated chart errors", async () => {
@@ -929,9 +912,7 @@ describe("Usage Component", () => {
         .findComponent({ name: "PanelSchemaRenderer" })
         .vm.$emit("error", { message: "SQL parse error near GROUP" });
       await flushPromises();
-      expect(wrapper.find('[data-test="usage-waiting-for-data"]').exists()).toBe(
-        false,
-      );
+      expect(wrapper.find('[data-test="usage-waiting-for-data"]').exists()).toBe(false);
     });
   });
 });

@@ -49,14 +49,10 @@ export interface AgentSignalsQuery {
  * Read pre-computed agent-behavior signals for an org over a window.
  * Hits the small derived `_agent_signals` stream — never raw traces.
  */
-const getAgentSignals = (
-  org_identifier: string,
-  query: AgentSignalsQuery = {},
-) => {
-  return http().get<AgentSignalsResponse>(
-    `/api/${org_identifier}/traces/agent_signals`,
-    { params: query },
-  );
+const getAgentSignals = (org_identifier: string, query: AgentSignalsQuery = {}) => {
+  return http().get<AgentSignalsResponse>(`/api/${org_identifier}/traces/agent_signals`, {
+    params: query,
+  });
 };
 
 export default { getAgentSignals };

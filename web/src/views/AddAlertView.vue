@@ -94,8 +94,7 @@ export default defineComponent({
       if (!destinations.value.length) {
         toast({
           variant: "warning",
-          message:
-            "No destinations found. Please create a destination first.",
+          message: "No destinations found. Please create a destination first.",
         });
         router.push({
           name: "alertList",
@@ -116,4 +115,3 @@ export default defineComponent({
   },
 });
 </script>
-

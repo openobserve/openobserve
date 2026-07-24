@@ -4,7 +4,6 @@ import { describe, it, expect, afterEach, beforeAll, vi } from "vitest";
 import { mount, VueWrapper, config } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 
-
 const i18n = createI18n({
   legacy: false,
   locale: "en",

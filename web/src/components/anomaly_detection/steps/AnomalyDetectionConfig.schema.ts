@@ -64,43 +64,27 @@ const makeAnomalyDetectionConfigBase = (t: Translator) =>
     // Required-ness is mode-conditional (filters mode only) → superRefine below.
     detection_function: z.string(),
     detection_function_field: z.string(),
-    histogram_interval_value: z.coerce
-      .number()
-      .min(1, t("alerts.validation.fieldRequired")),
+    histogram_interval_value: z.coerce.number().min(1, t("alerts.validation.fieldRequired")),
     histogram_interval_unit: z.string(),
-    schedule_interval_value: z.coerce
-      .number()
-      .min(1, t("alerts.validation.fieldRequired")),
+    schedule_interval_value: z.coerce.number().min(1, t("alerts.validation.fieldRequired")),
     schedule_interval_unit: z.string(),
-    detection_window_value: z.coerce
-      .number()
-      .min(1, t("alerts.validation.fieldRequired")),
+    detection_window_value: z.coerce.number().min(1, t("alerts.validation.fieldRequired")),
     detection_window_unit: z.string(),
-    training_window_days: z.coerce
-      .number()
-      .min(1, t("alerts.validation.minimumOneDay")),
+    training_window_days: z.coerce.number().min(1, t("alerts.validation.minimumOneDay")),
     // Type-only (fixed OSelect options).
     retrain_interval_days: z.coerce.number(),
     // ORange dual-handle value; written back to config.threshold_min/threshold.
     threshold_range: z.object({ min: z.coerce.number(), max: z.coerce.number() }),
   });
 
-export type AnomalyDetectionConfigForm = z.infer<
-  ReturnType<typeof makeAnomalyDetectionConfigBase>
->;
+export type AnomalyDetectionConfigForm = z.infer<ReturnType<typeof makeAnomalyDetectionConfigBase>>;
 
 /** True when the SQL aliases a column as the timestamp column (banned — the
  * anomaly query must alias its time column as `time_bucket`). */
-export const hasTimestampAliasInSql = (
-  sql: string,
-  timestampColumn: string,
-): boolean => {
+export const hasTimestampAliasInSql = (sql: string, timestampColumn: string): boolean => {
   if (!sql) return false;
   const escaped = timestampColumn.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(
-    `\\bAS\\s+["'\`]?${escaped}["'\`]?\\s*(?:,|\\s|$)`,
-    "i",
-  ).test(sql);
+  return new RegExp(`\\bAS\\s+["'\`]?${escaped}["'\`]?\\s*(?:,|\\s|$)`, "i").test(sql);
 };
 
 /**
@@ -121,9 +105,7 @@ export const createAnomalyDetectionConfigSchema = (
           path: ["custom_sql"],
           message: t("alerts.anomaly.sqlRequired"),
         });
-      } else if (
-        hasTimestampAliasInSql(value.custom_sql, getTimestampColumn())
-      ) {
+      } else if (hasTimestampAliasInSql(value.custom_sql, getTimestampColumn())) {
         // Timestamp column can't be an alias.
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -143,10 +125,7 @@ export const createAnomalyDetectionConfigSchema = (
           path: ["detection_function"],
           message: t("alerts.validation.detectionFunctionRequired"),
         });
-      } else if (
-        value.detection_function !== "count" &&
-        !value.detection_function_field
-      ) {
+      } else if (value.detection_function !== "count" && !value.detection_function_field) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["detection_function_field"],

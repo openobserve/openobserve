@@ -36,7 +36,6 @@ const i18n = createI18n({
   },
 });
 
-
 describe("DashboardJoinsOption", () => {
   let wrapper: any;
   let store: any;
@@ -62,9 +61,7 @@ describe("DashboardJoinsOption", () => {
   });
 
   it("renders correctly when joins are allowed", () => {
-    expect(
-      wrapper.find('[data-test="dashboard-joins-container"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="dashboard-joins-container"]').exists()).toBe(true);
   });
 
   it("adds a new join when add button is clicked", async () => {
@@ -290,9 +287,7 @@ describe("DashboardJoinsOption", () => {
       },
     });
 
-    expect(
-      defaultWrapper.find('[data-test="dashboard-joins-container"]').exists(),
-    ).toBe(true);
+    expect(defaultWrapper.find('[data-test="dashboard-joins-container"]').exists()).toBe(true);
   });
 
   it("handles stream with special characters", async () => {

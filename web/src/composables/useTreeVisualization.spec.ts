@@ -15,10 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 import { ref } from "vue";
-import {
-  useTreeVisualization,
-  type TreeNode,
-} from "@/composables/useTreeVisualization";
+import { useTreeVisualization, type TreeNode } from "@/composables/useTreeVisualization";
 
 const makeNode = (name: string, metadata: Record<string, any> = {}): TreeNode => ({
   id: name,
@@ -34,9 +31,7 @@ const getLabelFn = (nodeType: "service" | "pattern") =>
 describe("useTreeVisualization", () => {
   describe("getNodeLabel", () => {
     it("should truncate the name with an ellipsis when it exceeds the label limit", () => {
-      const label = getLabelFn("pattern")(
-        makeNode("oteldemo.RecommendationService"),
-      );
+      const label = getLabelFn("pattern")(makeNode("oteldemo.RecommendationService"));
 
       expect(label).toContain("{name|oteldemo.Recommendation…}");
       expect(label).not.toContain("RecommendationService");
@@ -50,9 +45,7 @@ describe("useTreeVisualization", () => {
     });
 
     it("should truncate long names when node type is service", () => {
-      const label = getLabelFn("service")(
-        makeNode("oteldemo.ProductCatalogService"),
-      );
+      const label = getLabelFn("service")(makeNode("oteldemo.ProductCatalogService"));
 
       expect(label).toContain("{name|oteldemo.ProductCatalog…}");
     });

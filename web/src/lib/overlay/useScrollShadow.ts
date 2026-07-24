@@ -16,8 +16,7 @@ export function useScrollShadow(elRef: Ref<HTMLElement | null>) {
       return;
     }
     canScrollUp.value = el.scrollTop > 0;
-    canScrollDown.value =
-      el.scrollTop + el.clientHeight < el.scrollHeight - 1;
+    canScrollDown.value = el.scrollTop + el.clientHeight < el.scrollHeight - 1;
   }
 
   let resizeObserver: ResizeObserver | null = null;

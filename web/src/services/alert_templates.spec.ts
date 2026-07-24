@@ -60,7 +60,7 @@ describe("alert_templates service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/${params.org_identifier}/alerts/templates`,
-        params.data
+        params.data,
       );
     });
 
@@ -77,7 +77,7 @@ describe("alert_templates service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/${params.org_identifier}/alerts/templates`,
-        params.data
+        params.data,
       );
     });
   });
@@ -99,7 +99,7 @@ describe("alert_templates service", () => {
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/${params.org_identifier}/alerts/templates/${encodeURIComponent(params.template_name)}`,
-        params.data
+        params.data,
       );
     });
 
@@ -116,7 +116,7 @@ describe("alert_templates service", () => {
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/${params.org_identifier}/alerts/templates/${encodeURIComponent(params.template_name)}`,
-        params.data
+        params.data,
       );
     });
 
@@ -133,7 +133,7 @@ describe("alert_templates service", () => {
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/${params.org_identifier}/alerts/templates/my%20slack%20template`,
-        params.data
+        params.data,
       );
     });
   });
@@ -147,7 +147,7 @@ describe("alert_templates service", () => {
       await template.list(params);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/alerts/templates`
+        `/api/${params.org_identifier}/alerts/templates`,
       );
     });
 
@@ -166,7 +166,7 @@ describe("alert_templates service", () => {
       await template.list(params);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/alerts/templates`
+        `/api/${params.org_identifier}/alerts/templates`,
       );
     });
   });
@@ -183,7 +183,7 @@ describe("alert_templates service", () => {
       await template.get_by_name(params);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/alerts/templates/${encodeURIComponent(params.template_name)}`
+        `/api/${params.org_identifier}/alerts/templates/${encodeURIComponent(params.template_name)}`,
       );
     });
 
@@ -193,12 +193,14 @@ describe("alert_templates service", () => {
         template_name: "template with spaces & special chars",
       };
 
-      mockHttpInstance.get.mockResolvedValue({ data: { name: "template with spaces & special chars" } });
+      mockHttpInstance.get.mockResolvedValue({
+        data: { name: "template with spaces & special chars" },
+      });
 
       await template.get_by_name(params);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/alerts/templates/${encodeURIComponent(params.template_name)}`
+        `/api/${params.org_identifier}/alerts/templates/${encodeURIComponent(params.template_name)}`,
       );
     });
   });
@@ -215,7 +217,7 @@ describe("alert_templates service", () => {
       await template.delete(params);
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/alerts/templates/${encodeURIComponent(params.template_name)}`
+        `/api/${params.org_identifier}/alerts/templates/${encodeURIComponent(params.template_name)}`,
       );
     });
 
@@ -230,7 +232,7 @@ describe("alert_templates service", () => {
       await template.delete(params);
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/alerts/templates/my%20email%20template`
+        `/api/${params.org_identifier}/alerts/templates/my%20email%20template`,
       );
     });
   });
@@ -246,7 +248,7 @@ describe("alert_templates service", () => {
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
         `/api/${org_identifier}/alerts/templates/bulk`,
-        { data }
+        { data },
       );
     });
 
@@ -260,7 +262,7 @@ describe("alert_templates service", () => {
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
         `/api/${org_identifier}/alerts/templates/bulk`,
-        { data }
+        { data },
       );
     });
 
@@ -274,7 +276,7 @@ describe("alert_templates service", () => {
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
         `/api/${org_identifier}/alerts/templates/bulk`,
-        { data }
+        { data },
       );
     });
   });
@@ -295,7 +297,7 @@ describe("alert_templates service", () => {
       await template.get_system_templates(params);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/alerts/templates/system/prebuilt`
+        `/api/${params.org_identifier}/alerts/templates/system/prebuilt`,
       );
     });
 
@@ -307,7 +309,7 @@ describe("alert_templates service", () => {
       await template.get_system_templates(params);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/alerts/templates/system/prebuilt`
+        `/api/${params.org_identifier}/alerts/templates/system/prebuilt`,
       );
     });
   });
@@ -318,7 +320,7 @@ describe("alert_templates service", () => {
       mockHttpInstance.post.mockRejectedValue(error);
 
       await expect(
-        template.create({ org_identifier: "org123", template_name: "t1", data: {} })
+        template.create({ org_identifier: "org123", template_name: "t1", data: {} }),
       ).rejects.toThrow("Validation error");
     });
 
@@ -327,7 +329,7 @@ describe("alert_templates service", () => {
       mockHttpInstance.put.mockRejectedValue(error);
 
       await expect(
-        template.update({ org_identifier: "org123", template_name: "t1", data: {} })
+        template.update({ org_identifier: "org123", template_name: "t1", data: {} }),
       ).rejects.toThrow("Not found");
     });
 
@@ -335,9 +337,7 @@ describe("alert_templates service", () => {
       const error = new Error("Unauthorized");
       mockHttpInstance.get.mockRejectedValue(error);
 
-      await expect(
-        template.list({ org_identifier: "org123" })
-      ).rejects.toThrow("Unauthorized");
+      await expect(template.list({ org_identifier: "org123" })).rejects.toThrow("Unauthorized");
     });
 
     it("should propagate errors from delete", async () => {
@@ -345,7 +345,7 @@ describe("alert_templates service", () => {
       mockHttpInstance.delete.mockRejectedValue(error);
 
       await expect(
-        template.delete({ org_identifier: "org123", template_name: "t1" })
+        template.delete({ org_identifier: "org123", template_name: "t1" }),
       ).rejects.toThrow("Forbidden");
     });
 
@@ -353,9 +353,9 @@ describe("alert_templates service", () => {
       const error = new Error("Server error");
       mockHttpInstance.get.mockRejectedValue(error);
 
-      await expect(
-        template.get_system_templates({ org_identifier: "org123" })
-      ).rejects.toThrow("Server error");
+      await expect(template.get_system_templates({ org_identifier: "org123" })).rejects.toThrow(
+        "Server error",
+      );
     });
   });
 });

@@ -51,9 +51,7 @@ vi.mock("@/services/reports", () => ({
 
 vi.mock("@/services/short_url", () => ({
   default: {
-    create: vi
-      .fn()
-      .mockResolvedValue({ data: { short_url: "http://short.url" } }),
+    create: vi.fn().mockResolvedValue({ data: { short_url: "http://short.url" } }),
   },
 }));
 
@@ -190,8 +188,7 @@ vi.mock("@/composables/useNotifications", () => ({
   default: () => ({
     showPositiveNotification: mockShowPositiveNotification,
     showErrorNotification: mockShowErrorNotification,
-    showConfictErrorNotificationWithRefreshBtn:
-      mockShowConflictErrorNotificationWithRefreshBtn,
+    showConfictErrorNotificationWithRefreshBtn: mockShowConflictErrorNotificationWithRefreshBtn,
   }),
 }));
 
@@ -229,7 +226,6 @@ vi.mock("moment-timezone", () => ({
 import ViewDashboard from "@/views/Dashboards/ViewDashboard.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-
 
 describe("ViewDashboard", () => {
   let wrapper: any;
@@ -584,10 +580,7 @@ describe("ViewDashboard", () => {
 
       await wrapper.vm.printDashboard();
 
-      expect(global.mockStoreDispatch).toHaveBeenCalledWith(
-        "setPrintMode",
-        !initialPrintMode,
-      );
+      expect(global.mockStoreDispatch).toHaveBeenCalledWith("setPrintMode", !initialPrintMode);
       // Check that router replace was called (query parameters are handled by the component)
       expect(global.mockRouterReplace).toHaveBeenCalled();
     });
@@ -601,10 +594,7 @@ describe("ViewDashboard", () => {
 
       // Manually trigger the method to test print mode functionality
       await wrapper.vm.printDashboard();
-      expect(global.mockStoreDispatch).toHaveBeenCalledWith(
-        "setPrintMode",
-        true,
-      );
+      expect(global.mockStoreDispatch).toHaveBeenCalledWith("setPrintMode", true);
     });
 
     it("should show correct print button icon based on print mode", async () => {
@@ -970,9 +960,7 @@ describe("ViewDashboard", () => {
 
       const settingsStub = wrapper.findComponent({ name: "DashboardSettings" });
       if (settingsStub.exists()) {
-        const loadSpy = vi
-          .spyOn(wrapper.vm, "loadDashboard")
-          .mockResolvedValue(undefined);
+        const loadSpy = vi.spyOn(wrapper.vm, "loadDashboard").mockResolvedValue(undefined);
 
         await settingsStub.vm.$emit("refresh");
         await flushPromises();
@@ -1340,9 +1328,7 @@ describe("ViewDashboard", () => {
       await wrapper.vm.$nextTick();
 
       // Check if title is set in component data
-      expect(wrapper.vm.currentDashboardData.data.title).toBe(
-        "Test Dashboard Title",
-      );
+      expect(wrapper.vm.currentDashboardData.data.title).toBe("Test Dashboard Title");
     });
 
     it("should show correct folder name", async () => {

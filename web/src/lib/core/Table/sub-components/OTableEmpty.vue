@@ -29,10 +29,7 @@ defineSlots<{
 <template>
   <div
     data-test="o2-table-empty"
-    :class="[
-      'flex flex-1 flex-col items-center justify-center',
-      floor ? 'min-h-75' : '',
-    ]"
+    :class="['flex flex-1 flex-col items-center justify-center', floor ? 'min-h-75' : '']"
   >
     <slot>
       <OEmptyState size="inline" :title="message ?? t('search.noData')" />

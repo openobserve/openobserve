@@ -16,264 +16,272 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="report-list-page" class="h-full">
-    <OPageLayout bleed
+    <OPageLayout
+      bleed
       :title="t('reports.header')"
       title-data-test="report-list-title"
       icon="description"
       :subtitle="t('reports.subtitle')"
     >
-          <template #actions>
-            <OButton
-              data-test="report-list-add-report-btn"
-              variant="primary"
-              size="sm"
-              @click="createNewReport"
+      <template #actions>
+        <OButton
+          data-test="report-list-add-report-btn"
+          variant="primary"
+          size="sm"
+          @click="createNewReport"
+        >
+          {{ t(`reports.add`) }}
+        </OButton>
+      </template>
+
+      <!-- Folder rail (fixed width) + table — matches the Alerts layout. -->
+      <div data-test="report-list-splitter" class="report-list-table flex min-h-0 flex-1">
+        <!-- Left: folder list -->
+        <div class="w-rail h-full shrink-0">
+          <div class="h-full">
+            <FolderList type="reports" @update:activeFolderId="updateActiveFolderId" />
+          </div>
+        </div>
+
+        <!-- Right: report table -->
+        <div class="h-full min-w-0 flex-1">
+          <div class="bg-card-glass-bg h-full">
+            <OTable
+              data-test="report-list-table"
+              :data="visibleRows"
+              :columns="columns"
+              row-key="report_id"
+              :frame="false"
+              :loading="isLoadingReports"
+              pagination="client"
+              selection="multiple"
+              v-model:selected-ids="selectedReportIds"
+              class="h-full w-full"
+              :show-global-filter="false"
+              :enable-column-resize="true"
+              :persist-columns="true"
+              :default-columns="false"
+              show-index
+              table-id="reports-report-list"
             >
-              {{ t(`reports.add`) }}
-            </OButton>
-          </template>
-
-    <!-- Folder rail (fixed width) + table — matches the Alerts layout. -->
-    <div
-      data-test="report-list-splitter"
-      class="report-list-table flex-1 flex min-h-0"
-    >
-      <!-- Left: folder list -->
-      <div class="shrink-0 h-full w-rail">
-        <div class="h-full">
-          <FolderList
-            type="reports"
-            @update:activeFolderId="updateActiveFolderId"
-          />
-        </div>
-      </div>
-
-      <!-- Right: report table -->
-      <div class="flex-1 min-w-0 h-full">
-        <div class="h-full bg-card-glass-bg">
-              <OTable
-                data-test="report-list-table"
-                :data="visibleRows"
-                :columns="columns"
-                row-key="report_id"
-                :frame="false"
-                :loading="isLoadingReports"
-                pagination="client"
-                selection="multiple"
-                v-model:selected-ids="selectedReportIds"
-                class="w-full h-full"
-                :show-global-filter="false"
-                :enable-column-resize="true"
-                :persist-columns="true"
-                :default-columns="false"
-                show-index
-                table-id="reports-report-list"
-              >
-                <!-- Toolbar: Scheduled/Cached tabs + search (inline folder scope) + refresh -->
-                <template #toolbar>
-                  <div class="flex items-center gap-2 w-full">
-                    <div class="app-tabs-container">
-                      <app-tabs
-                        class="tabs-selection-container"
-                        :tabs="tabs"
-                        v-model:active-tab="activeTab"
-                        @update:active-tab="() => { invalidateFolderCache(activeFolderId); loadReports(activeFolderId); }"
-                      />
-                    </div>
-                    <div class="flex-1 min-w-0">
-                      <OInput
-                        v-model="dynamicQueryModel"
-                        :placeholder="searchAcrossFolders ? t('dashboard.searchAcross') : t('reports.search')"
-                        :clearable="searchAcrossFolders"
-                        @clear="clearSearch"
-                        data-test="report-list-search-input"
-                        class="w-full"
-                      >
-                        <template #icon-left>
-                          <OIcon name="search" size="sm" />
-                        </template>
-                        <template #icon-right>
-                          <OToggleGroup
-                            :model-value="searchAcrossFolders ? 'all' : 'this'"
-                            type="single"
-                            class="self-center mr-1"
-                            @update:model-value="(v) => (searchAcrossFolders = v === 'all')"
+              <!-- Toolbar: Scheduled/Cached tabs + search (inline folder scope) + refresh -->
+              <template #toolbar>
+                <div class="flex w-full items-center gap-2">
+                  <div class="app-tabs-container">
+                    <AppTabs
+                      class="tabs-selection-container"
+                      :tabs="tabs"
+                      v-model:active-tab="activeTab"
+                      @update:active-tab="
+                        () => {
+                          invalidateFolderCache(activeFolderId);
+                          loadReports(activeFolderId);
+                        }
+                      "
+                    />
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <OInput
+                      v-model="dynamicQueryModel"
+                      :placeholder="
+                        searchAcrossFolders ? t('dashboard.searchAcross') : t('reports.search')
+                      "
+                      :clearable="searchAcrossFolders"
+                      @clear="clearSearch"
+                      data-test="report-list-search-input"
+                      class="w-full"
+                    >
+                      <template #icon-left>
+                        <OIcon name="search" size="sm" />
+                      </template>
+                      <template #icon-right>
+                        <OToggleGroup
+                          :model-value="searchAcrossFolders ? 'all' : 'this'"
+                          type="single"
+                          class="mr-1 self-center"
+                          @update:model-value="(v) => (searchAcrossFolders = v === 'all')"
+                        >
+                          <OToggleGroupItem
+                            value="this"
+                            size="xs"
+                            icon-left="folder-outline"
+                            data-test="report-list-search-scope-current"
+                            title="Search only this folder"
+                            >{{ t("reports.searchThisFolder") }}</OToggleGroupItem
                           >
-                            <OToggleGroupItem
-                              value="this"
-                              size="xs"
-                              icon-left="folder-outline"
-                              data-test="report-list-search-scope-current"
-                              title="Search only this folder"
-                            >{{ t('reports.searchThisFolder') }}</OToggleGroupItem>
-                            <OToggleGroupItem
-                              value="all"
-                              size="xs"
-                              icon-left="search"
-                              data-test="report-list-search-across-folders-toggle"
-                              title="Search across all folders"
-                            >{{ t('reports.searchAllFolders') }}</OToggleGroupItem>
-                          </OToggleGroup>
-                        </template>
-                      </OInput>
+                          <OToggleGroupItem
+                            value="all"
+                            size="xs"
+                            icon-left="search"
+                            data-test="report-list-search-across-folders-toggle"
+                            title="Search across all folders"
+                            >{{ t("reports.searchAllFolders") }}</OToggleGroupItem
+                          >
+                        </OToggleGroup>
+                      </template>
+                    </OInput>
+                  </div>
+                </div>
+              </template>
+              <template #toolbar-trailing>
+                <OButton
+                  variant="outline"
+                  size="icon-sm"
+                  icon-left="refresh"
+                  :loading="isLoadingReports"
+                  data-test="report-list-refresh-btn"
+                  @click="
+                    () => {
+                      invalidateFolderCache(activeFolderId);
+                      loadReports(activeFolderId);
+                    }
+                  "
+                >
+                  <OTooltip
+                    side="bottom"
+                    :content="t('reports.reloadReports')"
+                    shortcut-id="reportsRefresh"
+                  />
+                </OButton>
+              </template>
+              <template #empty>
+                <OEmptyState
+                  size="hero"
+                  preset="no-reports"
+                  :filtered="!!(filterQuery || searchQuery)"
+                  @action="
+                    (id) =>
+                      id === 'clear-filters'
+                        ? ((filterQuery = ''), (searchQuery = ''))
+                        : createNewReport()
+                  "
+                />
+              </template>
+
+              <!-- Name column: badges for type/preview -->
+              <template #cell-name="{ row }">
+                <span :data-test="`report-list-name-cell-${row.name}`">{{ row.name }}</span>
+                <OTag
+                  v-if="row.dashboards?.[0]?.report_type === 'png'"
+                  type="reportTag"
+                  value="png"
+                  class="ml-1"
+                />
+                <OTag v-if="row.imagePreview" type="reportTag" value="preview" class="ml-1" />
+              </template>
+
+              <!-- Owner column -->
+              <template #cell-owner="{ row }">
+                <OUserCell :value="row.owner" />
+              </template>
+
+              <!-- Folder column -->
+              <template #cell-folder_name="{ row }">
+                {{ row.folder_name || "default" }}
+              </template>
+
+              <!-- Last triggered timestamp -->
+              <template #cell-last_triggered_at="{ row }">
+                <OTimeCell
+                  :value="row.last_triggered_at_raw"
+                  unit="us"
+                  mode="absolute"
+                  :timezone="store.state.timezone"
+                  empty-label="Never"
+                />
+              </template>
+
+              <!-- Actions column -->
+              <template #cell-actions="{ row }">
+                <!-- Enable/disable toggle -->
+                <div
+                  v-if="reportsStateLoadingMap[row.report_id]"
+                  data-test="report-list-toggle-report-state-loader"
+                  style="display: inline-block; width: 33.14px"
+                  class="flex h-auto items-center justify-center"
+                >
+                  <OSpinner size="xs" />
+                </div>
+                <OButton
+                  v-else
+                  :data-test="`report-list-${row.name}-pause-start-report`"
+                  :data-row-action="row.enabled ? 'pause' : 'resume'"
+                  :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
+                  size="icon-sm"
+                  :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                  :title="row.enabled ? t('alerts.pause') : t('alerts.start')"
+                  @click="toggleReportState(row)"
+                />
+
+                <!-- Edit -->
+                <OButton
+                  :data-test="`report-list-${row.name}-edit-report`"
+                  data-row-action="edit"
+                  icon-left="edit"
+                  variant="ghost"
+                  size="icon-sm"
+                  :title="t('alerts.edit')"
+                  @click="editReport(row)"
+                />
+
+                <!-- Move to folder -->
+                <OButton
+                  :data-test="`report-list-${row.name}-move-report`"
+                  icon-left="drive-file-move"
+                  variant="ghost"
+                  size="icon-sm"
+                  :title="t('reports.moveToFolder')"
+                  @click="openMoveDialog(row)"
+                />
+
+                <!-- Delete -->
+                <OButton
+                  :data-test="`report-list-${row.name}-delete-report`"
+                  data-row-action="delete"
+                  icon-left="delete"
+                  variant="ghost-destructive"
+                  size="icon-sm"
+                  :title="t('alerts.delete')"
+                  @click="confirmDeleteReport(row)"
+                />
+              </template>
+
+              <!-- Table footer: pagination + bulk actions -->
+              <template #bottom>
+                <div class="flex h-12 w-full items-center justify-between">
+                  <!-- Left: count + action buttons grouped together -->
+                  <div class="flex items-center gap-2">
+                    <div class="flex items-center text-xs font-normal whitespace-nowrap">
+                      {{ resultTotal }} {{ t("reports.header") }}
                     </div>
+                    <OButton
+                      v-if="selectedReports.length > 0"
+                      data-test="report-list-move-reports-btn"
+                      icon-left="drive-file-move"
+                      variant="outline"
+                      size="sm-action"
+                      @click="moveMultipleReports"
+                    >
+                      {{ t("common.move") }}
+                    </OButton>
+                    <OButton
+                      v-if="selectedReports.length > 0"
+                      data-test="report-list-delete-reports-btn"
+                      icon-left="delete"
+                      variant="outline-destructive"
+                      size="sm-action"
+                      :loading="bulkDeleteLoading"
+                      @click="openBulkDeleteDialog"
+                    >
+                      {{ t("common.delete") }}
+                    </OButton>
                   </div>
-                </template>
-                <template #toolbar-trailing>
-                  <OButton
-                    variant="outline"
-                    size="icon-sm"
-                    icon-left="refresh"
-                    :loading="isLoadingReports"
-                    data-test="report-list-refresh-btn"
-                    @click="() => { invalidateFolderCache(activeFolderId); loadReports(activeFolderId); }"
-                  >
-                    <OTooltip side="bottom" :content="t('reports.reloadReports')" shortcut-id="reportsRefresh" />
-                  </OButton>
-                </template>
-                <template #empty>
-                  <OEmptyState
-                    size="hero"
-                    preset="no-reports"
-                    :filtered="!!(filterQuery || searchQuery)"
-                    @action="
-                      (id) =>
-                        id === 'clear-filters'
-                          ? ((filterQuery = ''), (searchQuery = ''))
-                          : createNewReport()
-                    "
-                  />
-                </template>
-
-                <!-- Name column: badges for type/preview -->
-                <template #cell-name="{ row }">
-                  <span :data-test="`report-list-name-cell-${row.name}`">{{ row.name }}</span>
-                  <OTag
-                    v-if="row.dashboards?.[0]?.report_type === 'png'"
-                    type="reportTag"
-                    value="png"
-                    class="ml-1"
-                  />
-                  <OTag
-                    v-if="row.imagePreview"
-                    type="reportTag"
-                    value="preview"
-                    class="ml-1"
-                  />
-                </template>
-
-                <!-- Owner column -->
-                <template #cell-owner="{ row }">
-                  <OUserCell :value="row.owner" />
-                </template>
-
-                <!-- Folder column -->
-                <template #cell-folder_name="{ row }">
-                  {{ row.folder_name || "default" }}
-                </template>
-
-                <!-- Last triggered timestamp -->
-                <template #cell-last_triggered_at="{ row }">
-                  <OTimeCell
-                    :value="row.last_triggered_at_raw"
-                    unit="us"
-                    mode="absolute"
-                    :timezone="store.state.timezone"
-                    empty-label="Never"
-                  />
-                </template>
-
-                <!-- Actions column -->
-                <template #cell-actions="{ row }">
-                  <!-- Enable/disable toggle -->
-                  <div
-                    v-if="reportsStateLoadingMap[row.report_id]"
-                    data-test="report-list-toggle-report-state-loader"
-                    style="display: inline-block; width: 33.14px"
-                    class="flex justify-center items-center h-auto"
-                  >
-                    <OSpinner size="xs" />
-                  </div>
-                  <OButton
-                    v-else
-                    :data-test="`report-list-${row.name}-pause-start-report`"
-                    :data-row-action="row.enabled ? 'pause' : 'resume'"
-                    :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
-                    size="icon-sm"
-                    :icon-left="row.enabled ? 'pause' : 'play-arrow'"
-                    :title="row.enabled ? t('alerts.pause') : t('alerts.start')"
-                    @click="toggleReportState(row)"
-                  />
-
-                  <!-- Edit -->
-                  <OButton
-                    :data-test="`report-list-${row.name}-edit-report`"
-                    data-row-action="edit"
-                    icon-left="edit"
-                    variant="ghost"
-                    size="icon-sm"
-                    :title="t('alerts.edit')"
-                    @click="editReport(row)"
-                  />
-
-                  <!-- Move to folder -->
-                  <OButton
-                    :data-test="`report-list-${row.name}-move-report`"
-                    icon-left="drive-file-move"
-                    variant="ghost"
-                    size="icon-sm"
-                    :title="t('reports.moveToFolder')"
-                    @click="openMoveDialog(row)"
-                  />
-
-                  <!-- Delete -->
-                  <OButton
-                    :data-test="`report-list-${row.name}-delete-report`"
-                    data-row-action="delete"
-                    icon-left="delete"
-                    variant="ghost-destructive"
-                    size="icon-sm"
-                    :title="t('alerts.delete')"
-                    @click="confirmDeleteReport(row)"
-                  />
-                </template>
-
-                <!-- Table footer: pagination + bulk actions -->
-                <template #bottom>
-                  <div class="flex items-center justify-between w-full h-12">
-                    <!-- Left: count + action buttons grouped together -->
-                    <div class="flex items-center gap-2">
-                      <div class="text-xs font-normal flex items-center whitespace-nowrap">
-                        {{ resultTotal }} {{ t("reports.header") }}
-                      </div>
-                      <OButton
-                        v-if="selectedReports.length > 0"
-                        data-test="report-list-move-reports-btn"
-                        icon-left="drive-file-move"
-                        variant="outline"
-                        size="sm-action"
-                        @click="moveMultipleReports"
-                      >
-                        {{ t('common.move') }}
-                      </OButton>
-                      <OButton
-                        v-if="selectedReports.length > 0"
-                        data-test="report-list-delete-reports-btn"
-                        icon-left="delete"
-                        variant="outline-destructive"
-                        size="sm-action"
-                        :loading="bulkDeleteLoading"
-                        @click="openBulkDeleteDialog"
-                      >
-                        {{ t('common.delete') }}
-                      </OButton>
-                    </div>
-                  </div>
-                </template>
-              </OTable>
+                </div>
+              </template>
+            </OTable>
+          </div>
         </div>
       </div>
-    </div>
     </OPageLayout>
 
     <!-- Single delete confirm -->
@@ -307,7 +315,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-
 import { ref, onBeforeMount, reactive, computed, watch, defineAsyncComponent } from "vue";
 import type { Ref } from "vue";
 import { useStore } from "vuex";
@@ -327,10 +334,10 @@ import { debounce } from "lodash-es";
 import AppTabs from "@/components/common/AppTabs.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { getFoldersListByType } from "@/utils/commons";
-import OButton from '@/lib/core/Button/OButton.vue';
-import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
-import OInput from '@/lib/forms/Input/OInput.vue';
-import OIcon from '@/lib/core/Icon/OIcon.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -349,11 +356,8 @@ const router = useRouter();
 const { track } = useReo();
 const store = useStore();
 
-
 // ── Folder state ──────────────────────────────────────────────────────────────
-const activeFolderId = ref<string>(
-  (router.currentRoute.value.query.folder as string) ?? "default",
-);
+const activeFolderId = ref<string>((router.currentRoute.value.query.folder as string) ?? "default");
 const searchAcrossFolders = ref(false);
 
 const showMoveDialog = ref(false);
@@ -372,7 +376,9 @@ const searchQuery = ref(""); // API search across all folders
 const cachedFolderReports = ref<any[]>([]); // current folder's reports before cross-folder search
 
 const dynamicQueryModel = computed({
-  get() { return searchAcrossFolders.value ? searchQuery.value : filterQuery.value; },
+  get() {
+    return searchAcrossFolders.value ? searchQuery.value : filterQuery.value;
+  },
   set(value: string) {
     if (searchAcrossFolders.value) searchQuery.value = value;
     else filterQuery.value = value;
@@ -381,34 +387,82 @@ const dynamicQueryModel = computed({
 
 const selectedReportIds = ref<string[]>([]);
 const selectedReports = computed({
-  get: () => (reportsTableRows.value || []).filter((row: any) => selectedReportIds.value.includes(row.report_id)),
-  set: (val) => { selectedReportIds.value = val.map((row: any) => row.report_id); },
+  get: () =>
+    (reportsTableRows.value || []).filter((row: any) =>
+      selectedReportIds.value.includes(row.report_id),
+    ),
+  set: (val) => {
+    selectedReportIds.value = val.map((row: any) => row.report_id);
+  },
 });
 const reportsStateLoadingMap: Ref<{ [key: string]: boolean }> = ref({});
 
 const tabs = reactive([
   { label: t("reports.scheduled"), value: "shared", icon: "schedule" },
-  { label: t("reports.cached"),    value: "cached", icon: "database" },
+  { label: t("reports.cached"), value: "cached", icon: "database" },
 ]);
 
 const resultTotal = ref<number>(0);
 
 const deleteDialog = ref({
-  show:    false,
-  title:   "Delete Report",
+  show: false,
+  title: "Delete Report",
   message: "Are you sure you want to delete report?",
-  data:    null as any, // { report_id, name }
+  data: null as any, // { report_id, name }
 });
 const confirmBulkDelete = ref<boolean>(false);
 const bulkDeleteLoading = ref<boolean>(false);
 
 const columns = computed<OTableColumnDef[]>(() => {
   const base: OTableColumnDef[] = [
-    { id: "name", header: t("alerts.name"), accessorKey: "name", cell: " ", sortable: true, resizable: true, hideable: true, size: COL.name, minSize: 160, meta: { align: "left", flex: true } },
-    { id: "owner", header: t("alerts.owner"), accessorKey: "owner", sortable: true, resizable: true, hideable: true, size: COL.owner },
-    { id: "description", header: t("alerts.description"), accessorKey: "description", sortable: false, resizable: true, hideable: true, size: COL.description, meta: { align: "left" } },
-    { id: "last_triggered_at", header: t("alerts.lastTriggered"), accessorKey: "last_triggered_at", sortable: true, resizable: true, hideable: true, size: COL.dateAbsolute, meta: { align: "left" } },
-    { id: "actions", header: t("alerts.actions"), isAction: true, size: 150, meta: { align: "center", cellClass: "actions-column", actionCount: 4 } },
+    {
+      id: "name",
+      header: t("alerts.name"),
+      accessorKey: "name",
+      cell: " ",
+      sortable: true,
+      resizable: true,
+      hideable: true,
+      size: COL.name,
+      minSize: 160,
+      meta: { align: "left", flex: true },
+    },
+    {
+      id: "owner",
+      header: t("alerts.owner"),
+      accessorKey: "owner",
+      sortable: true,
+      resizable: true,
+      hideable: true,
+      size: COL.owner,
+    },
+    {
+      id: "description",
+      header: t("alerts.description"),
+      accessorKey: "description",
+      sortable: false,
+      resizable: true,
+      hideable: true,
+      size: COL.description,
+      meta: { align: "left" },
+    },
+    {
+      id: "last_triggered_at",
+      header: t("alerts.lastTriggered"),
+      accessorKey: "last_triggered_at",
+      sortable: true,
+      resizable: true,
+      hideable: true,
+      size: COL.dateAbsolute,
+      meta: { align: "left" },
+    },
+    {
+      id: "actions",
+      header: t("alerts.actions"),
+      isAction: true,
+      size: 150,
+      meta: { align: "center", cellClass: "actions-column", actionCount: 4 },
+    },
   ];
 
   if (searchAcrossFolders.value && searchQuery.value !== "") {
@@ -610,7 +664,13 @@ const visibleRows = computed(() => {
   if (!filterQuery.value || searchAcrossFolders.value) return reportsTableRows.value ?? [];
   return filterData(reportsTableRows.value ?? [], filterQuery.value);
 });
-watch(visibleRows, (rows) => { resultTotal.value = rows.length; }, { immediate: true });
+watch(
+  visibleRows,
+  (rows) => {
+    resultTotal.value = rows.length;
+  },
+  { immediate: true },
+);
 
 // ── Actions ───────────────────────────────────────────────────────────────────
 const createNewReport = () => {
@@ -639,7 +699,11 @@ const editReport = (report: any) => {
 // Toggle enable/disable — uses report_id (v2)
 const toggleReportState = (report: any) => {
   const state = report.enabled ? "Stopping" : "Starting";
-  const dismiss = toast({ variant: "loading", message: `${state} report "${report.name}"`, timeout: 0 });
+  const dismiss = toast({
+    variant: "loading",
+    message: `${state} report "${report.name}"`,
+    timeout: 0,
+  });
   reportsStateLoadingMap.value[report.report_id] = true;
 
   reports
@@ -706,7 +770,9 @@ const deleteReport = () => {
 };
 
 // Bulk delete — uses report_ids (v2)
-const openBulkDeleteDialog = () => { confirmBulkDelete.value = true; };
+const openBulkDeleteDialog = () => {
+  confirmBulkDelete.value = true;
+};
 
 const bulkDeleteReports = async () => {
   bulkDeleteLoading.value = true;
@@ -727,7 +793,11 @@ const bulkDeleteReports = async () => {
 
     const { successful = [], unsuccessful = [] } = response.data ?? {};
     if (unsuccessful.length && successful.length) {
-      toast({ variant: "warning", message: `${successful.length} deleted, ${unsuccessful.length} failed`, timeout: 5000 });
+      toast({
+        variant: "warning",
+        message: `${successful.length} deleted, ${unsuccessful.length} failed`,
+        timeout: 5000,
+      });
     } else if (unsuccessful.length) {
       toast({ variant: "error", message: `Failed to delete ${unsuccessful.length} report(s)` });
     } else {
@@ -781,7 +851,9 @@ const onMoveUpdated = async (fromFolder: string, toFolder: string) => {
 useShortcuts([
   {
     id: "reportsAdd",
-    handler: () => { if (!isInputFocused()) createNewReport(); },
+    handler: () => {
+      if (!isInputFocused()) createNewReport();
+    },
   },
   {
     id: "reportsRefresh",
@@ -801,5 +873,3 @@ useShortcuts([
   },
 ]);
 </script>
-
-

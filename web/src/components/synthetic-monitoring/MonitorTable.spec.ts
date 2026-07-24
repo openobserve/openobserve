@@ -73,7 +73,7 @@ const OButtonStub = {
   inheritAttrs: false,
   methods: {
     onClick(e: MouseEvent) {
-      (this as any).$emit('click', e);
+      (this as any).$emit("click", e);
     },
   },
 };
@@ -121,8 +121,9 @@ const ODropdownSeparatorStub = {
 
 const OTooltipStub = {
   name: "OTooltipStub",
-  template: '<div class="otooltip-stub" />',
-  props: ["content", "side", "contentClass"],
+  template:
+    '<div class="otooltip-stub" :data-content="content" :data-content-class="contentClass"><slot /></div>',
+  props: ["content", "side", "contentClass", "delay"],
 };
 
 const OEmptyStateStub = {
@@ -208,9 +209,7 @@ describe("MonitorTable", () => {
 
     it("should render loading state indicator when loading is true", () => {
       wrapper = mountMonitorTable({ loading: true });
-      expect(
-        wrapper.find('[data-test="otable-loading-state"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="otable-loading-state"]').exists()).toBe(true);
     });
 
     it("should render correct columns for all mode", () => {
@@ -318,30 +317,22 @@ describe("MonitorTable", () => {
       expect(pauseBtn.exists()).toBe(true);
       await pauseBtn.trigger("click");
       expect(wrapper.emitted("toggle-enabled")).toHaveLength(1);
-      expect(wrapper.emitted("toggle-enabled")![0]).toEqual([
-        mockMonitorList[0],
-      ]);
+      expect(wrapper.emitted("toggle-enabled")![0]).toEqual([mockMonitorList[0]]);
     });
 
     it("should emit toggle-enabled with row data when enable button is clicked for disabled row", async () => {
       wrapper = mountMonitorTable();
       // Fourth row is mockMonitorDisabled which has enabled: false
-      const enableBtns = wrapper.findAll(
-        '[data-test="monitor-table-enable-btn"]',
-      );
+      const enableBtns = wrapper.findAll('[data-test="monitor-table-enable-btn"]');
       expect(enableBtns.length).toBeGreaterThan(0);
       await enableBtns[enableBtns.length - 1].trigger("click");
       expect(wrapper.emitted("toggle-enabled")).toHaveLength(1);
-      expect(wrapper.emitted("toggle-enabled")![0]).toEqual([
-        mockMonitorList[3],
-      ]);
+      expect(wrapper.emitted("toggle-enabled")![0]).toEqual([mockMonitorList[3]]);
     });
 
     it("should emit duplicate with row data when duplicate button is clicked", async () => {
       wrapper = mountMonitorTable();
-      const duplicateBtn = wrapper.find(
-        '[data-test="monitor-table-duplicate-btn"]',
-      );
+      const duplicateBtn = wrapper.find('[data-test="monitor-table-duplicate-btn"]');
       expect(duplicateBtn.exists()).toBe(true);
       await duplicateBtn.trigger("click");
       expect(wrapper.emitted("duplicate")).toHaveLength(1);
@@ -407,9 +398,7 @@ describe("MonitorTable", () => {
       const otable = wrapper.findComponent({ name: "OTableStub" });
       await otable.vm.$emit("update:selectedIds", ["mon-http-1", "mon-tcp-1"]);
       expect(wrapper.emitted("update:selectedIds")).toHaveLength(1);
-      expect(wrapper.emitted("update:selectedIds")![0]).toEqual([
-        ["mon-http-1", "mon-tcp-1"],
-      ]);
+      expect(wrapper.emitted("update:selectedIds")![0]).toEqual([["mon-http-1", "mon-tcp-1"]]);
     });
   });
 
@@ -418,24 +407,18 @@ describe("MonitorTable", () => {
   describe("empty state", () => {
     it("should show empty state region when data is empty", () => {
       wrapper = mountMonitorTable({ data: [] });
-      expect(
-        wrapper.find('[data-test="otable-empty-region"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="otable-empty-region"]').exists()).toBe(true);
     });
 
     it("should render OEmptyState when data is empty", () => {
       wrapper = mountMonitorTable({ data: [] });
-      const emptyState = wrapper.find(
-        '[data-test="monitor-table-empty-state"]',
-      );
+      const emptyState = wrapper.find('[data-test="monitor-table-empty-state"]');
       expect(emptyState.exists()).toBe(true);
     });
 
     it("should not render empty state region when data is present", () => {
       wrapper = mountMonitorTable({ data: mockMonitorList });
-      expect(
-        wrapper.find('[data-test="otable-empty-region"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="otable-empty-region"]').exists()).toBe(false);
     });
 
     it("should emit empty-action when OEmptyState action is triggered", async () => {
@@ -474,44 +457,24 @@ describe("MonitorTable", () => {
       wrapper = mountMonitorTable({
         selectedIds: ["mon-http-1", "mon-tcp-1"],
       });
-      expect(
-        wrapper.find('[data-test="monitor-table-pause-selected-btn"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="monitor-table-enable-selected-btn"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find(
-          '[data-test="monitor-table-trigger-selected-btn"]',
-        ).exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="monitor-table-move-selected-btn"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find(
-          '[data-test="monitor-table-delete-selected-btn"]',
-        ).exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="monitor-table-pause-selected-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="monitor-table-enable-selected-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="monitor-table-trigger-selected-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="monitor-table-move-selected-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="monitor-table-delete-selected-btn"]').exists()).toBe(true);
     });
 
     it("should not show bulk action buttons when no rows are selected", () => {
       wrapper = mountMonitorTable({ selectedIds: [] });
-      expect(
-        wrapper.find('[data-test="monitor-table-pause-selected-btn"]').exists(),
-      ).toBe(false);
-      expect(
-        wrapper.find('[data-test="monitor-table-delete-selected-btn"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="monitor-table-pause-selected-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="monitor-table-delete-selected-btn"]').exists()).toBe(false);
     });
 
     it("should emit pause-selected when pause selected button is clicked", async () => {
       wrapper = mountMonitorTable({
         selectedIds: ["mon-http-1"],
       });
-      const btn = wrapper.find(
-        '[data-test="monitor-table-pause-selected-btn"]',
-      );
+      const btn = wrapper.find('[data-test="monitor-table-pause-selected-btn"]');
       expect(btn.exists()).toBe(true);
       await btn.trigger("click");
       expect(wrapper.emitted("pause-selected")).toHaveLength(1);
@@ -521,9 +484,7 @@ describe("MonitorTable", () => {
       wrapper = mountMonitorTable({
         selectedIds: ["mon-http-1"],
       });
-      const btn = wrapper.find(
-        '[data-test="monitor-table-enable-selected-btn"]',
-      );
+      const btn = wrapper.find('[data-test="monitor-table-enable-selected-btn"]');
       expect(btn.exists()).toBe(true);
       await btn.trigger("click");
       expect(wrapper.emitted("enable-selected")).toHaveLength(1);
@@ -533,9 +494,7 @@ describe("MonitorTable", () => {
       wrapper = mountMonitorTable({
         selectedIds: ["mon-http-1"],
       });
-      const btn = wrapper.find(
-        '[data-test="monitor-table-trigger-selected-btn"]',
-      );
+      const btn = wrapper.find('[data-test="monitor-table-trigger-selected-btn"]');
       expect(btn.exists()).toBe(true);
       await btn.trigger("click");
       expect(wrapper.emitted("trigger-selected")).toHaveLength(1);
@@ -545,9 +504,7 @@ describe("MonitorTable", () => {
       wrapper = mountMonitorTable({
         selectedIds: ["mon-http-1"],
       });
-      const btn = wrapper.find(
-        '[data-test="monitor-table-move-selected-btn"]',
-      );
+      const btn = wrapper.find('[data-test="monitor-table-move-selected-btn"]');
       expect(btn.exists()).toBe(true);
       await btn.trigger("click");
       expect(wrapper.emitted("move-selected")).toHaveLength(1);
@@ -557,9 +514,7 @@ describe("MonitorTable", () => {
       wrapper = mountMonitorTable({
         selectedIds: ["mon-http-1"],
       });
-      const btn = wrapper.find(
-        '[data-test="monitor-table-delete-selected-btn"]',
-      );
+      const btn = wrapper.find('[data-test="monitor-table-delete-selected-btn"]');
       expect(btn.exists()).toBe(true);
       await btn.trigger("click");
       expect(wrapper.emitted("delete-selected")).toHaveLength(1);
@@ -570,17 +525,11 @@ describe("MonitorTable", () => {
         selectedIds: ["mon-http-1"],
         bulkActionLoading: true,
       });
-      const pauseBtn = wrapper.find(
-        '[data-test="monitor-table-pause-selected-btn"]',
-      );
+      const pauseBtn = wrapper.find('[data-test="monitor-table-pause-selected-btn"]');
       expect(pauseBtn.attributes("disabled")).toBeDefined();
-      const enableBtn = wrapper.find(
-        '[data-test="monitor-table-enable-selected-btn"]',
-      );
+      const enableBtn = wrapper.find('[data-test="monitor-table-enable-selected-btn"]');
       expect(enableBtn.attributes("disabled")).toBeDefined();
-      const triggerBtn = wrapper.find(
-        '[data-test="monitor-table-trigger-selected-btn"]',
-      );
+      const triggerBtn = wrapper.find('[data-test="monitor-table-trigger-selected-btn"]');
       expect(triggerBtn.attributes("disabled")).toBeDefined();
     });
   });
@@ -634,17 +583,13 @@ describe("MonitorTable", () => {
       wrapper = mountMonitorTable({
         toggleLoadingMap: { "mon-http-1": true },
       });
-      const spinner = wrapper.find(
-        '[data-test="monitor-table-toggle-spinner"]',
-      );
+      const spinner = wrapper.find('[data-test="monitor-table-toggle-spinner"]');
       expect(spinner.exists()).toBe(true);
     });
 
     it("should not show toggle spinner when toggleLoadingMap is empty", () => {
       wrapper = mountMonitorTable();
-      const spinner = wrapper.find(
-        '[data-test="monitor-table-toggle-spinner"]',
-      );
+      const spinner = wrapper.find('[data-test="monitor-table-toggle-spinner"]');
       expect(spinner.exists()).toBe(false);
     });
 
@@ -652,17 +597,13 @@ describe("MonitorTable", () => {
       wrapper = mountMonitorTable({
         triggerLoadingMap: { "mon-http-1": true },
       });
-      const spinner = wrapper.find(
-        '[data-test="monitor-table-trigger-spinner"]',
-      );
+      const spinner = wrapper.find('[data-test="monitor-table-trigger-spinner"]');
       expect(spinner.exists()).toBe(true);
     });
 
     it("should not show trigger spinner when triggerLoadingMap is empty", () => {
       wrapper = mountMonitorTable();
-      const spinner = wrapper.find(
-        '[data-test="monitor-table-trigger-spinner"]',
-      );
+      const spinner = wrapper.find('[data-test="monitor-table-trigger-spinner"]');
       expect(spinner.exists()).toBe(false);
     });
   });
@@ -686,12 +627,172 @@ describe("MonitorTable", () => {
       wrapper = mountMonitorTable();
       const editBtn = wrapper.find('[data-test="monitor-table-edit-btn"]');
       expect(editBtn.exists()).toBe(true);
-      const duplicateBtn = wrapper.find(
-        '[data-test="monitor-table-duplicate-btn"]',
-      );
+      const duplicateBtn = wrapper.find('[data-test="monitor-table-duplicate-btn"]');
       expect(duplicateBtn.exists()).toBe(true);
       const moreBtn = wrapper.find('[data-test="monitor-table-more-btn"]');
       expect(moreBtn.exists()).toBe(true);
+    });
+  });
+
+  // ── Cell tooltips (OTooltip wrapping) ──────────────────────────────────
+
+  describe("cell tooltips", () => {
+    // ── Name cell ──────────────────────────────────────────────────────
+
+    describe("name cell", () => {
+      it("renders OTooltip wrapping the name with cursor-help when name is present", () => {
+        wrapper = mountMonitorTable();
+        // Per row: name=idx+0, url=idx+1, locations=idx+2, then 4 action OTooltips.
+        const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
+        expect(tooltips.length).toBeGreaterThanOrEqual(3);
+        const nameTooltip = tooltips[0];
+        expect(nameTooltip.props("content")).toBe("HTTP Health Check");
+        expect(nameTooltip.find("span.cursor-help").exists()).toBe(true);
+      });
+
+      it("renders em-dash fallback span without OTooltip when name is absent", () => {
+        wrapper = mountMonitorTable({
+          data: [{ ...mockMonitorList[0], name: undefined as any, id: "test-no-name" }],
+        });
+        const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
+        // Only URL + locations + 4 actions = 6 OTooltips (name cell skipped)
+        expect(tooltips.length).toBe(6);
+        // The em-dash fallback should appear in the DOM
+        expect(wrapper.text()).toContain("—");
+      });
+    });
+
+    // ── URL cell ───────────────────────────────────────────────────────
+
+    describe("url cell", () => {
+      it("renders OTooltip wrapping the URL with cursor-help when URL is present", () => {
+        wrapper = mountMonitorTable();
+        const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
+        const urlTooltip = tooltips[1];
+        expect(urlTooltip.props("content")).toBe("https://example.com/health");
+        expect(urlTooltip.find("span.cursor-help").exists()).toBe(true);
+      });
+
+      it("renders em-dash fallback span without OTooltip when URL is absent", () => {
+        wrapper = mountMonitorTable({
+          data: [{ ...mockMonitorList[0], url: undefined as any, id: "test-no-url" }],
+        });
+        const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
+        // Name + locations + 4 actions = 6 OTooltips (URL cell skipped)
+        expect(tooltips.length).toBe(6);
+        // URL tooltip at index 1 is now the locations tooltip (shifted)
+        expect(tooltips[1].props("content")).toContain("us-east-1");
+        expect(wrapper.text()).toContain("—");
+      });
+    });
+
+    // ── Locations cell ─────────────────────────────────────────────────
+
+    describe("locations cell", () => {
+      it("renders OTooltip with formatted location list using locationNames", () => {
+        wrapper = mountMonitorTable({
+          locationNames: {
+            "us-east-1": "US East (N. Virginia)",
+            "eu-west-1": "EU (Ireland)",
+          },
+        });
+        const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
+        const locTooltip = tooltips[2];
+        expect(locTooltip.props("content")).toBe("US East (N. Virginia)\nEU (Ireland)");
+        expect(locTooltip.props("contentClass")).toContain("whitespace-pre-wrap");
+      });
+
+      it("falls back to raw location IDs when locationNames is empty", () => {
+        wrapper = mountMonitorTable();
+        const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
+        const locTooltip = tooltips[2];
+        expect(locTooltip.props("content")).toBe("us-east-1\neu-west-1");
+      });
+
+      it("falls back to raw IDs for locations not in the locationNames map", () => {
+        wrapper = mountMonitorTable({
+          locationNames: { "us-east-1": "US East" },
+        });
+        const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
+        const locTooltip = tooltips[2];
+        // eu-west-1 is not mapped, so it falls back to the raw id
+        expect(locTooltip.props("content")).toBe("US East\neu-west-1");
+      });
+
+      it("shows first location label and cursor-help class", () => {
+        wrapper = mountMonitorTable();
+        const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
+        const locTooltip = tooltips[2];
+        expect(locTooltip.text()).toContain("us-east-1");
+        expect(locTooltip.find(".cursor-help").exists()).toBe(true);
+      });
+
+      it("shows +N badge when more than one location", () => {
+        wrapper = mountMonitorTable();
+        // Row 0 (mockMonitorHttp): 2 locations => "+1"
+        // Row 2 (mockMonitorBrowser): 3 locations => "+2"
+        const text = wrapper.text();
+        expect(text).toContain("+1");
+        expect(text).toContain("+2");
+      });
+
+      it("does not show count badge when only one location", () => {
+        wrapper = mountMonitorTable();
+        const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
+        // Row 1 (mockMonitorTcp) has 1 location. Its locations OTooltip is at index 9.
+        const row1LocTooltip = tooltips[9];
+        const row1LocText = row1LocTooltip.text();
+        expect(row1LocText).toContain("us-east-1");
+        expect(row1LocText).not.toContain("+");
+      });
+
+      it("renders em-dash fallback without OTooltip when locations are empty", () => {
+        wrapper = mountMonitorTable({
+          data: [{ ...mockMonitorList[0], locations: [] as any, id: "test-no-loc" }],
+        });
+        const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
+        // Name + URL + 4 actions = 6 OTooltips (locations cell skipped)
+        expect(tooltips.length).toBe(6);
+        expect(wrapper.text()).toContain("—");
+      });
+
+      it("has delay=0 for instant tooltip appearance", () => {
+        wrapper = mountMonitorTable();
+        const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
+        const locTooltip = tooltips[2];
+        expect(locTooltip.props("delay")).toBe(0);
+      });
+    });
+
+    // ── formatLocationsList helper ──────────────────────────────────────
+
+    describe("formatLocationsList", () => {
+      it("joins location labels with newlines when all IDs are in the map", () => {
+        wrapper = mountMonitorTable({
+          locationNames: {
+            "us-east-1": "US East (N. Virginia)",
+            "eu-west-1": "EU (Ireland)",
+            "ap-southeast-1": "Asia Pacific (Singapore)",
+          },
+        });
+        const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
+        // Row 2 (mockMonitorBrowser) has 3 locations, its loc OTooltip is at index 16
+        const row2LocTooltip = tooltips[16];
+        expect(row2LocTooltip.props("content")).toBe(
+          "US East (N. Virginia)\nEU (Ireland)\nAsia Pacific (Singapore)",
+        );
+      });
+
+      it("handles location IDs not in the map by returning the raw ID", () => {
+        wrapper = mountMonitorTable({
+          locationNames: { "us-east-1": "US East" },
+        });
+        const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
+        // Row 2 has ["us-east-1", "eu-west-1", "ap-southeast-1"]
+        // Only us-east-1 is mapped; eu-west-1 and ap-southeast-1 fall back to raw IDs
+        const row2LocTooltip = tooltips[16];
+        expect(row2LocTooltip.props("content")).toBe("US East\neu-west-1\nap-southeast-1");
+      });
     });
   });
 });

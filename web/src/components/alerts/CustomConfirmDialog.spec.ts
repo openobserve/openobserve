@@ -66,13 +66,8 @@ const ODialogStub = {
 // helpers
 // ---------------------------------------------------------------------------
 
-function buildWrapper(
-  props: Record<string, any> = {},
-  storeInstance?: any,
-): VueWrapper<any> {
-  const vuexStore =
-    storeInstance ??
-    createStore({ state: { theme: "light" } });
+function buildWrapper(props: Record<string, any> = {}, storeInstance?: any): VueWrapper<any> {
+  const vuexStore = storeInstance ?? createStore({ state: { theme: "light" } });
 
   return mount(CustomConfirmDialog, {
     props: {
@@ -211,7 +206,9 @@ describe("CustomConfirmDialog", () => {
     it("forwards primaryButtonLabel='Clear & Continue'", () => {
       wrapper = buildWrapper();
 
-      expect(wrapper.findComponent(ODialogStub).props("primaryButtonLabel")).toBe("Clear & Continue");
+      expect(wrapper.findComponent(ODialogStub).props("primaryButtonLabel")).toBe(
+        "Clear & Continue",
+      );
     });
   });
 

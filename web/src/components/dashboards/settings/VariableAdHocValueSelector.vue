@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-wrap items-center">
     <div
-      class="flex flex-nowrap items-center mb-2 mr-4 gap-x-1"
+      class="mr-4 mb-2 flex flex-nowrap items-center gap-x-1"
       v-for="(item, index) in adhocVariables"
       :key="index"
     >
@@ -13,12 +13,14 @@
         @update:model-value="updateModelValueOfSelect(index, $event)"
         class="flex-1"
       />
-      <OSelect class="w-auto"
+      <OSelect
+        class="w-auto"
         v-model="adhocVariables[index].operator"
         :options="operatorOptions"
         data-test="dashboard-variable-adhoc-operator-selector"
       />
-      <OInput class="w-31.25"
+      <OInput
+        class="w-31.25"
         v-model="adhocVariables[index].value"
         :placeholder="t('dashboard.variableAdHocValueSelector.enterValue')"
         :debounce="1000"
@@ -39,7 +41,7 @@
     <OButton
       variant="ghost"
       size="sm"
-      class="ml-1 mb-2 hideOnPrintMode"
+      class="hideOnPrintMode mb-2 ml-1"
       @click="addFields"
       data-test="dashboard-variable-adhoc-add-selector"
     >
@@ -115,10 +117,7 @@ export default defineComponent({
     };
 
     const emitValue = () => {
-      emit(
-        "update:modelValue",
-        JSON.parse(JSON.stringify(adhocVariables.value)),
-      );
+      emit("update:modelValue", JSON.parse(JSON.stringify(adhocVariables.value)));
     };
 
     return {
@@ -136,4 +135,3 @@ export default defineComponent({
   },
 });
 </script>
-

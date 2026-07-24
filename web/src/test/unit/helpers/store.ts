@@ -341,7 +341,11 @@ const store = createStore({
       state.alertListFilters = { ...state.alertListFilters, ...payload };
     },
     setGithubDashboardGallery(state, payload) {
-      state.githubDashboardGallery = { ...state.githubDashboardGallery, dashboards: payload, lastFetched: Date.now() };
+      state.githubDashboardGallery = {
+        ...state.githubDashboardGallery,
+        dashboards: payload,
+        lastFetched: Date.now(),
+      };
     },
     setDashboardJsonCache(state, payload) {
       state.githubDashboardGallery.dashboardJsonCache = {
@@ -373,7 +377,7 @@ const store = createStore({
       state: {
         incidents: {},
         pageBeforeSearch: 1,
-        isInitialized: false
+        isInitialized: false,
       },
       getters: {
         getIncidents(state: any) {
@@ -404,16 +408,16 @@ const store = createStore({
       },
       actions: {
         setIncidents(context: any, incidents: any) {
-          context.commit('setIncidents', incidents);
+          context.commit("setIncidents", incidents);
         },
         setPageBeforeSearch(context: any, page: number) {
-          context.commit('setPageBeforeSearch', page);
+          context.commit("setPageBeforeSearch", page);
         },
         setIsInitialized(context: any, isInitialized: boolean) {
-          context.commit('setIsInitialized', isInitialized);
+          context.commit("setIsInitialized", isInitialized);
         },
         resetIncidents(context: any) {
-          context.commit('resetIncidents');
+          context.commit("resetIncidents");
         },
       },
     },

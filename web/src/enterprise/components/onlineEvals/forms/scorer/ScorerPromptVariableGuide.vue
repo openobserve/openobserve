@@ -1,13 +1,10 @@
 <template>
-  <section
-    class="flex flex-col gap-2.5"
-    data-test="scorer-form-prompt-variable-guide"
-  >
+  <section class="flex flex-col gap-2.5" data-test="scorer-form-prompt-variable-guide">
     <div class="flex flex-col gap-1.5">
       <!-- No "View Component" badge: that is internal architecture vocabulary
            and told the reader nothing about what the table is for. -->
       <div class="flex flex-wrap items-center gap-2">
-        <strong class="text-xs font-semibold text-text-heading">
+        <strong class="text-text-heading text-xs font-semibold">
           {{ t("onlineEvals.scorer.promptVariableGuide.title") }}
         </strong>
         <!-- Same affordance as the Eval Job form: a Learn more that opens the
@@ -50,57 +47,55 @@
       <!-- `bleed` drops ODrawer's body inset so the table runs edge to edge;
            the prose keeps the inset via the same tokens the drawer would have
            applied. Mirrors the Eval Job variables drawer. -->
-      <div class="flex flex-col gap-3 py-dialog-content-py">
-        <span
-          class="px-dialog-content-px text-xs leading-relaxed text-text-secondary"
-        >
+      <div class="py-dialog-content-py flex flex-col gap-3">
+        <span class="px-dialog-content-px text-text-secondary text-xs leading-relaxed">
           {{ t("onlineEvals.scorer.promptVariableGuide.description") }}
         </span>
 
-      <OTable
-        data-test="scorer-form-prompt-variable-table"
-        :data="guideRows"
-        :columns="columns"
-        row-key="key"
-        pagination="none"
-        sorting="none"
-        selection="none"
-        :show-global-filter="false"
-        :default-columns="false"
-        :fill-height="false"
-        :frame="false"
-        :sticky-header="false"
-        :dense="false"
-        wrap
-      >
-        <template #cell-variable="{ row }">
-          <div
-            class="flex flex-wrap gap-1.5"
-            :data-test="`scorer-form-prompt-variable-${row.key}`"
-          >
-            <code
-              v-for="variable in row.variables"
-              :key="variable"
-              class="rounded-default bg-surface-subtle px-1.5 py-0.5"
-              >{{ formatTemplateVariable(variable) }}</code
+        <OTable
+          data-test="scorer-form-prompt-variable-table"
+          :data="guideRows"
+          :columns="columns"
+          row-key="key"
+          pagination="none"
+          sorting="none"
+          selection="none"
+          :show-global-filter="false"
+          :default-columns="false"
+          :fill-height="false"
+          :frame="false"
+          :sticky-header="false"
+          :dense="false"
+          wrap
+        >
+          <template #cell-variable="{ row }">
+            <div
+              class="flex flex-wrap gap-1.5"
+              :data-test="`scorer-form-prompt-variable-${row.key}`"
             >
-          </div>
-        </template>
+              <code
+                v-for="variable in row.variables"
+                :key="variable"
+                class="rounded-default bg-surface-subtle px-1.5 py-0.5"
+                >{{ formatTemplateVariable(variable) }}</code
+              >
+            </div>
+          </template>
 
-        <template #cell-span="{ row }">
-          <ScopeCell :row="row" scope="span" />
-        </template>
+          <template #cell-span="{ row }">
+            <ScopeCell :row="row" scope="span" />
+          </template>
 
-        <template #cell-trace="{ row }">
-          <ScopeCell :row="row" scope="trace" />
-        </template>
+          <template #cell-trace="{ row }">
+            <ScopeCell :row="row" scope="trace" />
+          </template>
 
-        <template #cell-session="{ row }">
-          <ScopeCell :row="row" scope="session" />
-        </template>
-      </OTable>
+          <template #cell-session="{ row }">
+            <ScopeCell :row="row" scope="session" />
+          </template>
+        </OTable>
 
-      <div class="px-dialog-content-px">
+        <div class="px-dialog-content-px">
           <OBanner
             variant="info"
             icon="info"
@@ -135,11 +130,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { formatTemplateVariable } from "../../utils/evalFormat";
 
 type GuideScope = "span" | "trace" | "session";
-type GuideStatus =
-  | "jobMapped"
-  | "systemProvided"
-  | "requiresSelector"
-  | "unavailable";
+type GuideStatus = "jobMapped" | "systemProvided" | "requiresSelector" | "unavailable";
 
 interface GuideRow {
   key: "inputOutput" | "statistics" | "spans" | "steps";
@@ -229,8 +220,7 @@ const ScopeCell = defineComponent({
   setup(props) {
     return () => {
       const status = props.row.statuses[props.scope];
-      const primaryStatus =
-        status === "requiresSelector" ? "systemProvided" : status;
+      const primaryStatus = status === "requiresSelector" ? "systemProvided" : status;
       const statusVariant =
         primaryStatus === "systemProvided"
           ? "primary-soft"
@@ -247,16 +237,11 @@ const ScopeCell = defineComponent({
               size: "xs",
               disabled: primaryStatus === "unavailable",
             },
-            () =>
-              t(
-                `onlineEvals.scorer.promptVariableGuide.statuses.${primaryStatus}`,
-              ),
+            () => t(`onlineEvals.scorer.promptVariableGuide.statuses.${primaryStatus}`),
           ),
           status === "requiresSelector"
             ? h(OTag, { variant: "warning-soft", size: "xs" }, () =>
-                t(
-                  "onlineEvals.scorer.promptVariableGuide.statuses.selectorRequired",
-                ),
+                t("onlineEvals.scorer.promptVariableGuide.statuses.selectorRequired"),
               )
             : null,
         ]),
@@ -265,9 +250,7 @@ const ScopeCell = defineComponent({
           {
             class: "text-2xs leading-[1.4] text-text-secondary",
           },
-          t(
-            `onlineEvals.scorer.promptVariableGuide.variables.${props.row.key}.${props.scope}`,
-          ),
+          t(`onlineEvals.scorer.promptVariableGuide.variables.${props.row.key}.${props.scope}`),
         ),
       ]);
     };

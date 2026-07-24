@@ -69,8 +69,7 @@ function bucketToMs(bucket: unknown): number {
 
 function parseStatus(raw: unknown): RunStatus {
   const s = typeof raw === "string" ? raw.toLowerCase() : "";
-  if (s === "success" || s === "error" || s === "timeout" || s === "skipped")
-    return s;
+  if (s === "success" || s === "error" || s === "timeout" || s === "skipped") return s;
   return "unknown";
 }
 
@@ -145,8 +144,7 @@ interface RawRunRow {
 function mapRunRow(r: RawRunRow): JobRunRow {
   const score = extractScore(r.attributes_response);
   return {
-    id:
-      r.span_id ?? `${r._timestamp ?? ""}-${r.attributes_target_span_id ?? ""}`,
+    id: r.span_id ?? `${r._timestamp ?? ""}-${r.attributes_target_span_id ?? ""}`,
     timestampMs: bucketToMs(r._timestamp),
     status: parseStatus(r.attributes_status),
     scorerId: r.attributes_scorer_id ?? "",
@@ -268,12 +266,7 @@ export function useEvalJobRuns(
     const { startUs, endUs } = dateWindow.value;
     isLoadingKpis.value = true;
     try {
-      const kpiHits = await executeQuery(
-        kpiSql.value,
-        startUs,
-        endUs,
-        "traces",
-      ).catch((err) => {
+      const kpiHits = await executeQuery(kpiSql.value, startUs, endUs, "traces").catch((err) => {
         console.warn("[JobRuns:kpis] failed", err);
         return [] as KpiRow[];
       });
@@ -302,20 +295,16 @@ export function useEvalJobRuns(
     try {
       const [runHits, failureHits] = await Promise.all([
         runsSql.value
-          ? executeQuery(runsSql.value, startUs, endUs, "traces").catch(
-              (err) => {
-                console.warn("[JobRuns:runs] failed", err);
-                return [] as RawRunRow[];
-              },
-            )
+          ? executeQuery(runsSql.value, startUs, endUs, "traces").catch((err) => {
+              console.warn("[JobRuns:runs] failed", err);
+              return [] as RawRunRow[];
+            })
           : Promise.resolve([] as RawRunRow[]),
         failuresSql.value
-          ? executeQuery(failuresSql.value, startUs, endUs, "traces").catch(
-              (err) => {
-                console.warn("[JobRuns:failures] failed", err);
-                return [] as RawRunRow[];
-              },
-            )
+          ? executeQuery(failuresSql.value, startUs, endUs, "traces").catch((err) => {
+              console.warn("[JobRuns:failures] failed", err);
+              return [] as RawRunRow[];
+            })
           : Promise.resolve([] as RawRunRow[]),
       ]);
 

@@ -18,7 +18,6 @@ import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import PrebuiltDestinationSelector from "./PrebuiltDestinationSelector.vue";
 import { createI18n } from "vue-i18n";
 
-
 // ==================== TEST DATA FACTORIES ====================
 
 /**
@@ -32,8 +31,7 @@ function createMockI18n() {
       en: {
         alerts: {
           customDestination: "Custom Destination",
-          customDestinationDescription:
-            "Configure a custom webhook destination",
+          customDestinationDescription: "Configure a custom webhook destination",
         },
       },
     },
@@ -187,9 +185,7 @@ describe("PrebuiltDestinationSelector", () => {
     it("should display custom destination description from i18n", () => {
       wrapper = mountComponent();
       const customCard = findCardByType(wrapper, "custom");
-      const description = customCard.find(
-        '[data-test="destination-type-description"]'
-      );
+      const description = customCard.find('[data-test="destination-type-description"]');
 
       expect(description.text()).toBe("Configure a custom webhook destination");
     });
@@ -574,9 +570,7 @@ describe("PrebuiltDestinationSelector", () => {
 
       // All cards should be within the grid
       cards.forEach((card) => {
-        expect(card.element.parentElement?.classList.contains("selector-grid")).toBe(
-          true
-        );
+        expect(card.element.parentElement?.classList.contains("selector-grid")).toBe(true);
       });
     });
 

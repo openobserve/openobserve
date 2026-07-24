@@ -8,12 +8,7 @@ export {
   getShortcutDisplay,
   resolveShortcutKeys,
 } from "./shortcutRegistry";
-export type {
-  ShortcutEntry,
-  ShortcutGroup,
-  ShortcutModule,
-  ShortcutDef,
-} from "./shortcutRegistry";
+export type { ShortcutEntry, ShortcutGroup, ShortcutModule, ShortcutDef } from "./shortcutRegistry";
 export type {
   Shortcut,
   ShortcutById,

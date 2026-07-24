@@ -21,46 +21,46 @@ export const TABLE_CHECKBOX_COL_SIZE = 44;
 export const TABLE_INDEX_COL_SIZE = 56;
 
 export const COL = {
-  name:         200,
-  firstName:    130,
-  lastName:     130,
-  email:        220,
-  description:  300,
-  status:       100,
-  toggle:        80,
-  date:         200,
+  name: 200,
+  firstName: 130,
+  lastName: 130,
+  email: 220,
+  description: 300,
+  status: 100,
+  toggle: 80,
+  date: 200,
   // Full "YYYY-MM-DD HH:mm:ss" timestamps — predictable, so fix their width.
-  createdAt:    200,
-  updatedAt:    200,
+  createdAt: 200,
+  updatedAt: 200,
   dateAbsolute: 160,
-  duration:     120,
-  frequency:    130,
-  type:         180,
-  streamType:   120,
-  streamName:   180,
-  method:        80,
-  count:         90,
-  sizeBytes:    130,
-  url:          220,
-  template:     180,
-  owner:        220,
-  folder:       150,
-  role:         160,
-  authType:     100,
-  token:        200,
-  cron:         160,
-  price:        110,
+  duration: 120,
+  frequency: 130,
+  type: 180,
+  streamType: 120,
+  streamName: 180,
+  method: 80,
+  count: 90,
+  sizeBytes: 130,
+  url: 220,
+  template: 180,
+  owner: 220,
+  folder: 150,
+  role: 160,
+  authType: 100,
+  token: 200,
+  cron: 160,
+  price: 110,
   defaultModel: 180,
-  version:      100,
+  version: 100,
   // Synthetic monitoring
   responseTime: 90,
-  uptime:       130,
-  locations:    120,
-  interval:     72,
-  steps:        72,
-  assertions:   90,
-  lastCheck:    100,
-  history:      180,
+  uptime: 130,
+  locations: 120,
+  interval: 72,
+  steps: 72,
+  assertions: 90,
+  lastCheck: 100,
+  history: 180,
 } as const;
 
 // ── Column Definition ────────────────────────────────────────────
@@ -249,6 +249,12 @@ export interface OTableProps<TData = any> {
   virtualScroll?: boolean;
   /** Fixed row height for virtual scroll calculations (default 48) */
   virtualScrollItemSize?: number;
+  /**
+   * Rows rendered beyond the visible window on each side while virtualizing
+   * (default 100). Lower it (e.g. 10–20) for heavy rows / moderate datasets so
+   * the DOM stays small; the default suits long, light lists that scroll fast.
+   */
+  overscan?: number;
   /** Container max height; falls back to parent height when not set */
   maxHeight?: string | number;
 
@@ -331,11 +337,7 @@ export interface OTableProps<TData = any> {
   /** Returns a CSS color for the status bar (4px left border) per row */
   getRowStatusColor?: (row: TData) => string | undefined;
   /** Returns inline styles for individual cells */
-  getCellStyle?: (params: {
-    columnId: string;
-    row: TData;
-    value: any;
-  }) => Record<string, any>;
+  getCellStyle?: (params: { columnId: string; row: TData; value: any }) => Record<string, any>;
   /** Show hover-visible copy button on each cell */
   enableCellCopy?: boolean;
   /** Fixed row height in px (for virtual scroll accuracy) */
@@ -398,10 +400,7 @@ export interface OTableEmits<TData = any> {
   // Column events
   "column-order-change": [order: string[]];
   "column-visibility-change": [visibility: Record<string, boolean>];
-  "update:columnSizes": [
-    sizes: Record<string, number>,
-    idMap: Record<string, string>,
-  ];
+  "update:columnSizes": [sizes: Record<string, number>, idMap: Record<string, string>];
 
   // Row reorder
   "row-reorder": [data: TData[]];
@@ -423,12 +422,7 @@ export interface OTableSlots<TData = any> {
   }) => any;
   /** Per-column cell slot (`#cell-<columnId>`) — scoped to the plain row data (`row.original`) + row index */
   [key: `cell-${string}`]:
-    | ((props: {
-        row: TData;
-        column: OTableColumnDef<TData>;
-        value: any;
-        index: number;
-      }) => any)
+    | ((props: { row: TData; column: OTableColumnDef<TData>; value: any; index: number }) => any)
     | undefined;
   /** Custom header content */
   "header-actions"?: () => any;
@@ -439,6 +433,8 @@ export interface OTableSlots<TData = any> {
   toolbar?: () => any;
   /** Trailing toolbar actions rendered AFTER the auto-injected column toggle (e.g. a refresh button). */
   "toolbar-trailing"?: () => any;
+  /** Full-width content between the toolbar and the table body (e.g. a summary-stat strip). */
+  subheader?: () => any;
   /** Content below the table (above pagination). Scoped with pagination state. */
   bottom?: (props: {
     currentPage: number;

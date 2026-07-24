@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
     </template>
     <template #subtitle>
-      <span class="truncate min-w-0 leading-normal">{{ t('synthetics.tokens.summary') }}</span>
+      <span class="min-w-0 truncate leading-normal">{{ t("synthetics.tokens.summary") }}</span>
     </template>
     <template #actions>
       <OButton
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="synthetics-tokens-rotate-default-btn"
         @click="rotateDefault"
       >
-        {{ t('synthetics.tokens.rotateDefaultBtn') }}
+        {{ t("synthetics.tokens.rotateDefaultBtn") }}
       </OButton>
       <OButton
         variant="primary"
@@ -51,11 +51,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="synthetics-tokens-create-btn"
         @click="showCreateForm = true"
       >
-        {{ t('synthetics.tokens.createTokenBtn') }}
+        {{ t("synthetics.tokens.createTokenBtn") }}
       </OButton>
     </template>
 
-    <div class="w-full flex-1 min-h-0 overflow-hidden">
+    <div class="min-h-0 w-full flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <OTable
           :frame="false"
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           filter-mode="client"
         >
           <template #toolbar>
-            <div class="flex items-center gap-2 w-full">
+            <div class="flex w-full items-center gap-2">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('synthetics.tokens.searchPlaceholder')"
@@ -103,17 +103,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-name="{ row }">
-            <div class="flex items-center gap-2 min-w-0">
-              <span class="font-medium truncate">{{ row.name }}</span>
+            <div class="flex min-w-0 items-center gap-2">
+              <span class="truncate font-medium">{{ row.name }}</span>
               <OTag v-if="row.is_default" variant="primary-soft" size="xs" shape="rounded">
-                {{ t('synthetics.tokens.default') }}
+                {{ t("synthetics.tokens.default") }}
               </OTag>
             </div>
           </template>
 
           <template #cell-token="{ row }">
-            <div class="flex items-center gap-1 min-w-0">
-              <span class="font-mono text-xs text-text-secondary truncate">{{ row.token }}</span>
+            <div class="flex min-w-0 items-center gap-1">
+              <span class="text-text-secondary truncate font-mono text-xs">{{ row.token }}</span>
               <OButton
                 variant="ghost"
                 size="icon-sm"
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #cell-status="{ row }">
             <OBadge :variant="row.enabled ? 'success' : 'default'" :dot="true" size="sm">
-              {{ row.enabled ? t('common.enable') : t('common.disable') }}
+              {{ row.enabled ? t("common.enable") : t("common.disable") }}
             </OBadge>
           </template>
 
@@ -181,8 +181,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           autofocus
           data-test="synthetics-token-name-input"
         />
-        <p class="mt-2 text-xs text-text-muted">
-          {{ t('synthetics.tokens.tokenNameHint') }}
+        <p class="text-text-muted mt-2 text-xs">
+          {{ t("synthetics.tokens.tokenNameHint") }}
         </p>
       </OForm>
     </ODialog>
@@ -196,21 +196,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :secondary-button-label="t('common.close')"
       @click:secondary="showRevealedDialog = false"
     >
-      <div class="mb-1 text-xs font-medium text-text-label">
-        {{ t('synthetics.tokens.rawTokenLabel') }}
+      <div class="text-text-label mb-1 text-xs font-medium">
+        {{ t("synthetics.tokens.rawTokenLabel") }}
       </div>
-      <div class="p-2.5 border border-dashed rounded-default border-border-default mb-3 bg-surface-subtle">
-        <code class="break-all font-mono text-sm">{{ revealedToken?.token }}</code>
+      <div
+        class="rounded-default border-border-default bg-surface-subtle mb-3 border border-dashed p-2.5"
+      >
+        <code class="font-mono text-sm break-all">{{ revealedToken?.token }}</code>
       </div>
 
       <!-- Ready-to-run install command with the named token baked in. -->
       <template v-if="installCommand">
-        <div class="mb-1 text-xs font-medium text-text-label">
-          {{ t('synthetics.tokens.installCmdLabel') }}
+        <div class="text-text-label mb-1 text-xs font-medium">
+          {{ t("synthetics.tokens.installCmdLabel") }}
         </div>
         <div class="relative mb-1">
           <pre
-            class="bg-surface-subtle border border-border-default rounded-default p-3 text-xs font-mono overflow-x-auto whitespace-pre"
+            class="bg-surface-subtle border-border-default rounded-default overflow-x-auto border p-3 font-mono text-xs whitespace-pre"
             data-test="synthetics-token-install-cmd"
             >{{ installCommand }}</pre
           >
@@ -224,12 +226,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="copyCommand"
           />
         </div>
-        <div class="mb-3 text-xs text-text-secondary">
-          {{ t('synthetics.tokens.installCmdHint') }}
+        <div class="text-text-secondary mb-3 text-xs">
+          {{ t("synthetics.tokens.installCmdHint") }}
         </div>
       </template>
-      <div v-else class="mb-3 text-xs text-text-secondary">
-        {{ t('synthetics.tokens.installHint') }}
+      <div v-else class="text-text-secondary mb-3 text-xs">
+        {{ t("synthetics.tokens.installHint") }}
       </div>
 
       <div class="flex justify-end gap-2">
@@ -240,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="synthetics-token-copy-btn"
           @click="copyToken(revealedToken?.token || '')"
         >
-          {{ t('synthetics.tokens.copyTokenBtn') }}
+          {{ t("synthetics.tokens.copyTokenBtn") }}
         </OButton>
         <OButton
           v-if="installCommand"
@@ -250,7 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="synthetics-token-copy-cmd-primary-btn"
           @click="copyCommand"
         >
-          {{ t('synthetics.tokens.copyCmdBtn') }}
+          {{ t("synthetics.tokens.copyCmdBtn") }}
         </OButton>
       </div>
     </ODialog>
@@ -298,8 +300,19 @@ interface AgentToken {
 export default defineComponent({
   name: "SyntheticsTokens",
   components: {
-    OPageLayout, OButton, OEmptyState, OIcon, OSearchInput, OTooltip,
-    ODialog, OForm, OFormInput, OTable, OBadge, OTag, OUserCell,
+    OPageLayout,
+    OButton,
+    OEmptyState,
+    OIcon,
+    OSearchInput,
+    OTooltip,
+    ODialog,
+    OForm,
+    OFormInput,
+    OTable,
+    OBadge,
+    OTag,
+    OUserCell,
   },
   setup() {
     const store = useStore();

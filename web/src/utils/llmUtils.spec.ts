@@ -96,9 +96,7 @@ describe("isLLMTrace", () => {
 describe("hasTracePreview", () => {
   it("includes remote evaluator spans with stored prompt or response", () => {
     expect(hasTracePreview({ attributes_prompt: "request body" })).toBe(true);
-    expect(hasTracePreview({ attributes_response: '{"score":0.9}' })).toBe(
-      true,
-    );
+    expect(hasTracePreview({ attributes_response: '{"score":0.9}' })).toBe(true);
   });
 
   it("does not classify an ordinary span as previewable", () => {
@@ -350,9 +348,7 @@ describe("truncateLLMContent", () => {
       { role: "system", content: "You are helpful." },
       { role: "user", content: "Tell me a joke." },
     ];
-    expect(truncateLLMContent(JSON.stringify(messages))).toBe(
-      "Tell me a joke.",
-    );
+    expect(truncateLLMContent(JSON.stringify(messages))).toBe("Tell me a joke.");
   });
 
   it("falls back to first message with content when no user message", () => {
@@ -370,9 +366,7 @@ describe("truncateLLMContent", () => {
       tools: [],
       messages: [{ role: "user", content: "Nested user prompt" }],
     };
-    expect(truncateLLMContent(JSON.stringify(content))).toBe(
-      "Nested user prompt",
-    );
+    expect(truncateLLMContent(JSON.stringify(content))).toBe("Nested user prompt");
   });
 
   it("extracts text part from multimodal content array", () => {
@@ -385,9 +379,7 @@ describe("truncateLLMContent", () => {
         ],
       },
     ];
-    expect(truncateLLMContent(JSON.stringify(messages))).toBe(
-      "Describe this image.",
-    );
+    expect(truncateLLMContent(JSON.stringify(messages))).toBe("Describe this image.");
   });
 
   it("extracts from object with 'prompt' field", () => {
@@ -668,9 +660,7 @@ describe("formatModelParameters", () => {
   });
 
   it("formats a single parameter", () => {
-    expect(formatModelParameters({ temperature: 0.7 })).toBe(
-      "temperature: 0.7",
-    );
+    expect(formatModelParameters({ temperature: 0.7 })).toBe("temperature: 0.7");
   });
 
   it("formats multiple parameters with newlines", () => {

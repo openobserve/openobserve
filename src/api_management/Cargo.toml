@@ -15,6 +15,7 @@ enterprise = [
     "dep:o2_enterprise",
     "dep:o2_openfga",
     "openobserve-core/enterprise",
+    "openobserve-org-storage/enterprise",
 ]
 cloud = ["enterprise", "o2_enterprise/cloud", "openobserve-core/cloud"]
 
@@ -28,6 +29,7 @@ search_service.workspace = true
 transform.workspace = true
 vrl.workspace = true
 openobserve-core.workspace = true
+openobserve-org-storage.workspace = true
 anyhow.workspace = true
 axum.workspace = true
 axum-extra.workspace = true

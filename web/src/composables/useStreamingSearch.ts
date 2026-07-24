@@ -17,21 +17,16 @@ import { ref } from "vue";
 import type { SearchRequestPayload } from "@/ts/interfaces";
 import authService from "@/services/auth";
 import store from "@/stores";
-import {
-  getUUID,
-  useLocalCurrentUser,
-  useLocalUserInfo,
-} from "@/utils/zincutils";
+import { getUUID, useLocalCurrentUser, useLocalUserInfo } from "@/utils/zincutils";
 import { attemptTokenRefresh } from "@/services/http";
 
 // Create and manage stream workers
 let streamWorker: Worker | null = null;
 const createStreamWorker = () => {
   if (!streamWorker && window.Worker) {
-    streamWorker = new Worker(
-      new URL("../workers/streamWorker.js", import.meta.url),
-      { type: "module" },
-    );
+    streamWorker = new Worker(new URL("../workers/streamWorker.js", import.meta.url), {
+      type: "module",
+    });
   }
   return streamWorker;
 };
@@ -55,9 +50,7 @@ type TraceRecord = {
 
 const traceMap = ref<Record<string, TraceRecord>>({});
 const activeStreamId = ref<string | null>(null);
-const streamConnections = ref<
-  Record<string, ReadableStreamDefaultReader<Uint8Array>>
->({});
+const streamConnections = ref<Record<string, ReadableStreamDefaultReader<Uint8Array>>>({});
 const abortControllers = ref<Record<string, AbortController>>({});
 const errorOccurred = ref(false);
 
@@ -72,11 +65,7 @@ type StreamResponseType =
   | "promql_metadata";
 
 const useHttpStreaming = () => {
-  const onData = (
-    traceId: string,
-    type: StreamResponseType | "end",
-    response: any,
-  ) => {
+  const onData = (traceId: string, type: StreamResponseType | "end", response: any) => {
     if (!traceMap.value[traceId]) return;
 
     if (response === "end" || response === "[[DONE]]") {
@@ -91,11 +80,7 @@ const useHttpStreaming = () => {
       response = JSON.parse(response);
     }
 
-    const wsResponse = wsMapper[type as StreamResponseType](
-      traceId,
-      response,
-      type,
-    );
+    const wsResponse = wsMapper[type as StreamResponseType](traceId, response, type);
 
     for (const handler of traceMap.value[traceId].data) {
       handler(wsResponse, traceId);
@@ -119,13 +104,7 @@ const useHttpStreaming = () => {
   const fetchQueryDataWithHttpStream = async (
     data: {
       queryReq: SearchRequestPayload | any;
-      type:
-        | "search"
-        | "histogram"
-        | "pageCount"
-        | "values"
-        | "promql"
-        | "traces";
+      type: "search" | "histogram" | "pageCount" | "values" | "promql" | "traces";
       traceId: string;
       org_id: string;
       pageType?: string;
@@ -173,34 +152,17 @@ const useHttpStreaming = () => {
     initiateStreamConnection(data);
   };
 
-  const initiateStreamConnection = async (
-    data: {
-      queryReq: SearchRequestPayload | any;
-      type:
-        | "search"
-        | "histogram"
-        | "pageCount"
-        | "values"
-        | "promql"
-        | "traces";
-      traceId: string;
-      org_id: string;
-      pageType?: string;
-      searchType?: string;
-      meta?: any;
-      clear_cache?: boolean;
-    },
-  ) => {
-    const {
-      traceId,
-      org_id,
-      type,
-      queryReq,
-      searchType,
-      pageType,
-      meta,
-      clear_cache,
-    } = data;
+  const initiateStreamConnection = async (data: {
+    queryReq: SearchRequestPayload | any;
+    type: "search" | "histogram" | "pageCount" | "values" | "promql" | "traces";
+    traceId: string;
+    org_id: string;
+    pageType?: string;
+    searchType?: string;
+    meta?: any;
+    clear_cache?: boolean;
+  }) => {
+    const { traceId, org_id, type, queryReq, searchType, pageType, meta, clear_cache } = data;
     const abortController = new AbortController();
 
     // Store the abort controller for this trace
@@ -209,44 +171,34 @@ const useHttpStreaming = () => {
 
     // Construct URL based on search type
     let url = "";
-    const use_cache =
-      (window as any).use_cache !== undefined
-        ? (window as any).use_cache
-        : true;
+    const use_cache = (window as any).use_cache !== undefined ? (window as any).use_cache : true;
 
     // Check if this is a multi-stream request (similar to search.ts logic)
     const isMultiStream = typeof queryReq.query?.sql !== "string";
 
     //TODO OK: Create method to get the url based on the type
     if (type === "search" || type === "histogram" || type === "pageCount") {
-      const streamEndpoint = isMultiStream
-        ? "_search_multi_stream"
-        : "_search_stream";
+      const streamEndpoint = isMultiStream ? "_search_multi_stream" : "_search_stream";
 
       url = `/${streamEndpoint}?type=${pageType}&search_type=${searchType}&use_cache=${use_cache}`;
       if (meta?.dashboard_id) url += `&dashboard_id=${meta?.dashboard_id}`;
       if (meta?.dashboard_name)
         url += `&dashboard_name=${encodeURIComponent(meta?.dashboard_name)}`;
       if (meta?.folder_id) url += `&folder_id=${meta?.folder_id}`;
-      if (meta?.folder_name)
-        url += `&folder_name=${encodeURIComponent(meta?.folder_name)}`;
+      if (meta?.folder_name) url += `&folder_name=${encodeURIComponent(meta?.folder_name)}`;
       if (meta?.panel_id) url += `&panel_id=${meta?.panel_id}`;
-      if (meta?.panel_name)
-        url += `&panel_name=${encodeURIComponent(meta?.panel_name)}`;
+      if (meta?.panel_name) url += `&panel_name=${encodeURIComponent(meta?.panel_name)}`;
       if (meta?.run_id) url += `&run_id=${meta?.run_id}`;
       if (meta?.tab_id) url += `&tab_id=${meta?.tab_id}`;
-      if (meta?.tab_name)
-        url += `&tab_name=${encodeURIComponent(meta?.tab_name)}`;
+      if (meta?.tab_name) url += `&tab_name=${encodeURIComponent(meta?.tab_name)}`;
       if (meta?.fallback_order_by_col)
         url += `&fallback_order_by_col=${meta?.fallback_order_by_col}`;
       if (clear_cache) url += `&clear_cache=${clear_cache}`;
-      if (meta?.is_ui_histogram)
-        url += `&is_ui_histogram=${meta?.is_ui_histogram}`;
+      if (meta?.is_ui_histogram) url += `&is_ui_histogram=${meta?.is_ui_histogram}`;
 
       if (type === "histogram") {
         let is_multi_stream_search = false;
-        if (queryReq.query?.sql.indexOf(" UNION ALL ") !== -1)
-          is_multi_stream_search = true;
+        if (queryReq.query?.sql.indexOf(" UNION ALL ") !== -1) is_multi_stream_search = true;
         url += `&is_multi_stream_search=${is_multi_stream_search}`;
       }
     } else if (type === "values") {
@@ -256,8 +208,7 @@ const useHttpStreaming = () => {
       // PromQL streaming endpoint
       // For instant queries, set start == end to get a single evaluation point
       const queryType = queryReq.query_type || "range";
-      const startTime =
-        queryType === "instant" ? queryReq.end_time : queryReq.start_time;
+      const startTime = queryType === "instant" ? queryReq.end_time : queryReq.start_time;
       const endTime = queryReq.end_time;
 
       // Always use query_range endpoint (returns matrix format)
@@ -268,15 +219,12 @@ const useHttpStreaming = () => {
       if (meta?.dashboard_name)
         url += `&dashboard_name=${encodeURIComponent(meta?.dashboard_name)}`;
       if (meta?.folder_id) url += `&folder_id=${meta?.folder_id}`;
-      if (meta?.folder_name)
-        url += `&folder_name=${encodeURIComponent(meta?.folder_name)}`;
+      if (meta?.folder_name) url += `&folder_name=${encodeURIComponent(meta?.folder_name)}`;
       if (meta?.panel_id) url += `&panel_id=${meta?.panel_id}`;
-      if (meta?.panel_name)
-        url += `&panel_name=${encodeURIComponent(meta?.panel_name)}`;
+      if (meta?.panel_name) url += `&panel_name=${encodeURIComponent(meta?.panel_name)}`;
       if (meta?.run_id) url += `&run_id=${meta?.run_id}`;
       if (meta?.tab_id) url += `&tab_id=${meta?.tab_id}`;
-      if (meta?.tab_name)
-        url += `&tab_name=${encodeURIComponent(meta?.tab_name)}`;
+      if (meta?.tab_name) url += `&tab_name=${encodeURIComponent(meta?.tab_name)}`;
     } else if (type === "traces") {
       // Traces latest_stream endpoint — GET with query params
       const {
@@ -352,11 +300,7 @@ const useHttpStreaming = () => {
 
       if (worker) {
         // Set up worker message handling
-        const dispatchWorkerEvent = (
-          type: string,
-          eventTraceId: string,
-          data: any,
-        ) => {
+        const dispatchWorkerEvent = (type: string, eventTraceId: string, data: any) => {
           switch (type) {
             case "search_response_metadata":
               onData(eventTraceId, "search_response_metadata", data);
@@ -414,9 +358,7 @@ const useHttpStreaming = () => {
         // string shadow fields (_start_time_ns/_end_time_ns) before JSON.parse
         // corrupts 19-digit nanosecond timestamps. Spans mode uses type="search"
         // with pageType="traces"; aggregation mode uses type="traces" directly.
-        const patchNsFields =
-          type === "traces" ||
-          (type === "search" && pageType === "traces");
+        const patchNsFields = type === "traces" || (type === "search" && pageType === "traces");
 
         // Initialize the stream in the worker
         worker.postMessage({
@@ -516,10 +458,7 @@ const useHttpStreaming = () => {
     }
   };
 
-  const cancelStreamQueryBasedOnRequestId = (payload: {
-    trace_id: string;
-    org_id: string;
-  }) => {
+  const cancelStreamQueryBasedOnRequestId = (payload: { trace_id: string; org_id: string }) => {
     const { trace_id } = payload;
 
     // Check if this trace is still active before attempting cancellation
@@ -594,11 +533,7 @@ const useHttpStreaming = () => {
     await authService.refresh_token();
   };
 
-  const convertToWsResponse = (
-    traceId: string,
-    response: any,
-    type: StreamResponseType,
-  ) => {
+  const convertToWsResponse = (traceId: string, response: any, type: StreamResponseType) => {
     let resp = {
       content: {
         results: response.results || response,
@@ -621,10 +556,7 @@ const useHttpStreaming = () => {
     };
   };
 
-  const convertToWsEventProgress = (
-    traceId: string,
-    response: any,
-  ) => {
+  const convertToWsEventProgress = (traceId: string, response: any) => {
     return {
       content: {
         percent: response?.percent,
@@ -649,10 +581,7 @@ const useHttpStreaming = () => {
     };
   };
 
-  const convertToPromQLResponse = (
-    traceId: string,
-    response: any,
-  ) => {
+  const convertToPromQLResponse = (traceId: string, response: any) => {
     // Backend sends: PromqlResponse { data: QueryResult { result_type, result } }
     // We need to extract the QueryResult and return it in a format compatible with the old API
     return {
@@ -664,10 +593,7 @@ const useHttpStreaming = () => {
     };
   };
 
-  const convertToPromQLMetadata = (
-    traceId: string,
-    response: any,
-  ) => {
+  const convertToPromQLMetadata = (traceId: string, response: any) => {
     return {
       content: {
         ...response,

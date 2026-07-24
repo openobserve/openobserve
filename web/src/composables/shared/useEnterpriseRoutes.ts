@@ -46,8 +46,7 @@ const workflowsRouteGuard = (to: any, from: any, next: any) => {
   routeGuard(to, from, next);
 };
 
-const IdentityAccessManagement = () =>
-  import("@/views/IdentityAccessManagement.vue");
+const IdentityAccessManagement = () => import("@/views/IdentityAccessManagement.vue");
 
 const AppGroups = () => import("@/components/iam/groups/AppGroups.vue");
 
@@ -59,11 +58,9 @@ const EditGroup = () => import("@/components/iam/groups/EditGroup.vue");
 
 const Quota = () => import("@/components/iam/quota/Quota.vue");
 
-const Organizations = () =>
-  import("@/components/iam/organizations/AppOrganizations.vue");
+const Organizations = () => import("@/components/iam/organizations/AppOrganizations.vue");
 
-const ActionScripts = () =>
-  import("@/components/actionScripts/ActionScripts.vue");
+const ActionScripts = () => import("@/components/actionScripts/ActionScripts.vue");
 
 const Invitations = () => import("@/views/Invitations.vue");
 
@@ -71,14 +68,11 @@ import Users from "@/views/User.vue";
 
 const IncidentList = () => import("@/components/alerts/IncidentList.vue");
 
-const WorkflowsList = () =>
-  import("@/components/workflows/WorkflowsList.vue");
+const WorkflowsList = () => import("@/components/workflows/WorkflowsList.vue");
 
-const WorkflowEditor = () =>
-  import("@/components/workflows/WorkflowEditor.vue");
+const WorkflowEditor = () => import("@/components/workflows/WorkflowEditor.vue");
 
-const WorkflowRuns = () =>
-  import("@/components/workflows/WorkflowRuns.vue");
+const WorkflowRuns = () => import("@/components/workflows/WorkflowRuns.vue");
 
 const useEnterpriseRoutes = () => {
   const routes: any = [
@@ -107,8 +101,7 @@ const useEnterpriseRoutes = () => {
           meta: {
             title: "Ingestion Tokens",
           },
-          component: () =>
-            import("@/components/iam/IngestionTokens.vue"),
+          component: () => import("@/components/iam/IngestionTokens.vue"),
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
@@ -119,8 +112,7 @@ const useEnterpriseRoutes = () => {
           meta: {
             title: "Synthetics Tokens",
           },
-          component: () =>
-            import("@/components/iam/SyntheticsTokens.vue"),
+          component: () => import("@/components/iam/SyntheticsTokens.vue"),
           beforeEnter(to: any, from: any, next: any) {
             syntheticsRouteGuard(to, from, next);
           },
@@ -237,7 +229,7 @@ const useEnterpriseRoutes = () => {
         beforeEnter(to: any, from: any, next: any) {
           syntheticsRouteGuard(to, from, next);
         },
-      }
+      },
     );
 
     routes.push(

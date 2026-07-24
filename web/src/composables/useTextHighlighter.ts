@@ -100,9 +100,7 @@ export function useTextHighlighter() {
     }
 
     // Create regex pattern from keywords (escape special characters)
-    const escapedKeywords = keywords.map((k) =>
-      k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-    );
+    const escapedKeywords = keywords.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
 
     const pattern = new RegExp(`(${escapedKeywords.join("|")})`, "gi");
 
@@ -142,9 +140,7 @@ export function useTextHighlighter() {
    * //   {content: '[test]', type: 'token'}
    * // ]
    */
-  function smartTokenize(
-    text: string,
-  ): Array<{ content: string; type: string }> {
+  function smartTokenize(text: string): Array<{ content: string; type: string }> {
     if (!text) return [];
 
     const tokens: Array<{ content: string; type: string }> = [];
@@ -159,7 +155,7 @@ export function useTextHighlighter() {
       const isWhitespace = /^\s+$/.test(part);
       tokens.push({
         content: part,
-        type: isWhitespace ? "whitespace" : "token"
+        type: isWhitespace ? "whitespace" : "token",
       });
     }
 
@@ -190,11 +186,7 @@ export function useTextHighlighter() {
     if (/^https?:\/\//i.test(cleaned)) return "url";
 
     // Email addresses
-    if (
-      analysis.hasAtSymbol &&
-      analysis.hasDots &&
-      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleaned)
-    ) {
+    if (analysis.hasAtSymbol && analysis.hasDots && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleaned)) {
       return "email";
     }
 
@@ -250,20 +242,18 @@ export function useTextHighlighter() {
       hasParentheses: /[()[\]]/.test(text),
       dotSeparatedNumbers: (text.match(/\d+/g) || []).length,
       startsWithUppercase: /^[A-Z]/.test(text),
-      isThreeDigitStatusCode: /^(1(0[0-3])|2(0[0-8]|26)|3(0[0-8])|4(0[0-9]|1[0-9]|2[0-9]|3[01]|51)|5(0[0-9]|1[01]))$/.test(text),
+      isThreeDigitStatusCode:
+        /^(1(0[0-3])|2(0[0-8]|26)|3(0[0-8])|4(0[0-9]|1[0-9]|2[0-9]|3[01]|51)|5(0[0-9]|1[01]))$/.test(
+          text,
+        ),
       isLargeNumber: /^\d{4,}$/.test(text),
       hasDateTimePattern:
         /\d{1,4}[/-]\w{1,3}[/-]\d{1,4}[:\s]\d{1,2}:\d{1,2}(?::\d{1,2})?(?:\s*[+-]\d{4})?/.test(
           text,
         ),
       hasVersionPattern: /\d+\.\d+/.test(text),
-      hasCommonHttpVerb: /^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)$/.test(
-        text,
-      ),
-      isUuidPattern:
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-          text,
-        ),
+      hasCommonHttpVerb: /^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)$/.test(text),
+      isUuidPattern: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text),
       isFilePath: /^\//.test(text) || /^[A-Za-z]:\\/.test(text),
     };
   }
@@ -340,11 +330,7 @@ export function useTextHighlighter() {
    * @param cellValue - The cell value to analyze
    * @returns True if the column contains FTS content
    */
-  function isFTSColumn(
-    columnId: string,
-    cellValue: any,
-    selectedStreamFtsKeys: string[],
-  ): boolean {
+  function isFTSColumn(columnId: string, cellValue: any, selectedStreamFtsKeys: string[]): boolean {
     // Skip for source column (already handled separately)
     if (columnId === "source") return false;
     // Only analyze string values
@@ -366,8 +352,13 @@ export function useTextHighlighter() {
    * @param showQuotes - Whether to add quotes around values
    * @returns HTML string with applied styling
    */
-  function processTextSegments(segments: Array<{ content: string; type: string }>, keywords: string[], colors: any, showQuotes: boolean = false): string {
-    let result = '';
+  function processTextSegments(
+    segments: Array<{ content: string; type: string }>,
+    keywords: string[],
+    colors: any,
+    showQuotes: boolean = false,
+  ): string {
+    let result = "";
 
     // Add opening quote if requested
     if (showQuotes) {
@@ -375,27 +366,31 @@ export function useTextHighlighter() {
     }
 
     // Process each segment individually
-    result += segments.map(segment => {
-      // For whitespace, just return as-is with no special styling
-      if (segment.type === "whitespace") {
-        return segment.content;
-      }
-
-      // For regular tokens, split by keywords and apply semantic colors
-      const parts = splitTextByKeywords(segment.content, keywords);
-      return parts.map(part => {
-        const content = escapeHtml(part.text);
-        if (part.isHighlighted) {
-          // Highlighted keywords get yellow background
-          return `<span class="log-highlighted">${content}</span>`;
-        } else {
-          // Apply semantic colorization based on content type
-          const semanticType = detectSemanticType(part.text);
-          const semanticClass = getSemanticCSSClass(semanticType);
-          return `<span class="${semanticClass}">${content}</span>`;
+    result += segments
+      .map((segment) => {
+        // For whitespace, just return as-is with no special styling
+        if (segment.type === "whitespace") {
+          return segment.content;
         }
-      }).join('');
-    }).join('');
+
+        // For regular tokens, split by keywords and apply semantic colors
+        const parts = splitTextByKeywords(segment.content, keywords);
+        return parts
+          .map((part) => {
+            const content = escapeHtml(part.text);
+            if (part.isHighlighted) {
+              // Highlighted keywords get yellow background
+              return `<span class="log-highlighted">${content}</span>`;
+            } else {
+              // Apply semantic colorization based on content type
+              const semanticType = detectSemanticType(part.text);
+              const semanticClass = getSemanticCSSClass(semanticType);
+              return `<span class="${semanticClass}">${content}</span>`;
+            }
+          })
+          .join("");
+      })
+      .join("");
 
     // Add closing quote if requested
     if (showQuotes) {

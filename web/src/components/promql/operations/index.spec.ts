@@ -36,9 +36,7 @@ describe("buildPromqlStepCatalog", () => {
   describe("catalog integrity", () => {
     it("defines every step the enum declares", () => {
       const defined = new Set(definitions.map((d) => d.id));
-      const undefinedSteps = Object.values(PromqlStepId).filter(
-        (id) => !defined.has(id),
-      );
+      const undefinedSteps = Object.values(PromqlStepId).filter((id) => !defined.has(id));
 
       expect(undefinedSteps).toEqual([]);
     });
@@ -122,44 +120,32 @@ describe("buildPromqlStepCatalog", () => {
 
   describe("Operation Counts by Category", () => {
     it("should have multiple range functions", () => {
-      const rangeFunctions = definitions.filter(
-        (d) => d.group === PromqlStepGroup.RateAndRange,
-      );
+      const rangeFunctions = definitions.filter((d) => d.group === PromqlStepGroup.RateAndRange);
       expect(rangeFunctions.length).toBeGreaterThanOrEqual(10);
     });
 
     it("should have multiple aggregations", () => {
-      const aggregations = definitions.filter(
-        (d) => d.group === PromqlStepGroup.Aggregation,
-      );
+      const aggregations = definitions.filter((d) => d.group === PromqlStepGroup.Aggregation);
       expect(aggregations.length).toBeGreaterThanOrEqual(8);
     });
 
     it("should have multiple functions", () => {
-      const functions = definitions.filter(
-        (d) => d.group === PromqlStepGroup.Math,
-      );
+      const functions = definitions.filter((d) => d.group === PromqlStepGroup.Math);
       expect(functions.length).toBeGreaterThanOrEqual(10);
     });
 
     it("should have exactly 6 binary operations", () => {
-      const binaryOps = definitions.filter(
-        (d) => d.group === PromqlStepGroup.ScalarMath,
-      );
+      const binaryOps = definitions.filter((d) => d.group === PromqlStepGroup.ScalarMath);
       expect(binaryOps.length).toBe(6);
     });
 
     it("should have multiple trigonometric functions", () => {
-      const trigOps = definitions.filter(
-        (d) => d.group === PromqlStepGroup.Trigonometry,
-      );
+      const trigOps = definitions.filter((d) => d.group === PromqlStepGroup.Trigonometry);
       expect(trigOps.length).toBeGreaterThanOrEqual(12);
     });
 
     it("should have multiple time functions", () => {
-      const timeOps = definitions.filter(
-        (d) => d.group === PromqlStepGroup.TimeAndDate,
-      );
+      const timeOps = definitions.filter((d) => d.group === PromqlStepGroup.TimeAndDate);
       expect(timeOps.length).toBeGreaterThanOrEqual(5);
     });
   });
@@ -169,9 +155,7 @@ describe("buildPromqlStepCatalog", () => {
       const rate = definitions.find((d) => d.id === PromqlStepId.Rate);
       expect(rate).toBeDefined();
       expect(rate!.name).toBe("Rate");
-      expect(rate!.group).toBe(
-        PromqlStepGroup.RateAndRange,
-      );
+      expect(rate!.group).toBe(PromqlStepGroup.RateAndRange);
       expect(rate!.params).toHaveLength(1);
       expect(rate!.params[0].type).toBe("string");
       expect(rate!.defaultParams).toEqual(["$__rate_interval"]);
@@ -180,20 +164,14 @@ describe("buildPromqlStepCatalog", () => {
     it("should include Irate operation", () => {
       const irate = definitions.find((d) => d.id === PromqlStepId.Irate);
       expect(irate).toBeDefined();
-      expect(irate!.group).toBe(
-        PromqlStepGroup.RateAndRange,
-      );
+      expect(irate!.group).toBe(PromqlStepGroup.RateAndRange);
       expect(irate!.defaultParams).toEqual(["$__interval"]);
     });
 
     it("should include Increase operation", () => {
-      const increase = definitions.find(
-        (d) => d.id === PromqlStepId.Increase,
-      );
+      const increase = definitions.find((d) => d.id === PromqlStepId.Increase);
       expect(increase).toBeDefined();
-      expect(increase!.group).toBe(
-        PromqlStepGroup.RateAndRange,
-      );
+      expect(increase!.group).toBe(PromqlStepGroup.RateAndRange);
     });
 
     it("should include Delta operation", () => {
@@ -208,53 +186,37 @@ describe("buildPromqlStepCatalog", () => {
     });
 
     it("should include AvgOverTime with correct name", () => {
-      const avgOverTime = definitions.find(
-        (d) => d.id === PromqlStepId.AvgOverTime,
-      );
+      const avgOverTime = definitions.find((d) => d.id === PromqlStepId.AvgOverTime);
       expect(avgOverTime).toBeDefined();
       expect(avgOverTime!.name).toBe("Avg Over Time");
     });
 
     it("should include MinOverTime operation", () => {
-      expect(
-        definitions.find((d) => d.id === PromqlStepId.MinOverTime),
-      ).toBeDefined();
+      expect(definitions.find((d) => d.id === PromqlStepId.MinOverTime)).toBeDefined();
     });
 
     it("should include MaxOverTime operation", () => {
-      expect(
-        definitions.find((d) => d.id === PromqlStepId.MaxOverTime),
-      ).toBeDefined();
+      expect(definitions.find((d) => d.id === PromqlStepId.MaxOverTime)).toBeDefined();
     });
 
     it("should include SumOverTime operation", () => {
-      expect(
-        definitions.find((d) => d.id === PromqlStepId.SumOverTime),
-      ).toBeDefined();
+      expect(definitions.find((d) => d.id === PromqlStepId.SumOverTime)).toBeDefined();
     });
 
     it("should include CountOverTime operation", () => {
-      expect(
-        definitions.find((d) => d.id === PromqlStepId.CountOverTime),
-      ).toBeDefined();
+      expect(definitions.find((d) => d.id === PromqlStepId.CountOverTime)).toBeDefined();
     });
 
     it("should include StddevOverTime operation", () => {
-      expect(
-        definitions.find((d) => d.id === PromqlStepId.StddevOverTime),
-      ).toBeDefined();
+      expect(definitions.find((d) => d.id === PromqlStepId.StddevOverTime)).toBeDefined();
     });
 
     it("should include LastOverTime operation", () => {
-      expect(
-        definitions.find((d) => d.id === PromqlStepId.LastOverTime),
-      ).toBeDefined();
+      expect(definitions.find((d) => d.id === PromqlStepId.LastOverTime)).toBeDefined();
     });
 
     it("should include QuantileOverTime with two params", () => {
-      const quantileOverTime = definitions.find(
-        (d) => d.id === PromqlStepId.QuantileOverTime,
-      );
+      const quantileOverTime = definitions.find((d) => d.id === PromqlStepId.QuantileOverTime);
       expect(quantileOverTime).toBeDefined();
       expect(quantileOverTime!.params).toHaveLength(2);
       expect(quantileOverTime!.params[0].type).toBe("number");
@@ -264,9 +226,7 @@ describe("buildPromqlStepCatalog", () => {
 
     it("should have string type Range param for all range functions except QuantileOverTime", () => {
       const rangeFunctions = definitions.filter(
-        (d) =>
-          d.group === PromqlStepGroup.RateAndRange &&
-          d.id !== PromqlStepId.QuantileOverTime,
+        (d) => d.group === PromqlStepGroup.RateAndRange && d.id !== PromqlStepId.QuantileOverTime,
       );
       rangeFunctions.forEach((op) => {
         expect(op.params[0].type).toBe("string");
@@ -332,9 +292,7 @@ describe("buildPromqlStepCatalog", () => {
     });
 
     it("should include Quantile with quantile and labels params", () => {
-      const quantile = definitions.find(
-        (d) => d.id === PromqlStepId.Quantile,
-      );
+      const quantile = definitions.find((d) => d.id === PromqlStepId.Quantile);
       expect(quantile).toBeDefined();
       expect(quantile!.params).toHaveLength(2);
       expect(quantile!.params[0].type).toBe("number");
@@ -363,9 +321,7 @@ describe("buildPromqlStepCatalog", () => {
 
   describe("Math", () => {
     it("should include HistogramQuantile with quantile param", () => {
-      const hq = definitions.find(
-        (d) => d.id === PromqlStepId.HistogramQuantile,
-      );
+      const hq = definitions.find((d) => d.id === PromqlStepId.HistogramQuantile);
       expect(hq).toBeDefined();
       expect(hq!.name).toBe("Histogram Quantile");
       expect(hq!.group).toBe(PromqlStepGroup.Math);
@@ -409,27 +365,15 @@ describe("buildPromqlStepCatalog", () => {
     });
 
     it("should include Exp, Ln, Log2, Log10 operations", () => {
-      expect(
-        definitions.find((d) => d.id === PromqlStepId.Exp),
-      ).toBeDefined();
-      expect(
-        definitions.find((d) => d.id === PromqlStepId.Ln),
-      ).toBeDefined();
-      expect(
-        definitions.find((d) => d.id === PromqlStepId.Log2),
-      ).toBeDefined();
-      expect(
-        definitions.find((d) => d.id === PromqlStepId.Log10),
-      ).toBeDefined();
+      expect(definitions.find((d) => d.id === PromqlStepId.Exp)).toBeDefined();
+      expect(definitions.find((d) => d.id === PromqlStepId.Ln)).toBeDefined();
+      expect(definitions.find((d) => d.id === PromqlStepId.Log2)).toBeDefined();
+      expect(definitions.find((d) => d.id === PromqlStepId.Log10)).toBeDefined();
     });
 
     it("should include Sort and SortDesc operations", () => {
-      expect(
-        definitions.find((d) => d.id === PromqlStepId.Sort),
-      ).toBeDefined();
-      expect(
-        definitions.find((d) => d.id === PromqlStepId.SortDesc),
-      ).toBeDefined();
+      expect(definitions.find((d) => d.id === PromqlStepId.Sort)).toBeDefined();
+      expect(definitions.find((d) => d.id === PromqlStepId.SortDesc)).toBeDefined();
     });
 
     it("should include Clamp with min and max params", () => {
@@ -442,30 +386,22 @@ describe("buildPromqlStepCatalog", () => {
     });
 
     it("should include ClampMax with single max param defaulting to 100", () => {
-      const clampMax = definitions.find(
-        (d) => d.id === PromqlStepId.ClampMax,
-      );
+      const clampMax = definitions.find((d) => d.id === PromqlStepId.ClampMax);
       expect(clampMax).toBeDefined();
       expect(clampMax!.params).toHaveLength(1);
       expect(clampMax!.defaultParams).toEqual([100]);
     });
 
     it("should include ClampMin with single min param defaulting to 0", () => {
-      const clampMin = definitions.find(
-        (d) => d.id === PromqlStepId.ClampMin,
-      );
+      const clampMin = definitions.find((d) => d.id === PromqlStepId.ClampMin);
       expect(clampMin).toBeDefined();
       expect(clampMin!.params).toHaveLength(1);
       expect(clampMin!.defaultParams).toEqual([0]);
     });
 
     it("should include Deg and Rad conversion functions", () => {
-      expect(
-        definitions.find((d) => d.id === PromqlStepId.Deg),
-      ).toBeDefined();
-      expect(
-        definitions.find((d) => d.id === PromqlStepId.Rad),
-      ).toBeDefined();
+      expect(definitions.find((d) => d.id === PromqlStepId.Deg)).toBeDefined();
+      expect(definitions.find((d) => d.id === PromqlStepId.Rad)).toBeDefined();
     });
 
     it("should include Pi function with no params", () => {
@@ -519,9 +455,7 @@ describe("buildPromqlStepCatalog", () => {
     });
 
     it("should have exactly one number type param for all binary operations", () => {
-      const binaryOps = definitions.filter(
-        (d) => d.group === PromqlStepGroup.ScalarMath,
-      );
+      const binaryOps = definitions.filter((d) => d.group === PromqlStepGroup.ScalarMath);
       binaryOps.forEach((op) => {
         expect(op.params).toHaveLength(1);
         expect(op.params[0].type).toBe("number");
@@ -551,45 +485,25 @@ describe("buildPromqlStepCatalog", () => {
     });
 
     it("should include all inverse trig functions", () => {
-      expect(
-        definitions.find((d) => d.id === PromqlStepId.Asin),
-      ).toBeDefined();
-      expect(
-        definitions.find((d) => d.id === PromqlStepId.Acos),
-      ).toBeDefined();
-      expect(
-        definitions.find((d) => d.id === PromqlStepId.Atan),
-      ).toBeDefined();
+      expect(definitions.find((d) => d.id === PromqlStepId.Asin)).toBeDefined();
+      expect(definitions.find((d) => d.id === PromqlStepId.Acos)).toBeDefined();
+      expect(definitions.find((d) => d.id === PromqlStepId.Atan)).toBeDefined();
     });
 
     it("should include all hyperbolic trig functions", () => {
-      expect(
-        definitions.find((d) => d.id === PromqlStepId.Sinh),
-      ).toBeDefined();
-      expect(
-        definitions.find((d) => d.id === PromqlStepId.Cosh),
-      ).toBeDefined();
-      expect(
-        definitions.find((d) => d.id === PromqlStepId.Tanh),
-      ).toBeDefined();
+      expect(definitions.find((d) => d.id === PromqlStepId.Sinh)).toBeDefined();
+      expect(definitions.find((d) => d.id === PromqlStepId.Cosh)).toBeDefined();
+      expect(definitions.find((d) => d.id === PromqlStepId.Tanh)).toBeDefined();
     });
 
     it("should include all inverse hyperbolic trig functions", () => {
-      expect(
-        definitions.find((d) => d.id === PromqlStepId.Asinh),
-      ).toBeDefined();
-      expect(
-        definitions.find((d) => d.id === PromqlStepId.Acosh),
-      ).toBeDefined();
-      expect(
-        definitions.find((d) => d.id === PromqlStepId.Atanh),
-      ).toBeDefined();
+      expect(definitions.find((d) => d.id === PromqlStepId.Asinh)).toBeDefined();
+      expect(definitions.find((d) => d.id === PromqlStepId.Acosh)).toBeDefined();
+      expect(definitions.find((d) => d.id === PromqlStepId.Atanh)).toBeDefined();
     });
 
     it("should have all trig functions with no params and no default params", () => {
-      const trigFunctions = definitions.filter(
-        (d) => d.group === PromqlStepGroup.Trigonometry,
-      );
+      const trigFunctions = definitions.filter((d) => d.group === PromqlStepGroup.Trigonometry);
       trigFunctions.forEach((op) => {
         expect(op.params).toHaveLength(0);
         expect(op.defaultParams).toHaveLength(0);
@@ -642,9 +556,7 @@ describe("buildPromqlStepCatalog", () => {
     });
 
     it("should have all time functions with no params and no default params", () => {
-      const timeFunctions = definitions.filter(
-        (d) => d.group === PromqlStepGroup.TimeAndDate,
-      );
+      const timeFunctions = definitions.filter((d) => d.group === PromqlStepGroup.TimeAndDate);
       timeFunctions.forEach((op) => {
         expect(op.params).toHaveLength(0);
         expect(op.defaultParams).toHaveLength(0);
@@ -664,9 +576,7 @@ describe("buildPromqlStepCatalog", () => {
     });
 
     it("should have documentation for Increase", () => {
-      const increase = definitions.find(
-        (d) => d.id === PromqlStepId.Increase,
-      );
+      const increase = definitions.find((d) => d.id === PromqlStepId.Increase);
       expect(increase!.documentation).toBeTruthy();
     });
 
@@ -676,9 +586,7 @@ describe("buildPromqlStepCatalog", () => {
     });
 
     it("should have documentation for HistogramQuantile", () => {
-      const hq = definitions.find(
-        (d) => d.id === PromqlStepId.HistogramQuantile,
-      );
+      const hq = definitions.find((d) => d.id === PromqlStepId.HistogramQuantile);
       expect(hq!.documentation).toBeTruthy();
     });
   });
@@ -701,9 +609,7 @@ describe("buildPromqlStepCatalog", () => {
     });
 
     it("should have placeholder for QuantileOverTime quantile param", () => {
-      const qot = definitions.find(
-        (d) => d.id === PromqlStepId.QuantileOverTime,
-      );
+      const qot = definitions.find((d) => d.id === PromqlStepId.QuantileOverTime);
       expect(qot!.params[0].placeholder).toBeTruthy();
     });
   });

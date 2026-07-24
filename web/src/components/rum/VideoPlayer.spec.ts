@@ -187,9 +187,7 @@ describe("VideoPlayer", () => {
     });
 
     it("should render the playback_bar element", () => {
-      expect(
-        wrapper.find('[data-test="video-player-playback-bar"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="video-player-playback-bar"]').exists()).toBe(true);
     });
   });
 
@@ -199,17 +197,13 @@ describe("VideoPlayer", () => {
 
   describe("Loading State", () => {
     it("should not render loading indicator when isLoading is false", () => {
-      expect(
-        wrapper.find('[data-test="video-player-loading-indicator"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="video-player-loading-indicator"]').exists()).toBe(false);
     });
 
     it("should render loading indicator when isLoading is true", async () => {
       await wrapper.setProps({ isLoading: true });
 
-      expect(
-        wrapper.find('[data-test="video-player-loading-indicator"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="video-player-loading-indicator"]').exists()).toBe(true);
     });
 
     it("should display loading text message when isLoading is true", async () => {
@@ -220,15 +214,11 @@ describe("VideoPlayer", () => {
 
     it("should hide loading indicator when isLoading transitions from true to false", async () => {
       await wrapper.setProps({ isLoading: true });
-      expect(
-        wrapper.find('[data-test="video-player-loading-indicator"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="video-player-loading-indicator"]').exists()).toBe(true);
 
       await wrapper.setProps({ isLoading: false });
 
-      expect(
-        wrapper.find('[data-test="video-player-loading-indicator"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="video-player-loading-indicator"]').exists()).toBe(false);
     });
   });
 
@@ -337,9 +327,7 @@ describe("VideoPlayer", () => {
     });
 
     it("should not throw when the playback bar is clicked", async () => {
-      const playbackBar = wrapper.find(
-        '[data-test="video-player-playback-bar"]',
-      );
+      const playbackBar = wrapper.find('[data-test="video-player-playback-bar"]');
       expect(playbackBar.exists()).toBe(true);
 
       await expect(playbackBar.trigger("click")).resolves.not.toThrow();
@@ -358,9 +346,7 @@ describe("VideoPlayer", () => {
     });
 
     it("should accept new events prop value without errors", async () => {
-      const newEvents = [
-        { id: "new", name: "New Event", relativeTime: 5000 },
-      ];
+      const newEvents = [{ id: "new", name: "New Event", relativeTime: 5000 }];
 
       await wrapper.setProps({ events: newEvents });
 
@@ -388,9 +374,7 @@ describe("VideoPlayer", () => {
     });
 
     it("should not create a player instance when segments array is empty", async () => {
-      const { default: rrwebPlayerMock } = await import(
-        "@openobserve/rrweb-player"
-      );
+      const { default: rrwebPlayerMock } = await import("@openobserve/rrweb-player");
       (rrwebPlayerMock as ReturnType<typeof vi.fn>).mockClear();
 
       const localWrapper = mountComponent({ segments: [] });
@@ -432,9 +416,7 @@ describe("VideoPlayer", () => {
     });
 
     it("should transform type-8 records into type-5 viewport events during setupSession", async () => {
-      const { default: rrwebPlayerMock } = await import(
-        "@openobserve/rrweb-player"
-      );
+      const { default: rrwebPlayerMock } = await import("@openobserve/rrweb-player");
 
       // A segment containing both a type-8 record (to be transformed) and a
       // type-2 full-snapshot (needed so rrwebPlayer is constructed and we can
@@ -468,8 +450,7 @@ describe("VideoPlayer", () => {
       await localWrapper.vm.$nextTick();
 
       expect(rrwebPlayerMock).toHaveBeenCalled();
-      const callArgs = (rrwebPlayerMock as ReturnType<typeof vi.fn>).mock
-        .calls[0][0];
+      const callArgs = (rrwebPlayerMock as ReturnType<typeof vi.fn>).mock.calls[0][0];
       const events: any[] = callArgs?.props?.events ?? [];
       const viewportEvent = events.find((e: any) => e.type === 5);
       expect(viewportEvent).toBeDefined();
@@ -524,9 +505,7 @@ describe("VideoPlayer", () => {
     });
 
     it("should render event markers in the playback bar", () => {
-      const eventMarkers = frustrationWrapper.findAll(
-        '[data-test="video-player-event-marker"]',
-      );
+      const eventMarkers = frustrationWrapper.findAll('[data-test="video-player-event-marker"]');
 
       expect(eventMarkers.length).toBeGreaterThan(0);
     });
@@ -650,9 +629,7 @@ describe("VideoPlayer", () => {
     });
 
     it("should not call player.$set when the ResizeObserver callback fires before player is initialized", async () => {
-      const { default: rrwebPlayerMock } = await import(
-        "@openobserve/rrweb-player"
-      );
+      const { default: rrwebPlayerMock } = await import("@openobserve/rrweb-player");
       (rrwebPlayerMock as ReturnType<typeof vi.fn>).mockClear();
 
       const localWrapper = mountComponent({ segments: [] });

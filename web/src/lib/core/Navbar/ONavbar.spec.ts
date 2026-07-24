@@ -31,7 +31,7 @@ const mockLinks: NavItem[] = [
 
 const menuLinkStub = {
   template:
-    '<a :data-test="\'menu-link-\' + linkName + \'-item\'" @mouseenter="$emit(\'menu-hover\', link)"><slot /></a>',
+    "<a :data-test=\"'menu-link-' + linkName + '-item'\" @mouseenter=\"$emit('menu-hover', link)\"><slot /></a>",
   props: ["linkName", "mini", "title", "icon", "link", "name", "exact", "display", "hide"],
   emits: ["menu-hover"],
   inheritAttrs: true,
@@ -42,7 +42,7 @@ const menuLinkStub = {
 // wires entries correctly without a vuex store or the real flyout machinery.
 const navGroupStub = {
   template:
-    '<div :data-test="\'nav-group-\' + groupKey" :data-children="children.map(c => c.name).join(\',\')" :data-mode="parentItem ? \'link\' : \'group\'" />',
+    "<div :data-test=\"'nav-group-' + groupKey\" :data-children=\"children.map(c => c.name).join(',')\" :data-mode=\"parentItem ? 'link' : 'group'\" />",
   props: ["groupKey", "title", "icon", "children", "parentItem"],
 };
 
@@ -186,7 +186,9 @@ describe("ONavbar", () => {
       focusSpy = vi.spyOn(HTMLElement.prototype, "focus").mockImplementation(function () {
         activeEl = this as unknown as Element;
       });
-      activeElementSpy = vi.spyOn(document, "activeElement", "get").mockImplementation(() => activeEl as Element);
+      activeElementSpy = vi
+        .spyOn(document, "activeElement", "get")
+        .mockImplementation(() => activeEl as Element);
     });
 
     afterEach(() => {

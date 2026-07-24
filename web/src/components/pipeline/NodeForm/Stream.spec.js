@@ -21,11 +21,10 @@ import i18n from "@/locales";
 import Stream from "./Stream.vue";
 import useDnD from "@/plugins/pipelines/useDnD";
 
-
 // ---------------------------------------------------------------------------
 // Module mocks
 // ---------------------------------------------------------------------------
-const mockAddNode            = vi.fn();
+const mockAddNode = vi.fn();
 const mockDeletePipelineNode = vi.fn();
 const mockCheckIfDefaultDestinationNode = vi.fn().mockReturnValue(false);
 
@@ -46,8 +45,8 @@ vi.mock("@/composables/useStreams", () => ({
   default: () => ({
     getStreams: vi.fn().mockResolvedValue({
       list: [
-        { name: "logs_stream_1", stream_type: "logs"    },
-        { name: "logs_stream_2", stream_type: "logs"    },
+        { name: "logs_stream_1", stream_type: "logs" },
+        { name: "logs_stream_2", stream_type: "logs" },
         { name: "metrics_stream", stream_type: "metrics" },
       ],
     }),
@@ -93,8 +92,16 @@ function makePipelineObj(overrides = {}) {
 const ODrawerStub = {
   name: "ODrawer",
   props: [
-    "open", "size", "showClose", "title", "width", "persistent", "formId",
-    "primaryButtonLabel", "secondaryButtonLabel", "neutralButtonLabel",
+    "open",
+    "size",
+    "showClose",
+    "title",
+    "width",
+    "persistent",
+    "formId",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
   ],
   emits: ["update:open", "click:secondary", "click:neutral"],
   template: `<div class="o-drawer-stub">
@@ -120,9 +127,9 @@ function createWrapper(pipelineObjOverrides = {}) {
     global: {
       plugins: [i18n, store],
       stubs: {
-        AddStream:     true,
+        AddStream: true,
         ConfirmDialog: true,
-        ODrawer:       ODrawerStub,
+        ODrawer: ODrawerStub,
       },
     },
   });
@@ -156,9 +163,9 @@ describe("Stream Component", () => {
     it("renders outer section with data-test attribute", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="add-stream-input-stream-routing-section"]').exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-stream-input-stream-routing-section"]').exists()).toBe(
+        true,
+      );
     });
 
     it("initializes createNewStream as false", async () => {
@@ -236,9 +243,17 @@ describe("Stream Component", () => {
       const wrapper = createWrapper();
       await flushPromises();
       const fns = [
-        "sanitizeStreamName", "sanitizeStaticPart", "getStreamList", "updateStreams",
-        "handleCreateStreamName", "getLogStream", "handleSecondaryClick",
-        "openCancelDialog", "openDeleteDialog", "deleteNode", "onSubmit",
+        "sanitizeStreamName",
+        "sanitizeStaticPart",
+        "getStreamList",
+        "updateStreams",
+        "handleCreateStreamName",
+        "getLogStream",
+        "handleSecondaryClick",
+        "openCancelDialog",
+        "openDeleteDialog",
+        "deleteNode",
+        "onSubmit",
         "filterColumns",
       ];
       fns.forEach((fn) => expect(typeof wrapper.vm[fn]).toBe("function"));
@@ -273,7 +288,10 @@ describe("Stream Component", () => {
       wrapper.vm.selectedNodeType = "output";
       await nextTick();
       expect(wrapper.vm.filteredStreamTypes).toEqual([
-        "logs", "metrics", "traces", "enrichment_tables",
+        "logs",
+        "metrics",
+        "traces",
+        "enrichment_tables",
       ]);
     });
   });
@@ -281,13 +299,13 @@ describe("Stream Component", () => {
   // -------------------------------------------------------------------------
   describe("sanitizeStreamName", () => {
     const cases = [
-      { input: "test_stream",         expected: "test_stream"          },
-      { input: "test-stream",         expected: "test_stream"          },
-      { input: "test@stream",         expected: "test_stream"          },
-      { input: "test{field}stream",   expected: "test{field}stream"    },
-      { input: "test{field}@stream",  expected: "test{field}_stream"   },
-      { input: "abc123",              expected: "abc123"               },
-      { input: "CamelCase",           expected: "CamelCase"            },
+      { input: "test_stream", expected: "test_stream" },
+      { input: "test-stream", expected: "test_stream" },
+      { input: "test@stream", expected: "test_stream" },
+      { input: "test{field}stream", expected: "test{field}stream" },
+      { input: "test{field}@stream", expected: "test{field}_stream" },
+      { input: "abc123", expected: "abc123" },
+      { input: "CamelCase", expected: "CamelCase" },
     ];
 
     cases.forEach(({ input, expected }) => {
@@ -307,7 +325,7 @@ describe("Stream Component", () => {
       expect(mockToast).toHaveBeenCalledWith(
         expect.objectContaining({
           message: "Stream name should be less than 100 characters",
-        })
+        }),
       );
     });
 
@@ -334,12 +352,12 @@ describe("Stream Component", () => {
   // -------------------------------------------------------------------------
   describe("sanitizeStaticPart", () => {
     const cases = [
-      { input: "abc",    expected: ["a", "b", "c"]             },
-      { input: "a@b#c",  expected: ["a", "_", "b", "_", "c"]   },
-      { input: "123",    expected: ["1", "2", "3"]             },
-      { input: "a-b",    expected: ["a", "_", "b"]             },
-      { input: "a_b",    expected: ["a", "_", "b"]             },
-      { input: "",       expected: []                          },
+      { input: "abc", expected: ["a", "b", "c"] },
+      { input: "a@b#c", expected: ["a", "_", "b", "_", "c"] },
+      { input: "123", expected: ["1", "2", "3"] },
+      { input: "a-b", expected: ["a", "_", "b"] },
+      { input: "a_b", expected: ["a", "_", "b"] },
+      { input: "", expected: [] },
     ];
 
     cases.forEach(({ input, expected }) => {
@@ -382,7 +400,7 @@ describe("Stream Component", () => {
       await flushPromises();
       await wrapper.vm.getLogStream({ name: "test-stream", stream_type: "logs" });
       expect(mockAddNode).toHaveBeenCalledWith(
-        expect.objectContaining({ stream_name: "test_stream" })
+        expect.objectContaining({ stream_name: "test_stream" }),
       );
     });
 
@@ -390,9 +408,7 @@ describe("Stream Component", () => {
       const wrapper = createWrapper();
       await flushPromises();
       await wrapper.vm.getLogStream({ name: "metricsStream", stream_type: "metrics" });
-      expect(mockAddNode).toHaveBeenCalledWith(
-        expect.objectContaining({ stream_type: "metrics" })
-      );
+      expect(mockAddNode).toHaveBeenCalledWith(expect.objectContaining({ stream_type: "metrics" }));
     });
 
     it("turns off createNewStream after stream is added", async () => {
@@ -409,7 +425,7 @@ describe("Stream Component", () => {
       await wrapper.vm.getLogStream({ name: "my_stream", stream_type: "logs" });
       await flushPromises();
       expect(mockAddNode).toHaveBeenCalledWith(
-        expect.objectContaining({ stream_name: "my_stream" })
+        expect.objectContaining({ stream_name: "my_stream" }),
       );
     });
   });
@@ -446,9 +462,7 @@ describe("Stream Component", () => {
       wrapper.vm.usedStreams = [{ stream_name: "logs_stream_1", stream_type: "logs" }];
       await wrapper.vm.getStreamList();
       await flushPromises();
-      const stream = wrapper.vm.streams.logs?.find(
-        (s) => s.name === "logs_stream_1"
-      );
+      const stream = wrapper.vm.streams.logs?.find((s) => s.name === "logs_stream_1");
       expect(stream?.isDisable).toBe(true);
     });
 
@@ -465,9 +479,7 @@ describe("Stream Component", () => {
       await wrapper.vm.getStreamList();
       await flushPromises();
       // For output node the disable logic isn't applied; isDisable may be undefined
-      const stream = wrapper.vm.streams.logs?.find(
-        (s) => s.name === "logs_stream_1"
-      );
+      const stream = wrapper.vm.streams.logs?.find((s) => s.name === "logs_stream_1");
       expect(stream?.isDisable).toBeFalsy();
     });
   });
@@ -552,9 +564,7 @@ describe("Stream Component", () => {
       setField(wrapper, "stream_type", "logs");
       setField(wrapper, "stream_name", "my_stream");
       await submitForm(wrapper);
-      expect(mockAddNode).toHaveBeenCalledWith(
-        expect.objectContaining({ node_type: "stream" })
-      );
+      expect(mockAddNode).toHaveBeenCalledWith(expect.objectContaining({ node_type: "stream" }));
     });
 
     it("emits cancel:hideform after successful save", async () => {
@@ -572,9 +582,7 @@ describe("Stream Component", () => {
       setField(wrapper, "stream_type", "logs");
       setField(wrapper, "stream_name", "s");
       await submitForm(wrapper);
-      expect(mockAddNode).toHaveBeenCalledWith(
-        expect.objectContaining({ org_id: "default" })
-      );
+      expect(mockAddNode).toHaveBeenCalledWith(expect.objectContaining({ org_id: "default" }));
     });
 
     it("includes meta.append_data for enrichment_tables stream type", async () => {
@@ -588,7 +596,7 @@ describe("Stream Component", () => {
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({
           meta: { append_data: "true" },
-        })
+        }),
       );
     });
 
@@ -622,7 +630,6 @@ describe("Stream Component", () => {
       await nextTick();
       expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
     });
-
   });
 
   // -------------------------------------------------------------------------
@@ -633,9 +640,7 @@ describe("Stream Component", () => {
       wrapper.vm.openDeleteDialog();
       expect(wrapper.vm.dialog.show).toBe(true);
       expect(wrapper.vm.dialog.title).toBe("Delete Node");
-      expect(wrapper.vm.dialog.message).toBe(
-        "Are you sure you want to delete stream association?"
-      );
+      expect(wrapper.vm.dialog.message).toBe("Are you sure you want to delete stream association?");
     });
 
     it("sets warningMessage when deleting a default destination node", async () => {
@@ -766,17 +771,13 @@ describe("Stream Component", () => {
     it("shows delete button when pipelineObj.isEditNode is true", async () => {
       const wrapper = createWrapper({ isEditNode: true });
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="o-drawer-neutral-btn"]').exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="o-drawer-neutral-btn"]').exists()).toBe(true);
     });
 
     it("hides delete button when pipelineObj.isEditNode is false", async () => {
       const wrapper = createWrapper({ isEditNode: false });
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="o-drawer-neutral-btn"]').exists()
-      ).toBe(false);
+      expect(wrapper.find('[data-test="o-drawer-neutral-btn"]').exists()).toBe(false);
     });
   });
 

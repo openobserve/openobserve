@@ -10,32 +10,37 @@
     @update:open="$emit('update:open', $event)"
     @click:secondary="$emit('update:open', false)"
   >
-    <OForm id="add-to-dashboard-form" :schema="addToDashboardSchema" :default-values="addToDashboardDefaults()" @submit="onSubmit">
-    <div class="add-dashboard-form-card-section flex flex-col gap-4">
-      <!-- select folder or create new folder and select -->
-      <select-folder-dropdown @folder-selected="updateActiveFolderId" />
+    <OForm
+      id="add-to-dashboard-form"
+      :schema="addToDashboardSchema"
+      :default-values="addToDashboardDefaults()"
+      @submit="onSubmit"
+    >
+      <div class="add-dashboard-form-card-section flex flex-col gap-4">
+        <!-- select folder or create new folder and select -->
+        <SelectFolderDropdown @folder-selected="updateActiveFolderId" />
 
-      <!-- select folder or create new folder and select -->
-      <select-dashboard-dropdown
-        v-if="activeFolderId"
-        :folder-id="activeFolderId"
-        @dashboard-selected="updateSelectedDashboard"
-      />
+        <!-- select folder or create new folder and select -->
+        <SelectDashboardDropdown
+          v-if="activeFolderId"
+          :folder-id="activeFolderId"
+          @dashboard-selected="updateSelectedDashboard"
+        />
 
-      <!-- select tab or create new tab and select -->
-      <select-tab-dropdown
-        v-if="activeFolderId && selectedDashboard"
-        :folder-id="activeFolderId"
-        :dashboard-id="selectedDashboard"
-        @tab-selected="updateActiveTabId"
-      />
-      <OFormInput
-        name="panelTitle"
-        :label="t('dashboard.panelTitle')"
-        required
-        data-test="metrics-new-dashboard-panel-title"
-      />
-    </div>
+        <!-- select tab or create new tab and select -->
+        <SelectTabDropdown
+          v-if="activeFolderId && selectedDashboard"
+          :folder-id="activeFolderId"
+          :dashboard-id="selectedDashboard"
+          @tab-selected="updateActiveTabId"
+        />
+        <OFormInput
+          name="panelTitle"
+          :label="t('dashboard.panelTitle')"
+          required
+          data-test="metrics-new-dashboard-panel-title"
+        />
+      </div>
     </OForm>
   </ODialog>
 </template>
@@ -50,13 +55,17 @@ import { addPanel } from "@/utils/commons";
 import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.vue";
 import SelectDashboardDropdown from "@/components/dashboards/SelectDashboardDropdown.vue";
 import SelectTabDropdown from "@/components/dashboards/SelectTabDropdown.vue";
-import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
-import OForm from '@/lib/forms/Form/OForm.vue';
-import OFormInput from '@/lib/forms/Input/OFormInput.vue';
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import { useRouter } from "vue-router";
 import useNotifications from "@/composables/useNotifications";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { addToDashboardSchema, addToDashboardDefaults, type AddToDashboardForm } from "./AddToDashboard.schema";
+import {
+  addToDashboardSchema,
+  addToDashboardDefaults,
+  type AddToDashboardForm,
+} from "./AddToDashboard.schema";
 
 export default defineComponent({
   name: "AddToDashboard",
@@ -105,10 +114,8 @@ export default defineComponent({
     const activeTabId: any = ref(null);
     const { t } = useI18n();
 
-    const {
-      showErrorNotification,
-      showConfictErrorNotificationWithRefreshBtn,
-    } = useNotifications();
+    const { showErrorNotification, showConfictErrorNotificationWithRefreshBtn } =
+      useNotifications();
 
     // Fetch folders only when the drawer opens (matches old dialog behaviour where the
     // component mounted only on first open). Avoids an eager API call on page load.
@@ -174,13 +181,7 @@ export default defineComponent({
           // panel name will come from add to dashboard component
           dashboardPanelData.value.data.title = panelTitle;
           // to create panel dashboard id, paneldata and folderId is required
-          await addPanel(
-            store,
-            dashboardId,
-            dashboardPanelData.value.data,
-            folderId,
-            tabId,
-          );
+          await addPanel(store, dashboardId, dashboardPanelData.value.data, folderId, tabId);
         }
         toast({
           message: multi

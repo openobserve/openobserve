@@ -24,10 +24,7 @@ import {
   buildUrlFromRegistry,
   applyOverridesFromRegistry,
 } from "./deepLinkParams";
-import {
-  METRICS_PARAMS,
-  defaultMetricsQuery,
-} from "@/utils/metrics/metricsParamRegistry";
+import { METRICS_PARAMS, defaultMetricsQuery } from "@/utils/metrics/metricsParamRegistry";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 
 const PERQ = METRICS_PARAMS.filter((d) => d.scope === "perQuery");
@@ -56,9 +53,7 @@ describe("deepLinkParams · readIndexed", () => {
     expect(readIndexed({ "query.1": "b" }, "query", 1)).toBe("b");
   });
   it("prefers the explicit .0 over the bare key (.0 wins)", () => {
-    expect(readIndexed({ query: "bare", "query.0": "dot0" }, "query", 0)).toBe(
-      "dot0",
-    );
+    expect(readIndexed({ query: "bare", "query.0": "dot0" }, "query", 0)).toBe("dot0");
   });
   it("does NOT treat the bare key as index >= 1", () => {
     expect(readIndexed({ query: "a" }, "query", 1)).toBeUndefined();
@@ -77,28 +72,22 @@ describe("deepLinkParams · parseQueryIndices", () => {
     expect(parseQueryIndices({ "query.0": "a" }, PERQ)).toEqual([0]);
   });
   it("collects contiguous indices 0,1,2", () => {
-    expect(
-      parseQueryIndices({ query: "a", "query.1": "b", "query.2": "c" }, PERQ),
-    ).toEqual([0, 1, 2]);
+    expect(parseQueryIndices({ query: "a", "query.1": "b", "query.2": "c" }, PERQ)).toEqual([
+      0, 1, 2,
+    ]);
   });
   it("collects non-contiguous indices (gaps preserved here, compacted at apply)", () => {
     expect(parseQueryIndices({ "query.2": "c" }, PERQ)).toEqual([2]);
-    expect(parseQueryIndices({ "query.1": "b", "query.3": "d" }, PERQ)).toEqual([
-      1, 3,
-    ]);
+    expect(parseQueryIndices({ "query.1": "b", "query.3": "d" }, PERQ)).toEqual([1, 3]);
   });
   it("unions indices across descriptors and dedupes", () => {
-    expect(
-      parseQueryIndices({ stream_name: "s", "query.1": "q" }, PERQ),
-    ).toEqual([0, 1]);
-    expect(
-      parseQueryIndices({ "stream_name.1": "s", "query.1": "q" }, PERQ),
-    ).toEqual([1]);
+    expect(parseQueryIndices({ stream_name: "s", "query.1": "q" }, PERQ)).toEqual([0, 1]);
+    expect(parseQueryIndices({ "stream_name.1": "s", "query.1": "q" }, PERQ)).toEqual([1]);
   });
   it("returns a sorted result regardless of key order", () => {
-    expect(
-      parseQueryIndices({ "query.2": "c", query: "a", "query.1": "b" }, PERQ),
-    ).toEqual([0, 1, 2]);
+    expect(parseQueryIndices({ "query.2": "c", query: "a", "query.1": "b" }, PERQ)).toEqual([
+      0, 1, 2,
+    ]);
   });
   it("returns [] when no per-query params are present", () => {
     expect(parseQueryIndices({ chart_type: "bar" }, PERQ)).toEqual([]);
@@ -107,14 +96,10 @@ describe("deepLinkParams · parseQueryIndices", () => {
 
 describe("deepLinkParams · hasAnyDeepLinkParam", () => {
   it("is true when a panel param is present", () => {
-    expect(hasAnyDeepLinkParam({ chart_type: "bar" }, METRICS_PARAMS)).toBe(
-      true,
-    );
+    expect(hasAnyDeepLinkParam({ chart_type: "bar" }, METRICS_PARAMS)).toBe(true);
   });
   it("is true when a bare per-query param is present", () => {
-    expect(hasAnyDeepLinkParam({ stream_name: "cpu" }, METRICS_PARAMS)).toBe(
-      true,
-    );
+    expect(hasAnyDeepLinkParam({ stream_name: "cpu" }, METRICS_PARAMS)).toBe(true);
   });
   it("is true when an indexed per-query param is present", () => {
     expect(hasAnyDeepLinkParam({ "query.1": "x" }, METRICS_PARAMS)).toBe(true);
@@ -124,21 +109,14 @@ describe("deepLinkParams · hasAnyDeepLinkParam", () => {
   });
   it("is false when only unrelated params are present", () => {
     expect(
-      hasAnyDeepLinkParam(
-        { org_identifier: "x", refresh: "30s", period: "15m" },
-        METRICS_PARAMS,
-      ),
+      hasAnyDeepLinkParam({ org_identifier: "x", refresh: "30s", period: "15m" }, METRICS_PARAMS),
     ).toBe(false);
   });
 });
 
 describe("deepLinkParams · buildUrlFromRegistry (real METRICS_PARAMS)", () => {
   const build = (intent: any) =>
-    buildUrlFromRegistry(
-      new URL("https://o2.dev/metrics"),
-      METRICS_PARAMS,
-      intent,
-    ).searchParams;
+    buildUrlFromRegistry(new URL("https://o2.dev/metrics"), METRICS_PARAMS, intent).searchParams;
 
   it("emits panel params via read()", () => {
     const sp = build({ chartType: "bar", queryType: "sql" });
@@ -181,11 +159,7 @@ describe("deepLinkParams · applyOverridesFromRegistry · panel (real)", () => {
   });
   it("ignores an invalid chart_type (keeps base)", () => {
     const state = mkState();
-    applyOverridesFromRegistry(
-      METRICS_PARAMS,
-      { chart_type: "not-a-chart" },
-      state,
-    );
+    applyOverridesFromRegistry(METRICS_PARAMS, { chart_type: "not-a-chart" }, state);
     expect(state.data.type).toBe("line");
   });
   it("maps query_type sql/promql", () => {
@@ -200,21 +174,13 @@ describe("deepLinkParams · applyOverridesFromRegistry · panel (real)", () => {
 
 describe("deepLinkParams · applyOverridesFromRegistry · per-query literal index (real)", () => {
   it("overrides queries[i] IN PLACE when the base has it (surgical)", () => {
-    const base = [
-      defaultMetricsQuery(),
-      defaultMetricsQuery(),
-      defaultMetricsQuery(),
-    ];
+    const base = [defaultMetricsQuery(), defaultMetricsQuery(), defaultMetricsQuery()];
     base[0].query = "q0";
     base[1].query = "q1";
     base[2].query = "q2";
     const state = mkState(base);
     const ref0 = state.data.queries[0];
-    applyOverridesFromRegistry(
-      METRICS_PARAMS,
-      { "query.1": enc("OVERRIDDEN") },
-      state,
-    );
+    applyOverridesFromRegistry(METRICS_PARAMS, { "query.1": enc("OVERRIDDEN") }, state);
     expect(state.data.queries).toHaveLength(3);
     expect(state.data.queries[0]).toBe(ref0); // same ref, untouched
     expect(state.data.queries[0].query).toBe("q0");
@@ -225,12 +191,9 @@ describe("deepLinkParams · applyOverridesFromRegistry · per-query literal inde
 
   it("appends a cloned default beyond the base length", () => {
     const state = mkState([defaultMetricsQuery()]);
-    applyOverridesFromRegistry(
-      METRICS_PARAMS,
-      { query: enc("A"), "query.1": enc("B") },
-      state,
-      { makeDefaultQuery: defaultMetricsQuery },
-    );
+    applyOverridesFromRegistry(METRICS_PARAMS, { query: enc("A"), "query.1": enc("B") }, state, {
+      makeDefaultQuery: defaultMetricsQuery,
+    });
     expect(state.data.queries).toHaveLength(2);
     expect(state.data.queries[0].query).toBe("A");
     expect(state.data.queries[1].query).toBe("B");
@@ -238,11 +201,7 @@ describe("deepLinkParams · applyOverridesFromRegistry · per-query literal inde
 
   it("base64-decodes the query and marks it custom", () => {
     const state = mkState();
-    applyOverridesFromRegistry(
-      METRICS_PARAMS,
-      { query: enc("rate(cpu[5m])") },
-      state,
-    );
+    applyOverridesFromRegistry(METRICS_PARAMS, { query: enc("rate(cpu[5m])") }, state);
     expect(state.data.queries[0].query).toBe("rate(cpu[5m])");
     expect(state.data.queries[0].customQuery).toBe(true);
   });
@@ -307,12 +266,7 @@ describe("deepLinkParams · applyOverridesFromRegistry · compactIndices (real)"
 
   it("compacts a leading gap: query.1 only -> one query at slot 0", () => {
     const state = mkState([defaultMetricsQuery()]);
-    applyOverridesFromRegistry(
-      METRICS_PARAMS,
-      { "query.1": enc("B") },
-      state,
-      opts,
-    );
+    applyOverridesFromRegistry(METRICS_PARAMS, { "query.1": enc("B") }, state, opts);
     expect(state.data.queries).toHaveLength(1);
     expect(state.data.queries[0].query).toBe("B");
   });
@@ -374,11 +328,7 @@ describe("deepLinkParams · query honored verbatim (custom) vs builder mode", ()
   it("stream_name + query together: the query wins and stays custom/verbatim", () => {
     const state = mkState();
     const raw = "rate(node_cpu_seconds_total[5m])";
-    applyOverridesFromRegistry(
-      METRICS_PARAMS,
-      { stream_name: "cpu", query: enc(raw) },
-      state,
-    );
+    applyOverridesFromRegistry(METRICS_PARAMS, { stream_name: "cpu", query: enc(raw) }, state);
     expect(state.data.queries[0].fields.stream).toBe("cpu");
     expect(state.data.queries[0].query).toBe(raw); // authoritative, verbatim
     expect(state.data.queries[0].customQuery).toBe(true); // custom, not decomposed
@@ -402,11 +352,7 @@ describe("deepLinkParams · query honored verbatim (custom) vs builder mode", ()
   it("there is no separate `custom` param — customQuery is derived from query presence", () => {
     // a bare custom flag is meaningless; only the presence of `query` flips it
     const state = mkState();
-    applyOverridesFromRegistry(
-      METRICS_PARAMS,
-      { custom: "false", query: enc("up") } as any,
-      state,
-    );
+    applyOverridesFromRegistry(METRICS_PARAMS, { custom: "false", query: enc("up") } as any, state);
     expect(state.data.queries[0].customQuery).toBe(true); // query presence wins
   });
 });
