@@ -180,11 +180,11 @@
               <span class="sd-produces__name">{{
                 producesConfig.name
               }}</span>
-              <span class="sd-produces__version"
+              <span class="sd-produces__version text-text-secondary"
                 >v{{ producesConfig.version }}</span
               >
-              <span class="sd-produces__sep">·</span>
-              <span class="sd-produces__type">{{
+              <span class="sd-produces__sep text-text-secondary">·</span>
+              <span class="sd-produces__type text-text-secondary">{{
                 dataTypeOf(producesConfig)
               }}</span>
             </div>
@@ -856,7 +856,6 @@ function relativeTime(timestampMs: number): string {
 .sd-produces__version,
 .sd-produces__sep,
 .sd-produces__type {
-  color: var(--color-text-secondary, var(--color-text-secondary));
   font-size: var(--text-2xs);
 }
 

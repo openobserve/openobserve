@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- One-way reveal: clicking shows the calls and removes the pill. -->
     <button v-if="!shown" class="tt-toggle" @click="shown = true">
       <span class="tt-zz"></span>
-      <span class="tt-pill">
+      <span class="tt-pill border border-border-default bg-surface-base">
         <span class="tt-count text-text-secondary">
           {{ toolCalls.length }}
           {{
@@ -217,9 +217,7 @@ function formatDuration(ns: number): string {
     align-items: center;
     gap: 0.125rem;
     padding: 0.5rem 1.125rem;
-    border: 1px solid var(--color-border-default);
     border-radius: 0.625rem;
-    background: var(--color-surface-base);
     box-shadow: 0 1px 0.125rem color-mix(in srgb, var(--color-black) 4%, transparent);
     transition: box-shadow 0.15s ease, border-color 0.15s ease;
   }

@@ -314,7 +314,7 @@
                   <!-- Tool call block - expandable -->
                   <div
                     v-if="block.type === 'tool_call'"
-                    class="tool-call-item flex flex-col px-3 py-2 rounded-default text-compact mb-2 min-w-0 max-w-full"
+                    class="tool-call-item text-text-secondary flex flex-col px-3 py-2 rounded-default text-compact mb-2 min-w-0 max-w-full"
                     :class="[
                       { 'has-details': hasToolCallDetails(block) },
                       {
@@ -6093,7 +6093,6 @@ export default defineComponent({
    ============================================================ */
 .tool-call-item {
   background: color-mix(in srgb, var(--color-status-positive) 8%, transparent);
-  color: var(--color-text-secondary);
 }
 .dark .tool-call-item {
   background: color-mix(in srgb, var(--color-status-positive) 12%, transparent);

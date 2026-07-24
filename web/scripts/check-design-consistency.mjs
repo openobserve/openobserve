@@ -182,11 +182,8 @@ const WHOLE = {
 const STYLE_ONLY = {
   styleBlockHex: /#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/g,
   stylePxUnit: /\b(?:[2-9]|[0-9]{2,})(?:\.[0-9]+)?px\b/g, // 1px hairlines exempt
-  // Raw `var(--color-*)` inside a component style block (F.6). The consumption
-  // ladder wants colours reached via a registered utility, not a raw var() in a
-  // <style> block; ~84% of these already have a utility (AUDIT §7). Ratcheted so
-  // the count can only shrink — the biggest previously-unmeasured debt surface.
-  rawVarInComponent: /var\(\s*--color-[a-z0-9-]+/g,
+  // NOTE: rawVarInComponent (F.6) is NOT a flat regex — it is context-aware and
+  // computed by countRawVarInComponent() below. See that function for why.
 };
 
 function walk(dir, files = []) {
@@ -206,6 +203,75 @@ function styleBlocks(text) {
   let m;
   while ((m = re.exec(text)) !== null) out.push(m[1]);
   return out.join("\n");
+}
+
+// ── rawVarInComponent (F.6), CONTEXT-AWARE ─────────────────────────────────
+// A raw `var(--color-*)` inside a component <style> block is debt ONLY when a
+// registered utility (bg-x / text-x / border-x) could actually replace it. In a
+// handful of CSS positions a utility PHYSICALLY cannot — there the raw var() is
+// the correct and only option, exactly like the TS_HEX / DARK_SEAM allowlists
+// above exempt patterns that are correct-in-context. So we count an occurrence
+// only when it is NOT in one of these structurally-CSS-only positions:
+//   • inside :deep(…)             — targets a child component's internal DOM; the
+//                                   parent cannot put a utility class on it
+//   • inside color-mix()/gradient — a utility cannot be a mix input / colour stop
+//   • a pseudo-element rule (::before/::after/::-webkit-scrollbar/::placeholder…)
+//                                 — utilities have no pseudo-element surface here
+//   • inside @keyframes           — animated colour steps have no utility form
+//   • a CSS custom-property def (--x: var(…)) — a utility cannot DEFINE a var that
+//                                   sibling rules / child DOM then read
+// It is judged PER-OCCURRENCE, deliberately NOT by the block's keep() comment:
+// keep() is MANDATORY on every surviving <style> block (it justifies the block's
+// existence — see countUnjustifiedBlocks), so a block-level exemption would zero
+// the whole category. A block can legitimately exist for one keyframe yet still
+// carry an avoidable raw var() in a plain rule — this counts that, not the block.
+
+// selector-nesting stack (raw selector texts, incl. leading comments) at `target`
+function selectorStackAt(css, target) {
+  const stack = [];
+  let pending = 0;
+  for (let i = 0; i < target && i < css.length; i++) {
+    const ch = css[i];
+    if (ch === "{") { stack.push(css.slice(pending, i)); pending = i + 1; }
+    else if (ch === "}") { stack.pop(); pending = i + 1; }
+    else if (ch === ";") pending = i + 1;
+  }
+  return stack.join(" ");
+}
+
+// is the occurrence inside an unclosed color-mix()/…gradient() in its declaration?
+function insideColourFn(css, idx) {
+  let s = idx;
+  while (s > 0 && !";{}".includes(css[s - 1])) s--;
+  const chunk = css.slice(s, idx);
+  const k = chunk.search(/(?:color-mix|[a-z-]*gradient)\(/);
+  if (k === -1) return false;
+  let bal = 0;
+  for (let i = chunk.indexOf("(", k); i < chunk.length; i++) {
+    if (chunk[i] === "(") bal++;
+    else if (chunk[i] === ")") bal--;
+  }
+  return bal > 0;
+}
+
+function countRawVarInComponent(styleText) {
+  let n = 0;
+  const reVar = /var\(\s*--color-[a-z0-9-]+/g;
+  let m;
+  while ((m = reVar.exec(styleText)) !== null) {
+    const idx = m.index;
+    // CSS custom-property definition: the declaration key starts with `--`
+    let s = idx;
+    while (s > 0 && !";{}".includes(styleText[s - 1])) s--;
+    if (/^\s*--[\w-]+\s*:/.test(styleText.slice(s, idx))) continue;
+    if (insideColourFn(styleText, idx)) continue;
+    const sel = selectorStackAt(styleText, idx);
+    if (/:deep\(/.test(sel)) continue;   // child component internals
+    if (/::[a-z-]/.test(sel)) continue;  // pseudo-element
+    if (/@keyframes/.test(sel)) continue; // keyframe step
+    n++;
+  }
+  return n;
 }
 
 // Every surviving <style> block must justify its own existence: it opens with
@@ -262,6 +328,8 @@ function countFile(file, rel) {
       const n = (sb.match(re) || []).length;
       if (n) counts[k] = n;
     }
+    const rawVar = countRawVarInComponent(sb);
+    if (rawVar) counts.rawVarInComponent = rawVar;
     const unjustified = countUnjustifiedBlocks(text);
     if (unjustified) counts.styleKeepComment = unjustified;
   } else {
