@@ -273,7 +273,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         ref="scrollContainerRef"
         :class="[
-          'flex-1 min-h-0',
+          'min-h-0 flex-1',
           searchObj.meta.logsVisualizeToggle === 'patterns'
             ? 'overflow-auto'
             : 'flex flex-col overflow-hidden',
@@ -509,7 +509,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             expansion="multiple"
             :expanded-ids="expandedLogIds"
             data-test="logs-search-result-logs-table"
-            class="logs-results-otable w-full flex-1 min-h-0"
+            class="logs-results-otable min-h-0 w-full flex-1"
             @update:columnSizes="handleColumnSizesUpdate"
             @column-order-change="handleColumnOrderUpdate"
             @close-column="closeColumn"
@@ -536,6 +536,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-hover-actions="{ row, column, active }">
               <O2AIContextAddBtn
                 v-if="active && column.id === logsTimestampCol"
+                class="ai-btn"
                 data-test="logs-search-result-ai-btn"
                 @send-to-ai-chat="sendToAiChat(JSON.stringify(row), true)"
               />
