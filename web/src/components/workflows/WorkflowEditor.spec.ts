@@ -734,7 +734,11 @@ describe("WorkflowEditor", () => {
       expect(createWorkflow).toHaveBeenCalledTimes(1);
       const { org_identifier, data } = createWorkflow.mock.calls[0][0];
       expect(org_identifier).toBe("default");
-      expect(data).toMatchObject({
+      // Body is `{ workflow: {...}, trigger_type }` — the Workflow struct is
+      // nested under `workflow`; `trigger_type` (derived from the trigger kind)
+      // sits alongside it.
+      expect(data.trigger_type).toBe("AlertFired");
+      expect(data.workflow).toMatchObject({
         id: "",
         org_id: "",
         name: "my workflow", // trimmed
@@ -744,9 +748,11 @@ describe("WorkflowEditor", () => {
         updated_at: 0,
         created_by: "",
       });
-      expect(data.edges).toEqual([{ id: "e1", source: triggerId, target: "d1" }]);
+      expect(data.workflow.edges).toEqual([
+        { id: "e1", source: triggerId, target: "d1" },
+      ]);
 
-      const [trigger, destination] = data.nodes;
+      const [trigger, destination] = data.workflow.nodes;
       // trigger: io_type from the VueFlow type, kind carried in meta
       expect(trigger).toEqual({
         id: triggerId,
@@ -790,7 +796,7 @@ describe("WorkflowEditor", () => {
 
       await clickSave(wrapper);
 
-      const node = createWorkflow.mock.calls[0][0].data.nodes[0];
+      const node = createWorkflow.mock.calls[0][0].data.workflow.nodes[0];
       expect(node.io_type).toBe("default");
       expect(node.position).toEqual({ x: 0, y: 0 });
       expect(node.meta).toEqual({ trigger_kind: "alert_fired" });
@@ -806,7 +812,7 @@ describe("WorkflowEditor", () => {
 
       await clickSave(wrapper);
 
-      const bare = createWorkflow.mock.calls[0][0].data.nodes[1];
+      const bare = createWorkflow.mock.calls[0][0].data.workflow.nodes[1];
       expect(bare).toEqual({
         id: "bare",
         io_type: "default",
@@ -825,7 +831,7 @@ describe("WorkflowEditor", () => {
 
       await clickSave(wrapper);
 
-      expect(createWorkflow.mock.calls[0][0].data.enabled).toBe(true);
+      expect(createWorkflow.mock.calls[0][0].data.workflow.enabled).toBe(true);
     });
 
     it("captures the new id, flips to edit mode, toasts and emits saved", async () => {
@@ -963,7 +969,7 @@ describe("WorkflowEditor", () => {
       const call = updateWorkflow.mock.calls[0][0];
       expect(call.org_identifier).toBe("default");
       expect(call.id).toBe("wf-1");
-      expect(call.data).toMatchObject({
+      expect(call.data.workflow).toMatchObject({
         id: "wf-1",
         name: "my workflow",
         created_at: 111,
@@ -991,7 +997,7 @@ describe("WorkflowEditor", () => {
 
       await clickSave(wrapper);
 
-      expect(updateWorkflow.mock.calls[0][0].data.enabled).toBe(false);
+      expect(updateWorkflow.mock.calls[0][0].data.workflow.enabled).toBe(false);
     });
 
     it("surfaces the API error message and stays on the page", async () => {

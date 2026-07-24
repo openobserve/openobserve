@@ -16,9 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!--
   Condition node body — a thin wrapper over the shared ConditionBuilder (same
-  FilterGroup body the pipeline condition form uses). The fields are the
-  fired-alert payload (ALERT_PAYLOAD_FIELDS), since a workflow has no upstream
-  stream node; the guidelines below carry the workflow filter wording.
+  FilterGroup body the pipeline condition form uses). A workflow has no upstream
+  stream node, so the fields are the CURRENT trigger's payload fields (resolved
+  from the trigger registry by kind — alert vs incident); the guidelines below
+  carry the workflow filter wording.
 
   A Condition is a filter (single output): matching records continue, the rest
   are dropped. WorkflowNodeDrawer's Save calls submit() → { version, conditions }
@@ -74,11 +75,19 @@ import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ConditionBuilder from "@/components/flow/forms/ConditionBuilder.vue";
-import { workflowObj } from "@/plugins/workflows/useWorkflowCanvas";
-import { ALERT_PAYLOAD_FIELDS } from "@/plugins/workflows/alertFields";
+import {
+  workflowObj,
+  currentTriggerKind,
+} from "@/plugins/workflows/useWorkflowCanvas";
+import { triggerDef } from "@/plugins/workflows/triggers";
 
 const { t } = useI18n();
-const fields = ALERT_PAYLOAD_FIELDS;
+// The pickable fields are the CURRENT trigger's payload fields, so an incident
+// workflow branches on incident fields and an alert workflow on alert fields.
+// With no trigger (it was deleted), we offer nothing rather than a wrong set —
+// the user can still type any column via allow-custom-columns.
+const kind = currentTriggerKind();
+const fields = kind ? triggerDef(kind).conditionFields : [];
 const savedConditions =
   workflowObj.currentSelectedNodeData?.data?.conditions ?? null;
 

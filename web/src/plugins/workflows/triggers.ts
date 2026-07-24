@@ -34,7 +34,24 @@
 
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { buildTestSample } from "./testSample";
-import { buildIncidentSample } from "./incidentSample";
+import {
+  buildIncidentSample,
+  INCIDENT_EVENT_TYPES,
+  INCIDENT_COMMON_KEYS,
+} from "./incidentSample";
+import { ALERT_PAYLOAD_FIELDS } from "./alertFields";
+import type { WorkflowFieldOption } from "./alertFields";
+import { INCIDENT_PAYLOAD_FIELDS } from "./incidentFields";
+
+// A selectable variant of a trigger's sample payload. When a kind defines more
+// than one (e.g. an incident's lifecycle event_types), the trigger drawer shows
+// a dropdown so the user can preview each variant's exact payload.
+export interface TriggerSampleVariant {
+  /** Stable key + the value shown in the dropdown (e.g. the event_type). */
+  key: string;
+  /** This variant's sample payload. */
+  build: () => unknown[];
+}
 
 export interface WorkflowTriggerDef {
   /** Per-node kind, stored in node.data/meta.trigger_kind (backend snake_case). */
@@ -52,14 +69,39 @@ export interface WorkflowTriggerDef {
   descKey: string;
   /** i18n key — intro copy above the read-only payload reference. */
   introKey: string;
-  /** The payload this trigger hands downstream steps (read-only ref + test seed). */
-  buildSample: () => unknown;
   /**
-   * True when the payload carries alert-query `data[]` rows (whose columns depend
-   * on the alert), so the body shows the "example columns" caveat. Meta-only
-   * payloads (e.g. incidents) omit it.
+   * The payload this trigger hands downstream steps — a one-element array of
+   * events (read-only reference + Function "Events" sample + Test seed). When
+   * `sampleVariants` is set this is the DEFAULT variant.
    */
-  hasQueryRows?: boolean;
+  buildSample: () => unknown[];
+  /**
+   * Optional selectable sample payloads. When present (>1), the trigger drawer
+   * renders a dropdown (labelled by `sampleVariantLabelKey`) so the user can
+   * preview each — e.g. an incident's per-`event_type` payloads.
+   */
+  sampleVariants?: TriggerSampleVariant[];
+  /** i18n key for the sample-variant dropdown's label. */
+  sampleVariantLabelKey?: string;
+  /**
+   * When set, the trigger drawer splits the selected variant's `meta` into a
+   * COMMON block (these keys, in this order — shown on top as the always-present
+   * baseline) and an EVENT-SPECIFIC block (the rest — shown below). Omit to show
+   * a single combined payload.
+   */
+  commonMetaKeys?: string[];
+  /**
+   * Flattened `meta_*` field suggestions offered to the Condition builder for
+   * this kind (the backend flattens the `{ meta }` envelope). allow-custom-columns
+   * still lets the user type anything not listed.
+   */
+  conditionFields: WorkflowFieldOption[];
+  /**
+   * Optional i18n key for a caveat rendered under the payload reference — the
+   * alert kind notes its `data[]` columns come from the query; the incident kind
+   * notes its event-specific fields vary by `event_type`. Omit for none.
+   */
+  payloadNoteKey?: string;
   /**
    * True when this kind can be associated with alerts — after creating such a
    * workflow the editor offers the "link alerts" prompt (the link is stored on
@@ -79,7 +121,8 @@ export const WORKFLOW_TRIGGERS: WorkflowTriggerDef[] = [
     descKey: "workflow.triggerKind.alertFired.desc",
     introKey: "workflow.triggerKind.alertFired.intro",
     buildSample: buildTestSample,
-    hasQueryRows: true,
+    conditionFields: ALERT_PAYLOAD_FIELDS,
+    payloadNoteKey: "workflow.node.triggerDataExampleNote",
     linksAlerts: true,
   },
   {
@@ -92,6 +135,15 @@ export const WORKFLOW_TRIGGERS: WorkflowTriggerDef[] = [
     descKey: "workflow.triggerKind.incidentEvent.desc",
     introKey: "workflow.triggerKind.incidentEvent.intro",
     buildSample: buildIncidentSample,
+    // One preview variant per lifecycle event_type — the dropdown value IS the
+    // event_type, so it doubles as a reference for `event_type == "..."` filters.
+    sampleVariants: INCIDENT_EVENT_TYPES.map((type) => ({
+      key: type,
+      build: () => buildIncidentSample(type),
+    })),
+    sampleVariantLabelKey: "workflow.node.incidentEventTypeLabel",
+    commonMetaKeys: INCIDENT_COMMON_KEYS,
+    conditionFields: INCIDENT_PAYLOAD_FIELDS,
   },
 ];
 

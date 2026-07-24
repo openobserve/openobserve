@@ -39,6 +39,7 @@ vi.mock("@/services/workflows", () => ({ default: {} }));
 import { workflowObj } from "@/plugins/workflows/useWorkflowCanvas";
 import { TRIGGER_META_VARS } from "@/plugins/workflows/alertFields";
 import { buildTestSampleText } from "@/plugins/workflows/testSample";
+import { INCIDENT_EVENT_TYPES } from "@/plugins/workflows/incidentSample";
 import WorkflowAlertTrigger from "./WorkflowAlertTrigger.vue";
 
 function createWrapper() {
@@ -58,6 +59,13 @@ function createWrapper() {
             "stickyScroll",
           ],
           template: '<div class="query-editor" />',
+        },
+        // Emits update:modelValue so v-model drives the previewed variant.
+        OSelect: {
+          name: "OSelect",
+          props: ["modelValue", "options", "label"],
+          emits: ["update:modelValue"],
+          template: '<div class="o-select-stub" />',
         },
       },
     },
@@ -115,6 +123,82 @@ describe("WorkflowAlertTrigger", () => {
 
     it("is the SAME text the Test dialog seeds, so the two cannot drift", () => {
       expect(payload(createWrapper())).toBe(buildTestSampleText());
+    });
+  });
+
+  describe("incident event-type preview (split view)", () => {
+    const select = (w: any) => w.findComponent({ name: "OSelect" });
+    const jsonEditors = (w: any) => w.findAllComponents({ name: "QueryEditor" });
+    // common block is the first editor; its sample is the `[{meta,data}]` envelope
+    const commonMeta = (w: any) =>
+      JSON.parse(jsonEditors(w)[0].props("query"))[0].meta;
+    const asIncident = () => {
+      workflowObj.currentSelectedNodeData = {
+        data: { trigger_kind: "incident_event" },
+      } as any;
+    };
+
+    it("shows NO dropdown / split for an alert trigger (single sample)", () => {
+      workflowObj.currentSelectedNodeData = {
+        data: { trigger_kind: "alert_fired" },
+      } as any;
+      const w = createWrapper();
+      expect(select(w).exists()).toBe(false);
+      expect(w.find('[data-test="workflow-trigger-structure"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("offers a dropdown of every incident event_type", () => {
+      asIncident();
+      const options = select(createWrapper())
+        .props("options")
+        .map((o: any) => o.value);
+      expect(options).toEqual(INCIDENT_EVENT_TYPES);
+    });
+
+    it("shows only the common fields in the common block", () => {
+      asIncident();
+      const w = createWrapper();
+      expect(
+        w.find('[data-test="workflow-trigger-common-structure"]').exists(),
+      ).toBe(true);
+      const meta = commonMeta(w);
+      expect(meta.event_type).toBe(INCIDENT_EVENT_TYPES[0]);
+      expect(meta).toHaveProperty("incident_id");
+      expect(meta).toHaveProperty("status");
+    });
+
+    it("shows the no-extra-fields note for an event with no extras (created)", () => {
+      asIncident(); // default first event = "created" → no extras
+      const w = createWrapper();
+      expect(
+        w.find('[data-test="workflow-trigger-no-extras"]').exists(),
+      ).toBe(true);
+      expect(
+        w.find('[data-test="workflow-trigger-specific-structure"]').exists(),
+      ).toBe(false);
+    });
+
+    it("reveals ONLY the added fields when picking an event with extras", async () => {
+      asIncident();
+      const w = createWrapper();
+      select(w).vm.$emit("update:modelValue", "resolved");
+      await w.vm.$nextTick();
+
+      // common block reflects the picked event but stays common-only
+      const meta = commonMeta(w);
+      expect(meta.event_type).toBe("resolved");
+      expect(meta.status).toBe("resolved");
+      expect(meta).not.toHaveProperty("user_id");
+
+      // event-specific block appears with ONLY the extras
+      expect(
+        w.find('[data-test="workflow-trigger-specific-structure"]').exists(),
+      ).toBe(true);
+      const specific = JSON.parse(jsonEditors(w)[1].props("query"));
+      expect(specific).toHaveProperty("user_id");
+      expect(specific).not.toHaveProperty("incident_id");
     });
   });
 

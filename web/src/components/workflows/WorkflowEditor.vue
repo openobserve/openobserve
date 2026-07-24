@@ -231,6 +231,7 @@ import useWorkflowCanvas, {
   enabledTriggers,
   triggerDef,
   triggerTypeForKind,
+  currentTriggerKind,
   DEFAULT_TRIGGER_KIND,
 } from "@/plugins/workflows/useWorkflowCanvas";
 import workflowService from "@/services/workflows";
@@ -434,13 +435,7 @@ const validate = (): boolean => {
 const buildPayload = () => {
   const wf = workflowObj.currentSelectedWorkflow;
   // Top-level `trigger_type` (AlertFired | IncidentEvent) is derived from the
-  // trigger node's kind (stored in data.trigger_kind, or meta.trigger_kind after
-  // a reload). Defaults to AlertFired when no trigger/kind is present.
-  const triggerNode = (wf.nodes || []).find(
-    (n: any) => n.data?.node_type === "workflow_trigger",
-  );
-  const triggerKind =
-    triggerNode?.data?.trigger_kind || triggerNode?.meta?.trigger_kind;
+  // graph's trigger kind, defaulting to AlertFired when no trigger is present.
   return {
       workflow: {
       id: wf.id || "",
@@ -454,7 +449,7 @@ const buildPayload = () => {
       nodes: (wf.nodes || []).map(serializeNode),
       edges: wf.edges || [],
     },
-    trigger_type: triggerTypeForKind(triggerKind),
+    trigger_type: triggerTypeForKind(currentTriggerKind()),
   };
 };
 
@@ -506,7 +501,10 @@ const persist = async (): Promise<boolean> => {
     if (workflowObj.currentSelectedWorkflow.id) {
       await workflowService.updateWorkflow({
         org_identifier: org,
-        id: data.id,
+        // Use the store id (guaranteed truthy in this branch) rather than
+        // reaching into the payload — stays correct whatever shape buildPayload
+        // returns (the body is now `{ workflow: {...}, trigger_type }`).
+        id: workflowObj.currentSelectedWorkflow.id,
         data,
       });
       toast({ message: t("workflow.updateSuccess"), variant: "success" });
@@ -544,16 +542,6 @@ const linkAlerts = ref<{ show: boolean; id: string; name: string }>({
   id: "",
   name: "",
 });
-
-// The current graph's trigger kind — drives whether the post-create "link
-// alerts" prompt is offered (only Alert-Fired workflows associate with alerts;
-// incident/other kinds have no alerts to link).
-const currentTriggerKind = (): string | undefined => {
-  const trigger = (workflowObj.currentSelectedWorkflow.nodes || []).find(
-    (n: any) => n.data?.node_type === "workflow_trigger",
-  );
-  return trigger?.data?.trigger_kind || trigger?.meta?.trigger_kind;
-};
 
 const onSave = async () => {
   const wasCreate = !workflowObj.currentSelectedWorkflow.id;

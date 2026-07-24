@@ -233,6 +233,19 @@ const workflowObj = reactive(Object.assign({}, defaultObject));
 
 export { workflowObj };
 
+// The kind of the current graph's trigger node — the single lookup other pieces
+// (payload reference, condition fields, function sample) use to stay in sync
+// with whatever trigger the workflow starts from. Returns undefined when there
+// is NO trigger node (e.g. it was deleted): callers then show nothing rather
+// than defaulting to a kind that isn't there. The kind lives in
+// `data.trigger_kind` (fresh) or `meta.trigger_kind` (rehydrated from the API).
+export const currentTriggerKind = (): string | undefined => {
+  const trigger = (workflowObj.currentSelectedWorkflow?.nodes || []).find(
+    (n: any) => n.data?.node_type === "workflow_trigger",
+  );
+  return trigger?.data?.trigger_kind || trigger?.meta?.trigger_kind;
+};
+
 // ── Shared graph helpers ─────────────────────────────────────────────────────
 // Workflows enforce one incoming edge per node (see onConnect), so the graph is
 // a TREE rooted at the trigger (or from_node) — a plain BFS from the root visits

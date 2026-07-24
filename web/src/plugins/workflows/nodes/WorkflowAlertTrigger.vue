@@ -34,46 +34,99 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ t(introKey) }}
     </p>
 
-    <!-- Read-only Monaco instead of a hand-rolled schema tree: syntax
-         highlighting, folding (what the old expand/collapse buttons were
-         reimplementing) and copy/paste for free. Renders the SAME text the Test
-         dialog seeds (buildTestSampleText), so the reference and the test input
-         cannot drift.
-         Monaco needs a DEFINITE height — it measures its container and collapses
-         to nothing if that is auto/0. The wrapper supplies it (the drawer body is
-         not always full-height), and the editor fills the wrapper. -->
-    <div
-      data-test="workflow-trigger-structure"
-      class="w-full h-110 rounded-default border border-border-default overflow-hidden"
-    >
-      <QueryEditor
-        editor-id="workflow-trigger-payload"
-        language="json"
-        :read-only="true"
-        :show-auto-complete="false"
-        :show-line-numbers="false"
-        :sticky-scroll="false"
-        :query="payloadText"
-        class="w-full h-full!"
+    <!-- SPLIT VIEW (kinds with commonMetaKeys, e.g. incidents): a stable "common
+         fields" block on top, then a picker that reveals what each event_type
+         ADDS on top of it. Preview-only — the trigger node has no config. -->
+    <template v-if="isSplit">
+      <OSelect
+        v-model="selectedVariant"
+        :label="t(variantLabelKey)"
+        :options="variantOptions"
+        class="mb-3"
+        data-test="workflow-trigger-sample-variant"
       />
-    </div>
 
-    <!-- Kept from the old tree: without it the sample's job/level/log columns
-         read as guaranteed, when they actually come from the alert's query.
-         Incident payloads are `meta`-only (no query rows), so the note is
-         alert-specific. -->
-    <p
-      v-if="hasQueryRows"
-      class="text-xs text-text-secondary leading-normal mt-2 italic"
-    >
-      {{ t("workflow.node.triggerDataExampleNote") }}
-    </p>
+      <div class="text-xs font-semibold text-text-body mb-1">
+        {{ t("workflow.node.incidentCommonTitle") }}
+      </div>
+      <div
+        data-test="workflow-trigger-common-structure"
+        class="w-full h-96 rounded-default border border-border-default overflow-hidden"
+      >
+        <QueryEditor
+          :key="selectedVariant + '-common'"
+          editor-id="workflow-trigger-common"
+          language="json"
+          :read-only="true"
+          :show-auto-complete="false"
+          :show-line-numbers="false"
+          :sticky-scroll="false"
+          :query="commonText"
+          class="w-full h-full!"
+        />
+      </div>
+
+      <div class="text-xs font-semibold text-text-body mt-4 mb-1">
+        {{ t("workflow.node.incidentSpecificTitle") }}
+      </div>
+      <div
+        v-if="hasSpecific"
+        data-test="workflow-trigger-specific-structure"
+        class="w-full h-40 rounded-default border border-border-default overflow-hidden"
+      >
+        <QueryEditor
+          :key="selectedVariant + '-specific'"
+          editor-id="workflow-trigger-specific"
+          language="json"
+          :read-only="true"
+          :show-auto-complete="false"
+          :show-line-numbers="false"
+          :sticky-scroll="false"
+          :query="specificText"
+          class="w-full h-full!"
+        />
+      </div>
+      <p
+        v-else
+        data-test="workflow-trigger-no-extras"
+        class="text-xs text-text-secondary leading-normal italic"
+      >
+        {{ t("workflow.node.incidentNoExtraFields") }}
+      </p>
+    </template>
+
+    <!-- SINGLE VIEW (alert): one read-only payload reference. Renders the SAME
+         text the Test dialog seeds, so reference and test input cannot drift. -->
+    <template v-else>
+      <div
+        data-test="workflow-trigger-structure"
+        class="w-full h-110 rounded-default border border-border-default overflow-hidden"
+      >
+        <QueryEditor
+          editor-id="workflow-trigger-payload"
+          language="json"
+          :read-only="true"
+          :show-auto-complete="false"
+          :show-line-numbers="false"
+          :sticky-scroll="false"
+          :query="payloadText"
+          class="w-full h-full!"
+        />
+      </div>
+      <p
+        v-if="noteKey"
+        class="text-xs text-text-secondary leading-normal mt-2 italic"
+      >
+        {{ t(noteKey) }}
+      </p>
+    </template>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { defineAsyncComponent } from "vue";
+import { computed, defineAsyncComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { workflowObj } from "@/plugins/workflows/useWorkflowCanvas";
 import {
   triggerDef,
@@ -93,12 +146,58 @@ const savedData = workflowObj.currentSelectedNodeData?.data || {};
 const triggerKind = savedData.trigger_kind || DEFAULT_TRIGGER_KIND;
 
 // Everything the read-only reference shows comes from the trigger registry, so a
-// new trigger kind needs no change here: its intro copy, sample payload, and
-// whether it carries alert-query `data[]` rows all resolve from the kind.
+// new trigger kind needs no change here: its intro copy, per-kind caveat note,
+// and sample payload(s) all resolve from the kind.
 const def = triggerDef(triggerKind);
-const payloadText = buildTriggerSampleText(triggerKind);
 const introKey = def.introKey;
-const hasQueryRows = !!def.hasQueryRows;
+const noteKey = def.payloadNoteKey;
+
+// Sample-variant picker (e.g. incident lifecycle event_types). Preview-only —
+// the trigger node has no editable config, so nothing here is persisted.
+const variants = def.sampleVariants ?? [];
+const variantLabelKey = def.sampleVariantLabelKey ?? "";
+const variantOptions = variants.map((v) => ({ label: v.key, value: v.key }));
+const selectedVariant = ref(variants[0]?.key ?? "");
+
+// Kinds that declare `commonMetaKeys` render the SPLIT view (a stable common
+// block + a per-event "what it adds" block); the rest render one combined
+// payload. Both derive from the same variant sample, so they can't drift.
+const commonKeys = def.commonMetaKeys ?? [];
+const isSplit = !!(commonKeys.length && variants.length);
+
+// The `meta` block of the selected variant's sample (`[{ meta, data }]`).
+const selectedMeta = computed<Record<string, unknown>>(() => {
+  const variant =
+    variants.find((v) => v.key === selectedVariant.value) ?? variants[0];
+  const sample = variant?.build() as
+    | [{ meta?: Record<string, unknown> }]
+    | undefined;
+  return sample?.[0]?.meta ?? {};
+});
+
+// Common block, in the registry's key order, wrapped back in the real envelope.
+const commonText = computed(() => {
+  const meta = selectedMeta.value;
+  const common: Record<string, unknown> = {};
+  for (const k of commonKeys) if (k in meta) common[k] = meta[k];
+  return JSON.stringify([{ meta: common, data: [] }], null, 2);
+});
+
+// Only the fields THIS event adds on top of the common block.
+const specificFields = computed<Record<string, unknown>>(() => {
+  const meta = selectedMeta.value;
+  const commonSet = new Set(commonKeys);
+  const extras: Record<string, unknown> = {};
+  for (const k of Object.keys(meta)) if (!commonSet.has(k)) extras[k] = meta[k];
+  return extras;
+});
+const specificText = computed(() =>
+  JSON.stringify(specificFields.value, null, 2),
+);
+const hasSpecific = computed(() => Object.keys(specificFields.value).length > 0);
+
+// Combined single-payload text for non-split kinds (Alert Fired).
+const payloadText = computed(() => buildTriggerSampleText(triggerKind));
 
 // No editable fields — carry the trigger kind through (persisted in meta).
 const submit = () => ({ trigger_kind: triggerKind });
