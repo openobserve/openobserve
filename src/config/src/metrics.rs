@@ -1926,6 +1926,58 @@ pub static QUEUE_OLDEST_MESSAGE_AGE_SECONDS: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+pub static EVAL_SCHEDULER_PENDING_TARGETS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "eval_scheduler_pending_targets",
+            "Current in-flight (pending) evaluation targets tracked by the eval scheduler",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream"],
+    )
+    .expect("Metric created")
+});
+
+pub static EVAL_SCHEDULER_PENDING_MEMORY_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "eval_scheduler_pending_memory_bytes",
+            "Accounted bytes of pending evaluation targets, and the configured limit (state=used, limit)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["state"],
+    )
+    .expect("Metric created")
+});
+
+pub static EVAL_SCHEDULER_FORCED_READY_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "eval_scheduler_forced_ready_total",
+            "Total pending evaluation targets force-evaluated early because the pending memory budget was exceeded",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream"],
+    )
+    .expect("Metric created")
+});
+
+pub static EVAL_SCHEDULER_WATERMARK_LAG_SECONDS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "eval_scheduler_watermark_lag_seconds",
+            "Lag in seconds between the eval scheduler scan cursor and the committed (persisted) watermark",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream"],
+    )
+    .expect("Metric created")
+});
+
 fn register_metrics(registry: &Registry) {
     // http latency
     registry
@@ -2419,6 +2471,19 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(QUEUE_OLDEST_MESSAGE_AGE_SECONDS.clone()))
+        .expect("Metric registered");
+    // eval scheduler pending-target metrics
+    registry
+        .register(Box::new(EVAL_SCHEDULER_PENDING_TARGETS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(EVAL_SCHEDULER_PENDING_MEMORY_BYTES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(EVAL_SCHEDULER_FORCED_READY_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(EVAL_SCHEDULER_WATERMARK_LAG_SECONDS.clone()))
         .expect("Metric registered");
 }
 
