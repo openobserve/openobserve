@@ -169,38 +169,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
 
-        <!-- Last Refreshed — the SAME element the dashboard panel bar carries
-             (PanelErrorButtons): 🕑 with the relative tooltip. `ml-1.25` matches
-             PanelErrorButtons' spacing. A card restored from cache says how old
-             its data really is instead of passing it off as live. -->
-        <span
-          v-if="preview?.lastTriggeredAt"
-          class="lastRefreshedAt mr-0.5 ml-1.25 shrink-0 overflow-hidden text-[smaller] text-ellipsis whitespace-nowrap"
-          :data-test="`metrics-explorer-card-last-refreshed-${card.name}`"
-        >
-          <span class="mr-0.5 text-[smaller]">
-            🕑
-            <OTooltip side="bottom" align="end">
-              <template #content
-                >{{ t("metrics.metricCard.lastRefreshed") }}
-                <RelativeTime :timestamp="preview.lastTriggeredAt"
-              /></template>
-            </OTooltip>
-          </span>
-          <RelativeTime
-            :timestamp="preview.lastTriggeredAt"
-            :full-time-prefix="t('metrics.explorer.card.lastRefreshedPrefix')"
-          />
-        </span>
-
-        <!-- Refresh — rightmost, revealed with the actions. Re-runs this card's
-             query, dropping the cached response so a metric that has started
-             emitting shows up. Goes `warning` when the shown data was fetched
-             for a different window than the one selected — the same treatment
-             the dashboard refresh button gives unapplied variable changes — and
-             a warning nobody can see says nothing, so that state forces the
-             button visible at rest. While loading it is disabled, not
-             spinnered: the body's LoadingProgress bar is the loading signal. -->
+        <!-- Refresh — revealed with the actions, just LEFT of the freshness
+             clock (the clock is always the rightmost element). Re-runs this
+             card's query, dropping the cached response so a metric that has
+             started emitting shows up. Goes `warning` when the shown data was
+             fetched for a different window than the one selected — the same
+             treatment the dashboard refresh button gives unapplied variable
+             changes — and a warning nobody can see says nothing, so that state
+             forces the button visible at rest. While loading it is disabled,
+             not spinnered: the body's LoadingProgress bar is the loading
+             signal. -->
         <div
           :class="
             preview?.cachedDataDiffersFromTimeRange
@@ -227,6 +205,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </OButton>
         </div>
+
+        <!-- Last Refreshed — always the rightmost element, the SAME element the
+             dashboard panel bar carries (PanelErrorButtons): 🕑 with the
+             relative tooltip. `ml-1.25` matches PanelErrorButtons' spacing. A
+             card restored from cache says how old its data really is instead of
+             passing it off as live. -->
+        <span
+          v-if="preview?.lastTriggeredAt"
+          class="lastRefreshedAt mr-0.5 ml-1.25 shrink-0 overflow-hidden text-[smaller] text-ellipsis whitespace-nowrap"
+          :data-test="`metrics-explorer-card-last-refreshed-${card.name}`"
+        >
+          <span class="mr-0.5 text-[smaller]">
+            🕑
+            <OTooltip side="bottom" align="end">
+              <template #content
+                >{{ t("metrics.metricCard.lastRefreshed") }}
+                <RelativeTime :timestamp="preview.lastTriggeredAt"
+              /></template>
+            </OTooltip>
+          </span>
+          <RelativeTime
+            :timestamp="preview.lastTriggeredAt"
+            :full-time-prefix="t('metrics.explorer.card.lastRefreshedPrefix')"
+          />
+        </span>
       </div>
     </div>
 
