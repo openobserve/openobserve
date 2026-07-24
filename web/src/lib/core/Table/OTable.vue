@@ -31,6 +31,7 @@ import { useTableHighlight } from "./composables/useTableHighlight";
 import { useTableColumnManagement } from "./composables/useTableColumnManagement";
 import { useTableVirtualization } from "./composables/useTableVirtualization";
 import { useTableKeyboard } from "./composables/useTableKeyboard";
+import { useTableRowShortcuts } from "./composables/useTableRowShortcuts";
 
 import OTableHeader from "./sub-components/OTableHeader.vue";
 import OTableBody from "./sub-components/OTableBody.vue";
@@ -411,7 +412,7 @@ const {
   // Keep this in sync with the --table-row-height-* tokens (dense = 38px) so the
   // virtualizer's measured height matches the actual rendered row height.
   rowHeight: props.rowHeight ?? (props.dense ? 38 : 54),
-  overscan: 100,
+  overscan: props.overscan ?? 100,
 });
 
 const isVirtual = computed(() => props.virtualScroll && displayRows.value.length > 0);
@@ -726,9 +727,14 @@ const computedTableWidth = computed<string | undefined>(() => {
   return `${Math.max(containerWidth.value || 0, realSum())}px`;
 });
 
-// Virtual measureElement callback — wraps the virtualizer's measure
+// Virtual measureElement callback — wraps the virtualizer's measure.
+// Re-measuring is only needed when row heights actually VARY (expanded rows or
+// wrapped text). For fixed-height rows the virtualizer's size estimate is exact,
+// so calling measure() on every row that mounts during a scroll just re-runs the
+// virtualizer for nothing — a real per-row scroll tax on long lists. Skip it.
+const hasVariableRowHeight = computed(() => expansion.isEnabled.value || !!props.wrap);
 function measureElement(el: any) {
-  if (el && props.virtualScroll) {
+  if (el && props.virtualScroll && hasVariableRowHeight.value) {
     virtualMeasure();
   }
 }
@@ -743,6 +749,11 @@ useTableKeyboard(table, scrollContainerRef, {
     expansion.toggleRow(row);
   },
 });
+
+// Row hover/focus shortcuts (↑/↓, Enter, action keys) via ONE delegated window
+// listener for the whole table — replaces the per-row listener each OTableBodyRow
+// used to register (N rows → N identical listeners).
+useTableRowShortcuts(scrollContainerRef);
 
 // ── Table-level empty/loading/error state ──────────────────────
 // Use `heldLoading` (props.loading + min-2s hold) so skeleton doesn't flash.
@@ -858,6 +869,9 @@ defineExpose({
         />
         <slot name="toolbar-trailing" />
       </div>
+      <!-- ── Sub-header slot: custom full-width content between the toolbar and
+         the table body (e.g. a summary-stat strip). ── -->
+      <slot name="subheader" />
       <!-- ── Built-in global search ─────────────────────────── -->
       <div
         v-if="props.showGlobalFilter && !slots.top && !slots.toolbar"

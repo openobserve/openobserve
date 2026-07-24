@@ -282,6 +282,8 @@ describe("IncidentList.vue", () => {
     it("returns all incidents when searchQuery is empty", async () => {
       wrapper = createWrapper();
       await flushPromises();
+      // Default status filter is now "active"; select "all" to see every row.
+      (wrapper.vm as any).statusFilter = "all";
       (wrapper.vm as any).searchQuery = "";
       expect((wrapper.vm as any).visibleIncidents).toHaveLength(3);
     });
@@ -509,6 +511,8 @@ describe("IncidentList.vue", () => {
     it("visibleIncidents has 3 items after load", async () => {
       wrapper = createWrapper();
       await flushPromises();
+      // Default status filter is now "active"; select "all" to see every row.
+      (wrapper.vm as any).statusFilter = "all";
       expect((wrapper.vm as any).visibleIncidents).toHaveLength(3);
     });
 
