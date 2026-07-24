@@ -37,6 +37,7 @@ import CheckConfigure from "@/components/synthetics/configure/CheckConfigure.vue
 import CreateBrowserTestSkeleton from "@/components/synthetics/CreateBrowserTestSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyBrowserCheck from "@/lib/core/EmptyState/illustrations/EmptyBrowserCheck.vue";
+import BetaBadge from "@/components/common/BetaBadge.vue";
 
 const router = useRouter();
 const route = useRoute();
@@ -533,7 +534,6 @@ function onClearResults() {
   <!-- ── Non-loading: shared wrapper with page header ── -->
   <OPageLayout
     class="bg-surface-base"
-    :title="headerTitle"
     :subtitle="folderName"
     :back="{
       label: t('synthetics.newCheck.back'),
@@ -542,6 +542,12 @@ function onClearResults() {
     }"
     bleed
   >
+    <template #title>
+      <span class="inline-flex min-w-0 items-center gap-2">
+        <span class="truncate">{{ headerTitle }}</span>
+        <BetaBadge />
+      </span>
+    </template>
     <!-- ── Gate phase: URL + name ── -->
     <main v-if="phase === 'gate'" class="flex flex-1 flex-col items-center justify-center">
       <div class="mx-auto w-full max-w-[48rem] px-4 py-4">

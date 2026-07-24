@@ -49,7 +49,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }"
       >
         <template #title>
-          <span data-test="synthetics-run-detail-title">{{ displayMonitorName }}</span>
+          <span class="inline-flex min-w-0 items-center gap-2">
+            <span data-test="synthetics-run-detail-title" class="truncate">{{ displayMonitorName }}</span>
+            <BetaBadge />
+          </span>
         </template>
         <template #title-trail>
           <OBadge
@@ -496,6 +499,7 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import BetaBadge from "@/components/common/BetaBadge.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import VideoPlayer from "@/components/rum/VideoPlayer.vue";
