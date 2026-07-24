@@ -114,6 +114,18 @@ const useEnterpriseRoutes = () => {
           },
         },
         {
+          path: "syntheticsTokens",
+          name: "syntheticsTokens",
+          meta: {
+            title: "Synthetics Tokens",
+          },
+          component: () =>
+            import("@/components/iam/SyntheticsTokens.vue"),
+          beforeEnter(to: any, from: any, next: any) {
+            syntheticsRouteGuard(to, from, next);
+          },
+        },
+        {
           path: "serviceAccounts",
           name: "serviceAccounts",
           meta: {
