@@ -1080,25 +1080,10 @@ export default defineComponent({
       const hasData = c.total > 0;
       const v = (n: number): string | number => (hasData ? n : "—");
       const share = hasData ? c.total : undefined;
+      // Severity-descending so what needs attention sits on the left (matches the
+      // Incidents / Eval Jobs strips): failed (error) → recent (warning) → active
+      // (healthy) → paused (inert) → Total last.
       return [
-        {
-          key: "active",
-          label: t("alerts.summaryActive"),
-          value: v(c.active),
-          icon: "check-circle",
-          tone: "success",
-          max: share,
-          dataTest: "alert-summary-active",
-        },
-        {
-          key: "paused",
-          label: t("alerts.summaryPaused"),
-          value: v(c.paused),
-          icon: "pause",
-          tone: "neutral",
-          max: share,
-          dataTest: "alert-summary-paused",
-        },
         {
           key: "failed",
           label: t("alerts.summaryFailed"),
@@ -1116,6 +1101,24 @@ export default defineComponent({
           tone: "warning",
           max: share,
           dataTest: "alert-summary-recent",
+        },
+        {
+          key: "active",
+          label: t("alerts.summaryActive"),
+          value: v(c.active),
+          icon: "check-circle",
+          tone: "success",
+          max: share,
+          dataTest: "alert-summary-active",
+        },
+        {
+          key: "paused",
+          label: t("alerts.summaryPaused"),
+          value: v(c.paused),
+          icon: "pause",
+          tone: "neutral",
+          max: share,
+          dataTest: "alert-summary-paused",
         },
         {
           key: "total",
