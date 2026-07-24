@@ -27,14 +27,10 @@ const actions = {
     return http().get(`/api/${org_identifier}/actions`);
   },
   get_by_id: (org_identifier: string, ksuid: string) => {
-    return http().get(
-      `/api/${org_identifier}/actions/${encodeURIComponent(ksuid)}`,
-    );
+    return http().get(`/api/${org_identifier}/actions/${encodeURIComponent(ksuid)}`);
   },
   delete: (org_identifier: string, action_id: string) => {
-    return http().delete(
-      `/api/${org_identifier}/actions/${encodeURIComponent(action_id)}`,
-    );
+    return http().delete(`/api/${org_identifier}/actions/${encodeURIComponent(action_id)}`);
   },
   bulkDelete: (org_identifier: string, data: any) => {
     return http().delete(`/api/${org_identifier}/actions/bulk`, { data });

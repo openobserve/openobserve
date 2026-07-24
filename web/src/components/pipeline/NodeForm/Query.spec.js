@@ -1,7 +1,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
-import useDnD from '@/plugins/pipelines/useDnD';
+import useDnD from "@/plugins/pipelines/useDnD";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import Query from "./Query.vue";
@@ -44,7 +44,7 @@ vi.mock("@/composables/useQuery", () => ({
 }));
 
 const mockAddNode = vi.fn();
-vi.mock('@/plugins/pipelines/useDnD', () => ({
+vi.mock("@/plugins/pipelines/useDnD", () => ({
   default: vi.fn(),
   useDnD: () => ({
     addNode: mockAddNode,
@@ -54,8 +54,8 @@ vi.mock('@/plugins/pipelines/useDnD', () => ({
       userClickedNode: {},
       userSelectedNode: {},
     },
-    deletePipelineNode: vi.fn()
-  })
+    deletePipelineNode: vi.fn(),
+  }),
 }));
 
 describe("Query Component", () => {
@@ -67,17 +67,17 @@ describe("Query Component", () => {
     mockPipelineObj = {
       currentSelectedNodeData: {
         data: {},
-        type: 'query'
+        type: "query",
       },
       userSelectedNode: {},
-      isEditNode: false
+      isEditNode: false,
     };
 
     // Mock useDnD composable
     vi.mocked(useDnD).mockImplementation(() => ({
       pipelineObj: mockPipelineObj,
       addNode: mockAddNode,
-      deletePipelineNode: vi.fn()
+      deletePipelineNode: vi.fn(),
     }));
 
     // Mount component — Query OWNS the real <OForm>; ScheduledPipeline is stubbed.
@@ -87,15 +87,14 @@ describe("Query Component", () => {
         stubs: {
           ScheduledPipeline: true,
           ConfirmDialog: true,
-        }
+        },
       },
       props: {
         streamName: "test-stream",
         streamType: "logs",
-        streamRoutes: {}
-      }
+        streamRoutes: {},
+      },
     });
-
   });
 
   afterEach(() => {
@@ -156,10 +155,10 @@ describe("Query Component", () => {
       // Setup the mock rejection
       searchService.search.mockImplementationOnce(() =>
         Promise.reject({
-            response: { data: { message: errorMessage } },
-            message: errorMessage
-          })
-      )
+          response: { data: { message: errorMessage } },
+          message: errorMessage,
+        }),
+      );
 
       // Set initial state
       wrapper.vm.form.setFieldValue("query_condition.type", "sql");
@@ -175,9 +174,11 @@ describe("Query Component", () => {
       expect(wrapper.vm.isValidSqlQuery).toBe(false);
       expect(wrapper.vm.validatingSqlQuery).toBe(false);
       const { toast } = await import("@/lib/feedback/Toast/useToast");
-      expect(toast).toHaveBeenCalledWith(expect.objectContaining({
-        message: `Invalid SQL Query: ${errorMessage}`
-      }));
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: `Invalid SQL Query: ${errorMessage}`,
+        }),
+      );
     });
 
     it("skips validation for promql query type", async () => {

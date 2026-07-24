@@ -19,20 +19,19 @@ import PipelineFlow from "./PipelineFlow.vue";
 import { nextTick } from "vue";
 import { createI18n } from "vue-i18n";
 
-
 // Create i18n instance
 const i18n = createI18n({
   legacy: false,
-  locale: 'en',
+  locale: "en",
   messages: {
     en: {
       pipeline: {
-        unsavedChanges: 'You have unsaved changes',
-        emptyCanvas: 'Drag and drop nodes from the sidebar to start building your pipeline',
-        dropHere: 'Drop here'
-      }
-    }
-  }
+        unsavedChanges: "You have unsaved changes",
+        emptyCanvas: "Drag and drop nodes from the sidebar to start building your pipeline",
+        dropHere: "Drop here",
+      },
+    },
+  },
 });
 
 // Mock dependencies
@@ -50,17 +49,24 @@ vi.mock("@vue-flow/core", () => ({
   VueFlow: {
     name: "VueFlow",
     template: '<div class="mock-vue-flow"><slot /></div>',
-    props: [
-      "nodes", "edges", "defaultViewport", "minZoom", "maxZoom"
-    ],
+    props: ["nodes", "edges", "defaultViewport", "minZoom", "maxZoom"],
     emits: [
-      "drop", "node-change", "nodes-change", "edges-change", 
-      "connect", "dragover", "dragleave"
-    ]
+      "drop",
+      "node-change",
+      "nodes-change",
+      "edges-change",
+      "connect",
+      "dragover",
+      "dragleave",
+    ],
   },
   // The empty-canvas start node renders the shared FlowNodeCard, which imports
   // Handle + Position from this module.
-  Handle: { name: "Handle", props: ["id", "type", "position"], template: "<div class='mock-handle' />" },
+  Handle: {
+    name: "Handle",
+    props: ["id", "type", "position"],
+    template: "<div class='mock-handle' />",
+  },
   Position: { Top: "top", Right: "right", Bottom: "bottom", Left: "left" },
   useVueFlow: () => ({
     onInit: vi.fn(),
@@ -74,12 +80,12 @@ vi.mock("@vue-flow/controls", () => ({
   Controls: {
     name: "Controls",
     template: '<div class="mock-controls"><slot /></div>',
-    props: ["showInteractive", "position"]
+    props: ["showInteractive", "position"],
   },
   ControlButton: {
-    name: "ControlButton", 
-    template: '<button class="mock-control-button"><slot /></button>'
-  }
+    name: "ControlButton",
+    template: '<button class="mock-control-button"><slot /></button>',
+  },
 }));
 
 // Mock child components
@@ -87,8 +93,8 @@ vi.mock("./CustomNode.vue", () => ({
   default: {
     name: "CustomNode",
     template: '<div class="mock-custom-node"></div>',
-    props: ["id", "data", "io_type"]
-  }
+    props: ["id", "data", "io_type"],
+  },
 }));
 
 vi.mock("@/components/flow/FlowEdge.vue", () => ({
@@ -96,26 +102,34 @@ vi.mock("@/components/flow/FlowEdge.vue", () => ({
     name: "FlowEdge",
     template: '<div class="mock-custom-edge"></div>',
     props: [
-      "id", "sourceX", "sourceY", "targetX", "targetY",
-      "sourcePosition", "targetPosition", "data", "markerEnd", 
-      "style", "isInView"
-    ]
-  }
+      "id",
+      "sourceX",
+      "sourceY",
+      "targetX",
+      "targetY",
+      "sourcePosition",
+      "targetPosition",
+      "data",
+      "markerEnd",
+      "style",
+      "isInView",
+    ],
+  },
 }));
 
 vi.mock("./DropzoneBackground.vue", () => ({
   default: {
     name: "DropzoneBackground",
     template: '<div class="mock-dropzone-background"><slot /></div>',
-    props: ["style"]
-  }
+    props: ["style"],
+  },
 }));
 
 vi.mock("./EdgeWithButton.vue", () => ({
   default: {
     name: "EdgeWithButton",
-    template: '<div class="mock-edge-with-button"></div>'
-  }
+    template: '<div class="mock-edge-with-button"></div>',
+  },
 }));
 
 // Mock Vuex store
@@ -123,11 +137,11 @@ const mockStore = {
   state: {},
   getters: {},
   dispatch: vi.fn(),
-  commit: vi.fn()
+  commit: vi.fn(),
 };
 
 vi.mock("vuex", () => ({
-  useStore: () => mockStore
+  useStore: () => mockStore,
 }));
 
 // Create a mock useDragAndDrop composable
@@ -146,10 +160,10 @@ vi.mock("./useDnD", () => ({
     mockPipelineObj = {
       currentSelectedPipeline: {
         nodes: [],
-        edges: []
+        edges: [],
       },
       dirtyFlag: false,
-      isDragOver: false
+      isDragOver: false,
     };
 
     mockOnDragOver = vi.fn();
@@ -160,7 +174,7 @@ vi.mock("./useDnD", () => ({
     mockOnEdgesChange = vi.fn();
     mockOnConnect = vi.fn();
     mockValidateConnection = vi.fn();
-    
+
     return {
       onDragOver: mockOnDragOver,
       onDrop: mockOnDrop,
@@ -173,7 +187,7 @@ vi.mock("./useDnD", () => ({
       validateConnection: mockValidateConnection,
       pipelineObj: mockPipelineObj,
     };
-  }
+  },
 }));
 
 describe("PipelineFlow.vue", () => {
@@ -190,10 +204,10 @@ describe("PipelineFlow.vue", () => {
     mockPipelineObj = {
       currentSelectedPipeline: {
         nodes: [],
-        edges: []
+        edges: [],
       },
       dirtyFlag: false,
-      isDragOver: false
+      isDragOver: false,
     };
   });
 
@@ -217,7 +231,7 @@ describe("PipelineFlow.vue", () => {
         stubs: {
           OIcon: OIconStub,
         },
-      }
+      },
     });
   };
 
@@ -255,7 +269,7 @@ describe("PipelineFlow.vue", () => {
   it("should hide warning text when dirtyFlag is false", () => {
     wrapper = mountComponent();
     const warningText = wrapper.find('[data-test="pipeline-flow-unsaved-changes-warning-text"]');
-    expect(warningText.element.style.display).toBe('none');
+    expect(warningText.element.style.display).toBe("none");
   });
 
   // Test 7: Warning text is shown when dirtyFlag is true
@@ -264,7 +278,7 @@ describe("PipelineFlow.vue", () => {
     wrapper.vm.pipelineObj.dirtyFlag = true;
     await nextTick();
     const warningText = wrapper.find('[data-test="pipeline-flow-unsaved-changes-warning-text"]');
-    expect(warningText.attributes('v-show')).toBeUndefined();
+    expect(warningText.attributes("v-show")).toBeUndefined();
     expect(wrapper.vm.pipelineObj.dirtyFlag).toBe(true);
   });
 
@@ -273,13 +287,13 @@ describe("PipelineFlow.vue", () => {
     wrapper = mountComponent();
     const startNode = wrapper.find('[data-test="pipeline-flow-start-node"]');
     expect(startNode.exists()).toBe(true);
-    expect(startNode.text()).toBe('pipeline.chooseSource');
+    expect(startNode.text()).toBe("pipeline.chooseSource");
   });
 
   // Test 9: Empty canvas text is hidden when nodes exist
   it("should hide empty canvas text when nodes exist", async () => {
     wrapper = mountComponent();
-    wrapper.vm.pipelineObj.currentSelectedPipeline.nodes.push({ id: '1' });
+    wrapper.vm.pipelineObj.currentSelectedPipeline.nodes.push({ id: "1" });
     await nextTick();
     expect(wrapper.vm.pipelineObj.currentSelectedPipeline.nodes.length).toBe(1);
   });
@@ -288,17 +302,17 @@ describe("PipelineFlow.vue", () => {
   it("should pass correct props to VueFlow", () => {
     wrapper = mountComponent();
     const vueFlow = wrapper.findComponent({ name: "VueFlow" });
-    expect(vueFlow.props('defaultViewport')).toEqual({ zoom: 0.8 });
-    expect(vueFlow.props('minZoom')).toBe(0.2);
-    expect(vueFlow.props('maxZoom')).toBe(4);
+    expect(vueFlow.props("defaultViewport")).toEqual({ zoom: 0.8 });
+    expect(vueFlow.props("minZoom")).toBe(0.2);
+    expect(vueFlow.props("maxZoom")).toBe(4);
   });
 
   // Test 11: Controls component receives correct props
   it("should pass correct props to Controls", () => {
     wrapper = mountComponent();
     const controls = wrapper.findComponent({ name: "Controls" });
-    expect(controls.props('showInteractive')).toBe(false);
-    expect(controls.props('position')).toBe('top-left');
+    expect(controls.props("showInteractive")).toBe(false);
+    expect(controls.props("position")).toBe("top-left");
   });
 
   // Test 12: VueFlow ref is properly initialized
@@ -330,7 +344,7 @@ describe("PipelineFlow.vue", () => {
     expect(wrapper.vm.isDragOver).toBeDefined();
   });
 
-  // Test 16: node change functions are accessible  
+  // Test 16: node change functions are accessible
   it("should expose node change functions", () => {
     wrapper = mountComponent();
     expect(wrapper.vm.onNodeChange).toBeDefined();
@@ -367,7 +381,7 @@ describe("PipelineFlow.vue", () => {
   // Test 21: isCanvasEmpty computed property works correctly with nodes
   it("should compute isCanvasEmpty correctly when nodes exist", async () => {
     wrapper = mountComponent();
-    wrapper.vm.pipelineObj.currentSelectedPipeline.nodes.push({ id: '1' });
+    wrapper.vm.pipelineObj.currentSelectedPipeline.nodes.push({ id: "1" });
     await nextTick();
     expect(wrapper.vm.pipelineObj.currentSelectedPipeline.nodes.length).toBe(1);
   });
@@ -398,22 +412,24 @@ describe("PipelineFlow.vue", () => {
   // Test 25: onMounted lifecycle hook behavior with > 4 nodes
   it("should call fitView with padding 0.1 when nodes > 4 on mount", async () => {
     wrapper = mountComponent();
-    wrapper.vm.pipelineObj.currentSelectedPipeline.nodes = Array(5).fill().map((_, i) => ({ id: `node${i}` }));
-    
+    wrapper.vm.pipelineObj.currentSelectedPipeline.nodes = Array(5)
+      .fill()
+      .map((_, i) => ({ id: `node${i}` }));
+
     // Mock the vueFlowRef before timeout
     wrapper.vm.vueFlowRef = { fitView: mockFitView };
-    
-    await new Promise(resolve => setTimeout(resolve, 150));
+
+    await new Promise((resolve) => setTimeout(resolve, 150));
     expect(mockFitView).toHaveBeenCalledWith({ padding: 0.1 });
   });
 
   // Test 26: onMounted lifecycle hook behavior with <= 4 nodes
   it("should call fitView with padding 1 when nodes <= 4 on mount", async () => {
-    mockPipelineObj.currentSelectedPipeline.nodes = [{ id: 'node1' }];
+    mockPipelineObj.currentSelectedPipeline.nodes = [{ id: "node1" }];
     wrapper = mountComponent();
     wrapper.vm.vueFlowRef = { fitView: mockFitView };
-    
-    await new Promise(resolve => setTimeout(resolve, 150));
+
+    await new Promise((resolve) => setTimeout(resolve, 150));
     expect(mockFitView).toHaveBeenCalledWith({ padding: 1 });
   });
 
@@ -421,12 +437,12 @@ describe("PipelineFlow.vue", () => {
   it("should reset dirtyFlag when currentSelectedPipeline changes", async () => {
     mockPipelineObj.dirtyFlag = true;
     wrapper = mountComponent();
-    
+
     // Trigger the watcher by changing the pipeline reference
-    wrapper.vm.pipelineObj.currentSelectedPipeline = { nodes: [{ id: 'new' }], edges: [] };
+    wrapper.vm.pipelineObj.currentSelectedPipeline = { nodes: [{ id: "new" }], edges: [] };
     await nextTick();
     await flushPromises();
-    
+
     expect(wrapper.vm.pipelineObj.dirtyFlag).toBe(false);
   });
 
@@ -434,7 +450,7 @@ describe("PipelineFlow.vue", () => {
   it("should handle VueFlow drop event", () => {
     wrapper = mountComponent();
     const vueFlow = wrapper.findComponent({ name: "VueFlow" });
-    vueFlow.vm.$emit('drop');
+    vueFlow.vm.$emit("drop");
     expect(mockOnDrop).toHaveBeenCalled();
   });
 
@@ -442,7 +458,7 @@ describe("PipelineFlow.vue", () => {
   it("should handle VueFlow node-change event", () => {
     wrapper = mountComponent();
     const vueFlow = wrapper.findComponent({ name: "VueFlow" });
-    vueFlow.vm.$emit('node-change');
+    vueFlow.vm.$emit("node-change");
     expect(mockOnNodeChange).toHaveBeenCalled();
   });
 
@@ -450,7 +466,7 @@ describe("PipelineFlow.vue", () => {
   it("should handle VueFlow nodes-change event", () => {
     wrapper = mountComponent();
     const vueFlow = wrapper.findComponent({ name: "VueFlow" });
-    vueFlow.vm.$emit('nodes-change');
+    vueFlow.vm.$emit("nodes-change");
     expect(mockOnNodesChange).toHaveBeenCalled();
   });
 
@@ -458,7 +474,7 @@ describe("PipelineFlow.vue", () => {
   it("should handle VueFlow edges-change event", () => {
     wrapper = mountComponent();
     const vueFlow = wrapper.findComponent({ name: "VueFlow" });
-    vueFlow.vm.$emit('edges-change');
+    vueFlow.vm.$emit("edges-change");
     expect(mockOnEdgesChange).toHaveBeenCalled();
   });
 
@@ -466,7 +482,7 @@ describe("PipelineFlow.vue", () => {
   it("should handle VueFlow connect event", () => {
     wrapper = mountComponent();
     const vueFlow = wrapper.findComponent({ name: "VueFlow" });
-    vueFlow.vm.$emit('connect');
+    vueFlow.vm.$emit("connect");
     expect(mockOnConnect).toHaveBeenCalled();
   });
 
@@ -474,7 +490,7 @@ describe("PipelineFlow.vue", () => {
   it("should handle VueFlow dragover event", () => {
     wrapper = mountComponent();
     const vueFlow = wrapper.findComponent({ name: "VueFlow" });
-    vueFlow.vm.$emit('dragover');
+    vueFlow.vm.$emit("dragover");
     expect(mockOnDragOver).toHaveBeenCalled();
   });
 
@@ -482,7 +498,7 @@ describe("PipelineFlow.vue", () => {
   it("should handle VueFlow dragleave event", () => {
     wrapper = mountComponent();
     const vueFlow = wrapper.findComponent({ name: "VueFlow" });
-    vueFlow.vm.$emit('dragleave');
+    vueFlow.vm.$emit("dragleave");
     expect(mockOnDragLeave).toHaveBeenCalled();
   });
 
@@ -491,21 +507,21 @@ describe("PipelineFlow.vue", () => {
     wrapper = mountComponent();
     wrapper.vm.isDragOver = { value: true };
     await nextTick();
-    expect(wrapper.text()).toContain('Drop here');
+    expect(wrapper.text()).toContain("Drop here");
   });
 
   // Test 36: Component exposes setViewport function
   it("should expose setViewport function", () => {
     wrapper = mountComponent();
     expect(wrapper.vm.setViewport).toBeDefined();
-    expect(typeof wrapper.vm.setViewport).toBe('function');
+    expect(typeof wrapper.vm.setViewport).toBe("function");
   });
 
   // Test 37: CustomNode components are rendered in templates
   it("should render CustomNode components in templates", () => {
     wrapper = mountComponent();
     const customNodeComponent = wrapper.findComponent({ name: "CustomNode" });
-    
+
     // Check if CustomNode component is available
     expect(customNodeComponent.exists()).toBe(false); // Not rendered without nodes
   });
@@ -530,9 +546,9 @@ describe("PipelineFlow.vue", () => {
     wrapper = mountComponent();
     wrapper.vm.pipelineObj.dirtyFlag = true;
     await nextTick();
-    
+
     const warningText = wrapper.find('[data-test="pipeline-flow-unsaved-changes-warning-text"]');
-    expect(warningText.text()).toContain('Unsaved changes detected');
+    expect(warningText.text()).toContain("Unsaved changes detected");
     expect(warningText.find('[data-test-stub="o-icon"]').exists()).toBe(true);
   });
 });

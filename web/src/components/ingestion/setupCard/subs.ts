@@ -27,9 +27,7 @@ export function safeHttpUrl(url?: string): string {
   if (!url) return "#";
   try {
     const proto = new URL(url, window.location.origin).protocol;
-    return proto === "http:" || proto === "https:" || proto === "mailto:"
-      ? url
-      : "#";
+    return proto === "http:" || proto === "https:" || proto === "mailto:" ? url : "#";
   } catch {
     return "#";
   }
@@ -44,9 +42,6 @@ export function applySubs(template: string, subs: CardSubstitutions): string {
 }
 
 /** The masked counterpart of applySubs — same template, token hidden. */
-export function applySubsMasked(
-  template: string,
-  subs: CardSubstitutions,
-): string {
+export function applySubsMasked(template: string, subs: CardSubstitutions): string {
   return applySubs(template, { ...subs, token: MASKED_TOKEN });
 }

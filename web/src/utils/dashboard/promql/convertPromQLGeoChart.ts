@@ -171,17 +171,12 @@ export class GeoConverter implements PromQLChartConverter {
           data: geoData,
           symbolSize: function (val: any) {
             const normalizedSize = normalizeValue(val[2], minValue, maxValue);
-            const minSymbolSize =
-              config.map_symbol_style?.size_by_value?.min ?? 1;
-            const maxSymbolSize =
-              config.map_symbol_style?.size_by_value?.max ?? 100;
-            const mapSymbolStyleSelected =
-              config.map_symbol_style?.size ?? "by Value";
+            const minSymbolSize = config.map_symbol_style?.size_by_value?.min ?? 1;
+            const maxSymbolSize = config.map_symbol_style?.size_by_value?.max ?? 100;
+            const mapSymbolStyleSelected = config.map_symbol_style?.size ?? "by Value";
 
             if (mapSymbolStyleSelected === "by Value") {
-              return (
-                minSymbolSize + normalizedSize * (maxSymbolSize - minSymbolSize)
-              );
+              return minSymbolSize + normalizedSize * (maxSymbolSize - minSymbolSize);
             } else if (mapSymbolStyleSelected === "fixed") {
               return config.map_symbol_style?.size_fixed ?? 2;
             }

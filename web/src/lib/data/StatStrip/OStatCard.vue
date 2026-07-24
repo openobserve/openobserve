@@ -121,11 +121,7 @@ const pct = computed(() => {
   return Math.max(0, Math.min(100, (v / props.max) * 100));
 });
 const trendArrow = computed(() =>
-  props.trend?.direction === "up"
-    ? "▲"
-    : props.trend?.direction === "down"
-      ? "▼"
-      : "—",
+  props.trend?.direction === "up" ? "▲" : props.trend?.direction === "down" ? "▼" : "—",
 );
 const trendClass = computed(() =>
   props.trend?.tone
@@ -138,7 +134,7 @@ const trendClass = computed(() =>
   <component
     :is="clickable ? 'button' : 'div'"
     :type="clickable ? 'button' : undefined"
-    class="flex flex-col justify-center gap-1 rounded-default border bg-surface-base px-2.5 py-1 min-w-0 text-left transition-colors"
+    class="rounded-default bg-surface-base flex min-w-0 flex-col justify-center gap-1 border px-2.5 py-1 text-left transition-colors"
     :class="[
       selected ? 'border-accent' : 'border-border-default',
       clickable ? 'cursor-pointer' : '',
@@ -146,27 +142,24 @@ const trendClass = computed(() =>
     ]"
     :data-test="dataTest"
   >
-    <div class="flex items-center justify-between gap-2 min-w-0">
-      <div class="flex items-baseline gap-1.5 min-w-0">
+    <div class="flex min-w-0 items-center justify-between gap-2">
+      <div class="flex min-w-0 items-baseline gap-1.5">
         <span
-          class="text-2xl font-semibold leading-none truncate"
+          class="truncate text-2xl leading-none font-semibold"
           :class="isMuted ? 'text-text-muted' : tc.value"
         >
           <slot name="value">{{ displayValue }}</slot>
         </span>
-        <span
-          v-if="label"
-          class="truncate text-xs font-medium text-text-secondary"
-        >{{ label }}</span>
-        <span
-          v-if="trend"
-          class="shrink-0 text-2xs font-semibold"
-          :class="trendClass"
-        >{{ trendArrow }} {{ trend.label }}</span>
+        <span v-if="label" class="text-text-secondary truncate text-xs font-medium">{{
+          label
+        }}</span>
+        <span v-if="trend" class="text-2xs shrink-0 font-semibold" :class="trendClass"
+          >{{ trendArrow }} {{ trend.label }}</span
+        >
       </div>
       <span
         v-if="icon || slots.icon"
-        class="w-7 h-7 shrink-0 grid place-items-center rounded-default"
+        class="rounded-default grid h-7 w-7 shrink-0 place-items-center"
         :class="tc.chip"
       >
         <slot name="icon">
@@ -178,7 +171,7 @@ const trendClass = computed(() =>
     </div>
     <!-- Track is always rendered so the card height never shifts as data loads;
          only the fill width changes. -->
-    <div class="h-1 rounded-full bg-surface-subtle overflow-hidden">
+    <div class="bg-surface-subtle h-1 overflow-hidden rounded-full">
       <div
         class="h-full rounded-full transition-all duration-300"
         :class="tc.bar"

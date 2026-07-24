@@ -3,49 +3,47 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import i18n from "@/locales";
 import TestFunction from "./TestFunction.vue";
 import searchService from "@/services/search";
-import { nextTick } from 'vue';
+import { nextTick } from "vue";
 import useStreams from "@/composables/useStreams";
 
 // Mock the jstransform service
 vi.mock("@/services/jstransform", () => ({
   default: {
-    test: vi.fn(() => Promise.resolve({ 
-      data: { 
-        results: [
-          { event: { field1: "value1" } },
-          { event: { field2: "value2" } }
-        ] 
-      } 
-    }))
-  }
+    test: vi.fn(() =>
+      Promise.resolve({
+        data: {
+          results: [{ event: { field1: "value1" } }, { event: { field2: "value2" } }],
+        },
+      }),
+    ),
+  },
 }));
 
 // Mock the search service
 vi.mock("@/services/search", () => ({
   default: {
-    search: vi.fn(() => Promise.resolve({
-      data: {
-        hits: [
-          { field1: "value1" },
-          { field2: "value2" }
-        ]
-      }
-    }))
-  }
+    search: vi.fn(() =>
+      Promise.resolve({
+        data: {
+          hits: [{ field1: "value1" }, { field2: "value2" }],
+        },
+      }),
+    ),
+  },
 }));
 
 // Mock the useStreams composable
 vi.mock("@/composables/useStreams", () => ({
   default: vi.fn(() => ({
-    getStreams: vi.fn(() => Promise.resolve({ list: [] }))
-  }))
+    getStreams: vi.fn(() => Promise.resolve({ list: [] })),
+  })),
 }));
 
 // Mock the useParser composable
 vi.mock("@/composables/useParser", () => ({
   default: () => ({
-    sqlParser: vi.fn(() => Promise.resolve())
-  })
+    sqlParser: vi.fn(() => Promise.resolve()),
+  }),
 }));
 
 // Mock the useQuery composable
@@ -56,10 +54,10 @@ vi.mock("@/composables/useQuery", () => ({
       query: {
         sql: "",
         from: 0,
-        size: 10
-      }
-    }))
-  })
+        size: 10,
+      },
+    })),
+  }),
 }));
 
 describe("TestFunction Component", () => {
@@ -75,34 +73,34 @@ describe("TestFunction Component", () => {
     mockStore = {
       state: {
         selectedOrganization: {
-          identifier: "test-org"
+          identifier: "test-org",
         },
-        theme: 'light'
+        theme: "light",
       },
-      dispatch: vi.fn()
+      dispatch: vi.fn(),
     };
 
     // Setup router mock
     mockRouter = {
       currentRoute: {
         value: {
-          path: "/test"
-        }
-      }
+          path: "/test",
+        },
+      },
     };
 
     // Mock editor methods
     const mockEditor = {
       getModel: vi.fn(() => ({
-        getLinesContent: () => ["line1", "line2"]
+        getLinesContent: () => ["line1", "line2"],
       })),
-      addErrorDiagnostics: vi.fn()
+      addErrorDiagnostics: vi.fn(),
     };
 
     // Mock getStreams
     mockGetStreams = vi.fn(() => Promise.resolve({ list: [] }));
     useStreams.mockImplementation(() => ({
-      getStreams: mockGetStreams
+      getStreams: mockGetStreams,
     }));
 
     // Mount component
@@ -111,30 +109,30 @@ describe("TestFunction Component", () => {
         plugins: [i18n],
         provide: {
           store: mockStore,
-          router: mockRouter
+          router: mockRouter,
         },
         stubs: {
-          'query-editor': {
+          "query-editor": {
             template: '<div class="query-editor"></div>',
-            props: ['query'],
-            emits: ['update:query'],
+            props: ["query"],
+            emits: ["update:query"],
             methods: {
               getModel: () => mockEditor.getModel(),
-              addErrorDiagnostics: mockEditor.addErrorDiagnostics
-            }
+              addErrorDiagnostics: mockEditor.addErrorDiagnostics,
+            },
           },
-          'DateTime': true,
-          'FullViewContainer': true,
-          'O2AIContextAddBtn': true
-        }
+          DateTime: true,
+          FullViewContainer: true,
+          O2AIContextAddBtn: true,
+        },
       },
       props: {
         vrlFunction: {
           function: "test_function",
-          name: "Test Function"
+          name: "Test Function",
         },
-        heightOffset: 0
-      }
+        heightOffset: 0,
+      },
     });
 
     // Mock outputEventsEditorRef
@@ -142,21 +140,22 @@ describe("TestFunction Component", () => {
       value: {
         getModel: () => ({
           getLinesContent: () => [
-            '{',
+            "{",
             '  "event": {',
             '    "field1": "value1"',
-            '  },',
+            "  },",
             '  "message": "Error message"',
-            '}'
+            "}",
           ],
           getLineCount: () => 6,
-          getValueInRange: () => JSON.stringify({
-            event: { field1: "value1" },
-            message: "Error message"
-          })
+          getValueInRange: () =>
+            JSON.stringify({
+              event: { field1: "value1" },
+              message: "Error message",
+            }),
         }),
-        addErrorDiagnostics: vi.fn()
-      }
+        addErrorDiagnostics: vi.fn(),
+      },
     };
 
     // Mock getLineRanges
@@ -165,7 +164,7 @@ describe("TestFunction Component", () => {
       return {
         startLineNumber: 1,
         endLineNumber: 6,
-        message: event.message || ""
+        message: event.message || "",
       };
     });
 
@@ -189,7 +188,7 @@ describe("TestFunction Component", () => {
       expect(wrapper.vm.streamTypes).toMatchObject([
         { label: "Logs", value: "logs" },
         { label: "Metrics", value: "metrics" },
-        { label: "Traces", value: "traces" }
+        { label: "Traces", value: "traces" },
       ]);
     });
 
@@ -199,7 +198,7 @@ describe("TestFunction Component", () => {
         functions: true,
         query: false,
         events: true,
-        output: true
+        output: true,
       });
     });
 
@@ -238,7 +237,7 @@ describe("TestFunction Component", () => {
       wrapper.vm.loading.events = false;
       // Force server-side validation error to match component behavior
       searchService.search.mockRejectedValueOnce({
-        response: { data: { message: "Invalid SQL Query" } }
+        response: { data: { message: "Invalid SQL Query" } },
       });
       await wrapper.vm.getResults();
       await flushPromises();
@@ -259,18 +258,15 @@ describe("TestFunction Component", () => {
     it("executes query successfully", async () => {
       searchService.search.mockResolvedValueOnce({
         data: {
-          hits: [
-            { field1: "value1" },
-            { field2: "value2" }
-          ]
-        }
+          hits: [{ field1: "value1" }, { field2: "value2" }],
+        },
       });
 
       wrapper.vm.selectedStream.name = "test_stream";
       wrapper.vm.inputQuery = 'SELECT * FROM "test_stream"';
       wrapper.vm.dateTime = {
         type: "relative",
-        relativeTimePeriod: "15m"
+        relativeTimePeriod: "15m",
       };
       wrapper.vm.loading.events = false;
 
@@ -285,11 +281,11 @@ describe("TestFunction Component", () => {
 
     it("handles query execution error", async () => {
       searchService.search.mockRejectedValueOnce({
-        response: { data: { message: "Invalid query" } }
+        response: { data: { message: "Invalid query" } },
       });
 
       wrapper.vm.selectedStream.name = "test_stream";
-      wrapper.vm.inputQuery = 'INVALID QUERY';
+      wrapper.vm.inputQuery = "INVALID QUERY";
       wrapper.vm.loading.events = false;
       await wrapper.vm.getResults();
       await flushPromises();
@@ -304,7 +300,7 @@ describe("TestFunction Component", () => {
       wrapper.vm.loading.events = false;
       // Force server-side validation error to match component behavior
       searchService.search.mockRejectedValueOnce({
-        response: { data: { message: "Invalid SQL Query" } }
+        response: { data: { message: "Invalid SQL Query" } },
       });
       await wrapper.vm.getResults();
       await flushPromises();
@@ -319,7 +315,7 @@ describe("TestFunction Component", () => {
       wrapper.vm.loading.events = false;
       // Force server-side validation error to match component behavior
       searchService.search.mockRejectedValueOnce({
-        response: { data: { message: "Invalid SQL Query" } }
+        response: { data: { message: "Invalid SQL Query" } },
       });
       await wrapper.vm.getResults();
       await flushPromises();
@@ -332,7 +328,7 @@ describe("TestFunction Component", () => {
   describe("Stream Management", () => {
     it("updates streams when stream type changes", async () => {
       const mockStreams = ["stream1", "stream2"];
-      mockGetStreams.mockResolvedValueOnce({ list: mockStreams.map(name => ({ name })) });
+      mockGetStreams.mockResolvedValueOnce({ list: mockStreams.map((name) => ({ name })) });
 
       wrapper.vm.selectedStream.type = "logs";
       await wrapper.vm.updateStreams();
@@ -405,11 +401,8 @@ describe("TestFunction Component", () => {
     it("processes test results correctly", async () => {
       const testResults = {
         data: {
-          results: [
-            { event: { field1: "value1" } },
-            { event: { field2: "value2" } }
-          ]
-        }
+          results: [{ event: { field1: "value1" } }, { event: { field2: "value2" } }],
+        },
       };
 
       await wrapper.vm.processTestResults(testResults);
@@ -449,7 +442,7 @@ describe("TestFunction Component", () => {
 
     it("handles test function errors", async () => {
       const error = {
-        response: { data: { message: "Test error" } }
+        response: { data: { message: "Test error" } },
       };
       await wrapper.vm.handleTestError(error);
       await flushPromises();
@@ -460,7 +453,7 @@ describe("TestFunction Component", () => {
 
     it("handles network errors", async () => {
       const error = {
-        message: "Network error"
+        message: "Network error",
       };
       await wrapper.vm.handleTestError(error);
       await flushPromises();
@@ -471,7 +464,7 @@ describe("TestFunction Component", () => {
 
     it("handles timeout errors", async () => {
       const error = {
-        message: "Timeout"
+        message: "Timeout",
       };
       await wrapper.vm.handleTestError(error);
       await flushPromises();
@@ -482,7 +475,7 @@ describe("TestFunction Component", () => {
 
     it("handles server errors", async () => {
       const error = {
-        response: { data: { message: "Server error" } }
+        response: { data: { message: "Server error" } },
       };
       await wrapper.vm.handleTestError(error);
       await flushPromises();
@@ -493,17 +486,16 @@ describe("TestFunction Component", () => {
   });
 
   describe("Event Highlighting", () => {
-
     it("gets line ranges for error events", () => {
       const mockEvent = {
         event: { field1: "value1" },
-        message: "Error message"
+        message: "Error message",
       };
       const ranges = wrapper.vm.getLineRanges(mockEvent);
       expect(ranges).toEqual({
         startLineNumber: 1,
         endLineNumber: 6,
-        message: "Error message"
+        message: "Error message",
       });
     });
 
@@ -519,7 +511,7 @@ describe("TestFunction Component", () => {
       expect(ranges).toEqual({
         startLineNumber: 1,
         endLineNumber: 6,
-        message: ""
+        message: "",
       });
     });
 
@@ -534,7 +526,7 @@ describe("TestFunction Component", () => {
     it("updates datetime value", async () => {
       const newDateTime = {
         type: "relative",
-        relativeTimePeriod: "15m"
+        relativeTimePeriod: "15m",
       };
       wrapper.vm.updateDateTime(newDateTime);
       await flushPromises();
@@ -546,7 +538,7 @@ describe("TestFunction Component", () => {
       const newDateTime = {
         type: "absolute",
         startTime: "2021-01-01T00:00:00Z",
-        endTime: "2021-01-02T00:00:00Z"
+        endTime: "2021-01-02T00:00:00Z",
       };
       wrapper.vm.updateDateTime(newDateTime);
       await flushPromises();
@@ -559,7 +551,7 @@ describe("TestFunction Component", () => {
       for (const period of periods) {
         const newDateTime = {
           type: "relative",
-          relativeTimePeriod: period
+          relativeTimePeriod: period,
         };
         wrapper.vm.updateDateTime(newDateTime);
         await flushPromises();
@@ -597,6 +589,4 @@ describe("TestFunction Component", () => {
       expect(wrapper.emitted()["sendToAiChat"][0]).toEqual([testData]);
     });
   });
-
-
-}); 
+});

@@ -18,13 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-if="visible"
     ref="menuRef"
-    class="fixed z-9999 bg-dropdown-bg border border-solid border-dropdown-border rounded-default shadow-[0_2px_8px_rgba(0,0,0,0.15)] min-w-50 py-1 dark:shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
+    class="bg-dropdown-bg border-dropdown-border rounded-default fixed z-9999 min-w-50 border border-solid py-1 shadow-[0_2px_8px_rgba(0,0,0,0.15)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
     :style="menuStyle"
     @click.stop
     data-test="traces-metrics-context-menu"
   >
     <div
-      class="flex items-center px-4 py-2 cursor-pointer transition-colors text-compact text-dropdown-item-text select-none hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg"
+      class="text-compact text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 transition-colors select-none"
       @click="handleMenuItemClick('gte')"
       @mouseenter="hoveredItem = 'gte'"
       @mouseleave="hoveredItem = null"
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span>{{ fieldName }} >= {{ formattedValue }}</span>
     </div>
     <div
-      class="flex items-center px-4 py-2 cursor-pointer transition-colors text-compact text-dropdown-item-text select-none hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg"
+      class="text-compact text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 transition-colors select-none"
       @click="handleMenuItemClick('lte')"
       @mouseenter="hoveredItem = 'lte'"
       @mouseleave="hoveredItem = null"
@@ -49,11 +49,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch, onBeforeUnmount } from 'vue';
+import { defineComponent, ref, computed, watch, onBeforeUnmount } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
-  name: 'TracesMetricsContextMenu',
+  name: "TracesMetricsContextMenu",
   components: {
     OIcon,
   },
@@ -76,16 +76,16 @@ export default defineComponent({
     },
     fieldName: {
       type: String,
-      default: 'Value',
+      default: "Value",
     },
   },
-  emits: ['select', 'close'],
+  emits: ["select", "close"],
   setup(props, { emit }) {
     const menuRef = ref<HTMLElement | null>(null);
     const hoveredItem = ref<string | null>(null);
 
     const formattedValue = computed(() => {
-      if (typeof props.value === 'number') {
+      if (typeof props.value === "number") {
         return props.value.toLocaleString(undefined, {
           maximumFractionDigits: 2,
         });
@@ -98,8 +98,8 @@ export default defineComponent({
       top: `${props.y}px`,
     }));
 
-    const handleMenuItemClick = (condition: 'gte' | 'lte') => {
-      emit('select', {
+    const handleMenuItemClick = (condition: "gte" | "lte") => {
+      emit("select", {
         condition,
         value: props.value,
         fieldName: props.fieldName,
@@ -108,13 +108,13 @@ export default defineComponent({
 
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.value && !menuRef.value.contains(event.target as Node)) {
-        emit('close');
+        emit("close");
       }
     };
 
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        emit('close');
+      if (event.key === "Escape") {
+        emit("close");
       }
     };
 
@@ -123,19 +123,19 @@ export default defineComponent({
       (newVisible) => {
         if (newVisible) {
           setTimeout(() => {
-            document.addEventListener('click', handleClickOutside);
-            document.addEventListener('keydown', handleEscape);
+            document.addEventListener("click", handleClickOutside);
+            document.addEventListener("keydown", handleEscape);
           }, 0);
         } else {
-          document.removeEventListener('click', handleClickOutside);
-          document.removeEventListener('keydown', handleEscape);
+          document.removeEventListener("click", handleClickOutside);
+          document.removeEventListener("keydown", handleEscape);
         }
       },
     );
 
     onBeforeUnmount(() => {
-      document.removeEventListener('click', handleClickOutside);
-      document.removeEventListener('keydown', handleEscape);
+      document.removeEventListener("click", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
     });
 
     return {
@@ -148,4 +148,3 @@ export default defineComponent({
   },
 });
 </script>
-

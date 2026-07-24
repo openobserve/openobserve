@@ -45,25 +45,22 @@ const iconWrap = computed(() => {
 
 <template>
   <div
-    class="flex items-start justify-between gap-2 px-page-edge pt-3 pb-2"
+    class="px-page-edge flex items-start justify-between gap-2 pt-3 pb-2"
     data-test="ai-panel-section-header"
   >
-    <div class="flex items-center gap-2.5 min-w-0">
+    <div class="flex min-w-0 items-center gap-2.5">
       <span
         v-if="icon"
-        class="inline-flex items-center justify-center shrink-0 w-8.5 h-8.5 rounded-default"
+        class="rounded-default inline-flex h-8.5 w-8.5 shrink-0 items-center justify-center"
         :class="iconWrap"
       >
         <OIcon :name="icon" size="md" />
       </span>
-      <div class="flex flex-col min-w-0">
-        <div class="text-sm font-semibold text-text-heading truncate">
+      <div class="flex min-w-0 flex-col">
+        <div class="text-text-heading truncate text-sm font-semibold">
           {{ title }}
         </div>
-        <div
-          v-if="hint"
-          class="text-2xs leading-normal text-text-secondary"
-        >
+        <div v-if="hint" class="text-2xs text-text-secondary leading-normal">
           {{ hint }}
         </div>
       </div>

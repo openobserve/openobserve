@@ -42,9 +42,7 @@ const resolveAppLanguage = (): string => {
   if (cookieLanguage) return cookieLanguage;
 
   const navLanguage = (navigator.language || "").toLowerCase();
-  const match = Object.keys(APP_LOCALE_TO_BCP47).find(
-    (code) => navLanguage.indexOf(code) > -1,
-  );
+  const match = Object.keys(APP_LOCALE_TO_BCP47).find((code) => navLanguage.indexOf(code) > -1);
   return match ?? "en-us";
 };
 
@@ -52,5 +50,4 @@ const resolveAppLanguage = (): string => {
  * Returns a BCP-47 locale tag for the user's selected UI language, suitable for
  * `Intl.NumberFormat`. Falls back to "en-US" for unmapped languages.
  */
-export const getNumberLocale = (): string =>
-  APP_LOCALE_TO_BCP47[resolveAppLanguage()] ?? "en-US";
+export const getNumberLocale = (): string => APP_LOCALE_TO_BCP47[resolveAppLanguage()] ?? "en-US";

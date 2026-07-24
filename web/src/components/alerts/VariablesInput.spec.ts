@@ -28,7 +28,6 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 // tests
 // ---------------------------------------------------------------------------
 
-
 // ---------------------------------------------------------------------------
 // form mode (opt-in via `name-prefix` inside a REAL <OForm>)
 // ---------------------------------------------------------------------------
@@ -134,12 +133,8 @@ describe("VariablesInput — form mode (name-prefix inside a real <OForm>)", () 
   it("typing in a row's key/value inputs updates the form values", async () => {
     wrapper = buildFormWrapper([threeRows[0]]);
 
-    await wrapper
-      .find('[data-test="alert-variables-key-input"] input')
-      .setValue("typedKey");
-    await wrapper
-      .find('[data-test="alert-variables-value-input"] input')
-      .setValue("typedValue");
+    await wrapper.find('[data-test="alert-variables-key-input"] input').setValue("typedKey");
+    await wrapper.find('[data-test="alert-variables-value-input"] input').setValue("typedValue");
     await flushPromises();
 
     expect(getForm(wrapper).state.values.variables[0]).toEqual({

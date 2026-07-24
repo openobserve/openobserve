@@ -47,8 +47,7 @@ const authoritative = (
  * unit, and `_bucket`/`_sum`/`_count` coerced to `counter`.
  */
 const fallback = (name: string, docs = 100): MetricStream => {
-  const coerced =
-    name.endsWith("_bucket") || name.endsWith("_sum") || name.endsWith("_count");
+  const coerced = name.endsWith("_bucket") || name.endsWith("_sum") || name.endsWith("_count");
   return {
     name,
     stream_type: "metrics",
@@ -97,22 +96,16 @@ describe("fixture 1: metadata-only histogram base + real bucket/sum/count", () =
   });
 
   it("routes each member by name despite the coerced counter type", () => {
-    const byName = Object.fromEntries(
-      buildMetricCards(streams).map((c) => [c.name, c]),
-    );
+    const byName = Object.fromEntries(buildMetricCards(streams).map((c) => [c.name, c]));
     expect(byName["http_duration_seconds_bucket"].cardKind).toBe(
       CARD_KIND.CLASSIC_HISTOGRAM_BUCKETS,
     );
     expect(byName["http_duration_seconds_sum"].cardKind).toBe(CARD_KIND.MEAN_PAIR);
-    expect(byName["http_duration_seconds_count"].cardKind).toBe(
-      CARD_KIND.COUNTER_RATE,
-    );
+    expect(byName["http_duration_seconds_count"].cardKind).toBe(CARD_KIND.COUNTER_RATE);
   });
 
   it("propagates the family unit only where it is semantically valid", () => {
-    const byName = Object.fromEntries(
-      buildMetricCards(streams).map((c) => [c.name, c]),
-    );
+    const byName = Object.fromEntries(buildMetricCards(streams).map((c) => [c.name, c]));
     // Bucket bounds are in the observation unit.
     expect(byName["http_duration_seconds_bucket"].unit).toBe("seconds");
     // The mean pair's /s cancels, so it keeps the observation unit.
@@ -140,9 +133,7 @@ describe("fixture 2: summary base WITH quantile data", () => {
   });
 
   it("gives the base a quantile-series card", () => {
-    const base = buildMetricCards(streams).find(
-      (c) => c.name === "rpc_latency_seconds",
-    )!;
+    const base = buildMetricCards(streams).find((c) => c.name === "rpc_latency_seconds")!;
     expect(base.cardKind).toBe(CARD_KIND.SUMMARY_QUANTILES);
   });
 });
@@ -169,9 +160,7 @@ describe("fixture 3: unrelated X and X_count with different family names", () =>
   });
 
   it("keeps each metric's own help text", () => {
-    const byName = Object.fromEntries(
-      buildMetricCards(streams).map((c) => [c.name, c]),
-    );
+    const byName = Object.fromEntries(buildMetricCards(streams).map((c) => [c.name, c]));
     expect(byName["queue"].help).toBe("Queue depth.");
     expect(byName["queue_count"].help).toBe("Number of queues.");
   });
@@ -202,9 +191,7 @@ describe("fixture 4: base metadata missing entirely", () => {
   });
 
   it("falls back to name-based unit inference with no family unit", () => {
-    const bucket = buildMetricCards(streams).find((c) =>
-      c.name.endsWith("_bucket"),
-    )!;
+    const bucket = buildMetricCards(streams).find((c) => c.name.endsWith("_bucket"))!;
     // `_bucket` looks back past the suffix and finds `seconds`.
     expect(bucket.unit).toBe("seconds");
     expect(bucket.help).toBe("");
@@ -222,10 +209,7 @@ describe("phantom suppression predicate", () => {
     // to _bucket/_sum/_count. Stream stats on these metadata-only streams have
     // been observed non-zero in the wild, and a base that slips through renders
     // as a confidently-empty `avg()` gauge card.
-    const streams = [
-      authoritative("m", "Histogram", { docs: 5 }),
-      fallback("m_bucket"),
-    ];
+    const streams = [authoritative("m", "Histogram", { docs: 5 }), fallback("m_bucket")];
     const { families } = buildMetricFamilies(streams);
     expect(isPhantomBase(families.get("m")!)).toBe(true);
     expect(buildMetricCards(streams).map((c) => c.name)).toEqual(["m_bucket"]);
@@ -258,9 +242,7 @@ describe("operandStreamsOf", () => {
     fallback("lat_seconds_sum"),
     fallback("lat_seconds_count"),
   ];
-  const byName = Object.fromEntries(
-    buildMetricCards(streams).map((c) => [c.name, c]),
-  );
+  const byName = Object.fromEntries(buildMetricCards(streams).map((c) => [c.name, c]));
 
   it("reports both operands of a mean pair", () => {
     // A filter honoured by X_sum but silently ignored by X_count would make the
@@ -282,9 +264,7 @@ describe("operandStreamsOf", () => {
   });
 
   it("reports just the card's own stream otherwise", () => {
-    expect(operandStreamsOf(byName["lat_seconds_bucket"])).toEqual([
-      "lat_seconds_bucket",
-    ]);
+    expect(operandStreamsOf(byName["lat_seconds_bucket"])).toEqual(["lat_seconds_bucket"]);
   });
 });
 
@@ -436,9 +416,9 @@ describe("the family model is cached per stream list, never across lists", () =>
     expect(buildMetricCardFor(full, "http_duration_seconds_sum")?.cardKind).toBe(
       CARD_KIND.MEAN_PAIR,
     );
-    expect(
-      buildMetricCardFor(partial, "http_duration_seconds_sum")?.cardKind,
-    ).toBe(CARD_KIND.COUNTER_RATE);
+    expect(buildMetricCardFor(partial, "http_duration_seconds_sum")?.cardKind).toBe(
+      CARD_KIND.COUNTER_RATE,
+    );
     // ...and back again, which a single-slot cache would get wrong.
     expect(buildMetricCardFor(full, "http_duration_seconds_sum")?.cardKind).toBe(
       CARD_KIND.MEAN_PAIR,

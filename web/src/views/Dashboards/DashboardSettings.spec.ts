@@ -84,7 +84,6 @@ vi.mock("../../utils/zincutils", () => ({
   getImageURL: vi.fn((path: string) => `mocked-${path}`),
 }));
 
-
 describe("DashboardSettings.vue", () => {
   let wrapper: VueWrapper;
   let store: any;
@@ -243,12 +242,8 @@ describe("DashboardSettings.vue", () => {
     it("should render all three tabs with correct names and labels", () => {
       wrapper = mountComponent();
 
-      const generalTab = wrapper.find(
-        '[data-test="dashboard-settings-general-tab"]',
-      );
-      const variableTab = wrapper.find(
-        '[data-test="dashboard-settings-variable-tab"]',
-      );
+      const generalTab = wrapper.find('[data-test="dashboard-settings-general-tab"]');
+      const variableTab = wrapper.find('[data-test="dashboard-settings-variable-tab"]');
       const tabTab = wrapper.find('[data-test="dashboard-settings-tab-tab"]');
 
       expect(generalTab.exists()).toBe(true);

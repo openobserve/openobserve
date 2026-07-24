@@ -31,11 +31,7 @@ interface Options {
   excludeMatchAll?: boolean;
 }
 
-const SYSTEM_FIELDS = new Set([
-  "_timestamp",
-  "_all",
-  "_stream",
-]);
+const SYSTEM_FIELDS = new Set(["_timestamp", "_all", "_stream"]);
 
 const NUMERIC_TYPES = new Set(["Int64", "Float64", "UInt64", "Int32", "UInt32"]);
 
@@ -100,9 +96,9 @@ export function useQueryPlaceholder(
       .filter((x) => !x.isInterestingField && !x.ftsKey && !SYSTEM_FIELDS.has(x.name))
       .slice(0, 3);
 
-    const strFields = realFields.filter(
-      (x) => !SYSTEM_FIELDS.has(x.name) && !NUMERIC_TYPES.has(x.dataType ?? ""),
-    ).slice(0, 3);
+    const strFields = realFields
+      .filter((x) => !SYSTEM_FIELDS.has(x.name) && !NUMERIC_TYPES.has(x.dataType ?? ""))
+      .slice(0, 3);
 
     const fieldExpr = (field: StreamField): string => {
       const name = field.name;
@@ -148,7 +144,10 @@ export function useQueryPlaceholder(
         if (kf1) result.push(`${base} OR ${fieldExprSql(kf1)}`);
         if (!options.excludeMatchAll) {
           if (ff0) result.push(`SELECT * FROM stream WHERE match_all('${ftsVal(ff0)}')`);
-          if (ff0 && kf1) result.push(`SELECT * FROM stream WHERE ${fieldExprSql(kf0)} AND match_all('${ftsVal(ff0)}')`);
+          if (ff0 && kf1)
+            result.push(
+              `SELECT * FROM stream WHERE ${fieldExprSql(kf0)} AND match_all('${ftsVal(ff0)}')`,
+            );
         }
       }
       return result;

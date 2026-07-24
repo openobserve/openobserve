@@ -9734,7 +9734,7 @@
       "failed": "Failed",
       "failedRuns": "Failed Runs",
       "jumpToLastRun": "Jump to last run",
-        "jumpToLatestData": "Jump to latest data",
+      "jumpToLatestData": "Jump to latest data",
       "lastRun": "Last Run",
       "location": "Location",
       "monitors": "Monitors",

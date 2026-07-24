@@ -23,126 +23,120 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
     :scroll="false"
   >
-      <template #actions>
-        <date-time
-          ref="dateTimeRef"
-          auto-apply
-          menu-align="end"
-          :default-type="searchObj.data.datetime.type"
-          :default-absolute-time="{
-            startTime: searchObj.data.datetime.startTime ?? 0,
-            endTime: searchObj.data.datetime.endTime ?? 0,
-          }"
-          :default-relative-time="
-            searchObj.data.datetime.relativeTimePeriod ?? '15m'
-          "
-          data-test="ai-agent-graph-date-time"
-          class="h-8"
-          @on:date-change="onDateChange"
-        />
-        <!-- Last-refresh + refresh control, consistent with LLM Insights /
+    <template #actions>
+      <date-time
+        ref="dateTimeRef"
+        auto-apply
+        menu-align="end"
+        :default-type="searchObj.data.datetime.type"
+        :default-absolute-time="{
+          startTime: searchObj.data.datetime.startTime ?? 0,
+          endTime: searchObj.data.datetime.endTime ?? 0,
+        }"
+        :default-relative-time="searchObj.data.datetime.relativeTimePeriod ?? '15m'"
+        data-test="ai-agent-graph-date-time"
+        class="h-8"
+        @on:date-change="onDateChange"
+      />
+      <!-- Last-refresh + refresh control, consistent with LLM Insights /
              Sessions / Agent Behavior page headers. -->
-        <div
-          class="inline-flex items-center border border-border-default rounded-default px-1 h-8 overflow-hidden"
-        >
-          <ORefreshButton
-            :last-run-at="graphLastRunAt"
-            :loading="isGraphLoading"
-            :disabled="isGraphLoading"
-            data-test="ai-agent-graph-refresh-btn"
-            @click="refresh"
-          />
-        </div>
-      </template>
+      <div
+        class="border-border-default rounded-default inline-flex h-8 items-center overflow-hidden border px-1"
+      >
+        <ORefreshButton
+          :last-run-at="graphLastRunAt"
+          :loading="isGraphLoading"
+          :disabled="isGraphLoading"
+          data-test="ai-agent-graph-refresh-btn"
+          @click="refresh"
+        />
+      </div>
+    </template>
 
     <!-- Scope control — same Stream/Agent pattern as LLM Insights, so the two
          AI pages read as one product. Stream tab picks a trace stream; Agent
          tab picks a discovered agent and the graph follows its source_stream.
          Lives in OPageLayout's #subnav (which draws the full-bleed divider). -->
     <template #subnav>
-    <div class="flex items-center gap-3 px-page-edge py-2">
-      <OToggleGroup
-        :model-value="filterMode"
-        type="single"
-        data-test="agent-graph-filter-mode"
-        @update:model-value="onFilterModeChange"
-      >
-        <OToggleGroupItem value="agent" size="sm">{{
-          t("aiObservability.agentGraph.agent")
-        }}</OToggleGroupItem>
-        <OToggleGroupItem value="stream" size="sm">{{
-          t("aiObservability.agentGraph.stream")
-        }}</OToggleGroupItem>
-      </OToggleGroup>
+      <div class="px-page-edge flex items-center gap-3 py-2">
+        <OToggleGroup
+          :model-value="filterMode"
+          type="single"
+          data-test="agent-graph-filter-mode"
+          @update:model-value="onFilterModeChange"
+        >
+          <OToggleGroupItem value="agent" size="sm">{{
+            t("aiObservability.agentGraph.agent")
+          }}</OToggleGroupItem>
+          <OToggleGroupItem value="stream" size="sm">{{
+            t("aiObservability.agentGraph.stream")
+          }}</OToggleGroupItem>
+        </OToggleGroup>
 
-      <div
-        v-if="filterMode === 'stream'"
-        data-test="agent-graph-stream-selector"
-        class="w-80 shrink-0"
-      >
-        <OSelect
-          v-model="activeStream"
-          :label="t('aiObservability.agentGraph.stream')"
-          label-position="inside"
-          :options="streamSelectOptions"
-          labelKey="label"
-          valueKey="value"
-          option-tooltip
-          class="w-full rounded-default"
-        />
-      </div>
-      <div
-        v-else
-        data-test="agent-graph-agent-selector"
-        class="w-80 shrink-0"
-      >
-        <OSelect
-          v-model="activeAgentKey"
-          :label="t('aiObservability.agentGraph.agent')"
-          label-position="inside"
-          :options="agentSelectOptions"
-          labelKey="label"
-          valueKey="value"
-          :loading="!agentsLoaded"
-          class="w-full rounded-default"
-        />
-      </div>
+        <div
+          v-if="filterMode === 'stream'"
+          data-test="agent-graph-stream-selector"
+          class="w-80 shrink-0"
+        >
+          <OSelect
+            v-model="activeStream"
+            :label="t('aiObservability.agentGraph.stream')"
+            label-position="inside"
+            :options="streamSelectOptions"
+            labelKey="label"
+            valueKey="value"
+            option-tooltip
+            class="rounded-default w-full"
+          />
+        </div>
+        <div v-else data-test="agent-graph-agent-selector" class="w-80 shrink-0">
+          <OSelect
+            v-model="activeAgentKey"
+            :label="t('aiObservability.agentGraph.agent')"
+            label-position="inside"
+            :options="agentSelectOptions"
+            labelKey="label"
+            valueKey="value"
+            :loading="!agentsLoaded"
+            class="rounded-default w-full"
+          />
+        </div>
 
-      <!-- Agent Graph's OWN visualization + layout selection. Kept fully
+        <!-- Agent Graph's OWN visualization + layout selection. Kept fully
            independent of the Traces Service Graph tab (its own state + distinct
            localStorage keys), so the two surfaces don't share a type. Same
            control shape as the Traces SearchBar toolbar for consistency. -->
-      <div class="ml-auto flex items-center gap-2 shrink-0">
-        <OToggleGroup
-          :model-value="vizType"
-          type="single"
-          data-test="agent-graph-viz-type"
-          @update:model-value="onVizTypeChange"
-        >
-          <OToggleGroupItem value="tree" size="sm">
-            <template #icon-left>
-              <OIcon name="git-branch" size="sm" />
-            </template>
-            {{ t("traces.treeView") }}
-          </OToggleGroupItem>
-          <OToggleGroupItem value="graph" size="sm">
-            <template #icon-left>
-              <OIcon name="share" size="sm" class="shrink-0" />
-            </template>
-            {{ t("traces.graphView") }}
-          </OToggleGroupItem>
-        </OToggleGroup>
-        <OSelect
-          v-model="layoutType"
-          :options="layoutOptions"
-          :searchable="false"
-          data-test="agent-graph-layout-type"
-          class="w-[7.5rem] min-h-8! h-8!"
-          :disabled="vizType === 'graph'"
-          @update:model-value="onLayoutTypeChange"
-        />
+        <div class="ml-auto flex shrink-0 items-center gap-2">
+          <OToggleGroup
+            :model-value="vizType"
+            type="single"
+            data-test="agent-graph-viz-type"
+            @update:model-value="onVizTypeChange"
+          >
+            <OToggleGroupItem value="tree" size="sm">
+              <template #icon-left>
+                <OIcon name="git-branch" size="sm" />
+              </template>
+              {{ t("traces.treeView") }}
+            </OToggleGroupItem>
+            <OToggleGroupItem value="graph" size="sm">
+              <template #icon-left>
+                <OIcon name="share" size="sm" class="shrink-0" />
+              </template>
+              {{ t("traces.graphView") }}
+            </OToggleGroupItem>
+          </OToggleGroup>
+          <OSelect
+            v-model="layoutType"
+            :options="layoutOptions"
+            :searchable="false"
+            data-test="agent-graph-layout-type"
+            class="h-8! min-h-8! w-[7.5rem]"
+            :disabled="vizType === 'graph'"
+            @update:model-value="onLayoutTypeChange"
+          />
+        </div>
       </div>
-    </div>
     </template>
 
     <!-- Gate the graph until the effective stream is genuinely resolved.
@@ -160,14 +154,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :layout-type="layoutType"
       hide-stream-selector
       agent-highlight
-      class="flex-1 min-h-0"
+      class="min-h-0 flex-1"
     />
     <!-- No agents discovered in the current org / time window — show an empty
          state, NOT the fallback `default` service graph (the original bug). -->
     <div
       v-else-if="hasNoAgents"
       data-test="agent-graph-no-agents"
-      class="flex-1 min-h-0 flex items-center justify-center"
+      class="flex min-h-0 flex-1 items-center justify-center"
     >
       <OEmptyState
         size="block"
@@ -180,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-else
       data-test="agent-graph-loading"
-      class="flex-1 min-h-0 flex items-center justify-center"
+      class="flex min-h-0 flex-1 items-center justify-center"
     >
       <OSpinner />
     </div>
@@ -214,9 +208,7 @@ const { t } = useI18n();
 const store = useStore();
 const { searchObj } = useTraces();
 
-const ServiceGraph = defineAsyncComponent(
-  () => import("@/plugins/traces/ServiceGraph.vue"),
-);
+const ServiceGraph = defineAsyncComponent(() => import("@/plugins/traces/ServiceGraph.vue"));
 
 const DEFAULT_RELATIVE = "15m";
 
@@ -232,13 +224,9 @@ const activeStream = ref<string>("");
 // own localStorage keys persist the choice across visits. Passed down to
 // ServiceGraph via `viz-type` / `layout-type` props, which override the store.
 const vizType = ref<"tree" | "graph">(
-  (localStorage.getItem("agentGraph_visualizationType") as
-    | "tree"
-    | "graph") || "tree",
+  (localStorage.getItem("agentGraph_visualizationType") as "tree" | "graph") || "tree",
 );
-const layoutType = ref<string>(
-  localStorage.getItem("agentGraph_layoutType") || "horizontal",
-);
+const layoutType = ref<string>(localStorage.getItem("agentGraph_layoutType") || "horizontal");
 
 const layoutOptions = computed(() =>
   vizType.value === "graph"
@@ -249,9 +237,7 @@ const layoutOptions = computed(() =>
       ],
 );
 
-function onVizTypeChange(
-  value: boolean | AcceptableValue | AcceptableValue[],
-) {
+function onVizTypeChange(value: boolean | AcceptableValue | AcceptableValue[]) {
   if (value !== "tree" && value !== "graph") return;
   vizType.value = value;
   localStorage.setItem("agentGraph_visualizationType", value);
@@ -272,12 +258,8 @@ function onLayoutTypeChange(value: SelectModelValue) {
 // { refresh, loading, lastRunAt }.
 const graphRef = ref<any>(null);
 const isRefreshing = ref(false);
-const graphLastRunAt = computed<number | null>(
-  () => graphRef.value?.lastRunAt ?? null,
-);
-const isGraphLoading = computed(
-  () => isRefreshing.value || graphRef.value?.loading || false,
-);
+const graphLastRunAt = computed<number | null>(() => graphRef.value?.lastRunAt ?? null);
+const isGraphLoading = computed(() => isRefreshing.value || graphRef.value?.loading || false);
 
 async function refresh() {
   if (isRefreshing.value) return;
@@ -321,9 +303,7 @@ const agentSelectOptions = computed(() =>
 // with services but no agents (e.g. `introspection`) has nothing agent-related
 // to show here, so it must not appear. Derived from the agents list rather than
 // from all trace streams for exactly this reason.
-const availableStreams = computed(() => [
-  ...new Set(agents.value.map((a) => a.source_stream)),
-]);
+const availableStreams = computed(() => [...new Set(agents.value.map((a) => a.source_stream))]);
 
 // Stream picker options: the stream name annotated with how many agents it
 // contains, e.g. "sre_agent_traces_production (2 agents)". The count makes it
@@ -359,17 +339,13 @@ const selectedAgent = computed<GenAiAgentListItem | null>(
 // graph rendered the whole `default` trace stream's service topology instead of
 // an agent-scoped graph.
 const effectiveStream = computed(() =>
-  filterMode.value === "agent"
-    ? (selectedAgent.value?.source_stream ?? "")
-    : activeStream.value,
+  filterMode.value === "agent" ? (selectedAgent.value?.source_stream ?? "") : activeStream.value,
 );
 
 // Whether there is simply nothing agent-related to graph in the current org /
 // time window. There are no agents at all → both modes have nothing to show
 // (the Stream picker is itself derived from agent-bearing streams).
-const hasNoAgents = computed(
-  () => agentsLoaded.value && !agents.value.length,
-);
+const hasNoAgents = computed(() => agentsLoaded.value && !agents.value.length);
 
 // The graph may only mount once it has a real stream to query. In agent mode
 // that requires an actually-selected agent (whose source_stream is the stream);
@@ -381,9 +357,7 @@ const graphReady = computed(() =>
     : !!activeStream.value,
 );
 
-function onFilterModeChange(
-  mode: boolean | AcceptableValue | AcceptableValue[],
-) {
+function onFilterModeChange(mode: boolean | AcceptableValue | AcceptableValue[]) {
   if (mode === "stream" || mode === "agent") filterMode.value = mode;
 }
 
@@ -400,11 +374,7 @@ async function loadAgents() {
   try {
     const org = store.state.selectedOrganization.identifier;
     const { startTime, endTime } = effectiveWindow();
-    const res = await genAiAgentMappingService.listAgents(
-      org,
-      startTime,
-      endTime,
-    );
+    const res = await genAiAgentMappingService.listAgents(org, startTime, endTime);
     agents.value = res.agents ?? [];
     // Reconcile the selection against the fresh list. Reloading (e.g. after a
     // time-range change) can return a different or empty set, which would
@@ -462,13 +432,8 @@ function onDateChange(value: any) {
 }
 
 onMounted(() => {
-  if (
-    searchObj.data.datetime.type === "relative" ||
-    !searchObj.data.datetime.startTime
-  ) {
-    applyRelative(
-      searchObj.data.datetime.relativeTimePeriod || DEFAULT_RELATIVE,
-    );
+  if (searchObj.data.datetime.type === "relative" || !searchObj.data.datetime.startTime) {
+    applyRelative(searchObj.data.datetime.relativeTimePeriod || DEFAULT_RELATIVE);
   }
   loadAgents();
 });

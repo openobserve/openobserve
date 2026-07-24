@@ -15,16 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="scroll w-full h-full overflow-auto"
-    data-test="html-renderer-scroll-container"
-  >
-    <div class="min-h-full shrink-0"
+  <div class="scroll h-full w-full overflow-auto" data-test="html-renderer-scroll-container">
+    <div
+      class="min-h-full shrink-0"
       :id="scopeId"
-      :class="[
-        'prose prose-sm max-w-none px-2 py-1',
-        isDark && 'prose-invert',
-      ]"
+      :class="['prose prose-sm max-w-none px-2 py-1', isDark && 'prose-invert']"
       v-html="sanitizedContent"
       data-test="html-renderer"
     ></div>
@@ -56,10 +51,7 @@ const prefixSelectors = (rules: CSSRuleList, prefix: string): void => {
             : `${prefix} ${trimmed}`;
         })
         .join(", ");
-    } else if (
-      rule?.type === CSSRule.MEDIA_RULE ||
-      rule?.type === CSSRule.SUPPORTS_RULE
-    ) {
+    } else if (rule?.type === CSSRule.MEDIA_RULE || rule?.type === CSSRule.SUPPORTS_RULE) {
       prefixSelectors(rule?.cssRules, prefix);
     }
     // @keyframes and @font-face have no element selectors — leave as-is
@@ -119,10 +111,7 @@ export default defineComponent({
 
         // Sandbox restricts iframe capabilities. Key blocked capability:
         // - top-navigation: prevents iframe from redirecting the parent page
-        node.setAttribute(
-          "sandbox",
-          "allow-scripts allow-same-origin",
-        );
+        node.setAttribute("sandbox", "allow-scripts allow-same-origin");
       }
     });
 
@@ -153,10 +142,7 @@ export default defineComponent({
       });
 
       fragment.querySelectorAll("style").forEach((styleEl) => {
-        styleEl.textContent = scopeCss(
-          styleEl.textContent || "",
-          `#${scopeId.value}`,
-        );
+        styleEl.textContent = scopeCss(styleEl.textContent || "", `#${scopeId.value}`);
       });
 
       const container = document.createElement("div");

@@ -14,22 +14,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import {
-  buildDynamicGrid,
-  buildLegendConfig,
-  buildPieChartConfig,
-} from "./gridBuilder";
+import { buildDynamicGrid, buildLegendConfig, buildPieChartConfig } from "./gridBuilder";
 
 // Mock the legendConfiguration module
 vi.mock("../../legendConfiguration", () => ({
   calculateBottomLegendHeight: vi.fn((seriesCount) => {
     return `${Math.min(50 + seriesCount * 2, 100)}px`;
   }),
-  calculateRightLegendWidth: vi.fn(
-    (seriesCount, width, height, series, scrollable) => {
-      return scrollable ? 200 : 150;
-    },
-  ),
+  calculateRightLegendWidth: vi.fn((seriesCount, width, height, series, scrollable) => {
+    return scrollable ? 200 : 150;
+  }),
   getChartDimensions: vi.fn(() => ({
     chartWidth: 800,
     chartHeight: 600,
@@ -86,11 +80,7 @@ describe("gridBuilder", () => {
       };
       const seriesData = [{ name: "series1" }, { name: "series2" }];
 
-      const result = buildDynamicGrid(
-        panelSchema,
-        mockChartPanelRef,
-        seriesData,
-      );
+      const result = buildDynamicGrid(panelSchema, mockChartPanelRef, seriesData);
 
       expect(result.bottom).toBe("54px");
     });
@@ -105,11 +95,7 @@ describe("gridBuilder", () => {
       };
       const seriesData = [{ name: "series1" }, { name: "series2" }];
 
-      const result = buildDynamicGrid(
-        panelSchema,
-        mockChartPanelRef,
-        seriesData,
-      );
+      const result = buildDynamicGrid(panelSchema, mockChartPanelRef, seriesData);
 
       expect(result.right).toBe(200);
     });
@@ -124,11 +110,7 @@ describe("gridBuilder", () => {
       };
       const seriesData = [{ name: "series1" }];
 
-      const result = buildDynamicGrid(
-        panelSchema,
-        mockChartPanelRef,
-        seriesData,
-      );
+      const result = buildDynamicGrid(panelSchema, mockChartPanelRef, seriesData);
 
       expect(result.right).toBe(150);
     });
@@ -142,11 +124,7 @@ describe("gridBuilder", () => {
       };
       const seriesData = [{ name: "series1" }];
 
-      const result = buildDynamicGrid(
-        panelSchema,
-        mockChartPanelRef,
-        seriesData,
-      );
+      const result = buildDynamicGrid(panelSchema, mockChartPanelRef, seriesData);
 
       expect(result.top).toBe("15%");
     });
@@ -160,11 +138,7 @@ describe("gridBuilder", () => {
       };
       const seriesData = [{ name: "series1" }];
 
-      const result = buildDynamicGrid(
-        panelSchema,
-        mockChartPanelRef,
-        seriesData,
-      );
+      const result = buildDynamicGrid(panelSchema, mockChartPanelRef, seriesData);
 
       expect(result.left).toBe("15%");
     });
@@ -179,11 +153,7 @@ describe("gridBuilder", () => {
       };
       const seriesData = [{ name: "series1" }];
 
-      const result = buildDynamicGrid(
-        panelSchema,
-        mockChartPanelRef,
-        seriesData,
-      );
+      const result = buildDynamicGrid(panelSchema, mockChartPanelRef, seriesData);
 
       expect(result.left).toBe("120px");
     });
@@ -197,11 +167,7 @@ describe("gridBuilder", () => {
       };
       const seriesData = [{ name: "series1" }];
 
-      const result = buildDynamicGrid(
-        panelSchema,
-        mockChartPanelRef,
-        seriesData,
-      );
+      const result = buildDynamicGrid(panelSchema, mockChartPanelRef, seriesData);
 
       expect(result.bottom).toBe("3%");
     });
@@ -227,11 +193,7 @@ describe("gridBuilder", () => {
       };
       const seriesData = [{ name: "series1" }];
 
-      const result = buildDynamicGrid(
-        panelSchema,
-        mockChartPanelRef,
-        seriesData,
-      );
+      const result = buildDynamicGrid(panelSchema, mockChartPanelRef, seriesData);
 
       expect(result.bottom).toBe("52px");
     });
@@ -258,11 +220,7 @@ describe("gridBuilder", () => {
       };
       const seriesData = [{ name: "series1" }];
 
-      const result = buildDynamicGrid(
-        panelSchema,
-        mockChartPanelRef,
-        seriesData,
-      );
+      const result = buildDynamicGrid(panelSchema, mockChartPanelRef, seriesData);
 
       expect(result.right).toBe(200);
     });
@@ -285,11 +243,7 @@ describe("gridBuilder", () => {
       const panelSchema = { config: {} };
       const seriesData = [{ name: "series1" }];
 
-      const result = buildLegendConfig(
-        panelSchema,
-        mockChartPanelRef,
-        seriesData,
-      );
+      const result = buildLegendConfig(panelSchema, mockChartPanelRef, seriesData);
 
       expect(result.show).toBe(true);
       expect(result.type).toBe("scroll");
@@ -309,15 +263,9 @@ describe("gridBuilder", () => {
 
       // Reset mock to return 200
       const legendConfig = await import("../../legendConfiguration");
-      vi.mocked(legendConfig.calculateRightLegendWidth).mockReturnValueOnce(
-        200,
-      );
+      vi.mocked(legendConfig.calculateRightLegendWidth).mockReturnValueOnce(200);
 
-      const result = buildLegendConfig(
-        panelSchema,
-        mockChartPanelRef,
-        seriesData,
-      );
+      const result = buildLegendConfig(panelSchema, mockChartPanelRef, seriesData);
 
       expect(result.orient).toBe("vertical");
       expect(result.right).toBe(0);
@@ -333,11 +281,7 @@ describe("gridBuilder", () => {
       };
       const seriesData = [{ name: "series1" }];
 
-      const result = buildLegendConfig(
-        panelSchema,
-        mockChartPanelRef,
-        seriesData,
-      );
+      const result = buildLegendConfig(panelSchema, mockChartPanelRef, seriesData);
 
       expect(result.orient).toBe("vertical");
       expect(result.right).toBe(0);
@@ -352,11 +296,7 @@ describe("gridBuilder", () => {
       };
       const seriesData = [{ name: "series1" }];
 
-      const result = buildLegendConfig(
-        panelSchema,
-        mockChartPanelRef,
-        seriesData,
-      );
+      const result = buildLegendConfig(panelSchema, mockChartPanelRef, seriesData);
 
       expect(result.orient).toBe("horizontal");
       expect(result.left).toBe("0");
@@ -371,11 +311,7 @@ describe("gridBuilder", () => {
       };
       const seriesData = [{ name: "series1" }];
 
-      const result = buildLegendConfig(
-        panelSchema,
-        mockChartPanelRef,
-        seriesData,
-      );
+      const result = buildLegendConfig(panelSchema, mockChartPanelRef, seriesData);
 
       expect(result.type).toBe("plain");
     });
@@ -386,11 +322,7 @@ describe("gridBuilder", () => {
       };
       const seriesData = [{ name: "series1" }];
 
-      const result = buildLegendConfig(
-        panelSchema,
-        mockChartPanelRef,
-        seriesData,
-      );
+      const result = buildLegendConfig(panelSchema, mockChartPanelRef, seriesData);
 
       expect(result.type).toBe("scroll");
     });
@@ -399,11 +331,7 @@ describe("gridBuilder", () => {
       const panelSchema = { config: {} };
       const seriesData = [{ name: "series1" }];
 
-      const result = buildLegendConfig(
-        panelSchema,
-        mockChartPanelRef,
-        seriesData,
-      );
+      const result = buildLegendConfig(panelSchema, mockChartPanelRef, seriesData);
 
       expect(result.textStyle).toEqual({
         width: 150,
@@ -419,11 +347,7 @@ describe("gridBuilder", () => {
       const panelSchema = { config: {} };
       const seriesData = [{ name: "series1" }];
 
-      const result = buildLegendConfig(
-        panelSchema,
-        mockChartPanelRef,
-        seriesData,
-      );
+      const result = buildLegendConfig(panelSchema, mockChartPanelRef, seriesData);
 
       expect(result.tooltip).toEqual({
         show: true,
@@ -438,11 +362,7 @@ describe("gridBuilder", () => {
       const panelSchema = { config: {} };
       const seriesData = [{ name: "series1" }];
 
-      const result = buildLegendConfig(
-        panelSchema,
-        mockChartPanelRef,
-        seriesData,
-      );
+      const result = buildLegendConfig(panelSchema, mockChartPanelRef, seriesData);
 
       expect(result.padding).toEqual([10, 20, 10, 10]);
     });
@@ -456,11 +376,7 @@ describe("gridBuilder", () => {
       };
       const seriesData = [{ name: "series1" }];
 
-      const result = buildLegendConfig(
-        panelSchema,
-        mockChartPanelRef,
-        seriesData,
-      );
+      const result = buildLegendConfig(panelSchema, mockChartPanelRef, seriesData);
 
       expect(result.width).toBeUndefined();
     });
@@ -477,11 +393,7 @@ describe("gridBuilder", () => {
       const panelSchema = {};
       const seriesData = [{ name: "series1" }];
 
-      const result = buildLegendConfig(
-        panelSchema,
-        mockChartPanelRef,
-        seriesData,
-      );
+      const result = buildLegendConfig(panelSchema, mockChartPanelRef, seriesData);
 
       expect(result.show).toBe(true);
       expect(result.type).toBe("scroll");
@@ -493,12 +405,7 @@ describe("gridBuilder", () => {
       const panelSchema = { config: {} };
       const seriesData = [{ name: "series1" }];
 
-      const result = buildPieChartConfig(
-        panelSchema,
-        mockChartPanelRef,
-        seriesData,
-        false,
-      );
+      const result = buildPieChartConfig(panelSchema, mockChartPanelRef, seriesData, false);
 
       expect(result.radius).toBe("58%");
       expect(result.center).toEqual(["50%", "50%"]);
@@ -508,12 +415,7 @@ describe("gridBuilder", () => {
       const panelSchema = { config: {} };
       const seriesData = [{ name: "series1" }];
 
-      const result = buildPieChartConfig(
-        panelSchema,
-        mockChartPanelRef,
-        seriesData,
-        true,
-      );
+      const result = buildPieChartConfig(panelSchema, mockChartPanelRef, seriesData, true);
 
       expect(result.radius).toEqual(["40%", "58%"]);
       expect(result.center).toEqual(["50%", "50%"]);
@@ -527,12 +429,7 @@ describe("gridBuilder", () => {
       const legendConfig = await import("../../legendConfiguration");
       vi.mocked(legendConfig.calculatePieChartRadius).mockReturnValueOnce(50);
 
-      const result = buildPieChartConfig(
-        panelSchema,
-        mockChartPanelRef,
-        seriesData,
-        true,
-      );
+      const result = buildPieChartConfig(panelSchema, mockChartPanelRef, seriesData, true);
 
       expect(result.radius).toEqual(["40%", "45%"]);
     });
@@ -549,12 +446,7 @@ describe("gridBuilder", () => {
       const legendConfig = await import("../../legendConfiguration");
       vi.mocked(legendConfig.calculatePieChartRadius).mockReturnValueOnce(70);
 
-      const result = buildPieChartConfig(
-        panelSchema,
-        mockChartPanelRef,
-        seriesData,
-        false,
-      );
+      const result = buildPieChartConfig(panelSchema, mockChartPanelRef, seriesData, false);
 
       expect(result.center).toEqual(["30%", "40%"]);
     });
@@ -568,12 +460,7 @@ describe("gridBuilder", () => {
       };
       const seriesData = [{ name: "series1" }];
 
-      const result = buildPieChartConfig(
-        panelSchema,
-        mockChartPanelRef,
-        seriesData,
-        false,
-      );
+      const result = buildPieChartConfig(panelSchema, mockChartPanelRef, seriesData, false);
 
       expect(result.center).toEqual(["25%", "50%"]);
     });
@@ -587,12 +474,7 @@ describe("gridBuilder", () => {
       };
       const seriesData = [{ name: "series1" }];
 
-      const result = buildPieChartConfig(
-        panelSchema,
-        mockChartPanelRef,
-        seriesData,
-        false,
-      );
+      const result = buildPieChartConfig(panelSchema, mockChartPanelRef, seriesData, false);
 
       expect(result.center).toEqual(["50%", "50%"]);
     });
@@ -606,12 +488,7 @@ describe("gridBuilder", () => {
       };
       const seriesData = [{ name: "series1" }];
 
-      const result = buildPieChartConfig(
-        panelSchema,
-        mockChartPanelRef,
-        seriesData,
-        false,
-      );
+      const result = buildPieChartConfig(panelSchema, mockChartPanelRef, seriesData, false);
 
       expect(result.center).toEqual(["75%", "50%"]);
     });
@@ -625,12 +502,7 @@ describe("gridBuilder", () => {
       };
       const seriesData = [{ name: "series1" }];
 
-      const result = buildPieChartConfig(
-        panelSchema,
-        mockChartPanelRef,
-        seriesData,
-        false,
-      );
+      const result = buildPieChartConfig(panelSchema, mockChartPanelRef, seriesData, false);
 
       expect(result.center).toEqual(["50%", "50%"]);
     });
@@ -642,12 +514,7 @@ describe("gridBuilder", () => {
       const legendConfig = await import("../../legendConfiguration");
       vi.mocked(legendConfig.calculatePieChartRadius).mockReturnValueOnce(70);
 
-      const result = buildPieChartConfig(
-        panelSchema,
-        mockChartPanelRef,
-        [],
-        false,
-      );
+      const result = buildPieChartConfig(panelSchema, mockChartPanelRef, [], false);
 
       expect(result.radius).toBe("58%");
       expect(result.center).toEqual(["50%", "50%"]);
@@ -661,12 +528,7 @@ describe("gridBuilder", () => {
       const legendConfig = await import("../../legendConfiguration");
       vi.mocked(legendConfig.calculatePieChartRadius).mockReturnValueOnce(70);
 
-      const result = buildPieChartConfig(
-        panelSchema,
-        mockChartPanelRef,
-        seriesData,
-        false,
-      );
+      const result = buildPieChartConfig(panelSchema, mockChartPanelRef, seriesData, false);
 
       expect(result.radius).toBe("58%");
       expect(result.center).toEqual(["50%", "50%"]);
@@ -680,11 +542,7 @@ describe("gridBuilder", () => {
       const legendConfig = await import("../../legendConfiguration");
       vi.mocked(legendConfig.calculatePieChartRadius).mockReturnValueOnce(70);
 
-      const result = buildPieChartConfig(
-        panelSchema,
-        mockChartPanelRef,
-        seriesData,
-      );
+      const result = buildPieChartConfig(panelSchema, mockChartPanelRef, seriesData);
 
       expect(result.radius).toBe("58%");
     });

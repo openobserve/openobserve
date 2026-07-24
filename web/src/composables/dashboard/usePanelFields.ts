@@ -39,9 +39,7 @@ export const usePanelFields = ({
   store: any;
   pageKey?: string;
 }) => {
-  const promqlMode = computed(
-    () => dashboardPanelData.data.queryType == "promql",
-  );
+  const promqlMode = computed(() => dashboardPanelData.data.queryType == "promql");
 
   const generateLabelFromName = (name: string) => {
     return name
@@ -55,9 +53,7 @@ export const usePanelFields = ({
   const isPivotMode = computed(() => {
     if (dashboardPanelData.data.type !== "table") return false;
     const currentQuery =
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ];
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
     return (
       (currentQuery?.fields?.breakdown?.length ?? 0) > 0 &&
       (currentQuery?.fields?.y?.length ?? 0) > 0 &&
@@ -80,23 +76,20 @@ export const usePanelFields = ({
       case "stacked":
       case "h-stacked":
         return (
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.x.length >= 1
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x
+            .length >= 1
         );
       case "metric":
         return (
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.x.length >= 0
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x
+            .length >= 0
         );
       case "table":
         return false;
       default:
         return (
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.x.length >= 2
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x
+            .length >= 2
         );
     }
   });
@@ -112,16 +105,14 @@ export const usePanelFields = ({
       case "stacked":
       case "h-stacked":
         return (
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.breakdown?.length >= 1
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+            .breakdown?.length >= 1
         );
       case "table":
         // Allow up to 3 breakdown fields for table charts
         return (
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.breakdown?.length >= 3
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+            .breakdown?.length >= 3
         );
       default:
         return false;
@@ -134,22 +125,19 @@ export const usePanelFields = ({
       case "donut":
       case "gauge":
         return (
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.y.length >= 1
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y
+            .length >= 1
         );
       case "metric":
         return (
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.y.length >= 1
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y
+            .length >= 1
         );
       case "area-stacked":
       case "heatmap":
         return (
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.y.length >= 1
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y
+            .length >= 1
         );
       default:
         return false;
@@ -160,9 +148,8 @@ export const usePanelFields = ({
     switch (dashboardPanelData.data.type) {
       case "heatmap":
         return (
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.z.length >= 1
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z
+            .length >= 1
         );
       default:
         return false;
@@ -189,14 +176,8 @@ export const usePanelFields = ({
   };
 
   const addXAxisItem = (row: { name: string; streamAlias?: string }) => {
-    if (
-      !dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.x
-    ) {
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.x = [];
+    if (!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x) {
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x = [];
     }
 
     if (isAddXAxisNotAllowed.value) {
@@ -205,30 +186,23 @@ export const usePanelFields = ({
 
     const isDerived = checkIsDerivedField(row.name) ?? false;
 
-    dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields.x.push({
-      label: !dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].customQuery
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.push({
+      label: !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+        .customQuery
         ? generateLabelFromName(row.name)
         : row.name,
       alias:
-        !dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery && !isDerived
+        !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery &&
+        !isDerived
           ? "x_axis_" +
-            (dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.x.length +
+            (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x
+              .length +
               1)
           : row.name,
       color: null,
       type: "build",
       functionName:
-        row.name == store.state.zoConfig.timestamp_column && !isDerived
-          ? "histogram"
-          : null,
+        row.name == store.state.zoConfig.timestamp_column && !isDerived ? "histogram" : null,
       args:
         row.name == store.state.zoConfig.timestamp_column && !isDerived
           ? [
@@ -261,8 +235,7 @@ export const usePanelFields = ({
           : null,
       isDerived,
       havingConditions: [],
-      treatAsNonTimestamp:
-        row.name === store.state.zoConfig.timestamp_column ? false : true,
+      treatAsNonTimestamp: row.name === store.state.zoConfig.timestamp_column ? false : true,
       showFieldAsJson:
         pageKey === "logs"
           ? (store?.state?.zoConfig?.dashboard_show_field_as_json_enabled ?? false)
@@ -272,14 +245,9 @@ export const usePanelFields = ({
     updateArrayAlias();
   };
 
-  const addBreakDownAxisItem = (row: {
-    name: string;
-    streamAlias?: string;
-  }) => {
+  const addBreakDownAxisItem = (row: { name: string; streamAlias?: string }) => {
     if (
-      !dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.breakdown
+      !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.breakdown
     ) {
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -295,27 +263,22 @@ export const usePanelFields = ({
     dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields.breakdown.push({
-      label: !dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].customQuery
+      label: !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+        .customQuery
         ? generateLabelFromName(row.name)
         : row.name,
       alias:
-        !dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery && !isDerived
+        !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery &&
+        !isDerived
           ? "breakdown_" +
-            (dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.breakdown.length +
+            (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+              .breakdown.length +
               1)
           : row.name,
       color: null,
       type: "build",
       functionName:
-        row.name == store.state.zoConfig.timestamp_column && !isDerived
-          ? "histogram"
-          : null,
+        row.name == store.state.zoConfig.timestamp_column && !isDerived ? "histogram" : null,
       args:
         row.name == store.state.zoConfig.timestamp_column && !isDerived
           ? [
@@ -354,14 +317,8 @@ export const usePanelFields = ({
   };
 
   const addYAxisItem = (row: { name: string; streamAlias?: string }) => {
-    if (
-      !dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.y
-    ) {
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.y = [];
+    if (!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y) {
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y = [];
     }
 
     if (isAddYAxisNotAllowed.value) {
@@ -370,29 +327,23 @@ export const usePanelFields = ({
 
     const isDerived = checkIsDerivedField(row.name) ?? false;
 
-    dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields.y.push({
-      label: !dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].customQuery
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.push({
+      label: !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+        .customQuery
         ? generateLabelFromName(row.name)
         : row.name,
       alias:
-        !dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery && !isDerived
+        !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery &&
+        !isDerived
           ? "y_axis_" +
-            (dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.y.length +
+            (dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y
+              .length +
               1)
           : row.name,
       // column: row.name,
       color: getNewColorValue(),
       type: "build",
-      functionName:
-        dashboardPanelData.data.type == "heatmap" || isDerived ? null : "count",
+      functionName: dashboardPanelData.data.type == "heatmap" || isDerived ? null : "count",
       args: [
         {
           type: "field",
@@ -404,8 +355,7 @@ export const usePanelFields = ({
       ],
       isDerived,
       havingConditions: [],
-      treatAsNonTimestamp:
-        row.name === store.state.zoConfig.timestamp_column ? false : true,
+      treatAsNonTimestamp: row.name === store.state.zoConfig.timestamp_column ? false : true,
       showFieldAsJson:
         pageKey === "logs"
           ? (store?.state?.zoConfig?.dashboard_show_field_as_json_enabled ?? false)
@@ -415,14 +365,8 @@ export const usePanelFields = ({
   };
 
   const addZAxisItem = (row: { name: string; streamAlias?: string }) => {
-    if (
-      !dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.z
-    ) {
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.z = [];
+    if (!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z) {
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z = [];
     }
 
     if (isAddZAxisNotAllowed.value) {
@@ -431,22 +375,17 @@ export const usePanelFields = ({
 
     const isDerived = checkIsDerivedField(row.name) ?? false;
 
-    dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields.z.push({
-      label: !dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].customQuery
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z.push({
+      label: !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+        .customQuery
         ? generateLabelFromName(row.name)
         : row.name,
       alias:
-        !dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery && !isDerived
+        !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery &&
+        !isDerived
           ? "z_axis_" +
-            ((dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields?.z?.length ?? 0) +
+            ((dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.z
+              ?.length ?? 0) +
               1)
           : row.name,
       // column: row.name,
@@ -470,14 +409,11 @@ export const usePanelFields = ({
 
   const addLatitude = (row: any) => {
     const isDerived = checkIsDerivedField(row.name) ?? false;
-    dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields.latitude = {
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.latitude = {
       label: generateLabelFromName(row.name),
       alias:
-        !dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery && !isDerived
+        !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery &&
+        !isDerived
           ? "latitude"
           : row.name,
       // column: row.name,
@@ -500,44 +436,39 @@ export const usePanelFields = ({
 
   const addLongitude = (row: any) => {
     const isDerived = checkIsDerivedField(row.name) ?? false;
-    dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields.longitude = {
-      label: generateLabelFromName(row.name),
-      alias:
-        !dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery && !isDerived
-          ? "longitude"
-          : row.name,
-      // column: row.name,
-      color: getNewColorValue(),
-      type: "build",
-      functionName: null, // You can set the appropriate aggregation function here
-      args: [
-        {
-          type: "field",
-          value: {
-            field: row.name,
-            streamAlias: row.streamAlias,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.longitude =
+      {
+        label: generateLabelFromName(row.name),
+        alias:
+          !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+            .customQuery && !isDerived
+            ? "longitude"
+            : row.name,
+        // column: row.name,
+        color: getNewColorValue(),
+        type: "build",
+        functionName: null, // You can set the appropriate aggregation function here
+        args: [
+          {
+            type: "field",
+            value: {
+              field: row.name,
+              streamAlias: row.streamAlias,
+            },
           },
-        },
-      ],
-      isDerived,
-      havingConditions: [],
-    };
+        ],
+        isDerived,
+        havingConditions: [],
+      };
   };
 
   const addWeight = (row: any) => {
     const isDerived = checkIsDerivedField(row.name) ?? false;
-    dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields.weight = {
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight = {
       label: generateLabelFromName(row.name),
       alias:
-        !dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery && !isDerived
+        !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery &&
+        !isDerived
           ? "weight"
           : row.name,
       // column: row.name,
@@ -560,14 +491,11 @@ export const usePanelFields = ({
 
   const addMapName = (row: any) => {
     const isDerived = checkIsDerivedField(row.name) ?? false;
-    dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields.name = {
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.name = {
       label: generateLabelFromName(row.name),
       alias:
-        !dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery && !isDerived
+        !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery &&
+        !isDerived
           ? "name"
           : row.name,
       // column: row.name,
@@ -594,9 +522,8 @@ export const usePanelFields = ({
     ].fields.value_for_maps = {
       label: generateLabelFromName(row.name),
       alias:
-        !dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery && !isDerived
+        !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery &&
+        !isDerived
           ? "value_for_maps"
           : row.name,
       // column: row.name,
@@ -618,14 +545,11 @@ export const usePanelFields = ({
 
   const addSource = (row: any) => {
     const isDerived = checkIsDerivedField(row.name) ?? false;
-    dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields.source = {
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.source = {
       label: generateLabelFromName(row.name),
       alias:
-        !dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery && !isDerived
+        !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery &&
+        !isDerived
           ? "source"
           : row.name,
       // column: row.name,
@@ -648,14 +572,11 @@ export const usePanelFields = ({
 
   const addTarget = (row: any) => {
     const isDerived = checkIsDerivedField(row.name) ?? false;
-    dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields.target = {
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.target = {
       label: generateLabelFromName(row.name),
       alias:
-        !dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery && !isDerived
+        !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery &&
+        !isDerived
           ? "target"
           : row.name,
       // column: row.name,
@@ -678,14 +599,11 @@ export const usePanelFields = ({
 
   const addValue = (row: any) => {
     const isDerived = checkIsDerivedField(row.name) ?? false;
-    dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields.value = {
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.value = {
       label: generateLabelFromName(row.name),
       alias:
-        !dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery && !isDerived
+        !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery &&
+        !isDerived
           ? "value"
           : row.name,
       // column: row.name,
@@ -708,36 +626,27 @@ export const usePanelFields = ({
 
   // update X or Y axis aliases when new value pushes into the X and Y axes arrays
   const updateArrayAlias = () => {
-    dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields?.x?.forEach(
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.x?.forEach(
       (it: any, index: any) =>
         (it.alias =
-          !dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].customQuery && !it.isDerived
+          !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+            .customQuery && !it.isDerived
             ? "x_axis_" + (index + 1)
             : it?.alias),
     );
-    dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields?.y?.forEach(
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.y?.forEach(
       (it: any, index: any) =>
         (it.alias =
-          !dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].customQuery && !it.isDerived
+          !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+            .customQuery && !it.isDerived
             ? "y_axis_" + (index + 1)
             : it?.alias),
     );
-    dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields?.z?.forEach(
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.z?.forEach(
       (it: any, index: any) =>
         (it.alias =
-          !dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].customQuery && !it.isDerived
+          !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+            .customQuery && !it.isDerived
             ? "z_axis_" + (index + 1)
             : it?.alias),
     );
@@ -746,9 +655,8 @@ export const usePanelFields = ({
     ].fields?.breakdown?.forEach(
       (it: any, index: any) =>
         (it.alias =
-          !dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].customQuery && !it.isDerived
+          !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+            .customQuery && !it.isDerived
             ? "breakdown_" + (index + 1)
             : it?.alias),
     );
@@ -756,9 +664,10 @@ export const usePanelFields = ({
 
   const removeXAxisItemByIndex = (index: number) => {
     if (index >= 0) {
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.x.splice(index, 1);
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.splice(
+        index,
+        1,
+      );
     }
   };
 
@@ -772,17 +681,19 @@ export const usePanelFields = ({
 
   const removeYAxisItemByIndex = (index: number) => {
     if (index >= 0) {
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.y.splice(index, 1);
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.splice(
+        index,
+        1,
+      );
     }
   };
 
   const removeZAxisItemByIndex = (index: number) => {
     if (index >= 0) {
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.z.splice(index, 1);
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z.splice(
+        index,
+        1,
+      );
     }
   };
 
@@ -798,27 +709,22 @@ export const usePanelFields = ({
   };
 
   const removeLatitude = () => {
-    dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields.latitude = null;
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.latitude =
+      null;
   };
 
   const removeLongitude = () => {
-    dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields.longitude = null;
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.longitude =
+      null;
   };
 
   const removeWeight = () => {
-    dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields.weight = null;
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight =
+      null;
   };
 
   const removeMapName = () => {
-    dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields.name = null;
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.name = null;
   };
 
   const removeMapValue = () => {
@@ -828,29 +734,25 @@ export const usePanelFields = ({
   };
 
   const removeSource = () => {
-    dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields.source = null;
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.source =
+      null;
   };
 
   const removeTarget = () => {
-    dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields.target = null;
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.target =
+      null;
   };
 
   const removeValue = () => {
-    dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields.value = null;
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.value =
+      null;
   };
 
   const removeXYFilters = () => {
     if (
       promqlMode.value ||
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].customQuery == false
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery ==
+        false
     ) {
       dashboardPanelData.meta.stream.customQueryFields = [];
       dashboardPanelData.meta.stream.vrlFunctionFieldList = [];
@@ -858,73 +760,55 @@ export const usePanelFields = ({
       const currentIdx = dashboardPanelData.layout.currentQueryIndex;
       if (dashboardPanelData.meta.queryFields[currentIdx]) {
         dashboardPanelData.meta.queryFields[currentIdx].customQueryFields = [];
-        dashboardPanelData.meta.queryFields[currentIdx].vrlFunctionFieldList =
-          [];
+        dashboardPanelData.meta.queryFields[currentIdx].vrlFunctionFieldList = [];
       }
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.x.splice(
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x.splice(
         0,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.x.length,
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.x
+          .length,
       );
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.y.splice(
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y.splice(
         0,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.y.length,
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.y
+          .length,
       );
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.z.splice(
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z.splice(
         0,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.z.length,
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.z
+          .length,
       );
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields?.breakdown?.splice(
         0,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields?.breakdown?.length,
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+          ?.breakdown?.length,
       );
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.filter.conditions.splice(
         0,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.filter.conditions.length,
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.filter
+          .conditions.length,
       );
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.latitude = null;
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.latitude =
+        null;
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.longitude = null;
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.weight = null;
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.name = null;
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight =
+        null;
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.name =
+        null;
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.value_for_maps = null;
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.source = null;
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.target = null;
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.value = null;
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.source =
+        null;
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.target =
+        null;
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.value =
+        null;
     }
   };
 
@@ -933,15 +817,11 @@ export const usePanelFields = ({
     // which stream the query targets and should not change when chart type
     // or field layout changes.
     const currentFields =
-      dashboardPanelData?.data?.queries?.[
-        dashboardPanelData?.layout?.currentQueryIndex
-      ]?.fields;
+      dashboardPanelData?.data?.queries?.[dashboardPanelData?.layout?.currentQueryIndex]?.fields;
     const preservedStream = currentFields?.stream ?? "";
     const preservedStreamType = currentFields?.stream_type ?? "logs";
 
-    dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields = {
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields = {
       stream: preservedStream,
       stream_type: preservedStreamType,
       x: [],
@@ -964,10 +844,7 @@ export const usePanelFields = ({
     };
   };
 
-  const setFieldsBasedOnChartTypeValidation = (
-    fields: any,
-    _chartType: string,
-  ) => {
+  const setFieldsBasedOnChartTypeValidation = (fields: any, _chartType: string) => {
     // First reset all existing fields in dashboardPanelData
     resetFields();
 
@@ -977,8 +854,7 @@ export const usePanelFields = ({
     // The add functions will automatically apply validation based on current chart type
     // Add X-axis fields
     fieldsToProcess.x?.forEach((field: any) => {
-      const fieldName =
-        typeof field === "string" ? field : field.name || field.column;
+      const fieldName = typeof field === "string" ? field : field.name || field.column;
       if (fieldName) {
         addXAxisItem({ name: fieldName });
       }
@@ -986,8 +862,7 @@ export const usePanelFields = ({
 
     // Add Y-axis fields
     fieldsToProcess.y?.forEach((field: any) => {
-      const fieldName =
-        typeof field === "string" ? field : field.name || field.column;
+      const fieldName = typeof field === "string" ? field : field.name || field.column;
       if (fieldName) {
         addYAxisItem({ name: fieldName });
       }
@@ -995,8 +870,7 @@ export const usePanelFields = ({
 
     // Add Z-axis fields
     fieldsToProcess.z?.forEach((field: any) => {
-      const fieldName =
-        typeof field === "string" ? field : field.name || field.column;
+      const fieldName = typeof field === "string" ? field : field.name || field.column;
       if (fieldName) {
         addZAxisItem({ name: fieldName });
       }
@@ -1004,8 +878,7 @@ export const usePanelFields = ({
 
     // Add breakdown fields
     fieldsToProcess.breakdown?.forEach((field: any) => {
-      const fieldName =
-        typeof field === "string" ? field : field.name || field.column;
+      const fieldName = typeof field === "string" ? field : field.name || field.column;
       if (fieldName) {
         addBreakDownAxisItem({ name: fieldName });
       }

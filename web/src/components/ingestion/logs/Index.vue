@@ -16,134 +16,131 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <DataSourceSidebarLayout
-    v-model="ingestiontabs"
-    :splitter-width="250"
-  >
+  <DataSourceSidebarLayout v-model="ingestiontabs" :splitter-width="250">
     <template #tabs>
-            <ORouteTab
-              name="curl"
-              data-test="ingestion-logs-tab-curl"
-              :to="{
-                name: 'curl',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              icon="data-object"
-              label="Curl"
-            />
-            <ORouteTab
-              name="filebeat"
-              data-test="ingestion-logs-tab-filebeat"
-              :to="{
-                name: 'filebeat',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :icon="'img:' + getImageURL('images/ingestion/filebeat.png')"
-              label="Filebeat"
-            />
-            <ORouteTab
-              name="fluentbit"
-              data-test="ingestion-logs-tab-fluentbit"
-              :to="{
-                name: 'fluentbit',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :icon="'img:' + getImageURL('images/ingestion/fluentbit_icon.png')"
-              label="FluentBit"
-            />
-            <ORouteTab
-              name="fluentd"
-              data-test="ingestion-logs-tab-fluentd"
-              :to="{
-                name: 'fluentd',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :icon="'img:' + getImageURL('images/ingestion/fluentd_icon.svg')"
-              label="Fluentd"
-            />
-            <ORouteTab
-              name="vector"
-              :to="{
-                name: 'vector',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :icon="'img:' + getImageURL('images/ingestion/vector.png')"
-              label="Vector"
-            />
-            <ORouteTab
-              name="ingestLogsFromOtel"
-              :to="{
-                name: 'ingestLogsFromOtel',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
-              label="OTEL Collector"
-            />
-            <ORouteTab
-              name="logstash"
-              :to="{
-                name: 'logstash',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :icon="'img:' + getImageURL('images/ingestion/logstash.svg')"
-              label="Logstash"
-            />
-            <ORouteTab
-              name="syslogNg"
-              :to="{
-                name: 'syslogNg',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              icon="plagiarism"
-              label="Syslog-ng"
-            />
-            <ORouteTab
-              name="loongcollector"
-              data-test="ingestion-logs-tab-loongcollector"
-              :to="{
-                name: 'loongcollector',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :icon="'img:' + getImageURL('images/ingestion/loongcollector.svg')"
-              label="LoongCollector"
-            />
+      <ORouteTab
+        name="curl"
+        data-test="ingestion-logs-tab-curl"
+        :to="{
+          name: 'curl',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        icon="data-object"
+        label="Curl"
+      />
+      <ORouteTab
+        name="filebeat"
+        data-test="ingestion-logs-tab-filebeat"
+        :to="{
+          name: 'filebeat',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :icon="'img:' + getImageURL('images/ingestion/filebeat.png')"
+        label="Filebeat"
+      />
+      <ORouteTab
+        name="fluentbit"
+        data-test="ingestion-logs-tab-fluentbit"
+        :to="{
+          name: 'fluentbit',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :icon="'img:' + getImageURL('images/ingestion/fluentbit_icon.png')"
+        label="FluentBit"
+      />
+      <ORouteTab
+        name="fluentd"
+        data-test="ingestion-logs-tab-fluentd"
+        :to="{
+          name: 'fluentd',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :icon="'img:' + getImageURL('images/ingestion/fluentd_icon.svg')"
+        label="Fluentd"
+      />
+      <ORouteTab
+        name="vector"
+        :to="{
+          name: 'vector',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :icon="'img:' + getImageURL('images/ingestion/vector.png')"
+        label="Vector"
+      />
+      <ORouteTab
+        name="ingestLogsFromOtel"
+        :to="{
+          name: 'ingestLogsFromOtel',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
+        label="OTEL Collector"
+      />
+      <ORouteTab
+        name="logstash"
+        :to="{
+          name: 'logstash',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :icon="'img:' + getImageURL('images/ingestion/logstash.svg')"
+        label="Logstash"
+      />
+      <ORouteTab
+        name="syslogNg"
+        :to="{
+          name: 'syslogNg',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        icon="plagiarism"
+        label="Syslog-ng"
+      />
+      <ORouteTab
+        name="loongcollector"
+        data-test="ingestion-logs-tab-loongcollector"
+        :to="{
+          name: 'loongcollector',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :icon="'img:' + getImageURL('images/ingestion/loongcollector.svg')"
+        label="LoongCollector"
+      />
     </template>
 
-      <div class="w-full h-full">
-        <div class="bg-card-glass-bg h-full overflow-y-auto pt-0.5">
-          <router-view
-            :title="ingestiontabs"
-            :currOrgIdentifier="currOrgIdentifier"
-            :currUserEmail="currentUserEmail"
-            @copy-to-clipboard-fn="copyToClipboardFn"
-          >
-          </router-view>
-        </div>
+    <div class="h-full w-full">
+      <div class="bg-card-glass-bg h-full overflow-y-auto pt-0.5">
+        <router-view
+          :title="ingestiontabs"
+          :currOrgIdentifier="currOrgIdentifier"
+          :currUserEmail="currentUserEmail"
+          @copy-to-clipboard-fn="copyToClipboardFn"
+        >
+        </router-view>
       </div>
+    </div>
   </DataSourceSidebarLayout>
 </template>
 
 <script lang="ts">
-import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
-import DataSourceSidebarLayout from '@/components/ingestion/DataSourceSidebarLayout.vue'
+import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
+import DataSourceSidebarLayout from "@/components/ingestion/DataSourceSidebarLayout.vue";
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, computed, onUpdated } from "vue";
 import { useI18n } from "vue-i18n";
@@ -170,18 +167,11 @@ export default defineComponent({
     const router: any = useRouter();
     const rowData: any = ref({});
     const confirmUpdate = ref<boolean>(false);
-    const ingestiontabs = ref(resolveTab("ingestLogs", router.currentRoute.value.name as string, "curl"));
-    const currentOrgIdentifier: any = ref(
-      store.state.selectedOrganization.identifier,
+    const ingestiontabs = ref(
+      resolveTab("ingestLogs", router.currentRoute.value.name as string, "curl"),
     );
-    const ingestRoutes = [
-      "curl",
-      "fluentbit",
-      "fluentd",
-      "vector",
-      "syslogNg",
-      "loongcollector",
-    ];
+    const currentOrgIdentifier: any = ref(store.state.selectedOrganization.identifier);
+    const ingestRoutes = ["curl", "fluentbit", "fluentd", "vector", "syslogNg", "loongcollector"];
 
     onBeforeMount(() => {
       if (ingestRoutes.includes(router.currentRoute.value.name)) {
@@ -261,4 +251,3 @@ export default defineComponent({
   },
 });
 </script>
-

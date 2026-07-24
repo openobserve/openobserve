@@ -35,14 +35,30 @@ export type BadgeVariant =
   | "warning-soft"
   | "error-soft"
   // Extended color families for correlation dimensions.
-  | "teal" | "teal-outline" | "teal-soft"
-  | "orange" | "orange-outline" | "orange-soft"
-  | "lime" | "lime-outline" | "lime-soft"
-  | "amber" | "amber-outline" | "amber-soft"
-  | "cyan" | "cyan-outline" | "cyan-soft"
-  | "blue" | "blue-outline" | "blue-soft"
-  | "purple" | "purple-outline" | "purple-soft"
-  | "indigo" | "indigo-outline" | "indigo-soft";
+  | "teal"
+  | "teal-outline"
+  | "teal-soft"
+  | "orange"
+  | "orange-outline"
+  | "orange-soft"
+  | "lime"
+  | "lime-outline"
+  | "lime-soft"
+  | "amber"
+  | "amber-outline"
+  | "amber-soft"
+  | "cyan"
+  | "cyan-outline"
+  | "cyan-soft"
+  | "blue"
+  | "blue-outline"
+  | "blue-soft"
+  | "purple"
+  | "purple-outline"
+  | "purple-soft"
+  | "indigo"
+  | "indigo-outline"
+  | "indigo-soft";
 
 /** Size controls padding and font-size only. */
 export type BadgeSize = "xs" | "sm" | "md";

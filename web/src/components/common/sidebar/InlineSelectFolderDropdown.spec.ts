@@ -20,7 +20,6 @@ import InlineSelectFolderDropdown from "@/components/common/sidebar/InlineSelect
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
 vi.mock("vue-router", () => ({
@@ -128,7 +127,7 @@ const globalConfig = {
     ODrawer: ODrawerStub,
     AddFolder: AddFolderStub,
     OButton: OButtonStub,
-    "OSelect": {
+    OSelect: {
       template: `
         <div class="o-select-stub" :data-disable="String(disabled)">
           <select
@@ -145,7 +144,7 @@ const globalConfig = {
       props: ["modelValue", "options", "disabled"],
       emits: ["update:modelValue"],
     },
-    "OIcon": { template: '<i :class="name" />', props: ["name", "size"] },
+    OIcon: { template: '<i :class="name" />', props: ["name", "size"] },
   },
 };
 
@@ -315,7 +314,6 @@ describe("InlineSelectFolderDropdown.vue", () => {
   });
 
   // ─── ODrawer prop forwarding ────────────────────────────────────────────────
-
 
   // ─── Drawer slot content (AddFolder) ────────────────────────────────────────
 

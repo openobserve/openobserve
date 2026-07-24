@@ -197,7 +197,9 @@ describe("ErrorEvents", () => {
       wrapper.unmount();
       wrapper = mountComponent(
         makeError({
-          events: [{ type: "error", error_id: "err-001", error_type: "RangeError", _timestamp: ANCHOR_TS }],
+          events: [
+            { type: "error", error_id: "err-001", error_type: "RangeError", _timestamp: ANCHOR_TS },
+          ],
         }),
       );
       await flushPromises();
@@ -222,7 +224,9 @@ describe("ErrorEvents", () => {
   describe("category per event type", () => {
     it("shows error_type for an error event", () => {
       // events[0] = error with error_type "TypeError"
-      expect(wrapper.find('[data-test="error-events-timeline-category-0"]').text()).toBe("TypeError");
+      expect(wrapper.find('[data-test="error-events-timeline-category-0"]').text()).toBe(
+        "TypeError",
+      );
     });
 
     it("shows 'Error' for an error event with no error_type", async () => {
@@ -246,7 +250,9 @@ describe("ErrorEvents", () => {
 
     it("shows 'Navigation' for a view event with view_loading_type=route_change", () => {
       // events[2] = view with view_loading_type "route_change"
-      expect(wrapper.find('[data-test="error-events-timeline-category-2"]').text()).toBe("Navigation");
+      expect(wrapper.find('[data-test="error-events-timeline-category-2"]').text()).toBe(
+        "Navigation",
+      );
     });
 
     it("shows 'Reload' for a view event with other loading type", async () => {
@@ -279,7 +285,9 @@ describe("ErrorEvents", () => {
       await flushPromises();
 
       // Assert
-      expect(wrapper.find('[data-test="error-events-timeline-category-0"]').text()).toBe("custom_event");
+      expect(wrapper.find('[data-test="error-events-timeline-category-0"]').text()).toBe(
+        "custom_event",
+      );
     });
   });
 
@@ -307,7 +315,12 @@ describe("ErrorEvents", () => {
         makeError({
           error_id: "err-001",
           events: [
-            { type: "error", error_id: "err-DIFFERENT", error_type: "TypeError", _timestamp: ANCHOR_TS },
+            {
+              type: "error",
+              error_id: "err-DIFFERENT",
+              error_type: "TypeError",
+              _timestamp: ANCHOR_TS,
+            },
           ],
         }),
       );

@@ -39,9 +39,7 @@ export default function (store: any) {
 
   // Merge enterprise pipeline children (eval templates, etc.) as direct children of pipeline
   if (envRoutes.pipelineChildren) {
-    const pipelineRoute = homeChildRoutes.find(
-      (r: any) => r.path === "pipeline",
-    );
+    const pipelineRoute = homeChildRoutes.find((r: any) => r.path === "pipeline");
     if (pipelineRoute) {
       pipelineRoute.children = mergeRoutes(
         pipelineRoute.children || [],
@@ -51,12 +49,8 @@ export default function (store: any) {
   }
 
   // Filter out catchall route from homeChildRoutes
-  const catchAllRoute = homeChildRoutes.find(
-    (r: any) => r.path === "/:catchAll(.*)*",
-  );
-  const nonCatchAllRoutes = homeChildRoutes.filter(
-    (r: any) => r.path !== "/:catchAll(.*)*",
-  );
+  const catchAllRoute = homeChildRoutes.find((r: any) => r.path === "/:catchAll(.*)*");
+  const nonCatchAllRoutes = homeChildRoutes.filter((r: any) => r.path !== "/:catchAll(.*)*");
 
   const routes = [
     ...parentRoutes,
@@ -102,11 +96,7 @@ export default function (store: any) {
         to.path != "/web/cb" &&
         sessionUserInfo === null
       ) {
-        if (
-          to.path !== "/logout" &&
-          to.path !== "/cb" &&
-          to.path != "/web/cb"
-        ) {
+        if (to.path !== "/logout" && to.path !== "/cb" && to.path != "/web/cb") {
           // If query params contain short_url, store that URL; else store the
           // current URL. Needed for the short URL feature: after login the user
           // is redirected to the stored short URL.

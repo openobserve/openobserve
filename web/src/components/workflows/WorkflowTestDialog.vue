@@ -35,24 +35,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="run"
     @click:secondary="close"
   >
-    <div class="flex flex-col gap-4 text-left h-full p-4">
+    <div class="flex h-full flex-col gap-4 p-4 text-left">
       <!-- Run-from selector -->
       <div class="flex flex-col gap-1">
         <OText as="label" class="text-xs font-medium">
           {{ t("workflow.test.runFrom") }}
         </OText>
-        <OSelect
-          v-model="runFrom"
-          :options="runFromOptions"
-          data-test="workflow-test-run-from"
-        />
+        <OSelect v-model="runFrom" :options="runFromOptions" data-test="workflow-test-run-from" />
         <OText v-if="workflowObj.testRun.fromNode" variant="meta" as="p">
           {{ t("workflow.test.runFromNote") }}
         </OText>
       </div>
 
       <!-- Sample input editor — fills the remaining drawer height -->
-      <div class="flex flex-col gap-1 flex-1 min-h-0">
+      <div class="flex min-h-0 flex-1 flex-col gap-1">
         <div class="flex items-center justify-between">
           <OText as="label" class="text-xs font-medium">
             {{ t("workflow.test.inputLabel") }}
@@ -66,9 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("common.reset") }}
           </OButton>
         </div>
-        <div
-          class="flex-1 min-h-0 rounded-default border border-border-default overflow-hidden"
-        >
+        <div class="rounded-default border-border-default min-h-0 flex-1 overflow-hidden border">
           <CodeQueryEditor
             editor-id="workflow-test-input"
             language="json"
@@ -77,12 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:query="workflowObj.testRun.input = $event"
           />
         </div>
-        <OText
-          v-if="parseError"
-          variant="meta"
-          as="p"
-          class="text-input-error-text"
-        >
+        <OText v-if="parseError" variant="meta" as="p" class="text-input-error-text">
           {{ t("workflow.test.invalidJson") }}
         </OText>
         <OText v-else variant="meta" as="p">
@@ -124,12 +113,8 @@ const open = computed({
   set: (v: boolean) => (workflowObj.testRun.show = v),
 });
 
-const nodes = computed<any[]>(
-  () => workflowObj.currentSelectedWorkflow?.nodes || [],
-);
-const edges = computed<any[]>(
-  () => workflowObj.currentSelectedWorkflow?.edges || [],
-);
+const nodes = computed<any[]>(() => workflowObj.currentSelectedWorkflow?.nodes || []);
+const edges = computed<any[]>(() => workflowObj.currentSelectedWorkflow?.edges || []);
 
 // Seed the sample payload the first time the dialog opens (persisted after).
 onMounted(() => {
@@ -167,9 +152,7 @@ const nodesInFlowOrder = (): any[] => {
 };
 
 const runFromOptions = computed(() => {
-  const steps = nodesInFlowOrder().filter(
-    (n) => n.data?.node_type !== "workflow_trigger",
-  );
+  const steps = nodesInFlowOrder().filter((n) => n.data?.node_type !== "workflow_trigger");
   // Per-type totals so we only number when a type repeats.
   const totals: Record<string, number> = {};
   for (const n of steps) {
@@ -185,10 +168,7 @@ const runFromOptions = computed(() => {
     const detail = nodeDetail(n);
     return { label: detail ? `${numbered} · ${detail}` : numbered, value: n.id };
   });
-  return [
-    { label: t("workflow.test.runFromBeginning"), value: RUN_FROM_BEGINNING },
-    ...opts,
-  ];
+  return [{ label: t("workflow.test.runFromBeginning"), value: RUN_FROM_BEGINNING }, ...opts];
 });
 
 const parsedInputs = computed<unknown[] | null>(() => {

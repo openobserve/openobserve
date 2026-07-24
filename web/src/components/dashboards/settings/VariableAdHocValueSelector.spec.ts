@@ -24,32 +24,31 @@ config.global.plugins = [...(config.global.plugins ?? []), i18n];
 // Mock vuex store
 const mockStore = {
   state: {
-    theme: "light"
-  }
+    theme: "light",
+  },
 };
 
 vi.mock("vuex", () => ({
-  useStore: () => mockStore
+  useStore: () => mockStore,
 }));
 
 // Mock useSelectAutocomplete composable
 const mockUseSelectAutoComplete = {
   filterFn: vi.fn(),
-  filteredOptions: []
+  filteredOptions: [],
 };
 
 vi.mock("../../../composables/useSelectAutocomplete", () => ({
-  useSelectAutoComplete: vi.fn(() => mockUseSelectAutoComplete)
+  useSelectAutoComplete: vi.fn(() => mockUseSelectAutoComplete),
 }));
 
 // Mock DynamicFilterIcon component
 vi.mock("../../icons/DynamicFilterIcon.vue", () => ({
   default: {
     name: "DynamicFilterIcon",
-    template: '<div data-test="dynamic-filter-icon"></div>'
-  }
+    template: '<div data-test="dynamic-filter-icon"></div>',
+  },
 }));
-
 
 describe("VariableAdHocValueSelector", () => {
   let wrapper: VueWrapper<any>;
@@ -60,16 +59,16 @@ describe("VariableAdHocValueSelector", () => {
         name: "test-field",
         operator: "=",
         value: "test-value",
-        streams: []
-      }
+        streams: [],
+      },
     ],
     variableItem: {
       name: "test-variable",
       options: [
         { name: "field1", value: "value1" },
-        { name: "field2", value: "value2" }
-      ]
-    }
+        { name: "field2", value: "value2" },
+      ],
+    },
   };
 
   beforeEach(() => {
@@ -77,7 +76,7 @@ describe("VariableAdHocValueSelector", () => {
       global: {
         plugins: [],
       },
-      props: defaultProps
+      props: defaultProps,
     });
   });
 
@@ -88,9 +87,15 @@ describe("VariableAdHocValueSelector", () => {
   describe("Component Initialization", () => {
     it("should render correctly with initial props", () => {
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboard-variable-adhoc-name-selector"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboard-variable-adhoc-operator-selector"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboard-variable-adhoc-value-selector"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-variable-adhoc-name-selector"]').exists()).toBe(
+        true,
+      );
+      expect(
+        wrapper.find('[data-test="dashboard-variable-adhoc-operator-selector"]').exists(),
+      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-variable-adhoc-value-selector"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should display existing adhoc variables", () => {
@@ -119,15 +124,15 @@ describe("VariableAdHocValueSelector", () => {
         name: "updated-variable",
         options: [
           { name: "newField1", value: "newValue1" },
-          { name: "newField2", value: "newValue2" }
-        ]
+          { name: "newField2", value: "newValue2" },
+        ],
       };
 
       await wrapper.setProps({ variableItem: newVariableItem });
       await nextTick();
 
       // The options are managed internally, so we check if variableItem prop changed
-      expect(wrapper.props('variableItem')).toEqual(newVariableItem);
+      expect(wrapper.props("variableItem")).toEqual(newVariableItem);
     });
 
     it("should handle empty modelValue", async () => {
@@ -147,13 +152,13 @@ describe("VariableAdHocValueSelector", () => {
       await nextTick();
 
       expect(wrapper.vm.adhocVariables).toHaveLength(initialLength + 1);
-      
+
       const newField = wrapper.vm.adhocVariables[wrapper.vm.adhocVariables.length - 1];
       expect(newField).toEqual({
-        name: '',
-        operator: '=',
-        value: '',
-        streams: []
+        name: "",
+        operator: "=",
+        value: "",
+        streams: [],
       });
     });
 
@@ -177,8 +182,8 @@ describe("VariableAdHocValueSelector", () => {
       await wrapper.setProps({
         modelValue: [
           { name: "field1", operator: "=", value: "value1", streams: [] },
-          { name: "field2", operator: "!=", value: "value2", streams: [] }
-        ]
+          { name: "field2", operator: "!=", value: "value2", streams: [] },
+        ],
       });
     });
 
@@ -242,7 +247,9 @@ describe("VariableAdHocValueSelector", () => {
 
   describe("Operator Selection", () => {
     it("should render operator dropdown with correct options", async () => {
-      const operatorSelect = wrapper.find('[data-test="dashboard-variable-adhoc-operator-selector"]');
+      const operatorSelect = wrapper.find(
+        '[data-test="dashboard-variable-adhoc-operator-selector"]',
+      );
       expect(operatorSelect.exists()).toBe(true);
 
       // Operator options are {label, value} objects to match OSelect.
@@ -282,12 +289,16 @@ describe("VariableAdHocValueSelector", () => {
     });
 
     it("should have correct placeholder text", () => {
-      const valueInput = wrapper.find('[data-test="dashboard-variable-adhoc-value-selector"] input');
-      expect(valueInput.attributes('placeholder')).toBe('Enter Value');
+      const valueInput = wrapper.find(
+        '[data-test="dashboard-variable-adhoc-value-selector"] input',
+      );
+      expect(valueInput.attributes("placeholder")).toBe("Enter Value");
     });
 
     it("should have debounce configured", () => {
-      const valueInput = wrapper.find('[data-test="dashboard-variable-adhoc-value-selector"] input');
+      const valueInput = wrapper.find(
+        '[data-test="dashboard-variable-adhoc-value-selector"] input',
+      );
 
       // Test that input exists and has expected behavior
       expect(valueInput.exists()).toBe(true);
@@ -301,7 +312,7 @@ describe("VariableAdHocValueSelector", () => {
   describe("Theme Integration", () => {
     it("should apply correct styling for light theme", () => {
       mockStore.state.theme = "light";
-      
+
       const closeButton = wrapper.find('[data-test="dashboard-variable-adhoc-close-0"]');
       expect(closeButton.exists()).toBe(true);
     });
@@ -309,7 +320,7 @@ describe("VariableAdHocValueSelector", () => {
     it("should apply correct styling for dark theme", async () => {
       mockStore.state.theme = "dark";
       await nextTick();
-      
+
       const closeButton = wrapper.find('[data-test="dashboard-variable-adhoc-close-0"]');
       expect(closeButton.exists()).toBe(true);
     });
@@ -319,10 +330,10 @@ describe("VariableAdHocValueSelector", () => {
     it("should render tooltip on add button", () => {
       const addButton = wrapper.find('[data-test="dashboard-variable-adhoc-add-selector"]');
       expect(addButton.exists()).toBe(true);
-      const tooltip = wrapper.findComponent({ name: 'OTooltip' });
+      const tooltip = wrapper.findComponent({ name: "OTooltip" });
 
       if (tooltip.exists()) {
-        expect(tooltip.props('content')).toBe('Add Dynamic Filter');
+        expect(tooltip.props("content")).toBe("Add Dynamic Filter");
       }
     });
   });
@@ -347,13 +358,13 @@ describe("VariableAdHocValueSelector", () => {
       await wrapper.setProps({
         variableItem: {
           name: "test-variable",
-          options: []
-        }
+          options: [],
+        },
       });
       await nextTick();
 
       // Check that props were set correctly
-      expect(wrapper.props('variableItem').options).toEqual([]);
+      expect(wrapper.props("variableItem").options).toEqual([]);
     });
   });
 
@@ -365,7 +376,7 @@ describe("VariableAdHocValueSelector", () => {
       await nextTick();
 
       const emittedValue = wrapper.emitted("update:modelValue")?.[0]?.[0];
-      
+
       // Modify emitted value and check it doesn't affect component data
       if (Array.isArray(emittedValue)) {
         emittedValue[0].name = "modified-name";
@@ -380,8 +391,8 @@ describe("VariableAdHocValueSelector", () => {
         modelValue: [
           { name: "field1", operator: "=", value: "value1", streams: [] },
           { name: "field2", operator: "!=", value: "value2", streams: [] },
-          { name: "field3", operator: "=", value: "value3", streams: [] }
-        ]
+          { name: "field3", operator: "=", value: "value3", streams: [] },
+        ],
       });
     });
 
@@ -421,9 +432,9 @@ describe("VariableAdHocValueSelector", () => {
 
     it("should have correct component structure", () => {
       // Test that the component is properly structured
-      expect(wrapper.vm.$options.name).toBe('VariableAdHocValueSelector');
-      expect(wrapper.vm.$props).toHaveProperty('modelValue');
-      expect(wrapper.vm.$props).toHaveProperty('variableItem');
+      expect(wrapper.vm.$options.name).toBe("VariableAdHocValueSelector");
+      expect(wrapper.vm.$props).toHaveProperty("modelValue");
+      expect(wrapper.vm.$props).toHaveProperty("variableItem");
     });
   });
 });

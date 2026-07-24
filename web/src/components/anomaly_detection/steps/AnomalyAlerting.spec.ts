@@ -18,7 +18,6 @@ import { mount } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 vi.mock("vue-router", () => ({
   useRouter: () => ({
     resolve: vi.fn().mockReturnValue({ href: "/alerts/destinations" }),

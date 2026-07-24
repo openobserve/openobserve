@@ -1,6 +1,5 @@
 // Copyright 2026 OpenObserve Inc.
 
-
 export const b64EncodeUnicode = (str: string) => {
   try {
     return btoa(
@@ -21,12 +20,9 @@ export const b64DecodeUnicode = (str: string) => {
   try {
     return decodeURIComponent(
       Array.prototype.map
-        .call(
-          atob(str.replace(/-/g, "+").replace(/_/g, "/").replace(/\./g, "=")),
-          function (c) {
-            return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
-          },
-        )
+        .call(atob(str.replace(/-/g, "+").replace(/_/g, "/").replace(/\./g, "=")), function (c) {
+          return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
+        })
         .join(""),
     );
   } catch (e) {
@@ -55,9 +51,7 @@ const isBase64Encoded = (str: string): boolean => {
   }
 };
 
-export const smartDecodeVrlFunction = (
-  vrlFunction: string | null | undefined,
-): string => {
+export const smartDecodeVrlFunction = (vrlFunction: string | null | undefined): string => {
   if (!vrlFunction) return "";
 
   try {
@@ -80,12 +74,9 @@ export const smartDecodeVrlFunction = (
 export const b64EncodeStandard = (str: string) => {
   try {
     return btoa(
-      encodeURIComponent(str).replace(
-        /%([0-9A-F]{2})/g,
-        function (match, p1: any) {
-          return String.fromCharCode(parseInt(`0x${p1}`));
-        },
-      ),
+      encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function (match, p1: any) {
+        return String.fromCharCode(parseInt(`0x${p1}`));
+      }),
     );
   } catch (e) {
     console.log("Error: getBase64Encode: error while encoding.");
@@ -229,9 +220,7 @@ export const durationFormatter = (durationInSeconds: number): string => {
     const seconds = durationInSeconds % 60;
     formattedDuration = `${days > 0 ? `${days}d ` : ""}${
       hours > 0 ? `${hours}h ` : ""
-    }${minutes > 0 ? `${minutes}m ` : ""}${
-      seconds > 0 ? `${seconds}s` : ""
-    }`.trim();
+    }${minutes > 0 ? `${minutes}m ` : ""}${seconds > 0 ? `${seconds}s` : ""}`.trim();
   }
 
   return formattedDuration;

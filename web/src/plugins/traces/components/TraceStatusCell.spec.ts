@@ -19,7 +19,6 @@ import i18n from "@/locales";
 
 import TraceStatusCell from "./TraceStatusCell.vue";
 
-
 describe("TraceStatusCell", () => {
   let wrapper: VueWrapper;
 

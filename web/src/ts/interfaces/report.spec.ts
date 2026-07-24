@@ -293,7 +293,7 @@ describe("Report Interfaces", () => {
       };
 
       expect(new Date(report.last_triggered_at).getTime()).toBeGreaterThan(
-        new Date(report.created_at).getTime()
+        new Date(report.created_at).getTime(),
       );
     });
 

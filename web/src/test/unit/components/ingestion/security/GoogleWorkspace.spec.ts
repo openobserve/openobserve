@@ -8,11 +8,11 @@ import GoogleWorkspace from "@/components/ingestion/security/GoogleWorkspace.vue
 vi.mock("@/composables/useIngestion", () => ({
   default: vi.fn(() => ({
     endpoint: "https://api.example.com/ingest",
-    securityContent: "curl -X POST https://api.example.com/ingest -d '{\"stream\": \"[STREAM_NAME]\"}' ",
+    securityContent:
+      'curl -X POST https://api.example.com/ingest -d \'{"stream": "[STREAM_NAME]"}\' ',
     securityDocURLs: { googleworkspace: "https://docs.example.com/googleworkspace" },
   })),
 }));
-
 
 describe("GoogleWorkspace.vue", () => {
   let store: any;
@@ -24,7 +24,12 @@ describe("GoogleWorkspace.vue", () => {
     return mount(GoogleWorkspace, {
       global: {
         plugins: [store],
-        stubs: { CopyContent: { template: '<div data-test="copy-content-stub">{{ content }}</div>', props: ["content"] } },
+        stubs: {
+          CopyContent: {
+            template: '<div data-test="copy-content-stub">{{ content }}</div>',
+            props: ["content"],
+          },
+        },
       },
     });
   };

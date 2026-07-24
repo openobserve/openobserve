@@ -1,8 +1,5 @@
 ﻿<template>
-  <EvalListShell
-    data-test="scorer"
-    :show-empty="false"
-  >
+  <EvalListShell data-test="scorer" :show-empty="false">
     <template #table>
       <OTable
         v-model:selected-ids="selectedIds"
@@ -22,13 +19,13 @@
         :persist-columns="true"
         table-id="scorer-list"
         width="100%"
-        class="w-full h-full"
+        class="h-full w-full"
         @row-click="(row: any) => $emit('view', row)"
       >
         <template #toolbar>
           <OSearchInput
             :model-value="search"
-            class="flex-1 min-w-0"
+            class="min-w-0 flex-1"
             :placeholder="t('onlineEvals.scorer.searchPlaceholder')"
             data-test="scorer-list-search-input"
             clearable
@@ -53,7 +50,7 @@
              type dropdown; Total last, never itself the active tile. -->
         <template #subheader>
           <div
-            class="px-page-edge py-1.5 border-b border-table-row-divider"
+            class="px-page-edge border-table-row-divider border-b py-1.5"
             data-test="scorer-list-summary"
           >
             <OStatStrip
@@ -90,8 +87,18 @@
               preset="no-scorers"
               :filtered="hasFilters"
               :actions="[
-                { id: 'create', icon: 'add', titleKey: 'emptyState.noScorers.action', descriptionKey: 'emptyState.noScorers.actionDesc' },
-                { id: 'import', icon: 'upload-file', titleKey: 'emptyState.noScorers.import', descriptionKey: 'emptyState.noScorers.importDesc' },
+                {
+                  id: 'create',
+                  icon: 'add',
+                  titleKey: 'emptyState.noScorers.action',
+                  descriptionKey: 'emptyState.noScorers.actionDesc',
+                },
+                {
+                  id: 'import',
+                  icon: 'upload-file',
+                  titleKey: 'emptyState.noScorers.import',
+                  descriptionKey: 'emptyState.noScorers.importDesc',
+                },
               ]"
               data-test="scorer-empty-state"
               @action="onEmptyAction"
@@ -117,10 +124,7 @@
         </template>
 
         <template #cell-type="{ row }">
-          <OTag
-            type="scorerType"
-            :value="scorerTypeOf(row)"
-          />
+          <OTag type="scorerType" :value="scorerTypeOf(row)" />
         </template>
 
         <template #cell-produces="{ row }">
@@ -136,7 +140,7 @@
         </template>
 
         <template #cell-actions="{ row }">
-          <div class="flex items-center actions-container">
+          <div class="actions-container flex items-center">
             <OButton
               :data-test="`scorer-list-${row.name}-edit-btn`"
               data-row-action="edit"
@@ -230,71 +234,73 @@ function handleBulkExport() {
   emit("export-bulk", ids);
 }
 
-const columns = computed(() => [
-  {
-    id: "#",
-    header: "#",
-    accessorKey: "#",
-    sortable: false,
-    size: 56,
-    meta: { align: "left" },
-  },
-  {
-    id: "name",
-    header: t("onlineEvals.scorer.columns.name"),
-    accessorKey: "name",
-    sortable: true,
-    size: COL.name,
-    // `flex` (not `autoWidth`): fills leftover width on load AND stays
-    // resizable — matches Dashboards/AlertList; `autoWidth` has no resize grip.
-    meta: { align: "left", flex: true },
-  },
-  {
-    id: "type",
-    header: t("onlineEvals.scorer.columns.type"),
-    accessorFn: (row: Scorer) => scorerTypeOf(row),
-    sortable: true,
-    size: COL.type,
-    meta: { align: "left" },
-  },
-  {
-    id: "produces",
-    header: t("onlineEvals.scorer.columns.produces"),
-    accessorFn: (row: Scorer) => producesLabel(row),
-    sortable: true,
-    size: COL.template,
-    meta: { align: "left" },
-  },
-  {
-    id: "version",
-    header: t("onlineEvals.scorer.columns.version"),
-    accessorKey: "version",
-    sortable: true,
-    size: COL.version,
-    meta: { align: "right" },
-  },
-  {
-    id: "usedBy",
-    header: t("onlineEvals.scorer.columns.usedBy"),
-    accessorFn: (row: Scorer) => usedByCount(row),
-    sortable: true,
-    size: COL.count,
-    meta: { align: "right" },
-  },
-  {
-    id: "actions",
-    header: t("onlineEvals.scorer.columns.actions"),
-    sortable: false,
-    isAction: true,
-    size: 140,
-    meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
-  },
-].map((c: any) => ({
-  ...c,
-  // Every column except the row index, the name (row identity) and the
-  // actions column is offered in OTable's "Manage columns" chooser.
-  hideable: c.id !== "#" && c.id !== "name" && !c.isAction,
-})));
+const columns = computed(() =>
+  [
+    {
+      id: "#",
+      header: "#",
+      accessorKey: "#",
+      sortable: false,
+      size: 56,
+      meta: { align: "left" },
+    },
+    {
+      id: "name",
+      header: t("onlineEvals.scorer.columns.name"),
+      accessorKey: "name",
+      sortable: true,
+      size: COL.name,
+      // `flex` (not `autoWidth`): fills leftover width on load AND stays
+      // resizable — matches Dashboards/AlertList; `autoWidth` has no resize grip.
+      meta: { align: "left", flex: true },
+    },
+    {
+      id: "type",
+      header: t("onlineEvals.scorer.columns.type"),
+      accessorFn: (row: Scorer) => scorerTypeOf(row),
+      sortable: true,
+      size: COL.type,
+      meta: { align: "left" },
+    },
+    {
+      id: "produces",
+      header: t("onlineEvals.scorer.columns.produces"),
+      accessorFn: (row: Scorer) => producesLabel(row),
+      sortable: true,
+      size: COL.template,
+      meta: { align: "left" },
+    },
+    {
+      id: "version",
+      header: t("onlineEvals.scorer.columns.version"),
+      accessorKey: "version",
+      sortable: true,
+      size: COL.version,
+      meta: { align: "right" },
+    },
+    {
+      id: "usedBy",
+      header: t("onlineEvals.scorer.columns.usedBy"),
+      accessorFn: (row: Scorer) => usedByCount(row),
+      sortable: true,
+      size: COL.count,
+      meta: { align: "right" },
+    },
+    {
+      id: "actions",
+      header: t("onlineEvals.scorer.columns.actions"),
+      sortable: false,
+      isAction: true,
+      size: 140,
+      meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
+    },
+  ].map((c: any) => ({
+    ...c,
+    // Every column except the row index, the name (row identity) and the
+    // actions column is offered in OTable's "Manage columns" chooser.
+    hideable: c.id !== "#" && c.id !== "name" && !c.isAction,
+  })),
+);
 
 const filteredRows = computed(() =>
   typeFilter.value
@@ -356,8 +362,7 @@ const summaryStats = computed<StatItem[]>(() => {
 const selectedStatKey = computed(() => typeFilter.value);
 function onStatSelect(key: string) {
   // Re-clicking the active tile clears the filter (toggle), matching the Alerts strip.
-  typeFilter.value =
-    key === "all" || typeFilter.value === key ? null : (key as ScorerType);
+  typeFilter.value = key === "all" || typeFilter.value === key ? null : (key as ScorerType);
 }
 
 // When the org has no providers AND no scorers yet, surface a dedicated
@@ -379,9 +384,7 @@ const showNoProvidersState = computed(
 // filter widgets stay visible). OEmptyState lives inside the table's
 // #empty slot and switches between the first-run and "Clear filters"
 // variants via `:filtered`.
-const hasFilters = computed(
-  () => !!props.search?.trim() || !!typeFilter.value,
-);
+const hasFilters = computed(() => !!props.search?.trim() || !!typeFilter.value);
 
 function onEmptyAction(id?: string) {
   if (id === "create") emit("create");
@@ -393,9 +396,7 @@ function onEmptyAction(id?: string) {
 }
 
 function producesLabel(row: Scorer) {
-  const id = String(
-    valueOf(row, "producesScoreConfigId", "produces_score_config_id") || "",
-  );
+  const id = String(valueOf(row, "producesScoreConfigId", "produces_score_config_id") || "");
   if (!id) return "";
   const cfg = props.scoreConfigs.find((c) => entityId(c) === id);
   return cfg?.name || id;
@@ -417,6 +418,11 @@ function usedByText(row: Scorer) {
 }
 
 useShortcuts([
-  { id: "scorersRefresh", handler: () => { if (!isInputFocused()) emit("refresh"); } },
+  {
+    id: "scorersRefresh",
+    handler: () => {
+      if (!isInputFocused()) emit("refresh");
+    },
+  },
 ]);
 </script>

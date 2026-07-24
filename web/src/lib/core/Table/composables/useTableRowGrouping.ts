@@ -27,9 +27,7 @@ export function useTableRowGrouping<TData>(
   const mode = options.mode ?? "tree";
   const getRowId = options.getRowId ?? ((row: any) => row?.id?.toString() ?? "");
 
-  const expandedIds = ref<Set<string>>(
-    new Set(options.initialExpandedIds ?? []),
-  );
+  const expandedIds = ref<Set<string>>(new Set(options.initialExpandedIds ?? []));
 
   function isExpanded(row: TData): boolean {
     return expandedIds.value.has(getRowId(row));

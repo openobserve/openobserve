@@ -13,16 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import {
-  describe,
-  expect,
-  it,
-  beforeEach,
-  vi,
-  afterEach,
-  beforeAll,
-  afterAll,
-} from "vitest";
+import { describe, expect, it, beforeEach, vi, afterEach, beforeAll, afterAll } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import User from "@/components/iam/users/User.vue";
 import { createI18n } from "vue-i18n";
@@ -33,7 +24,6 @@ import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import { getRoles } from "@/services/iam";
 import segment from "@/services/segment_analytics";
-
 
 // Create i18n instance with comprehensive translations for CI/CD compatibility
 const i18n = createI18n({
@@ -185,7 +175,7 @@ const mountUser = () =>
         MemberInvitation: MemberInvitationStub,
         NoData: NoDataStub,
         QTablePagination: QTablePaginationStub,
-        "OIcon": { template: "<i />" },
+        OIcon: { template: "<i />" },
         OButton: {
           props: ["variant", "size", "disabled", "loading"],
           template: '<button class="o-button-stub" @click="$emit(\'click\')"><slot /></button>',
@@ -372,7 +362,8 @@ describe("User Component", () => {
   describe("Confirm Revoke ODialog", () => {
     it("opens when confirmRevokeAction is invoked", async () => {
       wrapper.vm.confirmRevokeAction({
-        email: "pending@example.com", token: "tok-123",
+        email: "pending@example.com",
+        token: "tok-123",
       });
       await flushPromises();
       expect(wrapper.vm.confirmRevoke).toBe(true);
@@ -404,7 +395,8 @@ describe("User Component", () => {
 
     it("invokes revokeInvite when primary is clicked", async () => {
       wrapper.vm.confirmRevokeAction({
-        email: "pending@example.com", token: "tok-123",
+        email: "pending@example.com",
+        token: "tok-123",
       });
       await flushPromises();
       const dialog = wrapper
@@ -702,9 +694,9 @@ describe("User Component", () => {
   describe("shouldAllowChangeRole", () => {
     it("should not allow role change for root users", () => {
       wrapper.vm.currentUserRole = "admin";
-      expect(
-        wrapper.vm.shouldAllowChangeRole({ email: "root@example.com", role: "root" }),
-      ).toBe(false);
+      expect(wrapper.vm.shouldAllowChangeRole({ email: "root@example.com", role: "root" })).toBe(
+        false,
+      );
     });
 
     it("should allow role change for non-root users when current user is admin", () => {
@@ -729,9 +721,7 @@ describe("User Component", () => {
   describe("shouldAllowDelete", () => {
     it("should not allow deleting root users", () => {
       wrapper.vm.currentUserRole = "admin";
-      expect(wrapper.vm.shouldAllowDelete({ email: "root@example.com", role: "root" })).toBe(
-        false,
-      );
+      expect(wrapper.vm.shouldAllowDelete({ email: "root@example.com", role: "root" })).toBe(false);
     });
 
     it("should not allow users to delete themselves", () => {
@@ -748,9 +738,7 @@ describe("User Component", () => {
 
     it("should allow admin to delete non-root users", () => {
       wrapper.vm.currentUserRole = "admin";
-      expect(wrapper.vm.shouldAllowDelete({ email: "m@example.com", role: "member" })).toBe(
-        true,
-      );
+      expect(wrapper.vm.shouldAllowDelete({ email: "m@example.com", role: "member" })).toBe(true);
     });
   });
 
@@ -896,9 +884,7 @@ describe("User Component", () => {
 
   describe("hideForm", () => {
     it("should hide add user dialog and navigate", () => {
-      const replaceSpy = vi
-        .spyOn(router, "replace")
-        .mockImplementation(() => Promise.resolve());
+      const replaceSpy = vi.spyOn(router, "replace").mockImplementation(() => Promise.resolve());
       wrapper.vm.showAddUserDialog = true;
 
       wrapper.vm.hideForm();
@@ -914,9 +900,7 @@ describe("User Component", () => {
   describe("addMember", () => {
     it("should handle successful user creation", async () => {
       const pushSpy = vi.spyOn(router, "push").mockImplementation(() => Promise.resolve());
-      const replaceSpy = vi
-        .spyOn(router, "replace")
-        .mockImplementation(() => Promise.resolve());
+      const replaceSpy = vi.spyOn(router, "replace").mockImplementation(() => Promise.resolve());
 
       await wrapper.vm.addMember(
         { code: 200 },
@@ -942,15 +926,9 @@ describe("User Component", () => {
     });
 
     it("should handle unsuccessful response", async () => {
-      const replaceSpy = vi
-        .spyOn(router, "replace")
-        .mockImplementation(() => Promise.resolve());
+      const replaceSpy = vi.spyOn(router, "replace").mockImplementation(() => Promise.resolve());
 
-      await wrapper.vm.addMember(
-        { code: 400 },
-        { email: "failed@example.com" },
-        "created",
-      );
+      await wrapper.vm.addMember({ code: 400 }, { email: "failed@example.com" }, "created");
 
       expect(wrapper.vm.showAddUserDialog).toBe(false);
       expect(replaceSpy).toHaveBeenCalled();

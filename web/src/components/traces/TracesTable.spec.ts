@@ -107,7 +107,6 @@ vi.stubGlobal("CSS", { supports: () => false });
 
 import TenstackTable from "@/components/TenstackTable.vue";
 
-
 // ---------------------------------------------------------------------------
 // Test fixtures
 // ---------------------------------------------------------------------------
@@ -123,10 +122,7 @@ const baseRows = [
   { name: "gamma", value: "v3" },
 ];
 
-function mountTable(
-  props: Record<string, any> = {},
-  slots: Record<string, any> = {},
-) {
+function mountTable(props: Record<string, any> = {}, slots: Record<string, any> = {}) {
   return mount(TenstackTable, {
     props: {
       columns: baseColumns,
@@ -171,8 +167,7 @@ describe("TenstackTable — generic features", () => {
   describe("rowClass prop", () => {
     it("should apply the class returned by rowClass to matching rows", () => {
       wrapper = mountTable({
-        rowClass: (row: any) =>
-          row.name === "alpha" ? "oz-table__row--error" : "",
+        rowClass: (row: any) => (row.name === "alpha" ? "oz-table__row--error" : ""),
       });
       const rows = wrapper.findAll("tr[data-test]");
       expect(rows[0].classes()).toContain("oz-table__row--error");
@@ -202,8 +197,7 @@ describe("TenstackTable — generic features", () => {
           ],
         },
         {
-          "cell-name": ({ item }: any) =>
-            h("span", { "data-test": "custom-name-cell" }, item.name),
+          "cell-name": ({ item }: any) => h("span", { "data-test": "custom-name-cell" }, item.name),
         },
       );
       const cells = wrapper.findAll('[data-test="custom-name-cell"]');
@@ -334,10 +328,7 @@ describe("TenstackTable — generic features", () => {
     });
 
     it("should not render the empty slot when rows exist", () => {
-      wrapper = mountTable(
-        {},
-        { empty: '<div data-test="custom-empty">No data</div>' },
-      );
+      wrapper = mountTable({}, { empty: '<div data-test="custom-empty">No data</div>' });
       expect(wrapper.find('[data-test="custom-empty"]').exists()).toBe(false);
     });
   });
@@ -359,14 +350,9 @@ describe("TenstackTable — generic features", () => {
         sortOrder: "asc" as const,
         sortFieldMap: { timestamp: "start_time" },
       });
-      await wrapper
-        .find('[data-test="o2-table-th-sort-timestamp"]')
-        .trigger("click");
+      await wrapper.find('[data-test="o2-table-th-sort-timestamp"]').trigger("click");
       expect(wrapper.emitted("sort-change")).toBeTruthy();
-      expect(wrapper.emitted("sort-change")![0]).toEqual([
-        "start_time",
-        "desc",
-      ]);
+      expect(wrapper.emitted("sort-change")![0]).toEqual(["start_time", "desc"]);
     });
 
     it("should toggle sort order when clicking the active sort column", async () => {
@@ -384,9 +370,7 @@ describe("TenstackTable — generic features", () => {
         sortOrder: "desc" as const,
         sortFieldMap: {},
       });
-      await wrapper
-        .find('[data-test="o2-table-th-sort-duration"]')
-        .trigger("click");
+      await wrapper.find('[data-test="o2-table-th-sort-duration"]').trigger("click");
       expect(wrapper.emitted("sort-change")![0]).toEqual(["duration", "asc"]);
     });
   });

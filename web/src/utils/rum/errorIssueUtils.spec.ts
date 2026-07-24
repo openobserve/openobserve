@@ -174,8 +174,7 @@ describe("parseTopFrame", () => {
 
   it("parses a Firefox-format frame (fn@url:line:col)", () => {
     const stack =
-      "TypeError: x is not a function\n" +
-      "doThing@https://app.example.com/js/main.js:42:7";
+      "TypeError: x is not a function\n" + "doThing@https://app.example.com/js/main.js:42:7";
 
     const result = parseTopFrame(stack);
 
@@ -191,15 +190,13 @@ describe("parseTopFrame", () => {
   });
 
   it("skips <anonymous> frames and returns null when no real frame exists", () => {
-    const stack =
-      "Error: oops\n    at <anonymous>:1:1\n    at <anonymous>:2:2";
+    const stack = "Error: oops\n    at <anonymous>:1:1\n    at <anonymous>:2:2";
 
     expect(parseTopFrame(stack)).toBeNull();
   });
 
   it("strips query strings from file paths", () => {
-    const stack =
-      "Error: fail\n    at render (https://cdn.example.com/bundle.js?v=abc:10:2)";
+    const stack = "Error: fail\n    at render (https://cdn.example.com/bundle.js?v=abc:10:2)";
 
     const result = parseTopFrame(stack);
 
@@ -254,9 +251,7 @@ describe("routeFromUrl", () => {
   });
 
   it("drops query string from absolute URL", () => {
-    expect(routeFromUrl("https://app.example.com/checkout?ref=banner")).toBe(
-      "/checkout",
-    );
+    expect(routeFromUrl("https://app.example.com/checkout?ref=banner")).toBe("/checkout");
   });
 
   it("accepts an already-relative path and strips query", () => {
@@ -286,34 +281,19 @@ describe("computeIssueStatus", () => {
 
   describe("with a deploy timestamp", () => {
     it("returns 'new' when firstSeen >= deployTs", () => {
-      const result = computeIssueStatus(
-        1_500_000,
-        1_400_000,
-        windowStart,
-        windowEnd,
-      );
+      const result = computeIssueStatus(1_500_000, 1_400_000, windowStart, windowEnd);
 
       expect(result).toBe("new");
     });
 
     it("returns 'new' when firstSeen exactly equals deployTs", () => {
-      const result = computeIssueStatus(
-        1_400_000,
-        1_400_000,
-        windowStart,
-        windowEnd,
-      );
+      const result = computeIssueStatus(1_400_000, 1_400_000, windowStart, windowEnd);
 
       expect(result).toBe("new");
     });
 
     it("returns 'ongoing' when firstSeen < deployTs", () => {
-      const result = computeIssueStatus(
-        1_200_000,
-        1_400_000,
-        windowStart,
-        windowEnd,
-      );
+      const result = computeIssueStatus(1_200_000, 1_400_000, windowStart, windowEnd);
 
       expect(result).toBe("ongoing");
     });
@@ -322,46 +302,26 @@ describe("computeIssueStatus", () => {
   describe("without a deploy timestamp (null)", () => {
     it("returns 'new' when firstSeen is past window start + 10% span", () => {
       // span = 1_000_000; 10% = 100_000; threshold = 1_100_000
-      const result = computeIssueStatus(
-        1_200_000,
-        null,
-        windowStart,
-        windowEnd,
-      );
+      const result = computeIssueStatus(1_200_000, null, windowStart, windowEnd);
 
       expect(result).toBe("new");
     });
 
     it("returns 'new' when firstSeen exactly equals the 10% threshold", () => {
       // threshold = windowStart + span * 0.1 = 1_000_000 + 100_000 = 1_100_000
-      const result = computeIssueStatus(
-        1_100_000,
-        null,
-        windowStart,
-        windowEnd,
-      );
+      const result = computeIssueStatus(1_100_000, null, windowStart, windowEnd);
 
       expect(result).toBe("new");
     });
 
     it("returns 'ongoing' when firstSeen is at the window start edge", () => {
-      const result = computeIssueStatus(
-        windowStart,
-        null,
-        windowStart,
-        windowEnd,
-      );
+      const result = computeIssueStatus(windowStart, null, windowStart, windowEnd);
 
       expect(result).toBe("ongoing");
     });
 
     it("returns 'ongoing' when firstSeen is below the 10% threshold", () => {
-      const result = computeIssueStatus(
-        1_050_000,
-        null,
-        windowStart,
-        windowEnd,
-      );
+      const result = computeIssueStatus(1_050_000, null, windowStart, windowEnd);
 
       expect(result).toBe("ongoing");
     });
@@ -438,10 +398,7 @@ describe("computeTrendAnnotation", () => {
   it("detects a spike: buckets [1,1,1,1,1,1,1,1,4,4,4,4] yields kind spike with factor 4", () => {
     // baseline = avg(first 8 buckets) = 1; recent = avg(last 4 buckets) = 4
     // factor = 4 / max(1, 0.01) = 4 >= SPIKE_FACTOR(2)
-    const result = computeTrendAnnotation(
-      [1, 1, 1, 1, 1, 1, 1, 1, 4, 4, 4, 4],
-      "ongoing",
-    );
+    const result = computeTrendAnnotation([1, 1, 1, 1, 1, 1, 1, 1, 4, 4, 4, 4], "ongoing");
 
     expect(result.kind).toBe("spike");
     expect(result.factor).toBe(4);
@@ -449,10 +406,7 @@ describe("computeTrendAnnotation", () => {
 
   it("detects a drop when recent / baseline <= 0.5", () => {
     // baseline = avg(first 8) = 4; recent = avg(last 4) = 1; factor = 0.25 <= DROP_FACTOR(0.5)
-    const result = computeTrendAnnotation(
-      [4, 4, 4, 4, 4, 4, 4, 4, 1, 1, 1, 1],
-      "ongoing",
-    );
+    const result = computeTrendAnnotation([4, 4, 4, 4, 4, 4, 4, 4, 1, 1, 1, 1], "ongoing");
 
     expect(result.kind).toBe("drop");
     expect(result.factor).toBe(0.25);
@@ -460,30 +414,21 @@ describe("computeTrendAnnotation", () => {
 
   it("returns flat when factor is between 0.5 and 2 (steady)", () => {
     // factor = 1 (all same values) — not spike, not drop
-    const result = computeTrendAnnotation(
-      [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
-      "ongoing",
-    );
+    const result = computeTrendAnnotation([2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2], "ongoing");
 
     expect(result).toEqual({ kind: "flat", factor: null });
   });
 
   it("uses 0.01 floor for all-zero baseline to avoid division by zero", () => {
     // baseline = 0 → 0.01 floor; recent = 4; factor = 400 >= 2 → spike
-    const result = computeTrendAnnotation(
-      [0, 0, 0, 0, 0, 0, 0, 0, 4, 4, 4, 4],
-      "ongoing",
-    );
+    const result = computeTrendAnnotation([0, 0, 0, 0, 0, 0, 0, 0, 4, 4, 4, 4], "ongoing");
 
     expect(result.kind).toBe("spike");
     expect(result.factor).toBeCloseTo(400);
   });
 
   it("all-zero buckets: factor = 0 / 0.01 = 0 which is <= 0.5 → kind drop", () => {
-    const result = computeTrendAnnotation(
-      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      "ongoing",
-    );
+    const result = computeTrendAnnotation([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "ongoing");
 
     expect(result.kind).toBe("drop");
     expect(result.factor).toBeCloseTo(0);
@@ -501,9 +446,7 @@ describe("pickLatestDeploy", () => {
   // threshold = windowStart + bucketMicros = 1_500_000
 
   it("returns null for empty list", () => {
-    expect(
-      pickLatestDeploy([], windowStart, windowEnd, bucketMicros),
-    ).toBeNull();
+    expect(pickLatestDeploy([], windowStart, windowEnd, bucketMicros)).toBeNull();
   });
 
   it("picks the newest qualifying deploy inside window", () => {
@@ -512,12 +455,7 @@ describe("pickLatestDeploy", () => {
       { version: "v1.1", firstSeen: 5_000_000 },
     ];
 
-    const result = pickLatestDeploy(
-      deploys,
-      windowStart,
-      windowEnd,
-      bucketMicros,
-    );
+    const result = pickLatestDeploy(deploys, windowStart, windowEnd, bucketMicros);
 
     expect(result).toEqual({ version: "v1.1", firstSeen: 5_000_000 });
   });
@@ -526,12 +464,7 @@ describe("pickLatestDeploy", () => {
     // firstSeen must be > threshold (1_500_000), not >=
     const deploys = [{ version: "v1.0", firstSeen: 1_500_000 }];
 
-    const result = pickLatestDeploy(
-      deploys,
-      windowStart,
-      windowEnd,
-      bucketMicros,
-    );
+    const result = pickLatestDeploy(deploys, windowStart, windowEnd, bucketMicros);
 
     expect(result).toBeNull();
   });
@@ -539,12 +472,7 @@ describe("pickLatestDeploy", () => {
   it("excludes deploys at or after windowEnd (condition is strictly less)", () => {
     const deploys = [{ version: "v2.0", firstSeen: windowEnd }];
 
-    const result = pickLatestDeploy(
-      deploys,
-      windowStart,
-      windowEnd,
-      bucketMicros,
-    );
+    const result = pickLatestDeploy(deploys, windowStart, windowEnd, bucketMicros);
 
     expect(result).toBeNull();
   });
@@ -552,12 +480,7 @@ describe("pickLatestDeploy", () => {
   it("includes a deploy strictly inside (threshold, windowEnd)", () => {
     const deploys = [{ version: "v1.5", firstSeen: 1_500_001 }];
 
-    const result = pickLatestDeploy(
-      deploys,
-      windowStart,
-      windowEnd,
-      bucketMicros,
-    );
+    const result = pickLatestDeploy(deploys, windowStart, windowEnd, bucketMicros);
 
     expect(result).toEqual({ version: "v1.5", firstSeen: 1_500_001 });
   });
@@ -569,12 +492,7 @@ describe("pickLatestDeploy", () => {
       { version: "v1.1", firstSeen: 5_000_000 },
     ];
 
-    const result = pickLatestDeploy(
-      deploys,
-      windowStart,
-      windowEnd,
-      bucketMicros,
-    );
+    const result = pickLatestDeploy(deploys, windowStart, windowEnd, bucketMicros);
 
     expect(result).toEqual({ version: "v1.2", firstSeen: 8_000_000 });
   });
@@ -677,9 +595,7 @@ describe("intervalToMicros", () => {
 
 describe("histogramKeyToMicros", () => {
   it("passes through a numeric key unchanged", () => {
-    expect(histogramKeyToMicros(1_700_000_000_000_000)).toBe(
-      1_700_000_000_000_000,
-    );
+    expect(histogramKeyToMicros(1_700_000_000_000_000)).toBe(1_700_000_000_000_000);
   });
 
   it("passes through zero as a number", () => {
@@ -701,9 +617,7 @@ describe("histogramKeyToMicros", () => {
   it("converts an ISO string with +00:00 timezone offset", () => {
     const expectedMicros = Date.UTC(2026, 6, 3, 12, 0, 0) * 1000;
 
-    expect(histogramKeyToMicros("2026-07-03T12:00:00+00:00")).toBe(
-      expectedMicros,
-    );
+    expect(histogramKeyToMicros("2026-07-03T12:00:00+00:00")).toBe(expectedMicros);
   });
 
   it("returns 0 for an unparseable string", () => {

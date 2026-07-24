@@ -20,10 +20,7 @@ import { overlayNewDataOnOldOptions } from "./overlayNewDataOnOldOptions";
  * Overlay is only appropriate for time-series charts with [timestamp, value] data format.
  * Ineligible types (pie, donut, metric, gauge) have no timestamps to merge on.
  */
-export function isOverlayEligible(
-  panelSchema: any,
-  oldOptions: any,
-): boolean {
+export function isOverlayEligible(panelSchema: any, oldOptions: any): boolean {
   // Chart type must support time-series overlay
   const eligibleTypes = new Set([
     "line",

@@ -35,38 +35,74 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- success rays + confetti -->
     <g stroke="var(--color-success-400)" stroke-width="2.5" stroke-linecap="round" opacity="0.45">
-      <line x1="120" y1="22" x2="120" y2="12" /><line x1="170" y1="34" x2="178" y2="27" /><line x1="70" y1="34" x2="62" y2="27" /><line x1="182" y1="74" x2="192" y2="74" /><line x1="58" y1="74" x2="48" y2="74" />
+      <line x1="120" y1="22" x2="120" y2="12" />
+      <line x1="170" y1="34" x2="178" y2="27" />
+      <line x1="70" y1="34" x2="62" y2="27" />
+      <line x1="182" y1="74" x2="192" y2="74" />
+      <line x1="58" y1="74" x2="48" y2="74" />
     </g>
     <g fill="var(--color-success-500)" opacity="0.7">
-      <circle cx="48" cy="100" r="2.2" /><circle cx="192" cy="104" r="2.2" /><circle cx="62" cy="40" r="1.8" />
+      <circle cx="48" cy="100" r="2.2" />
+      <circle cx="192" cy="104" r="2.2" />
+      <circle cx="62" cy="40" r="1.8" />
     </g>
 
     <!-- empty inbox tray -->
-    <path d="M74 138 L88 116 H152 L166 138 Z" fill="var(--color-surface-subtle)" stroke="var(--color-border-strong)" stroke-width="2" stroke-linejoin="round" />
-    <path d="M74 138 V150 Q74 154 78 154 H162 Q166 154 166 150 V138 H142 Q140 146 120 146 Q100 146 98 138 Z" fill="var(--color-surface-base)" stroke="var(--color-border-strong)" stroke-width="2" stroke-linejoin="round" />
+    <path
+      d="M74 138 L88 116 H152 L166 138 Z"
+      fill="var(--color-surface-subtle)"
+      stroke="var(--color-border-strong)"
+      stroke-width="2"
+      stroke-linejoin="round"
+    />
+    <path
+      d="M74 138 V150 Q74 154 78 154 H162 Q166 154 166 150 V138 H142 Q140 146 120 146 Q100 146 98 138 Z"
+      fill="var(--color-surface-base)"
+      stroke="var(--color-border-strong)"
+      stroke-width="2"
+      stroke-linejoin="round"
+    />
 
     <!-- check badge (pops) -->
     <g class="es-badge">
       <circle cx="120" cy="70" r="34" fill="var(--color-success-100)" />
-      <circle cx="120" cy="70" r="34" fill="none" stroke="var(--color-success-500)" stroke-width="3" />
-      <path class="es-check" d="M104 71 L116 83 L138 58" fill="none" stroke="var(--color-success-700)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+      <circle
+        cx="120"
+        cy="70"
+        r="34"
+        fill="none"
+        stroke="var(--color-success-500)"
+        stroke-width="3"
+      />
+      <path
+        class="es-check"
+        d="M104 71 L116 83 L138 58"
+        fill="none"
+        stroke="var(--color-success-700)"
+        stroke-width="6"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
     </g>
 
     <!-- sparkles -->
     <g class="es-spark es-spark-a" transform="translate(166 44)">
-      <path d="M0 -7 L1.6 -1.6 L7 0 L1.6 1.6 L0 7 L-1.6 1.6 L-7 0 L-1.6 -1.6 Z" fill="var(--color-success-500)" />
+      <path
+        d="M0 -7 L1.6 -1.6 L7 0 L1.6 1.6 L0 7 L-1.6 1.6 L-7 0 L-1.6 -1.6 Z"
+        fill="var(--color-success-500)"
+      />
     </g>
     <g class="es-spark es-spark-b" transform="translate(70 52)">
-      <path d="M0 -5 L1.2 -1.2 L5 0 L1.2 1.2 L0 5 L-1.2 1.2 L-5 0 L-1.2 -1.2 Z" fill="var(--color-primary-400)" />
+      <path
+        d="M0 -5 L1.2 -1.2 L5 0 L1.2 1.2 L0 5 L-1.2 1.2 L-5 0 L-1.2 -1.2 Z"
+        fill="var(--color-primary-400)"
+      />
     </g>
   </svg>
 </template>
 
 <script setup lang="ts">
-withDefaults(
-  defineProps<{ width?: number; animated?: boolean }>(),
-  { width: 260, animated: true },
-);
+withDefaults(defineProps<{ width?: number; animated?: boolean }>(), { width: 260, animated: true });
 </script>
 
 <style scoped>

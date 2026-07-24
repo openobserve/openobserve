@@ -74,9 +74,8 @@ export function useTableSelection<TData>(
 
   function toggleAllRows() {
     const newSet = new Set(localSelectedIds.value);
-    const allIds = props.selection === "multiple"
-      ? selectableRows().map((r) => getRowId(r.original))
-      : [];
+    const allIds =
+      props.selection === "multiple" ? selectableRows().map((r) => getRowId(r.original)) : [];
 
     if (allIds.length === 0) return;
 

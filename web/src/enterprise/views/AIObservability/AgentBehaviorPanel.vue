@@ -23,7 +23,7 @@
     <!-- Looping agents. Same card/header/table shape as the sibling LLM Insights
          panels (LLMErrorTable) so the whole page reads as one surface. -->
     <div
-      class="bg-card-glass-bg rounded-default flex flex-col flex-1 min-h-0 overflow-hidden border border-border-default"
+      class="bg-card-glass-bg rounded-default border-border-default flex min-h-0 flex-1 flex-col overflow-hidden border"
       data-test="agent-behavior-loops-card"
     >
       <PanelSectionHeader
@@ -41,7 +41,7 @@
         :show-global-filter="false"
         :row-class="loopRowClass"
         :footer-title="t('aiObservability.behavior.footerLoops')"
-        class="flex-1 min-h-0"
+        class="min-h-0 flex-1"
         show-index
         pagination="client"
         :empty-message="loopsEmptyMessage"
@@ -51,7 +51,7 @@
 
     <!-- Failure taxonomy -->
     <div
-      class="bg-card-glass-bg rounded-default flex flex-col flex-1 min-h-0 overflow-hidden border border-border-default"
+      class="bg-card-glass-bg rounded-default border-border-default flex min-h-0 flex-1 flex-col overflow-hidden border"
       data-test="agent-behavior-failures-card"
     >
       <PanelSectionHeader
@@ -69,7 +69,7 @@
         :show-global-filter="false"
         :row-class="failureRowClass"
         :footer-title="t('aiObservability.behavior.footerFailures')"
-        class="flex-1 min-h-0"
+        class="min-h-0 flex-1"
         show-index
         pagination="client"
         :empty-message="failuresEmptyMessage"
@@ -107,9 +107,7 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import AgentSignalDetailPanel from "./AgentSignalDetailPanel.vue";
 import PanelSectionHeader from "./PanelSectionHeader.vue";
-import agentSignalsService, {
-  type AgentSignalRecord,
-} from "@/services/agent_signals";
+import agentSignalsService, { type AgentSignalRecord } from "@/services/agent_signals";
 
 const props = defineProps<{
   startTime?: number;
@@ -132,10 +130,7 @@ const detailOpen = ref(false);
 const detailRow = ref<any>(null);
 
 /** Open the details panel for a clicked Behavior row (maps the table row to a signal). */
-const openDetail = (
-  signalType: "loop" | "failure" | "cost",
-  row: Record<string, any>,
-) => {
+const openDetail = (signalType: "loop" | "failure" | "cost", row: Record<string, any>) => {
   detailRow.value = { signalType, ...row };
   detailOpen.value = true;
 };
@@ -147,18 +142,13 @@ const isActiveRow = (type: "loop" | "failure", row: any): boolean => {
   const d = detailRow.value;
   if (!detailOpen.value || !d || d.signalType !== type) return false;
   if ((d.agentRaw ?? null) !== (row.agentRaw ?? null)) return false;
-  return type === "loop"
-    ? d.tool === row.tool
-    : d.failClass === row.failClass;
+  return type === "loop" ? d.tool === row.tool : d.failClass === row.failClass;
 };
-const loopRowClass = (row: any) =>
-  isActiveRow("loop", row) ? "bg-table-row-selected-bg" : "";
+const loopRowClass = (row: any) => (isActiveRow("loop", row) ? "bg-table-row-selected-bg" : "");
 const failureRowClass = (row: any) =>
   isActiveRow("failure", row) ? "bg-table-row-selected-bg" : "";
 
-const orgId = computed(
-  () => store.state.selectedOrganization?.identifier as string,
-);
+const orgId = computed(() => store.state.selectedOrganization?.identifier as string);
 
 /** Signals scoped to the selected agent (Agent mode) or all agents (Stream mode). */
 const scopedSignals = computed(() => {
@@ -223,9 +213,7 @@ const failureRows = computed(() =>
 const behaviorStats = computed<StatItem[]>(() => {
   const loops = loopRows.value;
   const failures = failureRows.value;
-  const agents = new Set(
-    [...loops, ...failures].map((r) => r.agentRaw).filter(Boolean),
-  );
+  const agents = new Set([...loops, ...failures].map((r) => r.agentRaw).filter(Boolean));
   const totalFailures = failures.reduce((sum, f) => sum + (f.count || 0), 0);
   const has = loops.length + failures.length > 0;
   const v = (n: number): string | number => (has ? n : "—");
@@ -339,10 +327,7 @@ const fetchSignals = async () => {
 };
 
 onMounted(fetchSignals);
-watch(
-  () => [props.startTime, props.endTime, props.sourceStream, orgId.value],
-  fetchSignals,
-);
+watch(() => [props.startTime, props.endTime, props.sourceStream, orgId.value], fetchSignals);
 
 defineExpose({ refresh: fetchSignals, lastRunAt, loading });
 </script>

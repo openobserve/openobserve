@@ -179,7 +179,12 @@ describe("NodePalette - drag and click callbacks", () => {
   let wrapper: any = null;
   const onDragStart = vi.fn();
   const onItemClick = vi.fn();
-  const inputNode = makeNode({ io_type: "input", subtype: "stream", label: "Stream", icon: "input" });
+  const inputNode = makeNode({
+    io_type: "input",
+    subtype: "stream",
+    label: "Stream",
+    icon: "input",
+  });
 
   beforeEach(async () => {
     vi.clearAllMocks();

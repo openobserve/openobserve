@@ -64,14 +64,10 @@ export function useTableRowShortcuts(containerRef: Ref<HTMLElement | null>) {
     // ↑ / ↓ — move focus to the adjacent row.
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       let sibling: Element | null =
-        e.key === "ArrowDown"
-          ? row.nextElementSibling
-          : row.previousElementSibling;
+        e.key === "ArrowDown" ? row.nextElementSibling : row.previousElementSibling;
       while (sibling && !(sibling as HTMLElement).matches?.(ROW_SELECTOR)) {
         sibling =
-          e.key === "ArrowDown"
-            ? sibling.nextElementSibling
-            : sibling.previousElementSibling;
+          e.key === "ArrowDown" ? sibling.nextElementSibling : sibling.previousElementSibling;
       }
       if (sibling instanceof HTMLElement) {
         e.preventDefault();
@@ -89,9 +85,7 @@ export function useTableRowShortcuts(containerRef: Ref<HTMLElement | null>) {
     }
 
     const action =
-      e.key === "Delete" || e.key === "Backspace"
-        ? "delete"
-        : ROW_ACTION_KEYS[e.key.toLowerCase()];
+      e.key === "Delete" || e.key === "Backspace" ? "delete" : ROW_ACTION_KEYS[e.key.toLowerCase()];
     if (!action) return;
 
     const btn = row.querySelector<HTMLElement>(`[data-row-action='${action}']`);

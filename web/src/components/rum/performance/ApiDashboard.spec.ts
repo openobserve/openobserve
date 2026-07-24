@@ -67,7 +67,9 @@ function createWrapper(props: Record<string, any> = {}) {
           template: '<div data-test="render-dashboard-charts"><slot /></div>',
           props: ["viewOnly", "dashboardData", "currentTimeObj", "searchType"],
           emits: ["variablesManagerReady"],
-          setup() { return { layoutUpdate: vi.fn() }; },
+          setup() {
+            return { layoutUpdate: vi.fn() };
+          },
         },
         OSpinner: { template: '<div data-test="spinner" />' },
       },
@@ -163,7 +165,12 @@ describe("ApiDashboard", () => {
 
     it("accepts custom dateTime prop", () => {
       // Arrange
-      const customDateTime = { startTime: 1609459200, endTime: 1609545600, type: "absolute", period: "1h" };
+      const customDateTime = {
+        startTime: 1609459200,
+        endTime: 1609545600,
+        type: "absolute",
+        period: "1h",
+      };
 
       // Act
       wrapper = createWrapper({ dateTime: customDateTime });
@@ -442,8 +449,18 @@ describe("ApiDashboard", () => {
       mockSearch.mockResolvedValue({
         data: {
           hits: [
-            { url: "https://api.example.com/users?id=1", max_duration: 150.25, max_resource_size: 1024.5, error_count: 5 },
-            { url: "https://api.example.com/orders", max_duration: 89.75, max_resource_size: 512.0, error_count: 2 },
+            {
+              url: "https://api.example.com/users?id=1",
+              max_duration: 150.25,
+              max_resource_size: 1024.5,
+              error_count: 5,
+            },
+            {
+              url: "https://api.example.com/orders",
+              max_duration: 89.75,
+              max_resource_size: 512.0,
+              error_count: 2,
+            },
           ],
         },
       });

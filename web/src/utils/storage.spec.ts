@@ -375,10 +375,7 @@ describe("useLocalStorage internals (via useLocalCurrentUser)", () => {
 
     useLocalCurrentUser("initial-value");
 
-    expect(localStorageMock.setItem).toHaveBeenCalledWith(
-      "currentuser",
-      expect.any(String),
-    );
+    expect(localStorageMock.setItem).toHaveBeenCalledWith("currentuser", expect.any(String));
   });
 
   it("does NOT write to localStorage when defaultValue is empty string", () => {

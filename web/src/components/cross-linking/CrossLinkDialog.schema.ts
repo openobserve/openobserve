@@ -18,6 +18,4 @@ export const makeCrossLinkDialogSchema = (t: (_key: string) => string) =>
     newFieldName: z.string().optional(),
   });
 
-export type CrossLinkDialogForm = z.infer<
-  ReturnType<typeof makeCrossLinkDialogSchema>
->;
+export type CrossLinkDialogForm = z.infer<ReturnType<typeof makeCrossLinkDialogSchema>>;

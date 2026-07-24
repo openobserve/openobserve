@@ -99,10 +99,8 @@ export const parseDurationWhereClause = (
       if (!node || node.type !== "binary_expr" || unknownUnit) return;
 
       if (
-        (node.left?.column === "duration" ||
-          node.left?.column?.expr?.value === "duration") &&
-        (node.right?.type === "single_quote_string" ||
-          node.right?.type === "string")
+        (node.left?.column === "duration" || node.left?.column?.expr?.value === "duration") &&
+        (node.right?.type === "single_quote_string" || node.right?.type === "string")
       ) {
         const strVal = String(node.right.value).trim();
         // Allow optional whitespace between number and unit; unit may be multi-char.
@@ -115,9 +113,7 @@ export const parseDurationWhereClause = (
             return;
           }
           const num = parseFloat(match[1]);
-          const us = Math.round(
-            num * (DURATION_UNIT_MULTIPLIERS[canonicalUnit] ?? 1),
-          );
+          const us = Math.round(num * (DURATION_UNIT_MULTIPLIERS[canonicalUnit] ?? 1));
           // Mutate the AST node in place — replace quoted string with a numeric literal.
           node.right = { type: "number", value: us };
         }
@@ -150,8 +146,7 @@ export const parseDurationWhereClause = (
  * stored in the stream. Formatting for display is the caller's responsibility.
  */
 const useDurationPercentiles = () => {
-  const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
-    useHttpStreaming();
+  const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
 
   const percentiles = ref<DurationPercentiles>({
     p25: null,
@@ -191,9 +186,7 @@ const useDurationPercentiles = () => {
     const { traceId } = generateTraceContext();
     currentTraceId = traceId;
 
-    const where = payload.whereClause?.trim()
-      ? ` WHERE ${payload.whereClause.trim()}`
-      : "";
+    const where = payload.whereClause?.trim() ? ` WHERE ${payload.whereClause.trim()}` : "";
     const sql =
       `SELECT approx_percentile_cont(duration, 0.25) as p25,` +
       ` approx_percentile_cont(duration, 0.50) as p50,` +

@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:selected-ids="handleSelectedIdsUpdate"
     >
       <template #toolbar>
-        <div class="flex items-center gap-3 flex-1 min-w-0">
+        <div class="flex min-w-0 flex-1 items-center gap-3">
           <span
             class="text-xs font-bold whitespace-nowrap"
             data-test="running-queries-last-refresh"
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :value="visual as string"
               size="sm"
             >
-              {{ (searchTypeLabels as Record<string, string>)?.[visual as string] ?? visual }}
+              {{ getSearchTypeLabel(visual as string) }}
             </OToggleGroupItem>
           </OToggleGroup>
         </div>
@@ -123,16 +123,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm-action"
           @click="handleMultiQueryCancel"
         >
-          {{ t('queries.cancelQuery') }}
+          {{ t("queries.cancelQuery") }}
         </OButton>
       </template>
     </OTable>
-    <ODrawer
-      bleed
-      v-model:open="showListSchemaDialog"
-      size="lg"
-      data-test="list-schema-dialog"
-    >
+    <ODrawer bleed v-model:open="showListSchemaDialog" size="lg" data-test="list-schema-dialog">
       <QueryList :schemaData="schemaData" @close="showListSchemaDialog = false" />
     </ODrawer>
   </template>
@@ -159,7 +154,18 @@ import { COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { QueryList, OEmptyState, OButton, OTooltip, OToggleGroup, OToggleGroupItem, ODrawer, OTable, OUserCell, OTag },
+  components: {
+    QueryList,
+    OEmptyState,
+    OButton,
+    OTooltip,
+    OToggleGroup,
+    OToggleGroupItem,
+    ODrawer,
+    OTable,
+    OUserCell,
+    OTag,
+  },
   props: {
     rows: {
       type: Array,
@@ -222,7 +228,7 @@ export default defineComponent({
         hideable: true,
         size: COL.email,
         minSize: 160,
-        meta: { align: "left" , flex: true },
+        meta: { align: "left", flex: true },
       },
       {
         id: "org_id",
@@ -335,6 +341,9 @@ export default defineComponent({
       emit("delete:queries");
     };
 
+    const getSearchTypeLabel = (visual: string) =>
+      (props.searchTypeLabels as Record<string, string>)?.[visual] ?? visual;
+
     return {
       t,
       store,
@@ -351,6 +360,7 @@ export default defineComponent({
       handleMultiQueryCancel,
       getDuration,
       durationFormatter,
+      getSearchTypeLabel,
     };
   },
 });

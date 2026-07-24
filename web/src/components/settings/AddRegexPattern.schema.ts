@@ -25,6 +25,4 @@ export const makeAddRegexPatternSchema = (t: (_key: string) => string) =>
     outputString: z.string().optional(),
   });
 
-export type AddRegexPatternForm = z.infer<
-  ReturnType<typeof makeAddRegexPatternSchema>
->;
+export type AddRegexPatternForm = z.infer<ReturnType<typeof makeAddRegexPatternSchema>>;

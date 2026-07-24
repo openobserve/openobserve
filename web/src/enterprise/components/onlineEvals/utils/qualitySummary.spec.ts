@@ -26,11 +26,7 @@ const emptyAgg = {
 describe("qualitySummaryForConfig", () => {
   it("uses the overall average for numeric configs", () => {
     expect(
-      qualitySummaryForConfig(
-        config("numeric"),
-        { ...emptyAgg, avgNumeric: 0.82 },
-        [],
-      ),
+      qualitySummaryForConfig(config("numeric"), { ...emptyAgg, avgNumeric: 0.82 }, []),
     ).toEqual({
       qualityValue: 0.82,
       qualityFormat: "number",

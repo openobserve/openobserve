@@ -5,7 +5,6 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { createRouter, createWebHistory } from "vue-router";
 
-
 // Create a mock router
 const mockRouter = createRouter({
   history: createWebHistory(),
@@ -272,13 +271,9 @@ describe("VisualizeLogsQuery Component", () => {
     });
 
     it("should initialize with correct props", () => {
-      expect(wrapper.props("visualizeChartData")).toEqual(
-        defaultProps.visualizeChartData,
-      );
+      expect(wrapper.props("visualizeChartData")).toEqual(defaultProps.visualizeChartData);
       expect(wrapper.props("errorData")).toEqual(defaultProps.errorData);
-      expect(wrapper.props("searchResponse")).toEqual(
-        defaultProps.searchResponse,
-      );
+      expect(wrapper.props("searchResponse")).toEqual(defaultProps.searchResponse);
       expect(wrapper.props("is_ui_histogram")).toBe(false);
     });
 
@@ -473,9 +468,7 @@ describe("VisualizeLogsQuery Component", () => {
 
       wrapper.vm.handleChartApiError(errorMessage);
 
-      expect(wrapper.props("errorData").errors).toContain(
-        "String error message",
-      );
+      expect(wrapper.props("errorData").errors).toContain("String error message");
     });
 
     it("should emit handleChartApiError event", () => {
@@ -590,17 +583,15 @@ describe("VisualizeLogsQuery Component", () => {
 
       wrapperWithHistogram.vm.addToDashboard();
 
-      expect(
-        wrapperWithHistogram.vm.dashboardPanelData.data.queries[0].query,
-      ).toBe("SELECT histogram(...)");
+      expect(wrapperWithHistogram.vm.dashboardPanelData.data.queries[0].query).toBe(
+        "SELECT histogram(...)",
+      );
       wrapperWithHistogram.unmount();
     });
 
     it.skip("should not copy histogram query when is_ui_histogram is false", () => {
       // SKIPPED: onResultMetadataUpdate method moved to PanelEditor component
-      wrapper.vm.onResultMetadataUpdate([
-        { converted_histogram_query: "SELECT histogram(...)" },
-      ]);
+      wrapper.vm.onResultMetadataUpdate([{ converted_histogram_query: "SELECT histogram(...)" }]);
 
       const originalQuery = wrapper.vm.dashboardPanelData.data.queries[0].query;
 
@@ -610,9 +601,7 @@ describe("VisualizeLogsQuery Component", () => {
 
       wrapper.vm.addToDashboard();
 
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toBe(
-        originalQuery,
-      );
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toBe(originalQuery);
     });
   });
 
@@ -726,19 +715,11 @@ describe("VisualizeLogsQuery Component", () => {
   // SKIPPED: updateVrlFunctionFieldList method moved to PanelEditor component
   describe.skip("updateVrlFunctionFieldList Function", () => {
     it("should process field list for auto SQL queries", () => {
-      const fieldList = [
-        "field1",
-        "field2",
-        "timestamp",
-        "count",
-        "custom_field",
-      ];
+      const fieldList = ["field1", "field2", "timestamp", "count", "custom_field"];
 
       wrapper.vm.updateVrlFunctionFieldList(fieldList);
 
-      expect(
-        wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList,
-      ).toEqual([
+      expect(wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList).toEqual([
         { name: "field1", type: "Utf8" },
         { name: "field2", type: "Utf8" },
       ]);
@@ -750,9 +731,7 @@ describe("VisualizeLogsQuery Component", () => {
 
       wrapper.vm.updateVrlFunctionFieldList(fieldList);
 
-      expect(
-        wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList,
-      ).toEqual([
+      expect(wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList).toEqual([
         { name: "field1", type: "Utf8" },
         { name: "field2", type: "Utf8" },
       ]);
@@ -769,9 +748,7 @@ describe("VisualizeLogsQuery Component", () => {
       wrapper.vm.updateVrlFunctionFieldList(fieldList);
 
       // derived_field should not be in alias list, so it should be in VRL function list
-      expect(
-        wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList,
-      ).toContainEqual({
+      expect(wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList).toContainEqual({
         name: "derived_field",
         type: "Utf8",
       });
@@ -780,9 +757,7 @@ describe("VisualizeLogsQuery Component", () => {
     it("should handle empty field list", () => {
       wrapper.vm.updateVrlFunctionFieldList([]);
 
-      expect(
-        wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList,
-      ).toEqual([]);
+      expect(wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList).toEqual([]);
     });
 
     it("should handle all field types (x, y, z, breakdown, etc.)", () => {
@@ -804,8 +779,7 @@ describe("VisualizeLogsQuery Component", () => {
       wrapper.vm.updateVrlFunctionFieldList(fieldList);
 
       // vrl_field should remain after filtering out all the aliased fields and custom fields
-      const vrlFields =
-        wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList;
+      const vrlFields = wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList;
       expect(vrlFields).toContainEqual({ name: "vrl_field", type: "Utf8" });
     });
   });
@@ -928,9 +902,7 @@ describe("VisualizeLogsQuery Component", () => {
       // SKIPPED: updateVrlFunctionFieldList method moved to PanelEditor component
       wrapper.vm.dashboardPanelData.data.queries[0].fields = {};
 
-      expect(() =>
-        wrapper.vm.updateVrlFunctionFieldList(["field1", "field2"]),
-      ).not.toThrow();
+      expect(() => wrapper.vm.updateVrlFunctionFieldList(["field1", "field2"])).not.toThrow();
     });
 
     it.skip("should handle null dashboardPanelData gracefully", () => {
@@ -953,9 +925,7 @@ describe("VisualizeLogsQuery Component", () => {
     it("should provide hoveredSeriesState to child components", () => {
       // The provide is set up in the component, we can verify it exists
       expect(wrapper.vm.hoveredSeriesState).toBeDefined();
-      expect(typeof wrapper.vm.hoveredSeriesState.setHoveredSeriesName).toBe(
-        "function",
-      );
+      expect(typeof wrapper.vm.hoveredSeriesState.setHoveredSeriesName).toBe("function");
       expect(typeof wrapper.vm.hoveredSeriesState.setIndex).toBe("function");
     });
 
@@ -985,9 +955,7 @@ describe("VisualizeLogsQuery Component", () => {
 
       const fieldList = ["field1", "field2", "custom_field"];
 
-      expect(() =>
-        wrapper.vm.updateVrlFunctionFieldList(fieldList),
-      ).not.toThrow();
+      expect(() => wrapper.vm.updateVrlFunctionFieldList(fieldList)).not.toThrow();
     });
 
     it.skip("should handle empty queries array", () => {
@@ -1046,12 +1014,8 @@ describe("VisualizeLogsQuery Component", () => {
         expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toContain(
           "SELECT timestamp, level, message FROM logs",
         );
-        expect(
-          wrapper.vm.dashboardPanelData.data.queries[0].query,
-        ).not.toContain("GROUP BY");
-        expect(wrapper.vm.dashboardPanelData.data.queries[0].customQuery).toBe(
-          true,
-        );
+        expect(wrapper.vm.dashboardPanelData.data.queries[0].query).not.toContain("GROUP BY");
+        expect(wrapper.vm.dashboardPanelData.data.queries[0].customQuery).toBe(true);
       });
 
       it("should validate simple query structure", () => {
@@ -1113,15 +1077,9 @@ describe("VisualizeLogsQuery Component", () => {
 
         wrapper.setProps({ searchResponse: mockSearchResponse });
 
-        expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toContain(
-          "GROUP BY level",
-        );
-        expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toContain(
-          "COUNT(*)",
-        );
-        expect(
-          wrapper.vm.dashboardPanelData.data.queries[0].fields.breakdown,
-        ).toHaveLength(1);
+        expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toContain("GROUP BY level");
+        expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toContain("COUNT(*)");
+        expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.breakdown).toHaveLength(1);
       });
 
       it("should validate GROUP BY query fields", () => {
@@ -1220,9 +1178,7 @@ describe("VisualizeLogsQuery Component", () => {
         await wrapper.setProps({ searchResponse: mockSearchResponse });
 
         expect(wrapper.props("searchResponse").data.hits).toHaveLength(3);
-        expect(wrapper.props("searchResponse").data.hits[0].error_count).toBe(
-          25,
-        );
+        expect(wrapper.props("searchResponse").data.hits[0].error_count).toBe(25);
       });
     });
 
@@ -1336,9 +1292,7 @@ describe("VisualizeLogsQuery Component", () => {
         const query = wrapper.vm.dashboardPanelData.data.queries[0];
 
         expect(query.query).toContain("LEFT JOIN users u ON l.user_id = u.id");
-        expect(query.query).toContain(
-          "INNER JOIN services s ON l.service_id = s.id",
-        );
+        expect(query.query).toContain("INNER JOIN services s ON l.service_id = s.id");
         expect(query.query).toContain("WHERE l.timestamp >= '2024-01-01'");
       });
 
@@ -1375,12 +1329,8 @@ describe("VisualizeLogsQuery Component", () => {
 
         await wrapper.setProps({ searchResponse: mockSearchResponse });
 
-        expect(wrapper.props("searchResponse").data.hits[0].username).toBe(
-          "john_doe",
-        );
-        expect(wrapper.props("searchResponse").data.hits[1].username).toBe(
-          null,
-        );
+        expect(wrapper.props("searchResponse").data.hits[0].username).toBe("john_doe");
+        expect(wrapper.props("searchResponse").data.hits[1].username).toBe(null);
       });
 
       it("should handle complex JOIN with aggregation", () => {
@@ -1568,12 +1518,8 @@ describe("VisualizeLogsQuery Component", () => {
 
           await wrapper.setProps({ searchResponse: mockSearchResponse });
 
-          expect(wrapper.props("searchResponse").data.hits[0].error_ratio).toBe(
-            161.29,
-          );
-          expect(wrapper.props("searchResponse").data.hits[0].avg_errors).toBe(
-            15.5,
-          );
+          expect(wrapper.props("searchResponse").data.hits[0].error_ratio).toBe(161.29);
+          expect(wrapper.props("searchResponse").data.hits[0].avg_errors).toBe(15.5);
         });
       });
 
@@ -1645,9 +1591,7 @@ describe("VisualizeLogsQuery Component", () => {
 
           expect(query.query).toContain("WHERE EXISTS (");
           expect(query.query).toContain("SELECT 1");
-          expect(query.query).toContain(
-            "WHERE l2.service_name = l1.service_name",
-          );
+          expect(query.query).toContain("WHERE l2.service_name = l1.service_name");
         });
       });
 
@@ -1681,9 +1625,7 @@ describe("VisualizeLogsQuery Component", () => {
         it("should handle correlated subquery", () => {
           const query = wrapper.vm.dashboardPanelData.data.queries[0];
 
-          expect(query.query).toContain(
-            "WHERE l2.service_name = l.service_name",
-          );
+          expect(query.query).toContain("WHERE l2.service_name = l.service_name");
           expect(query.query).toContain("AND l2.timestamp <= l.timestamp");
           expect(query.fields.y[0].isDerived).toBe(true);
         });
@@ -1697,8 +1639,7 @@ describe("VisualizeLogsQuery Component", () => {
       });
 
       it("should handle syntax errors in complex queries", () => {
-        wrapper.vm.dashboardPanelData.data.queries[0].query =
-          "SELECT * FORM logs"; // Intentional typo
+        wrapper.vm.dashboardPanelData.data.queries[0].query = "SELECT * FORM logs"; // Intentional typo
 
         const errorMessage = "Syntax error: unexpected token 'FORM'";
         wrapper.vm.handleChartApiError(errorMessage);
@@ -1767,18 +1708,12 @@ describe("VisualizeLogsQuery Component", () => {
           ORDER BY action_count DESC
         `;
 
-        expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toContain(
-          "JOIN users u ON",
-        );
-        expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toContain(
-          "JOIN services s ON",
-        );
+        expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toContain("JOIN users u ON");
+        expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toContain("JOIN services s ON");
         expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toContain(
           "JOIN user_roles ur ON",
         );
-        expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toContain(
-          "JOIN roles r ON",
-        );
+        expect(wrapper.vm.dashboardPanelData.data.queries[0].query).toContain("JOIN roles r ON");
       });
     });
   });
@@ -1908,19 +1843,13 @@ describe("VisualizeLogsQuery Component", () => {
     it("should handle vrlFunctionFieldList length check correctly", () => {
       // Test empty array
       wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList = [];
-      expect(
-        wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList.length >
-          0,
-      ).toBe(false);
+      expect(wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList.length > 0).toBe(false);
 
       // Test with items
       wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList = [
         { name: "field1", type: "Utf8" },
       ];
-      expect(
-        wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList.length >
-          0,
-      ).toBe(true);
+      expect(wrapper.vm.dashboardPanelData.meta.stream.vrlFunctionFieldList.length > 0).toBe(true);
     });
 
     it("should allow switching with multiple VRL derived fields", () => {
@@ -1943,14 +1872,7 @@ describe("VisualizeLogsQuery Component", () => {
         { name: "vrl_field", type: "Utf8" },
       ];
 
-      const chartTypes = [
-        "table",
-        "line",
-        "bar",
-        "area",
-        "scatter",
-        "h-bar"
-      ];
+      const chartTypes = ["table", "line", "bar", "area", "scatter", "h-bar"];
 
       if (typeof wrapper.vm.handleChartTypeChange === "function") {
         chartTypes.forEach((chartType) => {

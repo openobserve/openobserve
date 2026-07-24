@@ -50,9 +50,7 @@ export const sanitizeChartType = (raw: string): string | null =>
 
 // a fresh metrics query slot (cloned from the panel default, stream_type=metrics)
 export const defaultMetricsQuery = (): any => {
-  const q = JSON.parse(
-    JSON.stringify(getDefaultDashboardPanelData(store).data.queries[0]),
-  );
+  const q = JSON.parse(JSON.stringify(getDefaultDashboardPanelData(store).data.queries[0]));
   if (q?.fields) q.fields.stream_type = "metrics";
   return q;
 };

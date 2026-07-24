@@ -1,8 +1,5 @@
 ﻿<template>
-  <EvalListShell
-    data-test="score-config"
-    :show-empty="false"
-  >
+  <EvalListShell data-test="score-config" :show-empty="false">
     <template #table>
       <OTable
         v-model:selected-ids="selectedIds"
@@ -22,13 +19,13 @@
         :persist-columns="true"
         table-id="score-config-list"
         width="100%"
-        class="w-full h-full"
+        class="h-full w-full"
         @row-click="(row: any) => $emit('view', row)"
       >
         <template #toolbar>
           <OSearchInput
             :model-value="search"
-            class="flex-1 min-w-0"
+            class="min-w-0 flex-1"
             :placeholder="t('onlineEvals.scoreConfig.searchPlaceholder')"
             data-test="score-config-list-search-input"
             clearable
@@ -45,7 +42,11 @@
             data-test="score-config-list-refresh-btn"
             @click="emit('refresh')"
           >
-            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="scoreConfigsRefresh" />
+            <OTooltip
+              side="bottom"
+              :content="t('common.refresh')"
+              shortcut-id="scoreConfigsRefresh"
+            />
           </OButton>
         </template>
 
@@ -53,7 +54,7 @@
              the type dropdown; Total last, never itself the active tile. -->
         <template #subheader>
           <div
-            class="px-page-edge py-1.5 border-b border-table-row-divider"
+            class="px-page-edge border-table-row-divider border-b py-1.5"
             data-test="score-config-list-summary"
           >
             <OStatStrip
@@ -73,8 +74,18 @@
               preset="no-score-configs"
               :filtered="hasFilters"
               :actions="[
-                { id: 'create', icon: 'add', titleKey: 'emptyState.noScoreConfigs.action', descriptionKey: 'emptyState.noScoreConfigs.actionDesc' },
-                { id: 'import', icon: 'upload-file', titleKey: 'emptyState.noScoreConfigs.import', descriptionKey: 'emptyState.noScoreConfigs.importDesc' },
+                {
+                  id: 'create',
+                  icon: 'add',
+                  titleKey: 'emptyState.noScoreConfigs.action',
+                  descriptionKey: 'emptyState.noScoreConfigs.actionDesc',
+                },
+                {
+                  id: 'import',
+                  icon: 'upload-file',
+                  titleKey: 'emptyState.noScoreConfigs.import',
+                  descriptionKey: 'emptyState.noScoreConfigs.importDesc',
+                },
               ]"
               data-test="score-config-empty-state"
               @action="onEmptyAction"
@@ -124,7 +135,7 @@
         </template>
 
         <template #cell-actions="{ row }">
-          <div class="flex items-center actions-container">
+          <div class="actions-container flex items-center">
             <OButton
               :data-test="`score-config-list-${row.name}-edit-btn`"
               data-row-action="edit"
@@ -214,98 +225,98 @@ function handleBulkExport() {
   emit("export-bulk", ids);
 }
 
-const columns = computed(() => [
-  {
-    id: "#",
-    header: "#",
-    accessorKey: "#",
-    sortable: false,
-    size: 56,
-    meta: { align: "left" },
-  },
-  {
-    id: "name",
-    header: t("onlineEvals.scoreConfig.columns.name"),
-    accessorKey: "name",
-    sortable: true,
-    size: COL.name,
-    minSize: 160,
-    // `flex` (not `autoWidth`): fills leftover width on load AND stays
-    // resizable — matches Dashboards/AlertList; `autoWidth` has no resize grip.
-    meta: { align: "left", flex: true },
-  },
-  {
-    id: "type",
-    header: t("onlineEvals.scoreConfig.columns.type"),
-    accessorFn: (row: ScoreConfig) => dataTypeOf(row),
-    sortable: true,
-    // Type values are short ("numeric" / "categorical" / "boolean"), so the
-    // shared COL.type (180) is wider than needed — trim it back so the flex
-    // `name` column reclaims the width (matching the Scorers table).
-    size: 120,
-    meta: { align: "left" },
-  },
-  {
-    id: "rangeValues",
-    header: t("onlineEvals.scoreConfig.columns.rangeValues"),
-    accessorFn: (row: ScoreConfig) => rangeOrValues(row),
-    sortable: false,
-    // Slightly narrower than COL.description (300) — the range/values text is
-    // compact, and the freed width goes to the flex `name` column.
-    size: 160,
-    meta: { align: "left" },
-  },
-  {
-    id: "healthy",
-    header: t("onlineEvals.scoreConfig.columns.healthy"),
-    accessorFn: (row: ScoreConfig) => healthyDisplay(row),
-    sortable: false,
-    size: 150,
-    meta: { align: "left" },
-  },
-  {
-    id: "version",
-    header: t("onlineEvals.scoreConfig.columns.activeVersion"),
-    accessorKey: "version",
-    sortable: true,
-    size: COL.version,
-    meta: { align: "right" },
-  },
-  {
-    id: "usedBy",
-    header: t("onlineEvals.scoreConfig.columns.usedBy"),
-    accessorFn: (row: ScoreConfig) => usedByCount(row),
-    sortable: true,
-    size: COL.count,
-    meta: { align: "right" },
-  },
-  {
-    id: "created",
-    header: t("onlineEvals.scoreConfig.columns.created"),
-    accessorFn: (row: ScoreConfig) => rowCreated(row),
-    sortable: true,
-    size: COL.createdAt,
-    meta: { align: "left" },
-  },
-  {
-    id: "actions",
-    header: t("onlineEvals.scoreConfig.columns.actions"),
-    sortable: false,
-    isAction: true,
-    size: 140,
-    meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
-  },
-].map((c: any) => ({
-  ...c,
-  // Every column except the row index, the name (row identity) and the
-  // actions column is offered in OTable's "Manage columns" chooser.
-  hideable: c.id !== "#" && c.id !== "name" && !c.isAction,
-})));
+const columns = computed(() =>
+  [
+    {
+      id: "#",
+      header: "#",
+      accessorKey: "#",
+      sortable: false,
+      size: 56,
+      meta: { align: "left" },
+    },
+    {
+      id: "name",
+      header: t("onlineEvals.scoreConfig.columns.name"),
+      accessorKey: "name",
+      sortable: true,
+      size: COL.name,
+      minSize: 160,
+      // `flex` (not `autoWidth`): fills leftover width on load AND stays
+      // resizable — matches Dashboards/AlertList; `autoWidth` has no resize grip.
+      meta: { align: "left", flex: true },
+    },
+    {
+      id: "type",
+      header: t("onlineEvals.scoreConfig.columns.type"),
+      accessorFn: (row: ScoreConfig) => dataTypeOf(row),
+      sortable: true,
+      // Type values are short ("numeric" / "categorical" / "boolean"), so the
+      // shared COL.type (180) is wider than needed — trim it back so the flex
+      // `name` column reclaims the width (matching the Scorers table).
+      size: 120,
+      meta: { align: "left" },
+    },
+    {
+      id: "rangeValues",
+      header: t("onlineEvals.scoreConfig.columns.rangeValues"),
+      accessorFn: (row: ScoreConfig) => rangeOrValues(row),
+      sortable: false,
+      // Slightly narrower than COL.description (300) — the range/values text is
+      // compact, and the freed width goes to the flex `name` column.
+      size: 160,
+      meta: { align: "left" },
+    },
+    {
+      id: "healthy",
+      header: t("onlineEvals.scoreConfig.columns.healthy"),
+      accessorFn: (row: ScoreConfig) => healthyDisplay(row),
+      sortable: false,
+      size: 150,
+      meta: { align: "left" },
+    },
+    {
+      id: "version",
+      header: t("onlineEvals.scoreConfig.columns.activeVersion"),
+      accessorKey: "version",
+      sortable: true,
+      size: COL.version,
+      meta: { align: "right" },
+    },
+    {
+      id: "usedBy",
+      header: t("onlineEvals.scoreConfig.columns.usedBy"),
+      accessorFn: (row: ScoreConfig) => usedByCount(row),
+      sortable: true,
+      size: COL.count,
+      meta: { align: "right" },
+    },
+    {
+      id: "created",
+      header: t("onlineEvals.scoreConfig.columns.created"),
+      accessorFn: (row: ScoreConfig) => rowCreated(row),
+      sortable: true,
+      size: COL.createdAt,
+      meta: { align: "left" },
+    },
+    {
+      id: "actions",
+      header: t("onlineEvals.scoreConfig.columns.actions"),
+      sortable: false,
+      isAction: true,
+      size: 140,
+      meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
+    },
+  ].map((c: any) => ({
+    ...c,
+    // Every column except the row index, the name (row identity) and the
+    // actions column is offered in OTable's "Manage columns" chooser.
+    hideable: c.id !== "#" && c.id !== "name" && !c.isAction,
+  })),
+);
 
 const filteredRows = computed(() =>
-  typeFilter.value
-    ? props.rows.filter((row) => dataTypeOf(row) === typeFilter.value)
-    : props.rows,
+  typeFilter.value ? props.rows.filter((row) => dataTypeOf(row) === typeFilter.value) : props.rows,
 );
 
 const numberedRows = useNumberedRows(filteredRows);
@@ -373,17 +384,14 @@ const summaryStats = computed<StatItem[]>(() => {
 const selectedStatKey = computed(() => typeFilter.value);
 function onStatSelect(key: string) {
   // Re-clicking the active tile clears the filter (toggle), matching the Alerts strip.
-  typeFilter.value =
-    key === "all" || typeFilter.value === key ? null : (key as DataType);
+  typeFilter.value = key === "all" || typeFilter.value === key ? null : (key as DataType);
 }
 
 // Drives OEmptyState's `:filtered` — true whenever the user has narrowed
 // the list (search or type filter). The filtered case auto-renders the
 // "No score configs match these filters" + Clear-filters card; the
 // first-run case shows the preset's "Create score config" CTA.
-const hasFilters = computed(
-  () => !!props.search?.trim() || !!typeFilter.value,
-);
+const hasFilters = computed(() => !!props.search?.trim() || !!typeFilter.value);
 
 function onEmptyAction(id?: string) {
   if (id === "create") emit("create");
@@ -449,6 +457,11 @@ function usedByText(row: ScoreConfig) {
 }
 
 useShortcuts([
-  { id: "scoreConfigsRefresh", handler: () => { if (!isInputFocused()) emit("refresh"); } },
+  {
+    id: "scoreConfigsRefresh",
+    handler: () => {
+      if (!isInputFocused()) emit("refresh");
+    },
+  },
 ]);
 </script>

@@ -19,29 +19,29 @@
     @update:open="(v: boolean) => emit('update:open', v)"
   >
     <div class="flex flex-col gap-4">
-      <p class="m-0 text-text-secondary text-compact leading-normal">
+      <p class="text-text-secondary text-compact m-0 leading-normal">
         {{ t("onlineEvals.scorerTypeDialog.intro") }}
       </p>
 
-      <div class="grid grid-cols-2 max-md:grid-cols-1 gap-3">
+      <div class="grid grid-cols-2 gap-3 max-md:grid-cols-1">
         <button
           v-for="opt in typeOptions"
           :key="opt.type"
           type="button"
-          class="flex flex-col items-start gap-2.5 min-h-45 p-4 border border-border-default rounded-default bg-surface-base text-left cursor-pointer transition-colors hover:border-accent"
+          class="border-border-default rounded-default bg-surface-base hover:border-accent flex min-h-45 cursor-pointer flex-col items-start gap-2.5 border p-4 text-left transition-colors"
           :data-test="`scorer-type-${opt.testKey}`"
           @click="select(opt.type)"
         >
           <span
-            class="inline-flex items-center justify-center w-9 h-9 rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text"
+            class="rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text inline-flex h-9 w-9 items-center justify-center"
           >
             <OIcon :name="opt.icon" size="md" />
           </span>
-          <span class="text-sm font-semibold text-text-heading">{{ opt.title }}</span>
-          <span class="flex-1 text-xs leading-normal text-text-secondary">{{
+          <span class="text-text-heading text-sm font-semibold">{{ opt.title }}</span>
+          <span class="text-text-secondary flex-1 text-xs leading-normal">{{
             opt.description
           }}</span>
-          <span class="inline-flex items-center gap-1 mt-auto text-xs font-semibold text-accent">
+          <span class="text-accent mt-auto inline-flex items-center gap-1 text-xs font-semibold">
             {{ opt.cta }}
             <OIcon name="chevron-right" size="xs" />
           </span>

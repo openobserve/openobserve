@@ -33,7 +33,6 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-
 // Stub ODialog so tests are deterministic (no Portal/Teleport)
 // and so we can assert on the props the component forwards + emit
 // the click events the component listens to.
@@ -367,9 +366,7 @@ describe("AddAnnotation", () => {
     wrapper = buildWrapper({ annotation: mockAnnotation });
     await flushPromises();
 
-    (annotationService.update_timed_annotations as any).mockRejectedValueOnce(
-      new Error("boom"),
-    );
+    (annotationService.update_timed_annotations as any).mockRejectedValueOnce(new Error("boom"));
 
     // Drive + AWAIT the form's own handleSubmit (runs the schema, awaits the
     // handler) — deterministic, unlike a fire-and-forget native submit event.
@@ -383,9 +380,7 @@ describe("AddAnnotation", () => {
   });
 
   it("shows an error notification and does not close when create_timed_annotations rejects", async () => {
-    (annotationService.create_timed_annotations as any).mockRejectedValueOnce(
-      new Error("boom"),
-    );
+    (annotationService.create_timed_annotations as any).mockRejectedValueOnce(new Error("boom"));
 
     const inputs = wrapper.findAllComponents({ name: "OInput" });
     await inputs[0].vm.$emit("update:modelValue", "Title");

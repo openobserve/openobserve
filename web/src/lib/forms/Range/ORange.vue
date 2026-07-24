@@ -1,12 +1,7 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 
-import type {
-  RangeProps,
-  RangeEmits,
-  RangeSlots,
-  RangeValue,
-} from "./ORange.types";
+import type { RangeProps, RangeEmits, RangeSlots, RangeValue } from "./ORange.types";
 import { computed, ref, useAttrs, useId } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
@@ -52,9 +47,7 @@ const current = computed<RangeValue>(() => {
   return { min: props.min, max: props.max };
 });
 
-const effectiveError = computed(
-  () => props.errorMessage || (props.error ? " " : null) || null,
-);
+const effectiveError = computed(() => props.errorMessage || (props.error ? " " : null) || null);
 const hasError = computed(() => !!effectiveError.value);
 
 const range = computed(() => props.max - props.min);
@@ -76,18 +69,12 @@ const renderMax = computed(() =>
 
 const minPercent = computed(() => {
   if (range.value <= 0) return 0;
-  return Math.max(
-    0,
-    Math.min(100, ((renderMin.value - props.min) / range.value) * 100),
-  );
+  return Math.max(0, Math.min(100, ((renderMin.value - props.min) / range.value) * 100));
 });
 
 const maxPercent = computed(() => {
   if (range.value <= 0) return 0;
-  return Math.max(
-    0,
-    Math.min(100, ((renderMax.value - props.min) / range.value) * 100),
-  );
+  return Math.max(0, Math.min(100, ((renderMax.value - props.min) / range.value) * 100));
 });
 
 const trackHeight: Record<NonNullable<RangeProps["size"]>, string> = {
@@ -130,12 +117,8 @@ const resolvedSize = computed(() => props.size ?? "md");
  * right edge of the track).
  */
 const minOnTop = computed(() => minPercent.value > 50);
-const minZClass = computed(() =>
-  minOnTop.value ? "z-20" : "z-10",
-);
-const maxZClass = computed(() =>
-  minOnTop.value ? "z-10" : "z-20",
-);
+const minZClass = computed(() => (minOnTop.value ? "z-20" : "z-10"));
+const maxZClass = computed(() => (minOnTop.value ? "z-10" : "z-20"));
 
 function clamp(v: number) {
   return Math.max(props.min, Math.min(props.max, v));
@@ -189,12 +172,8 @@ function valueToTop(value: number): number {
 
 const vertMinTop = computed(() => valueToTop(current.value.min));
 const vertMaxTop = computed(() => valueToTop(current.value.max));
-const vertFilledTop = computed(() =>
-  Math.min(vertMinTop.value, vertMaxTop.value),
-);
-const vertFilledHeight = computed(() =>
-  Math.abs(vertMaxTop.value - vertMinTop.value),
-);
+const vertFilledTop = computed(() => Math.min(vertMinTop.value, vertMaxTop.value));
+const vertFilledHeight = computed(() => Math.abs(vertMaxTop.value - vertMinTop.value));
 
 const displayMin = computed(() => {
   const fmt = props.formatValue ?? ((n: number) => String(n));
@@ -206,12 +185,8 @@ const displayMax = computed(() => {
 });
 
 const vertMinOnTop = computed(() => vertMinTop.value < 50);
-const vertMinZClass = computed(() =>
-  vertMinOnTop.value ? "z-20" : "z-10",
-);
-const vertMaxZClass = computed(() =>
-  vertMinOnTop.value ? "z-10" : "z-20",
-);
+const vertMinZClass = computed(() => (vertMinOnTop.value ? "z-20" : "z-10"));
+const vertMaxZClass = computed(() => (vertMinOnTop.value ? "z-10" : "z-20"));
 
 const vertTrackRef = ref<HTMLElement | null>(null);
 let dragging: "min" | "max" | null = null;
@@ -221,11 +196,8 @@ function vToValue(clientY: number): number {
   if (!el) return props.min;
   const rect = el.getBoundingClientRect();
   const pct = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
-  const raw = props.reverse
-    ? props.max - pct * range.value
-    : props.min + pct * range.value;
-  const stepped =
-    Math.round((raw - props.min) / props.step) * props.step + props.min;
+  const raw = props.reverse ? props.max - pct * range.value : props.min + pct * range.value;
+  const stepped = Math.round((raw - props.min) / props.step) * props.step + props.min;
   return clamp(stepped);
 }
 
@@ -313,8 +285,7 @@ function hToValue(clientX: number): number {
 
 /** Round a raw value to the nearest step for emitting. */
 function snapToStep(v: number): number {
-  const stepped =
-    Math.round((v - props.min) / props.step) * props.step + props.min;
+  const stepped = Math.round((v - props.min) / props.step) * props.step + props.min;
   return clamp(stepped);
 }
 
@@ -391,37 +362,34 @@ function onHorizCancel() {
 </script>
 
 <template>
-  <div
-    v-bind="wrapperAttrs"
-    :class="
-      vertical
-        ? 'flex flex-row h-full'
-        : 'flex flex-col gap-1'
-    "
-  >
+  <div v-bind="wrapperAttrs" :class="vertical ? 'flex h-full flex-row' : 'flex flex-col gap-1'">
     <!-- ── Vertical mode ──────────────────────────────────────────────────── -->
     <template v-if="vertical">
       <!-- Value labels on left (labelAlways) -->
-      <div
-        v-if="labelAlways"
-        class="relative h-full shrink-0 w-6"
-        aria-hidden="true"
-      >
+      <div v-if="labelAlways" class="relative h-full w-6 shrink-0" aria-hidden="true">
         <span
-          class="absolute right-0.5 text-xs tabular-nums leading-none -translate-y-1/2 whitespace-nowrap text-slider-value"
+          class="text-slider-value absolute right-0.5 -translate-y-1/2 text-xs leading-none whitespace-nowrap tabular-nums"
           :style="{ top: vertMinTop + '%' }"
-        >{{ displayMin }}</span>
+          >{{ displayMin }}</span
+        >
         <span
-          class="absolute right-0.5 text-xs tabular-nums leading-none -translate-y-1/2 whitespace-nowrap text-slider-value"
+          class="text-slider-value absolute right-0.5 -translate-y-1/2 text-xs leading-none whitespace-nowrap tabular-nums"
           :style="{ top: vertMaxTop + '%' }"
-        >{{ displayMax }}</span>
+          >{{ displayMax }}</span
+        >
       </div>
 
       <!-- Track column -->
       <div
         ref="vertTrackRef"
-        class="relative h-full flex justify-center shrink-0"
-        :class="disabled ? 'cursor-not-allowed opacity-60' : hasRange ? 'cursor-pointer' : 'cursor-default'"
+        class="relative flex h-full shrink-0 justify-center"
+        :class="
+          disabled
+            ? 'cursor-not-allowed opacity-60'
+            : hasRange
+              ? 'cursor-pointer'
+              : 'cursor-default'
+        "
         :style="{ width: thumbSizePx[resolvedSize] }"
         @pointerdown="onVertDown"
         @pointermove="onVertMove"
@@ -431,13 +399,19 @@ function onHorizCancel() {
         <!-- Background track strip -->
         <div
           class="absolute top-0 bottom-0 rounded-full"
-          :class="[trackWidthV[resolvedSize], disabled ? 'bg-slider-disabled-track' : 'bg-slider-track']"
+          :class="[
+            trackWidthV[resolvedSize],
+            disabled ? 'bg-slider-disabled-track' : 'bg-slider-track',
+          ]"
           aria-hidden="true"
         />
         <!-- Filled segment -->
         <div
           class="absolute rounded-full"
-          :class="[trackWidthV[resolvedSize], disabled ? 'bg-slider-disabled-track-fill' : 'bg-slider-track-fill']"
+          :class="[
+            trackWidthV[resolvedSize],
+            disabled ? 'bg-slider-disabled-track-fill' : 'bg-slider-track-fill',
+          ]"
           :style="{ top: vertFilledTop + '%', height: vertFilledHeight + '%' }"
           aria-hidden="true"
         />
@@ -446,7 +420,7 @@ function onHorizCancel() {
           <div
             v-for="ml in markerLabels"
             :key="ml.value"
-            class="absolute left-0 right-0 h-px opacity-50"
+            class="absolute right-0 left-0 h-px opacity-50"
             :class="disabled ? 'bg-slider-disabled-track' : 'bg-slider-track'"
             :style="{ top: valueToTop(ml.value) + '%' }"
             aria-hidden="true"
@@ -456,11 +430,15 @@ function onHorizCancel() {
         <span
           data-thumb="min"
           :class="[
-            'absolute rounded-full border-2 border-slider-thumb-border',
+            'border-slider-thumb-border absolute rounded-full border-2',
             'left-1/2 -translate-x-1/2 touch-none select-none',
             thumbSize[resolvedSize],
             vertMinZClass,
-            disabled ? 'bg-slider-disabled-thumb cursor-not-allowed' : hasRange ? 'bg-slider-thumb cursor-grab' : 'bg-slider-thumb cursor-default',
+            disabled
+              ? 'bg-slider-disabled-thumb cursor-not-allowed'
+              : hasRange
+                ? 'bg-slider-thumb cursor-grab'
+                : 'bg-slider-thumb cursor-default',
           ]"
           :style="{ top: `calc(${vertMinTop}% - ${thumbHalf[resolvedSize]})` }"
           role="slider"
@@ -474,11 +452,15 @@ function onHorizCancel() {
         <span
           data-thumb="max"
           :class="[
-            'absolute rounded-full border-2 border-slider-thumb-border',
+            'border-slider-thumb-border absolute rounded-full border-2',
             'left-1/2 -translate-x-1/2 touch-none select-none',
             thumbSize[resolvedSize],
             vertMaxZClass,
-            disabled ? 'bg-slider-disabled-thumb cursor-not-allowed' : hasRange ? 'bg-slider-thumb cursor-grab' : 'bg-slider-thumb cursor-default',
+            disabled
+              ? 'bg-slider-disabled-thumb cursor-not-allowed'
+              : hasRange
+                ? 'bg-slider-thumb cursor-grab'
+                : 'bg-slider-thumb cursor-default',
           ]"
           :style="{ top: `calc(${vertMaxTop}% - ${thumbHalf[resolvedSize]})` }"
           role="slider"
@@ -491,187 +473,180 @@ function onHorizCancel() {
       </div>
 
       <!-- Marker labels on right -->
-      <div
-        v-if="markerLabels?.length"
-        class="relative h-full pl-1 shrink-0 w-6"
-        aria-hidden="true"
-      >
+      <div v-if="markerLabels?.length" class="relative h-full w-6 shrink-0 pl-1" aria-hidden="true">
         <span
           v-for="ml in markerLabels"
           :key="ml.value"
-          class="absolute left-1 text-xs leading-none -translate-y-1/2 whitespace-nowrap text-slider-value"
+          class="text-slider-value absolute left-1 -translate-y-1/2 text-xs leading-none whitespace-nowrap"
           :style="{ top: valueToTop(ml.value) + '%' }"
-        >{{ ml.label }}</span>
+          >{{ ml.label }}</span
+        >
       </div>
     </template>
 
     <!-- ── Horizontal mode (default) ───────────────────────────────────── -->
     <template v-else>
-    <div
-      v-if="$slots.label || label || showValue || $slots.tooltip"
-      class="flex items-center justify-between gap-2"
-    >
-      <label
-        v-if="$slots.label || label || $slots.tooltip"
-        :class="[
-          labelSize[resolvedSize],
-          'font-medium text-slider-label leading-none flex items-center gap-1',
-        ]"
+      <div
+        v-if="$slots.label || label || showValue || $slots.tooltip"
+        class="flex items-center justify-between gap-2"
       >
-        <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true" class="select-none">*</span>
-        <OIcon
-          v-if="$slots.tooltip"
-          name="info-outline"
-          size="sm"
-          :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
-          class="cursor-help text-slider-label"
-        ><slot name="tooltip" /></OIcon>
-      </label>
-      <span
-        v-if="showValue"
-        :class="[
-          labelSize[resolvedSize],
-          'tabular-nums text-slider-value leading-none',
-        ]"
-      >
-        {{ displayValue }}
-      </span>
-    </div>
+        <label
+          v-if="$slots.label || label || $slots.tooltip"
+          :class="[
+            labelSize[resolvedSize],
+            'text-slider-label flex items-center gap-1 leading-none font-medium',
+          ]"
+        >
+          <slot name="label">{{ label }}</slot
+          ><span v-if="required" aria-hidden="true" class="select-none">*</span>
+          <OIcon
+            v-if="$slots.tooltip"
+            name="info-outline"
+            size="sm"
+            :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
+            class="text-slider-label cursor-help"
+            ><slot name="tooltip"
+          /></OIcon>
+        </label>
+        <span
+          v-if="showValue"
+          :class="[labelSize[resolvedSize], 'text-slider-value leading-none tabular-nums']"
+        >
+          {{ displayValue }}
+        </span>
+      </div>
 
-    <div
-      ref="hTrackRef"
-      :class="[
-        'relative flex items-center w-full',
-        disabled ? 'cursor-not-allowed opacity-60' : hasRange ? 'cursor-pointer' : 'cursor-default',
-      ]"
-      @pointerdown="onHorizDown"
-      @pointermove="onHorizMove"
-      @pointerup="onHorizUp"
-      @pointercancel="onHorizCancel"
-    >
-      <!-- Background track -->
       <div
+        ref="hTrackRef"
         :class="[
-          'absolute left-0 right-0 rounded-full',
-          trackHeight[resolvedSize],
-          disabled ? 'bg-slider-disabled-track' : 'bg-slider-track',
-        ]"
-        aria-hidden="true"
-      />
-      <!-- Filled segment -->
-      <div
-        :class="[
-          'absolute rounded-full',
-          trackHeight[resolvedSize],
+          'relative flex w-full items-center',
           disabled
-            ? 'bg-slider-disabled-track-fill'
-            : 'bg-slider-track-fill',
+            ? 'cursor-not-allowed opacity-60'
+            : hasRange
+              ? 'cursor-pointer'
+              : 'cursor-default',
         ]"
-        :style="{
-          left: minPercent + '%',
-          width: maxPercent - minPercent + '%',
-        }"
-        aria-hidden="true"
-      />
+        @pointerdown="onHorizDown"
+        @pointermove="onHorizMove"
+        @pointerup="onHorizUp"
+        @pointercancel="onHorizCancel"
+      >
+        <!-- Background track -->
+        <div
+          :class="[
+            'absolute right-0 left-0 rounded-full',
+            trackHeight[resolvedSize],
+            disabled ? 'bg-slider-disabled-track' : 'bg-slider-track',
+          ]"
+          aria-hidden="true"
+        />
+        <!-- Filled segment -->
+        <div
+          :class="[
+            'absolute rounded-full',
+            trackHeight[resolvedSize],
+            disabled ? 'bg-slider-disabled-track-fill' : 'bg-slider-track-fill',
+          ]"
+          :style="{
+            left: minPercent + '%',
+            width: maxPercent - minPercent + '%',
+          }"
+          aria-hidden="true"
+        />
 
-      <input
-        :id="`${baseId}-min`"
-        type="range"
-        :name="name ? `${name}-min` : undefined"
-        :min="min"
-        :max="max"
-        :step="step"
-        :value="current.min"
-        :disabled="disabled"
-        :aria-label="`${label ?? 'Range'} minimum`"
-        :aria-invalid="hasError || undefined"
-        :class="[
-          'o2-range-input',
-          'absolute left-0 right-0 w-full bg-transparent appearance-none m-0 pointer-events-none',
-          minZClass,
-          'outline-none focus-visible:ring-2 focus-visible:ring-slider-focus-ring rounded-full',
-          trackHeight[resolvedSize],
-          disabled ? 'cursor-not-allowed' : hasRange ? 'cursor-pointer' : 'cursor-default',
-        ]"
-        @input="handleMin"
-        @change="handleMin"
-        @blur="emit('blur', $event)"
-        @focus="emit('focus', $event)"
-      />
-      <input
-        :id="`${baseId}-max`"
-        type="range"
-        :name="name ? `${name}-max` : undefined"
-        :min="min"
-        :max="max"
-        :step="step"
-        :value="current.max"
-        :disabled="disabled"
-        :aria-label="`${label ?? 'Range'} maximum`"
-        :aria-invalid="hasError || undefined"
-        :class="[
-          'o2-range-input',
-          'absolute left-0 right-0 w-full bg-transparent appearance-none m-0 pointer-events-none',
-          maxZClass,
-          'outline-none focus-visible:ring-2 focus-visible:ring-slider-focus-ring rounded-full',
-          trackHeight[resolvedSize],
-          disabled ? 'cursor-not-allowed' : hasRange ? 'cursor-pointer' : 'cursor-default',
-        ]"
-        @input="handleMax"
-        @change="handleMax"
-        @blur="emit('blur', $event)"
-        @focus="emit('focus', $event)"
-      />
+        <input
+          :id="`${baseId}-min`"
+          type="range"
+          :name="name ? `${name}-min` : undefined"
+          :min="min"
+          :max="max"
+          :step="step"
+          :value="current.min"
+          :disabled="disabled"
+          :aria-label="`${label ?? 'Range'} minimum`"
+          :aria-invalid="hasError || undefined"
+          :class="[
+            'o2-range-input',
+            'pointer-events-none absolute right-0 left-0 m-0 w-full appearance-none bg-transparent',
+            minZClass,
+            'focus-visible:ring-slider-focus-ring rounded-full outline-none focus-visible:ring-2',
+            trackHeight[resolvedSize],
+            disabled ? 'cursor-not-allowed' : hasRange ? 'cursor-pointer' : 'cursor-default',
+          ]"
+          @input="handleMin"
+          @change="handleMin"
+          @blur="emit('blur', $event)"
+          @focus="emit('focus', $event)"
+        />
+        <input
+          :id="`${baseId}-max`"
+          type="range"
+          :name="name ? `${name}-max` : undefined"
+          :min="min"
+          :max="max"
+          :step="step"
+          :value="current.max"
+          :disabled="disabled"
+          :aria-label="`${label ?? 'Range'} maximum`"
+          :aria-invalid="hasError || undefined"
+          :class="[
+            'o2-range-input',
+            'pointer-events-none absolute right-0 left-0 m-0 w-full appearance-none bg-transparent',
+            maxZClass,
+            'focus-visible:ring-slider-focus-ring rounded-full outline-none focus-visible:ring-2',
+            trackHeight[resolvedSize],
+            disabled ? 'cursor-not-allowed' : hasRange ? 'cursor-pointer' : 'cursor-default',
+          ]"
+          @input="handleMax"
+          @change="handleMax"
+          @blur="emit('blur', $event)"
+          @focus="emit('focus', $event)"
+        />
 
-      <!-- Visual thumbs -->
-      <!-- left is clamped so the thumb never overflows the track container at
+        <!-- Visual thumbs -->
+        <!-- left is clamped so the thumb never overflows the track container at
            either extreme: min 0px (left edge) and max calc(100% - thumbSize)
            (right edge). This prevents horizontal scroll in overflow:hidden or
            overflow-y:auto ancestor containers. -->
-      <span
-        :class="[
-          'absolute rounded-full pointer-events-none border-2 border-slider-thumb-border z-30',
-          thumbSize[resolvedSize],
-          disabled ? 'bg-slider-disabled-thumb' : 'bg-slider-thumb',
-        ]"
-        :style="{ left: `clamp(0px, calc(${minPercent}% - ${thumbHalf[resolvedSize]}), calc(100% - ${thumbSizePx[resolvedSize]}))` }"
-        aria-hidden="true"
-      />
-      <span
-        :class="[
-          'absolute rounded-full pointer-events-none border-2 border-slider-thumb-border z-30',
-          thumbSize[resolvedSize],
-          disabled ? 'bg-slider-disabled-thumb' : 'bg-slider-thumb',
-        ]"
-        :style="{ left: `clamp(0px, calc(${maxPercent}% - ${thumbHalf[resolvedSize]}), calc(100% - ${thumbSizePx[resolvedSize]}))` }"
-        aria-hidden="true"
-      />
+        <span
+          :class="[
+            'border-slider-thumb-border pointer-events-none absolute z-30 rounded-full border-2',
+            thumbSize[resolvedSize],
+            disabled ? 'bg-slider-disabled-thumb' : 'bg-slider-thumb',
+          ]"
+          :style="{
+            left: `clamp(0px, calc(${minPercent}% - ${thumbHalf[resolvedSize]}), calc(100% - ${thumbSizePx[resolvedSize]}))`,
+          }"
+          aria-hidden="true"
+        />
+        <span
+          :class="[
+            'border-slider-thumb-border pointer-events-none absolute z-30 rounded-full border-2',
+            thumbSize[resolvedSize],
+            disabled ? 'bg-slider-disabled-thumb' : 'bg-slider-thumb',
+          ]"
+          :style="{
+            left: `clamp(0px, calc(${maxPercent}% - ${thumbHalf[resolvedSize]}), calc(100% - ${thumbSizePx[resolvedSize]}))`,
+          }"
+          aria-hidden="true"
+        />
 
-      <!-- Spacer so the row has height -->
-      <span
-        :class="['invisible', thumbSize[resolvedSize]]"
-        aria-hidden="true"
-      />
-    </div>
+        <!-- Spacer so the row has height -->
+        <span :class="['invisible', thumbSize[resolvedSize]]" aria-hidden="true" />
+      </div>
 
-    <div
-      v-if="effectiveError || helpText"
-      class="flex items-center justify-between gap-2"
-    >
-      <span
-        v-if="effectiveError && effectiveError.trim()"
-        class="text-xs text-slider-error-text leading-none"
-        role="alert"
-      >
-        {{ effectiveError }}
-      </span>
-      <span
-        v-else-if="helpText"
-        class="text-xs text-slider-value leading-none"
-      >
-        {{ helpText }}
-      </span>
-    </div>
+      <div v-if="effectiveError || helpText" class="flex items-center justify-between gap-2">
+        <span
+          v-if="effectiveError && effectiveError.trim()"
+          class="text-slider-error-text text-xs leading-none"
+          role="alert"
+        >
+          {{ effectiveError }}
+        </span>
+        <span v-else-if="helpText" class="text-slider-value text-xs leading-none">
+          {{ helpText }}
+        </span>
+      </div>
     </template>
   </div>
 </template>

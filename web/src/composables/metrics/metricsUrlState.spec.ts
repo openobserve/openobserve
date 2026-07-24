@@ -100,18 +100,14 @@ describe("metricsUrlState · decodeMetricsConfig (defensive)", () => {
     expect(decodeMetricsConfig(b64EncodeUnicode("hello") as string)).toBeNull();
   });
   it("returns null when the blob has no `data`", () => {
-    expect(
-      decodeMetricsConfig(b64EncodeUnicode('{"v":1}') as string),
-    ).toBeNull();
+    expect(decodeMetricsConfig(b64EncodeUnicode('{"v":1}') as string)).toBeNull();
   });
   it("returns null for a mismatched version (gate)", () => {
     const future = encodeMetricsConfig({ v: 999, data: { type: "bar" } });
     expect(decodeMetricsConfig(future)).toBeNull();
   });
   it("returns null for a JSON array (has no `data`)", () => {
-    expect(
-      decodeMetricsConfig(b64EncodeUnicode("[1,2,3]") as string),
-    ).toBeNull();
+    expect(decodeMetricsConfig(b64EncodeUnicode("[1,2,3]") as string)).toBeNull();
   });
   it("returns null for a JSON primitive", () => {
     expect(decodeMetricsConfig(b64EncodeUnicode("42") as string)).toBeNull();
@@ -224,9 +220,7 @@ describe("metricsUrlState · applyDeepLinkOverrides (integration)", () => {
       {
         stream_type: "metrics",
         stream: "container_cpu_usage",
-        query: b64EncodeUnicode(
-          '(container_cpu_usage{k8s_namespace_name="dev"}) >= 0.5',
-        ) as string,
+        query: b64EncodeUnicode('(container_cpu_usage{k8s_namespace_name="dev"}) >= 0.5') as string,
       },
       dpd,
     );
@@ -246,10 +240,7 @@ describe("metricsUrlState · applyDeepLinkOverrides (integration)", () => {
 
   it("compacts a leading gap when there is no metrics_data base", () => {
     const dpd = getDefaultDashboardPanelData(store);
-    applyDeepLinkOverrides(
-      { "query.1": b64EncodeUnicode("B") as string },
-      dpd,
-    );
+    applyDeepLinkOverrides({ "query.1": b64EncodeUnicode("B") as string }, dpd);
     // no blob -> compactIndices true -> single query at slot 0
     expect(dpd.data.queries).toHaveLength(1);
     expect(dpd.data.queries[0].query).toBe("B");

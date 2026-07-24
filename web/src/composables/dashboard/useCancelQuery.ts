@@ -12,8 +12,7 @@ import { useStore } from "vuex";
  * }}
  */
 const useCancelQuery = () => {
-  const { showPositiveNotification, showErrorNotification } =
-    useNotifications();
+  const { showPositiveNotification, showErrorNotification } = useNotifications();
   const traceIdRef: any = ref([]);
   const store = useStore();
 
@@ -32,9 +31,7 @@ const useCancelQuery = () => {
   const cancelQuery = () => {
     window.dispatchEvent(new Event("cancelQuery"));
 
-    const traceIdArray = Array.isArray(traceIdRef.value)
-      ? traceIdRef.value
-      : [];
+    const traceIdArray = Array.isArray(traceIdRef.value) ? traceIdRef.value : [];
 
     if (traceIdArray.length === 0) {
       return;
@@ -43,10 +40,7 @@ const useCancelQuery = () => {
     const tracesIdsCopy = [...traceIdArray];
 
     queryService
-      .delete_running_queries(
-        store.state.selectedOrganization.identifier,
-        traceIdArray,
-      )
+      .delete_running_queries(store.state.selectedOrganization.identifier, traceIdArray)
       .then((res) => {
         const isCancelled = res.data.some((item: any) => item.is_success);
 
@@ -58,15 +52,12 @@ const useCancelQuery = () => {
       })
       .catch((error) => {
         console.error("delete running queries error", error);
-        showErrorNotification(
-          error.response?.data?.message || "Failed to cancel running query",
-          { timeout: 3000 },
-        );
+        showErrorNotification(error.response?.data?.message || "Failed to cancel running query", {
+          timeout: 3000,
+        });
       })
       .finally(() => {
-        traceIdRef.value = traceIdRef.value.filter(
-          (id: any) => !tracesIdsCopy.includes(id),
-        );
+        traceIdRef.value = traceIdRef.value.filter((id: any) => !tracesIdsCopy.includes(id));
       });
   };
 

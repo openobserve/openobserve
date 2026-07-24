@@ -93,10 +93,7 @@ function numberToMs(n: number, unit: TimeUnit): number {
 }
 
 const zone = computed(
-  () =>
-    props.timezone ||
-    Intl.DateTimeFormat().resolvedOptions().timeZone ||
-    "UTC",
+  () => props.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
 );
 
 /** Pretty absolute date used as the relative-mode fallback for old timestamps. */
@@ -127,11 +124,7 @@ const relative = computed(() => {
 const absolute = computed(() => {
   if (epochMs.value === null) return null;
   try {
-    return formatInTimeZone(
-      new Date(epochMs.value),
-      zone.value,
-      "yyyy-MM-dd HH:mm:ss",
-    );
+    return formatInTimeZone(new Date(epochMs.value), zone.value, "yyyy-MM-dd HH:mm:ss");
   } catch {
     return new Date(epochMs.value).toISOString();
   }
@@ -160,18 +153,13 @@ const display = computed(() => {
  * OTooltip only renders on hover — so a cell that is merely scrolled past in a
  * long/virtualized table never runs the timezone formatter.
  */
-const showAbsoluteTooltip = computed(
-  () => props.mode === "relative" && epochMs.value !== null,
-);
+const showAbsoluteTooltip = computed(() => props.mode === "relative" && epochMs.value !== null);
 </script>
 
 <template>
-  <span
-    v-if="display === null"
-    class="text-text-body text-xs"
-  >{{ emptyLabel }}</span>
+  <span v-if="display === null" class="text-text-body text-xs">{{ emptyLabel }}</span>
   <template v-else>
-    <span class="tabular-nums whitespace-nowrap">{{ display }}</span>
+    <span class="whitespace-nowrap tabular-nums">{{ display }}</span>
     <OTooltip v-if="showAbsoluteTooltip">
       <template #content>{{ absolute }}</template>
     </OTooltip>

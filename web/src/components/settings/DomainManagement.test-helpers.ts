@@ -118,7 +118,7 @@ export const domainValidationTestCases = [
   { input: "sub.example.com", expected: true, description: "subdomain" },
   { input: "my-company.org", expected: true, description: "domain with hyphen" },
   { input: "test123.co.uk", expected: true, description: "domain with numbers and country code" },
-  
+
   // Invalid cases
   { input: "", expected: true, description: "empty string (considered valid for optional)" },
   { input: "invalid", expected: false, description: "single word" },
@@ -127,54 +127,58 @@ export const domainValidationTestCases = [
   { input: "example..com", expected: false, description: "double dots" },
   { input: "example.com.", expected: true, description: "trailing dot (actually valid in DNS)" },
   { input: "-example.com", expected: false, description: "starting with hyphen" },
-  { input: "example-.com", expected: false, description: "ending with hyphen before dot (invalid per RFC)" },
+  {
+    input: "example-.com",
+    expected: false,
+    description: "ending with hyphen before dot (invalid per RFC)",
+  },
 ];
 
 export const emailValidationTestCases = [
   // Valid cases
-  { 
-    email: "user@example.com", 
-    domain: "example.com", 
-    expected: true, 
-    description: "valid email for domain" 
+  {
+    email: "user@example.com",
+    domain: "example.com",
+    expected: true,
+    description: "valid email for domain",
   },
-  { 
-    email: "admin@company.org", 
-    domain: "company.org", 
-    expected: true, 
-    description: "valid email with different TLD" 
+  {
+    email: "admin@company.org",
+    domain: "company.org",
+    expected: true,
+    description: "valid email with different TLD",
   },
-  { 
-    email: "test.user+tag@example.com", 
-    domain: "example.com", 
-    expected: true, 
-    description: "email with plus sign and dots" 
+  {
+    email: "test.user+tag@example.com",
+    domain: "example.com",
+    expected: true,
+    description: "email with plus sign and dots",
   },
-  
+
   // Invalid cases
-  { 
-    email: "", 
-    domain: "example.com", 
-    expected: false, 
-    description: "empty email" 
+  {
+    email: "",
+    domain: "example.com",
+    expected: false,
+    description: "empty email",
   },
-  { 
-    email: "invalid-email", 
-    domain: "example.com", 
-    expected: false, 
-    description: "invalid email format" 
+  {
+    email: "invalid-email",
+    domain: "example.com",
+    expected: false,
+    description: "invalid email format",
   },
-  { 
-    email: "user@different.com", 
-    domain: "example.com", 
-    expected: false, 
-    description: "email from different domain" 
+  {
+    email: "user@different.com",
+    domain: "example.com",
+    expected: false,
+    description: "email from different domain",
   },
-  { 
-    email: "user@subdomain.example.com", 
-    domain: "example.com", 
-    expected: false, 
-    description: "email from subdomain when parent domain expected" 
+  {
+    email: "user@subdomain.example.com",
+    domain: "example.com",
+    expected: false,
+    description: "email from subdomain when parent domain expected",
   },
 ];
 

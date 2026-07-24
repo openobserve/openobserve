@@ -16,16 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="step-alert-conditions w-full rounded-default mx-auto bg-surface-overlay border border-border-default"
+    class="step-alert-conditions rounded-default bg-surface-overlay border-border-default mx-auto w-full border"
   >
     <!-- Section header -->
-    <div
-      class="flex items-center py-2.5 px-3 border-b border-border-default"
-    >
-      <div class="w-0.75 h-4 rounded-default mr-2 shrink-0 bg-theme-accent" />
-      <span
-        class="text-compact font-semibold tracking-[0.01em] text-text-heading"
-      >{{
+    <div class="border-border-default flex items-center border-b px-3 py-2.5">
+      <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+      <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
         t("alerts.alertSettings.sectionTitle")
       }}</span>
     </div>
@@ -39,18 +35,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- For Real-Time Alerts -->
         <template v-if="isRealTime === 'true'">
           <!-- Silence Notification (Cooldown) -->
-          <div class="flex justify-start items-start pb-3 mb-4">
-            <div
-              class="font-semibold flex items-center w-47.5 h-7 text-text-heading"
-            >
+          <div class="mb-4 flex items-start justify-start pb-3">
+            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
               {{ t("alerts.silenceNotification") + " *" }}
               <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
-              <OTooltip
-                :content="t('alerts.alertSettings.cooldownTooltip')"
-                side="right"
-              />
+              <OTooltip :content="t('alerts.alertSettings.cooldownTooltip')" side="right" />
             </div>
-            <div class="flex flex-col gap-1 mr-2 w-fit">
+            <div class="mr-2 flex w-fit flex-col gap-1">
               <div class="flex items-center">
                 <div class="w-21.75">
                   <OFormInput
@@ -64,14 +55,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OFormInput>
                 </div>
                 <div
-                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text min-w-22.5 h-8.5 text-compact"
+                  class="bg-input-addon-bg text-input-addon-text text-compact flex h-8.5 min-w-22.5 items-center justify-center"
                 >
                   {{ t("alerts.minutes") }}
                 </div>
               </div>
               <div
                 v-if="silenceError"
-                class="text-xs text-input-error-text whitespace-nowrap"
+                class="text-input-error-text text-xs whitespace-nowrap"
                 data-test="alert-settings-silence-error"
                 role="alert"
               >
@@ -81,16 +72,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Destinations -->
-          <div class="flex items-start pb-4 mb-4">
-            <div
-              class="font-semibold flex items-center w-47.5 h-7 text-text-heading"
-            >
+          <div class="mb-4 flex items-start pb-4">
+            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
               {{ t("alerts.destination") + " *" }}
               <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
-              <OTooltip
-                :content="t('alerts.alertSettings.destinationsTooltip')"
-                side="right"
-              />
+              <OTooltip :content="t('alerts.alertSettings.destinationsTooltip')" side="right" />
             </div>
             <!-- Combined destinations + (enterprise) workflows picker. It owns its
                  refresh / add buttons and keeps the original data-test hooks; the
@@ -111,10 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @create-destination="routeToCreateDestination"
                 @create-workflow="routeToCreateWorkflow"
               />
-              <div
-                v-if="destinationsError"
-                class="text-red-8 pt-1 text-2xs leading-3"
-              >
+              <div v-if="destinationsError" class="text-red-8 text-2xs pt-1 leading-3">
                 {{ destinationsError }}
               </div>
             </div>
@@ -124,18 +107,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- For Scheduled Alerts -->
         <template v-else>
           <!-- Period -->
-          <div ref="periodFieldRef" class="flex items-start mr-2 mb-4!">
-            <div
-              class="font-semibold flex items-center w-47.5 h-7 text-text-heading"
-            >
+          <div ref="periodFieldRef" class="mr-2 mb-4! flex items-start">
+            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
               {{ t("alerts.period") + " *" }}
               <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
-              <OTooltip
-                :content="t('alerts.alertSettings.periodTooltip')"
-                side="right"
-              />
+              <OTooltip :content="t('alerts.alertSettings.periodTooltip')" side="right" />
             </div>
-            <div class="flex flex-col gap-1 mr-2 w-fit">
+            <div class="mr-2 flex w-fit flex-col gap-1">
               <div class="flex items-center">
                 <div class="w-21.75">
                   <OFormInput
@@ -151,14 +129,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OFormInput>
                 </div>
                 <div
-                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text min-w-22.5 h-8.5 text-compact"
+                  class="bg-input-addon-bg text-input-addon-text text-compact flex h-8.5 min-w-22.5 items-center justify-center"
                 >
                   {{ t("alerts.minutes") }}
                 </div>
               </div>
               <div
                 v-if="periodError"
-                class="text-xs text-input-error-text whitespace-nowrap"
+                class="text-input-error-text text-xs whitespace-nowrap"
                 data-test="alert-settings-period-error"
                 role="alert"
               >
@@ -168,18 +146,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Silence Notification (Cooldown) for Scheduled Alerts -->
-          <div ref="silenceFieldRef" class="flex items-start mr-2 mb-4!">
-            <div
-              class="font-semibold flex items-center w-47.5 h-7 text-text-heading"
-            >
+          <div ref="silenceFieldRef" class="mr-2 mb-4! flex items-start">
+            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
               {{ t("alerts.silenceNotification") + " *" }}
               <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
-              <OTooltip
-                :content="t('alerts.alertSettings.cooldownTooltip')"
-                side="right"
-              />
+              <OTooltip :content="t('alerts.alertSettings.cooldownTooltip')" side="right" />
             </div>
-            <div class="flex flex-col gap-1 mr-2 w-fit">
+            <div class="mr-2 flex w-fit flex-col gap-1">
               <div class="flex items-center">
                 <div class="w-21.75">
                   <OFormInput
@@ -194,14 +167,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OFormInput>
                 </div>
                 <div
-                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text min-w-22.5 h-8.5 text-compact"
+                  class="bg-input-addon-bg text-input-addon-text text-compact flex h-8.5 min-w-22.5 items-center justify-center"
                 >
                   {{ t("alerts.minutes") }}
                 </div>
               </div>
               <div
                 v-if="silenceError"
-                class="text-xs text-input-error-text whitespace-nowrap"
+                class="text-input-error-text text-xs whitespace-nowrap"
                 data-test="alert-settings-silence-error"
                 role="alert"
               >
@@ -211,16 +184,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Destinations -->
-          <div ref="destinationsFieldRef" class="flex items-start mr-2 mb-4!">
-            <div
-              class="font-semibold flex items-center w-47.5 h-7 text-text-heading"
-            >
+          <div ref="destinationsFieldRef" class="mr-2 mb-4! flex items-start">
+            <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
               {{ t("alerts.destination") + " *" }}
               <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
-              <OTooltip
-                :content="t('alerts.alertSettings.destinationsTooltip')"
-                side="right"
-              />
+              <OTooltip :content="t('alerts.alertSettings.destinationsTooltip')" side="right" />
             </div>
             <!-- Combined destinations + (enterprise) workflows picker. It owns its
                  refresh / add buttons and keeps the original data-test hooks; the
@@ -241,10 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @create-destination="routeToCreateDestination"
                 @create-workflow="routeToCreateWorkflow"
               />
-              <div
-                v-if="destinationsError"
-                class="text-red-8 pt-1 text-2xs leading-3"
-              >
+              <div v-if="destinationsError" class="text-red-8 text-2xs pt-1 leading-3">
                 {{ destinationsError }}
               </div>
             </div>
@@ -252,21 +217,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <!-- Creates Incident toggle — shown for all alert types -->
-        <div class="flex items-start mb-4!">
-          <div
-            class="font-semibold flex items-center w-47.5 h-7 text-text-heading"
-          >
+        <div class="mb-4! flex items-start">
+          <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
             {{ t("alerts.alertSettings.createsIncident") }}
             <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
-            <OTooltip
-              :content="t('alerts.alertSettings.createsIncidentTooltip')"
-              side="right"
-            />
+            <OTooltip :content="t('alerts.alertSettings.createsIncidentTooltip')" side="right" />
           </div>
-          <OFormSwitch
-            name="creates_incident"
-            data-test="alert-creates-incident-toggle"
-          />
+          <OFormSwitch name="creates_incident" data-test="alert-creates-incident-toggle" />
         </div>
       </div>
     </div>
@@ -274,14 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import {
-  computed,
-  defineComponent,
-  inject,
-  onMounted,
-  ref,
-  type PropType,
-} from "vue";
+import { computed, defineComponent, inject, onMounted, ref, type PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -369,9 +319,7 @@ export default defineComponent({
     const form: any = inject(FORM_CONTEXT_KEY, null);
     const fieldError = (path: string) =>
       form
-        ? form.useStore((s: any) =>
-            firstFieldError(s.fieldMeta?.[path]?.errors ?? []),
-          )
+        ? form.useStore((s: any) => firstFieldError(s.fieldMeta?.[path]?.errors ?? []))
         : computed(() => undefined);
     const periodError = fieldError("trigger_condition.period");
     const silenceError = fieldError("trigger_condition.silence");
@@ -457,15 +405,13 @@ export default defineComponent({
       // round-trips a pre-write snapshot and silently clobbers any field written
       // earlier in the same tick.
       const currentTrigger =
-        form?.getFieldValue?.("trigger_condition") ??
-        props.formData.trigger_condition;
+        form?.getFieldValue?.("trigger_condition") ?? props.formData.trigger_condition;
       const nextTrigger: Record<string, any> = {
         ...currentTrigger,
         period: val,
       };
       if (periodValue && periodValue > 0) {
-        const minFrequency =
-          Math.ceil(store.state?.zoConfig?.min_auto_refresh_interval / 60) || 10;
+        const minFrequency = Math.ceil(store.state?.zoConfig?.min_auto_refresh_interval / 60) || 10;
         if (periodValue >= minFrequency) nextTrigger.frequency = periodValue;
         nextTrigger.cron = convertMinutesToCron(periodValue);
         if (!nextTrigger.timezone) nextTrigger.timezone = getBrowserTimezone();

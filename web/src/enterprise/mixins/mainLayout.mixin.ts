@@ -3,7 +3,14 @@ import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 import { useStore } from "vuex";
 
-import { getUserInfo, getImageURL, useLocalOrganization, invalidateLoginData, useLocalCurrentUser, useLocalUserInfo } from "@/utils/zincutils";
+import {
+  getUserInfo,
+  getImageURL,
+  useLocalOrganization,
+  invalidateLoginData,
+  useLocalCurrentUser,
+  useLocalUserInfo,
+} from "@/utils/zincutils";
 import organizationService from "@/services/organizations";
 import userService from "@/services/users";
 
@@ -27,10 +34,7 @@ const MainLayoutCloudMixin = {
         name: "pipeline",
       });
 
-      if(!store.state.zoConfig?.custom_hide_menus
-          ?.split(",")
-          ?.includes("billings")
-      ) {
+      if (!store.state.zoConfig?.custom_hide_menus?.split(",")?.includes("billings")) {
         linksList.value.splice(10, 0, {
           title: t("menu.billings"),
           icon: "payments",
@@ -51,13 +55,7 @@ const MainLayoutCloudMixin = {
           store.dispatch("setOrganizations", res.data.data);
           const localOrg: any = useLocalOrganization();
           orgOptions.value = res.data.data.map(
-            (data: {
-              id: any;
-              name: any;
-              type: any;
-              identifier: any;
-              UserObj: any;
-            }) => {
+            (data: { id: any; name: any; type: any; identifier: any; UserObj: any }) => {
               const optiondata: any = {
                 label: data.name,
                 id: data.id,
@@ -71,9 +69,10 @@ const MainLayoutCloudMixin = {
                   store.state.userInfo.email == data.UserObj.email) ||
                 res.data.data.length == 1
               ) {
-                selectedOrg.value = localOrg.value && Object.keys(localOrg.value).length > 0
-                  ? localOrg.value
-                  : optiondata;
+                selectedOrg.value =
+                  localOrg.value && Object.keys(localOrg.value).length > 0
+                    ? localOrg.value
+                    : optiondata;
                 useLocalOrganization(selectedOrg.value);
                 store.dispatch("setSelectedOrganization", selectedOrg.value);
               }
@@ -93,9 +92,7 @@ const MainLayoutCloudMixin = {
       userService
         .getRefreshToken()
         .then((res) => {
-          const sessionUserInfo: any = getUserInfo(
-            "#id_token=" + res.data.data.id_token
-          );
+          const sessionUserInfo: any = getUserInfo("#id_token=" + res.data.data.id_token);
 
           const userInfo = sessionUserInfo !== null ? sessionUserInfo : null;
           if (userInfo !== null) {
@@ -111,8 +108,6 @@ const MainLayoutCloudMixin = {
           console.log("Error while fetching refresh token:", e);
         });
     };
-
-
 
     const signout = async () => {
       if (config.isEnterprise == "true") {

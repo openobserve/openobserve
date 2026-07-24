@@ -45,16 +45,14 @@ describe("triggerStatus.ts", () => {
   describe("TRIGGER_STATUS_DISPLAY_MAP", () => {
     it("should map backend statuses to UI labels correctly", () => {
       expect(TRIGGER_STATUS_DISPLAY_MAP[TriggerDataStatus.Completed]).toBe(
-        TriggerStatusLabel.Firing
+        TriggerStatusLabel.Firing,
       );
-      expect(TRIGGER_STATUS_DISPLAY_MAP[TriggerDataStatus.Failed]).toBe(
-        TriggerStatusLabel.Errored
-      );
+      expect(TRIGGER_STATUS_DISPLAY_MAP[TriggerDataStatus.Failed]).toBe(TriggerStatusLabel.Errored);
       expect(TRIGGER_STATUS_DISPLAY_MAP[TriggerDataStatus.ConditionNotSatisfied]).toBe(
-        TriggerStatusLabel.Resolved
+        TriggerStatusLabel.Resolved,
       );
       expect(TRIGGER_STATUS_DISPLAY_MAP[TriggerDataStatus.Skipped]).toBe(
-        TriggerStatusLabel.Skipped
+        TriggerStatusLabel.Skipped,
       );
     });
 

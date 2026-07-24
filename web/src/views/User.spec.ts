@@ -22,7 +22,6 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import { nextTick } from "vue";
 
-
 describe("User.vue Component", () => {
   let wrapper: any;
 
@@ -96,7 +95,7 @@ describe("User.vue Component", () => {
 
     it("should have all required setup return properties", () => {
       const setupProperties = ["store", "t", "componentName", "loadComponent"];
-      setupProperties.forEach(prop => {
+      setupProperties.forEach((prop) => {
         expect(wrapper.vm[prop]).toBeDefined();
       });
     });
@@ -235,19 +234,19 @@ describe("User.vue Component", () => {
     it("should execute onBeforeMount lifecycle hook", async () => {
       const mockOnBeforeMount = vi.fn();
       const testWrapper = mount({
-        template: '<div></div>',
+        template: "<div></div>",
         setup() {
           const store = vi.fn();
           const t = vi.fn();
           const componentName = "Users";
           const loadComponent = true;
-          
+
           mockOnBeforeMount();
-          
+
           return { store, t, componentName, loadComponent };
-        }
+        },
       });
-      
+
       expect(mockOnBeforeMount).toHaveBeenCalled();
       testWrapper.unmount();
     });
@@ -270,13 +269,13 @@ describe("User.vue Component", () => {
 
   describe("Template Rendering Tests", () => {
     it("should render the root div element", () => {
-      expect(wrapper.find('div').exists()).toBe(true);
+      expect(wrapper.find("div").exists()).toBe(true);
     });
 
     it("should conditionally render component based on loadComponent", async () => {
       wrapper.vm.loadComponent = true;
       await nextTick();
-      expect(wrapper.find('div').exists()).toBe(true);
+      expect(wrapper.find("div").exists()).toBe(true);
     });
 
     it("should not render dynamic component when loadComponent is false", async () => {
@@ -289,12 +288,12 @@ describe("User.vue Component", () => {
     it("should render dynamic component when loadComponent is true", async () => {
       wrapper.vm.loadComponent = true;
       await nextTick();
-      expect(wrapper.html()).toContain('div');
+      expect(wrapper.html()).toContain("div");
     });
 
     it("should have correct template structure", () => {
       const html = wrapper.html();
-      expect(html).toContain('<div');
+      expect(html).toContain("<div");
     });
 
     it("should render Users component when loaded", async () => {
@@ -329,9 +328,9 @@ describe("User.vue Component", () => {
     it("should maintain component state", async () => {
       const initialName = wrapper.vm.componentName;
       const initialLoad = wrapper.vm.loadComponent;
-      
+
       await nextTick();
-      
+
       expect(wrapper.vm.componentName).toBe(initialName);
       expect(wrapper.vm.loadComponent).toBe(initialLoad);
     });
@@ -397,7 +396,7 @@ describe("User.vue Component", () => {
       wrapper.vm.loadComponent = true;
       await nextTick();
       expect(wrapper.vm.loadComponent).toBe(true);
-      
+
       wrapper.vm.loadComponent = false;
       await nextTick();
       expect(wrapper.vm.loadComponent).toBe(false);
@@ -450,9 +449,9 @@ describe("User.vue Component", () => {
       for (let i = 0; i < 3; i++) {
         wrappers.push(mount(User, mountOptions));
       }
-      
+
       expect(wrappers.length).toBe(3);
-      wrappers.forEach(w => {
+      wrappers.forEach((w) => {
         expect(w.vm.componentName).toBe("Users");
         expect(w.vm.loadComponent).toBe(true);
         w.unmount();

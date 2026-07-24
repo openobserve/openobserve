@@ -27,36 +27,23 @@
     <!-- Signal-type icon in the drawer header, so the drawer's subject reads at
          a glance (⟳ loop / ⚠ failure / $ cost). -->
     <template #header-left>
-      <div
-        class="flex items-center justify-center h-7 w-7 rounded-default"
-        :class="signalIconWrap"
-      >
+      <div class="rounded-default flex h-7 w-7 items-center justify-center" :class="signalIconWrap">
         <OIcon :name="signalIcon" size="sm" />
       </div>
     </template>
 
-    <div
-      class="flex flex-col min-h-full"
-      data-test="agent-signal-detail-body"
-    >
+    <div class="flex min-h-full flex-col" data-test="agent-signal-detail-body">
       <!-- Headline: the finding, stated plainly -->
       <div
-        class="flex items-start gap-2 px-page-edge pt-4 pb-3"
+        class="px-page-edge flex items-start gap-2 pt-4 pb-3"
         data-test="agent-signal-detail-headline"
       >
-        <OIcon
-          :name="signalIcon"
-          size="sm"
-          class="mt-0.5 shrink-0"
-          :class="signalIconColor"
-        />
+        <OIcon :name="signalIcon" size="sm" class="mt-0.5 shrink-0" :class="signalIconColor" />
         <div class="flex flex-col gap-1">
-          <p class="m-0 text-compact leading-normal text-text-heading">
+          <p class="text-compact text-text-heading m-0 leading-normal">
             {{ headline }}
           </p>
-          <p
-            class="m-0 text-2xs leading-normal text-text-secondary"
-          >
+          <p class="text-2xs text-text-secondary m-0 leading-normal">
             {{ explanation }}
           </p>
         </div>
@@ -64,9 +51,7 @@
 
       <!-- FAILURE: the real error messages behind the class -->
       <template v-if="signalType === 'failure'">
-        <PanelSectionHeader
-          :title="t('aiObservability.behavior.detail.errorsTitle')"
-        />
+        <PanelSectionHeader :title="t('aiObservability.behavior.detail.errorsTitle')" />
         <OTable
           data-test="agent-signal-detail-errors"
           :data="errorRows"
@@ -84,7 +69,7 @@
           <template #cell-message="{ row }">
             <div class="flex flex-col gap-1 py-0.5">
               <span
-                class="text-xs leading-normal text-text-heading whitespace-pre-wrap break-words"
+                class="text-text-heading text-xs leading-normal break-words whitespace-pre-wrap"
               >
                 {{ expandedErrors.has(row.full) ? row.full : row.message }}
               </span>
@@ -127,18 +112,18 @@
         :page-size-options="[10, 20, 50]"
         @row-click="openTrace"
       >
-          <!-- Trace id renders with an "open in new tab" icon so it's clear the
+        <!-- Trace id renders with an "open in new tab" icon so it's clear the
                row opens the trace in a new browser tab, not in place. -->
-          <template #cell-trace_id="{ row }">
-            <span
-              class="inline-flex items-center gap-1 text-text-link hover:underline"
-              :title="t('aiObservability.behavior.detail.openInNewTab')"
-            >
-              <span class="font-mono truncate">{{ row.trace_id }}</span>
-              <OIcon name="open-in-new" size="xs" class="opacity-70 shrink-0" />
-            </span>
-          </template>
-        </OTable>
+        <template #cell-trace_id="{ row }">
+          <span
+            class="text-text-link inline-flex items-center gap-1 hover:underline"
+            :title="t('aiObservability.behavior.detail.openInNewTab')"
+          >
+            <span class="truncate font-mono">{{ row.trace_id }}</span>
+            <OIcon name="open-in-new" size="xs" class="shrink-0 opacity-70" />
+          </span>
+        </template>
+      </OTable>
     </div>
   </ODrawer>
 </template>
@@ -207,9 +192,7 @@ const toggleError = (key: string) => {
   expandedErrors.value = next;
 };
 
-const orgId = computed(
-  () => store.state.selectedOrganization?.identifier as string,
-);
+const orgId = computed(() => store.state.selectedOrganization?.identifier as string);
 const signalType = computed(() => props.row?.signalType);
 
 // Signal-type iconography — a distinct icon + accent per drawer so the subject
@@ -227,10 +210,8 @@ const signalIconColor = computed(() => {
   return "text-badge-error-soft-text";
 });
 const signalIconWrap = computed(() => {
-  if (signalType.value === "loop")
-    return "bg-badge-warning-soft-bg text-badge-warning-soft-text";
-  if (signalType.value === "cost")
-    return "bg-badge-primary-soft-bg text-badge-primary-soft-text";
+  if (signalType.value === "loop") return "bg-badge-warning-soft-bg text-badge-warning-soft-text";
+  if (signalType.value === "cost") return "bg-badge-primary-soft-bg text-badge-primary-soft-text";
   return "bg-badge-error-soft-bg text-badge-error-soft-text";
 });
 
@@ -275,19 +256,15 @@ const headline = computed(() => {
 const explanation = computed(() => {
   const r = props.row;
   if (!r) return "";
-  if (r.signalType === "loop")
-    return t("aiObservability.behavior.detail.loopExplain");
-  if (r.signalType === "failure")
-    return t("aiObservability.behavior.detail.failExplain");
+  if (r.signalType === "loop") return t("aiObservability.behavior.detail.loopExplain");
+  if (r.signalType === "failure") return t("aiObservability.behavior.detail.failExplain");
   return t("aiObservability.behavior.detail.costExplain");
 });
 
 const tracesTitle = computed(() => {
   const r = props.row;
-  if (r?.signalType === "loop")
-    return t("aiObservability.behavior.detail.worstLoopTraces");
-  if (r?.signalType === "cost")
-    return t("aiObservability.behavior.detail.topCostTraces");
+  if (r?.signalType === "loop") return t("aiObservability.behavior.detail.worstLoopTraces");
+  if (r?.signalType === "cost") return t("aiObservability.behavior.detail.topCostTraces");
   return t("aiObservability.behavior.detail.tracesTitle");
 });
 
@@ -385,8 +362,7 @@ const AGENT_INHERIT_DEPTH = 4;
  *  falling back to service_name. Mirrors sql.rs::agent_coalesce. */
 const callerExpr = () => {
   const parts = ["c.gen_ai_agent_name"];
-  for (let k = 1; k <= AGENT_INHERIT_DEPTH; k++)
-    parts.push(`p${k}.gen_ai_agent_name`);
+  for (let k = 1; k <= AGENT_INHERIT_DEPTH; k++) parts.push(`p${k}.gen_ai_agent_name`);
   parts.push("c.service_name");
   return `COALESCE(${parts.join(", ")})`;
 };
@@ -422,7 +398,10 @@ const condenseError = (raw: string): string => {
   const m = s.match(/"message"\s*:\s*"([^"]{3,})"/);
   if (m) {
     // Keep the leading error class (before the first "{") + the inner message.
-    const prefix = s.split("{")[0].replace(/[-:\s]+$/, "").trim();
+    const prefix = s
+      .split("{")[0]
+      .replace(/[-:\s]+$/, "")
+      .trim();
     s = prefix ? `${prefix} — ${m[1]}` : m[1];
   }
   if (s.length > MAX_ERR_LEN) s = s.slice(0, MAX_ERR_LEN).trimEnd() + "…";
@@ -469,8 +448,7 @@ const fetchDetails = async () => {
   // The error detail can live in status_message OR error_message depending on
   // the framework — COALESCE so the message shows wherever it was populated
   // (mirrors the rollup's configurable error-detail-field coalescing).
-  const detail =
-    "COALESCE(NULLIF(c.status_message, ''), NULLIF(c.error_message, ''))";
+  const detail = "COALESCE(NULLIF(c.status_message, ''), NULLIF(c.error_message, ''))";
   try {
     if (r.signalType === "failure") {
       // The real, grouped error messages behind this class — the actionable content.
