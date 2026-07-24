@@ -180,10 +180,13 @@ describe("MetricCard (ported to @/lib)", () => {
       expect(wrapper.emitted("toggle-favorite")).toBeTruthy();
     });
 
-    it("shows the pin, drill-in, refresh and configure at rest — no hover gate", () => {
-      // The whole point of the redesign: the controls used to live behind an
-      // `invisible group-hover:visible` bar — undiscoverable, unreachable by
-      // keyboard, dead on touch. Every action is in the DOM unconditionally now.
+    it("keeps every action in the DOM and the tab order — the hover reveal is width/opacity, never display", () => {
+      // The actions are visually collapsed at rest (the header shows the
+      // query · unit info instead), but they must never leave the DOM or the
+      // tab order: the reveal is focus-driven too, so tabbing into the first
+      // (invisible) action expands the row for keyboard users. `display:none`
+      // or `visibility:hidden` would drop them from the tab order — the exact
+      // trap the old `invisible group-hover:visible` bar had.
       wrapper = createWrapper();
       expect(
         wrapper
@@ -199,8 +202,26 @@ describe("MetricCard (ported to @/lib)", () => {
       expect(
         wrapper.find('[data-test="metrics-explorer-card-fn-node_cpu_seconds_total"]').exists(),
       ).toBe(true);
-      // No leftover hover-gating class anywhere in the card.
+      const actions = wrapper.find(
+        '[data-test="metrics-explorer-card-actions-node_cpu_seconds_total"]',
+      );
+      expect(actions.classes()).toContain("group-focus-within:w-auto");
+      expect(actions.classes()).not.toContain("hidden");
+      expect(actions.classes()).not.toContain("invisible");
       expect(wrapper.html()).not.toContain("group-hover:visible");
+    });
+
+    it("shows the effective function and unit at rest in the header", () => {
+      // A ⚙ override must be visible on the card rather than silently
+      // identical to the default, so the preview's label wins over the card's.
+      wrapper = createWrapper({ preview: preview({ footerLabel: "sum(rate)" }) });
+      const info = wrapper.find(
+        '[data-test="metrics-explorer-card-rest-info-node_cpu_seconds_total"]',
+      );
+      expect(info.exists()).toBe(true);
+      expect(info.text()).toBe("sum(rate) · s");
+      // Swapped out, not removed, when the actions take its place.
+      expect(info.classes()).toContain("group-hover:hidden");
     });
 
     it("routes the error state's Retry through refresh, not a plain re-request", async () => {
@@ -255,6 +276,46 @@ describe("MetricCard (ported to @/lib)", () => {
         .find('[data-test="metrics-explorer-card-refresh-node_cpu_seconds_total"]')
         .trigger("click");
       expect(wrapper.emitted("refresh")).toBeTruthy();
+    });
+
+    it("turns the refresh action warning-colored when the data was fetched for a different window", () => {
+      // Same contract as the dashboard's refresh button with unapplied variable
+      // changes: the button itself carries the "this is out of date" signal.
+      wrapper = createWrapper({
+        preview: preview({ cachedDataDiffersFromTimeRange: true }),
+      });
+      const btn = wrapper.find(
+        '[data-test="metrics-explorer-card-refresh-node_cpu_seconds_total"]',
+      );
+      expect(btn.classes().join(" ")).toContain("bg-button-warning");
+    });
+
+    it("keeps the refresh action quiet when the data matches the selected window", () => {
+      wrapper = createWrapper({ preview: preview() });
+      const btn = wrapper.find(
+        '[data-test="metrics-explorer-card-refresh-node_cpu_seconds_total"]',
+      );
+      expect(btn.classes().join(" ")).not.toContain("bg-button-warning");
+    });
+
+    it("forces the warning refresh visible at rest — a warning nobody can see says nothing", () => {
+      wrapper = createWrapper({
+        preview: preview({ cachedDataDiffersFromTimeRange: true }),
+      });
+      const btn = wrapper.find(
+        '[data-test="metrics-explorer-card-refresh-node_cpu_seconds_total"]',
+      );
+      expect(btn.element.parentElement?.className).not.toContain("w-0");
+    });
+
+    it("collapses the quiet refresh at rest, revealing it with the hover/focus actions", () => {
+      wrapper = createWrapper({ preview: preview() });
+      const btn = wrapper.find(
+        '[data-test="metrics-explorer-card-refresh-node_cpu_seconds_total"]',
+      );
+      const cls = btn.element.parentElement?.className ?? "";
+      expect(cls).toContain("w-0");
+      expect(cls).toContain("group-focus-within:w-auto");
     });
 
     it("has no refresh action on an unsupported card (there is nothing to run)", () => {

@@ -142,7 +142,78 @@ pub trait Queue: Sync + Send + 'static {
         topic: &str,
         deliver_policy: Option<DeliverPolicy>,
     ) -> Result<Arc<mpsc::Receiver<Message>>>;
+    /// Pull-based consumption for shared work queues: consumers in the same
+    /// `group` share one durable delivery cursor, and each message's
+    /// visibility timeout starts only when [`PullConsumer::next`] hands it to
+    /// the caller.
+    async fn pull_consume(
+        &self,
+        topic: &str,
+        group: &str,
+        deliver_policy: Option<DeliverPolicy>,
+    ) -> Result<PullConsumer>;
     async fn purge(&self, topic: &str, sequence: usize) -> Result<()>;
+}
+
+/// A backend-independent pull consumer returned by [`Queue::pull_consume`].
+///
+/// Unlike [`Queue::consume`], no messages are buffered ahead of the caller, so
+/// the ack deadline of a message never runs while it is still waiting to be
+/// picked up.
+pub struct PullConsumer {
+    inner: PullConsumerInner,
+}
+
+impl std::fmt::Debug for PullConsumer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let backend = match &self.inner {
+            PullConsumerInner::Nats(_) => "nats",
+            PullConsumerInner::Memory(_) => "memory",
+        };
+        f.debug_struct("PullConsumer")
+            .field("backend", &backend)
+            .finish()
+    }
+}
+
+// a process holds only a handful of long-lived pull consumers, so the size
+// difference between variants is fine
+#[allow(clippy::large_enum_variant)]
+enum PullConsumerInner {
+    Nats(nats::NatsPullConsumer),
+    Memory(memory::MemoryPullConsumer),
+}
+
+impl PullConsumer {
+    pub(crate) fn from_nats(consumer: nats::NatsPullConsumer) -> Self {
+        Self {
+            inner: PullConsumerInner::Nats(consumer),
+        }
+    }
+
+    pub(crate) fn from_memory(consumer: memory::MemoryPullConsumer) -> Self {
+        Self {
+            inner: PullConsumerInner::Memory(consumer),
+        }
+    }
+
+    /// The ack deadline of the backend: a message must be acked (or its
+    /// progress reported) within this duration after `next` returned it.
+    pub fn ack_wait(&self) -> std::time::Duration {
+        match &self.inner {
+            PullConsumerInner::Nats(consumer) => consumer.ack_wait(),
+            PullConsumerInner::Memory(consumer) => consumer.ack_wait(),
+        }
+    }
+
+    /// Wait for the next message. Returns `Ok(None)` when no message arrived
+    /// within the backend's poll interval; callers are expected to call again.
+    pub async fn next(&mut self) -> Result<Option<Message>> {
+        match &mut self.inner {
+            PullConsumerInner::Nats(consumer) => consumer.next().await,
+            PullConsumerInner::Memory(consumer) => consumer.next().await,
+        }
+    }
 }
 
 /// A queue message with a backend-independent payload and acknowledgement

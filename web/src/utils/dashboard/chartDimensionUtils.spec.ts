@@ -21,6 +21,7 @@ import {
   calculateNiceTickValues,
   calculateRotatedLabelBottomSpace,
   applyMeasuredYAxisLeftInset,
+  X_AXIS_TICK_LABEL_BAND,
 } from "@/utils/dashboard/chartDimensionUtils";
 
 // calculateWidthText delegates to zrender's text measurement (the same one
@@ -246,6 +247,31 @@ describe("chartDimensionUtils", () => {
       // "60000c/s" is the widest label; grid.left should equal its measured width
       expect(options.grid.left).toBe(calculateWidthText("60000c/s"));
       expect(options.grid.containLabel).toBe(false);
+    });
+
+    it("re-reserves the x tick-label band when it turns containLabel off", () => {
+      const options = {
+        grid: { left: 10, bottom: 30, containLabel: true },
+        yAxis: { type: "value", axisLabel: { formatter } },
+        series: [{ data: [[0, 60000]] }],
+      };
+
+      applyMeasuredYAxisLeftInset(options);
+
+      expect(options.grid.bottom).toBe(30 + X_AXIS_TICK_LABEL_BAND);
+      expect(options.grid.containLabel).toBe(false);
+    });
+
+    it("leaves grid.bottom alone when containLabel was already off", () => {
+      const options = {
+        grid: { left: 10, bottom: 50, containLabel: false },
+        yAxis: { type: "value", axisLabel: { formatter } },
+        series: [{ data: [[0, 60000]] }],
+      };
+
+      applyMeasuredYAxisLeftInset(options);
+
+      expect(options.grid.bottom).toBe(50);
     });
 
     it("handles scalar (non-tuple) series points", () => {

@@ -261,6 +261,19 @@ impl super::Queue for NatsQueue {
         Ok(Arc::new(rx))
     }
 
+    async fn pull_consume(
+        &self,
+        topic: &str,
+        group: &str,
+        deliver_policy: Option<queue::DeliverPolicy>,
+    ) -> Result<queue::PullConsumer> {
+        let consumer = self
+            .with_consumer_name(group.to_string(), true)
+            .pull_consumer(topic, deliver_policy)
+            .await?;
+        Ok(queue::PullConsumer::from_nats(consumer))
+    }
+
     async fn purge(&self, _topic: &str, _sequence: usize) -> Result<()> {
         Ok(())
     }
