@@ -1110,9 +1110,14 @@ defineExpose({
             // so the table fills the container when its columns are narrower than
             // the viewport (otherwise it shrinks to content and leaves a gap on
             // the right); min-w-max still lets it grow + scroll when wider.
-            // Delegated-scroll grids (logs/traces) keep min-w-max only.
+            // EXCEPTION: with a sticky (right-pinned) total column, w-full stretches
+            // the table but the fixed-width total column can't absorb the slack, so
+            // the extra space opens as a gap BEFORE the pinned total (it looks like
+            // it floats mid-table). There, use min-w-max only so the total sits
+            // flush against the data. Delegated-scroll grids (logs/traces) keep
+            // min-w-max too.
             props.horizontalScroll
-              ? isDelegatedScroll
+              ? isDelegatedScroll || props.stickyColTotals
                 ? 'min-w-max'
                 : 'w-full min-w-max'
               : useComputedWidth && frozen
