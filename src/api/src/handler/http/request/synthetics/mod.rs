@@ -883,11 +883,14 @@ pub async fn run_synthetic_now(
 
 #[utoipa::path(
     post,
-    path = "/synthetics/jobs/resolve",
+    path = "/{org_id}/synthetics/jobs/resolve",
     context_path = "/api",
     tag = "Synthetics",
     operation_id = "SyntheticsJobResolve",
     summary = "Resolve a job — probe fetches monitor config (authenticated via o2syn_ token)",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
     security(("Authorization" = [])),
     request_body(content = Object, description = r#"{"job_id": 42}"#, content_type = "application/json"),
     responses(
@@ -940,11 +943,14 @@ pub async fn job_resolve(
 
 #[utoipa::path(
     post,
-    path = "/synthetics/jobs/lease",
+    path = "/{org_id}/synthetics/jobs/lease",
     context_path = "/api",
     tag = "Synthetics",
     operation_id = "SyntheticsJobLease",
     summary = "Lease a batch of jobs for a probe pool (authenticated via o2syn_ token)",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
     security(("Authorization" = [])),
     request_body(content = Object, description = r#"{"pool": "aws-browser", "limit": 10}"#, content_type = "application/json"),
     responses(
@@ -993,11 +999,14 @@ pub async fn job_lease(
 
 #[utoipa::path(
     post,
-    path = "/synthetics/jobs/ack",
+    path = "/{org_id}/synthetics/jobs/ack",
     context_path = "/api",
     tag = "Synthetics",
     operation_id = "SyntheticsJobAck",
     summary = "Acknowledge a completed check — probe submits result (authenticated via o2syn_ token)",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
     security(("Authorization" = [])),
     request_body(content = Object, description = r#"{"job_id": 42, "status": "up", "response_time_ms": 1200, "error": null}"#, content_type = "application/json"),
     responses(
