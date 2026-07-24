@@ -1102,7 +1102,18 @@ defineExpose({
       >
         <table
           :class="[
-            props.horizontalScroll ? 'min-w-max' : useComputedWidth && frozen ? '' : 'w-full',
+            // Non-delegated horizontal-scroll tables (dashboard pivot) add w-full
+            // so the table fills the container when its columns are narrower than
+            // the viewport (otherwise it shrinks to content and leaves a gap on
+            // the right); min-w-max still lets it grow + scroll when wider.
+            // Delegated-scroll grids (logs/traces) keep min-w-max only.
+            props.horizontalScroll
+              ? isDelegatedScroll
+                ? 'min-w-max'
+                : 'w-full min-w-max'
+              : useComputedWidth && frozen
+                ? ''
+                : 'w-full',
             props.horizontalScroll || props.defaultColumns ? 'table-auto' : 'table-fixed',
             // border-separate is required whenever cells are sticky (pinned/action
             // columns, OR pivot sticky headers/total columns) so their borders +
