@@ -365,6 +365,18 @@ const pagination = useTablePagination(
   emit,
 );
 
+// Jump the table body back to the top whenever the page changes, so the user
+// lands on row 1 of the new page instead of staying at the previous scroll
+// offset (QA: changing page should scroll to top). Uses the delegated scroll
+// element when one is provided, else the internal scroll container.
+watch(
+  () => pagination.currentPage.value,
+  () => {
+    const el = props.scrollEl ?? scrollContainerRef.value;
+    if (el) el.scrollTop = 0;
+  },
+);
+
 // ── Sorting ─────────────────────────────────────────────────────
 const sorting = useTableSorting(
   table,
