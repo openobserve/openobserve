@@ -10766,7 +10766,6 @@ dependencies = [
  "enrichment-data",
  "hashbrown 0.16.1",
  "infra",
- "itertools 0.14.0",
  "log",
  "o2_enterprise",
  "schema",

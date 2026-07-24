@@ -8,6 +8,10 @@ publish = false
 [lib]
 path = "src/lib.rs"
 
+[features]
+default = []
+enterprise = ["config/enterprise", "db/enterprise"]
+
 [dependencies]
 anyhow.workspace = true
 arrow-schema.workspace = true
