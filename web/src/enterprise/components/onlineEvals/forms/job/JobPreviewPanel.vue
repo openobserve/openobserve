@@ -1,12 +1,12 @@
 <template>
-  <aside class="flex-[3.5] min-w-0 overflow-auto p-2 bg-surface-base rounded-default shadow-[0_0_0.313rem_0.063rem_var(--color-hover-shadow)]">
+  <aside class="flex-[3.5] min-w-0 overflow-auto p-2 bg-surface-base rounded-default border border-border-default">
     <section
-      class="py-3.5 px-4 mb-3 border border-(--color-dialog-header-border,var(--color-border-default)) rounded-default"
+      class="py-3.5 px-4 mb-3 border border-dialog-header-border rounded-default"
       data-test="job-preview-matched-targets"
     >
-      <header class="flex items-center gap-1.5 mb-1.5 text-(--color-text-secondary,var(--color-text-secondary))">
+      <header class="flex items-center gap-1.5 mb-1.5 text-text-secondary">
         <OIcon name="visibility" size="xs" />
-        <span class="m-0 text-compact font-semibold text-(--color-text-heading,currentColor)">{{
+        <span class="m-0 text-compact font-semibold text-text-heading">{{
           t(`onlineEvals.job.preview.scopes.${targetScope}.title`)
         }}</span>
       </header>
@@ -32,19 +32,19 @@
         {{ t("onlineEvals.job.preview.matchedError") }}
       </div>
       <div v-else class="flex items-baseline gap-1.5">
-        <span class="text-2xl font-bold text-text-heading [font-variant-numeric:tabular-nums]">{{ formattedCount }}</span>
-        <span class="text-xs text-(--color-text-secondary,var(--color-text-secondary))">
+        <span class="text-2xl font-bold text-text-heading tabular-nums">{{ formattedCount }}</span>
+        <span class="text-xs text-text-secondary">
           {{ t(`onlineEvals.job.preview.scopes.${targetScope}.matchedSuffix`) }}
         </span>
       </div>
     </section>
 
-    <section class="py-3.5 px-4 mb-0 border border-(--color-dialog-header-border,var(--color-border-default)) rounded-default">
-      <header class="flex items-center gap-1.5 mb-1.5 text-(--color-text-secondary,var(--color-text-secondary))">
+    <section class="py-3.5 px-4 mb-0 border border-dialog-header-border rounded-default">
+      <header class="flex items-center gap-1.5 mb-1.5 text-text-secondary">
         <OIcon name="info" size="xs" />
-        <span class="m-0 text-compact font-semibold text-(--color-text-heading,currentColor)">{{ t("onlineEvals.job.preview.summaryTitle") }}</span>
+        <span class="m-0 text-compact font-semibold text-text-heading">{{ t("onlineEvals.job.preview.summaryTitle") }}</span>
       </header>
-      <dl class="grid grid-cols-[96px_1fr] gap-x-3 gap-y-2 m-0 text-xs [&_dt]:text-text-secondary [&_dd]:m-0 [&_dd]:text-text-body">
+      <dl class="grid grid-cols-[6rem_1fr] gap-x-3 gap-y-2 m-0 text-xs [&_dt]:text-text-secondary [&_dd]:m-0 [&_dd]:text-text-body">
         <dt>{{ t("onlineEvals.job.preview.summaryName") }}</dt>
         <dd>{{ name || t("onlineEvals.job.preview.emptyValue") }}</dd>
         <dt>{{ t("onlineEvals.job.preview.summaryType") }}</dt>

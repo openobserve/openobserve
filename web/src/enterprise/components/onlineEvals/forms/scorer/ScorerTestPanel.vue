@@ -1,6 +1,6 @@
 <template>
   <aside class="eval-form-page__side eval-form-page__side--test p-0 max-[60rem]:border-l-0 max-[60rem]:border-t max-[60rem]:border-border-default">
-    <section class="eval-test-panel min-h-full p-5 bg-surface-base rounded-default shadow-[0_0_0.313rem_0.063rem_var(--color-hover-shadow)]">
+    <section class="eval-test-panel min-h-full p-5 bg-surface-base rounded-default border border-border-default">
       <!-- Header -->
       <div class="flex flex-col gap-1">
         <h3 class="m-0 text-text-heading text-sm font-bold">{{ t("onlineEvals.scorer.testPanel.title") }}</h3>
@@ -57,7 +57,7 @@
       <div
         v-if="state !== 'idle'"
         class="flex flex-col gap-2 mt-4 p-3 border border-border-default rounded-default bg-surface-base text-text-secondary text-xs"
-        :class="{ 'border-[color-mix(in_srgb,var(--color-status-success-text)_35%,var(--color-border-default))]': state === 'success', 'border-[color-mix(in_srgb,var(--color-status-error-text)_35%,var(--color-border-default))] text-status-error-text': state === 'error' }"
+        :class="{ 'border-status-success-text': state === 'success', 'border-status-error-text text-status-error-text': state === 'error' }"
         data-test="scorer-test-result"
       >
         <template v-if="state === 'running'">

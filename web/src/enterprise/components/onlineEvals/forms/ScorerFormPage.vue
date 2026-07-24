@@ -46,7 +46,7 @@
           data-test="scorer-form-identity-section"
         >
           <div class="flex items-center border-b border-border-default px-3 py-2.5">
-            <div class="mr-2 h-4 w-[0.1875rem] shrink-0 rounded-default bg-theme-accent" />
+            <div class="mr-2 h-4 w-0.75 shrink-0 rounded-default bg-theme-accent" />
             <span class="text-compact font-semibold tracking-[0.01em] text-text-heading">{{ t("onlineEvals.scorer.identitySection") }}</span>
           </div>
           <div class="flex flex-col gap-3 py-3.5 px-4">
@@ -85,7 +85,7 @@
               @update:modelValue="handleScoreConfigSelection"
             />
 
-            <div v-if="selectedScoreConfig" class="flex items-center flex-wrap gap-x-2.5 gap-y-1.5 px-3 py-2 mt-2 border border-[color-mix(in_srgb,var(--color-status-info-text)_25%,transparent)] rounded-default bg-[color-mix(in_srgb,var(--color-status-info-text)_8%,transparent)] text-xs text-text-body">
+            <div v-if="selectedScoreConfig" class="flex items-center flex-wrap gap-x-2.5 gap-y-1.5 px-3 py-2 mt-2 border border-status-info-text rounded-default bg-status-info-bg text-xs text-text-body">
               <span class="w-2 h-2 rounded-full bg-status-info-text shrink-0" />
               <span class="font-medium">
                 {{ t("onlineEvals.scorer.selectedPrefix") }}
@@ -120,7 +120,7 @@
           data-test="scorer-form-judge-section"
         >
           <div class="flex items-center border-b border-border-default px-3 py-2.5">
-            <div class="mr-2 h-4 w-[0.1875rem] shrink-0 rounded-default bg-theme-accent" />
+            <div class="mr-2 h-4 w-0.75 shrink-0 rounded-default bg-theme-accent" />
             <span class="text-compact font-semibold tracking-[0.01em] text-text-heading">{{ t("onlineEvals.scorer.judgeSection") }}</span>
           </div>
           <div class="flex flex-col gap-3 py-3.5 px-4">
@@ -147,7 +147,7 @@
               />
             </div>
 
-            <div v-if="selectedProvider" class="flex items-center flex-wrap gap-x-2.5 gap-y-1.5 px-3 py-2 mt-2 border border-[color-mix(in_srgb,var(--color-status-info-text)_25%,transparent)] rounded-default bg-[color-mix(in_srgb,var(--color-status-info-text)_8%,transparent)] text-xs text-text-body">
+            <div v-if="selectedProvider" class="flex items-center flex-wrap gap-x-2.5 gap-y-1.5 px-3 py-2 mt-2 border border-status-info-text rounded-default bg-status-info-bg text-xs text-text-body">
               <span class="w-2 h-2 rounded-full bg-status-info-text shrink-0" />
               <span class="text-text-secondary">
                 {{ t("onlineEvals.scorer.endpointLabel") }}
@@ -309,7 +309,7 @@
           data-test="scorer-form-endpoint-section"
         >
           <div class="flex items-center border-b border-border-default px-3 py-2.5">
-            <div class="mr-2 h-4 w-[0.1875rem] shrink-0 rounded-default bg-theme-accent" />
+            <div class="mr-2 h-4 w-0.75 shrink-0 rounded-default bg-theme-accent" />
             <span class="text-compact font-semibold tracking-[0.01em] text-text-heading">{{ t("onlineEvals.scorer.endpointSection") }}</span>
           </div>
           <div class="flex flex-col gap-3 py-3.5 px-4">
@@ -377,7 +377,7 @@
           data-test="scorer-form-auth-section"
         >
           <div class="flex items-center border-b border-border-default px-3 py-2.5">
-            <div class="mr-2 h-4 w-[0.1875rem] shrink-0 rounded-default bg-theme-accent" />
+            <div class="mr-2 h-4 w-0.75 shrink-0 rounded-default bg-theme-accent" />
             <span class="text-compact font-semibold tracking-[0.01em] text-text-heading">{{ t("onlineEvals.scorer.authSection") }}</span>
           </div>
           <div class="flex flex-col gap-3 py-3.5 px-4">
@@ -472,7 +472,7 @@
           data-test="scorer-form-headers-section"
         >
           <div class="flex items-center border-b border-border-default px-3 py-2.5">
-            <div class="mr-2 h-4 w-[0.1875rem] shrink-0 rounded-default bg-theme-accent" />
+            <div class="mr-2 h-4 w-0.75 shrink-0 rounded-default bg-theme-accent" />
             <span class="text-compact font-semibold tracking-[0.01em] text-text-heading">{{ t("onlineEvals.scorer.headersSection") }}</span>
             <span class="ml-auto text-2xs text-text-secondary italic">
               {{ t("onlineEvals.scorer.remoteHeaders.subtitle") }}
@@ -539,7 +539,7 @@
           data-test="scorer-form-body-section"
         >
           <div class="flex items-center border-b border-border-default px-3 py-2.5">
-            <div class="mr-2 h-4 w-[0.1875rem] shrink-0 rounded-default bg-theme-accent" />
+            <div class="mr-2 h-4 w-0.75 shrink-0 rounded-default bg-theme-accent" />
             <span class="text-compact font-semibold tracking-[0.01em] text-text-heading">{{ t("onlineEvals.scorer.requestBodySection") }}</span>
           </div>
           <div class="flex flex-col gap-3 py-3.5 px-4">
@@ -559,7 +559,7 @@
               <span
                 v-for="v in promptVariables"
                 :key="v"
-                class="py-px px-1.5 rounded-default text-2xs font-mono bg-[color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] text-text-body"
+                class="py-px px-1.5 rounded-default text-2xs font-mono bg-surface-subtle text-text-body"
               >{{ formatTemplateVariable(v) }}</span>
             </div>
           </div>
@@ -616,7 +616,7 @@
       >
         {{ schemaPreviewError }}
       </p>
-      <pre class="m-0 max-h-[60vh] overflow-auto p-3 rounded-default bg-card-bg border border-border-default font-normal text-xs font-(family-name:--font-mono) text-text-body whitespace-pre [tab-size:2]" v-else>{{ schemaPreview }}</pre>
+      <pre class="m-0 max-h-[60vh] overflow-auto p-3 rounded-default bg-card-bg border border-border-default font-normal text-xs font-mono text-text-body whitespace-pre [tab-size:2]" v-else>{{ schemaPreview }}</pre>
 
       <template #footer>
         <div class="flex items-center justify-between gap-2 w-full">
