@@ -49,6 +49,9 @@ pub struct Model {
     pub dedup_time_window_minutes: Option<i32>,
     pub dedup_config: Option<Json>,
     pub creates_incident: bool,
+    /// JSONB serialization of `CompositeSpec`. `NULL` for ordinary (non-composite)
+    /// alerts. Threaded via `try_from` (load) and `update_mutable_fields` (save).
+    pub composite_spec: Option<Json>,
     pub workflows: Json,
 }
 
@@ -122,6 +125,7 @@ mod tests {
             dedup_time_window_minutes: None,
             dedup_config: None,
             creates_incident: false,
+            composite_spec: None,
             workflows: serde_json::json!(vec!["abc123"]),
         };
         assert_eq!(m.id, "alert-1");

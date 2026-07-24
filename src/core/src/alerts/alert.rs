@@ -75,7 +75,7 @@ use crate::auth::check_permissions;
 #[cfg(feature = "enterprise")]
 use crate::workflows::WorkflowTriggerType;
 use crate::{
-    alerts::{QueryConditionExt, build_sql, destinations},
+    alerts::{QueryConditionExt, build_sql, composite_template, destinations},
     auth::is_ofga_unsupported,
     common::{infra::config::ORGANIZATIONS, meta::authz::Authz, utils::ssrf_guard::SsrfGuard},
     short_url,
@@ -192,6 +192,14 @@ pub enum AlertError {
     #[error("Not support save destination {0} type for alert so far")]
     NotSupportedAlertDestinationType(Module),
 
+    /// A composite alert was submitted in a build without the enterprise feature.
+    #[error("Composite alerts are only available in the enterprise edition")]
+    CompositeNotSupported,
+
+    /// A composite alert failed structural validation (§4.2).
+    #[error("Invalid composite alert: {0}")]
+    CompositeInvalid(String),
+
     #[error("Alert workflow {id} not found")]
     AlertWorkflowNotFound { id: String },
 }
@@ -306,11 +314,36 @@ async fn prepare_alert(
         }
     }
 
-    if alert.name.is_empty() || alert.stream_name.is_empty() {
+    // A composite alert has no single top-level stream (each term carries its
+    // own), so only its name is required here; the per-term stream/query checks
+    // that follow are gated behind `!is_composite`.
+    let is_composite = alert.composite.is_some();
+    if alert.name.is_empty() || (alert.stream_name.is_empty() && !is_composite) {
         return Err(AlertError::AlertNameMissing);
     }
     if alert.name.contains('/') {
         return Err(AlertError::AlertNameContainsForwardSlash);
+    }
+
+    // Composite structural validation + normalization (§4.2). The parser, term
+    // rules and Kleene logic live in the enterprise crate (feature-gated).
+    if is_composite {
+        #[cfg(not(feature = "enterprise"))]
+        {
+            return Err(AlertError::CompositeNotSupported);
+        }
+        #[cfg(feature = "enterprise")]
+        {
+            // Phase 1: composites are scheduled-only.
+            if alert.is_real_time {
+                return Err(AlertError::CompositeInvalid(
+                    "composite alerts must be scheduled, not real-time".to_string(),
+                ));
+            }
+            let spec = alert.composite.as_mut().unwrap();
+            o2_enterprise::enterprise::alerts::composite::validate_and_normalize(spec)
+                .map_err(|e| AlertError::CompositeInvalid(e.to_string()))?;
+        }
     }
 
     if let Some(vrl) = alert.query_condition.vrl_function.as_ref() {
@@ -343,26 +376,32 @@ async fn prepare_alert(
         });
     }
 
-    #[cfg(feature = "enterprise")]
-    let destination_missing = alert.destinations.is_empty() && alert.workflows.is_empty();
-    #[cfg(not(feature = "enterprise"))]
-    let destination_missing = alert.destinations.is_empty();
+    // before saving alert check alert destination. A composite routes via its
+    // `notify` block (on_composite / on_term) rather than the top-level
+    // `destinations`, so validate those instead.
+    if is_composite {
+        validate_composite_destinations(org_id, alert).await?;
+    } else {
+        #[cfg(feature = "enterprise")]
+        let destination_missing = alert.destinations.is_empty() && alert.workflows.is_empty();
+        #[cfg(not(feature = "enterprise"))]
+        let destination_missing = alert.destinations.is_empty();
 
-    // before saving alert check alert destination
-    if destination_missing {
-        return Err(AlertError::AlertDestinationMissing);
-    }
-    for dest in alert.destinations.iter() {
-        match db::alerts::destinations::get(org_id, dest).await {
-            Ok(d) => {
-                if !d.is_alert_destinations() {
-                    return Err(AlertError::NotSupportedAlertDestinationType(d.module));
+        if destination_missing {
+            return Err(AlertError::AlertDestinationMissing);
+        }
+        for dest in alert.destinations.iter() {
+            match db::alerts::destinations::get(org_id, dest).await {
+                Ok(d) => {
+                    if !d.is_alert_destinations() {
+                        return Err(AlertError::NotSupportedAlertDestinationType(d.module));
+                    }
                 }
-            }
-            Err(_) => {
-                return Err(AlertError::AlertDestinationNotFound {
-                    dest: dest.to_string(),
-                });
+                Err(_) => {
+                    return Err(AlertError::AlertDestinationNotFound {
+                        dest: dest.to_string(),
+                    });
+                }
             }
         }
     }
@@ -395,82 +434,87 @@ async fn prepare_alert(
         alert.context_attributes = Some(new_attrs);
     }
 
-    // before saving alert check column type to decide numeric condition
-    let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
-    if stream_name.is_empty() || schema.fields().is_empty() {
-        return Err(AlertError::StreamNotFound {
-            stream_name: stream_name.to_owned(),
-        });
-    }
-
-    // Alerts must follow the max_query_range of the stream as set in the schema
-    if let Some(settings) = unwrap_stream_settings(&schema) {
-        let max_query_range = settings.max_query_range;
-        if max_query_range > 0
-            && !alert.is_real_time
-            && alert.trigger_condition.period > max_query_range * 60
-        {
-            return Err(AlertError::PeriodExceedsMaxQueryRange {
-                max_query_range_hours: max_query_range,
+    // The remaining checks resolve a single top-level stream schema and validate
+    // the top-level query. A composite has neither (each term is validated on
+    // its own query_condition), so they are skipped for composites.
+    if !is_composite {
+        // before saving alert check column type to decide numeric condition
+        let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
+        if stream_name.is_empty() || schema.fields().is_empty() {
+            return Err(AlertError::StreamNotFound {
                 stream_name: stream_name.to_owned(),
             });
         }
-    }
 
-    if alert.is_real_time && alert.query_condition.query_type != QueryType::Custom {
-        return Err(AlertError::RealtimeMissingCustomQuery);
-    }
-
-    match alert.query_condition.query_type {
-        QueryType::SQL => {
-            if alert.query_condition.sql.is_none()
-                || alert.query_condition.sql.as_ref().unwrap().is_empty()
+        // Alerts must follow the max_query_range of the stream as set in the schema
+        if let Some(settings) = unwrap_stream_settings(&schema) {
+            let max_query_range = settings.max_query_range;
+            if max_query_range > 0
+                && !alert.is_real_time
+                && alert.trigger_condition.period > max_query_range * 60
             {
-                return Err(AlertError::SqlMissingQuery);
+                return Err(AlertError::PeriodExceedsMaxQueryRange {
+                    max_query_range_hours: max_query_range,
+                    stream_name: stream_name.to_owned(),
+                });
             }
-            if alert.query_condition.sql.is_some()
-                && RE_ONLY_SELECT.is_match(alert.query_condition.sql.as_ref().unwrap())
-            {
-                return Err(AlertError::SqlContainsSelectStar);
-            }
+        }
 
-            let sql = alert.query_condition.sql.as_ref().unwrap();
-            let stream_names = match resolve_stream_names(sql) {
-                Ok(stream_names) => stream_names,
-                Err(e) => {
-                    return Err(AlertError::ResolveStreamNameError(e));
-                }
-            };
+        if alert.is_real_time && alert.query_condition.query_type != QueryType::Custom {
+            return Err(AlertError::RealtimeMissingCustomQuery);
+        }
 
-            // SQL may contain multiple stream names, check for each stream
-            // if the alert period is greater than the max query range
-            for stream in stream_names.iter() {
-                if !stream.eq(stream_name)
-                    && let Some(settings) =
-                        infra::schema::get_settings(org_id, stream, stream_type).await
+        match alert.query_condition.query_type {
+            QueryType::SQL => {
+                if alert.query_condition.sql.is_none()
+                    || alert.query_condition.sql.as_ref().unwrap().is_empty()
                 {
-                    let max_query_range = settings.max_query_range;
-                    if max_query_range > 0
-                        && !alert.is_real_time
-                        && alert.trigger_condition.period > max_query_range * 60
+                    return Err(AlertError::SqlMissingQuery);
+                }
+                if alert.query_condition.sql.is_some()
+                    && RE_ONLY_SELECT.is_match(alert.query_condition.sql.as_ref().unwrap())
+                {
+                    return Err(AlertError::SqlContainsSelectStar);
+                }
+
+                let sql = alert.query_condition.sql.as_ref().unwrap();
+                let stream_names = match resolve_stream_names(sql) {
+                    Ok(stream_names) => stream_names,
+                    Err(e) => {
+                        return Err(AlertError::ResolveStreamNameError(e));
+                    }
+                };
+
+                // SQL may contain multiple stream names, check for each stream
+                // if the alert period is greater than the max query range
+                for stream in stream_names.iter() {
+                    if !stream.eq(stream_name)
+                        && let Some(settings) =
+                            infra::schema::get_settings(org_id, stream, stream_type).await
                     {
-                        return Err(AlertError::PeriodExceedsMaxQueryRange {
-                            max_query_range_hours: max_query_range,
-                            stream_name: stream_name.to_owned(),
-                        });
+                        let max_query_range = settings.max_query_range;
+                        if max_query_range > 0
+                            && !alert.is_real_time
+                            && alert.trigger_condition.period > max_query_range * 60
+                        {
+                            return Err(AlertError::PeriodExceedsMaxQueryRange {
+                                max_query_range_hours: max_query_range,
+                                stream_name: stream_name.to_owned(),
+                            });
+                        }
                     }
                 }
             }
+            QueryType::PromQL
+                if (alert.query_condition.promql.is_none()
+                    || alert.query_condition.promql.as_ref().unwrap().is_empty()
+                    || alert.query_condition.promql_condition.is_none()) =>
+            {
+                return Err(AlertError::PromqlMissingQuery);
+            }
+            _ => {}
         }
-        QueryType::PromQL
-            if (alert.query_condition.promql.is_none()
-                || alert.query_condition.promql.as_ref().unwrap().is_empty()
-                || alert.query_condition.promql_condition.is_none()) =>
-        {
-            return Err(AlertError::PromqlMissingQuery);
-        }
-        _ => {}
-    }
+    } // end if !is_composite
 
     // Commented intentionally - in case the alert period is big and there
     // is huge amount of data within the time period, the below can timeout and return error.
@@ -479,6 +523,47 @@ async fn prepare_alert(
     //     return Err(anyhow::anyhow!("Alert test failed: {}", e));
     // }
 
+    Ok(())
+}
+
+/// Validates the destinations referenced by a composite alert's `notify` block.
+/// `on_composite` must have at least one destination, and every destination
+/// referenced by `on_composite` or any `on_term` entry must exist and be an
+/// alert-type destination.
+async fn validate_composite_destinations(org_id: &str, alert: &Alert) -> Result<(), AlertError> {
+    let notify = &alert
+        .composite
+        .as_ref()
+        .expect("validate_composite_destinations called on a non-composite alert")
+        .notify;
+    if notify.on_composite.is_empty() {
+        return Err(AlertError::CompositeInvalid(
+            "notify.on_composite must have at least one destination".to_string(),
+        ));
+    }
+    // Collect every referenced destination (composite + per-term), de-duplicated.
+    let mut all: Vec<&String> = notify.on_composite.iter().collect();
+    for dests in notify.on_term.values() {
+        for d in dests {
+            if !all.contains(&d) {
+                all.push(d);
+            }
+        }
+    }
+    for dest in all {
+        match db::alerts::destinations::get(org_id, dest).await {
+            Ok(d) => {
+                if !d.is_alert_destinations() {
+                    return Err(AlertError::NotSupportedAlertDestinationType(d.module));
+                }
+            }
+            Err(_) => {
+                return Err(AlertError::AlertDestinationNotFound {
+                    dest: dest.to_string(),
+                });
+            }
+        }
+    }
     Ok(())
 }
 
@@ -492,8 +577,74 @@ pub fn update_cron_expression(cron_exp: &str, now: u32) -> String {
     cron_exp
 }
 
+// ---------------------------------------------------------------------------
+// Composite terms: a composite owns an ordered set of named terms. A term is
+// EITHER a reference to an existing alert (re-run over the composite's shared
+// window each tick — ReRun) OR an inline query stored on the composite. A
+// composite NEVER mutates, pauses, or reschedules anything it references — the
+// referenced alerts keep running on their own schedule, fully independent.
+// ---------------------------------------------------------------------------
+
+/// Validates a composite's terms BEFORE the composite row is written. For each
+/// reference term the referenced alert must exist, live in the composite's
+/// folder (RBAC v1), not itself be a composite (no nesting), and be a scheduled
+/// (not real-time) alert so its query can be re-run over a window. Inline terms
+/// must carry a query. Purely read-only: nothing referenced is modified.
+async fn validate_composite_terms<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    composite_folder: &str,
+    alert: &Alert,
+) -> Result<(), AlertError> {
+    let Some(spec) = alert.composite.as_ref() else {
+        return Ok(());
+    };
+    for term in &spec.terms {
+        match term.alert_id {
+            // Reference term (ReRun) — validate the referenced alert.
+            Some(rid) => {
+                let Some((folder, referenced)) =
+                    db::alerts::alert::get_by_id(conn, org_id, rid).await?
+                else {
+                    return Err(AlertError::CompositeInvalid(format!(
+                        "referenced alert {rid} not found"
+                    )));
+                };
+                if referenced.composite.is_some() {
+                    return Err(AlertError::CompositeInvalid(format!(
+                        "referenced alert '{}' is itself a composite; nesting is not allowed",
+                        referenced.name
+                    )));
+                }
+                if referenced.is_real_time {
+                    return Err(AlertError::CompositeInvalid(format!(
+                        "referenced alert '{}' is real-time; only scheduled alerts can be referenced",
+                        referenced.name
+                    )));
+                }
+                if folder.folder_id != composite_folder {
+                    return Err(AlertError::CompositeInvalid(format!(
+                        "referenced alert '{}' must be in the composite's folder",
+                        referenced.name
+                    )));
+                }
+            }
+            // Inline term — must carry its own query.
+            None => {
+                if term.query.is_none() {
+                    return Err(AlertError::CompositeInvalid(format!(
+                        "term '{}' has neither a referenced alert nor an inline query",
+                        term.name
+                    )));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Creates a new alert in the specified folder.
-pub async fn create<C: TransactionTrait>(
+pub async fn create<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
     org_id: &str,
     folder_id: &str,
@@ -519,6 +670,12 @@ pub async fn create<C: TransactionTrait>(
         overwrite,
     )
     .await?;
+
+    // Validate composite terms BEFORE writing so a bad reference never leaves a
+    // partial state. Referenced alerts are never modified.
+    if alert.composite.is_some() {
+        validate_composite_terms(conn, org_id, folder_id, &alert).await?;
+    }
 
     let alert = db::alerts::alert::create(conn, org_id, folder_id, alert, overwrite).await?;
 
@@ -631,7 +788,21 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
 
     prepare_alert(org_id, &stream_name, &alert_name, &mut alert, false, false).await?;
 
+    // Validate composite terms BEFORE writing (avoid partial state). Referenced
+    // alerts are never modified — the composite is fully non-invasive.
+    if alert.composite.is_some() {
+        let folder = match alert.id {
+            Some(id) => match db::alerts::alert::get_by_id(conn, org_id, id).await? {
+                Some((f, _)) => f.folder_id,
+                None => DEFAULT_FOLDER.to_string(),
+            },
+            None => DEFAULT_FOLDER.to_string(),
+        };
+        validate_composite_terms(conn, org_id, &folder, &alert).await?;
+    }
+
     let alert = db::alerts::alert::update(conn, org_id, dst_folder_id_info, alert).await?;
+
     #[cfg(feature = "enterprise")]
     if let Some((curr_folder_id, dst_folder_id)) = _folder_info
         && get_openfga_config().enabled
@@ -762,18 +933,18 @@ pub async fn list_v2<C: ConnectionTrait>(
 }
 
 /// Deletes an alert by its KSUID primary key.
-pub async fn delete_by_id<C: ConnectionTrait>(
+pub async fn delete_by_id<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
     org_id: &str,
     alert_id: Ksuid,
 ) -> Result<(), AlertError> {
-    if db::alerts::alert::get_by_id(conn, org_id, alert_id)
-        .await?
-        .is_none()
-    {
+    let Some((_folder, _alert)) = db::alerts::alert::get_by_id(conn, org_id, alert_id).await?
+    else {
         return Ok(());
     };
 
+    // Deleting a composite only removes the composite row — the alerts it
+    // referenced are independent and left untouched.
     let alert_id_str = alert_id.to_string();
     match db::alerts::alert::delete_by_id(conn, org_id, alert_id).await {
         Ok(_) => {
@@ -1058,200 +1229,232 @@ impl AlertExt for Alert {
 
     async fn send_notification(
         &self,
-        _trace_id: &str,
+        trace_id: &str,
         rows: &[Map<String, Value>],
         rows_end_time: i64,
         start_time: Option<i64>,
         evaluation_timestamp: i64,
     ) -> Result<(String, String), AlertError> {
-        let mut err_message = "".to_string();
-        let mut success_message = "".to_string();
-        let mut no_of_error = 0;
+        send_to_destinations(
+            self,
+            &self.destinations,
+            rows,
+            rows_end_time,
+            start_time,
+            evaluation_timestamp,
+            trace_id,
+        )
+        .await
+    }
+}
 
-        #[cfg(feature = "enterprise")]
-        let mut workflow_error = 0;
-        #[cfg(feature = "enterprise")]
-        let mut workflow_err_msg = "".to_string();
+/// Sends the alert notification to an arbitrary subset of destinations, using
+/// the given `rows` as the template context. Extracted from
+/// `AlertExt::send_notification` (which now delegates here with
+/// `self.destinations`) so composite alerts can target their `on_composite` and
+/// per-term `on_term` destination subsets independently (§5 F7/F8).
+pub(crate) async fn send_to_destinations(
+    alert: &Alert,
+    destinations: &[String],
+    rows: &[Map<String, Value>],
+    rows_end_time: i64,
+    start_time: Option<i64>,
+    evaluation_timestamp: i64,
+    _trace_id: &str,
+) -> Result<(String, String), AlertError> {
+    let mut err_message = "".to_string();
+    let mut success_message = "".to_string();
+    let mut no_of_error = 0;
 
-        #[cfg(not(feature = "enterprise"))]
-        let workflow_error = 0;
-        #[cfg(not(feature = "enterprise"))]
-        let workflow_err_msg = "".to_string();
+    #[cfg(feature = "enterprise")]
+    let mut workflow_error = 0;
+    #[cfg(feature = "enterprise")]
+    let mut workflow_err_msg = "".to_string();
+    #[cfg(not(feature = "enterprise"))]
+    let workflow_error = 0;
+    #[cfg(not(feature = "enterprise"))]
+    let workflow_err_msg = "".to_string();
 
-        // Get alert-level template if specified (takes precedence over destination templates)
-        let alert_template = if let Some(ref template_name) = self.template {
-            Some(
-                db::alerts::templates::get(&self.org_id, template_name)
-                    .await
-                    .map_err(|_| AlertError::AlertTemplateNotFound {
-                        template: template_name.clone(),
-                    })?,
-            )
-        } else {
-            None
+    // Get alert-level template if specified (takes precedence over destination templates)
+    let alert_template = if let Some(ref template_name) = alert.template {
+        Some(
+            db::alerts::templates::get(&alert.org_id, template_name)
+                .await
+                .map_err(|_| AlertError::AlertTemplateNotFound {
+                    template: template_name.clone(),
+                })?,
+        )
+    } else {
+        None
+    };
+
+    for dest_name in destinations.iter() {
+        let (dest, dest_template) =
+            destinations::get_with_template(&alert.org_id, dest_name).await?;
+        let Module::Alert {
+            destination_type, ..
+        } = dest.module
+        else {
+            return Err(AlertError::GetDestinationWithTemplateError(
+                db::alerts::destinations::DestinationError::UnsupportedType,
+            ));
         };
 
-        for dest_name in self.destinations.iter() {
-            let (dest, dest_template) =
-                destinations::get_with_template(&self.org_id, dest_name).await?;
-            let Module::Alert {
-                destination_type, ..
-            } = dest.module
-            else {
-                return Err(AlertError::GetDestinationWithTemplateError(
-                    db::alerts::destinations::DestinationError::UnsupportedType,
-                ));
-            };
+        // Use alert-level template if specified, otherwise fall back to destination template
+        let template = match (&alert_template, &dest_template) {
+            (Some(alert_tpl), _) => alert_tpl,
+            (None, Some(dest_tpl)) => dest_tpl,
+            (None, None) => {
+                no_of_error += 1;
+                err_message = format!(
+                    "{err_message} No template configured for destination {};",
+                    dest.name
+                );
+                log::error!(
+                    "No template configured for alert {}/{}/{}/{} destination {}",
+                    alert.org_id,
+                    alert.stream_type,
+                    alert.stream_name,
+                    alert.name,
+                    dest.name
+                );
+                continue;
+            }
+        };
 
-            // Use alert-level template if specified, otherwise fall back to destination template
-            let template = match (&alert_template, &dest_template) {
-                (Some(alert_tpl), _) => alert_tpl,
-                (None, Some(dest_tpl)) => dest_tpl,
-                (None, None) => {
-                    no_of_error += 1;
-                    err_message = format!(
-                        "{err_message} No template configured for destination {};",
-                        dest.name
-                    );
-                    log::error!(
-                        "No template configured for alert {}/{}/{}/{} destination {}",
-                        self.org_id,
-                        self.stream_type,
-                        self.stream_name,
-                        self.name,
-                        dest.name
-                    );
-                    continue;
+        match send_notification(
+            alert,
+            &destination_type,
+            template,
+            rows,
+            rows_end_time,
+            start_time,
+            evaluation_timestamp,
+        )
+        .await
+        {
+            Ok(resp) => {
+                success_message = format!("{success_message} destination {} {resp};", dest.name);
+            }
+            Err(e) => {
+                log::error!(
+                    "Error sending notification for {}/{}/{}/{} for destination {} err: {}",
+                    alert.org_id,
+                    alert.stream_type,
+                    alert.stream_name,
+                    alert.name,
+                    dest.name,
+                    e
+                );
+                no_of_error += 1;
+                err_message = format!(
+                    "{err_message} Error sending notification for destination {} err: {e};",
+                    dest.name
+                );
+            }
+        }
+    }
+
+    // Trigger any configured workflows (enterprise). Checked for non-empty to
+    // avoid cloning the rows into Value when there are none.
+    #[cfg(feature = "enterprise")]
+    if !alert.workflows.is_empty() {
+        let data: Vec<_> = rows.iter().map(|v| Value::Object(v.clone())).collect();
+
+        let source_id = alert
+            .id
+            .as_ref()
+            .map_or(format!("{}/{}", alert.org_id, alert.name), |v| {
+                v.to_string()
+            });
+
+        let metadata: HashMap<String, String> = vec![
+            ("org_id", alert.org_id.clone()),
+            ("stream_type", alert.stream_type.to_string()),
+            ("stream_name", alert.stream_name.clone()),
+            ("alert_name", alert.name.clone()),
+            (
+                "alert_type",
+                if alert.is_real_time {
+                    "realtime"
+                } else {
+                    "scheduled"
                 }
-            };
+                .to_string(),
+            ),
+            ("alert_period", alert.trigger_condition.period.to_string()),
+            (
+                "alert_operator",
+                alert.trigger_condition.operator.to_string(),
+            ),
+            (
+                "alert_threshold",
+                alert.trigger_condition.threshold.to_string(),
+            ),
+            ("alert_count", rows.len().to_string()),
+            (
+                "alert_start_time",
+                start_time
+                    .unwrap_or(
+                        rows_end_time
+                            - Duration::try_minutes(alert.trigger_condition.period)
+                                .unwrap()
+                                .num_microseconds()
+                                .unwrap(),
+                    )
+                    .to_string(),
+            ),
+            ("alert_end_time", rows_end_time.to_string()),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v))
+        .collect();
 
-            match send_notification(
-                self,
-                &destination_type,
-                template,
-                rows,
-                rows_end_time,
-                start_time,
-                evaluation_timestamp,
+        for workflow in alert.workflows.iter() {
+            if let Err(e) = crate::workflows::send_workflow_trigger(
+                _trace_id,
+                &alert.org_id,
+                source_id.clone(),
+                WorkflowTriggerType::AlertFired,
+                workflow,
+                metadata.clone(),
+                &data,
             )
             .await
             {
-                Ok(resp) => {
-                    success_message =
-                        format!("{success_message} destination {} {resp};", dest.name);
-                }
-                Err(e) => {
-                    log::error!(
-                        "Error sending notification for {}/{}/{}/{} for destination {} err: {}",
-                        self.org_id,
-                        self.stream_type,
-                        self.stream_name,
-                        self.name,
-                        dest.name,
-                        e
-                    );
-                    no_of_error += 1;
-                    err_message = format!(
-                        "{err_message} Error sending notification for destination {} err: {e};",
-                        dest.name
-                    );
-                }
-            }
-        }
-
-        // we check specifically for non empty to avoid the clone of data into Value
-        #[cfg(feature = "enterprise")]
-        if !self.workflows.is_empty() {
-            let data: Vec<_> = rows.iter().map(|v| Value::Object(v.clone())).collect();
-
-            let source_id = self
-                .id
-                .as_ref()
-                .map_or(format!("{}/{}", self.org_id, self.name), |v| v.to_string());
-
-            let metadata: HashMap<String, String> = vec![
-                ("org_id", self.org_id.clone()),
-                ("stream_type", self.stream_type.to_string()),
-                ("stream_name", self.stream_name.clone()),
-                ("alert_name", self.name.clone()),
-                (
-                    "alert_type",
-                    if self.is_real_time {
-                        "realtime"
-                    } else {
-                        "scheduled"
-                    }
-                    .to_string(),
-                ),
-                ("alert_period", self.trigger_condition.period.to_string()),
-                (
-                    "alert_operator",
-                    self.trigger_condition.operator.to_string(),
-                ),
-                (
-                    "alert_threshold",
-                    self.trigger_condition.threshold.to_string(),
-                ),
-                ("alert_count", rows.len().to_string()),
-                (
-                    "alert_start_time",
-                    start_time
-                        .unwrap_or(
-                            rows_end_time
-                                - Duration::try_minutes(self.trigger_condition.period)
-                                    .unwrap()
-                                    .num_microseconds()
-                                    .unwrap(),
-                        )
-                        .to_string(),
-                ),
-                ("alert_end_time", rows_end_time.to_string()),
-            ]
-            .into_iter()
-            .map(|(k, v)| (k.to_string(), v))
-            .collect();
-
-            for workflow in self.workflows.iter() {
-                if let Err(e) = crate::workflows::send_workflow_trigger(
-                    _trace_id,
-                    &self.org_id,
-                    source_id.clone(),
-                    WorkflowTriggerType::AlertFired,
+                log::error!(
+                    "Error triggering workflow for {}/{}/{}/{} for workflow {} err: {}",
+                    alert.org_id,
+                    alert.stream_type,
+                    alert.stream_name,
+                    alert.name,
                     workflow,
-                    metadata.clone(),
-                    &data,
-                )
-                .await
-                {
-                    log::error!(
-                        "Error triggering workflow for {}/{}/{}/{} for workflow {} err: {}",
-                        self.org_id,
-                        self.stream_type,
-                        self.stream_name,
-                        self.name,
-                        workflow,
-                        e
-                    );
-                    workflow_error += 1;
-                    workflow_err_msg = format!(
-                        "{workflow_err_msg} Error triggering workflow {} err: {e};",
-                        workflow
-                    );
-                }
+                    e
+                );
+                workflow_error += 1;
+                workflow_err_msg = format!(
+                    "{workflow_err_msg} Error triggering workflow {} err: {e};",
+                    workflow
+                );
             }
         }
-
-        if no_of_error == self.destinations.len() {
-            Err(AlertError::SendNotificationError {
-                error_message: err_message,
-            })
-        } else if self.destinations.is_empty() && workflow_error == self.workflows.len() {
-            Err(AlertError::SendNotificationError {
-                error_message: workflow_err_msg,
-            })
-        } else {
-            Ok((success_message, err_message))
-        }
+    }
+    // A subset with no destinations (e.g. a composite on_term subset) is not an
+    // error. Fail only when every attempted destination — or every workflow when
+    // there are no destinations — failed.
+    if !destinations.is_empty() && no_of_error == destinations.len() {
+        Err(AlertError::SendNotificationError {
+            error_message: err_message,
+        })
+    } else if destinations.is_empty()
+        && !alert.workflows.is_empty()
+        && workflow_error == alert.workflows.len()
+    {
+        Err(AlertError::SendNotificationError {
+            error_message: workflow_err_msg,
+        })
+    } else {
+        Ok((success_message, err_message))
     }
 }
 
@@ -1531,6 +1734,11 @@ fn process_row_template(
         let mut alert_start_time = 0;
         let mut alert_end_time = 0;
         for (key, value) in row.iter() {
+            // The composite context object is resolved by a dedicated scoped
+            // pass below, not the flat substitution.
+            if key == composite_template::COMPOSITE_CONTEXT_KEY {
+                continue;
+            }
             let value = if value.is_string() {
                 value.as_str().unwrap_or_default().to_string()
             } else if value.is_f64() {
@@ -1614,6 +1822,14 @@ fn process_row_template(
             }
         }
 
+        // Composite alerts: resolve namespaced {a.value}/{composite.result}/…
+        // tokens from the context object carried on the row (§6).
+        if alert.composite.is_some()
+            && let Some(cx) = row.get(composite_template::COMPOSITE_CONTEXT_KEY)
+        {
+            resp = composite_template::resolve_composite_vars(&resp, cx);
+        }
+
         // If this is a JSON row template, try to parse it as JSON
         if is_json_template {
             match serde_json::from_str::<Value>(&resp) {
@@ -1660,6 +1876,11 @@ async fn process_dest_template(
     let mut vars = HashMap::with_capacity(rows.len());
     for row in rows.iter() {
         for (key, value) in row.iter() {
+            // The composite context object is resolved by a dedicated scoped
+            // pass at the end, not the flat substitution.
+            if key == composite_template::COMPOSITE_CONTEXT_KEY {
+                continue;
+            }
             let value = if value.is_string() {
                 value.as_str().unwrap_or_default().to_string()
             } else if value.is_f64() {
@@ -1956,6 +2177,17 @@ async fn process_dest_template(
     // credential_priority)
     for (key, value) in metadata.iter() {
         resp = resp.replace(&format!("{{{}}}", key), value);
+    }
+
+    // Composite alerts: resolve namespaced {a.value}/{composite.result}/… tokens
+    // from the context object carried on the synthetic row (§6). Runs last so it
+    // only ever sees tokens the flat substitution left verbatim.
+    if alert.composite.is_some()
+        && let Some(cx) = rows
+            .first()
+            .and_then(|r| r.get(composite_template::COMPOSITE_CONTEXT_KEY))
+    {
+        resp = composite_template::resolve_composite_vars(&resp, cx);
     }
 
     resp

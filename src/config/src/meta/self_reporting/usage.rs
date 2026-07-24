@@ -119,6 +119,11 @@ pub struct TriggerData {
     pub grouped: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub group_size: Option<i32>,
+    /// For composite alerts: the per-term search `trace_id`s (`"<term>=<trace_id>"`),
+    /// so a single composite trigger record can be correlated with the N
+    /// separate search-usage records its terms produced.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub composite_search_trace_ids: Option<Vec<String>>,
 }
 
 impl Default for TriggerData {
@@ -150,6 +155,7 @@ impl Default for TriggerData {
             dedup_count: None,
             grouped: None,
             group_size: None,
+            composite_search_trace_ids: None,
         }
     }
 }
@@ -192,6 +198,7 @@ impl TriggerData {
             dedup_count: Some(0),
             grouped: Some(false),
             group_size: Some(0),
+            composite_search_trace_ids: Some(vec![String::new()]),
         }
     }
 
@@ -902,6 +909,7 @@ mod tests {
             dedup_count: None,
             grouped: None,
             group_size: None,
+            composite_search_trace_ids: None,
         };
 
         let json = serde_json::to_string(&trigger_data).unwrap();

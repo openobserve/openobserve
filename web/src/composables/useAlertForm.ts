@@ -43,6 +43,7 @@ import {
   getUUID,
   getTimezoneOffset,
   b64DecodeUnicode,
+  b64EncodeUnicode,
   smartDecodeVrlFunction,
   isValidResourceName,
   getTimezonesByOffset,
@@ -60,11 +61,14 @@ import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import {
   getAlertPayload as getAlertPayloadUtil,
   prepareAndSaveAlert as prepareAndSaveAlertUtil,
+  transformCompositeTermsForSave,
   stripFormExtras,
   type PayloadContext,
   type PayloadFormData,
   type SaveAlertContext,
 } from "@/utils/alerts/alertPayload";
+import { validateCompositeExpression } from "@/utils/alerts/compositeExpression";
+import { makeDefaultComposite } from "@/components/alerts/composite/CompositeAlert.vue";
 // Pure cron helpers — used by the cron save gate in runImperativeQueryChecks.
 import {
   getCronIntervalDifferenceInSeconds,
@@ -341,6 +345,28 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   /** Write a single (possibly nested, dot/bracket-path) field into the ONE form. */
   const setF = (path: string, value: any): void =>
     form.setFieldValue(path as any, value);
+
+  // Composite alerts are edited on a LOCAL mutable model, decoupled from the
+  // OForm: the form read-view is immutable (its nested fields can't be mutated
+  // by the composite child components), and a composite has no top-level
+  // stream/query for the composed schema to own. `composite` holds the spec
+  // (terms/expression/notify/on_error); `compositeTrigger` holds its shared
+  // schedule (period/frequency/silence). Both are seeded on edit-load and
+  // injected into the payload at save.
+  const composite = ref<any>(null);
+  const compositeTrigger = ref<any>(null);
+  const isComposite = computed(() => composite.value != null);
+  const enableComposite = (): void => {
+    if (composite.value) return;
+    composite.value = makeDefaultComposite();
+    compositeTrigger.value = { ...defaultAlertValue().trigger_condition };
+    // A composite is scheduled and has no single top-level stream.
+    setF("is_real_time", "false");
+  };
+  const disableComposite = (): void => {
+    composite.value = null;
+    compositeTrigger.value = null;
+  };
 
   /** Reset the whole form (edit-prefill / post-save reset) to a complete alert
    *  object, re-seeding the form-only extras (logGroupBy / _meta). */
@@ -1286,6 +1312,65 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // Regex matching backend RE_OFGA_UNSUPPORTED_NAME in src/common/utils/auth.rs
   const ALERT_NAME_UNSUPPORTED_CHARS = /[:#?\s'"%&]+/;
 
+  // Validates a composite alert before save (mirrors the back-end §4.2 rules).
+  const validateCompositeAlert = (): boolean => {
+    const c = composite.value;
+    if (!c || !Array.isArray(c.terms) || c.terms.length < 2) {
+      toast({ variant: "error", message: t("alerts.composite.minTermsError") });
+      return false;
+    }
+    if (c.terms.length > 10) {
+      toast({ variant: "error", message: t("alerts.composite.maxTermsError") });
+      return false;
+    }
+    const names = new Set<string>();
+    for (const term of c.terms) {
+      if (!/^[a-zA-Z0-9_]+$/.test(term.name)) {
+        toast({ variant: "error", message: t("alerts.composite.invalidTermName", { name: term.name }) });
+        return false;
+      }
+      if (names.has(term.name)) {
+        toast({ variant: "error", message: t("alerts.composite.duplicateTermName", { name: term.name }) });
+        return false;
+      }
+      names.add(term.name);
+      if (term.mode === "new") {
+        // Scratch term: must have a stream + a query.
+        const draft = term.draft || {};
+        const type = draft.query_condition?.type || "custom";
+        if (!draft.stream_name) {
+          toast({ variant: "error", message: t("alerts.composite.termStreamRequired", { name: term.name }) });
+          return false;
+        }
+        if (type === "sql" && !draft.query_condition?.sql?.trim()) {
+          toast({ variant: "error", message: t("alerts.composite.termSqlRequired", { name: term.name }) });
+          return false;
+        }
+        if (type === "promql" && !draft.query_condition?.promql?.trim()) {
+          toast({ variant: "error", message: t("alerts.composite.termPromqlRequired", { name: term.name }) });
+          return false;
+        }
+      } else if (!term.alert_id) {
+        // Existing term: must reference a member alert.
+        toast({ variant: "error", message: t("alerts.composite.termMemberRequired", { name: term.name }) });
+        return false;
+      }
+    }
+    const res = validateCompositeExpression(
+      c.expression || "",
+      c.terms.map((tm: any) => tm.name),
+    );
+    if (!res.valid) {
+      toast({ variant: "error", message: res.error || t("alerts.composite.invalidExpression") });
+      return false;
+    }
+    if (!c.notify?.on_composite?.length) {
+      toast({ variant: "error", message: t("alerts.composite.onCompositeRequired") });
+      return false;
+    }
+    return true;
+  };
+
   // Schema-driven validity predicate (validation ONLY — never triggers the save;
   // the real save path is handleSave → form.handleSubmit). The ONE composed
   // schema owns name/stream + the step field rules, so this just runs the
@@ -1294,6 +1379,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // programmatic callers (Rule ④ — same name/stream/§4 gating as before, now via
   // the schema).
   const validateAndFocus = async (): Promise<boolean> => {
+    // Composite alerts validate their terms + expression + destinations rather
+    // than a single top-level stream/query/settings.
+    if (composite.value) {
+      return validateCompositeAlert();
+    }
     if (isAnomalyMode.value) {
       if (!anomalyConfig.value.name?.trim()) {
         toast({
@@ -1386,6 +1476,64 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
   const retransformBEToFE = (data: any) => {
     return retransformBEToFEUtil(data);
+  };
+
+
+  // Rehydrates a composite alert's terms on edit-load. A term is either a
+  // reference to an existing alert (`alert_id`) or an inline query (`query`)
+  // stored on the composite. Reference terms show the picker; inline terms
+  // repopulate the query-builder draft so the user can edit them in place.
+  const rehydrateCompositeTerms = (composite: any) => {
+    if (!composite || !Array.isArray(composite.terms)) return;
+    composite.terms.forEach((term: any) => {
+      if (term.member_name === undefined) term.member_name = "";
+      // An inline term carries a `query`; a reference term carries `alert_id`.
+      if (term.query && !term.alert_id) {
+        term.mode = "new";
+        term.draft = draftFromInlineQuery(term.query);
+      } else if (term.mode === undefined) {
+        term.mode = "existing";
+      }
+      // Ensure a draft always exists so toggling Existing/New never crashes.
+      if (!term.draft) term.draft = draftFromInlineQuery(null);
+    });
+  };
+
+  // Reconstructs a query-builder draft from a stored inline term query (the
+  // inverse of the payload's `buildInlineTermQuery`). `null` yields an empty
+  // draft (the shape `makeMemberDraft` produces).
+  const draftFromInlineQuery = (query: any): any => {
+    const q = query || {};
+    const beQc = q.query_condition || {};
+    const emptyGroup = {
+      filterType: "group",
+      logicalOperator: "AND",
+      groupId: "",
+      conditions: [],
+    };
+    return {
+      stream_type: q.stream_type || "logs",
+      stream_name: q.stream_name || "",
+      query_condition: {
+        // Unwrap the versioned conditions back to the FE group the builder edits.
+        conditions: beQc.conditions?.conditions || emptyGroup,
+        sql: beQc.sql || "",
+        promql: beQc.promql || "",
+        type: beQc.type || "custom",
+        aggregation: beQc.aggregation || {
+          group_by: [],
+          function: "avg",
+          having: { column: "", operator: ">=", value: 1 },
+        },
+        promql_condition: beQc.promql_condition || null,
+        vrl_function: beQc.vrl_function
+          ? b64DecodeUnicode(beQc.vrl_function)
+          : null,
+        multi_time_range: beQc.multi_time_range || [],
+      },
+      operator: q.operator || ">=",
+      threshold: q.threshold ?? 1,
+    };
   };
 
   // ── UI Update Methods ───────────────────────────────────────────────────
@@ -2067,6 +2215,13 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // user why. The anomaly branch's ONLY rule is the blank name, so this can only
   // fire for that.
   const handleSave = async () => {
+    // Composite alerts have no top-level stream/query for the composed schema to
+    // validate, so they bypass form.handleSubmit and run their own validation.
+    if (composite.value) {
+      if (!validateCompositeAlert()) return;
+      await performSave();
+      return;
+    }
     await form.handleSubmit();
     if (!form.state.isValid) {
       focusOnFirstError();
@@ -2178,6 +2333,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // `form.state.values` — the synchronous source of truth (formData is its
   // reactive read-view and can lag by a tick after a just-written setF).
   const onSubmit = async () => {
+    // Composite alerts have no top-level query/cron/UDS to gate — skip those
+    // checks (they were already validated via validateCompositeAlert).
+    if (!composite.value) {
     if (!runImperativeQueryChecks()) return false;
 
     if (
@@ -2257,8 +2415,27 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       activeTab.value = "condition";
       return false;
     }
+    } // end if (!composite.value)
 
     const payload = getAlertPayload();
+
+    // Composite alerts are edited on a local model kept out of the OForm: inject
+    // the spec + its shared schedule into the payload here. The backend ignores
+    // the top-level stream/query for a composite.
+    if (composite.value) {
+      payload.composite = cloneDeep(composite.value);
+      payload.is_real_time = false;
+      const ct = compositeTrigger.value || {};
+      payload.trigger_condition = {
+        ...payload.trigger_condition,
+        period: parseInt(ct.period),
+        frequency: parseInt(ct.frequency),
+        silence: parseInt(ct.silence),
+        frequency_type: ct.frequency_type || "minutes",
+        cron: ct.cron || "",
+        timezone: ct.timezone || "UTC",
+      };
+    }
 
     const dismiss = toast({
       variant: "loading",
@@ -2289,6 +2466,12 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       version: 2,
       conditions: form.state.values.query_condition.conditions,
     };
+
+    // Composite alerts carry their query on each term, not the top-level
+    // query_condition. Normalize each term for the back-end payload.
+    if (payload.composite) {
+      transformCompositeTermsForSave(payload);
+    }
 
     if (beingUpdated.value) {
       payload.folder_id =
@@ -2460,6 +2643,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           data.query_condition.vrl_function,
         );
       }
+
     }
 
     data.is_real_time = data.is_real_time.toString();
@@ -2540,6 +2724,20 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         conditions: [],
         groupId: getUUID(),
       };
+    }
+
+    // Composite alerts are edited on a local mutable model (the form read-view
+    // is immutable). Seed it from the loaded alert, rehydrate each term's query
+    // (BE→FE), and keep it OUT of the OForm so the composed schema never gates
+    // a composite on the missing top-level stream/query.
+    if (data.composite) {
+      composite.value = cloneDeep(data.composite);
+      rehydrateCompositeTerms(composite.value);
+      compositeTrigger.value = cloneDeep(data.trigger_condition);
+      delete data.composite;
+    } else {
+      composite.value = null;
+      compositeTrigger.value = null;
     }
 
     // Seed the ONE form (single source of truth) with the fully-transformed obj.
@@ -3025,6 +3223,13 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     store,
     router,
     track,
+
+    // Composite alert local model (decoupled from the OForm)
+    composite,
+    compositeTrigger,
+    isComposite,
+    enableComposite,
+    disableComposite,
 
     // Core state
     beingUpdated,

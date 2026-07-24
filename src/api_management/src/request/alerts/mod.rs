@@ -1433,6 +1433,120 @@ pub async fn generate_sql(
     }
 }
 
+/// Request body for the composite preview. Each term is either a reference to an
+/// existing member alert (`alert_id`) or an inline draft query for a not-yet-
+/// saved "New" term (Appendix R1.5).
+#[cfg(feature = "enterprise")]
+#[derive(serde::Deserialize)]
+pub struct CompositePreviewRequestBody {
+    #[serde(default)]
+    pub trigger_condition: config::meta::alerts::TriggerCondition,
+    #[serde(default)]
+    pub expression: String,
+    #[serde(default)]
+    pub terms: Vec<CompositePreviewTermBody>,
+}
+
+#[cfg(feature = "enterprise")]
+#[derive(serde::Deserialize)]
+pub struct CompositePreviewTermBody {
+    pub name: String,
+    /// Existing member: KSUID string. Empty/absent for inline ("New") terms.
+    #[serde(default)]
+    pub alert_id: String,
+    #[serde(default)]
+    pub stream_type: config::meta::stream::StreamType,
+    #[serde(default)]
+    pub stream_name: String,
+    #[serde(default)]
+    pub query_condition: config::meta::alerts::QueryCondition,
+    #[serde(default)]
+    pub operator: config::meta::alerts::Operator,
+    #[serde(default)]
+    pub threshold: i64,
+}
+
+/// PreviewCompositeAlert
+///
+/// Evaluates a composite's terms over the current window WITHOUT saving or
+/// notifying, returning each term's tri-state (TRUE/FALSE/ERROR) + value and the
+/// evaluated composite result. Terms can be existing member refs OR inline
+/// drafts for not-yet-saved "New" terms (§8.3, R1.5).
+#[cfg(feature = "enterprise")]
+pub async fn preview_composite(
+    Path(org_id): Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    Json(req_body): Json<CompositePreviewRequestBody>,
+) -> Response {
+    // RBAC v1 (Appendix R1.7): members are alerts in the composite's folder, so
+    // folder access = compose access. Per-member stream checks are a follow-up.
+    let _ = &user_email;
+
+    if req_body.terms.is_empty() {
+        return MetaHttpResponse::bad_request("composite preview requires at least one term");
+    }
+
+    // Build the resolver specs (parse existing alert_ids; inline otherwise).
+    let mut specs = Vec::with_capacity(req_body.terms.len());
+    for t in req_body.terms {
+        let alert_id = if t.alert_id.trim().is_empty() {
+            None
+        } else {
+            match Ksuid::from_str(t.alert_id.trim()) {
+                Ok(id) => Some(id),
+                Err(_) => {
+                    return MetaHttpResponse::bad_request(format!(
+                        "invalid alert_id for term '{}'",
+                        t.name
+                    ));
+                }
+            }
+        };
+        specs.push(openobserve_core::alerts::composite::PreviewTermSpec {
+            name: t.name,
+            alert_id,
+            stream_type: t.stream_type,
+            stream_name: t.stream_name,
+            query_condition: t.query_condition,
+            operator: t.operator,
+            threshold: t.threshold,
+        });
+    }
+
+    let resolved = match openobserve_core::alerts::composite::resolve_preview_terms(&org_id, specs)
+        .await
+    {
+        Ok(r) => r,
+        Err(e) => return MetaHttpResponse::bad_request(format!("Composite preview failed: {e}")),
+    };
+
+    // Preview over the composite's own period ending now.
+    let end = chrono::Utc::now().timestamp_micros();
+    let period_minutes = req_body.trigger_condition.period.max(1);
+    let start = end - period_minutes * 60 * 1_000_000;
+    let trace_id = config::ider::generate_trace_id();
+
+    match openobserve_core::alerts::composite::preview_composite(
+        &org_id,
+        resolved,
+        req_body.expression,
+        period_minutes,
+        (Some(start), end),
+        Some(trace_id),
+    )
+    .await
+    {
+        Ok(res) => MetaHttpResponse::json(res),
+        Err(e) => MetaHttpResponse::bad_request(format!("Composite preview failed: {e}")),
+    }
+}
+
+/// Composite alerts require the enterprise edition.
+#[cfg(not(feature = "enterprise"))]
+pub async fn preview_composite(Path(_org_id): Path<String>) -> Response {
+    MetaHttpResponse::forbidden("Composite alerts are only available in the enterprise edition")
+}
+
 #[cfg(test)]
 mod tests {
     use axum::{http::StatusCode, response::Response};

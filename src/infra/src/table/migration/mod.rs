@@ -132,6 +132,7 @@ mod m20260707_000002_create_synthetics_runs;
 mod m20260707_000003_create_synthetics_jobs;
 mod m20260707_000004_create_synthetics_probe_tokens;
 mod m20260710_000001_add_target_scope_to_online_eval_jobs;
+mod m20260713_000001_add_alert_composite_spec;
 mod m20260714_000001_create_synthetics_locations;
 mod m20260714_000002_create_synthetics_agents;
 mod m20260720_000001_add_alert_workflows_col;
@@ -259,6 +260,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260707_000003_create_synthetics_jobs::Migration),
             Box::new(m20260707_000004_create_synthetics_probe_tokens::Migration),
             Box::new(m20260710_000001_add_target_scope_to_online_eval_jobs::Migration),
+            Box::new(m20260713_000001_add_alert_composite_spec::Migration),
             Box::new(m20260714_000001_create_synthetics_locations::Migration),
             Box::new(m20260714_000002_create_synthetics_agents::Migration),
             Box::new(m20260720_000001_create_workflows_table::Migration),

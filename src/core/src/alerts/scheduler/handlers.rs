@@ -759,8 +759,63 @@ async fn handle_alert_triggers(
         ..Default::default()
     };
 
+    // Composite alerts are evaluated by a dedicated branch that runs each term
+    // and reduces the N results into one synthetic `TriggerEvalResults`, then
+    // rejoins the common tail below (§4.1 F5). Shadowed as mutable because the
+    // composite branch rewrites `destinations` to the `on_composite` set.
+    #[cfg(feature = "enterprise")]
+    let mut alert = alert;
+
+    // Per-term on_term notifications produced by the composite branch, sent on
+    // the fire path below so they share the composite's silence window.
+    #[cfg(feature = "enterprise")]
+    let mut composite_on_term_sends: Vec<crate::alerts::composite::OnTermSend> = Vec::new();
+
     let evaluation_took = Instant::now();
     // evaluate alert
+    #[cfg(feature = "enterprise")]
+    let result = if alert.composite.is_some() {
+        match crate::alerts::composite::evaluate_composite_for_scheduler(
+            &trigger.org,
+            &mut alert,
+            (Some(start_time), final_end_time),
+            Some(query_trace_id.clone()),
+        )
+        .await
+        {
+            Ok(outcome) => {
+                // Record a Kleene ERROR in the trigger history so it is never
+                // silent, regardless of the on_error policy (§2.2).
+                if let Some(err) = outcome.error_summary {
+                    trigger_data_stream.error = Some(err);
+                }
+                // Record the per-term search trace_ids so this single composite
+                // trigger record can be correlated with the N term search-usage
+                // records (each term search has its own trace_id).
+                if !outcome.term_trace_ids.is_empty() {
+                    trigger_data_stream.composite_search_trace_ids = Some(
+                        outcome
+                            .term_trace_ids
+                            .iter()
+                            .map(|(name, tid)| format!("{name}={tid}"))
+                            .collect(),
+                    );
+                }
+                composite_on_term_sends = outcome.on_term_sends;
+                Ok(outcome.eval)
+            }
+            Err(e) => Err(e),
+        }
+    } else {
+        alert
+            .evaluate(
+                None,
+                (Some(start_time), final_end_time),
+                Some(query_trace_id.clone()),
+            )
+            .await
+    };
+    #[cfg(not(feature = "enterprise"))]
     let result = alert
         .evaluate(
             None,
@@ -874,6 +929,31 @@ async fn handle_alert_triggers(
 
     if trigger_results.data.is_some() {
         trigger_data.last_satisfied_at = Some(triggered_at);
+    }
+
+    // Composite per-term on_term notifications, sent on the fire path so they
+    // share the composite's silence window. A failed on_term send is logged but
+    // never fails the tick (the composite fire itself proceeds).
+    #[cfg(feature = "enterprise")]
+    if trigger_results.data.is_some() && !composite_on_term_sends.is_empty() {
+        for send in &composite_on_term_sends {
+            if let Err(e) = crate::alerts::alert::send_to_destinations(
+                &alert,
+                &send.destinations,
+                &send.rows,
+                trigger_results.end_time,
+                Some(start_time),
+                triggered_at,
+                &scheduler_trace_id,
+            )
+            .await
+            {
+                log::error!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] composite on_term notification failed for {}: {e}",
+                    new_trigger.module_key
+                );
+            }
+        }
     }
 
     // send notification

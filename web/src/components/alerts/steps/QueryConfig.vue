@@ -423,7 +423,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <!-- Check every row -->
-            <div class="flex items-start
+            <div v-if="!hideSchedule" class="flex items-start
              gap-3 py-2 px-3 rounded-default text-compact">
               <span class="font-bold text-text-heading text-compact whitespace-nowrap min-w-22.5 shrink-0 leading-7">
                 {{ t('alerts.queryConfig.checkEvery') }} *
@@ -764,7 +764,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="isRealTime === 'false'" class="flex flex-col gap-0 mt-2 px-1">
 
             <!-- Check every -->
-            <div class="flex items-start gap-3 py-2 px-3 rounded-default text-compact">
+            <div v-if="!hideSchedule" class="flex items-start gap-3 py-2 px-3 rounded-default text-compact">
               <span class="font-bold text-text-heading text-compact whitespace-nowrap min-w-40 w-40 shrink-0 leading-7">
                 {{ t('alerts.queryConfig.checkEvery') }} *
                 <OTooltip :content="t('alerts.howOftenCheckTooltip')" :delay="300" side="top" />
@@ -1105,6 +1105,12 @@ export default defineComponent({
     triggerCondition: {
       type: Object as PropType<any>,
       default: null,
+    },
+    /** Hide the per-query "Check every" schedule row. Used by composite term
+     * cards, where the schedule is shared across all terms (one trigger). */
+    hideSchedule: {
+      type: Boolean,
+      default: false,
     },
   },
   emits: ["update:tab", "update-group", "remove-group", "input:update", "update:sqlQuery", "update:promqlQuery", "update:vrlFunction", "validate-sql", "clear-multi-windows", "editor-closed", "editor-state-changed", "update:isAggregationEnabled", "update:aggregation", "update:promqlCondition", "update:triggerCondition"],

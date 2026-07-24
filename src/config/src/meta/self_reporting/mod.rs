@@ -380,6 +380,7 @@ mod tests {
             dedup_count: None,
             grouped: None,
             group_size: None,
+            composite_search_trace_ids: None,
         };
 
         let result = queue
@@ -914,6 +915,7 @@ mod tests {
             dedup_count: None,
             grouped: None,
             group_size: None,
+            composite_search_trace_ids: None,
         };
 
         let error_data = error::ErrorData {
@@ -982,6 +984,7 @@ mod tests {
             dedup_count: None,
             grouped: None,
             group_size: None,
+            composite_search_trace_ids: None,
         };
 
         let trigger_data2 = TriggerData {
@@ -1040,6 +1043,7 @@ mod tests {
             dedup_count: None,
             grouped: None,
             group_size: None,
+            composite_search_trace_ids: None,
         };
 
         // Should succeed when queue has space

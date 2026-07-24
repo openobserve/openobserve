@@ -21,7 +21,10 @@ use utoipa::ToSchema;
 
 use crate::{
     meta::{
-        alerts::{QueryCondition, TriggerCondition, deduplication::DeduplicationConfig},
+        alerts::{
+            QueryCondition, TriggerCondition, composite::CompositeSpec,
+            deduplication::DeduplicationConfig,
+        },
         stream::StreamType,
         triggers::{ScheduledTriggerData, Trigger},
     },
@@ -99,6 +102,12 @@ pub struct Alert {
     /// to any incident.
     #[serde(default)]
     pub creates_incident: bool,
+    /// When present, this alert is a composite alert: it owns an ordered set of
+    /// named terms whose tri-state results are combined by a boolean expression.
+    /// When absent (default), the alert is an ordinary single-query alert and
+    /// behaves byte-identically to before. See [`CompositeSpec`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub composite: Option<CompositeSpec>,
     #[serde(default)]
     pub workflows: Vec<String>,
 }
@@ -159,6 +168,7 @@ impl Default for Alert {
             last_satisfied_at: None,
             deduplication: None,
             creates_incident: false,
+            composite: None,
             workflows: vec![],
         }
     }

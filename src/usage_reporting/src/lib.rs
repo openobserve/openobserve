@@ -465,6 +465,7 @@ mod tests {
             dedup_count: None,
             grouped: None,
             group_size: None,
+            composite_search_trace_ids: None,
         }
     }
 

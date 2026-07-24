@@ -165,15 +165,16 @@ mod tests {
         assert!(field_names.contains(&"status".to_string()));
         assert!(field_names.contains(&"next_run_at".to_string()));
 
-        // Verify count matches struct fields (26 total: 21 original + 5 dedup/grouping fields)
-        assert_eq!(field_names.len(), 26);
+        // Verify count matches struct fields (27 total: 21 original + 5 dedup/grouping
+        // fields + 1 composite field: composite_search_trace_ids)
+        assert_eq!(field_names.len(), 27);
 
         // Verify no duplicate fields
         let unique_count = field_names
             .iter()
             .collect::<std::collections::HashSet<_>>()
             .len();
-        assert_eq!(unique_count, 26);
+        assert_eq!(unique_count, 27);
     }
 
     #[tokio::test]

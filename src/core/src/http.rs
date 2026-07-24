@@ -96,6 +96,8 @@ impl From<AlertError> for Response {
             AlertError::PermissionDenied | AlertError::UserNotFound => {
                 MetaHttpResponse::forbidden("Unauthorized access")
             }
+            AlertError::CompositeNotSupported => MetaHttpResponse::forbidden(value),
+            AlertError::CompositeInvalid(_) => MetaHttpResponse::bad_request(value),
         }
     }
 }

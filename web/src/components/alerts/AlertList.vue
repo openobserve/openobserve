@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model:selected-ids="selectedAlertIds"
                 selection="multiple"
                 data-test="alert-list-table"
-                :data="filteredResults || []"
+                :data="displayedRows"
                 :columns="columns"
                 show-index
                 row-key="alert_id"
@@ -198,13 +198,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="sm"
                       class="text-icon-color shrink-0"
                     />
-                    <span class="truncate">{{ row.name || "--" }}</span>
+                    <span class="truncate">
+                      {{ row.name || "--" }}
+                      <OTooltip
+                        v-if="row.name"
+                        :content="row.name"
+                        content-class="max-w-100 whitespace-normal break-words text-xs"
+                      />
+                    </span>
+                    <!-- Composite: icon + term count. Referenced alerts run
+                         independently and appear as ordinary rows. -->
+                    <span
+                      v-if="row.is_composite"
+                      class="shrink-0 inline-flex items-center gap-0.5 rounded-default px-1.5 py-0.5 text-2xs font-semibold text-badge-primary-soft-text bg-badge-primary-soft-bg"
+                      :data-test="`alert-list-${row.name}-composite-badge`"
+                    >
+                      <OIcon name="account-tree" size="xs" />
+                      {{ row.composite_term_count }}
+                      <OTooltip
+                        side="top"
+                        :content="t('alerts.composite.compositeBadgeTooltip', { count: row.composite_term_count })"
+                      />
+                    </span>
                   </div>
-                  <OTooltip
-                    v-if="row.name"
-                    :content="row.name"
-                    content-class="max-w-100 whitespace-normal break-words text-xs"
-                  />
                 </template>
 
                 <template #cell-owner="{ row }">
@@ -907,6 +923,10 @@ export default defineComponent({
 
     const filteredResults: Ref<any[]> = ref([]);
 
+    // Composites and the alerts they reference all appear as ordinary rows: a
+    // composite is non-invasive and never owns/nests other alerts.
+    const displayedRows = computed(() => filteredResults.value || []);
+
     const activeFolderToMove = ref("default");
 
     // Tabs for alerts view
@@ -1280,6 +1300,9 @@ export default defineComponent({
               id: data.folder_id,
             },
             is_real_time: data.is_real_time,
+            // Composite indicator for the list badge.
+            is_composite: !!data.is_composite,
+            composite_term_count: data.composite_term_count || 0,
           };
         });
 
@@ -2661,6 +2684,7 @@ export default defineComponent({
       folders,
       splitterModel,
       alertStateLoadingMap,
+      displayedRows,
       toggleAlertState,
       templates,
       routeTo,
