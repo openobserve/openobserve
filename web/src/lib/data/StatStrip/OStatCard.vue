@@ -121,7 +121,7 @@ const trendClass = computed(() =>
   <component
     :is="clickable ? 'button' : 'div'"
     :type="clickable ? 'button' : undefined"
-    class="flex flex-col justify-center gap-1.5 rounded-default border bg-surface-base px-4 py-1.5 min-w-0 text-left transition-colors"
+    class="flex flex-col justify-center gap-1 rounded-default border bg-surface-base px-2.5 py-1 min-w-0 text-left transition-colors"
     :class="[
       selected ? 'border-accent' : 'border-border-default',
       clickable ? 'cursor-pointer' : '',
@@ -149,11 +149,13 @@ const trendClass = computed(() =>
       </div>
       <span
         v-if="icon || slots.icon"
-        class="w-8 h-8 shrink-0 grid place-items-center rounded-default"
+        class="w-7 h-7 shrink-0 grid place-items-center rounded-default"
         :class="tc.chip"
       >
         <slot name="icon">
-          <OIcon v-if="icon" :name="icon" size="md" />
+          <!-- 20px glyph: the step between OIcon's sm (16px) and md (24px), so the
+               icon fills the w-7 chip without touching the surrounding background. -->
+          <OIcon v-if="icon" :name="icon" size="sm" class="size-5!" />
         </slot>
       </span>
     </div>

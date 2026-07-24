@@ -38,7 +38,7 @@ const onCardClick = (item: StatItem) => {
 </script>
 
 <template>
-  <div class="flex flex-wrap gap-2.5" data-test="o-stat-strip">
+  <div class="flex flex-wrap gap-2" data-test="o-stat-strip">
     <OStatCard
       v-for="item in items"
       :key="item.key"
