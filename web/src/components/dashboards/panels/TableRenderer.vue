@@ -444,15 +444,24 @@ export default defineComponent({
   font-family: var(--font-sans);
 }
 
-/* Subtle vertical divider on every column (header + body) so the panel table
-   has the same column separators other tables show — those come from the
-   column-resize handles the panel table intentionally doesn't enable. Uses the
-   same subtle token as the horizontal row dividers; the last column is skipped
-   so there's no trailing line at the right edge. Applies to both the regular
-   (border-collapse) and pivot (border-separate) layouts. */
-.table-wrapper :deep(thead th:not(:last-child)),
-.table-wrapper :deep(tbody td:not(:last-child)) {
-  border-right: 1px solid var(--color-table-row-divider);
+/* Column dividers drawn to match the column-resize-handle dividers other tables
+   show (dashboard listing etc.): a short, vertically-centered 1px line in the
+   `--color-border-default` colour at each header column's right edge. The panel
+   table keeps resize disabled, so it renders these statically as a ::after
+   instead of via the resize handle — identical look, header-only, no trailing
+   line on the last column. Works for both the regular and pivot layouts. */
+.table-wrapper :deep(thead th) {
+  position: relative;
+}
+.table-wrapper :deep(thead th:not(:last-child))::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  height: 1rem;
+  width: 1px;
+  background: var(--color-border-default);
 }
 
 /* Pivot table styles */
@@ -463,7 +472,10 @@ export default defineComponent({
 
 .table-wrapper :deep(.pivot-group-header) {
   font-weight: 600;
-  border-bottom: 0.125rem solid var(--color-table-row-divider);
+  /* 1px (not 2px) so the group→value separator matches the value→data
+     separator weight — a short value row between two heavier lines read as a
+     double line (QA feedback). */
+  border-bottom: 1px solid var(--color-table-row-divider);
 }
 
 .table-wrapper :deep(.pivot-section-border) {
