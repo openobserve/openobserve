@@ -121,12 +121,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <!-- Scope chips: which env/version variant of the agent is in view. Only in
            Agent mode — Stream mode isn't scoped to one agent variant. -->
-      <OAgentBadges
+      <span
         v-if="filterMode === 'agent' && selectedAgent"
-        :env="selectedAgent.env"
-        :version="selectedAgent.version"
-        data-test="agent-graph-scope-badges"
-      />
+        class="inline-flex items-center gap-1"
+      >
+        <OAgentBadges
+          :env="selectedAgent.env"
+          :version="selectedAgent.version"
+          data-test="agent-graph-scope-badges"
+        />
+        <!-- The version chip is informational here: topology is version-agnostic
+             (scoped by env, not version). Surface that with a hint icon so users
+             don't expect the graph to change when they switch versions. -->
+        <OTooltip
+          v-if="selectedAgent.version"
+          :content="t('aiObservability.agentGraph.versionAgnosticHint')"
+        >
+          <OIcon
+            name="info"
+            size="sm"
+            class="text-text-muted cursor-help"
+            data-test="agent-graph-version-agnostic-hint"
+          />
+        </OTooltip>
+      </span>
 
       <!-- Agent Graph's OWN visualization + layout selection. Kept fully
            independent of the Traces Service Graph tab (its own state + distinct
@@ -176,6 +194,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="graphReady"
       ref="graphRef"
       :stream-filter="effectiveStream"
+      :agent-id="filterMode === 'agent' ? (selectedAgent?.id ?? null) : null"
+      :agent-name="filterMode === 'agent' ? (selectedAgent?.name ?? null) : null"
+      :agent-env="filterMode === 'agent' ? (selectedAgent?.env ?? null) : null"
       :viz-type="vizType"
       :layout-type="layoutType"
       hide-stream-selector
@@ -219,6 +240,7 @@ import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";

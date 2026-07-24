@@ -182,6 +182,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import searchService from "@/services/search";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
+import { buildAgentClimbFilter } from "./agentClimbFilter";
 
 interface SignalRow {
   signalType: "loop" | "failure" | "cost";
@@ -429,9 +430,13 @@ const ancestorJoins = (stream: string) => {
   return joins.join(" ");
 };
 
-/** Agent-scoping predicate on the CLIMBED agent (not the span-local column). */
+/** Agent-scoping predicate on the CLIMBED agent (not the span-local column),
+ *  further narrowed to the selected env/version variant when present. */
 const agentClimbFilter = (agent?: string) =>
-  agent ? `${callerExpr()} = '${escapeSingleQuotes(agent)}'` : "1=1";
+  buildAgentClimbFilter(callerExpr(), agent, {
+    env: props.agentEnv,
+    version: props.agentVersion,
+  });
 
 /**
  * Condense a raw error string into a scannable one-liner. Framework errors are

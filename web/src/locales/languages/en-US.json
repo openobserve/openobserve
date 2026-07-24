@@ -7808,7 +7808,8 @@
       "stream": "Stream",
       "agent": "Agent",
       "noAgentsTitle": "No agents found",
-      "noAgentsDescription": "No agents were discovered in this time range. Try widening the time range, or check that your traces include gen_ai agent attributes."
+      "noAgentsDescription": "No agents were discovered in this time range. Try widening the time range, or check that your traces include gen_ai agent attributes.",
+      "versionAgnosticHint": "Topology is the same across versions — the graph scopes by environment, not version. Use version comparison to compare versions."
     },
     "kpi": {
       "totalCost": "Total Cost",

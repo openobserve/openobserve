@@ -1433,7 +1433,7 @@ pub async fn enrich_with_topology(
             } else {
                 // Query service graph to check for a known dependency
                 let raw_sg_edges = match service_graph::query_edges_from_stream_internal(
-                    org_id, None, None, None,
+                    org_id, None, None, None, None,
                 )
                 .await
                 {

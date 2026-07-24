@@ -178,6 +178,13 @@ pub struct AgentSignalRecord {
     pub signal_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub agent_name: Option<String>,
+    #[serde(rename = "gen_ai_agent_env", skip_serializing_if = "Option::is_none")]
+    pub agent_env: Option<String>,
+    #[serde(
+        rename = "gen_ai_agent_version",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub agent_version: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -221,6 +228,8 @@ mod tests {
             source_stream: "sre_agent_traces".to_string(),
             signal_type: "failure".to_string(),
             agent_name: Some("sre_rca_agent".to_string()),
+            agent_env: None,
+            agent_version: None,
             tool_name: None,
             fail_class: Some("malformed_tool_call".to_string()),
             count: 161,
@@ -248,6 +257,31 @@ mod tests {
         let val = make_record().to_json();
         assert!(val.get("tool_name").is_none());
         assert!(val.get("cost").is_none());
+    }
+
+    #[test]
+    fn record_carries_env_and_version() {
+        let r = AgentSignalRecord {
+            timestamp: 1,
+            org_id: "o".into(),
+            source_stream: "s".into(),
+            signal_type: "failure".into(),
+            agent_name: Some("a".into()),
+            agent_env: Some("prod".into()),
+            agent_version: Some("2.1".into()),
+            tool_name: None,
+            fail_class: Some("timeout".into()),
+            count: 3,
+            calls: None,
+            distinct_traces: None,
+            cost: None,
+            tokens: None,
+            errors: None,
+            p95_latency_ns: None,
+        };
+        let v = r.to_json();
+        assert_eq!(v["gen_ai_agent_env"], "prod");
+        assert_eq!(v["gen_ai_agent_version"], "2.1");
     }
 
     fn valid_taxonomy() -> AgentSignalsTaxonomy {

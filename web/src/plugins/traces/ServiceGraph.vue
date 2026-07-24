@@ -464,6 +464,21 @@ export default defineComponent({
       type: String,
       default: undefined,
     },
+    // Agent scoping (Agent Graph page). When set, the topology is scoped to the
+    // selected agent + its environment. ENV-ONLY: version is deliberately NOT a
+    // prop and is never forwarded — the graph is version-agnostic.
+    agentId: {
+      type: String as PropType<string | null>,
+      default: null,
+    },
+    agentName: {
+      type: String as PropType<string | null>,
+      default: null,
+    },
+    agentEnv: {
+      type: String as PropType<string | null>,
+      default: null,
+    },
   },
   emits: ["view-traces", "request:stream-change", "jump-to-stream-data"],
   setup(props, { emit, expose }) {
@@ -522,6 +537,16 @@ export default defineComponent({
           streamFilter.value = next;
           loadServiceGraph();
         }
+      },
+    );
+    // Agent scoping (Agent Graph page) changes id/name/env when a different
+    // agent is selected. The topology must be re-fetched so it scopes to the
+    // newly selected agent + env. ENV-ONLY: no version in the deps — the graph
+    // is version-agnostic, so a version switch alone must NOT trigger a refetch.
+    watch(
+      () => [props.agentId, props.agentName, props.agentEnv],
+      () => {
+        loadServiceGraph();
       },
     );
     const availableStreams = ref<string[]>([]);
@@ -1558,6 +1583,11 @@ export default defineComponent({
           streamName,
           startTime,
           endTime,
+          // ENV-ONLY: forward agent id/name/env for agent-scoped topology.
+          // agent_version is intentionally never sent (version-agnostic graph).
+          agentId: props.agentId,
+          agentName: props.agentName,
+          agentEnv: props.agentEnv,
         });
         const raw = response?.data ?? { nodes: [], edges: [] };
         const nodeIds = new Set((raw.nodes ?? []).map((n: any) => n.id));

@@ -110,6 +110,7 @@ import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import AgentSignalDetailPanel from "./AgentSignalDetailPanel.vue";
 import PanelSectionHeader from "./PanelSectionHeader.vue";
 import agentSignalsService, { type AgentSignalRecord } from "@/services/agent_signals";
+import { matchesAgentScope } from "./agentScope";
 
 const props = defineProps<{
   startTime?: number;
@@ -159,7 +160,9 @@ const orgId = computed(() => store.state.selectedOrganization?.identifier as str
 const scopedSignals = computed(() => {
   const a = props.agentFilter?.trim();
   if (!a) return signals.value;
-  return signals.value.filter((s) => (s.agent_name ?? "") === a);
+  return signals.value.filter((s) =>
+    matchesAgentScope(s, { name: a, env: props.agentEnv, version: props.agentVersion }),
+  );
 });
 
 /** Loop rows: rank (agent, tool) by calls-per-trace ratio. */
