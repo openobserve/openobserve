@@ -436,4 +436,11 @@ mod tests {
         let resp: Response = err.into();
         assert_eq!(resp.status().as_u16(), 500);
     }
+
+    #[test]
+    fn test_eval_job_error_task_publish_is_500() {
+        let err = EvalJobError::TaskPublish("queue publish timed out".to_string());
+        let resp: Response = err.into();
+        assert_eq!(resp.status().as_u16(), 500);
+    }
 }
