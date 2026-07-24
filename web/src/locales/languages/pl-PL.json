@@ -2222,6 +2222,7 @@
       "linkPartial": "Połączono z {ok} alertami, {failed} nie udało się",
       "linkError": "Nie udało się połączyć alertów."
     },
+    "chooseTrigger": "Wybierz wyzwalacz",
     "node": {
       "kindTrigger": "Wyzwalacz",
       "kindLogic": "Logika",
@@ -2378,6 +2379,11 @@
     "deleteNodeTitle": "Usuń węzeł",
     "deleteNodeLlmEvalConfirm": "Czy na pewno chcesz usunąć ten węzeł oceny LLM?",
     "cancel": "Anuluj",
+    "collapseNodes": "Zwiń węzły",
+    "openNodes": "Otwórz węzły",
+    "chooseSource": "Wybierz źródło",
+    "sourceStreamDesc": "Przetwarzaj dane w czasie rzeczywistym podczas ich wprowadzania do strumienia",
+    "sourceQueryDesc": "Uruchom zapytanie według harmonogramu i przetwarzaj jego wyniki",
     "promqlOnlyForMetrics": "PromQL jest dostępny tylko dla typu strumienia metryk",
     "invalidCronExpression": "Nieprawidłowe wyrażenie cron",
     "cronRequired": "Wyrażenie cron jest wymagane",
@@ -3326,6 +3332,8 @@
     "seriesName": "Nazwa serii",
     "seriesValue": "Wartość serii",
     "axisValue": "Wartość osi",
+    "expandAllSections": "Rozwiń wszystkie sekcje",
+    "collapseAllSections": "Zwiń wszystkie sekcje",
     "configSectionGeneral": "Ogólne",
     "configSectionPromqlTable": "Tryb tabeli PromQL",
     "configSectionGeographic": "Konfiguracja geograficzna",
@@ -7730,7 +7738,11 @@
     "agentGraph": {
       "allAgents": "Wszyscy agenci",
       "stream": "Strumień",
-      "agent": "Agent"
+      "agent": "Agent",
+      "noAgentsTitle": "Nie znaleziono agentów",
+      "noAgentsDescription": "Nie znaleziono agentów w tym zakresie czasu. Spróbuj poszerzyć zakres czasu lub sprawdź, czy Twoje ślady zawierają atrybuty agenta gen_ai.",
+      "agentCountSingular": "agent",
+      "agentCountPlural": "agenci"
     },
     "kpi": {
       "totalCost": "Całkowity koszt",
@@ -9381,6 +9393,8 @@
     "dialog": {
       "bulkDeleteBody": "Czy na pewno chcesz usunąć {count} kontrolę(i)? Tej czynności nie można cofnąć.",
       "bulkDeleteTitle": "Usuń kontrole",
+      "deleteSingleBody": "Czy na pewno chcesz usunąć \"{name}\"? Tej czynności nie można cofnąć.",
+      "deleteSingleTitle": "Usuń sprawdzenie",
       "duplicateTitle": "Duplikuj kontrolę"
     },
     "empty": {
@@ -9574,6 +9588,7 @@
       "httpDesc": "Sprawdź punkty końcowe, kody statusu i treści odpowiedzi",
       "leave": "Opuść",
       "loadEditFailed": "Nie udało się załadować sprawdzenia do edycji — formularz pokazuje wartości domyślne, nie zapisuj",
+      "notFoundInOrg": "To sprawdzenie nie istnieje w bieżącej organizacji.",
       "modalSubtitle": "Wybierz, co chcesz monitorować",
       "modalTitle": "Utwórz sprawdzenie",
       "pageTitle": "Nowe sprawdzenie {label}",
@@ -9693,6 +9708,7 @@
       "failed": "Nieudane",
       "failedRuns": "Nieudane uruchomienia",
       "jumpToLastRun": "Przejdź do ostatniego uruchomienia",
+      "jumpToLatestData": "Przejdź do najnowszych danych",
       "lastRun": "Ostatnie uruchomienie",
       "location": "Lokalizacja",
       "monitors": "Monitory",
@@ -10022,7 +10038,8 @@
       "nameRequired": "Nazwa jest wymagana",
       "selectorRequired": "Selektor jest wymagany dla \"{step}\"",
       "urlInvalid": "Wprowadź prawidłowy URL zaczynający się od http:// lub https://",
-      "urlRequired": "Początkowy URL jest wymagany"
+      "urlRequired": "Początkowy URL jest wymagany",
+      "fixHighlightedFields": "Popraw zaznaczone pola przed zapisaniem"
     },
     "privateLocations": {
       "searchPlaceholder": "Szukaj lokalizacji...",
@@ -10209,6 +10226,8 @@
       "panelEditorQueryInspector": "Otwórz inspektor zapytań",
       "metricsRunQuery": "Wykonaj zapytanie PromQL",
       "metricsRefresh": "Odśwież",
+      "metricsAddToDashboard": "Dodaj do pulpitu nawigacyjnego",
+      "metricsCopyUrl": "Skopiuj link do udostępnienia",
       "tracesSearch": "Wykonaj zapytanie",
       "tracesRefresh": "Odśwież",
       "alertsCreate": "Utwórz nowy alert",

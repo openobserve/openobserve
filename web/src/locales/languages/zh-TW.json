@@ -2071,7 +2071,7 @@
   "workflow": {
     "header": "工作流程",
     "subtitle": "使用觸發器、邏輯和目的地自動化動作",
-    "create": "新工作流程",
+    "create": "新增工作流程",
     "createTitle": "建立工作流程",
     "createConfirm": "建立",
     "createSuccess": "工作流程已成功建立",
@@ -2222,6 +2222,7 @@
       "linkPartial": "已連結至 {ok} 個警示，{failed} 個失敗",
       "linkError": "無法連結警示。"
     },
+    "chooseTrigger": "選擇觸發器",
     "node": {
       "kindTrigger": "觸發器",
       "kindLogic": "邏輯",
@@ -2378,6 +2379,11 @@
     "deleteNodeTitle": "刪除節點",
     "deleteNodeLlmEvalConfirm": "確定要刪除此 LLM 評估節點嗎？",
     "cancel": "取消",
+    "collapseNodes": "折疊節點",
+    "openNodes": "展開節點",
+    "chooseSource": "選擇來源",
+    "sourceStreamDesc": "即時處理串流中擷取的資料",
+    "sourceQueryDesc": "依排程執行查詢並處理結果",
     "promqlOnlyForMetrics": "PromQL 僅適用於指標串流類型",
     "invalidCronExpression": "無效的 cron 運算式",
     "cronRequired": "Cron 運算式為必填項",
@@ -3326,6 +3332,8 @@
     "seriesName": "系列名稱",
     "seriesValue": "系列值",
     "axisValue": "軸值",
+    "expandAllSections": "展開所有區段",
+    "collapseAllSections": "折疊所有區段",
     "configSectionGeneral": "一般",
     "configSectionPromqlTable": "PromQL 表格模式",
     "configSectionGeographic": "地理組態",
@@ -7730,7 +7738,11 @@
     "agentGraph": {
       "allAgents": "所有代理",
       "stream": "串流",
-      "agent": "代理"
+      "agent": "代理",
+      "noAgentsTitle": "找不到任何代理",
+      "noAgentsDescription": "在此時間範圍內未發現任何代理。請嘗試擴大時間範圍，或檢查您的追蹤是否包含 gen_ai 代理屬性。",
+      "agentCountSingular": "代理",
+      "agentCountPlural": "代理"
     },
     "kpi": {
       "totalCost": "總成本",
@@ -9381,6 +9393,8 @@
     "dialog": {
       "bulkDeleteBody": "您確定要刪除 {count} 個檢查嗎？此操作無法復原。",
       "bulkDeleteTitle": "刪除檢查",
+      "deleteSingleBody": "您確定要刪除「{name}」嗎？此操作無法復原。",
+      "deleteSingleTitle": "刪除檢查",
       "duplicateTitle": "複製檢查"
     },
     "empty": {
@@ -9574,6 +9588,7 @@
       "httpDesc": "檢查端點、狀態碼和回應主體",
       "leave": "離開",
       "loadEditFailed": "無法載入檢查進行編輯 — 表單顯示預設值，請勿儲存",
+      "notFoundInOrg": "此檢查在目前組織中不存在。",
       "modalSubtitle": "選擇您要監控的內容",
       "modalTitle": "建立檢查",
       "pageTitle": "新增 {label} 檢查",
@@ -9693,6 +9708,7 @@
       "failed": "失敗",
       "failedRuns": "失敗的執行",
       "jumpToLastRun": "跳至最後一次執行",
+      "jumpToLatestData": "跳至最新資料",
       "lastRun": "上次執行",
       "location": "位置",
       "monitors": "監控項目",
@@ -10022,7 +10038,8 @@
       "nameRequired": "名稱為必填",
       "selectorRequired": "選擇器是「{step}」的必填項",
       "urlInvalid": "輸入以 http:// 或 https:// 開頭的有效 URL",
-      "urlRequired": "起始 URL 為必填"
+      "urlRequired": "起始 URL 為必填",
+      "fixHighlightedFields": "修正反白標記的欄位後再儲存"
     },
     "privateLocations": {
       "searchPlaceholder": "搜尋位置...",
@@ -10209,6 +10226,8 @@
       "panelEditorQueryInspector": "開啟查詢檢查器",
       "metricsRunQuery": "執行 PromQL 查詢",
       "metricsRefresh": "重新整理",
+      "metricsAddToDashboard": "新增至儀表板",
+      "metricsCopyUrl": "複製分享連結",
       "tracesSearch": "執行查詢",
       "tracesRefresh": "重新整理",
       "alertsCreate": "建立新警示",

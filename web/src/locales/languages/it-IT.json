@@ -2222,6 +2222,7 @@
       "linkPartial": "Collegato a {ok} avviso(i), {failed} falliti",
       "linkError": "Impossibile collegare gli avvisi."
     },
+    "chooseTrigger": "Scegli un trigger",
     "node": {
       "kindTrigger": "Trigger",
       "kindLogic": "Logica",
@@ -2378,6 +2379,11 @@
     "deleteNodeTitle": "Elimina nodo",
     "deleteNodeLlmEvalConfirm": "Sei sicuro di voler eliminare questo nodo di valutazione LLM?",
     "cancel": "Annulla",
+    "collapseNodes": "Comprimi nodi",
+    "openNodes": "Apri nodi",
+    "chooseSource": "Scegli una sorgente",
+    "sourceStreamDesc": "Elabora i dati in tempo reale mentre vengono inseriti in uno stream",
+    "sourceQueryDesc": "Esegui una query pianificata e processa i risultati",
     "promqlOnlyForMetrics": "ProMQL è disponibile solo per il tipo di flusso di metriche",
     "invalidCronExpression": "Espressione cron non valida",
     "cronRequired": "L'espressione cron è obbligatoria",
@@ -3326,6 +3332,8 @@
     "seriesName": "Nome della serie",
     "seriesValue": "Valore della serie",
     "axisValue": "Valore dell'asse",
+    "expandAllSections": "Espandi tutte le sezioni",
+    "collapseAllSections": "Comprimi tutte le sezioni",
     "configSectionGeneral": "Generale",
     "configSectionPromqlTable": "Modalità tabella ProMQL",
     "configSectionGeographic": "Configurazione geografica",
@@ -7730,7 +7738,11 @@
     "agentGraph": {
       "allAgents": "Tutti gli agenti",
       "stream": "Stream",
-      "agent": "Agente"
+      "agent": "Agente",
+      "noAgentsTitle": "Nessun agente trovato",
+      "noAgentsDescription": "Nessun agente scoperto in questo intervallo di tempo. Prova ad ampliare l'intervallo o verifica che le tue tracce includano attributi dell'agente gen_ai.",
+      "agentCountSingular": "agente",
+      "agentCountPlural": "agenti"
     },
     "kpi": {
       "totalCost": "Costo totale",
@@ -9381,6 +9393,8 @@
     "dialog": {
       "bulkDeleteBody": "Sei sicuro di voler eliminare {count} controllo(i)? Questa azione non può essere annullata.",
       "bulkDeleteTitle": "Elimina controlli",
+      "deleteSingleBody": "Sei sicuro di voler eliminare \"{name}\"? Questa azione non può essere annullata.",
+      "deleteSingleTitle": "Elimina check",
       "duplicateTitle": "Duplica controllo"
     },
     "empty": {
@@ -9574,6 +9588,7 @@
       "httpDesc": "Controlla endpoint, codici di stato e corpi delle risposte",
       "leave": "Esci",
       "loadEditFailed": "Caricamento del controllo per la modifica fallito — il modulo mostra i valori predefiniti, non salvare",
+      "notFoundInOrg": "Questo check non esiste nell'organizzazione corrente.",
       "modalSubtitle": "Scegli cosa monitorare",
       "modalTitle": "Crea un check",
       "pageTitle": "Nuovo controllo {label}",
@@ -9693,6 +9708,7 @@
       "failed": "Fallito",
       "failedRuns": "Esecuzioni fallite",
       "jumpToLastRun": "Vai all'ultima esecuzione",
+      "jumpToLatestData": "Vai ai dati più recenti",
       "lastRun": "Ultima corsa",
       "location": "Posizione",
       "monitors": "Monitor",
@@ -10022,7 +10038,8 @@
       "nameRequired": "Il nome è obbligatorio",
       "selectorRequired": "Il selettore è obbligatorio per \"{step}\"",
       "urlInvalid": "Inserisci un URL valido che inizi con http:// o https://",
-      "urlRequired": "L'URL iniziale è obbligatorio"
+      "urlRequired": "L'URL iniziale è obbligatorio",
+      "fixHighlightedFields": "Correggi i campi evidenziati prima di salvare"
     },
     "privateLocations": {
       "searchPlaceholder": "Cerca posizioni...",
@@ -10209,6 +10226,8 @@
       "panelEditorQueryInspector": "Apri l'ispettore delle interrogazioni",
       "metricsRunQuery": "Esegui una query ProMQL",
       "metricsRefresh": "Aggiorna",
+      "metricsAddToDashboard": "Aggiungi alla dashboard",
+      "metricsCopyUrl": "Copia link di condivisione",
       "tracesSearch": "Cerca tracce",
       "tracesRefresh": "Aggiorna",
       "alertsCreate": "Crea un nuovo avviso",
