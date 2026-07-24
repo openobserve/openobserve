@@ -2295,6 +2295,23 @@ export default defineComponent({
   /* Match main's log cell size (--text-xs). OTable cells set no explicit size,
      so they'd otherwise inherit a larger ambient font and read as too big. */
   font-size: var(--text-xs);
+  /* Cap the line box so a single log line can't push the row past the 20px
+     target (matches main's dense rows). */
+  line-height: 1.125rem;
+}
+
+/* OTable's expand button is size-6 (24px), which forces EVERY log row to be
+   >=24px regardless of :row-height, so fewer lines fit per screen than on main.
+   Main's log expand button is 1.25rem (20px) — match it so the rows collapse to
+   the same 20px density and the same number of lines fit. */
+.logs-results-otable :deep([data-test^="o2-table-expand-"]) {
+  height: 1.125rem !important;
+  width: 1.125rem !important;
+  min-height: 0 !important;
+}
+.logs-results-otable :deep([data-test^="o2-table-expand-"] svg) {
+  width: 0.875rem !important;
+  height: 0.875rem !important;
 }
 
 /* keep(generated-content): pin-breakdown tooltip. The rows are built from data
