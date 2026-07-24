@@ -156,6 +156,7 @@ async function probeExtension() {
 
 // Server-driven lists fetched once here and threaded down to CheckConfigure.
 const locations = ref<SyntheticsLocation[]>([]);
+const locationsLoading = ref(false);
 const browsers = ref<string[]>([]);
 const devices = ref<SyntheticsDevice[]>([]);
 const destinations = ref<string[]>([]);
@@ -216,6 +217,7 @@ async function openAgentSetup() {
 }
 
 async function fetchLocations() {
+  locationsLoading.value = true;
   try {
     const org = store.state.selectedOrganization.identifier;
     const res = await syntheticsService.getLocations(org);
@@ -233,6 +235,8 @@ async function fetchLocations() {
     locations.value = [];
     browsers.value = [];
     devices.value = [];
+  } finally {
+    locationsLoading.value = false;
   }
 }
 
@@ -1048,6 +1052,7 @@ function onClearResults() {
               :check="check"
               check-type="browser"
               :locations="locations"
+              :loading-locations="locationsLoading"
               :browsers="browsers"
               :devices="devices"
               :destinations="destinations"
@@ -1059,6 +1064,7 @@ function onClearResults() {
               @refresh:destinations="fetchDestinations"
               @update:check="onConfigureUpdate"
               @setup-agent="openAgentSetup"
+              @refresh-locations="fetchLocations"
             />
           </OStep>
         </OStepper>
