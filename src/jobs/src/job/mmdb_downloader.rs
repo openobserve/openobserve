@@ -20,14 +20,12 @@ use config::{
     MMDB_CITY_FILE_NAME,
     utils::download_utils::{download_file, is_digest_different},
 };
+use enrichment_data::enrichment_table::geoip::{Geoip, GeoipConfig, MMDB_INIT_NOTIFIER};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use tokio::time;
 
-use crate::{
-    common::{infra::config::MAXMIND_DB_CLIENT, meta::maxmind::MaxmindClient},
-    service::enrichment_table::geoip::{Geoip, GeoipConfig, MMDB_INIT_NOTIFIER},
-};
+use crate::common::{infra::config::MAXMIND_DB_CLIENT, meta::maxmind::MaxmindClient};
 
 static CLIENT_INITIALIZED: LazyLock<bool> = LazyLock::new(|| true);
 

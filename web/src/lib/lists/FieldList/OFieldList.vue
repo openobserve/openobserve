@@ -53,7 +53,7 @@
         <!-- Group header -->
         <div
           v-if="row.isGroup"
-          class="o-field-list__group-header h-7 px-page-edge flex items-center justify-between text-2xs font-semibold text-field-list-group-text cursor-default select-none tracking-[0.01em] sticky top-0 z-[2] bg-surface-panel"
+          class="o-field-list__group-header h-7 px-page-edge flex items-center justify-between text-2xs font-semibold text-field-list-group-text cursor-default select-none tracking-[0.01em] sticky top-0 z-2 bg-surface-panel"
           :data-test="`o-field-list-group-${row.groupName}`"
         >
           <slot name="group-header" :row="row" :group-name="row.groupName">
@@ -109,7 +109,7 @@
         <!-- Expanded content -->
         <div
           v-if="isExpanded(row) && $slots.expansion"
-          class="w-full pt-1 pb-1.5 border border-field-list-expansion-border border-t-0 rounded-b-default mb-1.5 relative z-[1] box-border"
+          class="w-full pt-1 pb-1.5 border border-field-list-expansion-border border-t-0 rounded-b-default mb-1.5 relative z-1 box-border"
         >
           <slot name="expansion" :row="row" />
         </div>

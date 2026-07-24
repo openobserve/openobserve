@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog v-model:open="showDialog" data-test="enterprise-upgrade-dialog" :show-close="false" :width="75" @update:open="(v) => !v && onDialogHide()">
     <div class="enterprise-dialog-v3 overflow-hidden relative -my-(--spacing-dialog-content-py) -mx-(--spacing-dialog-content-px)">
       <!-- Close Button -->
-      <div class="absolute top-4 right-4 z-[100] text-text-secondary hover:text-text-body">
+      <div class="absolute top-4 right-4 z-100 text-text-secondary hover:text-text-body">
         <OButton
           variant="ghost"
           size="icon"

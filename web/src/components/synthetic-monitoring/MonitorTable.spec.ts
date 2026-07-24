@@ -370,6 +370,15 @@ describe("MonitorTable", () => {
       expect(wrapper.emitted("delete")![0]).toEqual([mockMonitorList[0]]);
     });
 
+    it("should emit move with row data when move menu item is clicked", async () => {
+      wrapper = mountMonitorTable();
+      const moveItem = wrapper.find('[data-test="monitor-table-move-item"]');
+      expect(moveItem.exists()).toBe(true);
+      await moveItem.trigger("click");
+      expect(wrapper.emitted("move")).toHaveLength(1);
+      expect(wrapper.emitted("move")![0]).toEqual([mockMonitorList[0]]);
+    });
+
     it("should render per-row action buttons for each data row", () => {
       wrapper = mountMonitorTable();
       // Each row should have edit, duplicate, and more buttons

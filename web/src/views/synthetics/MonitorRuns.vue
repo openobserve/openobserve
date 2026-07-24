@@ -37,7 +37,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="monitor-runs h-full flex flex-col"
     data-test="synthetics-monitor-runs"
   >
+    <!-- Full-page empty state — replaces the entire content area when no
+         runs exist in the current time window. The parent (MonitorResults)
+         passes lastTriggeredAt to distinguish "never triggered" from "no
+         runs in this window." -->
+    <template v-if="kpiHasLoadedOnce && synthetics.kpi.value.totalRuns === 0">
+      <div class="flex-1 flex items-center justify-center">
+        <OEmptyState
+          size="hero"
+          :illustration="lastTriggeredAt > 0 ? 'no-results' : 'browser-check'"
+          :title="lastTriggeredAt > 0 ? t('synthetics.results.noRunsInWindow') : t('synthetics.results.noRunsYet')"
+          :description="lastTriggeredAt > 0 ? t('synthetics.results.noRunsInWindowDesc') : t('synthetics.results.noRunsYetDesc')"
+          data-test="monitor-runs-page-empty"
+        >
+          <template #actions>
+            <EmptyStateActionCard
+              v-if="lastTriggeredAt > 0"
+              icon="schedule"
+              :label="t('synthetics.results.jumpToLatestData')"
+              :sublabel="lastTriggeredAtSublabel"
+              data-test="monitor-runs-empty-jump-latest"
+              @click="handleJumpToLatestData"
+            />
+            <EmptyStateActionCard
+              v-else
+              icon="play-arrow"
+              :label="t('synthetics.results.triggerRunNow')"
+              :sublabel="t('synthetics.results.triggerRunNowDesc')"
+              data-test="monitor-runs-empty-trigger-run"
+              @click="handleEmptyStateAction('trigger-run')"
+            />
+            <EmptyStateActionCard
+              v-if="hasActiveFilters"
+              icon="filter-list"
+              :label="t('synthetics.results.clearFilters')"
+              :sublabel="t('synthetics.results.clearFiltersDesc')"
+              data-test="monitor-runs-empty-clear-filters"
+              @click="handleEmptyStateAction('clear-filters')"
+            />
+          </template>
+        </OEmptyState>
+      </div>
+    </template>
+
     <!-- ── Tabs ──────────────────────────────────────────────────────── -->
+    <template v-else>
     <OTabs
       v-model="activeTab"
       class="shrink-0 px-page-edge border-b border-border-default"
@@ -117,6 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="px-page-edge">
               <MonitorStatusTimeline
                 :segments="timelineSegments"
+                :is-browser="isBrowser"
                 :fail-count="timelineFailCount"
                 :pass-count="timelinePassCount"
                 :mixed-count="timelineMixedCount"
@@ -129,9 +174,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- KPI Cards — gated on KPI + last-run queries -->
             <template v-if="kpiLoading || !kpiHasLoadedOnce">
               <div class="px-page-edge">
-                <div class="grid grid-cols-5 gap-2.5">
+                <div class="grid grid-cols-6 gap-2.5">
                   <div
-                    v-for="n in 5"
+                    v-for="n in 6"
                     :key="n"
                     class="card-container rounded-default flex flex-col px-3.5 pt-2.5 pb-2.5 gap-2 bg-surface-base border border-border-default"
                   >
@@ -143,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template v-else>
               <div class="px-page-edge">
-              <div class="grid grid-cols-5 gap-2.5">
+              <div class="grid grid-cols-6 gap-2.5">
                 <div
                   v-for="card in kpiCards"
                   :key="card.key"
@@ -371,7 +416,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     class="flex items-center gap-2 px-2 pt-2.5 pb-2"
                   >
-                    <OIcon name="language" size="sm" class="text-primary-700" />
+                    <OIcon name="language" size="sm" class="text-accent" />
                     <span class="font-bold text-sm text-text-heading">
                       {{ t('synthetics.runs.passRateByBrowser') }}
                     </span>
@@ -420,7 +465,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon
                       name="location-on"
                       size="sm"
-                      class="text-primary-700"
+                      class="text-accent"
                     />
                     <span class="font-bold text-sm text-text-heading">
                       {{ t('synthetics.runs.passRateByLocation') }}
@@ -467,7 +512,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     class="flex items-center gap-2 px-2 pt-2.5 pb-2"
                   >
-                    <OIcon name="devices" size="sm" class="text-primary-700" />
+                    <OIcon name="devices" size="sm" class="text-accent" />
                     <span class="font-bold text-sm text-text-heading">
                       {{ t('synthetics.runs.passRateByDevice') }}
                     </span>
@@ -961,12 +1006,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTabPanel>
       </OTabPanels>
     </div>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
@@ -1019,7 +1066,11 @@ const emit = defineEmits<{
 }>();
 
 const store = useStore();
+const route = useRoute();
 const orgIdentifier = computed(() => (store.state as any).selectedOrganization?.identifier ?? "");
+// The check's folder (name), carried on the results-page route as ?folder=.
+// Passed to per-check API calls so RBAC can resolve folder-scoped grants.
+const folderName = computed(() => String(route.query.folder ?? ""));
 
 // id -> "Name (region)" — run records carry the raw location id (KSUID for
 // private, "aws-us-east-1" for public); resolve to a human label wherever
@@ -1031,9 +1082,9 @@ function locationLabel(id: string): string {
 onMounted(async () => {
   try {
     const res = await syntheticsService.getLocations(orgIdentifier.value);
-    const locations: { id: string; name: string; region: string }[] = (res.data as any).locations ?? [];
+    const locations: { id: string; label: string; region: string }[] = (res.data as any).locations ?? [];
     locationNames.value = Object.fromEntries(
-      locations.map((loc) => [loc.id, locationDisplayLabel(loc.name, loc.region)]),
+      locations.map((loc) => [loc.id, locationDisplayLabel(loc.label, loc.region)]),
     );
   } catch (err) {
     console.error("[synthetics] failed to load locations", err);
@@ -1045,9 +1096,18 @@ interface Props {
   monitorId: string;
   monitorName: string;
   monitorStatus?: "healthy" | "degraded" | "critical";
+  /** Microsecond timestamp of the check's most recent trigger (0 = never triggered).
+   * Used by the page-level empty state to distinguish "never run" vs "no runs in
+   * this time window" and compute the jump-to-latest-data target. */
+  lastTriggeredAt?: number;
+  /** Check type ("browser" | "http" | etc.) — provided by the parent after it
+   * fetches the check. Controls the tabs grid layout and step analysis visibility. */
+  checkType?: string;
 }
 const props = withDefaults(defineProps<Props>(), {
   monitorStatus: "healthy",
+  lastTriggeredAt: 0,
+  checkType: "browser",
 });
 
 // ── Synthetic results composable ──────────────────────────────────────────
@@ -1095,21 +1155,8 @@ function locationIcon(region: string): string {
 // ── State ────────────────────────────────────────────────────────────────
 const activeTab = ref("overview");
 
-// ── Monitor type resolution ──────────────────────────────────────────────
-const isBrowser = ref(true);
-let monitorTypeResolved = false;
-
-async function resolveMonitorType() {
-  try {
-    const res = await syntheticsService.get(orgIdentifier.value, props.monitorId);
-    const type = (res.data as any)?.type ?? "browser";
-    isBrowser.value = type === "browser";
-    monitorTypeResolved = true;
-  } catch {
-    // Default to browser on fetch failure — safe fallback
-    monitorTypeResolved = true;
-  }
-}
+// ── Monitor type — derived from the prop set by parent's fetchCheck() call ──
+const isBrowser = computed(() => props.checkType === "browser");
 
 // ── Seeded random (for fallback mock data in charts/timeline) ────────────
 function seedRand(seed: number) {
@@ -1163,6 +1210,15 @@ const hasActiveFilters = computed(
     errorFilter.value !== null,
 );
 
+// Sublabel for the "Jump to latest data" action card in the page-level
+// empty state — formats the last_triggered_at timestamp for display.
+// lastTriggeredAt is in microseconds; convert to ms for Date().
+const lastTriggeredAtSublabel = computed(() => {
+  const ts = props.lastTriggeredAt;
+  if (!ts || ts <= 0) return "";
+  return new Date(ts / 1000).toLocaleString();
+});
+
 const lastRunLabel = computed(() => {
   const ts = synthetics.kpi.value.lastRunAt;
   if (!ts) return "";
@@ -1170,6 +1226,17 @@ const lastRunLabel = computed(() => {
 });
 
 const runTriggerLoading = ref(false);
+
+// Page-level "Jump to latest data" — builds a 1-hour window (±30 min)
+// centered on lastTriggeredAt (microseconds) and emits it to the parent.
+function handleJumpToLatestData() {
+  const ts = props.lastTriggeredAt;
+  if (!ts || ts <= 0) return;
+  const HALF_HOUR_US = 30 * 60 * 1000 * 1000;
+  const startTime = ts - HALF_HOUR_US;
+  const endTime = ts + HALF_HOUR_US;
+  emit("jump-to-window", startTime, endTime);
+}
 
 async function handleEmptyStateAction(id: string) {
   if (id === "jump-to-last-run") {
@@ -1196,7 +1263,7 @@ async function handleEmptyStateAction(id: string) {
       timeout: 0,
     });
     try {
-      await syntheticsService.run(orgIdentifier.value, props.monitorId, {});
+      await syntheticsService.run(orgIdentifier.value, props.monitorId, {}, folderName.value);
       dismiss();
       toast({ variant: "success", message: t('synthetics.toast.triggerSuccessSingle', { name: props.monitorName }) });
       // Emit refresh so parent reloads data
@@ -1265,6 +1332,12 @@ const actionOptions: SelectOption[] = [
 function toMockRun(r: SyntheticRun, idx: number): MockRun {
   const eng = r.browserEngine;
   const browser = eng ? eng.charAt(0).toUpperCase() + eng.slice(1) : eng;
+  const mappedStatus = (
+    r.status === "passed" ? "pass"
+    : r.status === "warning" ? "warning"
+    : r.status === "error" ? "error"
+    : "fail"
+  ) as MockRun["status"];
   return {
     id: idx + 1,
     runId: r.runId || "unknown-" + idx,
@@ -1273,7 +1346,7 @@ function toMockRun(r: SyntheticRun, idx: number): MockRun {
     timestamp: r.timestamp,
     triggerType: r.triggerType,
     duration: r.durationMs,
-    status: r.status === "passed" ? ("pass" as const) : ("fail" as const),
+    status: mappedStatus,
     location: r.location,
     browser,
     device: r.device,
@@ -1368,14 +1441,22 @@ const kpiCards = computed<KpiCard[]>(() => {
         key: "last-run",
         label: t('synthetics.results.lastRun'),
         value: k.lastRunStatus
-          ? k.lastRunStatus === "failed"
-            ? t('synthetics.results.failed')
-            : t('synthetics.results.passed')
+          ? k.lastRunStatus === "passed"
+            ? t('synthetics.results.passed')
+            : k.lastRunStatus === "warning"
+              ? t('synthetics.protocolRun.warning')
+              : k.lastRunStatus === "error"
+                ? t('synthetics.results.error')
+                : t('synthetics.results.failed')
           : "—",
         valueClass:
-          k.lastRunStatus === "failed"
-            ? "text-status-error-text!"
-            : "text-status-success-text!",
+          k.lastRunStatus === "passed"
+            ? "text-status-success-text!"
+            : k.lastRunStatus === "warning"
+              ? "text-status-warning-text!"
+              : k.lastRunStatus
+                ? "text-status-error-text!"
+                : undefined,
       },
       {
         key: "pass-rate",
@@ -1397,6 +1478,12 @@ const kpiCards = computed<KpiCard[]>(() => {
         valueClass: k.retriedRuns > 0 ? "text-text-body!" : undefined,
       },
       {
+        key: "warning-runs",
+        label: t('synthetics.runs.warningRuns'),
+        value: String(k.warningRuns),
+        valueClass: k.warningRuns > 0 ? "text-status-warning-text!" : undefined,
+      },
+      {
         key: "failed-runs",
         label: t('synthetics.results.failedRuns'),
         value: String(k.failedRuns),
@@ -1408,29 +1495,44 @@ const kpiCards = computed<KpiCard[]>(() => {
   const fallbackPassPct =
     allRuns.value.length > 0
       ? (
-          (allRuns.value.filter((r) => r.status === "pass").length /
+          (allRuns.value.filter((r) => r.status === "pass" || r.status === "warning").length /
             allRuns.value.length) *
           100
         ).toFixed(1) + "%"
       : "100%";
   const lastRun = allRuns.value[0];
   return [
+    {
+      key: "last-run",
+      label: t('synthetics.results.lastRun'),
+      value: lastRun
+        ? lastRun.status === "pass"
+          ? t('synthetics.results.passed')
+          : lastRun.status === "warning"
+            ? t('synthetics.protocolRun.warning')
+            : t('synthetics.results.failed')
+        : "—",
+      valueClass:
+        lastRun?.status === "pass"
+          ? "text-status-success-text!"
+          : lastRun?.status === "warning"
+            ? "text-status-warning-text!"
+            : lastRun
+              ? "text-status-error-text!"
+              : undefined,
+    },
     { key: "pass-rate", label: t('synthetics.runs.passRate'), value: fallbackPassPct },
     { key: "p95-duration", label: t('synthetics.results.p95Duration'), value: "—" },
     { key: "retry-rate", label: t('synthetics.runs.retryRate'), value: "0.0%" },
     {
+      key: "warning-runs",
+      label: t('synthetics.runs.warningRuns'),
+      value: String(allRuns.value.filter((r) => r.status === "warning").length),
+    },
+    {
       key: "failed-runs",
       label: t('synthetics.results.failedRuns'),
       value: String(totalFails.value),
-    },
-    {
-      key: "last-run",
-      label: t('synthetics.results.lastRun'),
-      value: lastRun?.status === "fail" ? t('synthetics.results.failed') : t('synthetics.results.passed'),
-      valueClass:
-        lastRun?.status === "fail"
-          ? "text-status-error-text!"
-          : "text-status-success-text!",
     },
   ];
 });
@@ -1440,14 +1542,14 @@ interface TimelineExecution {
   location: string;
   browserEngine: string;
   device: string;
-  status: "pass" | "fail";
+  status: "pass" | "warning" | "fail" | "error";
   statusIcon: string;
   errorSnippet: string | null;
 }
 
 interface TimelineSegment {
   runId: string;
-  status: "all-pass" | "mixed" | "all-fail";
+  status: "all-pass" | "all-warning" | "mixed" | "all-fail";
   color: string;
   title: string;
   /** Epoch ms of the first execution in this logical run. */
@@ -1476,10 +1578,17 @@ const timelineSegments = computed<TimelineSegment[]>(() => {
 
   return groupOrder.map((runId) => {
     const executions = groupMap.get(runId)!;
-    const allPass = executions.every((e) => e.status === "pass");
-    const allFail = executions.every((e) => e.status === "fail");
+    const allPass = executions.every(
+      (e) => e.status === "pass" || e.status === "warning",
+    );
+    const allFail = executions.every(
+      (e) => e.status === "fail" || e.status === "error",
+    );
+    const allWarning = executions.every((e) => e.status === "warning");
     const status: TimelineSegment["status"] = allPass
-      ? "all-pass"
+      ? allWarning
+        ? "all-warning"
+        : "all-pass"
       : allFail
         ? "all-fail"
         : "mixed";
@@ -1487,25 +1596,39 @@ const timelineSegments = computed<TimelineSegment[]>(() => {
     const color =
       status === "all-pass"
         ? "bg-badge-success-solid-bg/80"
-        : status === "all-fail"
-          ? "bg-badge-error-solid-bg/80"
-          : "bg-badge-orange-solid-bg/80";
+        : status === "all-warning"
+          ? "bg-badge-warning-solid-bg/80"
+          : status === "all-fail"
+            ? "bg-badge-error-solid-bg/80"
+            : "bg-badge-orange-solid-bg/80";
 
-    const passCount = executions.filter((e) => e.status === "pass").length;
+    const passCount = executions.filter(
+      (e) => e.status === "pass" || e.status === "warning",
+    ).length;
     const failCount = executions.length - passCount;
     const title =
       status === "all-pass"
         ? t('synthetics.runs.timelineAllPassed', { count: executions.length })
-        : status === "all-fail"
-          ? t('synthetics.runs.timelineAllFailed', { count: executions.length })
-          : t('synthetics.runs.timelineMixed', { passed: passCount, failed: failCount, total: executions.length });
+        : status === "all-warning"
+          ? t('synthetics.runs.timelineAllWarning', { count: executions.length })
+          : status === "all-fail"
+            ? t('synthetics.runs.timelineAllFailed', { count: executions.length })
+            : t('synthetics.runs.timelineMixed', { passed: passCount, failed: failCount, total: executions.length });
 
     const execDetails: TimelineExecution[] = executions.map((e) => ({
       location: e.location,
       browserEngine: e.browser,
       device: e.device,
-      status: e.status === "pass" ? "pass" : "fail",
-      statusIcon: e.status === "pass" ? "check_circle" : "cancel",
+      status: e.status === "pass"
+        ? "pass"
+        : e.status === "warning"
+          ? "warning"
+          : e.status === "error"
+            ? "error"
+            : "fail",
+      statusIcon: e.status === "pass" || e.status === "warning"
+        ? "check_circle"
+        : "cancel",
       errorSnippet: e.errorPattern
         ? e.errorPattern.split(":")[0].substring(0, 50)
         : null,
@@ -1526,10 +1649,16 @@ const timelineFailCount = computed(() =>
   String(timelineSegments.value.filter((s) => s.status === "all-fail").length),
 );
 const timelinePassCount = computed(() =>
-  String(timelineSegments.value.filter((s) => s.status === "all-pass").length),
+  String(
+    timelineSegments.value.filter((s) => s.status === "all-pass").length,
+  ),
 );
 const timelineMixedCount = computed(() =>
-  String(timelineSegments.value.filter((s) => s.status === "mixed").length),
+  String(
+    timelineSegments.value.filter(
+      (s) => s.status === "mixed" || s.status === "all-warning",
+    ).length,
+  ),
 );
 
 function formatTimelineDate(ms: number): string {
@@ -1591,7 +1720,7 @@ const browserBreakdown = computed<BreakdownItem[]>(() => {
     const key = run.browser || "Unknown";
     const g = groups.get(key) ?? { pass: 0, total: 0 };
     g.total++;
-    if (run.status === "pass") g.pass++;
+    if (run.status === "pass" || run.status === "warning") g.pass++;
     groups.set(key, g);
   }
   const browserIconMap: Record<string, string> = {
@@ -1617,7 +1746,7 @@ const locationBreakdown = computed<BreakdownItem[]>(() => {
     const key = run.location || "Unknown";
     const g = groups.get(key) ?? { pass: 0, total: 0 };
     g.total++;
-    if (run.status === "pass") g.pass++;
+    if (run.status === "pass" || run.status === "warning") g.pass++;
     groups.set(key, g);
   }
 
@@ -1654,7 +1783,7 @@ const deviceBreakdown = computed<BreakdownItem[]>(() => {
     const key = run.device || "Unknown";
     const g = groups.get(key) ?? { pass: 0, total: 0 };
     g.total++;
-    if (run.status === "pass") g.pass++;
+    if (run.status === "pass" || run.status === "warning") g.pass++;
     groups.set(key, g);
   }
   return Array.from(groups.entries()).map(([id, g]) => {
@@ -1708,6 +1837,7 @@ const locationDurationBreakdown = computed<BreakdownItem[]>(() => {
 const statusOptions = [
   { key: "all", label: t('synthetics.filters.all'), dot: "var(--color-text-secondary)" },
   { key: "pass", label: t('synthetics.results.passed'), dot: "var(--color-status-success-text)" },
+  { key: "warning", label: t('synthetics.runs.warning'), dot: "var(--color-status-warning-text)" },
   { key: "fail", label: t('synthetics.results.failed'), dot: "var(--color-status-error-text)" },
 ];
 
@@ -1751,7 +1881,7 @@ function fmtAge(min: number): string {
 }
 interface MockRun {
   id: number; runId: string; ageMin: number; scheduledTs: number;
-  timestamp: number; duration: number; status: "pass" | "fail";
+  timestamp: number; duration: number; status: "pass" | "warning" | "fail" | "error";
   location: string; browser: string; device: string; triggerType: string;
   failedStep: string | null; locator: string | null; action: string | null;
   errorPattern: string | null;
@@ -1776,7 +1906,13 @@ function generateRuns(timeRange?: { startTimeMs: number; endTimeMs: number }): M
     const intervalFraction = logicalRunIdx / NUM_LOGICAL_RUNS;
     const scheduledBase = baseTime - Math.round(intervalFraction * timeSpan);
     for (let execIdx = 0; execIdx < numExecutions; execIdx++) {
-      const isFail = r() < 0.22;
+      const rand = r();
+      const status: MockRun["status"] =
+        rand < 0.05 ? "warning"
+        : rand < 0.22 ? "fail"
+        : rand < 0.24 ? "error"
+        : "pass";
+      const isFail = status === "fail" || status === "error";
       const dur = isFail ? Math.round(20000 + r() * 15000) : Math.round(1800 + r() * 3200);
       const errIdx = Math.floor(r() * errs.length);
       const failedStep = isFail ? steps[8 + Math.floor(r() * 4)] : null;
@@ -1785,7 +1921,7 @@ function generateRuns(timeRange?: { startTimeMs: number; endTimeMs: number }): M
         id: idCounter++, runId,
         ageMin: Math.round((baseTime - scheduledBase) / 60000),
         scheduledTs: scheduledBase, timestamp: scheduledBase + Math.round(r() * 30000),
-        triggerType: "schedule", duration: dur, status: isFail ? "fail" : "pass",
+        triggerType: "schedule", duration: dur, status,
         location: locations[Math.floor(r() * locations.length)],
         browser: browsers[Math.floor(r() * browsers.length)],
         device: devices[r() < 0.7 ? 0 : r() < 0.85 ? 1 : 2],
@@ -1843,12 +1979,24 @@ interface VisibleRun {
 
 const visibleRuns = computed<VisibleRun[]>(() => {
   return filteredRuns.value.map((run) => {
-    const isFail = run.status === "fail";
+    const isPass = run.status === "pass";
+    const isWarning = run.status === "warning";
+    const isError = run.status === "error";
     return {
       id: run.id,
-      statusBadgeVariant: isFail ? "error-soft" : "success-soft",
-      statusIcon: isFail ? "cancel" : "check_circle",
-      statusLabel: isFail ? t('synthetics.results.failed') : t('synthetics.results.passed'),
+      statusBadgeVariant: isPass
+        ? "success-soft"
+        : isWarning
+          ? "warning-soft"
+          : "error-soft",
+      statusIcon: isPass || isWarning ? "check_circle" : "cancel",
+      statusLabel: isPass
+        ? t('synthetics.results.passed')
+        : isWarning
+          ? t('synthetics.protocolRun.warning')
+          : isError
+            ? t('synthetics.results.error')
+            : t('synthetics.results.failed'),
       scheduledTs: run.scheduledTs,
       lastRunTs: run.timestamp,
       triggerType: run.triggerType === "manual" ? t('synthetics.runs.triggerManual') : t('synthetics.runs.triggerSchedule'),
@@ -2188,9 +2336,6 @@ function openRun(row: { id: number }) {
 async function refresh(startTime?: number, endTime?: number) {
   if (!startTime || !endTime) return;
   timeRangeMicros.value = { startTime, endTime };
-  if (!monitorTypeResolved) {
-    resolveMonitorType();
-  }
   await synthetics.fetchAll(props.monitorId, startTime, endTime);
 }
 

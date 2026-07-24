@@ -627,7 +627,7 @@ function openChromeExtensions() {
       role="status"
       data-test="synthetics-journey-replay-banner"
     >
-      <OIcon name="sync" size="sm" class="animate-spin text-primary-500" aria-hidden="true" />
+      <OIcon name="sync" size="sm" class="animate-spin text-accent" aria-hidden="true" />
       <span
         class="text-sm text-text-body"
         data-test="synthetics-journey-replay-banner-text"

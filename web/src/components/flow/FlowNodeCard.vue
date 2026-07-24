@@ -27,11 +27,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     hasInput / hasOutput — whether to render the target / source handle
     inputPosition / outputPosition — handle sides (default top / bottom)
 
-  Slots: #body (the node's label/content), #actions (hover buttons),
-  #footer (hover-`+`). The shared node typography (15px / bold / left) lives on
-  the body container, so wrappers supply content — not styling — and both
-  canvases render identically.
+  Slots: #body (the node's label/content), #actions (hover buttons), #footer
+  (extra affordances under the card). The shared node typography (15px / bold /
+  left) lives on the body container, so wrappers supply content — not styling —
+  and both canvases render identically.
   Native @click / @mouseenter / @mouseleave fall through to the root element.
+
+  Emits: outputClick — the source handle was clicked (Pipelines uses it to open
+  the "add next step" picker; see the connect-on-click note in PipelineFlow).
 
   Card background/border colour comes from the VueFlow node wrapper
   (`.vue-flow__node-<ioType>`) styled by each flow, and the handle look from the
@@ -69,6 +72,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <slot name="body" />
     </div>
 
+    <!-- Clicking the source dot is the "add next step" affordance (Pipelines).
+         Emitted rather than handled here so this stays presentational; a canvas
+         that does not listen keeps the plain handle. -->
     <Handle
       v-if="hasOutput"
       id="output"
@@ -76,6 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :position="outputPosition"
       :class="handleClass"
       :data-test="outputHandleTest"
+      @click.stop="emit('outputClick', $event)"
     />
 
     <!-- hover actions (delete, etc.) supplied by the wrapper -->
@@ -113,6 +120,10 @@ const props = withDefaults(
     outputHandleTest: undefined,
   },
 );
+
+// Click on the source (output) handle — the wrapper decides what it means. The
+// event travels with it so the wrapper can anchor a popover at the click.
+const emit = defineEmits<{ (e: "outputClick", event: MouseEvent): void }>();
 
 const handleClass = computed(
   () => `node_handle_custom handle_${props.ioType || "default"}`,

@@ -159,7 +159,7 @@ const heightClasses = computed<string>(() => {
       <span
         v-if="isDropTarget"
         aria-hidden="true"
-        class="absolute rounded-full bg-primary-600 pointer-events-none z-20"
+        class="absolute rounded-full bg-tabs-indicator pointer-events-none z-20"
         :class="dropIndicatorClass"
       />
       <!-- Drag handle — shown only in reorderable mode to signal the tab can be

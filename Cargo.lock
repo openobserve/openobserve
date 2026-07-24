@@ -2322,6 +2322,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "compaction"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arrow",
+ "arrow-schema",
+ "bytes",
+ "chrono",
+ "config",
+ "datafusion",
+ "db",
+ "futures",
+ "hashbrown 0.16.1",
+ "infra",
+ "ingester",
+ "itertools 0.14.0",
+ "log",
+ "o2_enterprise",
+ "parking_lot 0.12.5",
+ "parquet",
+ "rand 0.10.1",
+ "schema",
+ "search",
+ "search_service",
+ "tantivy_utils",
+ "tokio",
+]
+
+[[package]]
 name = "compression-codecs"
 version = "0.4.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4063,6 +4092,45 @@ dependencies = [
 ]
 
 [[package]]
+name = "enrichment-data"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arrow",
+ "arrow-json",
+ "arrow-schema",
+ "axum",
+ "bytes",
+ "chrono",
+ "common",
+ "compaction",
+ "config",
+ "csv",
+ "datafusion",
+ "db",
+ "enrichment",
+ "futures",
+ "futures-util",
+ "hashbrown 0.16.1",
+ "infra",
+ "log",
+ "maxminddb",
+ "multer",
+ "o2_enterprise",
+ "parquet",
+ "proto",
+ "rayon",
+ "reqwest 0.13.2",
+ "schema",
+ "search_service",
+ "serde",
+ "serde_json",
+ "tokio",
+ "transform",
+ "vrl",
+]
+
+[[package]]
 name = "env_filter"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5315,6 +5383,18 @@ dependencies = [
  "snafu 0.9.0",
  "tokio",
  "wal",
+]
+
+[[package]]
+name = "ingestion-common"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "common",
+ "config",
+ "serde",
+ "serde_json",
+ "utoipa",
 ]
 
 [[package]]
@@ -6725,6 +6805,7 @@ dependencies = [
  "chrono",
  "clap",
  "common",
+ "compaction",
  "config",
  "console-subscriber",
  "cron",
@@ -6734,6 +6815,7 @@ dependencies = [
  "datafusion-functions-json",
  "datafusion-proto",
  "db",
+ "enrichment-data",
  "env_logger",
  "expect-test",
  "faststr",
@@ -6750,6 +6832,7 @@ dependencies = [
  "http-body-util",
  "infra",
  "ingester",
+ "ingestion-common",
  "itertools 0.14.0",
  "jemalloc_pprof",
  "jsonwebtoken",
@@ -6760,7 +6843,6 @@ dependencies = [
  "memchr",
  "mimalloc",
  "mime",
- "mime_guess",
  "multer",
  "object_store",
  "openobserve-api",
@@ -6789,9 +6871,9 @@ dependencies = [
  "regex-syntax",
  "report_server",
  "reqwest 0.13.2",
- "rust-embed-for-web",
  "rustls",
  "rustls-native-certs",
+ "schema",
  "sea-orm",
  "search",
  "search_service",
@@ -6834,6 +6916,7 @@ dependencies = [
  "utoipa-swagger-ui",
  "version-compare",
  "wal",
+ "web",
  "webpki-roots 1.0.6",
  "x509-parser",
  "zip 8.2.0",
@@ -6860,6 +6943,7 @@ dependencies = [
  "config",
  "datafusion",
  "db",
+ "enrichment-data",
  "flate2",
  "flight",
  "futures",
@@ -6870,11 +6954,11 @@ dependencies = [
  "http-body-util",
  "infra",
  "ingester",
+ "ingestion-common",
  "itertools 0.14.0",
  "jemalloc_pprof",
  "log",
  "mime",
- "mime_guess",
  "o2_dex",
  "o2_enterprise",
  "o2_openfga",
@@ -6889,17 +6973,18 @@ dependencies = [
  "opentelemetry-proto",
  "parking_lot 0.12.5",
  "pprof",
+ "promql-service",
  "prost 0.14.3",
  "proto",
  "rand 0.10.1",
  "regex",
  "reqwest 0.13.2",
- "rust-embed-for-web",
  "search",
  "search_service",
  "serde",
  "serde_json",
  "snap",
+ "stream",
  "svix-ksuid",
  "tikv-jemalloc-ctl",
  "tikv-jemalloc-sys",
@@ -6915,7 +7000,6 @@ dependencies = [
  "url",
  "utoipa",
  "utoipa-swagger-ui",
- "web",
  "zip 8.2.0",
 ]
 
@@ -6989,6 +7073,7 @@ dependencies = [
  "hashbrown 0.16.1",
  "http 1.4.0",
  "infra",
+ "ingestion-common",
  "log",
  "o2_enterprise",
  "o2_openfga",
@@ -6996,6 +7081,7 @@ dependencies = [
  "openobserve-core",
  "promql",
  "promql-parser",
+ "promql-service",
  "proto",
  "search",
  "search_service",
@@ -7041,6 +7127,7 @@ dependencies = [
  "chromiumoxide",
  "chrono",
  "common",
+ "compaction",
  "config",
  "cron",
  "csv",
@@ -7048,6 +7135,7 @@ dependencies = [
  "datafusion",
  "db",
  "enrichment",
+ "enrichment-data",
  "flate2",
  "futures",
  "futures-util",
@@ -7056,6 +7144,7 @@ dependencies = [
  "http-body-util",
  "infra",
  "ingester",
+ "ingestion-common",
  "itertools 0.14.0",
  "jsonwebtoken",
  "lettre",
@@ -7074,6 +7163,7 @@ dependencies = [
  "prometheus",
  "promql",
  "promql-parser",
+ "promql-service",
  "prost 0.14.3",
  "prost-wkt-types",
  "proto",
@@ -7084,6 +7174,7 @@ dependencies = [
  "reqwest 0.13.2",
  "rustls",
  "rustls-native-certs",
+ "schema",
  "sea-orm",
  "search",
  "search_service",
@@ -7091,6 +7182,7 @@ dependencies = [
  "serde_json",
  "snap",
  "sourcemap",
+ "stream",
  "svix-ksuid",
  "tantivy",
  "tantivy_utils",
@@ -7125,25 +7217,31 @@ dependencies = [
  "bytes",
  "chrono",
  "common",
+ "compaction",
  "config",
  "db",
+ "enrichment-data",
  "futures",
  "hashbrown 0.16.1",
  "infra",
  "ingester",
+ "ingestion-common",
  "log",
  "o2_dex",
  "o2_enterprise",
  "o2_openfga",
  "openobserve-core",
  "prometheus",
+ "promql-service",
  "proto",
  "regex",
  "report_server",
  "reqwest 0.13.2",
+ "schema",
  "search",
  "search_service",
  "serde_json",
+ "stream",
  "tokio",
  "tonic",
  "transform",
@@ -7968,6 +8066,37 @@ dependencies = [
  "lrpar",
  "regex",
  "unescaper",
+]
+
+[[package]]
+name = "promql-service"
+version = "0.1.0"
+dependencies = [
+ "arrow",
+ "async-trait",
+ "config",
+ "datafusion",
+ "db",
+ "futures",
+ "hashbrown 0.16.1",
+ "infra",
+ "itertools 0.14.0",
+ "log",
+ "o2_enterprise",
+ "promql",
+ "promql-parser",
+ "prost 0.14.3",
+ "proto",
+ "rayon",
+ "search",
+ "search_service",
+ "serde",
+ "tokio",
+ "tonic",
+ "tracing",
+ "tracing-opentelemetry",
+ "usage_reporting",
+ "utoipa",
 ]
 
 [[package]]
@@ -9507,6 +9636,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "schema"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arrow-schema",
+ "common",
+ "config",
+ "dashmap",
+ "db",
+ "hashbrown 0.16.1",
+ "infra",
+ "ingestion-common",
+ "log",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "schemars"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9771,6 +9918,7 @@ dependencies = [
 name = "search_service"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "arrow",
  "arrow-schema",
  "async-recursion",
@@ -10605,6 +10753,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9091b6114800a5f2141aee1d1b9d6ca3592ac062dc5decb3764ec5895a47b4eb"
 
 [[package]]
+name = "stream"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arrow-schema",
+ "axum",
+ "chrono",
+ "common",
+ "config",
+ "db",
+ "enrichment-data",
+ "hashbrown 0.16.1",
+ "infra",
+ "log",
+ "o2_enterprise",
+ "schema",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "string_cache"
 version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10718,14 +10888,17 @@ dependencies = [
  "async-recursion",
  "bytes",
  "common",
+ "compaction",
  "config",
  "db",
+ "enrichment-data",
  "infra",
  "log",
  "o2_enterprise",
  "openobserve-core",
  "serde",
  "serde_json",
+ "stream",
  "svix-ksuid",
  "tokio",
 ]
@@ -11007,6 +11180,8 @@ name = "tantivy_utils"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "arrow",
+ "arrow-schema",
  "async-trait",
  "bitflags 2.11.0",
  "byteorder",
@@ -11019,10 +11194,12 @@ dependencies = [
  "log",
  "object_store",
  "parking_lot 0.12.5",
+ "parquet",
  "serde",
  "serde_json",
  "tantivy",
  "tokio",
+ "vortex",
  "zstd",
 ]
 
@@ -12384,7 +12561,12 @@ dependencies = [
 name = "web"
 version = "0.1.0"
 dependencies = [
+ "axum",
+ "config",
+ "mime_guess",
  "rust-embed-for-web",
+ "tokio",
+ "tower",
 ]
 
 [[package]]

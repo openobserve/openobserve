@@ -219,6 +219,9 @@
     /* Collapsible */
     --color-collapsible-trigger-hover-bg: var(--color-primary-900);
     --color-collapsible-trigger-active-bg: var(--color-surface-accent-active);
+    --color-collapsible-trigger-open-bg: var(--color-primary-900);
+    --color-collapsible-open-accent: var(--color-primary-400);
+    --color-collapsible-icon-open: var(--color-primary-400);
 
     /* OFieldList / OFieldRow / OFieldLabel */
     --color-field-list-row-hover-bg:   var(--color-primary-900);
@@ -394,6 +397,7 @@
     --color-file-border: var(--color-border-strong);
     --color-file-disabled-bg: var(--color-surface-subtle);
     --color-file-disabled-border: var(--color-border-default);
+    --color-file-error-text: var(--color-error-400);
     --color-file-error-border: var(--color-error-400);
     --color-file-chip-bg: var(--color-primary-900);
     --color-file-chip-text: var(--color-primary-200);
@@ -509,6 +513,100 @@
     --color-usage-banner-warning-border: #a08530;
     --color-usage-banner-warning-bg:     linear-gradient(to right, transparent 60%, #2d2a1f 70%, #3d3520 100%);
 
+}
+
+/* Dashboard classic series palette — dark overrides (light values in base.css) */
+:root.dark,
+.dark :root,
+.dark {
+  --color-chart-series-1: #60a5fa;
+  --color-chart-series-2: #6ee7b7;
+  --color-chart-series-3: #fdba74;
+  --color-chart-series-4: #f9a8d4;
+  --color-chart-series-5: #c4b5fd;
+  --color-chart-series-6: #fde68a;
+  --color-chart-series-7: #7dd3fc;
+  --color-chart-series-8: #fca5a5;
+  --color-chart-series-9: #5eead4;
+  --color-chart-series-10: #86efac;
+  --color-chart-series-11: #f5d0fe;
+  --color-chart-series-12: #fef08a;
+
+  /* Dashboard table row-highlight palette — dark overrides */
+  --color-chart-table-1: rgba(255, 100, 180, 0.15);
+  --color-chart-table-2: rgba(255, 100, 110, 0.15);
+  --color-chart-table-3: rgba(100, 240, 230, 0.15);
+  --color-chart-table-4: rgba(90, 170, 240, 0.15);
+  --color-chart-table-5: rgba(100, 210, 240, 0.15);
+  --color-chart-table-6: rgba(255, 100, 160, 0.15);
+  --color-chart-table-7: rgba(100, 220, 230, 0.15);
+  --color-chart-table-8: rgba(255, 250, 100, 0.15);
+  --color-chart-table-9: rgba(160, 200, 255, 0.15);
+  --color-chart-table-10: rgba(230, 130, 130, 0.15);
+  --color-chart-table-11: rgba(100, 210, 225, 0.15);
+  --color-chart-table-12: rgba(100, 190, 240, 0.15);
+  --color-chart-table-13: rgba(200, 100, 240, 0.15);
+  --color-chart-table-14: rgba(100, 200, 195, 0.15);
+  --color-chart-table-15: rgba(130, 240, 120, 0.15);
+  --color-chart-table-16: rgba(240, 130, 170, 0.15);
+  --color-chart-table-17: rgba(130, 190, 255, 0.15);
+  --color-chart-table-18: rgba(170, 120, 255, 0.15);
+  --color-chart-table-19: rgba(150, 210, 170, 0.15);
+  --color-chart-table-20: rgba(130, 200, 135, 0.15);
+  --color-chart-table-21: rgba(210, 240, 180, 0.15);
+  --color-chart-table-22: rgba(255, 230, 130, 0.15);
+  --color-chart-table-23: rgba(255, 180, 180, 0.15);
+  --color-chart-table-24: rgba(180, 225, 245, 0.15);
+
+  /* Chart grid line — dark override */
+  --color-chart-gridline: rgba(255, 255, 255, 0.12);
+
+  /* Crosshair axis-pointer label chip — dark-only. Light leaves this undefined so
+     chartColor() resolves to "" and ECharts uses its auto default (see base.css). */
+  --color-chart-crosshair-bg: #333;
+
+  /* Trace span palette (HEX/canvas variant) — dark overrides (light in base.css) */
+  --color-trace-span-1: #60A5FA;
+  --color-trace-span-2: #F87171;
+  --color-trace-span-3: #34D399;
+  --color-trace-span-4: #C084FC;
+  --color-trace-span-5: #FB923C;
+  --color-trace-span-6: #22D3EE;
+  --color-trace-span-7: #F472B6;
+  --color-trace-span-8: #A3E635;
+  --color-trace-span-9: #818CF8;
+  --color-trace-span-10: #FBBF24;
+  --color-trace-span-11: #2DD4BF;
+  --color-trace-span-12: #E879F9;
+  --color-trace-span-13: #4ADE80;
+  --color-trace-span-14: #A78BFA;
+  --color-trace-span-15: #FCD34D;
+  --color-trace-span-16: #38BDF8;
+  --color-trace-span-17: #FB7185;
+  --color-trace-span-18: #BEF264;
+  --color-trace-span-19: #818CF8;
+  --color-trace-span-20: #FCA5A5;
+  --color-trace-span-21: #6EE7B7;
+  --color-trace-span-22: #C084FC;
+  --color-trace-span-23: #FDBA74;
+  --color-trace-span-24: #67E8F9;
+  --color-trace-span-25: #F9A8D4;
+  --color-trace-span-26: #86EFAC;
+  --color-trace-span-27: #D8B4FE;
+  --color-trace-span-28: #FDE68A;
+  --color-trace-span-29: #93C5FD;
+  --color-trace-span-30: #FECACA;
+  --color-trace-span-31: #5EEAD4;
+  --color-trace-span-32: #F0ABFC;
+  --color-trace-span-33: #D9F99D;
+  --color-trace-span-34: #A5B4FC;
+  --color-trace-span-35: #FED7AA;
+
+  /* Chart metric text default + numeric tokens — dark overrides */
+  --color-chart-metric-text: #FFFFFF;
+  --chart-area-fill-top-opacity: 1;
+  --chart-area-fill-bottom-opacity: 1;
+  --chart-metric-contrast-threshold: 0.8;
 }
 
 /* ── Theme-driven runtime tokens, dark mode (utils/theme.ts) ──

@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="settings" size="md" class="text-accent shrink-0" />
                 <div class="flex-1 flex flex-col gap-0.5 min-w-0">
                   <span class="text-sm font-semibold font-mono text-text-heading whitespace-nowrap overflow-hidden text-ellipsis">Cargo.toml</span>
-                  <span class="text-xs text-text-muted">Rust crates</span>
+                  <span class="text-xs text-text-secondary">Rust crates</span>
                 </div>
                 <OIcon name="open-in-new" size="sm" class="text-text-muted shrink-0" />
               </a>
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="backpack" size="md" class="text-accent shrink-0" />
                 <div class="flex-1 flex flex-col gap-0.5 min-w-0">
                   <span class="text-sm font-semibold font-mono text-text-heading whitespace-nowrap overflow-hidden text-ellipsis">package.json</span>
-                  <span class="text-xs text-text-muted">Node packages</span>
+                  <span class="text-xs text-text-secondary">Node packages</span>
                 </div>
                 <OIcon name="open-in-new" size="sm" class="text-text-muted shrink-0" />
               </a>
@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="javascript" size="md" class="text-accent shrink-0" />
                 <div class="flex-1 flex flex-col gap-0.5 min-w-0">
                   <span class="text-sm font-semibold font-mono text-text-heading whitespace-nowrap overflow-hidden text-ellipsis">npmjs.com</span>
-                  <span class="text-xs text-text-muted">JS registry</span>
+                  <span class="text-xs text-text-secondary">JS registry</span>
                 </div>
                 <OIcon name="open-in-new" size="sm" class="text-text-muted shrink-0" />
               </a>
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="inventory-2" size="md" class="text-accent shrink-0" />
                 <div class="flex-1 flex flex-col gap-0.5 min-w-0">
                   <span class="text-sm font-semibold font-mono text-text-heading whitespace-nowrap overflow-hidden text-ellipsis">crates.io</span>
-                  <span class="text-xs text-text-muted">Rust registry</span>
+                  <span class="text-xs text-text-secondary">Rust registry</span>
                 </div>
                 <OIcon name="open-in-new" size="sm" class="text-text-muted shrink-0" />
               </a>

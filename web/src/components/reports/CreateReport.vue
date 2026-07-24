@@ -411,21 +411,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             class="ml-1 cursor-pointer text-text-muted"
                           >
                             <OTooltip side="right" align="center">
-                              <template #content><span style="font-size: var(--text-sm)">
-                                Pattern: * * * * * * means every second.
-                                <br />
-                                Format: [Second (optional) 0-59] [Minute 0-59]
-                                [Hour 0-23] [Day of Month 1-31, 'L'] [Month
-                                1-12] [Day of Week 0-7 or '1L-7L', 0 and 7 for
-                                Sunday].
-                                <br />
-                                Use '*' to represent any value, 'L' for the last
-                                day/weekday. <br />
-                                Example: 0 0 12 * * ? - Triggers at 12:00 PM
-                                daily. It specifies second, minute, hour, day of
-                                month, month, and day of week,
-                                respectively.</span
-                              ></template>
+                              <template #content>
+                                <span style="font-size: var(--text-sm); white-space: pre-line">
+                                  {{ t('reports.cronFormatTooltip') }}
+                                </span>
+                              </template>
                             </OTooltip>
                           </OIcon>
                         </div>
@@ -674,8 +664,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      class="flex justify-end px-3 w-full py-3 bg-card-glass-bg sticky! bottom-0 border-t border-card-glass-border"
-      style="z-index: 2"
+      class="flex justify-end px-3 w-full py-3 bg-card-glass-bg sticky! bottom-0 border-t border-card-glass-border z-2"
     >
       <OButton
         data-test="add-report-cancel-btn"
