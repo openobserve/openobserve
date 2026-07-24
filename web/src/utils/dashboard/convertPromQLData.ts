@@ -347,7 +347,7 @@ export const convertPromQLData = async (
       //based on config width set grid
       left: panelSchema.config?.axis_width ?? 5,
       right: 20,
-      top: "15",
+      top: 16,
       bottom: (() => {
         // Reserve space below the plot for: tick labels, the axis name (when present)
         // and — for a horizontal bottom legend — the legend row. Without the axis name

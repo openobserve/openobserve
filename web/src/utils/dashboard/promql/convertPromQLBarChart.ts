@@ -236,9 +236,9 @@ export class BarConverter implements PromQLChartConverter {
       series,
       ...axisConfig,
       grid: {
-        left: 8,
+        left: 16,
         right: rightInset,
-        top: 8,
+        top: 16,
         bottom: legendAtBottom ? 40 : 12,
         containLabel: true,
         ...(config.axis_width && { left: config.axis_width }),
