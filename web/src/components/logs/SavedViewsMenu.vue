@@ -101,7 +101,7 @@ const resetInlineState = () => {
 const isFavorite = (view: SavedView) => (props.favorites ?? []).includes(view.view_id);
 const isActive = (view: SavedView) => !!props.activeViewId && props.activeViewId === view.view_id;
 
-const showSearch = computed(() => (props.views?.length ?? 0) > 7);
+const showSearch = computed(() => (props.views?.length ?? 0) > 5);
 
 const filteredOrdered = computed<SavedView[]>(() => {
   const needle = filter.value.trim().toLowerCase();
@@ -124,7 +124,6 @@ const hasFavorites = computed(() => !!firstFavoriteId.value);
 const activeView = computed(() =>
   (props.views ?? []).find((v) => v.view_id === props.activeViewId),
 );
-const triggerLabel = computed(() => activeView.value?.view_name || t("search.savedViewsTitle"));
 
 // ── Actions ─────────────────────────────────────────────────────────────────
 const applyView = (view: SavedView) => {
@@ -225,16 +224,28 @@ watch(
     @update:open="onOpenChange"
   >
     <template #trigger>
+      <!-- Icon-only to match the sibling pinned toolbar controls and stay
+         compact on a crowded bar. A filled dot marks that a view is active. -->
       <OButton
         variant="outline"
         size="xs"
-        icon-left="saved-search"
+        class="relative gap-0.5 px-1.5!"
         data-test="logs-saved-views-menu-trigger"
-        class="max-w-52"
       >
-        <span class="max-w-36 truncate">{{ triggerLabel }}</span>
-        <OIcon name="arrow-drop-down" size="sm" class="-mr-1 shrink-0" />
-        <OTooltip :content="t('search.savedViewsTitle')" :side-offset="4" />
+        <OIcon name="saved-search" size="sm" class="shrink-0" />
+        <OIcon name="arrow-drop-down" size="sm" class="-ml-1 shrink-0" />
+        <span
+          v-if="activeView"
+          class="bg-accent absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full"
+        />
+        <OTooltip
+          :content="
+            activeView
+              ? `${t('search.activeViewLabel')}: ${activeView.view_name}`
+              : t('search.savedViewsTitle')
+          "
+          :side-offset="4"
+        />
       </OButton>
     </template>
 
