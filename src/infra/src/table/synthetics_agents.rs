@@ -19,7 +19,9 @@
 //! `/synthetics/agent/register`; `last_seen_at` refreshed by register and by
 //! every job lease. A location whose agents are all stale is reported "down".
 
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set, sea_query::Expr};
+use sea_orm::{
+    ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set, sea_query::Expr,
+};
 
 use super::{
     entity::synthetics_agents::{ActiveModel, Column, Entity, Model},
@@ -38,6 +40,9 @@ pub struct SyntheticsAgentRecord {
     pub name: String,
     pub version: Option<String>,
     pub capabilities: Option<serde_json::Value>,
+    /// Probe token the agent last authenticated with (for "N agents on this
+    /// token"). `None` for agents registered before this was tracked.
+    pub token_id: Option<String>,
     pub last_seen_at: i64,
     pub created_at: i64,
 }
@@ -51,6 +56,7 @@ impl From<Model> for SyntheticsAgentRecord {
             name: m.name,
             version: m.version,
             capabilities: m.capabilities,
+            token_id: m.token_id,
             last_seen_at: m.last_seen_at,
             created_at: m.created_at,
         }
@@ -76,6 +82,7 @@ pub async fn register(record: &SyntheticsAgentRecord) -> Result<(), errors::Erro
                     Expr::value(record.capabilities.clone()),
                 )
                 .col_expr(Column::LastSeenAt, Expr::value(record.last_seen_at))
+                .col_expr(Column::TokenId, Expr::value(record.token_id.clone()))
                 .filter(Column::Id.eq(&record.id))
                 .exec(client)
                 .await
@@ -89,6 +96,7 @@ pub async fn register(record: &SyntheticsAgentRecord) -> Result<(), errors::Erro
                 name: Set(record.name.clone()),
                 version: Set(record.version.clone()),
                 capabilities: Set(record.capabilities.clone()),
+                token_id: Set(record.token_id.clone()),
                 last_seen_at: Set(record.last_seen_at),
                 created_at: Set(record.created_at),
             };
@@ -146,6 +154,29 @@ pub async fn find_by_identity(
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
     Ok(row.map(Into::into))
+}
+
+/// Count agents per token for an org (`token_id` → count). Agents with no
+/// `token_id` yet (registered before this was tracked) are omitted. Powers
+/// "N agents on this token" so a token can be safely disabled once its count
+/// reaches zero.
+pub async fn count_by_token(
+    org_id: &str,
+) -> Result<std::collections::HashMap<String, i64>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let rows: Vec<Option<String>> = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .select_only()
+        .column(Column::TokenId)
+        .into_tuple::<Option<String>>()
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    let mut counts = std::collections::HashMap::new();
+    for tid in rows.into_iter().flatten() {
+        *counts.entry(tid).or_insert(0) += 1;
+    }
+    Ok(counts)
 }
 
 /// Find one agent by id.

@@ -57,10 +57,24 @@
         </div>
       </template>
 
-      <!-- Agents: name(s), live if any are online else the last known one.
-           Pool health (live/total) is on the detail page, not repeated here. -->
+      <!-- Agents: live/total count (a location is a pool of interchangeable
+           agents). Names/health are on the detail page; shown here on hover. -->
       <template #cell-agents="{ row }">
-        <span class="truncate">{{ agentSubtext(row as any) || "—" }}</span>
+        <div class="flex min-w-0 flex-col" :title="agentSubtext(row as any) || ''">
+          <span class="truncate"
+            >{{ (row as any).live_agents ?? 0
+            }}<span class="text-text-muted">/{{ (row as any).agents_total ?? 0 }}</span></span
+          >
+          <span v-if="(row as any).version" class="text-text-muted truncate text-xs"
+            >v{{ (row as any).version }}</span
+          >
+        </div>
+      </template>
+
+      <!-- Checks per minute -->
+      <template #cell-cmin="{ row }">
+        <span v-if="(row as any).checks_per_min != null">~{{ (row as any).checks_per_min }}</span>
+        <span v-else class="text-text-muted">—</span>
       </template>
 
       <!-- Capability type chips -->
@@ -173,11 +187,10 @@ const filteredLocations = computed(() => {
 const statusVariant = (status: string) =>
   status === "online" ? "success" : status === "offline" ? "error" : "default";
 
-/** Live agent name(s) when any are online; otherwise the last known agent's
- *  name (still visible offline) so a dead location doesn't hide who to
- *  recover, without opening the detail page. */
+/** Live agent name(s), shown on hover over the agent-count cell. Full agent
+ *  detail (incl. offline agents) lives on the location detail page. */
 const agentSubtext = (row: SyntheticLocation) =>
-  row.agent_names?.length ? row.agent_names.join(", ") : row.last_agent_name || null;
+  row.agent_names?.length ? row.agent_names.join(", ") : null;
 
 const columns = computed<OTableColumnDef[]>(() => [
   {
@@ -209,7 +222,7 @@ const columns = computed<OTableColumnDef[]>(() => [
   {
     id: "agents",
     header: t("synthetics.privateLocations.table.agents"),
-    accessorKey: "last_agent_name",
+    accessorKey: "live_agents",
     size: 100,
     minSize: 80,
     sortable: true,
@@ -227,6 +240,16 @@ const columns = computed<OTableColumnDef[]>(() => [
     id: "monitors",
     header: t("synthetics.privateLocations.table.checks"),
     accessorKey: "monitors_count",
+    size: 90,
+    minSize: 70,
+    sortable: true,
+    meta: { align: "right" },
+    hideable: true,
+  },
+  {
+    id: "cmin",
+    header: t("synthetics.privateLocations.table.checksPerMin"),
+    accessorKey: "checks_per_min",
     size: 90,
     minSize: 70,
     sortable: true,

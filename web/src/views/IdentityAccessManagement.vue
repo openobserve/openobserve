@@ -53,6 +53,7 @@ const routeToIamTab: Record<string, string> = {
   users: "users",
   serviceAccounts: "serviceAccounts",
   ingestionTokens: "ingestionTokens",
+  syntheticsTokens: "syntheticsTokens",
   mcpServer: "mcpServer",
   groups: "groups",
   editGroup: "groups",
@@ -102,6 +103,15 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
           icon: "key",
           to: { name: "ingestionTokens", query: orgQuery.value },
           dataTest: "iam-ingestion-tokens-tab",
+        },
+        {
+          key: "syntheticsTokens",
+          label: t("iam.syntheticsTokens"),
+          description: t("iam.syntheticsTokensDesc"),
+          icon: "key",
+          to: { name: "syntheticsTokens", query: orgQuery.value },
+          visible: isEnt && store.state.zoConfig?.synthetics_enabled !== false,
+          dataTest: "iam-synthetics-tokens-tab",
         },
         {
           key: "mcpServer",

@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   size="icon-sm"
                   icon-left="content-copy"
-                  :title="t('synthetics.privateLocations.detail.recoverAgent')"
+                  :title="t('synthetics.privateLocations.detail.restartConfig')"
                   :data-test="`synthetics-private-location-agent-recover-btn-${(row as any).id}`"
                   @click="openSetup((row as any).name)"
                 />

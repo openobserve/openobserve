@@ -21,7 +21,9 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: String,
     pub org_id: String,
+    pub name: String,
     pub token: String,
+    pub is_default: bool,
     pub enabled: bool,
     pub created_by: String,
     pub created_at: i64,
