@@ -33,12 +33,6 @@ vectorscan = [
     "search_service/vectorscan",
     "stream/vectorscan",
 ]
-vortex = [
-    "compaction/vortex",
-    "openobserve-core/vortex",
-    "promql-service/vortex",
-    "search_service/vortex",
-]
 
 [dependencies]
 audit.workspace = true

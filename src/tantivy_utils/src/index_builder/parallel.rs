@@ -18,25 +18,21 @@ use std::sync::Arc;
 use anyhow::{Context, Error};
 use bytes::Bytes;
 use config::{
-    FileFormat, TIMESTAMP_COL_NAME,
+    FileFormat, PARQUET_MAX_ROW_GROUP_SIZE, TIMESTAMP_COL_NAME,
     tantivy::tokenizer::{CollectType, O2_TOKENIZER, o2_tokenizer_build},
 };
 use futures::future::join_all;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use tantivy::{directory::MmapDirectory, indexer::merge_indices};
 use tokio::task::JoinHandle;
-#[cfg(all(feature = "vortex", feature = "enterprise"))]
-use {
-    config::PARQUET_MAX_ROW_GROUP_SIZE,
-    vortex::{
-        VortexSessionDefault,
-        file::OpenOptionsSessionExt,
-        io::{
-            runtime::{BlockingRuntime, single::SingleThreadRuntime},
-            session::RuntimeSessionExt,
-        },
-        session::VortexSession,
+use vortex::{
+    VortexSessionDefault,
+    file::OpenOptionsSessionExt,
+    io::{
+        runtime::{BlockingRuntime, single::SingleThreadRuntime},
+        session::RuntimeSessionExt,
     },
+    session::VortexSession,
 };
 
 use super::{TantivyIndexSchema, convert_batch_to_docs_sync};
@@ -69,7 +65,6 @@ pub(super) async fn build_index<D: tantivy::Directory + Send + Sync + 'static>(
             )
             .await
         }
-        #[cfg(all(feature = "vortex", feature = "enterprise"))]
         FileFormat::Vortex => {
             let buf_meta = buf.clone();
             let row_count: u64 = tokio::task::spawn_blocking(move || -> Result<u64, Error> {
@@ -99,10 +94,6 @@ pub(super) async fn build_index<D: tantivy::Directory + Send + Sync + 'static>(
             )
             .await
         }
-        #[cfg(not(all(feature = "vortex", feature = "enterprise")))]
-        FileFormat::Vortex => Err(anyhow::anyhow!(
-            "Vortex file format requires the vortex feature"
-        )),
     }
 }
 
@@ -566,7 +557,6 @@ mod tests {
         }
     }
 
-    #[cfg(all(feature = "vortex", feature = "enterprise"))]
     mod vortex_tests {
         use std::sync::Arc;
 
