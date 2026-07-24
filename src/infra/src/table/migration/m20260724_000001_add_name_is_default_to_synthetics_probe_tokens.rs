@@ -68,13 +68,12 @@ impl MigrationTrait for Migration {
         // unnamed). Naming them all 'default' would violate the unique
         // (org_id, name) index below with "could not create unique index".
         //
-        //   1. Give every row a guaranteed-unique name = its id (the KSUID PK),
-        //      so no two rows in an org collide.
-        //   2. Promote the oldest token per org (MIN(id) — KSUIDs sort by
-        //      creation time) back to the canonical name='default'/is_default so
-        //      agent-setup and the dispatcher keep resolving a default token, and
-        //      existing agents (which authenticate by token string, unchanged)
-        //      keep working.
+        //   1. Give every row a guaranteed-unique name = its id (the KSUID PK), so no two rows in
+        //      an org collide.
+        //   2. Promote the oldest token per org (MIN(id) — KSUIDs sort by creation time) back to
+        //      the canonical name='default'/is_default so agent-setup and the dispatcher keep
+        //      resolving a default token, and existing agents (which authenticate by token string,
+        //      unchanged) keep working.
         //
         // The derived-table wrap in step 2 keeps the self-referential UPDATE
         // legal on MySQL (error 1093), and is valid on Postgres and SQLite too.
