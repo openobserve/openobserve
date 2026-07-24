@@ -65,7 +65,7 @@ vi.mock("@/composables/useStreamingSearch", () => ({
 // Fix 4: component reads SQL-aliased fields (_view_url, _view_loading_type, _date).
 function createRumHit(overrides: Record<string, any> = {}) {
   return {
-    _oo_trace_id: "trace-abc123def456",
+    _trace_id: "trace-abc123def456",
     _view_url: "https://example.com/products",
     _view_loading_type: "initial_load",
     _view_id: "view-1",
@@ -262,6 +262,20 @@ function mountComponent(options: MountOptions = {}) {
 
 // Must import after mocks
 import PlayerTracesTab from "@/components/rum/PlayerTracesTab.vue";
+
+
+// The composable now asks the stream schema which trace-id namespaces exist (`_o2_` vs
+// `_oo_`) before building SQL, so getStream must be mocked or every call hangs.
+// Reports the legacy spelling, matching data ingested before the namespace migration.
+const mockGetStream = vi.fn().mockResolvedValue({
+  schema: [{ name: "_oo_trace_id" }, { name: "_oo_span_id" }],
+});
+
+vi.mock("@/composables/useStreams", () => ({
+  default: () => ({
+    getStream: mockGetStream,
+  }),
+}));
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -519,8 +533,8 @@ describe("PlayerTracesTab", () => {
       const traceId = "same-trace";
       setupSuccessfulMocks(
         [
-          createRumHit({ _oo_trace_id: traceId }),
-          createRumHit({ _oo_trace_id: traceId, _view_id: "view-2" }),
+          createRumHit({ _trace_id: traceId }),
+          createRumHit({ _trace_id: traceId, _view_id: "view-2" }),
         ],
         [createTraceMetadata({ trace_id: traceId })],
       );
@@ -540,8 +554,8 @@ describe("PlayerTracesTab", () => {
       mockSearch.mockResolvedValue({
         data: {
           hits: [
-            createRumHit({ _oo_trace_id: null }),
-            createRumHit({ _oo_trace_id: "valid-trace" }),
+            createRumHit({ _trace_id: null }),
+            createRumHit({ _trace_id: "valid-trace" }),
           ],
         },
       });
@@ -558,11 +572,11 @@ describe("PlayerTracesTab", () => {
       setupSuccessfulMocks(
         [
           createRumHit({
-            _oo_trace_id: "trace-1",
+            _trace_id: "trace-1",
             _view_url: "https://example.com/page1",
           }),
           createRumHit({
-            _oo_trace_id: "trace-2",
+            _trace_id: "trace-2",
             _view_url: "https://example.com/page2",
           }),
         ],

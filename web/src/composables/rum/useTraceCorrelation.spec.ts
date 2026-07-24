@@ -18,6 +18,20 @@ import { ref } from "vue";
 import useTraceCorrelation from "@/composables/rum/useTraceCorrelation";
 import searchService from "@/services/search";
 
+
+// The composable now asks the stream schema which trace-id namespaces exist (`_o2_` vs
+// `_oo_`) before building SQL, so getStream must be mocked or every call hangs.
+// Reports the legacy spelling, matching data ingested before the namespace migration.
+const mockGetStream = vi.fn().mockResolvedValue({
+  schema: [{ name: "_oo_trace_id" }, { name: "_oo_span_id" }],
+});
+
+vi.mock("@/composables/useStreams", () => ({
+  default: () => ({
+    getStream: mockGetStream,
+  }),
+}));
+
 // Mock search service
 vi.mock("@/services/search", () => ({
   default: {
@@ -209,7 +223,7 @@ describe("useTraceCorrelation", () => {
       );
     });
 
-    it("should use _oo_trace_id column name in RUM SQL query", async () => {
+    it("filters on the trace-id column present in the stream schema", async () => {
       const traceId = ref("trace-abc-999");
 
       mockSuccessfulSearch([], []);
@@ -220,8 +234,10 @@ describe("useTraceCorrelation", () => {
       const firstCall = vi.mocked(searchService.search).mock.calls[0];
       const sql: string = firstCall[0].query.query.sql;
 
-      expect(sql).toContain('"_oo_trace_id"');
-      expect(sql).toContain("trace-abc-999");
+      // The predicate is built from the stream schema, which this suite mocks as
+      // carrying only the legacy namespace — so the query targets _oo_trace_id. A stream
+      // holding both spellings yields `_o2_trace_id = .. OR _oo_trace_id = ..`.
+      expect(sql).toContain("_oo_trace_id = 'trace-abc-999'");
     });
 
     it("should fetch trace data after RUM data", async () => {

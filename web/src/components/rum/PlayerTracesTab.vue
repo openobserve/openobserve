@@ -227,6 +227,8 @@ import { ref, watch, onMounted, computed } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import searchService from "@/services/search";
+import useStreams from "@/composables/useStreams";
+import { rumFieldSql, rumFieldNotNullSql } from "@/utils/rum/fields";
 import { formatTimeWithSuffix, formatLargeNumber, generateTraceContext } from "@/utils/zincutils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -240,6 +242,7 @@ import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 
 const { t } = useI18n();
 const store = useStore();
+const { getStream } = useStreams();
 
 const props = defineProps({
   sessionId: {
@@ -431,9 +434,22 @@ async function fetchTraces() {
     const searchStartTime = (props.startTime || (nowMs - 86400000)) * 1000;
     const searchEndTime = (props.endTime || nowMs) * 1000;
 
+    // The trace-id column exists under two namespaces (`_o2_` on newer SDKs, `_oo_` on
+    // older ones and on all previously ingested data). Build the expression from the
+    // schema — naming a column the stream lacks fails the whole query — and alias it to
+    // a stable `_trace_id` so SELECT/GROUP BY and the row reads below stay identical
+    // regardless of which spellings are present.
+    const rumStream = await getStream("_rumdata", "logs", true);
+    const traceIdExpr = rumFieldSql(rumStream?.schema, "trace_id");
+    const traceIdSet = rumFieldNotNullSql(rumStream?.schema, "trace_id");
+    if (!traceIdExpr || !traceIdSet) {
+      correlatedViews.value = [];
+      return;
+    }
+
     const rumQuery = {
       query: {
-        sql: `SELECT max(view_id) as _view_id, max(view_url) as _view_url, max(view_loading_type) as _view_loading_type, _oo_trace_id, max(type) as _type, min(date) as _date FROM "_rumdata" WHERE session_id='${props.sessionId}' AND _oo_trace_id IS NOT NULL AND action_id is not null GROUP BY _oo_trace_id ORDER BY _date ASC`,
+        sql: `SELECT max(view_id) as _view_id, max(view_url) as _view_url, max(view_loading_type) as _view_loading_type, ${traceIdExpr} as _trace_id, max(type) as _type, min(date) as _date FROM "_rumdata" WHERE session_id='${props.sessionId}' AND ${traceIdSet} AND action_id is not null GROUP BY ${traceIdExpr} ORDER BY _date ASC`,
         start_time: searchStartTime,
         end_time: searchEndTime,
         from: 0,
@@ -460,7 +476,7 @@ async function fetchTraces() {
     // Deduplicate by trace_id, keep first occurrence for view context
     const traceMap = new Map<string, any>();
     for (const hit of rumHits) {
-      const traceId = hit._oo_trace_id;
+      const traceId = hit._trace_id;
       if (!traceId || traceMap.has(traceId)) continue;
       const viewUrl = hit._view_url || hit.view_url || "";
       traceMap.set(traceId, {
