@@ -26,23 +26,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="text-left rounded-default border border-border-default bg-surface-panel flex flex-col"
+    class="rounded-default border-border-default bg-surface-panel flex flex-col border text-left"
     data-test="error-detail-panel"
   >
     <!-- Summary row (always shown) -->
-    <div class="px-4 py-3 flex flex-col gap-1">
+    <div class="flex flex-col gap-1 px-4 py-3">
       <p
         v-if="summaryLine"
-        class="text-sm font-medium text-text-body m-0"
+        class="text-text-body m-0 text-sm font-medium"
         data-test="error-detail-summary"
       >
         {{ summaryLine }}
       </p>
-      <small
-        v-if="traceId"
-        class="text-text-secondary"
-        data-test="error-detail-trace-id"
-      >
+      <small v-if="traceId" class="text-text-secondary" data-test="error-detail-trace-id">
         <span class="font-medium">{{ t("queryError.traceId") }}</span>
         {{ traceId }}
       </small>
@@ -50,17 +46,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Toggle row -->
     <template v-if="hasDetail">
-      <div class="border-t border-border-default px-4 py-1">
+      <div class="border-border-default border-t px-4 py-1">
         <button
           type="button"
-          class="flex items-center gap-1.5 text-xs text-text-secondary py-1.5 cursor-pointer bg-transparent border-0 p-0 hover:text-text-body transition-colors"
+          class="text-text-secondary hover:text-text-body flex cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 py-1.5 text-xs transition-colors"
           data-test="error-detail-toggle-btn"
           @click="emit('toggle-detail')"
         >
-          <OIcon
-            :name="showDetail ? 'expand-less' : 'expand-more'"
-            size="xs"
-          />
+          <OIcon :name="showDetail ? 'expand-less' : 'expand-more'" size="xs" />
           {{ showDetail ? t("queryError.hideDetail") : t("queryError.showDetail") }}
         </button>
       </div>
@@ -68,12 +61,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Expanded body — scrollable, capped height -->
       <div
         v-if="showDetail"
-        class="border-t border-border-default px-4 py-3 max-h-52 overflow-y-auto"
+        class="border-border-default max-h-52 overflow-y-auto border-t px-4 py-3"
         data-test="error-detail-body"
       >
-        <p
-          class="text-xs font-mono text-text-secondary m-0 whitespace-pre-wrap break-all"
-        >
+        <p class="text-text-secondary m-0 font-mono text-xs break-all whitespace-pre-wrap">
           {{ detailBody }}
         </p>
       </div>

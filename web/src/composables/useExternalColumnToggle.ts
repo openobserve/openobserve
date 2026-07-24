@@ -28,9 +28,7 @@ import { useTableColumnPersistence } from "@/lib/core/Table/composables/useTable
 const useExternalColumnToggle = (tableId: string) => {
   const persistence = useTableColumnPersistence({ tableId, enabled: true });
 
-  const columnVisibility = ref<Record<string, boolean>>(
-    persistence.loadColumnVisibility() ?? {},
-  );
+  const columnVisibility = ref<Record<string, boolean>>(persistence.loadColumnVisibility() ?? {});
 
   const setColumnVisibility = (visibility: Record<string, boolean>) => {
     columnVisibility.value = visibility;

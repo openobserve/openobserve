@@ -34,31 +34,120 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- rings + crosshair -->
     <circle cx="104" cy="80" r="20" stroke="var(--color-border-default)" stroke-width="1.5" />
     <circle cx="104" cy="80" r="40" stroke="var(--color-border-default)" stroke-width="1.5" />
-    <circle cx="104" cy="80" r="60" stroke="var(--color-border-default)" stroke-width="1.5" opacity="0.7" />
-    <line x1="44" y1="80" x2="164" y2="80" stroke="var(--color-border-default)" stroke-width="1" opacity="0.5" />
-    <line x1="104" y1="20" x2="104" y2="140" stroke="var(--color-border-default)" stroke-width="1" opacity="0.5" />
+    <circle
+      cx="104"
+      cy="80"
+      r="60"
+      stroke="var(--color-border-default)"
+      stroke-width="1.5"
+      opacity="0.7"
+    />
+    <line
+      x1="44"
+      y1="80"
+      x2="164"
+      y2="80"
+      stroke="var(--color-border-default)"
+      stroke-width="1"
+      opacity="0.5"
+    />
+    <line
+      x1="104"
+      y1="20"
+      x2="104"
+      y2="140"
+      stroke="var(--color-border-default)"
+      stroke-width="1"
+      opacity="0.5"
+    />
 
     <!-- rotating sweep -->
     <g>
-      <animateTransform v-if="animated" attributeName="transform" type="rotate" values="0 104 80;360 104 80" dur="4s" repeatCount="indefinite" />
-      <path d="M104 80 L164 80 A60 60 0 0 0 146 37.6 Z" fill="var(--color-primary-500)" opacity="0.16" />
-      <line x1="104" y1="80" x2="164" y2="80" stroke="var(--color-primary-500)" stroke-width="2.5" stroke-linecap="round" />
+      <animateTransform
+        v-if="animated"
+        attributeName="transform"
+        type="rotate"
+        values="0 104 80;360 104 80"
+        dur="4s"
+        repeatCount="indefinite"
+      />
+      <path
+        d="M104 80 L164 80 A60 60 0 0 0 146 37.6 Z"
+        fill="var(--color-primary-500)"
+        opacity="0.16"
+      />
+      <line
+        x1="104"
+        y1="80"
+        x2="164"
+        y2="80"
+        stroke="var(--color-primary-500)"
+        stroke-width="2.5"
+        stroke-linecap="round"
+      />
     </g>
 
     <!-- blips pinging at staggered times -->
     <circle v-for="(p, i) in blips" :key="'b' + i" :cx="p.x" :cy="p.y" r="3" :fill="p.fill">
-      <animate v-if="animated" attributeName="opacity" values="0;0;1;0" :keyTimes="`0;${p.t};${p.t + 0.05};${p.t + 0.4}`" dur="4s" repeatCount="indefinite" />
-      <animate v-if="animated" attributeName="r" values="3;3;7;3" :keyTimes="`0;${p.t};${p.t + 0.05};${p.t + 0.4}`" dur="4s" repeatCount="indefinite" />
+      <animate
+        v-if="animated"
+        attributeName="opacity"
+        values="0;0;1;0"
+        :keyTimes="`0;${p.t};${p.t + 0.05};${p.t + 0.4}`"
+        dur="4s"
+        repeatCount="indefinite"
+      />
+      <animate
+        v-if="animated"
+        attributeName="r"
+        values="3;3;7;3"
+        :keyTimes="`0;${p.t};${p.t + 0.05};${p.t + 0.4}`"
+        dur="4s"
+        repeatCount="indefinite"
+      />
     </circle>
 
     <!-- data chips drifting up at the edges -->
     <g v-for="(c, i) in chips" :key="'c' + i" :transform="`translate(${c.x} ${c.y})`">
       <g>
-        <animateTransform v-if="animated" attributeName="transform" type="translate" values="0 8;0 -10" :dur="c.dur" :begin="c.begin" repeatCount="indefinite" />
-        <animate v-if="animated" attributeName="opacity" values="0;1;1;0" keyTimes="0;0.2;0.7;1" :dur="c.dur" :begin="c.begin" repeatCount="indefinite" />
-        <rect x="-10" y="-6" width="20" height="12" rx="3" fill="var(--color-surface-base)" stroke="var(--color-border-strong)" stroke-width="1.25" />
+        <animateTransform
+          v-if="animated"
+          attributeName="transform"
+          type="translate"
+          values="0 8;0 -10"
+          :dur="c.dur"
+          :begin="c.begin"
+          repeatCount="indefinite"
+        />
+        <animate
+          v-if="animated"
+          attributeName="opacity"
+          values="0;1;1;0"
+          keyTimes="0;0.2;0.7;1"
+          :dur="c.dur"
+          :begin="c.begin"
+          repeatCount="indefinite"
+        />
+        <rect
+          x="-10"
+          y="-6"
+          width="20"
+          height="12"
+          rx="3"
+          fill="var(--color-surface-base)"
+          stroke="var(--color-border-strong)"
+          stroke-width="1.25"
+        />
         <circle cx="-4" cy="0" r="2" fill="var(--color-primary-500)" />
-        <rect x="0" y="-1.5" width="7" height="3" rx="1.5" fill="var(--color-border-strong)" opacity="0.5" />
+        <rect
+          x="0"
+          y="-1.5"
+          width="7"
+          height="3"
+          rx="1.5"
+          fill="var(--color-border-strong)"
+          opacity="0.5"
+        />
       </g>
     </g>
 
@@ -67,19 +156,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- sparkle -->
     <g transform="translate(40 38)">
-      <path d="M0 -6 L1.5 -1.5 L6 0 L1.5 1.5 L0 6 L-1.5 1.5 L-6 0 L-1.5 -1.5 Z" fill="var(--color-primary-400)">
-        <animate v-if="animated" attributeName="opacity" values="0.2;1;0.2" dur="2.6s" repeatCount="indefinite" />
-        <animateTransform v-if="animated" attributeName="transform" type="scale" values="0.6;1.1;0.6" dur="2.6s" repeatCount="indefinite" />
+      <path
+        d="M0 -6 L1.5 -1.5 L6 0 L1.5 1.5 L0 6 L-1.5 1.5 L-6 0 L-1.5 -1.5 Z"
+        fill="var(--color-primary-400)"
+      >
+        <animate
+          v-if="animated"
+          attributeName="opacity"
+          values="0.2;1;0.2"
+          dur="2.6s"
+          repeatCount="indefinite"
+        />
+        <animateTransform
+          v-if="animated"
+          attributeName="transform"
+          type="scale"
+          values="0.6;1.1;0.6"
+          dur="2.6s"
+          repeatCount="indefinite"
+        />
       </path>
     </g>
   </svg>
 </template>
 
 <script setup lang="ts">
-withDefaults(
-  defineProps<{ width?: number; animated?: boolean }>(),
-  { width: 208, animated: true },
-);
+withDefaults(defineProps<{ width?: number; animated?: boolean }>(), { width: 208, animated: true });
 
 // t = fraction of the 4s loop when each blip lights up (roughly as the sweep passes)
 const blips = [

@@ -23,10 +23,7 @@ export const streamNameRegex = /^[a-zA-Z0-9_:]+$/;
  * @param t useI18n's `t`, so required messages resolve from the shared
  *   `logStream.*` keys.
  */
-export const makeAddStreamSchema = (
-  retentionEnabled: boolean,
-  t: (_key: string) => string,
-) =>
+export const makeAddStreamSchema = (retentionEnabled: boolean, t: (_key: string) => string) =>
   z
     .object({
       // NO schema `.trim()`: OForm/TanStack uses the schema to VALIDATE but saves

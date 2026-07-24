@@ -88,24 +88,17 @@ export const useSearchResponseHandler = () => {
       return;
     }
 
-    if (
-      payload.type === "search" &&
-      response?.type === "search_response_hits"
-    ) {
+    if (payload.type === "search" && response?.type === "search_response_hits") {
       const isStreamingAggs =
-        response.content?.streaming_aggs ||
-        searchObj.data.queryResults.streaming_aggs;
+        response.content?.streaming_aggs || searchObj.data.queryResults.streaming_aggs;
       const shouldAppendStreamingResults = isStreamingAggs
         ? !response.content?.results?.hits?.length
         : true;
-      searchPartitionMap[payload.traceId].chunks[
-        searchPartitionMap[payload.traceId].partition
-      ]++;
+      searchPartitionMap[payload.traceId].chunks[searchPartitionMap[payload.traceId].partition]++;
 
       const isChunkedHits =
-        searchPartitionMap[payload.traceId].chunks[
-          searchPartitionMap[payload.traceId].partition
-        ] > 1;
+        searchPartitionMap[payload.traceId].chunks[searchPartitionMap[payload.traceId].partition] >
+        1;
 
       handleStreamingHits(
         payload,
@@ -117,10 +110,7 @@ export const useSearchResponseHandler = () => {
       return;
     }
 
-    if (
-      payload.type === "search" &&
-      response?.type === "search_response_metadata"
-    ) {
+    if (payload.type === "search" && response?.type === "search_response_metadata") {
       searchPartitionMap[payload.traceId] = searchPartitionMap[payload.traceId]
         ? searchPartitionMap[payload.traceId]
         : {
@@ -134,48 +124,33 @@ export const useSearchResponseHandler = () => {
         : true;
 
       searchPartitionMap[payload.traceId].partition++;
-      searchPartitionMap[payload.traceId].chunks[
-        searchPartitionMap[payload.traceId].partition
-      ] = 0;
+      searchPartitionMap[payload.traceId].chunks[searchPartitionMap[payload.traceId].partition] = 0;
 
       handleStreamingMetadata(
         payload,
         response,
         payload.isPagination,
-        shouldAppendStreamingResults &&
-          searchPartitionMap[payload.traceId].partition > 1,
+        shouldAppendStreamingResults && searchPartitionMap[payload.traceId].partition > 1,
       );
       return;
     }
 
-    if (
-      payload.type === "histogram" &&
-      response?.type === "search_response_hits"
-    ) {
+    if (payload.type === "histogram" && response?.type === "search_response_hits") {
       handleHistogramStreamingHits(payload, response);
       return;
     }
 
-    if (
-      payload.type === "histogram" &&
-      response?.type === "search_response_metadata"
-    ) {
+    if (payload.type === "histogram" && response?.type === "search_response_metadata") {
       handleHistogramStreamingMetadata(payload, response);
       return;
     }
 
-    if (
-      payload.type === "pageCount" &&
-      response?.type === "search_response_hits"
-    ) {
+    if (payload.type === "pageCount" && response?.type === "search_response_hits") {
       handlePageCountStreamingHits(payload, response);
       return;
     }
 
-    if (
-      payload.type === "pageCount" &&
-      response?.type === "search_response_metadata"
-    ) {
+    if (payload.type === "pageCount" && response?.type === "search_response_metadata") {
       handlePageCountStreamingMetadata(payload, response);
       return;
     }
@@ -201,10 +176,7 @@ export const useSearchResponseHandler = () => {
   ) => {
     const hits = response.content?.results?.hits || [];
 
-    if (
-      (isPagination && searchPartitionMap[payload.traceId].partition === 1) ||
-      !appendResult
-    ) {
+    if ((isPagination && searchPartitionMap[payload.traceId].partition === 1) || !appendResult) {
       clearCache();
       searchObj.data.queryResults.hits = hits;
     } else if (appendResult) {
@@ -217,19 +189,13 @@ export const useSearchResponseHandler = () => {
         response.content.results.hits.length,
         searchObj.data.queryResults.hits.length,
       );
-      trimPageCountExtraHit(
-        payload.queryReq,
-        searchObj.data.queryResults.hits.length,
-      );
+      trimPageCountExtraHit(payload.queryReq, searchObj.data.queryResults.hits.length);
     }
 
     if (
       searchObj.data.queryResults.hits.length > 0 &&
       store.state.zoConfig.timestamp_column != "" &&
-      Object.prototype.hasOwnProperty.call(
-        searchObj.data.queryResults,
-        "order_by_metadata",
-      ) &&
+      Object.prototype.hasOwnProperty.call(searchObj.data.queryResults, "order_by_metadata") &&
       searchObj.data.queryResults.order_by_metadata.length > 0
     ) {
       sortResponse(
@@ -261,40 +227,31 @@ export const useSearchResponseHandler = () => {
     handleAggregation(payload.queryReq, response);
     resetFieldValues();
 
-    if (
-      !Object.prototype.hasOwnProperty.call(
-        payload.queryReq.query,
-        "track_total_hits",
-      )
-    ) {
+    if (!Object.prototype.hasOwnProperty.call(payload.queryReq.query, "track_total_hits")) {
       delete response.content.total;
     }
 
     if (appendResult) {
       searchObj.data.queryResults.total += response.content.results.total;
       searchObj.data.queryResults.took += response.content.results.took;
-      searchObj.data.queryResults.scan_size +=
-        response.content.results.scan_size;
+      searchObj.data.queryResults.scan_size += response.content.results.scan_size;
     } else {
       if (isPagination && response.content?.streaming_aggs) {
         searchObj.data.queryResults.from = response.content.results.from;
-        searchObj.data.queryResults.scan_size =
-          response.content.results.scan_size;
+        searchObj.data.queryResults.scan_size = response.content.results.scan_size;
         searchObj.data.queryResults.took = response.content.results.took;
       } else if (response.content?.streaming_aggs) {
         searchObj.data.queryResults = {
           ...response.content.results,
           took: (searchObj.data?.queryResults?.took || 0) + response.content.results.took,
           scan_size:
-            (searchObj.data?.queryResults?.scan_size || 0) +
-            response.content.results.scan_size,
+            (searchObj.data?.queryResults?.scan_size || 0) + response.content.results.scan_size,
           hits: searchObj.data?.queryResults?.hits || [],
           streaming_aggs: response.content?.streaming_aggs,
         };
       } else if (isPagination) {
         searchObj.data.queryResults.from = response.content.results.from;
-        searchObj.data.queryResults.scan_size =
-          response.content.results.scan_size;
+        searchObj.data.queryResults.scan_size = response.content.results.scan_size;
         searchObj.data.queryResults.took = response.content.results.took;
         searchObj.data.queryResults.total = response.content.results.total;
       } else {
@@ -302,12 +259,7 @@ export const useSearchResponseHandler = () => {
       }
     }
 
-    if (
-      Object.prototype.hasOwnProperty.call(
-        response.content.results,
-        "is_histogram_eligible",
-      )
-    ) {
+    if (Object.prototype.hasOwnProperty.call(response.content.results, "is_histogram_eligible")) {
       searchObj.data.queryResults.is_histogram_eligible =
         response.content.results.is_histogram_eligible;
     }
@@ -325,8 +277,7 @@ export const useSearchResponseHandler = () => {
         response.content.results.total != payload.queryReq.query.size
       ) {
         searchObj.data.queryResults.pageCountTotal =
-          payload.queryReq.query.size *
-            Math.max(searchObj.data.resultGrid.currentPage - 1, 0) +
+          payload.queryReq.query.size * Math.max(searchObj.data.resultGrid.currentPage - 1, 0) +
           response.content.results.total;
       }
     }
@@ -349,18 +300,10 @@ export const useSearchResponseHandler = () => {
   ) => {
     try {
       const parsedSQL = fnParsedSQL();
-      if (
-        shouldGetPageCount(queryReq, parsedSQL) &&
-        total === queryReq.query.size
-      ) {
+      if (shouldGetPageCount(queryReq, parsedSQL) && total === queryReq.query.size) {
         searchObj.data.queryResults.pageCountTotal =
-          searchObj.meta.resultGrid.rowsPerPage *
-            searchObj.data.resultGrid.currentPage +
-          1;
-      } else if (
-        shouldGetPageCount(queryReq, parsedSQL) &&
-        total !== queryReq.query.size
-      ) {
+          searchObj.meta.resultGrid.rowsPerPage * searchObj.data.resultGrid.currentPage + 1;
+      } else if (shouldGetPageCount(queryReq, parsedSQL) && total !== queryReq.query.size) {
         searchObj.data.queryResults.pageCountTotal =
           searchObj.meta.resultGrid.rowsPerPage *
             Math.max(searchObj.data.resultGrid.currentPage - 1, 0) +
@@ -371,21 +314,14 @@ export const useSearchResponseHandler = () => {
     }
   };
 
-  const trimPageCountExtraHit = (
-    queryReq: SearchRequestPayload,
-    total: any,
-  ) => {
+  const trimPageCountExtraHit = (queryReq: SearchRequestPayload, total: any) => {
     try {
       const parsedSQL = fnParsedSQL();
-      if (
-        shouldGetPageCount(queryReq, parsedSQL) &&
-        total === queryReq.query.size
-      ) {
-        searchObj.data.queryResults.hits =
-          searchObj.data.queryResults.hits.slice(
-            0,
-            searchObj.data.queryResults.hits.length - 1,
-          );
+      if (shouldGetPageCount(queryReq, parsedSQL) && total === queryReq.query.size) {
+        searchObj.data.queryResults.hits = searchObj.data.queryResults.hits.slice(
+          0,
+          searchObj.data.queryResults.hits.length - 1,
+        );
       }
     } catch (e: any) {
       console.error("Error while trimming page count extra hit", e);
@@ -402,15 +338,10 @@ export const useSearchResponseHandler = () => {
       searchObj.data.queryResults.aggs = [];
     }
 
-    if (
-      searchObj.data.queryResults.aggs.length == 0 &&
-      response.content.results.hits.length > 0
-    ) {
+    if (searchObj.data.queryResults.aggs.length == 0 && response.content.results.hits.length > 0) {
       let date = new Date();
-      const startDateTime =
-        searchObj.data.customDownloadQueryObj.query.start_time / 1000;
-      const endDateTime =
-        searchObj.data.customDownloadQueryObj.query.end_time / 1000;
+      const startDateTime = searchObj.data.customDownloadQueryObj.query.start_time / 1000;
+      const endDateTime = searchObj.data.customDownloadQueryObj.query.end_time / 1000;
       const nowString = response.content.results.hits[0].zo_sql_key;
       const now = new Date(nowString);
       const day = String(now.getDate()).padStart(2, "0");
@@ -423,16 +354,9 @@ export const useSearchResponseHandler = () => {
         minutes = String(now.getMinutes() + 1).padStart(2, "0");
       }
       const time = `${hours}:${minutes}`;
-      const currentTimeToBePassed = convertDateToTimestamp(
-        dateToBePassed,
-        time,
-        "UTC",
-      );
+      const currentTimeToBePassed = convertDateToTimestamp(dateToBePassed, time, "UTC");
       if (!searchObj.data.histogramInterval) {
-        console.error(
-          "Error processing histogram data:",
-          "histogramInterval is not set",
-        );
+        console.error("Error processing histogram data:", "histogramInterval is not set");
         searchObj.loadingHistogram = false;
         return;
       }
@@ -464,9 +388,7 @@ export const useSearchResponseHandler = () => {
     if (searchObj.data.queryResults.order_by?.toLowerCase() === "desc") {
       searchObj.data.queryResults.aggs.push(...response.content.results.hits);
     } else {
-      searchObj.data.queryResults.aggs.unshift(
-        ...response.content.results.hits,
-      );
+      searchObj.data.queryResults.aggs.unshift(...response.content.results.hits);
     }
 
     (async () => {
@@ -494,17 +416,13 @@ export const useSearchResponseHandler = () => {
 
     searchObj.data.queryResults.scan_size += response.content.results.scan_size;
     searchObj.data.queryResults.took += response.content.results.took;
-    searchObj.data.queryResults.result_cache_ratio +=
-      response.content.results.result_cache_ratio;
-    searchObj.data.queryResults.histogram_interval =
-      response.content.results.histogram_interval;
+    searchObj.data.queryResults.result_cache_ratio += response.content.results.result_cache_ratio;
+    searchObj.data.queryResults.histogram_interval = response.content.results.histogram_interval;
 
     if (searchObj.data.queryResults.histogram_interval)
-      searchObj.data.histogramInterval =
-        searchObj.data.queryResults.histogram_interval * 1000000;
+      searchObj.data.histogramInterval = searchObj.data.queryResults.histogram_interval * 1000000;
 
-    searchObj.data.queryResults.order_by =
-      response?.content?.results?.order_by ?? "desc";
+    searchObj.data.queryResults.order_by = response?.content?.results?.order_by ?? "desc";
 
     searchObj.data.queryResults.converted_histogram_query =
       response?.content?.results?.converted_histogram_query ?? "";
@@ -526,17 +444,11 @@ export const useSearchResponseHandler = () => {
     response: WebSocketSearchResponse,
   ) => {
     let regeratePaginationFlag = false;
-    if (
-      response.content.results.hits.length !=
-      searchObj.meta.resultGrid.rowsPerPage
-    ) {
+    if (response.content.results.hits.length != searchObj.meta.resultGrid.rowsPerPage) {
       regeratePaginationFlag = true;
     }
 
-    if (
-      response.content?.streaming_aggs ||
-      searchObj.data.queryResults.streaming_aggs
-    ) {
+    if (response.content?.streaming_aggs || searchObj.data.queryResults.streaming_aggs) {
       searchObj.data.queryResults.aggs = response.content.results.hits;
     } else {
       searchObj.data.queryResults.aggs.push(...response.content.results.hits);
@@ -556,41 +468,25 @@ export const useSearchResponseHandler = () => {
       searchObj.data.queryResults.aggs = [];
     }
 
-    searchObj.data.queryResults.streaming_aggs =
-      response?.content?.streaming_aggs;
+    searchObj.data.queryResults.streaming_aggs = response?.content?.streaming_aggs;
 
     searchObj.data.queryResults.scan_size += response.content.results.scan_size;
     searchObj.data.queryResults.took += response.content.results.took;
   };
 
-  const handleFunctionError = (
-    queryReq: SearchRequestPayload,
-    response: any,
-  ) => {
+  const handleFunctionError = (queryReq: SearchRequestPayload, response: any) => {
     if (
-      Object.prototype.hasOwnProperty.call(
-        response.content.results,
-        "function_error",
-      ) &&
+      Object.prototype.hasOwnProperty.call(response.content.results, "function_error") &&
       response.content.results.function_error != ""
     ) {
       searchObj.data.functionError = response.content.results.function_error;
     }
 
     if (
-      Object.prototype.hasOwnProperty.call(
-        response.content.results,
-        "function_error",
-      ) &&
+      Object.prototype.hasOwnProperty.call(response.content.results, "function_error") &&
       response.content.results.function_error != "" &&
-      Object.prototype.hasOwnProperty.call(
-        response.content.results,
-        "new_start_time",
-      ) &&
-      Object.prototype.hasOwnProperty.call(
-        response.content.results,
-        "new_end_time",
-      )
+      Object.prototype.hasOwnProperty.call(response.content.results, "new_start_time") &&
+      Object.prototype.hasOwnProperty.call(response.content.results, "new_end_time")
     ) {
       response.content.results.function_error = getFunctionErrorMessage(
         response.content.results.function_error,
@@ -598,16 +494,13 @@ export const useSearchResponseHandler = () => {
         response.content.results.new_end_time,
         store.state.timezone,
       );
-      searchObj.data.datetime.startTime =
-        response.content.results.new_start_time;
+      searchObj.data.datetime.startTime = response.content.results.new_start_time;
       searchObj.data.datetime.endTime = response.content.results.new_end_time;
       searchObj.data.datetime.type = "absolute";
       queryReq.query.start_time = response.content.results.new_start_time;
       queryReq.query.end_time = response.content.results.new_end_time;
-      searchObj.data.histogramQuery.query.start_time =
-        response.content.results.new_start_time;
-      searchObj.data.histogramQuery.query.end_time =
-        response.content.results.new_end_time;
+      searchObj.data.histogramQuery.query.start_time = response.content.results.new_start_time;
+      searchObj.data.histogramQuery.query.end_time = response.content.results.new_end_time;
 
       updateUrlQueryParams();
     }
@@ -621,14 +514,10 @@ export const useSearchResponseHandler = () => {
         searchAggData.hasAggregation = true;
         searchObj.meta.resultGrid.showPagination = false;
 
-        if (
-          response.content?.streaming_aggs &&
-          response.content?.results?.total
-        ) {
+        if (response.content?.streaming_aggs && response.content?.results?.total) {
           searchAggData.total = response.content?.results?.total;
         } else {
-          searchAggData.total =
-            searchAggData.total + response.content?.results?.total;
+          searchAggData.total = searchAggData.total + response.content?.results?.total;
         }
       }
     }
@@ -720,12 +609,7 @@ export const useSearchResponseHandler = () => {
   };
 
   const setCancelSearchError = () => {
-    if (
-      !Object.prototype.hasOwnProperty.call(
-        searchObj.data?.queryResults,
-        "hits",
-      )
-    ) {
+    if (!Object.prototype.hasOwnProperty.call(searchObj.data?.queryResults, "hits")) {
       searchObj.data.queryResults.hits = [];
     }
 
@@ -735,24 +619,17 @@ export const useSearchResponseHandler = () => {
     }
 
     if (
-      Object.prototype.hasOwnProperty.call(
-        searchObj.data?.queryResults ?? {},
-        "hits",
-      ) &&
+      Object.prototype.hasOwnProperty.call(searchObj.data?.queryResults ?? {}, "hits") &&
       searchObj.data.queryResults?.hits?.length &&
       !searchObj.data.queryResults?.aggs?.length
     ) {
-      searchObj.data.histogram.errorMsg =
-        "Histogram search query was cancelled";
+      searchObj.data.histogram.errorMsg = "Histogram search query was cancelled";
     }
   };
 
   const shouldGetPageCount = (queryReq: any, _parsedSQL: any): boolean => {
     // Simplified version - implement full logic as needed
-    return (
-      !queryReq.query.sql?.includes("LIMIT") &&
-      !queryReq.query.sql?.includes("DISTINCT")
-    );
+    return !queryReq.query.sql?.includes("LIMIT") && !queryReq.query.sql?.includes("DISTINCT");
   };
 
   // const refreshPagination = (regenerateFlag: boolean = false) => {

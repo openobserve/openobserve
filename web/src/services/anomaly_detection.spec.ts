@@ -50,9 +50,7 @@ describe("anomaly_detection service", () => {
 
       await anomaly_detection.list(org_identifier);
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${org_identifier}/anomaly_detection`
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(`/api/${org_identifier}/anomaly_detection`);
     });
 
     it("should make GET request with a different org identifier", async () => {
@@ -69,9 +67,7 @@ describe("anomaly_detection service", () => {
 
       await anomaly_detection.list(org_identifier);
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${org_identifier}/anomaly_detection`
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(`/api/${org_identifier}/anomaly_detection`);
     });
   });
 
@@ -87,7 +83,7 @@ describe("anomaly_detection service", () => {
       await anomaly_detection.get(org_identifier, anomaly_id);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/v2/${org_identifier}/alerts/${anomaly_id}`
+        `/api/v2/${org_identifier}/alerts/${anomaly_id}`,
       );
     });
 
@@ -102,7 +98,7 @@ describe("anomaly_detection service", () => {
       await anomaly_detection.get(org_identifier, anomaly_id);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/v2/${org_identifier}/alerts/${anomaly_id}`
+        `/api/v2/${org_identifier}/alerts/${anomaly_id}`,
       );
     });
   });
@@ -121,10 +117,7 @@ describe("anomaly_detection service", () => {
 
       await anomaly_detection.create(org_identifier, data);
 
-      expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        `/api/v2/${org_identifier}/alerts`,
-        data
-      );
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(`/api/v2/${org_identifier}/alerts`, data);
     });
 
     it("should make POST request with minimal payload", async () => {
@@ -135,10 +128,7 @@ describe("anomaly_detection service", () => {
 
       await anomaly_detection.create(org_identifier, data);
 
-      expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        `/api/v2/${org_identifier}/alerts`,
-        data
-      );
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(`/api/v2/${org_identifier}/alerts`, data);
     });
   });
 
@@ -158,7 +148,7 @@ describe("anomaly_detection service", () => {
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/v2/${org_identifier}/alerts/${anomaly_id}`,
-        data
+        data,
       );
     });
 
@@ -173,7 +163,7 @@ describe("anomaly_detection service", () => {
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/v2/${org_identifier}/alerts/${anomaly_id}`,
-        data
+        data,
       );
     });
   });
@@ -188,7 +178,7 @@ describe("anomaly_detection service", () => {
       await anomaly_detection.delete(org_identifier, anomaly_id);
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/v2/${org_identifier}/alerts/${anomaly_id}`
+        `/api/v2/${org_identifier}/alerts/${anomaly_id}`,
       );
     });
 
@@ -201,7 +191,7 @@ describe("anomaly_detection service", () => {
       await anomaly_detection.delete(org_identifier, anomaly_id);
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/v2/${org_identifier}/alerts/${anomaly_id}`
+        `/api/v2/${org_identifier}/alerts/${anomaly_id}`,
       );
     });
   });
@@ -218,7 +208,7 @@ describe("anomaly_detection service", () => {
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/v2/${org_identifier}/alerts/${anomaly_id}`,
-        { alert_type: "anomaly_detection", anomaly_config: { enabled } }
+        { alert_type: "anomaly_detection", anomaly_config: { enabled } },
       );
     });
 
@@ -233,7 +223,7 @@ describe("anomaly_detection service", () => {
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/v2/${org_identifier}/alerts/${anomaly_id}`,
-        { alert_type: "anomaly_detection", anomaly_config: { enabled: false } }
+        { alert_type: "anomaly_detection", anomaly_config: { enabled: false } },
       );
     });
   });
@@ -249,7 +239,7 @@ describe("anomaly_detection service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/${org_identifier}/anomaly_detection/${anomaly_id}/train`,
-        {}
+        {},
       );
     });
 
@@ -263,7 +253,7 @@ describe("anomaly_detection service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/${org_identifier}/anomaly_detection/${anomaly_id}/train`,
-        {}
+        {},
       );
     });
   });
@@ -278,7 +268,7 @@ describe("anomaly_detection service", () => {
       await anomaly_detection.cancelTraining(org_identifier, anomaly_id);
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/${org_identifier}/anomaly_detection/${anomaly_id}/train`
+        `/api/${org_identifier}/anomaly_detection/${anomaly_id}/train`,
       );
     });
 
@@ -291,7 +281,7 @@ describe("anomaly_detection service", () => {
       await anomaly_detection.cancelTraining(org_identifier, anomaly_id);
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/${org_identifier}/anomaly_detection/${anomaly_id}/train`
+        `/api/${org_identifier}/anomaly_detection/${anomaly_id}/train`,
       );
     });
   });
@@ -307,7 +297,7 @@ describe("anomaly_detection service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/${org_identifier}/anomaly_detection/${anomaly_id}/detect`,
-        {}
+        {},
       );
     });
 
@@ -321,7 +311,7 @@ describe("anomaly_detection service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/${org_identifier}/anomaly_detection/${anomaly_id}/detect`,
-        {}
+        {},
       );
     });
   });
@@ -336,7 +326,7 @@ describe("anomaly_detection service", () => {
       await anomaly_detection.getHistory(org_identifier, anomaly_id);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${org_identifier}/anomaly_detection/${anomaly_id}/history?limit=100`
+        `/api/${org_identifier}/anomaly_detection/${anomaly_id}/history?limit=100`,
       );
     });
 
@@ -350,7 +340,7 @@ describe("anomaly_detection service", () => {
       await anomaly_detection.getHistory(org_identifier, anomaly_id, limit);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${org_identifier}/anomaly_detection/${anomaly_id}/history?limit=${limit}`
+        `/api/${org_identifier}/anomaly_detection/${anomaly_id}/history?limit=${limit}`,
       );
     });
 
@@ -364,7 +354,7 @@ describe("anomaly_detection service", () => {
       await anomaly_detection.getHistory(org_identifier, anomaly_id, limit);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${org_identifier}/anomaly_detection/${anomaly_id}/history?limit=1`
+        `/api/${org_identifier}/anomaly_detection/${anomaly_id}/history?limit=1`,
       );
     });
 
@@ -378,7 +368,7 @@ describe("anomaly_detection service", () => {
       await anomaly_detection.getHistory(org_identifier, anomaly_id, limit);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${org_identifier}/anomaly_detection/${anomaly_id}/history?limit=500`
+        `/api/${org_identifier}/anomaly_detection/${anomaly_id}/history?limit=500`,
       );
     });
   });
@@ -395,18 +385,16 @@ describe("anomaly_detection service", () => {
       const error = new Error("Not found");
       mockHttpInstance.get.mockRejectedValue(error);
 
-      await expect(
-        anomaly_detection.get("org123", "missing-id")
-      ).rejects.toThrow("Not found");
+      await expect(anomaly_detection.get("org123", "missing-id")).rejects.toThrow("Not found");
     });
 
     it("should propagate errors from create", async () => {
       const error = new Error("Validation error");
       mockHttpInstance.post.mockRejectedValue(error);
 
-      await expect(
-        anomaly_detection.create("org123", { name: "bad-detector" })
-      ).rejects.toThrow("Validation error");
+      await expect(anomaly_detection.create("org123", { name: "bad-detector" })).rejects.toThrow(
+        "Validation error",
+      );
     });
 
     it("should propagate errors from update", async () => {
@@ -414,7 +402,7 @@ describe("anomaly_detection service", () => {
       mockHttpInstance.put.mockRejectedValue(error);
 
       await expect(
-        anomaly_detection.update("org123", "detector-id", { name: "updated" })
+        anomaly_detection.update("org123", "detector-id", { name: "updated" }),
       ).rejects.toThrow("Conflict");
     });
 
@@ -422,45 +410,43 @@ describe("anomaly_detection service", () => {
       const error = new Error("Forbidden");
       mockHttpInstance.delete.mockRejectedValue(error);
 
-      await expect(
-        anomaly_detection.delete("org123", "detector-id")
-      ).rejects.toThrow("Forbidden");
+      await expect(anomaly_detection.delete("org123", "detector-id")).rejects.toThrow("Forbidden");
     });
 
     it("should propagate errors from triggerTraining", async () => {
       const error = new Error("Training already in progress");
       mockHttpInstance.post.mockRejectedValue(error);
 
-      await expect(
-        anomaly_detection.triggerTraining("org123", "detector-id")
-      ).rejects.toThrow("Training already in progress");
+      await expect(anomaly_detection.triggerTraining("org123", "detector-id")).rejects.toThrow(
+        "Training already in progress",
+      );
     });
 
     it("should propagate errors from cancelTraining", async () => {
       const error = new Error("No training in progress");
       mockHttpInstance.delete.mockRejectedValue(error);
 
-      await expect(
-        anomaly_detection.cancelTraining("org123", "detector-id")
-      ).rejects.toThrow("No training in progress");
+      await expect(anomaly_detection.cancelTraining("org123", "detector-id")).rejects.toThrow(
+        "No training in progress",
+      );
     });
 
     it("should propagate errors from triggerDetection", async () => {
       const error = new Error("Detection failed");
       mockHttpInstance.post.mockRejectedValue(error);
 
-      await expect(
-        anomaly_detection.triggerDetection("org123", "detector-id")
-      ).rejects.toThrow("Detection failed");
+      await expect(anomaly_detection.triggerDetection("org123", "detector-id")).rejects.toThrow(
+        "Detection failed",
+      );
     });
 
     it("should propagate errors from getHistory", async () => {
       const error = new Error("Server error");
       mockHttpInstance.get.mockRejectedValue(error);
 
-      await expect(
-        anomaly_detection.getHistory("org123", "detector-id")
-      ).rejects.toThrow("Server error");
+      await expect(anomaly_detection.getHistory("org123", "detector-id")).rejects.toThrow(
+        "Server error",
+      );
     });
   });
 });

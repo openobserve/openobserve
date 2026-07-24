@@ -3,51 +3,56 @@
        Streams header → KPI tile strip → resources rail + two chart cards. No
        outer card-container (the loaded content has none either). -->
   <div
-    class="home-view-skeleton w-full h-full flex flex-col px-page-edge pt-2 pb-1 overflow-hidden"
+    class="home-view-skeleton px-page-edge flex h-full w-full flex-col overflow-hidden pt-2 pb-1"
   >
     <!-- Streams section header -->
-    <div data-test="home-view-skeleton-streams-header" class="flex items-center justify-between mb-2">
+    <div
+      data-test="home-view-skeleton-streams-header"
+      class="mb-2 flex items-center justify-between"
+    >
       <div class="flex items-center gap-2">
-        <OSkeleton class="w-8 h-8" />
-        <OSkeleton type="text" class="w-24 h-5" />
+        <OSkeleton class="h-8 w-8" />
+        <OSkeleton type="text" class="h-5 w-24" />
       </div>
-      <OSkeleton class="w-8 h-8" />
+      <OSkeleton class="h-8 w-8" />
     </div>
 
     <!-- KPI tile strip (mirrors KpiCardRow / KpiCard) -->
-    <div class="grid gap-2.5 mb-4 grid-cols-[repeat(auto-fit,minmax(12rem,1fr))]">
+    <div class="mb-4 grid grid-cols-[repeat(auto-fit,minmax(12rem,1fr))] gap-2.5">
       <div
         v-for="n in 5"
         :key="`kpi-${n}`"
         data-test="home-view-skeleton-tile"
-        class="bg-card-glass-bg rounded-default border border-border-default px-3.5 py-2.5 flex flex-col gap-1"
+        class="bg-card-glass-bg rounded-default border-border-default flex flex-col gap-1 border px-3.5 py-2.5"
       >
-        <div class="flex items-center justify-between gap-2 mb-1">
-          <OSkeleton type="text" class="w-20 h-4" />
-          <OSkeleton class="w-10 h-10" />
+        <div class="mb-1 flex items-center justify-between gap-2">
+          <OSkeleton type="text" class="h-4 w-20" />
+          <OSkeleton class="h-10 w-10" />
         </div>
-        <OSkeleton type="text" class="w-24 h-7" />
+        <OSkeleton type="text" class="h-7 w-24" />
       </div>
     </div>
 
     <!-- Main region: resources rail + two status-chart cards -->
-    <div class="grid grid-cols-1 lg:grid-cols-[16rem_minmax(0,1fr)_minmax(0,1fr)] gap-3 flex-1 min-h-0">
+    <div
+      class="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[16rem_minmax(0,1fr)_minmax(0,1fr)]"
+    >
       <!-- Resources rail -->
       <div
         data-test="home-view-skeleton-rail"
-        class="rounded-default p-4 bg-card-glass-bg border border-card-glass-border flex flex-col"
+        class="rounded-default bg-card-glass-bg border-card-glass-border flex flex-col border p-4"
       >
-        <OSkeleton type="text" class="w-24 h-4 mb-2" />
+        <OSkeleton type="text" class="mb-2 h-4 w-24" />
         <div v-for="n in 2" :key="`res-${n}`" class="flex items-center gap-2.5 py-2">
-          <OSkeleton class="w-8 h-8" />
-          <OSkeleton type="text" class="flex-1 h-4" />
-          <OSkeleton type="text" class="w-6 h-4" />
+          <OSkeleton class="h-8 w-8" />
+          <OSkeleton type="text" class="h-4 flex-1" />
+          <OSkeleton type="text" class="h-4 w-6" />
         </div>
-        <div class="h-px bg-border-default my-3"></div>
-        <OSkeleton type="text" class="w-16 h-3.5 mb-2" />
+        <div class="bg-border-default my-3 h-px"></div>
+        <OSkeleton type="text" class="mb-2 h-3.5 w-16" />
         <div v-for="n in 4" :key="`exp-${n}`" class="flex items-center gap-2.5 py-2">
-          <OSkeleton class="w-8 h-8" />
-          <OSkeleton type="text" class="flex-1 h-4" />
+          <OSkeleton class="h-8 w-8" />
+          <OSkeleton type="text" class="h-4 flex-1" />
         </div>
       </div>
 
@@ -56,35 +61,35 @@
         v-for="n in 2"
         :key="`chart-${n}`"
         data-test="home-view-skeleton-chart"
-        class="rounded-default p-4 bg-card-glass-bg border border-card-glass-border flex flex-col min-h-0"
+        class="rounded-default bg-card-glass-bg border-card-glass-border flex min-h-0 flex-col border p-4"
       >
         <!-- Header -->
-        <div class="flex justify-between items-center">
+        <div class="flex items-center justify-between">
           <span class="flex items-center gap-2">
-            <OSkeleton class="w-10 h-10" />
-            <OSkeleton type="text" class="w-24 h-5" />
+            <OSkeleton class="h-10 w-10" />
+            <OSkeleton type="text" class="h-5 w-24" />
           </span>
-          <OSkeleton class="w-8 h-8" />
+          <OSkeleton class="h-8 w-8" />
         </div>
         <!-- Stats row -->
-        <div class="flex pt-3 gap-4">
+        <div class="flex gap-4 pt-3">
           <div class="flex flex-col gap-1">
-            <OSkeleton type="text" class="w-16 h-3.5" />
-            <OSkeleton type="text" class="w-8 h-5" />
+            <OSkeleton type="text" class="h-3.5 w-16" />
+            <OSkeleton type="text" class="h-5 w-8" />
           </div>
           <OSeparator vertical />
           <div class="flex flex-col gap-1">
-            <OSkeleton type="text" class="w-16 h-3.5" />
-            <OSkeleton type="text" class="w-8 h-5" />
+            <OSkeleton type="text" class="h-3.5 w-16" />
+            <OSkeleton type="text" class="h-5 w-8" />
           </div>
         </div>
         <!-- Chart area -->
-        <div class="flex-1 min-h-50 w-full mt-3">
+        <div class="mt-3 min-h-50 w-full flex-1">
           <!-- custom-radius, not the boolean radius prop, is what actually lands
                lg corners here: OSkeleton type="text" base `rounded-default` beats
                `rounded-default` on Tailwind's alphabetical emit order, while this
                inline binding beats both. -->
-          <OSkeleton type="text" custom-radius="var(--radius-surface)" class="w-full h-full" />
+          <OSkeleton type="text" custom-radius="var(--radius-surface)" class="h-full w-full" />
         </div>
       </div>
     </div>

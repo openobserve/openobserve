@@ -82,11 +82,7 @@ const backfill = {
   /**
    * List all backfill jobs for an organization
    */
-  listBackfillJobs: async ({
-    org_id,
-  }: {
-    org_id: string;
-  }): Promise<BackfillJob[]> => {
+  listBackfillJobs: async ({ org_id }: { org_id: string }): Promise<BackfillJob[]> => {
     const url = `/api/${org_id}/pipelines/backfill`;
     const response = await http().get(url);
     return response.data;

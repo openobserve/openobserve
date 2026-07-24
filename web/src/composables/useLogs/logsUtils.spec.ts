@@ -182,7 +182,14 @@ describe("logsUtils", () => {
     });
 
     it("should filter out comment lines starting with --", () => {
-      const mockAst = { columns: [], from: [], orderby: null, limit: null, groupby: null, where: null };
+      const mockAst = {
+        columns: [],
+        from: [],
+        orderby: null,
+        limit: null,
+        groupby: null,
+        where: null,
+      };
       mockParserInstance.astify.mockReturnValue(mockAst);
 
       utils.fnParsedSQL("-- this is a comment\nSELECT * FROM logs");
@@ -192,7 +199,14 @@ describe("logsUtils", () => {
     });
 
     it("should use searchObj.data.query when no query provided", () => {
-      const mockAst = { columns: [], from: [], orderby: null, limit: null, groupby: null, where: null };
+      const mockAst = {
+        columns: [],
+        from: [],
+        orderby: null,
+        limit: null,
+        groupby: null,
+        where: null,
+      };
       mockParserInstance.astify.mockReturnValue(mockAst);
       mockSearchObj.data.query = "SELECT * FROM default_stream";
 
@@ -308,9 +322,7 @@ describe("logsUtils", () => {
 
   describe("hasAggregation", () => {
     it("should return true when column has aggr_func type", () => {
-      const columns = [
-        { expr: { type: "aggr_func", name: "count" } },
-      ];
+      const columns = [{ expr: { type: "aggr_func", name: "count" } }];
       expect(utils.hasAggregation(columns)).toBe(true);
     });
 
@@ -435,11 +447,7 @@ describe("logsUtils", () => {
       utils.addTraceId("trace-1");
       utils.addTraceId("trace-2");
       utils.addTraceId("trace-3");
-      expect(mockSearchObj.data.searchRequestTraceIds).toEqual([
-        "trace-1",
-        "trace-2",
-        "trace-3",
-      ]);
+      expect(mockSearchObj.data.searchRequestTraceIds).toEqual(["trace-1", "trace-2", "trace-3"]);
     });
 
     it("should not add empty string trace ID", () => {
@@ -461,19 +469,12 @@ describe("logsUtils", () => {
 
     it("should remove trace ID from the collection", () => {
       utils.removeTraceId("trace-2");
-      expect(mockSearchObj.data.searchRequestTraceIds).toEqual([
-        "trace-1",
-        "trace-3",
-      ]);
+      expect(mockSearchObj.data.searchRequestTraceIds).toEqual(["trace-1", "trace-3"]);
     });
 
     it("should handle removing non-existent trace ID", () => {
       utils.removeTraceId("trace-999");
-      expect(mockSearchObj.data.searchRequestTraceIds).toEqual([
-        "trace-1",
-        "trace-2",
-        "trace-3",
-      ]);
+      expect(mockSearchObj.data.searchRequestTraceIds).toEqual(["trace-1", "trace-2", "trace-3"]);
     });
 
     it("should handle empty collection", () => {
@@ -494,16 +495,12 @@ describe("logsUtils", () => {
 
   describe("isTimestampASC", () => {
     it("should return true when timestamp is ordered ASC", () => {
-      const orderby = [
-        { expr: { column: "_timestamp" }, type: "ASC" },
-      ];
+      const orderby = [{ expr: { column: "_timestamp" }, type: "ASC" }];
       expect(utils.isTimestampASC(orderby)).toBe(true);
     });
 
     it("should return false when timestamp is ordered DESC", () => {
-      const orderby = [
-        { expr: { column: "_timestamp" }, type: "DESC" },
-      ];
+      const orderby = [{ expr: { column: "_timestamp" }, type: "DESC" }];
       expect(utils.isTimestampASC(orderby)).toBe(false);
     });
 
@@ -513,17 +510,13 @@ describe("logsUtils", () => {
     });
 
     it("should return false when ordering different column", () => {
-      const orderby = [
-        { expr: { column: "other_field" }, type: "ASC" },
-      ];
+      const orderby = [{ expr: { column: "other_field" }, type: "ASC" }];
       expect(utils.isTimestampASC(orderby)).toBe(false);
     });
 
     it("should check timestamp column from store config", () => {
       mockStore.state.zoConfig.timestamp_column = "custom_ts";
-      const orderby = [
-        { expr: { column: "custom_ts" }, type: "ASC" },
-      ];
+      const orderby = [{ expr: { column: "custom_ts" }, type: "ASC" }];
       // Re-get utils to pick up new config
       const newUtils = logsUtils();
       expect(newUtils.isTimestampASC(orderby)).toBe(true);
@@ -554,7 +547,7 @@ describe("logsUtils", () => {
       expect(utils.checkTimestampAlias("SELECT field1 AS '_timestamp' FROM logs")).toBe(false);
     });
 
-    it("should return false for AS \"_timestamp\" pattern in query", () => {
+    it('should return false for AS "_timestamp" pattern in query', () => {
       mockParserInstance.astify.mockReturnValue({ columns: [] });
       expect(utils.checkTimestampAlias('SELECT field1 AS "_timestamp" FROM logs')).toBe(false);
     });
@@ -572,37 +565,55 @@ describe("logsUtils", () => {
 
   describe("isNonAggregatedSQLMode", () => {
     it("should return true when not in SQL mode", () => {
-      const searchObjParam = { meta: { sqlMode: false }, data: { queryResults: { is_histogram_eligible: true } } };
+      const searchObjParam = {
+        meta: { sqlMode: false },
+        data: { queryResults: { is_histogram_eligible: true } },
+      };
       const parsedSQL = {};
       expect(utils.isNonAggregatedSQLMode(searchObjParam, parsedSQL)).toBe(true);
     });
 
     it("should return false when SQL mode with LIMIT query", () => {
-      const searchObjParam = { meta: { sqlMode: true }, data: { queryResults: { is_histogram_eligible: true } } };
+      const searchObjParam = {
+        meta: { sqlMode: true },
+        data: { queryResults: { is_histogram_eligible: true } },
+      };
       const parsedSQL = { limit: { value: [{ value: 10 }] } };
       expect(utils.isNonAggregatedSQLMode(searchObjParam, parsedSQL)).toBe(false);
     });
 
     it("should return false when SQL mode with DISTINCT query", () => {
-      const searchObjParam = { meta: { sqlMode: true }, data: { queryResults: { is_histogram_eligible: true } } };
+      const searchObjParam = {
+        meta: { sqlMode: true },
+        data: { queryResults: { is_histogram_eligible: true } },
+      };
       const parsedSQL = { distinct: { type: "DISTINCT" } };
       expect(utils.isNonAggregatedSQLMode(searchObjParam, parsedSQL)).toBe(false);
     });
 
     it("should return false when SQL mode with WITH query", () => {
-      const searchObjParam = { meta: { sqlMode: true }, data: { queryResults: { is_histogram_eligible: true } } };
+      const searchObjParam = {
+        meta: { sqlMode: true },
+        data: { queryResults: { is_histogram_eligible: true } },
+      };
       const parsedSQL = { with: [{ name: "cte" }] };
       expect(utils.isNonAggregatedSQLMode(searchObjParam, parsedSQL)).toBe(false);
     });
 
     it("should return false when not histogram eligible", () => {
-      const searchObjParam = { meta: { sqlMode: true }, data: { queryResults: { is_histogram_eligible: false } } };
+      const searchObjParam = {
+        meta: { sqlMode: true },
+        data: { queryResults: { is_histogram_eligible: false } },
+      };
       const parsedSQL = {};
       expect(utils.isNonAggregatedSQLMode(searchObjParam, parsedSQL)).toBe(false);
     });
 
     it("should return true for simple SQL mode query", () => {
-      const searchObjParam = { meta: { sqlMode: true }, data: { queryResults: { is_histogram_eligible: true } } };
+      const searchObjParam = {
+        meta: { sqlMode: true },
+        data: { queryResults: { is_histogram_eligible: true } },
+      };
       const parsedSQL = {};
       expect(utils.isNonAggregatedSQLMode(searchObjParam, parsedSQL)).toBe(true);
     });

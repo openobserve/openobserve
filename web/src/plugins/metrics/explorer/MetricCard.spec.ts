@@ -89,9 +89,7 @@ describe("MetricCard (ported to @/lib)", () => {
     it("carries the card data-test", () => {
       wrapper = createWrapper();
       expect(
-        wrapper
-          .find('[data-test="metrics-explorer-card-node_cpu_seconds_total"]')
-          .exists(),
+        wrapper.find('[data-test="metrics-explorer-card-node_cpu_seconds_total"]').exists(),
       ).toBe(true);
     });
 
@@ -102,9 +100,7 @@ describe("MetricCard (ported to @/lib)", () => {
       // on the card. The tooltip content is not rendered until opened, so the
       // help sentence is absent from the card's text at rest.
       wrapper = createWrapper();
-      expect(wrapper.text()).not.toContain(
-        "Seconds the CPUs spent in each mode.",
-      );
+      expect(wrapper.text()).not.toContain("Seconds the CPUs spent in each mode.");
     });
 
     it("offers the help text through an info-icon button, reachable by a screen reader", () => {
@@ -112,40 +108,28 @@ describe("MetricCard (ported to @/lib)", () => {
       // info-outline button whose aria-label carries the full help sentence, so
       // it is announced — not hidden behind hover alone.
       wrapper = createWrapper();
-      const help = wrapper.find(
-        '[data-test="metrics-explorer-card-help-node_cpu_seconds_total"]',
-      );
+      const help = wrapper.find('[data-test="metrics-explorer-card-help-node_cpu_seconds_total"]');
       expect(help.exists()).toBe(true);
-      expect(help.attributes("aria-label")).toContain(
-        "Seconds the CPUs spent in each mode.",
-      );
+      expect(help.attributes("aria-label")).toContain("Seconds the CPUs spent in each mode.");
     });
 
     it("shows no info action when the metric has no help text", () => {
       wrapper = createWrapper({ card: { ...CARD, help: "" } });
       expect(
-        wrapper
-          .find(
-            '[data-test="metrics-explorer-card-help-node_cpu_seconds_total"]',
-          )
-          .exists(),
+        wrapper.find('[data-test="metrics-explorer-card-help-node_cpu_seconds_total"]').exists(),
       ).toBe(false);
     });
 
     it("renders the configure button only when the card is configurable", () => {
       wrapper = createWrapper();
       expect(
-        wrapper
-          .find('[data-test="metrics-explorer-card-fn-node_cpu_seconds_total"]')
-          .exists(),
+        wrapper.find('[data-test="metrics-explorer-card-fn-node_cpu_seconds_total"]').exists(),
       ).toBe(true);
 
       wrapper.unmount();
       wrapper = createWrapper({ card: { ...CARD, configurable: false } });
       expect(
-        wrapper
-          .find('[data-test="metrics-explorer-card-fn-node_cpu_seconds_total"]')
-          .exists(),
+        wrapper.find('[data-test="metrics-explorer-card-fn-node_cpu_seconds_total"]').exists(),
       ).toBe(false);
     });
   });
@@ -154,9 +138,7 @@ describe("MetricCard (ported to @/lib)", () => {
     it("emits select ONLY from the open-in-editor icon", async () => {
       wrapper = createWrapper();
       await wrapper
-        .find(
-          '[data-test="metrics-explorer-card-select-node_cpu_seconds_total"]',
-        )
+        .find('[data-test="metrics-explorer-card-select-node_cpu_seconds_total"]')
         .trigger("click");
       expect(wrapper.emitted("select")).toHaveLength(1);
     });
@@ -193,9 +175,7 @@ describe("MetricCard (ported to @/lib)", () => {
     it("emits toggle-favorite from the pin button", async () => {
       wrapper = createWrapper();
       await wrapper
-        .find(
-          '[data-test="metrics-explorer-card-favorite-node_cpu_seconds_total"]',
-        )
+        .find('[data-test="metrics-explorer-card-favorite-node_cpu_seconds_total"]')
         .trigger("click");
       expect(wrapper.emitted("toggle-favorite")).toBeTruthy();
     });
@@ -207,29 +187,17 @@ describe("MetricCard (ported to @/lib)", () => {
       wrapper = createWrapper();
       expect(
         wrapper
-          .find(
-            '[data-test="metrics-explorer-card-favorite-node_cpu_seconds_total"]',
-          )
+          .find('[data-test="metrics-explorer-card-favorite-node_cpu_seconds_total"]')
           .exists(),
       ).toBe(true);
       expect(
-        wrapper
-          .find(
-            '[data-test="metrics-explorer-card-select-node_cpu_seconds_total"]',
-          )
-          .exists(),
+        wrapper.find('[data-test="metrics-explorer-card-select-node_cpu_seconds_total"]').exists(),
       ).toBe(true);
       expect(
-        wrapper
-          .find(
-            '[data-test="metrics-explorer-card-refresh-node_cpu_seconds_total"]',
-          )
-          .exists(),
+        wrapper.find('[data-test="metrics-explorer-card-refresh-node_cpu_seconds_total"]').exists(),
       ).toBe(true);
       expect(
-        wrapper
-          .find('[data-test="metrics-explorer-card-fn-node_cpu_seconds_total"]')
-          .exists(),
+        wrapper.find('[data-test="metrics-explorer-card-fn-node_cpu_seconds_total"]').exists(),
       ).toBe(true);
       // No leftover hover-gating class anywhere in the card.
       expect(wrapper.html()).not.toContain("group-hover:visible");
@@ -243,9 +211,7 @@ describe("MetricCard (ported to @/lib)", () => {
         preview: preview({ status: "error", error: "bad query" }),
       });
       await wrapper
-        .find(
-          '[data-test="metrics-explorer-card-retry-node_cpu_seconds_total"]',
-        )
+        .find('[data-test="metrics-explorer-card-retry-node_cpu_seconds_total"]')
         .trigger("click");
       expect(wrapper.emitted("refresh")).toBeTruthy();
       expect(wrapper.emitted("retry")).toBeFalsy();
@@ -268,9 +234,7 @@ describe("MetricCard (ported to @/lib)", () => {
       );
 
       const emitted = new Set(
-        [...source.matchAll(/(?:\$emit|\bemit)\(\s*["']([\w-]+)["']/g)].map(
-          (m) => m[1],
-        ),
+        [...source.matchAll(/(?:\$emit|\bemit)\(\s*["']([\w-]+)["']/g)].map((m) => m[1]),
       );
       const declared = new Set<string>((MetricCard as any).emits ?? []);
 
@@ -288,9 +252,7 @@ describe("MetricCard (ported to @/lib)", () => {
     it("emits refresh from the per-card refresh action", async () => {
       wrapper = createWrapper();
       await wrapper
-        .find(
-          '[data-test="metrics-explorer-card-refresh-node_cpu_seconds_total"]',
-        )
+        .find('[data-test="metrics-explorer-card-refresh-node_cpu_seconds_total"]')
         .trigger("click");
       expect(wrapper.emitted("refresh")).toBeTruthy();
     });
@@ -298,11 +260,7 @@ describe("MetricCard (ported to @/lib)", () => {
     it("has no refresh action on an unsupported card (there is nothing to run)", () => {
       wrapper = createWrapper({ card: { ...CARD, unsupported: true } });
       expect(
-        wrapper
-          .find(
-            '[data-test="metrics-explorer-card-refresh-node_cpu_seconds_total"]',
-          )
-          .exists(),
+        wrapper.find('[data-test="metrics-explorer-card-refresh-node_cpu_seconds_total"]').exists(),
       ).toBe(false);
     });
 
@@ -319,9 +277,7 @@ describe("MetricCard (ported to @/lib)", () => {
       wrapper = createWrapper({ card: { ...CARD, unsupported: true } });
       expect(
         wrapper
-          .find(
-            '[data-test="metrics-explorer-card-unsupported-node_cpu_seconds_total"]',
-          )
+          .find('[data-test="metrics-explorer-card-unsupported-node_cpu_seconds_total"]')
           .exists(),
       ).toBe(true);
       expect(wrapper.text()).toContain("Unsupported type (v1)");
@@ -332,11 +288,7 @@ describe("MetricCard (ported to @/lib)", () => {
         preview: preview({ status: "error", error: "bad query" }),
       });
       expect(
-        wrapper
-          .find(
-            '[data-test="metrics-explorer-card-error-node_cpu_seconds_total"]',
-          )
-          .exists(),
+        wrapper.find('[data-test="metrics-explorer-card-error-node_cpu_seconds_total"]').exists(),
       ).toBe(true);
       expect(wrapper.text()).toContain("Query failed");
     });
@@ -459,9 +411,7 @@ describe("MetricCard (ported to @/lib)", () => {
       });
       expect(
         wrapper
-          .find(
-            '[data-test="metrics-explorer-card-skeleton-node_cpu_seconds_total"]',
-          )
+          .find('[data-test="metrics-explorer-card-skeleton-node_cpu_seconds_total"]')
           .exists(),
       ).toBe(true);
     });
@@ -474,11 +424,7 @@ describe("MetricCard (ported to @/lib)", () => {
         }),
       });
       expect(
-        wrapper
-          .find(
-            '[data-test="metrics-explorer-card-nodata-node_cpu_seconds_total"]',
-          )
-          .exists(),
+        wrapper.find('[data-test="metrics-explorer-card-nodata-node_cpu_seconds_total"]').exists(),
       ).toBe(true);
       // The dashboards' own copy (`panel.noData`) — the card shows the SAME
       // inline empty state a dashboard panel does.
@@ -492,9 +438,7 @@ describe("MetricCard (ported to @/lib)", () => {
           results: [{ resultType: "matrix", result: [{ values: [[1, "1"]] }] }],
         }),
       });
-      expect(wrapper.findComponent({ name: "MetricCardChart" }).exists()).toBe(
-        true,
-      );
+      expect(wrapper.findComponent({ name: "MetricCardChart" }).exists()).toBe(true);
     });
 
     it("renders the stale indicator when the last refresh failed", () => {
@@ -506,11 +450,7 @@ describe("MetricCard (ported to @/lib)", () => {
         }),
       });
       expect(
-        wrapper
-          .find(
-            '[data-test="metrics-explorer-card-stale-node_cpu_seconds_total"]',
-          )
-          .exists(),
+        wrapper.find('[data-test="metrics-explorer-card-stale-node_cpu_seconds_total"]').exists(),
       ).toBe(true);
     });
   });
@@ -527,13 +467,9 @@ describe("MetricCard (ported to @/lib)", () => {
       // Header bar (the dashboard panel bar's box — untinted, bordered),
       // footer, and the badge in the footer where it cannot truncate the name
       // it describes.
-      expect(wrapper.find(".min-h-7.border-b.border-border-default").exists()).toBe(
-        true,
-      );
+      expect(wrapper.find(".min-h-7.border-b.border-border-default").exists()).toBe(true);
       expect(
-        wrapper
-          .find('[data-test="metrics-explorer-card-badge-node_cpu_seconds_total"]')
-          .exists(),
+        wrapper.find('[data-test="metrics-explorer-card-badge-node_cpu_seconds_total"]').exists(),
       ).toBe(true);
       expect(wrapper.text()).toContain("counter");
     });
@@ -562,7 +498,10 @@ describe("MetricCard (ported to @/lib)", () => {
     it("uses the CACHED window when the data was restored from cache", () => {
       wrapper = createWrapper({
         timeRange: SELECTED,
-        preview: preview({ results: [{ result: [{ values: [[1, "1"]] }] }], cachedTimeRange: CACHED }),
+        preview: preview({
+          results: [{ result: [{ values: [[1, "1"]] }] }],
+          cachedTimeRange: CACHED,
+        }),
       });
 
       // Not SELECTED: those points describe 1_000-11_000, and saying otherwise
@@ -573,7 +512,10 @@ describe("MetricCard (ported to @/lib)", () => {
     it("uses the SELECTED window on the live path, where they are the same thing", () => {
       wrapper = createWrapper({
         timeRange: SELECTED,
-        preview: preview({ results: [{ result: [{ values: [[1, "1"]] }] }], cachedTimeRange: null }),
+        preview: preview({
+          results: [{ result: [{ values: [[1, "1"]] }] }],
+          cachedTimeRange: null,
+        }),
       });
 
       expect(chartTimeRange(wrapper)).toEqual(SELECTED);
@@ -602,11 +544,9 @@ describe("MetricCard (ported to @/lib)", () => {
         }),
       });
 
-      expect(
-        wrapper
-          .findComponent({ name: "MetricCardChart" })
-          .props("allowAlertCreation"),
-      ).toBe(true);
+      expect(wrapper.findComponent({ name: "MetricCardChart" }).props("allowAlertCreation")).toBe(
+        true,
+      );
     });
   });
 });

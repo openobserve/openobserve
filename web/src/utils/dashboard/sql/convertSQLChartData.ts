@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import {
-  applyAutoSQLTimeSeries,
-  applyCustomSQLTimeSeries,
-} from "../sqlTimeSeriesConverter";
+import { applyAutoSQLTimeSeries, applyCustomSQLTimeSeries } from "../sqlTimeSeriesConverter";
 import { isGivenFieldInOrderBy } from "../../query/sqlUtils";
 import { applyLegendConfiguration } from "../legendConfiguration";
 import { applySeriesColorMappings } from "../chartColorUtils";
@@ -130,29 +127,13 @@ export const convertSQLChartData = async (
   let isTimeSeriesFlag = false;
 
   // auto SQL: if x axis has time series
-  if (
-    applyAutoSQLTimeSeries(
-      options,
-      panelSchema,
-      store,
-      metadata,
-      hoveredSeriesState,
-    )
-  ) {
+  if (applyAutoSQLTimeSeries(options, panelSchema, store, metadata, hoveredSeriesState)) {
     // set timeseries flag as a true
     isTimeSeriesFlag = true;
   }
 
   //custom SQL: check if it is timeseries or not
-  if (
-    applyCustomSQLTimeSeries(
-      options,
-      panelSchema,
-      store,
-      metadata,
-      hoveredSeriesState,
-    )
-  ) {
+  if (applyCustomSQLTimeSeries(options, panelSchema, store, metadata, hoveredSeriesState)) {
     // set timeseries flag as a true
     isTimeSeriesFlag = true;
   }
@@ -166,8 +147,7 @@ export const convertSQLChartData = async (
     // get x axis object
     // for h-stacked, categorical axis is y axis
     // for stacked and area-stacked, categorical axis is x axis
-    const xAxisObj =
-      panelSchema.type == "h-stacked" ? options.yAxis : options.xAxis;
+    const xAxisObj = panelSchema.type == "h-stacked" ? options.yAxis : options.xAxis;
 
     // check if order by uses y axis field
     // will return null if not exist
@@ -181,8 +161,7 @@ export const convertSQLChartData = async (
       const totals = new Map();
       for (let i = 0; i < xAxisObj[0]?.data?.length; i++) {
         const total = options?.series?.reduce(
-          (sum: number, currentSeries: any) =>
-            sum + (currentSeries?.data[i] ?? 0),
+          (sum: number, currentSeries: any) => sum + (currentSeries?.data[i] ?? 0),
           0,
         );
         totals.set(i, { label: xAxisObj[0]?.data[i], total });
@@ -205,12 +184,7 @@ export const convertSQLChartData = async (
   }
 
   // Apply all legend configurations using the new centralized function
-  applyLegendConfiguration(
-    panelSchema,
-    chartPanelRef,
-    hoveredSeriesState,
-    options,
-  );
+  applyLegendConfiguration(panelSchema, chartPanelRef, hoveredSeriesState, options);
 
   //check if is there any data else filter out axis or series data
   // for metric, gauge we does not have data field
@@ -221,16 +195,9 @@ export const convertSQLChartData = async (
   options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;
 
   if (
-    [
-      "area",
-      "area-stacked",
-      "bar",
-      "h-bar",
-      "line",
-      "scatter",
-      "stacked",
-      "h-stacked",
-    ].includes(panelSchema.type) &&
+    ["area", "area-stacked", "bar", "h-bar", "line", "scatter", "stacked", "h-stacked"].includes(
+      panelSchema.type,
+    ) &&
     isTimeSeriesFlag &&
     !panelSchema.config.trellis?.layout
   ) {
@@ -260,8 +227,7 @@ export const convertSQLChartData = async (
       });
     } else if (options.xAxis) {
       if (!options.xAxis.axisLabel) options.xAxis.axisLabel = {};
-      options.xAxis.axisLabel.width =
-        panelSchema.config.axis_label_truncate_width;
+      options.xAxis.axisLabel.width = panelSchema.config.axis_label_truncate_width;
       options.xAxis.axisLabel.overflow = "truncate";
     }
   }

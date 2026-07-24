@@ -70,9 +70,7 @@ vi.mock("@/utils/html", () => ({
 // Mock textHighlighter composable
 vi.mock("@/composables/useTextHighlighter", () => ({
   useTextHighlighter: () => ({
-    processTextWithHighlights: vi.fn(
-      (text) => `<span class="log-string">${text}</span>`,
-    ),
+    processTextWithHighlights: vi.fn((text) => `<span class="log-string">${text}</span>`),
     extractKeywords: vi.fn((query) => (query ? ["test"] : [])),
     splitTextByKeywords: vi.fn((text, keywords) =>
       keywords.length
@@ -80,8 +78,7 @@ vi.mock("@/composables/useTextHighlighter", () => ({
         : [{ text: text, isHighlighted: false }],
     ),
     isFTSColumn: vi.fn(
-      (columnId, value, keys) =>
-        keys.includes(columnId) && typeof value === "string",
+      (columnId, value, keys) => keys.includes(columnId) && typeof value === "string",
     ),
   }),
 }));
@@ -378,10 +375,7 @@ describe("useLogsHighlighter", () => {
 
   describe("simpleHighlight", () => {
     it("should highlight matching keywords", () => {
-      const result = logsHighlighter.simpleHighlight(
-        "error in system",
-        "match_all('error')",
-      );
+      const result = logsHighlighter.simpleHighlight("error in system", "match_all('error')");
 
       expect(result).toContain("error in system");
     });
@@ -393,10 +387,7 @@ describe("useLogsHighlighter", () => {
     });
 
     it("should escape HTML in text", () => {
-      const result = logsHighlighter.simpleHighlight(
-        "<script>alert('xss')</script>",
-        "",
-      );
+      const result = logsHighlighter.simpleHighlight("<script>alert('xss')</script>", "");
 
       expect(result).toContain("&lt;script&gt;");
     });
@@ -460,9 +451,7 @@ describe("useLogsHighlighter", () => {
     });
 
     it("should detect UUIDs", () => {
-      const result = logsHighlighter.detectSemanticType(
-        "550e8400-e29b-41d4-a716-446655440000",
-      );
+      const result = logsHighlighter.detectSemanticType("550e8400-e29b-41d4-a716-446655440000");
       expect(result).toBe("uuid");
     });
 
@@ -472,9 +461,7 @@ describe("useLogsHighlighter", () => {
     });
 
     it("should detect Windows file paths", () => {
-      const result = logsHighlighter.detectSemanticType(
-        "C:\\Windows\\System32",
-      );
+      const result = logsHighlighter.detectSemanticType("C:\\Windows\\System32");
       expect(result).toBe("path");
     });
 
@@ -491,32 +478,20 @@ describe("useLogsHighlighter", () => {
     it("should handle empty or invalid input", () => {
       expect(logsHighlighter.detectSemanticType("")).toBe("default");
       expect(logsHighlighter.detectSemanticType(null as any)).toBe("default");
-      expect(logsHighlighter.detectSemanticType(undefined as any)).toBe(
-        "default",
-      );
+      expect(logsHighlighter.detectSemanticType(undefined as any)).toBe("default");
     });
   });
 
   describe("createStyledSpanWithClasses", () => {
     it("should create span with appropriate classes", () => {
-      const result = logsHighlighter.createStyledSpanWithClasses(
-        "192.168.1.1",
-        "ip",
-        "",
-        false,
-      );
+      const result = logsHighlighter.createStyledSpanWithClasses("192.168.1.1", "ip", "", false);
 
       expect(result).toContain("log-ip");
       expect(result).toContain("192.168.1.1");
     });
 
     it("should add quotes when requested", () => {
-      const result = logsHighlighter.createStyledSpanWithClasses(
-        "test text",
-        "string",
-        "",
-        true,
-      );
+      const result = logsHighlighter.createStyledSpanWithClasses("test text", "string", "", true);
 
       expect(result).toContain('"');
     });
@@ -535,8 +510,7 @@ describe("useLogsHighlighter", () => {
 
   describe("isLogLineWithMixedContent", () => {
     it("should detect HTTP log lines with mixed content", () => {
-      const logLine =
-        '192.168.1.1 - - [01/Jan/2023:12:00:00 +0000] "GET /api/users HTTP/1.1" 200';
+      const logLine = '192.168.1.1 - - [01/Jan/2023:12:00:00 +0000] "GET /api/users HTTP/1.1" 200';
       const result = logsHighlighter.isLogLineWithMixedContent(logLine);
       expect(result).toBe(true);
     });
@@ -574,12 +548,7 @@ describe("useLogsHighlighter", () => {
   describe("colorizeObjectWithClasses", () => {
     it("should colorize simple object", () => {
       const obj = { level: "error", message: "Something wrong" };
-      const result = logsHighlighter.colorizeObjectWithClasses(
-        obj,
-        true,
-        true,
-        "",
-      );
+      const result = logsHighlighter.colorizeObjectWithClasses(obj, true, true, "");
 
       expect(result).toContain("level");
       expect(result).toContain("error");
@@ -589,12 +558,7 @@ describe("useLogsHighlighter", () => {
 
     it("should handle objects without braces", () => {
       const obj = { level: "error" };
-      const result = logsHighlighter.colorizeObjectWithClasses(
-        obj,
-        false,
-        true,
-        "",
-      );
+      const result = logsHighlighter.colorizeObjectWithClasses(obj, false, true, "");
 
       expect(result).toContain("level");
       expect(result).not.toContain("log-object-brace");
@@ -602,12 +566,7 @@ describe("useLogsHighlighter", () => {
 
     it("should handle objects without quotes", () => {
       const obj = { level: "error" };
-      const result = logsHighlighter.colorizeObjectWithClasses(
-        obj,
-        true,
-        false,
-        "",
-      );
+      const result = logsHighlighter.colorizeObjectWithClasses(obj, true, false, "");
 
       expect(result).toContain("level");
       expect(result).not.toContain('"level"');
@@ -620,12 +579,7 @@ describe("useLogsHighlighter", () => {
           email: "user@example.com",
         },
       };
-      const result = logsHighlighter.colorizeObjectWithClasses(
-        obj,
-        true,
-        true,
-        "",
-      );
+      const result = logsHighlighter.colorizeObjectWithClasses(obj, true, true, "");
 
       expect(result).toContain("user");
       expect(result).toContain("id");
@@ -634,12 +588,7 @@ describe("useLogsHighlighter", () => {
 
     it("should handle arrays in objects", () => {
       const obj = { items: [1, 2, 3] };
-      const result = logsHighlighter.colorizeObjectWithClasses(
-        obj,
-        true,
-        true,
-        "",
-      );
+      const result = logsHighlighter.colorizeObjectWithClasses(obj, true, true, "");
 
       expect(result).toContain("items");
       expect(result).toContain("[1,2,3]");
@@ -653,12 +602,7 @@ describe("useLogsHighlighter", () => {
         null: null,
         timestamp: 1640995200000,
       };
-      const result = logsHighlighter.colorizeObjectWithClasses(
-        obj,
-        true,
-        true,
-        "",
-      );
+      const result = logsHighlighter.colorizeObjectWithClasses(obj, true, true, "");
 
       expect(result).toContain("text");
       expect(result).toContain("42");
@@ -684,24 +628,13 @@ describe("useLogsHighlighter", () => {
       const obj = { level: "error", message: "test" };
       const colors = { keyName: "#000", stringValue: "#333" };
 
-      const result = logsHighlighter.colorizeObject(
-        obj,
-        colors,
-        true,
-        true,
-        "",
-      );
+      const result = logsHighlighter.colorizeObject(obj, colors, true, true, "");
       expect(result).toContain("level");
       expect(result).toContain("error");
     });
 
     it("should maintain backward compatibility with createStyledSpan", () => {
-      const result = logsHighlighter.createStyledSpan(
-        "192.168.1.1",
-        "#1976d2",
-        "",
-        false,
-      );
+      const result = logsHighlighter.createStyledSpan("192.168.1.1", "#1976d2", "", false);
 
       expect(result).toContain("192.168.1.1");
     });
@@ -721,14 +654,9 @@ describe("useLogsHighlighter", () => {
       ];
 
       const startTime = Date.now();
-      const result = await logsHighlighter.processHitsInChunks(
-        largeHits,
-        columns,
-        false,
-        "",
-        100,
-        ["message"],
-      );
+      const result = await logsHighlighter.processHitsInChunks(largeHits, columns, false, "", 100, [
+        "message",
+      ]);
       const endTime = Date.now();
 
       expect(result).toBeDefined();
@@ -761,12 +689,7 @@ describe("useLogsHighlighter", () => {
         "key@with@symbols": "value4",
       };
 
-      const result = logsHighlighter.colorizeObjectWithClasses(
-        obj,
-        true,
-        true,
-        "",
-      );
+      const result = logsHighlighter.colorizeObjectWithClasses(obj, true, true, "");
       expect(result).toContain("key with spaces");
       expect(result).toContain("key-with-dashes");
       expect(result).toContain("key.with.dots");

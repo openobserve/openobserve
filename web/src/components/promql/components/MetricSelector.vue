@@ -1,23 +1,29 @@
 <template>
   <div data-test="promql-metric-selector" class="mb-2">
-    <div class="pl-3 flex flex-row">
+    <div class="flex flex-row pl-3">
       <div
         data-test="promql-metric-selector-label"
-        class="text-sm whitespace-nowrap flex items-center min-w-32.5"
-      >{{ t("panel.metric") }}</div>
-      <span class="flex items-center ml-0.5 mr-0.5">:</span>
+        class="flex min-w-32.5 items-center text-sm whitespace-nowrap"
+      >
+        {{ t("panel.metric") }}
+      </div>
+      <span class="mr-0.5 ml-0.5 flex items-center">:</span>
       <div class="m-1.25 flex-1">
         <OSelect
           v-model="selectedMetric"
           :options="metrics"
           :label="t('metrics.metricSelector.metricName')"
-          class="showLabelOnTop min-w-75 max-w-125"
+          class="showLabelOnTop max-w-125 min-w-75"
           @update:model-value="onMetricSelect"
           clearable
           data-test="metric-selector"
         >
           <template #empty>
-            {{ loading ? t('metrics.metricSelector.loadingMetrics') : t('metrics.metricSelector.noMetricsFound') }}
+            {{
+              loading
+                ? t("metrics.metricSelector.loadingMetrics")
+                : t("metrics.metricSelector.noMetricsFound")
+            }}
           </template>
         </OSelect>
       </div>
@@ -64,7 +70,7 @@ const loadMetrics = async () => {
       -1, // limit (get all)
       "", // keyword
       "", // sort
-      false // asc
+      false, // asc
     );
 
     if (response.data && response.data.list) {

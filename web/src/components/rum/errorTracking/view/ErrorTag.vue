@@ -15,11 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODimensionChip
-    :dim-key="tag.key"
-    :value="tag.value"
-    class="mr-2 mt-2"
-  />
+  <ODimensionChip :dim-key="tag.key" :value="tag.value" class="mt-2 mr-2" />
 </template>
 
 <script setup lang="ts">

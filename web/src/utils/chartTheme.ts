@@ -166,9 +166,7 @@ export function chartNumber(token: `--${string}`, fallback: number): number {
   if (typeof document === "undefined" || typeof getComputedStyle === "undefined") {
     return fallback;
   }
-  const v = parseFloat(
-    getComputedStyle(document.documentElement).getPropertyValue(token),
-  );
+  const v = parseFloat(getComputedStyle(document.documentElement).getPropertyValue(token));
   return Number.isFinite(v) ? v : fallback;
 }
 

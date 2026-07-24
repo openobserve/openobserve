@@ -72,7 +72,7 @@ export async function loadIdentityConfig(orgIdentifier: string): Promise<Service
       const response = await serviceStreamsApi.getIdentityConfig(orgIdentifier);
       const cacheEntry: CacheEntry = {
         data: response.data,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
       identityConfigCache.set(orgIdentifier, cacheEntry);
       return response.data;
@@ -124,7 +124,7 @@ export function getCacheStatus(): Record<string, { age_seconds: number; expired:
     const age = now - entry.timestamp;
     status[orgIdentifier] = {
       age_seconds: Math.round(age / 1000),
-      expired: age >= CACHE_TTL_MS
+      expired: age >= CACHE_TTL_MS,
     };
   }
 

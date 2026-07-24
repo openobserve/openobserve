@@ -41,11 +41,9 @@ export function formatTemplateVariable(variable: string) {
 }
 
 export function defaultTestValue(variable: string) {
-  if (variable === "input")
-    return "The capital of France is Paris, located on the Seine river.";
+  if (variable === "input") return "The capital of France is Paris, located on the Seine river.";
   if (variable === "output") return "Paris is the capital of France.";
-  if (variable === "context")
-    return "France country profile: Paris is the capital city.";
+  if (variable === "context") return "France country profile: Paris is the capital city.";
   if (variable === "metadata") return "{}";
   if (variable === "trace.id") return "test_trace_123";
   if (variable === "span.id") return "test_span_456";

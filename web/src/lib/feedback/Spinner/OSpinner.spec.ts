@@ -50,9 +50,7 @@ describe("OSpinner", () => {
     sizes.forEach((size) => {
       it(`applies ${expectedClasses[size]} for size="${size}"`, () => {
         const wrapper = mount(OSpinner, { props: { size } });
-        expect(wrapper.find("span[role='status']").classes()).toContain(
-          expectedClasses[size]
-        );
+        expect(wrapper.find("span[role='status']").classes()).toContain(expectedClasses[size]);
       });
     });
   });
@@ -65,9 +63,7 @@ describe("OSpinner", () => {
 
     it("has aria-label=Loading", () => {
       const wrapper = mount(OSpinner);
-      expect(wrapper.find("[role='status']").attributes("aria-label")).toBe(
-        "Loading"
-      );
+      expect(wrapper.find("[role='status']").attributes("aria-label")).toBe("Loading");
     });
 
     it("svg has aria-hidden=true", () => {

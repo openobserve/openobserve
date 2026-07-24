@@ -26,9 +26,14 @@
   via `form-id` (R4); the save handler is baked into useOForm({ onSubmit }).
 -->
 <template>
-  <ODialog data-test="color-by-series-popup-dialog"
+  <ODialog
+    data-test="color-by-series-popup-dialog"
     :open="open"
-    @update:open="(v) => { if (!v) cancelEdit(); }"
+    @update:open="
+      (v) => {
+        if (!v) cancelEdit();
+      }
+    "
     :title="t('dashboard.colorBySeriesPopUp.title')"
     size="lg"
     :neutral-button-label="t('dashboard.colorBySeriesPopUp.addNewColor')"
@@ -38,67 +43,65 @@
     @click:neutral="addcolorBySeries"
   >
     <OForm id="color-by-series-form" :form="form">
-    <div data-test="dashboard-color-by-series-popup">
-      <draggable
-        :model-value="editColorBySeries"
-        @update:model-value="onReorder"
-        :options="dragOptions"
-        @mousedown.stop="() => {}"
-        data-test="dashboard-addpanel-config-color-by-series-drag"
-      >
-        <div
-          v-for="(series, index) in editColorBySeries"
-          :key="index"
-          class="flex items-center justify-between mb-2"
+      <div data-test="dashboard-color-by-series-popup">
+        <draggable
+          :model-value="editColorBySeries"
+          @update:model-value="onReorder"
+          :options="dragOptions"
+          @mousedown.stop="() => {}"
+          data-test="dashboard-addpanel-config-color-by-series-drag"
         >
-          <div class="cursor-move p-2 self-center">
-            <OIcon
-              name="drag-indicator" size="sm"
-              class="mr-1"
-              :data-test="`dashboard-addpanel-config-color-by-series-drag-handle-${index}`"
-            />
-          </div>
-          <div class="flex items-center justify-between flex-1 gap-x-3">
-            <div class="flex-1 min-w-0">
-              <OFormCombobox
-                :name="`series[${index}].value`"
-                :items="seriesDataItems"
-                search-regex="(?:{([^}])(?:{.})*$|([a-zA-Z-_]+)$)"
-                :label="t('dashboard.colorBySeriesPopUp.selectSeries')"
-                label-position="inside"
-                required
-                :value-replace-fn="selectColorBySeriesOption"
-                :data-test="`dashboard-addpanel-config-color-by-series-series-select-${index}`"
+          <div
+            v-for="(series, index) in editColorBySeries"
+            :key="index"
+            class="mb-2 flex items-center justify-between"
+          >
+            <div class="cursor-move self-center p-2">
+              <OIcon
+                name="drag-indicator"
+                size="sm"
+                class="mr-1"
+                :data-test="`dashboard-addpanel-config-color-by-series-drag-handle-${index}`"
               />
             </div>
-
-            <!-- Color Picker -->
-            <div
-              class="flex items-center shrink-0"
-              :data-test="`dashboard-addpanel-config-color-by-series-color-section-${index}`"
-            >
-              <div
-                v-if="series.color !== null"
-                class="items-center flex gap-1"
-              >
-                <OFormColor
-                  :name="`series[${index}].color`"
-                  class="flex-1"
-                  clearable
-                  @clear="removeColorByIndex(index)"
+            <div class="flex flex-1 items-center justify-between gap-x-3">
+              <div class="min-w-0 flex-1">
+                <OFormCombobox
+                  :name="`series[${index}].value`"
+                  :items="seriesDataItems"
+                  search-regex="(?:{([^}])(?:{.})*$|([a-zA-Z-_]+)$)"
+                  :label="t('dashboard.colorBySeriesPopUp.selectSeries')"
+                  label-position="inside"
+                  required
+                  :value-replace-fn="selectColorBySeriesOption"
+                  :data-test="`dashboard-addpanel-config-color-by-series-series-select-${index}`"
                 />
               </div>
-              <div v-else class="w-full">
-                <OButton
-                  variant="ghost-primary"
-                  size="sm"
-                  class="w-full"
-                  :data-test="`dashboard-addpanel-config-color-by-series-set-color-btn-${index}`"
-                  @click="setColorByIndex(index)"
-                  >{{ t('dashboard.colorBySeriesPopUp.setColor') }}</OButton
-                >
+
+              <!-- Color Picker -->
+              <div
+                class="flex shrink-0 items-center"
+                :data-test="`dashboard-addpanel-config-color-by-series-color-section-${index}`"
+              >
+                <div v-if="series.color !== null" class="flex items-center gap-1">
+                  <OFormColor
+                    :name="`series[${index}].color`"
+                    class="flex-1"
+                    clearable
+                    @clear="removeColorByIndex(index)"
+                  />
+                </div>
+                <div v-else class="w-full">
+                  <OButton
+                    variant="ghost-primary"
+                    size="sm"
+                    class="w-full"
+                    :data-test="`dashboard-addpanel-config-color-by-series-set-color-btn-${index}`"
+                    @click="setColorByIndex(index)"
+                    >{{ t("dashboard.colorBySeriesPopUp.setColor") }}</OButton
+                  >
+                </div>
               </div>
-            </div>
 
               <!-- Delete series -->
               <OButton
@@ -112,7 +115,7 @@
             </div>
           </div>
         </draggable>
-    </div>
+      </div>
     </OForm>
   </ODialog>
 </template>
@@ -145,7 +148,7 @@ export default defineComponent({
     OFormColor,
     OFormCombobox,
     OIcon,
-},
+  },
   props: {
     open: {
       type: Boolean,
@@ -208,14 +211,11 @@ export default defineComponent({
     // Cast: useOForm erases TFormData to Record<string, unknown>, so array
     // field keys don't survive DeepKeysOfType and resolve to `never`.
     const addcolorBySeries = () => {
-      (form.pushFieldValue as (field: string, value: unknown) => void)(
-        "series",
-        {
-          type: "value",
-          value: "",
-          color: null,
-        },
-      );
+      (form.pushFieldValue as (field: string, value: unknown) => void)("series", {
+        type: "value",
+        value: "",
+        color: null,
+      });
     };
 
     // Use props.options for series dropdown options (not for initialization)
@@ -234,10 +234,7 @@ export default defineComponent({
     };
 
     const removecolorBySeriesByIndex = (index: number) => {
-      (form.removeFieldValue as (field: string, index: number) => void)(
-        "series",
-        index,
-      );
+      (form.removeFieldValue as (field: string, index: number) => void)("series", index);
     };
 
     // Draggable reorder → write the new order back to the form.
@@ -246,10 +243,7 @@ export default defineComponent({
     };
 
     onMounted(() => {
-      if (
-        ((form.getFieldValue("series") ??
-          []) as ColorBySeriesPopUpForm["series"]).length === 0
-      ) {
+      if (((form.getFieldValue("series") ?? []) as ColorBySeriesPopUpForm["series"]).length === 0) {
         addcolorBySeries();
       }
     });
@@ -285,7 +279,7 @@ export default defineComponent({
       removeColorByIndex,
       cancelEdit,
       editColorBySeries,
-      "cancel": "cancel",
+      cancel: "cancel",
       seriesDataItems,
       openColorPicker,
       selectColorBySeriesOption,

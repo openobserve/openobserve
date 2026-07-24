@@ -34,7 +34,7 @@ describe("rate_limit service", () => {
       await rate_limit.getApiLimits("test-org");
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        "/api/_meta/ratelimit/module_list?org_id=test-org"
+        "/api/_meta/ratelimit/module_list?org_id=test-org",
       );
     });
 
@@ -44,7 +44,7 @@ describe("rate_limit service", () => {
       await rate_limit.getApiLimits("test-org", "1h");
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        "/api/_meta/ratelimit/module_list?org_id=test-org&interval=1h"
+        "/api/_meta/ratelimit/module_list?org_id=test-org&interval=1h",
       );
     });
 
@@ -53,9 +53,7 @@ describe("rate_limit service", () => {
 
       await rate_limit.getApiLimits("");
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        "/api/_meta/ratelimit/module_list"
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith("/api/_meta/ratelimit/module_list");
     });
 
     it("should not append interval when interval is undefined", async () => {
@@ -64,16 +62,14 @@ describe("rate_limit service", () => {
       await rate_limit.getApiLimits("my-org", undefined);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        "/api/_meta/ratelimit/module_list?org_id=my-org"
+        "/api/_meta/ratelimit/module_list?org_id=my-org",
       );
     });
 
     it("should propagate errors", async () => {
       mockHttpInstance.get.mockRejectedValue(new Error("Server error"));
 
-      await expect(rate_limit.getApiLimits("test-org")).rejects.toThrow(
-        "Server error"
-      );
+      await expect(rate_limit.getApiLimits("test-org")).rejects.toThrow("Server error");
     });
   });
 
@@ -84,7 +80,7 @@ describe("rate_limit service", () => {
       await rate_limit.getRoleLimits("test-org", "admin");
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        "/api/_meta/ratelimit/role_list?user_role=admin&org_id=test-org"
+        "/api/_meta/ratelimit/role_list?user_role=admin&org_id=test-org",
       );
     });
 
@@ -94,7 +90,7 @@ describe("rate_limit service", () => {
       await rate_limit.getRoleLimits("test-org", "viewer", "30m");
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        "/api/_meta/ratelimit/role_list?user_role=viewer&org_id=test-org&interval=30m"
+        "/api/_meta/ratelimit/role_list?user_role=viewer&org_id=test-org&interval=30m",
       );
     });
 
@@ -104,7 +100,7 @@ describe("rate_limit service", () => {
       await rate_limit.getRoleLimits("prod-org", "editor", undefined);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        "/api/_meta/ratelimit/role_list?user_role=editor&org_id=prod-org"
+        "/api/_meta/ratelimit/role_list?user_role=editor&org_id=prod-org",
       );
     });
 
@@ -115,7 +111,7 @@ describe("rate_limit service", () => {
       for (const role of roles) {
         await rate_limit.getRoleLimits("test-org", role);
         expect(mockHttpInstance.get).toHaveBeenCalledWith(
-          `/api/_meta/ratelimit/role_list?user_role=${role}&org_id=test-org`
+          `/api/_meta/ratelimit/role_list?user_role=${role}&org_id=test-org`,
         );
       }
     });
@@ -123,9 +119,7 @@ describe("rate_limit service", () => {
     it("should propagate errors", async () => {
       mockHttpInstance.get.mockRejectedValue(new Error("Unauthorized"));
 
-      await expect(
-        rate_limit.getRoleLimits("test-org", "admin")
-      ).rejects.toThrow("Unauthorized");
+      await expect(rate_limit.getRoleLimits("test-org", "admin")).rejects.toThrow("Unauthorized");
     });
   });
 
@@ -138,7 +132,7 @@ describe("rate_limit service", () => {
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         "/api/_meta/ratelimit/update?update_type=module&org_id=test-org",
-        data
+        data,
       );
     });
 
@@ -150,7 +144,7 @@ describe("rate_limit service", () => {
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         "/api/_meta/ratelimit/update?update_type=role&user_role=admin&org_id=test-org",
-        data
+        data,
       );
     });
 
@@ -162,7 +156,7 @@ describe("rate_limit service", () => {
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         "/api/_meta/ratelimit/update?update_type=role&user_role=admin&org_id=test-org&interval=1h",
-        data
+        data,
       );
     });
 
@@ -174,7 +168,7 @@ describe("rate_limit service", () => {
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         "/api/_meta/ratelimit/update&org_id=test-org",
-        data
+        data,
       );
     });
 
@@ -186,16 +180,14 @@ describe("rate_limit service", () => {
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         "/api/_meta/ratelimit/update?update_type=module",
-        data
+        data,
       );
     });
 
     it("should propagate errors", async () => {
       mockHttpInstance.put.mockRejectedValue(new Error("Forbidden"));
 
-      await expect(
-        rate_limit.update_batch("test-org", [], "module")
-      ).rejects.toThrow("Forbidden");
+      await expect(rate_limit.update_batch("test-org", [], "module")).rejects.toThrow("Forbidden");
     });
   });
 
@@ -206,7 +198,7 @@ describe("rate_limit service", () => {
       await rate_limit.download_template("test-org");
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        "/api/_meta/ratelimit/download_template?org_id=test-org"
+        "/api/_meta/ratelimit/download_template?org_id=test-org",
       );
     });
 
@@ -215,9 +207,7 @@ describe("rate_limit service", () => {
 
       await rate_limit.download_template("");
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        "/api/_meta/ratelimit/download_template"
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith("/api/_meta/ratelimit/download_template");
     });
 
     it("should handle different org identifiers", async () => {
@@ -227,7 +217,7 @@ describe("rate_limit service", () => {
       for (const org of orgs) {
         await rate_limit.download_template(org);
         expect(mockHttpInstance.get).toHaveBeenCalledWith(
-          `/api/_meta/ratelimit/download_template?org_id=${org}`
+          `/api/_meta/ratelimit/download_template?org_id=${org}`,
         );
       }
     });
@@ -235,9 +225,7 @@ describe("rate_limit service", () => {
     it("should propagate errors", async () => {
       mockHttpInstance.get.mockRejectedValue(new Error("Not found"));
 
-      await expect(rate_limit.download_template("test-org")).rejects.toThrow(
-        "Not found"
-      );
+      await expect(rate_limit.download_template("test-org")).rejects.toThrow("Not found");
     });
   });
 
@@ -251,7 +239,7 @@ describe("rate_limit service", () => {
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         "/api/_meta/ratelimit/upload?org_id=test-org",
         expect.any(FormData),
-        { headers: { "Content-Type": "multipart/form-data" } }
+        { headers: { "Content-Type": "multipart/form-data" } },
       );
     });
 
@@ -275,16 +263,14 @@ describe("rate_limit service", () => {
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         "/api/_meta/ratelimit/upload",
         expect.any(FormData),
-        { headers: { "Content-Type": "multipart/form-data" } }
+        { headers: { "Content-Type": "multipart/form-data" } },
       );
     });
 
     it("should propagate errors", async () => {
       mockHttpInstance.put.mockRejectedValue(new Error("Upload failed"));
 
-      await expect(
-        rate_limit.upload_template("test-org", [])
-      ).rejects.toThrow("Upload failed");
+      await expect(rate_limit.upload_template("test-org", [])).rejects.toThrow("Upload failed");
     });
   });
 
@@ -295,7 +281,7 @@ describe("rate_limit service", () => {
       await rate_limit.getModules("test-org");
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        "/api/_meta/ratelimit/api_modules?org_id=test-org"
+        "/api/_meta/ratelimit/api_modules?org_id=test-org",
       );
     });
 
@@ -304,9 +290,7 @@ describe("rate_limit service", () => {
 
       await rate_limit.getModules("");
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        "/api/_meta/ratelimit/api_modules"
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith("/api/_meta/ratelimit/api_modules");
     });
 
     it("should handle different org identifiers", async () => {
@@ -316,7 +300,7 @@ describe("rate_limit service", () => {
       for (const org of orgs) {
         await rate_limit.getModules(org);
         expect(mockHttpInstance.get).toHaveBeenCalledWith(
-          `/api/_meta/ratelimit/api_modules?org_id=${org}`
+          `/api/_meta/ratelimit/api_modules?org_id=${org}`,
         );
       }
     });
@@ -324,9 +308,7 @@ describe("rate_limit service", () => {
     it("should propagate errors", async () => {
       mockHttpInstance.get.mockRejectedValue(new Error("Service unavailable"));
 
-      await expect(rate_limit.getModules("test-org")).rejects.toThrow(
-        "Service unavailable"
-      );
+      await expect(rate_limit.getModules("test-org")).rejects.toThrow("Service unavailable");
     });
   });
 });

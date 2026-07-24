@@ -32,11 +32,7 @@ import {
  * @param {any} searchQueryData - The search query data.
  * @return {object} An object containing rows and columns.
  */
-export const convertTableData = (
-  panelSchema: any,
-  searchQueryData: any,
-  store: any,
-) => {
+export const convertTableData = (panelSchema: any, searchQueryData: any, store: any) => {
   // if no data than return it
   if (
     !Array.isArray(searchQueryData) ||
@@ -47,12 +43,8 @@ export const convertTableData = (
     return { rows: [], columns: [] };
   }
 
-  const x = (panelSchema?.queries || []).flatMap(
-    (q: any) => q?.fields?.x || [],
-  );
-  const y = (panelSchema?.queries || []).flatMap(
-    (q: any) => q?.fields?.y || [],
-  );
+  const x = (panelSchema?.queries || []).flatMap((q: any) => q?.fields?.x || []);
+  const y = (panelSchema?.queries || []).flatMap((q: any) => q?.fields?.y || []);
   let columnData = [...x, ...y];
   // Avoid deep cloning - use shallow copy and work with original data
   let tableRows = searchQueryData[0];
@@ -211,9 +203,7 @@ export const convertTableData = (
     // Note: do NOT use ?? "" here — null/undefined values must stay as-is so that
     // String(null) = "null" gives a non-empty column key that passes TanStack's filter.
     // Using "" as a fallback would produce an empty column id that TanStack can't handle.
-    const transposeColumns = searchQueryData[0].map(
-      (it: any) => getDataValue(it, transposeColumn),
-    );
+    const transposeColumns = searchQueryData[0].map((it: any) => getDataValue(it, transposeColumn));
 
     let uniqueTransposeColumns: any = [];
     const columnDuplicationMap: any = {};
@@ -251,9 +241,7 @@ export const convertTableData = (
           formattedDate = parseTimestampValue(baseVal, timezone);
 
           // Append the underscore part (if it exists) back to the formatted date
-          formattedDate = formattedDate
-            ? `${formattedDate}${underscorePart}`
-            : null;
+          formattedDate = formattedDate ? `${formattedDate}${underscorePart}` : null;
         }
 
         // Return the formatted date with the underscore or the original value if it can't be parsed
@@ -313,14 +301,7 @@ export const convertTableData = (
           const decimals = panelSchema.config?.decimals ?? 2;
 
           obj["format"] = (val: any) =>
-            formatNumericValue(
-              val,
-              valueMappingCache,
-              unit,
-              unitCustom,
-              decimals,
-              missingValue,
-            );
+            formatNumericValue(val, valueMappingCache, unit, unitCustom, decimals, missingValue);
         }
 
         // Check if it's a histogram field
@@ -344,15 +325,11 @@ export const convertTableData = (
     // Transpose rows, adding 'label' as the first column
 
     tableRows = columnData.map((it: any) => {
-      let obj = uniqueTransposeColumns.reduce(
-        (acc: any, curr: any, reduceIndex: any) => {
-          const value =
-            getDataValue(searchQueryData[0][reduceIndex], it.alias) ?? "";
-          acc[curr] = value;
-          return acc;
-        },
-        {},
-      );
+      let obj = uniqueTransposeColumns.reduce((acc: any, curr: any, reduceIndex: any) => {
+        const value = getDataValue(searchQueryData[0][reduceIndex], it.alias) ?? "";
+        acc[curr] = value;
+        return acc;
+      }, {});
       obj["label"] = it.label || transposeColumnLabel; // Add the label corresponding to each column
       return obj;
     });
@@ -379,12 +356,7 @@ const isSampleValuesNumbers = (arr: any, key: string, sampleSize: number) => {
   const sample = arr.slice(0, Math.min(sampleSize, arr.length));
   return sample.every((obj) => {
     const value = getDataValue(obj, key);
-    return (
-      value === undefined ||
-      value === null ||
-      value === "" ||
-      typeof value === "number"
-    );
+    return value === undefined || value === null || value === "" || typeof value === "number";
   });
 };
 
@@ -418,9 +390,7 @@ export const convertMultiQueryTableData = (
   });
 
   // Build value mapping cache once for all cells
-  const valueMappingCache = buildValueMappingCache(
-    panelSchema.config?.mappings,
-  );
+  const valueMappingCache = buildValueMappingCache(panelSchema.config?.mappings);
 
   const overrideMaps = parseOverrideConfigs(panelSchema.config.override_config);
   const { unitConfigMap, fieldTypeMap } = overrideMaps;
@@ -451,15 +421,9 @@ export const convertMultiQueryTableData = (
   };
 
   // 1) Q1..Qn X-axis fields, 2) Q1..Qn breakdown fields, 3) Q1..Qn Y-axis fields
-  panelSchema.queries.forEach((q: any) =>
-    (q.fields?.x || []).forEach(addField),
-  );
-  panelSchema.queries.forEach((q: any) =>
-    (q.fields?.breakdown || []).forEach(addField),
-  );
-  panelSchema.queries.forEach((q: any) =>
-    (q.fields?.y || []).forEach(addField),
-  );
+  panelSchema.queries.forEach((q: any) => (q.fields?.x || []).forEach(addField));
+  panelSchema.queries.forEach((q: any) => (q.fields?.breakdown || []).forEach(addField));
+  panelSchema.queries.forEach((q: any) => (q.fields?.y || []).forEach(addField));
 
   // Then add dynamic (non-selected) response columns per query, if enabled.
   if (isDynamicColumns) {
@@ -502,15 +466,12 @@ export const convertMultiQueryTableData = (
   const isTransposeEnabled = panelSchema.config?.table_transpose;
   const transposeColumn = orderedColumnNames[0] || "";
   const transposeColumnConfig = knownAliases.get(transposeColumn);
-  const transposeColumnLabel =
-    transposeColumnConfig?.label || transposeColumn;
+  const transposeColumnLabel = transposeColumnConfig?.label || transposeColumn;
 
   if (isTransposeEnabled && transposeColumn) {
     // Transpose: first column's values become column headers,
     // remaining columns become rows (works on the unioned allRows)
-    const transposeValues = allRows.map(
-      (row: any) => getDataValue(row, transposeColumn) ?? "",
-    );
+    const transposeValues = allRows.map((row: any) => getDataValue(row, transposeColumn) ?? "");
 
     let uniqueTransposeColumns: any[] = [];
     const columnDuplicationMap: any = {};
@@ -526,8 +487,7 @@ export const convertMultiQueryTableData = (
       }
     });
 
-    const isFirstColumnTimestamp =
-      detectedTimestampAliases.has(transposeColumn);
+    const isFirstColumnTimestamp = detectedTimestampAliases.has(transposeColumn);
 
     if (isFirstColumnTimestamp) {
       uniqueTransposeColumns = uniqueTransposeColumns.map((val: any) => {
@@ -545,9 +505,7 @@ export const convertMultiQueryTableData = (
     }
 
     // Remaining columns (excluding the transpose pivot column)
-    const remainingColumns = orderedColumnNames.filter(
-      (c) => c !== transposeColumn,
-    );
+    const remainingColumns = orderedColumnNames.filter((c) => c !== transposeColumn);
 
     // Build column definitions: label column + transposed value columns
     const columns: any[] = [
@@ -588,14 +546,7 @@ export const convertMultiQueryTableData = (
           const decimals = panelSchema.config?.decimals ?? 2;
 
           col["format"] = (val: any) =>
-            formatNumericValue(
-              val,
-              valueMappingCache,
-              unit,
-              unitCustom,
-              decimals,
-              missingValue,
-            );
+            formatNumericValue(val, valueMappingCache, unit, unitCustom, decimals, missingValue);
         }
 
         if (detectedTimestampAliases.has(it)) {
@@ -613,13 +564,10 @@ export const convertMultiQueryTableData = (
     // Transpose rows: each remaining column becomes a row
     const tableRows = remainingColumns.map((colName) => {
       const fieldConfig = knownAliases.get(colName);
-      const obj = uniqueTransposeColumns.reduce(
-        (acc: any, curr: any, reduceIndex: number) => {
-          acc[curr] = getDataValue(allRows[reduceIndex], colName) ?? "";
-          return acc;
-        },
-        {} as any,
-      );
+      const obj = uniqueTransposeColumns.reduce((acc: any, curr: any, reduceIndex: number) => {
+        acc[curr] = getDataValue(allRows[reduceIndex], colName) ?? "";
+        return acc;
+      }, {} as any);
       obj["label"] = fieldConfig?.label || colName;
       return obj;
     });

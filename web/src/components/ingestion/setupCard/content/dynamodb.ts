@@ -26,14 +26,11 @@ import { applySubs, applySubsMasked } from "../subs";
 const FIREHOSE = `HTTP endpoint URL: {url}/aws/{org}/dynamodb/_kinesis_firehose
 Access key: Basic {token}`;
 
-export default function dynamodbCard(
-  subs: CardSubstitutions,
-): RichCardContent {
+export default function dynamodbCard(subs: CardSubstitutions): RichCardContent {
   return {
     provider: {
       name: "DynamoDB",
-      tagline:
-        "Stream DynamoDB item changes into OpenObserve via Kinesis Firehose.",
+      tagline: "Stream DynamoDB item changes into OpenObserve via Kinesis Firehose.",
       logo: getImageURL("images/ingestion/dynamodb.png"),
       tone: "#4053D6",
       metaBadges: ["Logs"],
@@ -63,8 +60,7 @@ export default function dynamodbCard(
       {
         id: "verify",
         title: "Verify Data in OpenObserve",
-        description:
-          "Hit Test below, or open Logs for the `dynamodb` stream once items change.",
+        description: "Hit Test below, or open Logs for the `dynamodb` stream once items change.",
         chip: { kind: "traces", label: "Logs" },
         completeOn: "detect",
         detectionAnchor: true,

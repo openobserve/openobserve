@@ -87,14 +87,9 @@ describe("useLatencyInsightsAnalysis", () => {
   // -------------------------------------------------------------------------
   describe("SQL query building", () => {
     it("includes COALESCE cast in distribution query SQL", async () => {
-      mockSearch.mockResolvedValue(
-        makeSearchResponse([{ value: "frontend", count: "10" }]),
-      );
+      mockSearch.mockResolvedValue(makeSearchResponse([{ value: "frontend", count: "10" }]));
 
-      await useLatencyInsightsAnalysis().analyzeDimension(
-        "service_name",
-        makeConfig(),
-      );
+      await useLatencyInsightsAnalysis().analyzeDimension("service_name", makeConfig());
 
       const firstCall = mockSearch.mock.calls[0][0];
       expect(firstCall.query.query.sql).toContain("COALESCE");
@@ -156,10 +151,7 @@ describe("useLatencyInsightsAnalysis", () => {
     it("sends correct org_identifier and page_type to search service", async () => {
       mockSearch.mockResolvedValue(makeSearchResponse([]));
 
-      await useLatencyInsightsAnalysis().analyzeDimension(
-        "service_name",
-        makeConfig(),
-      );
+      await useLatencyInsightsAnalysis().analyzeDimension("service_name", makeConfig());
 
       const call = mockSearch.mock.calls[0][0];
       expect(call.org_identifier).toBe("test-org");
@@ -169,10 +161,7 @@ describe("useLatencyInsightsAnalysis", () => {
     it("sets sql_mode to full and quick_mode to false in payload", async () => {
       mockSearch.mockResolvedValue(makeSearchResponse([]));
 
-      await useLatencyInsightsAnalysis().analyzeDimension(
-        "service_name",
-        makeConfig(),
-      );
+      await useLatencyInsightsAnalysis().analyzeDimension("service_name", makeConfig());
 
       const { sql_mode, quick_mode } = mockSearch.mock.calls[0][0].query.query;
       expect(sql_mode).toBe("full");
@@ -186,12 +175,8 @@ describe("useLatencyInsightsAnalysis", () => {
   describe("analyzeDimension – baseline-only mode", () => {
     it("returns correct DimensionAnalysis shape", async () => {
       mockSearch
-        .mockResolvedValueOnce(
-          makeSearchResponse([{ value: "frontend", count: "50" }]),
-        )
-        .mockResolvedValueOnce(
-          makeSearchResponse([{ total_count: 100, populated_count: 80 }]),
-        );
+        .mockResolvedValueOnce(makeSearchResponse([{ value: "frontend", count: "50" }]))
+        .mockResolvedValueOnce(makeSearchResponse([{ total_count: 100, populated_count: 80 }]));
 
       const result = await useLatencyInsightsAnalysis().analyzeDimension(
         "service_name",
@@ -210,15 +195,12 @@ describe("useLatencyInsightsAnalysis", () => {
     it("calculates baselinePopulation as populated_count / total_count", async () => {
       mockSearch
         .mockResolvedValueOnce(makeSearchResponse([{ value: "svc", count: "40" }]))
-        .mockResolvedValueOnce(
-          makeSearchResponse([{ total_count: 100, populated_count: 80 }]),
-        );
+        .mockResolvedValueOnce(makeSearchResponse([{ total_count: 100, populated_count: 80 }]));
 
-      const { baselinePopulation } =
-        await useLatencyInsightsAnalysis().analyzeDimension(
-          "service_name",
-          makeConfig(),
-        );
+      const { baselinePopulation } = await useLatencyInsightsAnalysis().analyzeDimension(
+        "service_name",
+        makeConfig(),
+      );
 
       expect(baselinePopulation).toBeCloseTo(0.8);
     });
@@ -226,15 +208,12 @@ describe("useLatencyInsightsAnalysis", () => {
     it("returns zero baselinePopulation when total_count is 0", async () => {
       mockSearch
         .mockResolvedValueOnce(makeSearchResponse([]))
-        .mockResolvedValueOnce(
-          makeSearchResponse([{ total_count: 0, populated_count: 0 }]),
-        );
+        .mockResolvedValueOnce(makeSearchResponse([{ total_count: 0, populated_count: 0 }]));
 
-      const { baselinePopulation } =
-        await useLatencyInsightsAnalysis().analyzeDimension(
-          "service_name",
-          makeConfig(),
-        );
+      const { baselinePopulation } = await useLatencyInsightsAnalysis().analyzeDimension(
+        "service_name",
+        makeConfig(),
+      );
 
       expect(baselinePopulation).toBe(0);
     });
@@ -247,9 +226,7 @@ describe("useLatencyInsightsAnalysis", () => {
             { value: "a", count: "90" },
           ]),
         )
-        .mockResolvedValueOnce(
-          makeSearchResponse([{ total_count: 100, populated_count: 100 }]),
-        );
+        .mockResolvedValueOnce(makeSearchResponse([{ total_count: 100, populated_count: 100 }]));
 
       const { data } = await useLatencyInsightsAnalysis().analyzeDimension(
         "service_name",
@@ -268,21 +245,13 @@ describe("useLatencyInsightsAnalysis", () => {
     function setupComparisonMocks() {
       mockSearch
         // baseline dist
-        .mockResolvedValueOnce(
-          makeSearchResponse([{ value: "frontend", count: "60" }]),
-        )
+        .mockResolvedValueOnce(makeSearchResponse([{ value: "frontend", count: "60" }]))
         // baseline pop
-        .mockResolvedValueOnce(
-          makeSearchResponse([{ total_count: 100, populated_count: 100 }]),
-        )
+        .mockResolvedValueOnce(makeSearchResponse([{ total_count: 100, populated_count: 100 }]))
         // selected dist
-        .mockResolvedValueOnce(
-          makeSearchResponse([{ value: "backend", count: "30" }]),
-        )
+        .mockResolvedValueOnce(makeSearchResponse([{ value: "backend", count: "30" }]))
         // selected pop
-        .mockResolvedValueOnce(
-          makeSearchResponse([{ total_count: 50, populated_count: 40 }]),
-        );
+        .mockResolvedValueOnce(makeSearchResponse([{ total_count: 50, populated_count: 40 }]));
     }
 
     it("makes 4 search calls in comparison mode", async () => {
@@ -314,8 +283,10 @@ describe("useLatencyInsightsAnalysis", () => {
         },
       });
 
-      const { selectedPopulation } =
-        await useLatencyInsightsAnalysis().analyzeDimension("service_name", config);
+      const { selectedPopulation } = await useLatencyInsightsAnalysis().analyzeDimension(
+        "service_name",
+        config,
+      );
 
       expect(selectedPopulation).toBeCloseTo(0.8); // 40/50
     });
@@ -332,8 +303,10 @@ describe("useLatencyInsightsAnalysis", () => {
         },
       });
 
-      const { differenceScore } =
-        await useLatencyInsightsAnalysis().analyzeDimension("service_name", config);
+      const { differenceScore } = await useLatencyInsightsAnalysis().analyzeDimension(
+        "service_name",
+        config,
+      );
 
       expect(differenceScore).toBeGreaterThan(0);
     });
@@ -350,10 +323,7 @@ describe("useLatencyInsightsAnalysis", () => {
         },
       });
 
-      const { data } = await useLatencyInsightsAnalysis().analyzeDimension(
-        "service_name",
-        config,
-      );
+      const { data } = await useLatencyInsightsAnalysis().analyzeDimension("service_name", config);
 
       // frontend comes from baseline, backend from selected
       const values = data.map((d) => d.value);
@@ -374,9 +344,7 @@ describe("useLatencyInsightsAnalysis", () => {
       const instance = useLatencyInsightsAnalysis();
 
       // Need to add population mock too
-      mockSearch.mockResolvedValue(
-        makeSearchResponse([{ total_count: 0, populated_count: 0 }]),
-      );
+      mockSearch.mockResolvedValue(makeSearchResponse([{ total_count: 0, populated_count: 0 }]));
 
       expect(instance.loading.value).toBe(false);
       const promise = instance.analyzeAllDimensions(makeConfig());
@@ -397,9 +365,7 @@ describe("useLatencyInsightsAnalysis", () => {
       // Dimensions: ["svc", "env"]
       // Make svc have a high difference score by giving large divergence
       // For simplicity, use baseline-only mode (no filters) so differenceScore = 0 for all
-      mockSearch.mockResolvedValue(
-        makeSearchResponse([{ total_count: 10, populated_count: 5 }]),
-      );
+      mockSearch.mockResolvedValue(makeSearchResponse([{ total_count: 10, populated_count: 5 }]));
 
       const config = makeConfig({ dimensions: ["service_name", "env"] });
       const results = await useLatencyInsightsAnalysis().analyzeAllDimensions(config);
@@ -413,9 +379,7 @@ describe("useLatencyInsightsAnalysis", () => {
       // First dimension (service_name) will throw; second (env) will succeed
       mockSearch
         .mockRejectedValueOnce(new Error("network error")) // baseline dist for svc
-        .mockResolvedValue(
-          makeSearchResponse([{ total_count: 10, populated_count: 5 }]),
-        );
+        .mockResolvedValue(makeSearchResponse([{ total_count: 10, populated_count: 5 }]));
 
       const config = makeConfig({ dimensions: ["service_name", "env"] });
       const results = await useLatencyInsightsAnalysis().analyzeAllDimensions(config);
@@ -444,9 +408,7 @@ describe("useLatencyInsightsAnalysis", () => {
       const instance = useLatencyInsightsAnalysis();
       instance.error.value = "stale error";
 
-      mockSearch.mockResolvedValue(
-        makeSearchResponse([{ total_count: 0, populated_count: 0 }]),
-      );
+      mockSearch.mockResolvedValue(makeSearchResponse([{ total_count: 0, populated_count: 0 }]));
 
       await instance.analyzeAllDimensions(makeConfig({ dimensions: [] }));
 
@@ -462,10 +424,7 @@ describe("useLatencyInsightsAnalysis", () => {
       mockSearch.mockRejectedValue(new Error("search failed"));
 
       await expect(
-        useLatencyInsightsAnalysis().analyzeDimension(
-          "service_name",
-          makeConfig(),
-        ),
+        useLatencyInsightsAnalysis().analyzeDimension("service_name", makeConfig()),
       ).rejects.toThrow("search failed");
     });
 
@@ -504,9 +463,7 @@ describe("useLatencyInsightsAnalysis", () => {
         .mockResolvedValueOnce(
           makeSearchResponse([{ count: "5" }]), // no `value` field
         )
-        .mockResolvedValueOnce(
-          makeSearchResponse([{ total_count: 10, populated_count: 5 }]),
-        );
+        .mockResolvedValueOnce(makeSearchResponse([{ total_count: 10, populated_count: 5 }]));
 
       const { data } = await useLatencyInsightsAnalysis().analyzeDimension(
         "service_name",

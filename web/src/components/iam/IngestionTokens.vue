@@ -16,38 +16,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OPageLayout
-      :title="t('ingestion.tokenManagementTitle')"
-      title-data-test="ingestion-tokens-title-text"
-      icon="key" bleed>
-      <!-- Full explanation lives in this info tooltip; the subtitle below is a
+    :title="t('ingestion.tokenManagementTitle')"
+    title-data-test="ingestion-tokens-title-text"
+    icon="key"
+    bleed
+  >
+    <!-- Full explanation lives in this info tooltip; the subtitle below is a
            truncated preview so neither overruns the Create action button. -->
-      <template #title-trail>
-        <span class="inline-flex items-center">
-          <OIcon
-            name="info-outline"
-            size="sm"
-            class="text-text-secondary cursor-help"
-            data-test="ingestion-tokens-info-icon"
-          />
-          <OTooltip :content="t('ingestion.orgLevelExplanation')" max-width="360px" />
-        </span>
-      </template>
-      <!-- Short summary subtitle; the full explanation is in the title info tooltip. -->
-      <template #subtitle>
-        <span class="truncate min-w-0 leading-normal">{{ t('ingestion.orgLevelSummary') }}</span>
-      </template>
-      <template #actions>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          data-test="add-ingestion-token"
-          @click="showCreateForm = true"
-        >
-          {{ t('ingestion.createTokenBtn') }}
-        </OButton>
-      </template>
+    <template #title-trail>
+      <span class="inline-flex items-center">
+        <OIcon
+          name="info-outline"
+          size="sm"
+          class="text-text-secondary cursor-help"
+          data-test="ingestion-tokens-info-icon"
+        />
+        <OTooltip :content="t('ingestion.orgLevelExplanation')" max-width="360px" />
+      </span>
+    </template>
+    <!-- Short summary subtitle; the full explanation is in the title info tooltip. -->
+    <template #subtitle>
+      <span class="min-w-0 truncate leading-normal">{{ t("ingestion.orgLevelSummary") }}</span>
+    </template>
+    <template #actions>
+      <OButton
+        variant="primary"
+        size="sm-action"
+        data-test="add-ingestion-token"
+        @click="showCreateForm = true"
+      >
+        {{ t("ingestion.createTokenBtn") }}
+      </OButton>
+    </template>
 
-    <div class="w-full flex-1 min-h-0 overflow-hidden">
+    <div class="min-h-0 w-full flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <OTable
           :frame="false"
@@ -64,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           filter-mode="client"
         >
           <template #toolbar>
-            <div class="flex items-center gap-2 w-full">
+            <div class="flex w-full items-center gap-2">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('ingestion.searchToken', 'Search tokens')"
@@ -82,7 +84,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="ingestion-tokens-refresh-btn"
               @click="fetchTokens"
             >
-              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="ingestionTokensRefresh" />
+              <OTooltip
+                side="bottom"
+                :content="t('common.refresh')"
+                shortcut-id="ingestionTokensRefresh"
+              />
             </OButton>
           </template>
           <template #empty>
@@ -90,7 +96,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="hero"
               preset="no-ingestion-tokens"
               :filtered="!!filterQuery"
-              @action="(id) => id === 'clear-filters' ? (filterQuery = '') : (showCreateForm = true)"
+              @action="
+                (id) => (id === 'clear-filters' ? (filterQuery = '') : (showCreateForm = true))
+              "
             />
           </template>
 
@@ -167,18 +175,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="showRevealedDialog = false"
     >
       <!-- Primary: the ready-to-paste Authorization credential. -->
-      <div class="mb-1 text-xs font-medium text-text-label">
-        {{ t('ingestion.authHeaderLabel') }}
+      <div class="text-text-label mb-1 text-xs font-medium">
+        {{ t("ingestion.authHeaderLabel") }}
       </div>
       <div
-        class="p-2.5 border border-dashed rounded-default border-border-default mb-1 bg-surface-subtle"
+        class="rounded-default border-border-default bg-surface-subtle mb-1 border border-dashed p-2.5"
       >
-        <code
-          class="break-all font-mono text-sm"
-        >{{ revealedBasicAuth }}</code>
+        <code class="font-mono text-sm break-all">{{ revealedBasicAuth }}</code>
       </div>
-      <div class="mb-3 text-xs text-text-secondary">
-        {{ t('ingestion.authHeaderHelp') }}
+      <div class="text-text-secondary mb-3 text-xs">
+        {{ t("ingestion.authHeaderHelp") }}
       </div>
       <div class="flex justify-end gap-2">
         <OButton
@@ -187,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon="content-copy"
           @click="copyToken(revealedToken?.token || '')"
         >
-          {{ t('ingestion.copyRawTokenBtn') }}
+          {{ t("ingestion.copyRawTokenBtn") }}
         </OButton>
         <OButton
           variant="primary"
@@ -195,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon="content-copy"
           @click="copyToken(revealedBasicAuth)"
         >
-          {{ t('ingestion.copyAuthHeaderBtn') }}
+          {{ t("ingestion.copyAuthHeaderBtn") }}
         </OButton>
       </div>
     </ODialog>
@@ -243,7 +249,20 @@ interface Token {
 
 export default defineComponent({
   name: "IngestionTokens",
-  components: { OPageLayout, OButton, OEmptyState, OIcon, OSearchInput, OTooltip, ODialog, OForm, OFormInput, OTable, OCodeCell, OUserCell },
+  components: {
+    OPageLayout,
+    OButton,
+    OEmptyState,
+    OIcon,
+    OSearchInput,
+    OTooltip,
+    ODialog,
+    OForm,
+    OFormInput,
+    OTable,
+    OCodeCell,
+    OUserCell,
+  },
   setup() {
     const store = useStore();
     const { t } = useI18n();
@@ -263,9 +282,7 @@ export default defineComponent({
     // Ready-to-paste "Basic base64(name:token)" credential shown in the
     // "New Token Generated" dialog (restored — the merge auto-drop lost it).
     const revealedBasicAuth = computed(() =>
-      revealedToken.value
-        ? getBasicAuth(revealedToken.value.name, revealedToken.value.token)
-        : "",
+      revealedToken.value ? getBasicAuth(revealedToken.value.name, revealedToken.value.token) : "",
     );
 
     const columns: OTableColumnDef<Token>[] = [
@@ -360,8 +377,7 @@ export default defineComponent({
       } catch (e: any) {
         toast({
           variant: "error",
-          message:
-            e.response?.data?.message || t("ingestion.tokenCreateError"),
+          message: e.response?.data?.message || t("ingestion.tokenCreateError"),
           timeout: 5000,
         });
       } finally {
@@ -402,8 +418,7 @@ export default defineComponent({
     // tokens are org-scoped and the backend ignores the username, so using the
     // token name keeps the credential person-independent (never goes stale when
     // a user leaves) and gives meaningful ingestion-log attribution.
-    const toBasicAuth = (name: string, token: string) =>
-      getBasicAuth(name, token);
+    const toBasicAuth = (name: string, token: string) => getBasicAuth(name, token);
 
     const copyToken = (token: string) => {
       copyToClipboard(token);
@@ -417,11 +432,15 @@ export default defineComponent({
     useShortcuts([
       {
         id: "ingestionTokensAdd",
-        handler: () => { if (!isInputFocused()) showCreateForm.value = true; },
+        handler: () => {
+          if (!isInputFocused()) showCreateForm.value = true;
+        },
       },
       {
         id: "ingestionTokensRefresh",
-        handler: () => { if (!isInputFocused()) fetchTokens(); },
+        handler: () => {
+          if (!isInputFocused()) fetchTokens();
+        },
       },
       {
         id: "ingestionTokensFocusSearch",

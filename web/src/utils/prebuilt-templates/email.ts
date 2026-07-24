@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { PrebuiltConfig } from './types';
+import { PrebuiltConfig } from "./types";
 
 /**
  * Email prebuilt destination configuration
  * Uses HTML email template for rich formatting
  */
 export const emailTemplate = {
-  name: 'prebuilt_email',
+  name: "prebuilt_email",
   body: `<!DOCTYPE html>
 <html>
 <head>
@@ -93,36 +93,38 @@ export const emailTemplate = {
     </div>
 </body>
 </html>`,
-  type: 'email' as const,
-  title: 'OpenObserve Alert Notification',
-  isDefault: false
+  type: "email" as const,
+  title: "OpenObserve Alert Notification",
+  isDefault: false,
 };
 
 export const emailConfig: PrebuiltConfig = {
-  templateName: 'prebuilt_email',
+  templateName: "prebuilt_email",
   templateBody: emailTemplate.body,
   headers: {
-    'Content-Type': 'text/html'
+    "Content-Type": "text/html",
   },
-  method: 'post',
+  method: "post",
   urlValidator: () => false, // Email doesn't use URLs - always return false
   credentialFields: [
     {
-      key: 'recipients',
-      labelKey: 'alerts.prebuiltDestinations.emailRecipients',
-      type: 'email',
+      key: "recipients",
+      labelKey: "alerts.prebuiltDestinations.emailRecipients",
+      type: "email",
       required: true,
-      hint: 'Comma-separated email addresses',
+      hint: "Comma-separated email addresses",
       validator: (emails: string) => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        const emailList = emails.split(',').map(e => e.trim());
-        const invalidEmails = emailList.filter(email => !emailRegex.test(email));
-        return invalidEmails.length === 0 || {
-          key: 'alerts.prebuiltDestinations.invalidEmailAddresses',
-          params: { emails: invalidEmails.join(', ') }
-        };
-      }
-    }
+        const emailList = emails.split(",").map((e) => e.trim());
+        const invalidEmails = emailList.filter((email) => !emailRegex.test(email));
+        return (
+          invalidEmails.length === 0 || {
+            key: "alerts.prebuiltDestinations.invalidEmailAddresses",
+            params: { emails: invalidEmails.join(", ") },
+          }
+        );
+      },
+    },
     // CC and Subject are not supported by the backend Email struct
     // {
     //   key: 'ccRecipients',
@@ -138,17 +140,17 @@ export const emailConfig: PrebuiltConfig = {
     //   required: false,
     //   hint: 'Custom subject line (defaults to alert name)'
     // }
-  ]
+  ],
 };
 
-import emailLogo from '@/assets/images/alerts/destinations/email.png';
+import emailLogo from "@/assets/images/alerts/destinations/email.png";
 
 export const emailDestinationType = {
-  id: 'email',
-  name: 'Email',
-  description: 'Send HTML formatted email notifications',
-  icon: 'email',
+  id: "email",
+  name: "Email",
+  description: "Send HTML formatted email notifications",
+  icon: "email",
   image: emailLogo,
   popular: true,
-  category: 'email'
+  category: "email",
 };

@@ -13,19 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import {
-  ref,
-  computed,
-  watch,
-  nextTick,
-  onBeforeMount,
-  onUnmounted,
-} from "vue";
-import {
-  getAllDashboardsByFolderId,
-  getDashboard,
-  getFoldersList,
-} from "@/utils/commons";
+import { ref, computed, watch, nextTick, onBeforeMount, onUnmounted } from "vue";
+import { getAllDashboardsByFolderId, getDashboard, getFoldersList } from "@/utils/commons";
 import { b64EncodeUnicode, escapeSingleQuotes } from "@/utils/zincutils";
 import { getUTCTimestampFromZonedTimestamp } from "@/utils/dashboard/dateTimeUtils";
 import { normalizeVariableSyntax } from "@/utils/dashboard/variables/variablesUtils";
@@ -103,9 +92,7 @@ export function usePanelDrilldown({
   });
 
   // get interval from resultMetaData if it exists
-  const interval = computed(
-    () => resultMetaData?.value?.[0]?.[0]?.histogram_interval,
-  );
+  const interval = computed(() => resultMetaData?.value?.[0]?.[0]?.histogram_interval);
 
   // get interval in micro seconds
   const intervalMicro = computed(() => interval.value * 1000 * 1000);
@@ -130,21 +117,24 @@ export function usePanelDrilldown({
     }
 
     // Replace both {{key}} and ${key} patterns
-    return str.replace(/(?:\{\{([^}]+)\}\})|(?:\$\{([^}]+)\})/g, function (_: any, mustacheKey: any, dollarKey: any) {
-      const key = (mustacheKey || dollarKey).trim();
-      // Split the key into parts by either a dot or a ["xyz"] pattern and filter out empty strings
-      let parts = key.split(/\.|\["(.*?)"\]/).filter(Boolean);
+    return str.replace(
+      /(?:\{\{([^}]+)\}\})|(?:\$\{([^}]+)\})/g,
+      function (_: any, mustacheKey: any, dollarKey: any) {
+        const key = (mustacheKey || dollarKey).trim();
+        // Split the key into parts by either a dot or a ["xyz"] pattern and filter out empty strings
+        let parts = key.split(/\.|\["(.*?)"\]/).filter(Boolean);
 
-      let value = obj;
-      for (let part of parts) {
-        if (value && part in value) {
-          value = value[part];
-        } else {
-          return mustacheKey ? "{{" + key + "}}" : "${" + key + "}";
+        let value = obj;
+        for (let part of parts) {
+          if (value && part in value) {
+            value = value[part];
+          } else {
+            return mustacheKey ? "{{" + key + "}}" : "${" + key + "}";
+          }
         }
-      }
-      return value;
-    });
+        return value;
+      },
+    );
   };
 
   const replaceDrilldownToLogs = (str: any, obj: any) => {
@@ -160,23 +150,26 @@ export function usePanelDrilldown({
     }
 
     // Replace both {{key}} and ${key} patterns
-    return str.replace(/(?:\{\{([^}]+)\}\})|(?:\$\{([^}]+)\})/g, function (_: any, mustacheKey: any, dollarKey: any) {
-      const key = (mustacheKey || dollarKey).trim();
-      // Split the key into parts by either a dot or a ["xyz"] pattern and filter out empty strings
-      let parts = key.split(/\.|\["(.*?)"\]/).filter(Boolean);
+    return str.replace(
+      /(?:\{\{([^}]+)\}\})|(?:\$\{([^}]+)\})/g,
+      function (_: any, mustacheKey: any, dollarKey: any) {
+        const key = (mustacheKey || dollarKey).trim();
+        // Split the key into parts by either a dot or a ["xyz"] pattern and filter out empty strings
+        let parts = key.split(/\.|\["(.*?)"\]/).filter(Boolean);
 
-      let value = obj;
-      for (let part of parts) {
-        if (value && part in value) {
-          value = value[part];
-        } else {
-          return mustacheKey ? "{{" + key + "}}" : "${" + key + "}"; // Keep the placeholder if the key is not found
+        let value = obj;
+        for (let part of parts) {
+          if (value && part in value) {
+            value = value[part];
+          } else {
+            return mustacheKey ? "{{" + key + "}}" : "${" + key + "}"; // Keep the placeholder if the key is not found
+          }
         }
-      }
 
-      // Ensure string values are wrapped in quotes
-      return typeof value === "string" ? `'${value}'` : value;
-    });
+        // Ensure string values are wrapped in quotes
+        return typeof value === "string" ? `'${value}'` : value;
+      },
+    );
   };
 
   // get offset from parent
@@ -191,25 +184,14 @@ export function usePanelDrilldown({
   }
 
   // Helper function to calculate popup offset
-  const calculatePopupOffset = (
-    offsetX: any,
-    offsetY: any,
-    popupRef: any,
-    containerRef: any,
-  ) => {
+  const calculatePopupOffset = (offsetX: any, offsetY: any, popupRef: any, containerRef: any) => {
     let offSetValues = { left: offsetX, top: offsetY };
 
     if (popupRef.value) {
-      if (
-        offSetValues.top + popupRef.value.offsetHeight >
-        containerRef.value.offsetHeight
-      ) {
+      if (offSetValues.top + popupRef.value.offsetHeight > containerRef.value.offsetHeight) {
         offSetValues.top -= popupRef.value.offsetHeight;
       }
-      if (
-        offSetValues.left + popupRef.value.offsetWidth >
-        containerRef.value.offsetWidth
-      ) {
+      if (offSetValues.left + popupRef.value.offsetWidth > containerRef.value.offsetWidth) {
         offSetValues.left -= popupRef.value.offsetWidth;
       }
     }
@@ -228,10 +210,7 @@ export function usePanelDrilldown({
     return { originalQuery, streamName };
   };
 
-  const calculateTimeRange = (
-    hoveredTimestamp: number | null,
-    interval: number | undefined,
-  ) => {
+  const calculateTimeRange = (hoveredTimestamp: number | null, interval: number | undefined) => {
     if (interval && hoveredTimestamp) {
       const startTime = hoveredTimestamp; // hovertedTimestamp is in microseconds
       return {
@@ -259,16 +238,12 @@ export function usePanelDrilldown({
     breakdownValue?: string,
   ): string => {
     let whereClause = ast?.where
-      ? parser
-          .sqlify({ type: "select", where: ast.where })
-          .slice("SELECT".length)
+      ? parser.sqlify({ type: "select", where: ast.where }).slice("SELECT".length)
       : "";
 
     if (breakdownColumn && breakdownValue) {
       const breakdownCondition = `${breakdownColumn} = '${breakdownValue}'`;
-      whereClause += whereClause
-        ? ` AND ${breakdownCondition}`
-        : ` WHERE ${breakdownCondition}`;
+      whereClause += whereClause ? ` AND ${breakdownCondition}` : ` WHERE ${breakdownCondition}`;
     }
 
     return whereClause;
@@ -290,8 +265,7 @@ export function usePanelDrilldown({
       if (Array.isArray(variable.value)) {
         const value = variable.value
           .map(
-            (value: any) =>
-              `'${variable.escapeSingleQuotes ? escapeSingleQuotes(value) : value}'`,
+            (value: any) => `'${variable.escapeSingleQuotes ? escapeSingleQuotes(value) : value}'`,
           )
           .join(",");
         const possibleVariablesPlaceHolderTypes = [
@@ -351,19 +325,14 @@ export function usePanelDrilldown({
           //     value: placeHolderObj.value,
           //   });
           // }
-          query = query.replaceAll(
-            placeHolderObj.placeHolder,
-            placeHolderObj.value,
-          );
+          query = query.replaceAll(placeHolderObj.placeHolder, placeHolderObj.value);
         });
       } else {
         variableValue =
           variable.value === null
             ? ""
             : `${
-                variable.escapeSingleQuotes
-                  ? escapeSingleQuotes(variable.value)
-                  : variable.value
+                variable.escapeSingleQuotes ? escapeSingleQuotes(variable.value) : variable.value
               }`;
         // if (query.includes(variableName)) {
         //   metadata.push({
@@ -373,22 +342,16 @@ export function usePanelDrilldown({
         //   });
         // }
 
-        // Replace all forms of the variable placeholder in the query, 
-        // placeholders can be in the form of {{varName}}, ${varName}, ${varName}, {{varName:csv}}, ${varName:csv} etc. 
-        // which will be replaced with the variable value. For csv and pipe forms, if the variable value is an array, it will be joined with comma or pipe respectively. 
-        // For doublequote form, the variable value will be wrapped with double quotes. 
+        // Replace all forms of the variable placeholder in the query,
+        // placeholders can be in the form of {{varName}}, ${varName}, ${varName}, {{varName:csv}}, ${varName:csv} etc.
+        // which will be replaced with the variable value. For csv and pipe forms, if the variable value is an array, it will be joined with comma or pipe respectively.
+        // For doublequote form, the variable value will be wrapped with double quotes.
         // For singlequote form, the variable value will be wrapped with single quotes.
         const mustachePlaceholder = `{{${variable.name}}}`;
         query = query.replaceAll(`{{${variable.name}:csv}}`, variableValue);
         query = query.replaceAll(`{{${variable.name}:pipe}}`, variableValue);
-        query = query.replaceAll(
-          `{{${variable.name}:doublequote}}`,
-          variableValue,
-        );
-        query = query.replaceAll(
-          `{{${variable.name}:singlequote}}`,
-          variableValue,
-        );
+        query = query.replaceAll(`{{${variable.name}:doublequote}}`, variableValue);
+        query = query.replaceAll(`{{${variable.name}:singlequote}}`, variableValue);
         query = query.replaceAll(mustachePlaceholder, variableValue);
         query = query.replaceAll(variableNameWithBrackets, variableValue);
         query = query.replaceAll(variableName, variableValue);
@@ -406,19 +369,13 @@ export function usePanelDrilldown({
     currentUrl: string,
   ) => {
     const logsUrl = new URL(currentUrl + "/logs");
-    logsUrl.searchParams.set(
-      "stream_type",
-      queryDetails.queries[0]?.fields?.stream_type,
-    );
+    logsUrl.searchParams.set("stream_type", queryDetails.queries[0]?.fields?.stream_type);
     logsUrl.searchParams.set("stream", streamName);
     logsUrl.searchParams.set("from", calculatedTimeRange.startTime.toString());
     logsUrl.searchParams.set("to", calculatedTimeRange.endTime.toString());
     logsUrl.searchParams.set("sql_mode", "true");
     logsUrl.searchParams.set("query", encodedQuery);
-    logsUrl.searchParams.set(
-      "org_identifier",
-      store.state.selectedOrganization.identifier,
-    );
+    logsUrl.searchParams.set("org_identifier", store.state.selectedOrganization.identifier);
     if (store.state.zoConfig.quick_mode_enabled) {
       logsUrl.searchParams.set("quick_mode", "true");
     } else {
@@ -438,11 +395,14 @@ export function usePanelDrilldown({
     for (const f of fields) {
       aliasMap[f.name] = f.alias || f.name;
     }
-    return url.replace(/(?:\{\{\s*(\w+)\s*\}\})|(?:\$?\{\s*(\w+)\s*\})/g, (_match: string, mustacheField: string, dollarField: string) => {
-      const fieldName = mustacheField || dollarField;
-      const resolved = aliasMap[fieldName] || fieldName;
-      return '${row.field["' + resolved + '"]}';
-    });
+    return url.replace(
+      /(?:\{\{\s*(\w+)\s*\}\})|(?:\$?\{\s*(\w+)\s*\})/g,
+      (_match: string, mustacheField: string, dollarField: string) => {
+        const fieldName = mustacheField || dollarField;
+        const resolved = aliasMap[fieldName] || fieldName;
+        return '${row.field["' + resolved + '"]}';
+      },
+    );
   };
 
   // Cross-linking: merge stream + org links with field-level replacement
@@ -473,9 +433,7 @@ export function usePanelDrilldown({
     // Add org links only if they have at least one matched field NOT covered by stream
     for (const link of org_links) {
       const matchedFields = link.fields.filter((f: any) => f.alias);
-      const hasUncovered = matchedFields.some(
-        (f: any) => !streamCoveredFields.has(f.name),
-      );
+      const hasUncovered = matchedFields.some((f: any) => !streamCoveredFields.has(f.name));
       if (matchedFields.length > 0 && !hasUncovered) continue;
 
       result.push({
@@ -507,8 +465,7 @@ export function usePanelDrilldown({
   const onChartClick = async (params: any, ...args: any) => {
     // Check if we have both drilldown and annotation at the same point
     const hasAnnotation =
-      params?.componentType === "markLine" ||
-      params?.componentType === "markArea";
+      params?.componentType === "markLine" || params?.componentType === "markArea";
     const hasDrilldown = panelSchema.value.config.drilldown?.length > 0;
 
     // If in annotation add mode, handle that first
@@ -517,10 +474,7 @@ export function usePanelDrilldown({
         if (hasAnnotation) {
           editAnnotation(params?.data?.annotationDetails);
         } else {
-          handleAddAnnotation(
-            params?.data?.[0] || params?.data?.time || params?.data?.name,
-            null,
-          );
+          handleAddAnnotation(params?.data?.[0] || params?.data?.time || params?.data?.name, null);
         }
         return;
       }
@@ -584,10 +538,7 @@ export function usePanelDrilldown({
     }
 
     // Hide popups if no content to display
-    if (
-      !shouldShowDrilldown &&
-      (!hasAnnotation || !params?.data?.annotationDetails?.text)
-    ) {
+    if (!shouldShowDrilldown && (!hasAnnotation || !params?.data?.annotationDetails?.text)) {
       hidePopupsAndOverlays();
     }
   };
@@ -630,8 +581,7 @@ export function usePanelDrilldown({
           const record: Record<string, any> = {};
           const queryResult = data.value?.[0]?.result;
           const xFields = panelSchema.value?.queries?.[0]?.fields?.x || [];
-          const breakdownFields =
-            panelSchema.value?.queries?.[0]?.fields?.breakdown || [];
+          const breakdownFields = panelSchema.value?.queries?.[0]?.fields?.breakdown || [];
 
           let xAxisValue: any;
           if (isPieOrDonut) {
@@ -649,19 +599,10 @@ export function usePanelDrilldown({
             for (const row of queryResult) {
               let matches = true;
               if (xFields.length > 0 && xAxisValue !== undefined) {
-                if (String(row[xFields[0].alias]) !== String(xAxisValue))
-                  matches = false;
+                if (String(row[xFields[0].alias]) !== String(xAxisValue)) matches = false;
               }
-              if (
-                matches &&
-                breakdownFields.length > 0 &&
-                seriesName &&
-                !isPieOrDonut
-              ) {
-                if (
-                  String(row[breakdownFields[0].alias]) !== String(seriesName)
-                )
-                  matches = false;
+              if (matches && breakdownFields.length > 0 && seriesName && !isPieOrDonut) {
+                if (String(row[breakdownFields[0].alias]) !== String(seriesName)) matches = false;
               }
               if (matches) {
                 Object.assign(record, row);
@@ -692,9 +633,7 @@ export function usePanelDrilldown({
 
         // Get query
         const currentQuery =
-          metadata?.value?.queries?.[0]?.query ??
-          panelSchema?.value?.queries?.[0]?.query ??
-          "";
+          metadata?.value?.queries?.[0]?.query ?? panelSchema?.value?.queries?.[0]?.query ?? "";
 
         // Resolve the 6 fixed variables
         const resolvedUrl = rawUrl
@@ -709,7 +648,10 @@ export function usePanelDrilldown({
           .replace(/(?:\{\{start_time\}\})|(?:\$\{start_time\})/g, String(startTime))
           .replace(/(?:\{\{end_time\}\})|(?:\$\{end_time\})/g, String(endTime))
           .replace(/(?:\{\{query\}\})|(?:\$\{query\})/g, encodeURIComponent(currentQuery))
-          .replace(/(?:\{\{query_encoded\}\})|(?:\$\{query_encoded\})/g, b64EncodeUnicode(currentQuery));
+          .replace(
+            /(?:\{\{query_encoded\}\})|(?:\$\{query_encoded\})/g,
+            b64EncodeUnicode(currentQuery),
+          );
 
         window.open(resolvedUrl, "_blank");
       } catch (error) {
@@ -721,10 +663,7 @@ export function usePanelDrilldown({
     // if panelSchema exists
     if (panelSchema.value) {
       // check if drilldown data exists
-      if (
-        !panelSchema.value.config.drilldown ||
-        panelSchema.value.config.drilldown.length == 0
-      ) {
+      if (!panelSchema.value.config.drilldown || panelSchema.value.config.drilldown.length == 0) {
         return;
       }
 
@@ -747,10 +686,7 @@ export function usePanelDrilldown({
           : null;
         const breakdown = queryDetails.queries[0].fields?.breakdown || [];
 
-        const calculatedTimeRange = calculateTimeRange(
-          hoveredTimestamp,
-          intervalMicro.value,
-        );
+        const calculatedTimeRange = calculateTimeRange(hoveredTimestamp, intervalMicro.value);
 
         let modifiedQuery = originalQuery;
 
@@ -769,27 +705,19 @@ export function usePanelDrilldown({
             ?.filter((fromEntry: any) => fromEntry.as)
             .map((fromEntry: any) => fromEntry.as);
 
-          const aliasClause = tableAliases?.length
-            ? ` AS ${tableAliases.join(", ")}`
-            : "";
+          const aliasClause = tableAliases?.length ? ` AS ${tableAliases.join(", ")}` : "";
 
           const breakdownColumn = breakdown[0]?.column;
 
           const seriesIndex = drilldownParams[0]?.seriesIndex;
           const breakdownSeriesName =
-            seriesIndex !== undefined
-              ? panelData.value.options.series[seriesIndex]
-              : undefined;
+            seriesIndex !== undefined ? panelData.value.options.series[seriesIndex] : undefined;
           const uniqueSeriesName = breakdownSeriesName
             ? breakdownSeriesName.originalSeriesName
             : drilldownParams[0]?.seriesName;
           const breakdownValue = uniqueSeriesName;
 
-          const whereClause = buildWhereClause(
-            ast,
-            breakdownColumn,
-            breakdownValue,
-          );
+          const whereClause = buildWhereClause(ast, breakdownColumn, breakdownValue);
 
           modifiedQuery = `SELECT * FROM "${streamName}"${aliasClause} ${whereClause}`;
         } else if (drilldownData.data.logsMode === "auto" && isPromQLQuery) {
@@ -820,12 +748,8 @@ export function usePanelDrilldown({
 
           // Add query and encoded query
           drilldownVariables.query =
-            metadata?.value?.queries[0]?.query ??
-            panelSchema?.value?.queries[0]?.query ??
-            "";
-          drilldownVariables.query_encoded = b64EncodeUnicode(
-            drilldownVariables.query,
-          );
+            metadata?.value?.queries[0]?.query ?? panelSchema?.value?.queries[0]?.query ?? "";
+          drilldownVariables.query_encoded = b64EncodeUnicode(drilldownVariables.query);
 
           // Handle different chart types
           if (panelSchema.value.type == "table") {
@@ -860,16 +784,13 @@ export function usePanelDrilldown({
             }
           } else {
             drilldownVariables.series = {
-              __name: ["pie", "donut", "heatmap"].includes(
-                panelSchema.value.type,
-              )
+              __name: ["pie", "donut", "heatmap"].includes(panelSchema.value.type)
                 ? drilldownParams[0].name
                 : drilldownParams[0].seriesName,
               __value: Array.isArray(drilldownParams[0].value)
                 ? drilldownParams[0].value[drilldownParams[0].value.length - 1]
                 : drilldownParams[0].value,
-              __axisValue:
-                drilldownParams?.[0]?.value?.[0] ?? drilldownParams?.[0]?.name,
+              __axisValue: drilldownParams?.[0]?.value?.[0] ?? drilldownParams?.[0]?.name,
             };
           }
 
@@ -900,9 +821,7 @@ export function usePanelDrilldown({
         const pos = window.location.pathname.indexOf("/web/");
         const currentUrl =
           pos > -1
-            ? window.location.origin +
-              window.location.pathname.slice(0, pos) +
-              "/web"
+            ? window.location.origin + window.location.pathname.slice(0, pos) + "/web"
             : window.location.origin;
 
         const logsUrl = constructLogsUrl(
@@ -944,10 +863,7 @@ export function usePanelDrilldown({
         ).getTime();
       }
 
-      if (
-        selectedTimeObj?.value?.end_time &&
-        selectedTimeObj?.value?.end_time != "Invalid Date"
-      ) {
+      if (selectedTimeObj?.value?.end_time && selectedTimeObj?.value?.end_time != "Invalid Date") {
         drilldownVariables.end_time = new Date(
           selectedTimeObj?.value?.end_time?.toISOString(),
         ).getTime();
@@ -956,13 +872,9 @@ export function usePanelDrilldown({
       // param to pass current query
       // use metadata query[replaced variables values] or panelSchema query
       drilldownVariables.query =
-        metadata?.value?.queries[0]?.query ??
-        panelSchema?.value?.queries[0]?.query ??
-        "";
+        metadata?.value?.queries[0]?.query ?? panelSchema?.value?.queries[0]?.query ?? "";
       drilldownVariables.query_encoded = b64EncodeUnicode(
-        metadata?.value?.queries[0]?.query ??
-          panelSchema?.value?.queries[0]?.query ??
-          "",
+        metadata?.value?.queries[0]?.query ?? panelSchema?.value?.queries[0]?.query ?? "",
       );
 
       // if chart type is 'table' then we need to pass the table name
@@ -970,11 +882,7 @@ export function usePanelDrilldown({
         const fields: any = {};
         panelSchema.value.queries.forEach((query: any) => {
           // take all field from x, y and z
-          const panelFields: any = [
-            ...query.fields.x,
-            ...query.fields.y,
-            ...query.fields.z,
-          ];
+          const panelFields: any = [...query.fields.x, ...query.fields.y, ...query.fields.z];
           panelFields.forEach((field: any) => {
             // we have label and alias, use both in dynamic values
             fields[field.label] = drilldownParams[1][0][field.alias];
@@ -1011,8 +919,7 @@ export function usePanelDrilldown({
           __value: Array.isArray(drilldownParams[0].value)
             ? drilldownParams[0].value[drilldownParams[0].value.length - 1]
             : drilldownParams[0].value,
-          __axisValue:
-            drilldownParams?.[0]?.value?.[0] ?? drilldownParams?.[0]?.name,
+          __axisValue: drilldownParams?.[0]?.value?.[0] ?? drilldownParams?.[0]?.name,
         };
       }
 
@@ -1060,10 +967,7 @@ export function usePanelDrilldown({
         }
 
         // get dashboard id
-        const allDashboardData = await getAllDashboardsByFolderId(
-          store,
-          folderId,
-        );
+        const allDashboardData = await getAllDashboardsByFolderId(store, folderId);
 
         const dashboardId = allDashboardData?.find(
           (dashboard: any) => dashboard.title === drilldownData.data.dashboard,
@@ -1077,9 +981,8 @@ export function usePanelDrilldown({
 
         // get tab id
         const tabId =
-          dashboardData.tabs.find(
-            (tab: any) => tab.name == drilldownData.data.tab,
-          )?.tabId ?? dashboardData.tabs[0].tabId;
+          dashboardData.tabs.find((tab: any) => tab.name == drilldownData.data.tab)?.tabId ??
+          dashboardData.tabs[0].tabId;
 
         // if targetBlank is true then create new url
         // else made changes in current router only
@@ -1090,9 +993,7 @@ export function usePanelDrilldown({
           // url will be: origin from window.location.origin + pathname up to /web/ + /web/
           let currentUrl: any =
             pos > -1
-              ? window.location.origin +
-                window.location.pathname.slice(0, pos) +
-                "/web"
+              ? window.location.origin + window.location.pathname.slice(0, pos) + "/web"
               : window.location.origin;
 
           // always, go to view dashboard page
@@ -1114,10 +1015,7 @@ export function usePanelDrilldown({
               );
             }
           });
-          url.searchParams.set(
-            "org_identifier",
-            store.state.selectedOrganization.identifier,
-          );
+          url.searchParams.set("org_identifier", store.state.selectedOrganization.identifier);
           url.searchParams.set("dashboard", dashboardData.dashboardId);
           url.searchParams.set("folder", folderId);
           url.searchParams.set("tab", tabId);
@@ -1134,9 +1032,8 @@ export function usePanelDrilldown({
 
           drilldownData.data.variables.forEach((variable: any) => {
             if (variable?.name?.trim() && variable?.value?.trim()) {
-              oldParams[
-                "var-" + replacePlaceholders(variable.name, drilldownVariables)
-              ] = replacePlaceholders(variable.value, drilldownVariables);
+              oldParams["var-" + replacePlaceholders(variable.name, drilldownVariables)] =
+                replacePlaceholders(variable.value, drilldownVariables);
             }
           });
 
@@ -1162,20 +1059,14 @@ export function usePanelDrilldown({
 
   // Cross-linking: fetch cross-links when the executed query (with variables resolved) changes
   watch(
-    () =>
-      metadata.value?.queries?.[0]?.query ||
-      panelSchema.value?.queries?.[0]?.query,
+    () => metadata.value?.queries?.[0]?.query || panelSchema.value?.queries?.[0]?.query,
     async (newQuery: string) => {
       // Cross-linking is only supported for logs streams; skip the result_schema
       // call for panels backed by other stream types (metrics, traces,
       // enrichment_tables) to avoid failing requests.
-      const crossLinkStreamType =
-        panelSchema.value?.queries?.[0]?.fields?.stream_type;
+      const crossLinkStreamType = panelSchema.value?.queries?.[0]?.fields?.stream_type;
       if (
-        !isCrossLinkingEnabledForStream(
-          store.state.zoConfig,
-          crossLinkStreamType,
-        ) ||
+        !isCrossLinkingEnabledForStream(store.state.zoConfig, crossLinkStreamType) ||
         !newQuery ||
         panelSchema.value?.queryType === "promql"
       ) {
@@ -1198,9 +1089,7 @@ export function usePanelDrilldown({
                 streaming_output: false,
                 streaming_id: null,
               },
-              ...(store.state.zoConfig.sql_base64_enabled
-                ? { encoding: "base64" }
-                : {}),
+              ...(store.state.zoConfig.sql_base64_enabled ? { encoding: "base64" } : {}),
             },
             page_type: "dashboards",
             is_streaming: false,

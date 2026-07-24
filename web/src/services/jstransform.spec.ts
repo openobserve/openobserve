@@ -61,11 +61,11 @@ describe("jstransform service", () => {
         params.sort_by,
         params.desc,
         params.name,
-        params.org_identifier
+        params.org_identifier,
       );
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/functions?page_num=${params.page_num}&page_size=${params.page_size}&sort_by=${params.sort_by}&desc=${params.desc}&name=${params.name}`
+        `/api/${params.org_identifier}/functions?page_num=${params.page_num}&page_size=${params.page_size}&sort_by=${params.sort_by}&desc=${params.desc}&name=${params.name}`,
       );
     });
 
@@ -87,11 +87,11 @@ describe("jstransform service", () => {
         params.sort_by,
         params.desc,
         params.name,
-        params.org_identifier
+        params.org_identifier,
       );
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/production-org/functions?page_num=2&page_size=50&sort_by=created_at&desc=true&name=`
+        `/api/production-org/functions?page_num=2&page_size=50&sort_by=created_at&desc=true&name=`,
       );
     });
   });
@@ -101,7 +101,7 @@ describe("jstransform service", () => {
       const org_identifier = "org123";
       const data = {
         name: "my-function",
-        function: ".field = \"value\"",
+        function: '.field = "value"',
         order: 1,
       };
 
@@ -109,15 +109,12 @@ describe("jstransform service", () => {
 
       await jstransform.create(org_identifier, data);
 
-      expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        `/api/${org_identifier}/functions`,
-        data
-      );
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(`/api/${org_identifier}/functions`, data);
     });
 
     it("should pass the function data as the POST body", async () => {
       const org_identifier = "staging-org";
-      const data = { name: "transform-fn", function: ".status = \"ok\"" };
+      const data = { name: "transform-fn", function: '.status = "ok"' };
 
       mockHttpInstance.post.mockResolvedValue({ data: {} });
 
@@ -137,9 +134,7 @@ describe("jstransform service", () => {
 
       await jstransform.getAssociatedPipelines(org_identifier, name);
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${org_identifier}/functions/${name}`
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(`/api/${org_identifier}/functions/${name}`);
     });
 
     it("should use function name in the URL path", async () => {
@@ -151,7 +146,7 @@ describe("jstransform service", () => {
       await jstransform.getAssociatedPipelines(org_identifier, name);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/prod-org/functions/log-enrichment-fn`
+        `/api/prod-org/functions/log-enrichment-fn`,
       );
     });
   });
@@ -161,7 +156,7 @@ describe("jstransform service", () => {
       const org_identifier = "org123";
       const data = {
         name: "existing-function",
-        function: ".new_field = \"new_value\"",
+        function: '.new_field = "new_value"',
       };
 
       mockHttpInstance.put.mockResolvedValue({ data: { success: true } });
@@ -170,7 +165,7 @@ describe("jstransform service", () => {
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/${org_identifier}/functions/${data.name}`,
-        data
+        data,
       );
     });
 
@@ -184,7 +179,7 @@ describe("jstransform service", () => {
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/staging-org/functions/transform-v2`,
-        data
+        data,
       );
     });
   });
@@ -200,7 +195,7 @@ describe("jstransform service", () => {
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
         `/api/${org_identifier}/functions/${transform_name}`,
-        {}
+        {},
       );
     });
 
@@ -215,7 +210,7 @@ describe("jstransform service", () => {
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
         `/api/${org_identifier}/functions/${transform_name}`,
-        { params: { force: true } }
+        { params: { force: true } },
       );
     });
 
@@ -230,7 +225,7 @@ describe("jstransform service", () => {
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
         `/api/${org_identifier}/functions/${transform_name}`,
-        {}
+        {},
       );
     });
   });
@@ -246,7 +241,7 @@ describe("jstransform service", () => {
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
         `/api/${org_identifier}/functions/bulk`,
-        { data }
+        { data },
       );
     });
 
@@ -268,7 +263,7 @@ describe("jstransform service", () => {
       const org_identifier = "org123";
       const stream_name = "my-stream";
       const stream_type = "logs";
-      const data = { name: "my-function", function: ".field = \"value\"" };
+      const data = { name: "my-function", function: '.field = "value"' };
 
       mockHttpInstance.put.mockResolvedValue({ data: { success: true } });
 
@@ -276,7 +271,7 @@ describe("jstransform service", () => {
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/${org_identifier}/${stream_name}/functions/${data.name}?type=${stream_type}`,
-        data
+        data,
       );
     });
 
@@ -284,7 +279,7 @@ describe("jstransform service", () => {
       const org_identifier = "prod-org";
       const stream_name = "metrics-stream";
       const stream_type = "metrics";
-      const data = { name: "metrics-transform", function: ".metric = \"value\"" };
+      const data = { name: "metrics-transform", function: '.metric = "value"' };
 
       mockHttpInstance.put.mockResolvedValue({ data: {} });
 
@@ -298,7 +293,7 @@ describe("jstransform service", () => {
       const org_identifier = "org123";
       const stream_name = "trace-stream";
       const stream_type = "traces";
-      const data = { name: "trace-enrichment", function: ".trace_id = \"value\"" };
+      const data = { name: "trace-enrichment", function: '.trace_id = "value"' };
 
       mockHttpInstance.put.mockResolvedValue({ data: {} });
 
@@ -306,7 +301,7 @@ describe("jstransform service", () => {
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/org123/trace-stream/functions/trace-enrichment?type=traces`,
-        data
+        data,
       );
     });
   });
@@ -320,10 +315,15 @@ describe("jstransform service", () => {
 
       mockHttpInstance.delete.mockResolvedValue({ data: { success: true } });
 
-      await jstransform.delete_stream_function(org_identifier, stream_name, stream_type, transform_name);
+      await jstransform.delete_stream_function(
+        org_identifier,
+        stream_name,
+        stream_type,
+        transform_name,
+      );
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/${org_identifier}/${stream_name}/functions/${transform_name}?type=${stream_type}`
+        `/api/${org_identifier}/${stream_name}/functions/${transform_name}?type=${stream_type}`,
       );
     });
 
@@ -335,7 +335,12 @@ describe("jstransform service", () => {
 
       mockHttpInstance.delete.mockResolvedValue({ data: {} });
 
-      await jstransform.delete_stream_function(org_identifier, stream_name, stream_type, transform_name);
+      await jstransform.delete_stream_function(
+        org_identifier,
+        stream_name,
+        stream_type,
+        transform_name,
+      );
 
       const calledUrl = mockHttpInstance.delete.mock.calls[0][0];
       expect(calledUrl).toContain(`?type=${stream_type}`);
@@ -353,7 +358,7 @@ describe("jstransform service", () => {
       await jstransform.stream_function(org_identifier, stream_name, stream_type);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${org_identifier}/streams/${stream_name}/functions?type=${stream_type}`
+        `/api/${org_identifier}/streams/${stream_name}/functions?type=${stream_type}`,
       );
     });
 
@@ -367,7 +372,7 @@ describe("jstransform service", () => {
       await jstransform.stream_function(org_identifier, stream_name, stream_type);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/prod-org/streams/application-logs/functions?type=logs`
+        `/api/prod-org/streams/application-logs/functions?type=logs`,
       );
     });
   });
@@ -382,11 +387,17 @@ describe("jstransform service", () => {
 
       mockHttpInstance.put.mockResolvedValue({ data: { success: true } });
 
-      await jstransform.apply_stream_function(org_identifier, stream_name, stream_type, function_name, data);
+      await jstransform.apply_stream_function(
+        org_identifier,
+        stream_name,
+        stream_type,
+        function_name,
+        data,
+      );
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/${org_identifier}/streams/${stream_name}/functions/${function_name}?type=${stream_type}`,
-        data
+        data,
       );
     });
 
@@ -399,11 +410,17 @@ describe("jstransform service", () => {
 
       mockHttpInstance.put.mockResolvedValue({ data: {} });
 
-      await jstransform.apply_stream_function(org_identifier, stream_name, stream_type, function_name, data);
+      await jstransform.apply_stream_function(
+        org_identifier,
+        stream_name,
+        stream_type,
+        function_name,
+        data,
+      );
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/staging-org/streams/traces-stream/functions/trace-transform?type=traces`,
-        data
+        data,
       );
     });
   });
@@ -417,10 +434,15 @@ describe("jstransform service", () => {
 
       mockHttpInstance.delete.mockResolvedValue({ data: { success: true } });
 
-      await jstransform.remove_stream_function(org_identifier, stream_name, stream_type, function_name);
+      await jstransform.remove_stream_function(
+        org_identifier,
+        stream_name,
+        stream_type,
+        function_name,
+      );
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/${org_identifier}/streams/${stream_name}/functions/${function_name}?type=${stream_type}`
+        `/api/${org_identifier}/streams/${stream_name}/functions/${function_name}?type=${stream_type}`,
       );
     });
 
@@ -432,10 +454,15 @@ describe("jstransform service", () => {
 
       mockHttpInstance.delete.mockResolvedValue({ data: {} });
 
-      await jstransform.remove_stream_function(org_identifier, stream_name, stream_type, function_name);
+      await jstransform.remove_stream_function(
+        org_identifier,
+        stream_name,
+        stream_type,
+        function_name,
+      );
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/prod-org/streams/k8s-logs/functions/k8s-transform?type=logs`
+        `/api/prod-org/streams/k8s-logs/functions/k8s-transform?type=logs`,
       );
     });
   });
@@ -454,7 +481,7 @@ describe("jstransform service", () => {
       expect(http).toHaveBeenCalledWith({ headers: { "Content-Type": "multipart/form-data" } });
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/${org_identifier}/enrichment_tables/${table_name}?append=${append}`,
-        data
+        data,
       );
     });
 
@@ -484,7 +511,7 @@ describe("jstransform service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/org123/enrichment_tables/ip-lookup-table?append=false`,
-        data
+        data,
       );
     });
   });
@@ -498,11 +525,16 @@ describe("jstransform service", () => {
 
       mockHttpInstance.post.mockResolvedValue({ data: { success: true } });
 
-      await jstransform.create_enrichment_table_from_url(org_identifier, table_name, url, append_data);
+      await jstransform.create_enrichment_table_from_url(
+        org_identifier,
+        table_name,
+        url,
+        append_data,
+      );
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/${org_identifier}/enrichment_tables/${table_name}/url?append=${append_data}&resume=false&retry=false`,
-        { url, replace_failed: false }
+        { url, replace_failed: false },
       );
     });
 
@@ -522,12 +554,12 @@ describe("jstransform service", () => {
         url,
         append_data,
         resume,
-        retry
+        retry,
       );
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/staging-org/enrichment_tables/geo-table/url?append=true&resume=true&retry=true`,
-        { url, replace_failed: false }
+        { url, replace_failed: false },
       );
     });
 
@@ -549,7 +581,7 @@ describe("jstransform service", () => {
         append_data,
         resume,
         retry,
-        replace_failed
+        replace_failed,
       );
 
       const callArgs = mockHttpInstance.post.mock.calls[0];
@@ -564,7 +596,12 @@ describe("jstransform service", () => {
 
       mockHttpInstance.post.mockResolvedValue({ data: {} });
 
-      await jstransform.create_enrichment_table_from_url(org_identifier, table_name, url, append_data);
+      await jstransform.create_enrichment_table_from_url(
+        org_identifier,
+        table_name,
+        url,
+        append_data,
+      );
 
       const callArgs = mockHttpInstance.post.mock.calls[0];
       expect(callArgs[0]).toContain("resume=false");
@@ -582,7 +619,7 @@ describe("jstransform service", () => {
       await jstransform.get_all_enrichment_table_statuses(org_identifier);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${org_identifier}/enrichment_tables/status`
+        `/api/${org_identifier}/enrichment_tables/status`,
       );
     });
 
@@ -594,7 +631,7 @@ describe("jstransform service", () => {
       await jstransform.get_all_enrichment_table_statuses(org_identifier);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/production-org/enrichment_tables/status`
+        `/api/production-org/enrichment_tables/status`,
       );
     });
   });
@@ -603,7 +640,7 @@ describe("jstransform service", () => {
     it("should make POST request to test a function", async () => {
       const org_identifier = "org123";
       const data = {
-        function: ".field = \"test_value\"",
+        function: '.field = "test_value"',
         events: [{ message: "test log", level: "info" }],
       };
 
@@ -613,7 +650,7 @@ describe("jstransform service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/${org_identifier}/functions/test`,
-        data
+        data,
       );
     });
 
@@ -638,45 +675,43 @@ describe("jstransform service", () => {
       const error = new Error("Network error");
       mockHttpInstance.get.mockRejectedValue(error);
 
-      await expect(
-        jstransform.list(1, 20, "name", false, "", "org123")
-      ).rejects.toThrow("Network error");
+      await expect(jstransform.list(1, 20, "name", false, "", "org123")).rejects.toThrow(
+        "Network error",
+      );
     });
 
     it("should propagate errors from create", async () => {
       const error = new Error("Validation error");
       mockHttpInstance.post.mockRejectedValue(error);
 
-      await expect(
-        jstransform.create("org123", { name: "bad-fn" })
-      ).rejects.toThrow("Validation error");
+      await expect(jstransform.create("org123", { name: "bad-fn" })).rejects.toThrow(
+        "Validation error",
+      );
     });
 
     it("should propagate errors from update", async () => {
       const error = new Error("Not found");
       mockHttpInstance.put.mockRejectedValue(error);
 
-      await expect(
-        jstransform.update("org123", { name: "missing-fn" })
-      ).rejects.toThrow("Not found");
+      await expect(jstransform.update("org123", { name: "missing-fn" })).rejects.toThrow(
+        "Not found",
+      );
     });
 
     it("should propagate errors from delete", async () => {
       const error = new Error("Forbidden");
       mockHttpInstance.delete.mockRejectedValue(error);
 
-      await expect(
-        jstransform.delete("org123", "locked-fn")
-      ).rejects.toThrow("Forbidden");
+      await expect(jstransform.delete("org123", "locked-fn")).rejects.toThrow("Forbidden");
     });
 
     it("should propagate errors from stream_function", async () => {
       const error = new Error("Unauthorized");
       mockHttpInstance.get.mockRejectedValue(error);
 
-      await expect(
-        jstransform.stream_function("org123", "my-stream", "logs")
-      ).rejects.toThrow("Unauthorized");
+      await expect(jstransform.stream_function("org123", "my-stream", "logs")).rejects.toThrow(
+        "Unauthorized",
+      );
     });
 
     it("should propagate errors from apply_stream_function", async () => {
@@ -684,7 +719,7 @@ describe("jstransform service", () => {
       mockHttpInstance.put.mockRejectedValue(error);
 
       await expect(
-        jstransform.apply_stream_function("org123", "my-stream", "logs", "my-fn", {})
+        jstransform.apply_stream_function("org123", "my-stream", "logs", "my-fn", {}),
       ).rejects.toThrow("Conflict");
     });
 
@@ -693,7 +728,7 @@ describe("jstransform service", () => {
       mockHttpInstance.post.mockRejectedValue(error);
 
       await expect(
-        jstransform.create_enrichment_table("org123", "my-table", new FormData(), false)
+        jstransform.create_enrichment_table("org123", "my-table", new FormData(), false),
       ).rejects.toThrow("Payload too large");
     });
 
@@ -702,7 +737,7 @@ describe("jstransform service", () => {
       mockHttpInstance.post.mockRejectedValue(error);
 
       await expect(
-        jstransform.test("org123", { function: ".bad = syntax(", events: [] })
+        jstransform.test("org123", { function: ".bad = syntax(", events: [] }),
       ).rejects.toThrow("Function execution error");
     });
   });

@@ -17,7 +17,6 @@ import { describe, it, expect, afterEach } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import IncidentRCAAnalysis from "./IncidentRCAAnalysis.vue";
 
-
 // ==================== TEST DATA FACTORIES ====================
 
 /**
@@ -513,9 +512,7 @@ describe("IncidentRCAAnalysis", () => {
       });
 
       expect(existsByTestId(wrapper, "rca-existing-container")).toBe(true);
-      expect(findByTestId(wrapper, "rca-existing-content").html()).toContain(
-        "Root Cause Analysis"
-      );
+      expect(findByTestId(wrapper, "rca-existing-content").html()).toContain("Root Cause Analysis");
     });
   });
 });

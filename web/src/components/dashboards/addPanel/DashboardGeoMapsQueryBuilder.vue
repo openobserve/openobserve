@@ -17,18 +17,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div v-if="!promqlMode && dashboardPanelData.data.type == 'geomap'">
     <!-- latitude container -->
-    <div class="pl-3 flex flex-row">
-      <div class="whitespace-nowrap min-w-32.5 flex items-center">
+    <div class="flex flex-row pl-3">
+      <div class="flex min-w-32.5 items-center whitespace-nowrap">
         {{ t("panel.latitude") }}
         <OIcon name="info-outline" size="sm" class="ml-1" />
-          <OTooltip :content="Hint" />
+        <OTooltip :content="Hint" />
       </div>
-      <span class="flex items-center mx-0.5">:</span>
+      <span class="mx-0.5 flex items-center">:</span>
       <div
-        class="axis-container droppable flex-1 w-full flex flex-wrap border-2 border-dashed border-transparent"
+        class="axis-container droppable flex w-full flex-1 flex-wrap border-2 border-dashed border-transparent"
         :class="{
-          'bg-[rgba(0,0,0,0.042)] border-white border-dotted': dashboardPanelData.meta.dragAndDrop.dragging,
-          'transition-all duration-200 bg-field-list-row-hover-bg':
+          'border-dotted border-white bg-[rgba(0,0,0,0.042)]':
+            dashboardPanelData.meta.dragAndDrop.dragging,
+          'bg-field-list-row-hover-bg transition-all duration-200':
             dashboardPanelData.meta.dragAndDrop.dragging &&
             dashboardPanelData.meta.dragAndDrop.currentDragArea == 'latitude',
         }"
@@ -39,20 +40,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-latitude-layout"
       >
         <OButtonGroup
-          class="axis-field overflow-hidden mr-2 my-1"
+          class="axis-field my-1 mr-2 overflow-hidden"
           radius="sm"
           v-if="
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields?.latitude
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+              ?.latitude
           "
           :draggable="true"
           @dragstart="
             onFieldDragStart(
               $event,
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields?.latitude,
+              dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+                ?.latitude,
               'latitude',
             )
           "
@@ -75,38 +74,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`dashboard-latitude-item-${latitudeLabel}`"
               >
                 {{ latitudeLabel }}
-                <template #icon-right><OIcon name="arrow-drop-down" size="sm"
-                /></template>
+                <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-geo-maps-query-builder-dropdown w-[48.1875rem]! h-[20.1875rem] shadow-md p-4 translate-y-2 rounded-none"
+              class="field-function-menu-popup dashboard-geo-maps-query-builder-dropdown h-[20.1875rem] w-[48.1875rem]! translate-y-2 rounded-none p-4 shadow-md"
               :data-test="`dashboard-latitude-item-${latitudeLabel}-menu`"
             >
-              <div class="pt-0.75 pr-4 pb-4 pl-4"
+              <div
+                class="pt-0.75 pr-4 pb-4 pl-4"
                 :style="{
                   width:
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].customQuery ||
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].fields.latitude.isDerived
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .customQuery ||
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .fields.latitude.isDerived
                       ? 'auto'
                       : '771px',
                 }"
               >
                 <DynamicFunctionPopUp
                   v-model="
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].fields.latitude
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .fields.latitude
                   "
                   :allowAggregation="false"
                   :customQuery="
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].customQuery
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .customQuery
                   "
                   :chartType="dashboardPanelData.data.type"
                 />
@@ -123,11 +118,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="text-xs font-bold text-center py-1"
+          class="py-1 text-center text-xs font-bold"
           v-if="
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.latitude == null
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+              .latitude == null
           "
         >
           <div class="mt-1">{{ Hint }}</div>
@@ -136,18 +130,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <OSeparator />
     <!-- longitude container -->
-    <div class="pl-3 flex flex-row">
-      <div class="whitespace-nowrap min-w-32.5 flex items-center">
+    <div class="flex flex-row pl-3">
+      <div class="flex min-w-32.5 items-center whitespace-nowrap">
         {{ t("panel.longitude") }}
         <OIcon name="info-outline" size="sm" class="ml-1" />
-          <OTooltip :content="Hint" />
+        <OTooltip :content="Hint" />
       </div>
-      <span class="flex items-center mx-0.5">:</span>
+      <span class="mx-0.5 flex items-center">:</span>
       <div
-        class="axis-container droppable flex-1 w-full flex flex-wrap border-2 border-dashed border-transparent"
+        class="axis-container droppable flex w-full flex-1 flex-wrap border-2 border-dashed border-transparent"
         :class="{
-          'bg-[rgba(0,0,0,0.042)] border-white border-dotted': dashboardPanelData.meta.dragAndDrop.dragging,
-          'transition-all duration-200 bg-field-list-row-hover-bg':
+          'border-dotted border-white bg-[rgba(0,0,0,0.042)]':
+            dashboardPanelData.meta.dragAndDrop.dragging,
+          'bg-field-list-row-hover-bg transition-all duration-200':
             dashboardPanelData.meta.dragAndDrop.dragging &&
             dashboardPanelData.meta.dragAndDrop.currentDragArea == 'longitude',
         }"
@@ -158,20 +153,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-longitude-layout"
       >
         <OButtonGroup
-          class="axis-field overflow-hidden mr-2 my-1"
+          class="axis-field my-1 mr-2 overflow-hidden"
           radius="sm"
           v-if="
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields?.longitude
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+              ?.longitude
           "
           :draggable="true"
           @dragstart="
             onFieldDragStart(
               $event,
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields?.longitude,
+              dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+                ?.longitude,
               'longitude',
             )
           "
@@ -194,38 +187,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`dashboard-longitude-item-${longitudeLabel}`"
               >
                 {{ longitudeLabel }}
-                <template #icon-right><OIcon name="arrow-drop-down" size="sm"
-                /></template>
+                <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-geo-maps-query-builder-dropdown w-[48.1875rem]! h-[20.1875rem] shadow-md p-4 translate-y-2 rounded-none"
+              class="field-function-menu-popup dashboard-geo-maps-query-builder-dropdown h-[20.1875rem] w-[48.1875rem]! translate-y-2 rounded-none p-4 shadow-md"
               :data-test="`dashboard-longitude-item-${longitudeLabel}-menu`"
             >
-              <div class="pt-0.75 pr-4 pb-4 pl-4"
+              <div
+                class="pt-0.75 pr-4 pb-4 pl-4"
                 :style="{
                   width:
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].customQuery ||
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].fields.longitude.isDerived
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .customQuery ||
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .fields.longitude.isDerived
                       ? 'auto'
                       : '771px',
                 }"
               >
                 <DynamicFunctionPopUp
                   v-model="
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].fields.longitude
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .fields.longitude
                   "
                   :allowAggregation="false"
                   :customQuery="
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].customQuery
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .customQuery
                   "
                   :chartType="dashboardPanelData.data.type"
                 />
@@ -242,11 +231,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="text-xs font-bold text-center py-1"
+          class="py-1 text-center text-xs font-bold"
           v-if="
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.longitude == null
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+              .longitude == null
           "
         >
           <div class="mt-1">{{ Hint }}</div>
@@ -255,18 +243,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <OSeparator />
     <!-- weight container -->
-    <div class="pl-3 flex flex-row">
-      <div class="whitespace-nowrap min-w-32.5 flex items-center">
+    <div class="flex flex-row pl-3">
+      <div class="flex min-w-32.5 items-center whitespace-nowrap">
         {{ t("panel.weight") }}
         <OIcon name="info-outline" size="sm" class="ml-1" />
-          <OTooltip :content="WeightHint" />
+        <OTooltip :content="WeightHint" />
       </div>
-      <span class="flex items-center mx-0.5">:</span>
+      <span class="mx-0.5 flex items-center">:</span>
       <div
-        class="axis-container droppable flex-1 w-full flex flex-wrap border-2 border-dashed border-transparent"
+        class="axis-container droppable flex w-full flex-1 flex-wrap border-2 border-dashed border-transparent"
         :class="{
-          'bg-[rgba(0,0,0,0.042)] border-white border-dotted': dashboardPanelData.meta.dragAndDrop.dragging,
-          'transition-all duration-200 bg-field-list-row-hover-bg':
+          'border-dotted border-white bg-[rgba(0,0,0,0.042)]':
+            dashboardPanelData.meta.dragAndDrop.dragging,
+          'bg-field-list-row-hover-bg transition-all duration-200':
             dashboardPanelData.meta.dragAndDrop.dragging &&
             dashboardPanelData.meta.dragAndDrop.currentDragArea == 'weight',
         }"
@@ -277,20 +266,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-weight-layout"
       >
         <OButtonGroup
-          class="axis-field overflow-hidden mr-2 my-1"
+          class="axis-field my-1 mr-2 overflow-hidden"
           radius="sm"
           v-if="
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields?.weight
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+              ?.weight
           "
           :draggable="true"
           @dragstart="
             onFieldDragStart(
               $event,
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields?.weight,
+              dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+                ?.weight,
               'weight',
             )
           "
@@ -313,38 +300,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`dashboard-weight-item-${weightLabel}`"
               >
                 {{ weightLabel }}
-                <template #icon-right><OIcon name="arrow-drop-down" size="sm"
-                /></template>
+                <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-geo-maps-query-builder-dropdown w-[48.1875rem]! h-[20.1875rem] shadow-md p-4 translate-y-2 rounded-none"
+              class="field-function-menu-popup dashboard-geo-maps-query-builder-dropdown h-[20.1875rem] w-[48.1875rem]! translate-y-2 rounded-none p-4 shadow-md"
               :data-test="`dashboard-weight-item-${weightLabel}-menu`"
             >
-              <div class="pt-0.75 pr-4 pb-4 pl-4"
+              <div
+                class="pt-0.75 pr-4 pb-4 pl-4"
                 :style="{
                   width:
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].customQuery ||
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].fields.weight.isDerived
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .customQuery ||
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .fields.weight.isDerived
                       ? 'auto'
                       : '771px',
                 }"
               >
                 <DynamicFunctionPopUp
                   v-model="
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].fields.weight
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .fields.weight
                   "
                   :allowAggregation="true"
                   :customQuery="
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].customQuery
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .customQuery
                   "
                   :chartType="dashboardPanelData.data.type"
                 />
@@ -361,11 +344,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="text-xs font-bold text-center py-1"
+          class="py-1 text-center text-xs font-bold"
           v-if="
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.weight == null
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+              .weight == null
           "
         >
           <div class="mt-1">{{ WeightHint }}</div>
@@ -374,14 +356,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <template v-if="showJoinsAndFilters">
       <OSeparator />
-      <DashboardJoinsOption
-        :dashboardData="dashboardData"
-      ></DashboardJoinsOption>
+      <DashboardJoinsOption :dashboardData="dashboardData"></DashboardJoinsOption>
       <OSeparator />
       <!-- filters container -->
-      <DashboardFiltersOption
-        :dashboardData="dashboardData"
-      ></DashboardFiltersOption>
+      <DashboardFiltersOption :dashboardData="dashboardData"></DashboardFiltersOption>
     </template>
   </div>
 </template>
@@ -428,10 +406,7 @@ export default defineComponent({
       weight: true,
       filter: false,
     });
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
 
     const {
       dashboardPanelData,
@@ -512,9 +487,7 @@ export default defineComponent({
         const dragElement = dashboardPanelData.meta.dragAndDrop.dragElement;
 
         const currentQueryField =
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields;
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields;
         if (targetAxis !== "f") {
           if (
             (targetAxis === "latitude" && currentQueryField.latitude) ||
@@ -523,13 +496,10 @@ export default defineComponent({
           ) {
             const maxAllowedAxisFields = 1;
 
-            const errorMessage = t(
-              "dashboard.dashboardGeoMapsQueryBuilder.maxFieldAllowed",
-              {
-                count: maxAllowedAxisFields,
-                axis: targetAxis.toUpperCase(),
-              },
-            );
+            const errorMessage = t("dashboard.dashboardGeoMapsQueryBuilder.maxFieldAllowed", {
+              count: maxAllowedAxisFields,
+              axis: targetAxis.toUpperCase(),
+            });
 
             showErrorNotification(errorMessage);
             cleanupDraggingFields();
@@ -556,9 +526,7 @@ export default defineComponent({
         )?.value;
 
         if (!firstFieldTypeArg) {
-          showErrorNotification(
-            t("dashboard.dashboardGeoMapsQueryBuilder.withoutFieldDrag"),
-          );
+          showErrorNotification(t("dashboard.dashboardGeoMapsQueryBuilder.withoutFieldDrag"));
           cleanupDraggingFields();
           return;
         }
@@ -589,17 +557,12 @@ export default defineComponent({
       e.preventDefault();
     };
     const onDragEnter = (e: any, area: string, index: any) => {
-      if (
-        dashboardPanelData.meta.dragAndDrop.dragSource != "fieldList" &&
-        area === "f"
-      ) {
+      if (dashboardPanelData.meta.dragAndDrop.dragSource != "fieldList" && area === "f") {
         e.preventDefault();
         return;
       }
       dashboardPanelData.meta.dragAndDrop.targetDragIndex =
-        index != null && index >= 0
-          ? index
-          : dashboardPanelData.meta.dragAndDrop.targetDragIndex;
+        index != null && index >= 0 ? index : dashboardPanelData.meta.dragAndDrop.targetDragIndex;
       dashboardPanelData.meta.dragAndDrop.currentDragArea = area;
       e.preventDefault();
     };
@@ -633,20 +596,15 @@ export default defineComponent({
 
     const commonBtnLabel = (field: any) => {
       if (
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery
       ) {
         return field.alias;
       }
       const label = buildSQLQueryFromInput(
         field,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.joins?.length
-          ? dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields?.stream
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.joins?.length
+          ? dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+              ?.stream
           : "",
       );
 
@@ -657,25 +615,21 @@ export default defineComponent({
 
     const latitudeLabel = computed(() => {
       const latitudeField =
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.latitude;
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+          .latitude;
       return commonBtnLabel(latitudeField);
     });
 
     const longitudeLabel = computed(() => {
       const longitudeField =
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.longitude;
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+          .longitude;
       return commonBtnLabel(longitudeField);
     });
 
     const weightLabel = computed(() => {
       const weightField =
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.weight;
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.weight;
       return commonBtnLabel(weightField);
     });
 
@@ -684,12 +638,8 @@ export default defineComponent({
     // double border.
     const showJoinsAndFilters = computed(() => {
       const currentQuery =
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ];
-      return !(
-        currentQuery?.customQuery && dashboardPanelData.data.queryType === "sql"
-      );
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
+      return !(currentQuery?.customQuery && dashboardPanelData.data.queryType === "sql");
     });
 
     return {

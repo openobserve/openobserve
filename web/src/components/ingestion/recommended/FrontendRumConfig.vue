@@ -39,18 +39,12 @@ defineProps<{
 const store = useStore();
 const { t } = useI18n();
 
-const rumToken = computed<string>(
-  () => store.state.organizationData?.rumToken?.rum_token ?? "",
-);
+const rumToken = computed<string>(() => store.state.organizationData?.rumToken?.rum_token ?? "");
 
 // Full origin (preconnect/CSP hints) and the protocol-less `site` SDK option.
-const endpoint = computed(() =>
-  (getIngestionURL() as string).replace(/\/$/, ""),
-);
+const endpoint = computed(() => (getIngestionURL() as string).replace(/\/$/, ""));
 const site = computed(() => endpoint.value.replace(/^https?:\/\//, ""));
-const insecureHTTP = computed(
-  () => !String(store.state.API_ENDPOINT ?? "").startsWith("https://"),
-);
+const insecureHTTP = computed(() => !String(store.state.API_ENDPOINT ?? "").startsWith("https://"));
 
 const content = computed(() =>
   rumCard({

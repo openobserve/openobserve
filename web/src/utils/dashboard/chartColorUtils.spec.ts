@@ -21,13 +21,7 @@ import {
 } from "@/utils/dashboard/chartColorUtils";
 
 vi.mock("@/utils/dashboard/colorPalette", () => ({
-  getColorPalette: vi.fn(() => [
-    "#FF5733",
-    "#33FF57",
-    "#3357FF",
-    "#F333FF",
-    "#33F3FF",
-  ]),
+  getColorPalette: vi.fn(() => ["#FF5733", "#33FF57", "#3357FF", "#F333FF", "#33F3FF"]),
 }));
 
 describe("chartColorUtils", () => {
@@ -49,77 +43,55 @@ describe("chartColorUtils", () => {
 
     it("returns black text for light hex background in light theme", () => {
       // #FFFFFF is white -> luminance ~1.0 > 0.5 => black text
-      expect(getContrastColor("#FFFFFF", "#FFFFFF", LIGHT_THRESHOLD)).toBe(
-        "#000000",
-      );
+      expect(getContrastColor("#FFFFFF", "#FFFFFF", LIGHT_THRESHOLD)).toBe("#000000");
     });
 
     it("returns white text for dark hex background in light theme", () => {
       // #000000 is black -> luminance ~0 < 0.5 => white text
-      expect(getContrastColor("#000000", "#000000", LIGHT_THRESHOLD)).toBe(
-        "#FFFFFF",
-      );
+      expect(getContrastColor("#000000", "#000000", LIGHT_THRESHOLD)).toBe("#FFFFFF");
     });
 
     it("returns white text for dark hex background in dark theme", () => {
       // #000000 luminance ~0 <= 0.8 => white text
-      expect(getContrastColor("#000000", "#FFFFFF", DARK_THRESHOLD)).toBe(
-        "#FFFFFF",
-      );
+      expect(getContrastColor("#000000", "#FFFFFF", DARK_THRESHOLD)).toBe("#FFFFFF");
     });
 
     it("returns black text for very light hex background in dark theme", () => {
       // #FFFFFF luminance ~1.0 > 0.8 => black text
-      expect(getContrastColor("#FFFFFF", "#FFFFFF", DARK_THRESHOLD)).toBe(
-        "#000000",
-      );
+      expect(getContrastColor("#FFFFFF", "#FFFFFF", DARK_THRESHOLD)).toBe("#000000");
     });
 
     it("handles rgb format", () => {
       // rgb(255,255,255) -> luminance ~1.0 > 0.5 => black
-      expect(
-        getContrastColor("rgb(255,255,255)", "#FFFFFF", LIGHT_THRESHOLD),
-      ).toBe("#000000");
+      expect(getContrastColor("rgb(255,255,255)", "#FFFFFF", LIGHT_THRESHOLD)).toBe("#000000");
     });
 
     it("handles rgb format with dark color", () => {
       // rgb(0,0,0) -> luminance 0 <= 0.5 => white
-      expect(getContrastColor("rgb(0,0,0)", "#000000", LIGHT_THRESHOLD)).toBe(
-        "#FFFFFF",
-      );
+      expect(getContrastColor("rgb(0,0,0)", "#000000", LIGHT_THRESHOLD)).toBe("#FFFFFF");
     });
 
     it("handles rgba format", () => {
       // rgba(255,255,255,0.5) -> luminance ~1.0 > 0.5 => black
-      expect(
-        getContrastColor("rgba(255,255,255,0.5)", "#FFFFFF", LIGHT_THRESHOLD),
-      ).toBe("#000000");
+      expect(getContrastColor("rgba(255,255,255,0.5)", "#FFFFFF", LIGHT_THRESHOLD)).toBe("#000000");
     });
 
     it("handles rgb with spaces stripped", () => {
       // rgb(128,128,128) -> medium grey
-      const result = getContrastColor(
-        "rgb(128, 128, 128)",
-        "#FFFFFF",
-        LIGHT_THRESHOLD,
-      );
+      const result = getContrastColor("rgb(128, 128, 128)", "#FFFFFF", LIGHT_THRESHOLD);
       expect(result).toMatch(/^#(000000|FFFFFF)$/);
     });
 
     it("returns fallback for unknown color format", () => {
       // Unknown format falls back to {r:255,g:255,b:255} (white)
       // luminance ~1.0 > 0.5 => black in light theme
-      expect(getContrastColor("invalidcolor", "#FFFFFF", LIGHT_THRESHOLD)).toBe(
-        "#000000",
-      );
+      expect(getContrastColor("invalidcolor", "#FFFFFF", LIGHT_THRESHOLD)).toBe("#000000");
     });
 
     it("handles medium brightness background", () => {
       // #808080 grey: luminance = (0.299*128 + 0.587*128 + 0.114*128)/255 ≈ 0.502
       // light theme: > 0.5 => black
-      expect(getContrastColor("#808080", "#FFFFFF", LIGHT_THRESHOLD)).toBe(
-        "#000000",
-      );
+      expect(getContrastColor("#808080", "#FFFFFF", LIGHT_THRESHOLD)).toBe("#000000");
     });
   });
 
@@ -163,9 +135,7 @@ describe("chartColorUtils", () => {
     });
 
     it("enforces configured colors for mapped series (itemStyle.color)", () => {
-      const series = [
-        { name: "A", itemStyle: { color: "#OLD111" } },
-      ];
+      const series = [{ name: "A", itemStyle: { color: "#OLD111" } }];
       const colorBySeries = [{ value: "A", color: "#FF0000" }];
       applySeriesColorMappings(series, colorBySeries, "light");
       expect(series[0].itemStyle.color).toBe("#FF0000");
@@ -229,7 +199,7 @@ describe("chartColorUtils", () => {
     });
 
     it("uses HSL fallback when palette is exhausted", async () => {
-      const { getColorPalette } = await import("@/utils/dashboard/colorPalette") as any;
+      const { getColorPalette } = (await import("@/utils/dashboard/colorPalette")) as any;
       getColorPalette.mockReturnValueOnce([]); // empty palette to force HSL fallback
 
       const series = [

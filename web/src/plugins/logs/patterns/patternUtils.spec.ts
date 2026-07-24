@@ -26,19 +26,14 @@ import {
 
 describe("extractConstantsFromPattern", () => {
   it("returns segments longer than 10 chars split by <*>", () => {
-    const result = extractConstantsFromPattern(
-      "User authentication failed for <*> from host <*>",
+    const result = extractConstantsFromPattern("User authentication failed for <*> from host <*>");
+    expect(result).toEqual(
+      ["User authentication failed for", "from host"].filter((s) => s.trim().length > 10),
     );
-    expect(result).toEqual([
-      "User authentication failed for",
-      "from host",
-    ].filter((s) => s.trim().length > 10));
   });
 
   it("returns only segments longer than 10 chars", () => {
-    const result = extractConstantsFromPattern(
-      "INFO action <*> at 14:47.1755283",
-    );
+    const result = extractConstantsFromPattern("INFO action <*> at 14:47.1755283");
     // "INFO action" = 11 chars > 10 — included; "at 14:47.1755283" = 16 chars > 10 — included
     expect(result).toContain("INFO action");
     expect(result).toContain("at 14:47.1755283");
@@ -74,13 +69,9 @@ describe("extractConstantsFromPattern", () => {
   });
 
   it("handles template with no variable markers", () => {
-    const result = extractConstantsFromPattern(
-      "This is a long constant string with no variables",
-    );
+    const result = extractConstantsFromPattern("This is a long constant string with no variables");
     expect(result).toHaveLength(1);
-    expect(result[0]).toBe(
-      "This is a long constant string with no variables",
-    );
+    expect(result[0]).toBe("This is a long constant string with no variables");
   });
 });
 
@@ -136,39 +127,24 @@ describe("buildPatternSqlQuery", () => {
   });
 
   it("escapes special chars in constants", () => {
-    const sql = buildPatternSqlQuery(
-      "Error: it's a problem here <*> done",
-      "my_stream",
-    );
+    const sql = buildPatternSqlQuery("Error: it's a problem here <*> done", "my_stream");
     expect(sql).toContain("match_all('Error: it\\'s a problem here')");
   });
 });
 
 describe("buildAlertNameFromPattern", () => {
   it("prefixes with Alert for normal patterns", () => {
-    const name = buildAlertNameFromPattern(
-      "User logged in from <*>",
-      "mystream",
-      false,
-    );
+    const name = buildAlertNameFromPattern("User logged in from <*>", "mystream", false);
     expect(name).toMatch(/^Alert_/);
   });
 
   it("prefixes with Anomaly for anomaly patterns", () => {
-    const name = buildAlertNameFromPattern(
-      "Unknown error occurred <*>",
-      "mystream",
-      true,
-    );
+    const name = buildAlertNameFromPattern("Unknown error occurred <*>", "mystream", true);
     expect(name).toMatch(/^Anomaly_/);
   });
 
   it("includes stream name in alert name", () => {
-    const name = buildAlertNameFromPattern(
-      "User logged in <*>",
-      "prod_logs",
-      false,
-    );
+    const name = buildAlertNameFromPattern("User logged in <*>", "prod_logs", false);
     expect(name).toContain("prod_logs");
   });
 
@@ -223,12 +199,7 @@ describe("buildPatternAlertData", () => {
   });
 
   it("sets isAnomaly true when pattern.is_anomaly is truthy", () => {
-    const data = buildPatternAlertData(
-      { ...mockPattern, is_anomaly: true },
-      "my_stream",
-      15,
-      0,
-    );
+    const data = buildPatternAlertData({ ...mockPattern, is_anomaly: true }, "my_stream", 15, 0);
     expect(data.isAnomaly).toBe(true);
   });
 

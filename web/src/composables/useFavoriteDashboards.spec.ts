@@ -121,9 +121,7 @@ describe("useFavoriteDashboards", () => {
     favorites.value = [D1];
     await toggleFavorite("org1", "me@example.com", D2);
     expect(favorites.value).toEqual([D1]); // reverted
-    expect(toast).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: "error" }),
-    );
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
   });
 
   it("toggleFavorite shows a permission message on 403", async () => {

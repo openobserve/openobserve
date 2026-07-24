@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   its own footer — CreateDestinationForm carries its own Save/Cancel).
 -->
 <template>
-  <div data-test="destination-picker" class="w-full flex flex-col gap-4">
+  <div data-test="destination-picker" class="flex w-full flex-col gap-4">
     <!-- Mode toggle — a bare control OUTSIDE the form: it swaps the
          select-existing form for the CreateDestinationForm create child. -->
     <OSwitch

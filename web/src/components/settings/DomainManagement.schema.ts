@@ -23,17 +23,25 @@ export const isValidDomain = (domain: any): boolean => {
 
   // Security: Check for potentially malicious content (more targeted patterns)
   const maliciousPatterns = [
-    "<script", "</script", "javascript:", "DROP TABLE", "SELECT FROM",
-    "INSERT INTO", "UPDATE SET", "DELETE FROM", "UNION SELECT", "--", "/*",
-    "*/", "\0", "\n", "\r",
+    "<script",
+    "</script",
+    "javascript:",
+    "DROP TABLE",
+    "SELECT FROM",
+    "INSERT INTO",
+    "UPDATE SET",
+    "DELETE FROM",
+    "UNION SELECT",
+    "--",
+    "/*",
+    "*/",
+    "\0",
+    "\n",
+    "\r",
   ];
 
   const upperDomain = trimmed.toUpperCase();
-  if (
-    maliciousPatterns.some((pattern) =>
-      upperDomain.includes(pattern.toUpperCase()),
-    )
-  ) {
+  if (maliciousPatterns.some((pattern) => upperDomain.includes(pattern.toUpperCase()))) {
     return false;
   }
 
@@ -44,8 +52,7 @@ export const isValidDomain = (domain: any): boolean => {
   const cleanDomain = trimmed.endsWith(".") ? trimmed.slice(0, -1) : trimmed;
 
   // Each label can be 1-63 characters, the domain must have at least one dot.
-  const domainRegex =
-    /^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
+  const domainRegex = /^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
 
   try {
     return domainRegex.test(cleanDomain);
@@ -56,27 +63,41 @@ export const isValidDomain = (domain: any): boolean => {
 
 export const isValidEmail = (email: any, domain: any): boolean => {
   // Handle null, undefined, and non-string inputs
-  if (email === null || email === undefined || typeof email !== "string")
-    return false;
-  if (domain === null || domain === undefined || typeof domain !== "string")
-    return false;
+  if (email === null || email === undefined || typeof email !== "string") return false;
+  if (domain === null || domain === undefined || typeof domain !== "string") return false;
 
   // Handle empty strings
   if (!email.trim() || !domain.trim()) return false;
 
   // Security: Check for potentially malicious content
   const maliciousPatterns = [
-    "<", ">", "script", "javascript:", "DROP", "SELECT", "INSERT", "UPDATE",
-    "DELETE", "UNION", "CREATE", "ALTER", "TABLE", "FROM", "--", "/*", "*/",
-    "'", '"', "\0", "\n", "\r", "\t",
+    "<",
+    ">",
+    "script",
+    "javascript:",
+    "DROP",
+    "SELECT",
+    "INSERT",
+    "UPDATE",
+    "DELETE",
+    "UNION",
+    "CREATE",
+    "ALTER",
+    "TABLE",
+    "FROM",
+    "--",
+    "/*",
+    "*/",
+    "'",
+    '"',
+    "\0",
+    "\n",
+    "\r",
+    "\t",
   ];
 
   const upperEmail = email.toUpperCase();
-  if (
-    maliciousPatterns.some((pattern) =>
-      upperEmail.includes(pattern.toUpperCase()),
-    )
-  ) {
+  if (maliciousPatterns.some((pattern) => upperEmail.includes(pattern.toUpperCase()))) {
     return false;
   }
 
@@ -101,9 +122,7 @@ export const makeAddDomainSchema = (t: (_key: string) => string) =>
       .string()
       .min(1, t("settings.domainRequired") || "Domain is required")
       .refine((v) => isValidDomain(v), {
-        message:
-          t("settings.invalidDomain") ||
-          "Please enter a valid domain (e.g. example.com)",
+        message: t("settings.invalidDomain") || "Please enter a valid domain (e.g. example.com)",
       }),
   });
 
@@ -115,10 +134,7 @@ export const addDomainDefaults = (): AddDomainForm => ({ newDomain: "" });
 // ── Add-email row (per-domain): REQUIRED + valid + belongs to the domain.
 //    Empty → "Email is required" (first submit); non-empty invalid → email error.
 //    Its own OForm, so requiring it does not gate the domain-level save. ────────
-export const makeAddEmailSchema = (
-  domainName: string,
-  t: (_key: string) => string,
-) =>
+export const makeAddEmailSchema = (domainName: string, t: (_key: string) => string) =>
   z.object({
     newEmail: z
       .string()

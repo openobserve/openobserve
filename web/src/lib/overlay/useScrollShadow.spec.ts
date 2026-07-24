@@ -68,9 +68,7 @@ const mountHost = (
       const api = useScrollShadow(elRef);
       expose({ elRef, ...api });
       return () =>
-        opts.withElement
-          ? h("div", { ref: (el: any) => (elRef.value = el) })
-          : h("div");
+        opts.withElement ? h("div", { ref: (el: any) => (elRef.value = el) }) : h("div");
     },
   });
 

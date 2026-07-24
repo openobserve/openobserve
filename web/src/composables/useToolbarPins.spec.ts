@@ -47,9 +47,7 @@ describe("useToolbarPins defaults", () => {
   it("keeps the histogram decided-flag behavior intact", async () => {
     const { useToolbarPins } = await importFresh();
     useToolbarPins().togglePin("histogram");
-    expect(
-      window.localStorage.getItem("logs_toolbar_histogram_pin_decided"),
-    ).toBe("true");
+    expect(window.localStorage.getItem("logs_toolbar_histogram_pin_decided")).toBe("true");
     const fresh = await importFresh();
     expect(fresh.useToolbarPins().isPinned("histogram")).toBe(false);
   });
@@ -59,10 +57,6 @@ describe("useToolbarPins defaults", () => {
     const { togglePin, pinnedItems } = useToolbarPins();
     togglePin("syntaxGuide");
     togglePin("sqlMode");
-    expect(pinnedItems.value).toEqual([
-      "histogram",
-      "sqlMode",
-      "syntaxGuide",
-    ]);
+    expect(pinnedItems.value).toEqual(["histogram", "sqlMode", "syntaxGuide"]);
   });
 });

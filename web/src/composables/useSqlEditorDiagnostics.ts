@@ -45,10 +45,7 @@
 
 import { watch, type Ref } from "vue";
 import { debounce } from "lodash-es";
-import {
-  validateSql,
-  type SqlErrorRange,
-} from "@/utils/query/sqlDiagnostics";
+import { validateSql, type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 
 interface Options {
   queryEditorRef: Ref<any>;

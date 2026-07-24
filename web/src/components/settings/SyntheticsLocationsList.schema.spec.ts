@@ -202,9 +202,7 @@ describe("makeSyntheticsLocationFormSchema", () => {
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      const regionIssue = result.error.issues.find(
-        (i) => i.path.join(".") === "region"
-      );
+      const regionIssue = result.error.issues.find((i) => i.path.join(".") === "region");
       expect(regionIssue).toBeDefined();
       expect(regionIssue!.message).toBe("synthetics.locations.regionRequired");
     }
@@ -219,13 +217,9 @@ describe("makeSyntheticsLocationFormSchema", () => {
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      const customIssue = result.error.issues.find(
-        (i) => i.path.join(".") === "customProvider"
-      );
+      const customIssue = result.error.issues.find((i) => i.path.join(".") === "customProvider");
       expect(customIssue).toBeDefined();
-      expect(customIssue!.message).toBe(
-        "synthetics.locations.customProviderRequired"
-      );
+      expect(customIssue!.message).toBe("synthetics.locations.customProviderRequired");
     }
   });
 });

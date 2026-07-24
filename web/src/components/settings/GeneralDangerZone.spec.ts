@@ -108,22 +108,18 @@ describe("General settings Danger Zone", () => {
   // (initiate_org_deletion). The UI must not offer the action to anyone the API
   // would reject with a 403.
   describe("who may see it", () => {
-    const zone = (w: any) =>
-      w.find('[data-test="general-settings-danger-zone"]').exists();
+    const zone = (w: any) => w.find('[data-test="general-settings-danger-zone"]').exists();
 
     it("shows it to an admin of this org", async () => {
       expect(zone(await mountGeneral())).toBe(true);
     });
 
-    it.each(["editor", "viewer", "user", "member"])(
-      "hides it from a %s",
-      async (role) => {
-        orgUsersSpy.mockResolvedValue({
-          data: { data: [{ email: "me@o2.ai", role }] },
-        });
-        expect(zone(await mountGeneral())).toBe(false);
-      },
-    );
+    it.each(["editor", "viewer", "user", "member"])("hides it from a %s", async (role) => {
+      orgUsersSpy.mockResolvedValue({
+        data: { data: [{ email: "me@o2.ai", role }] },
+      });
+      expect(zone(await mountGeneral())).toBe(false);
+    });
 
     it("hides it when the caller is not in the member list at all", async () => {
       orgUsersSpy.mockResolvedValue({
@@ -159,9 +155,7 @@ describe("General settings Danger Zone", () => {
       await loadLocaleMessages(locale);
       i18n.global.locale.value = locale;
       const wrapper = await mountGeneral();
-      const text = wrapper
-        .find('[data-test="general-settings-danger-zone"]')
-        .text();
+      const text = wrapper.find('[data-test="general-settings-danger-zone"]').text();
 
       expect(text).toContain(header);
       expect(text).toContain(ownerFact);
@@ -185,19 +179,13 @@ describe("General settings Danger Zone", () => {
 
   it("renders one consequence tile per fact", async () => {
     const wrapper = await mountGeneral();
-    expect(
-      wrapper.find('[data-test="general-settings-danger-zone"]').exists(),
-    ).toBe(true);
-    expect(
-      wrapper.findAll('[data-test^="general-settings-delete-org-fact-"]'),
-    ).toHaveLength(4);
+    expect(wrapper.find('[data-test="general-settings-danger-zone"]').exists()).toBe(true);
+    expect(wrapper.findAll('[data-test^="general-settings-delete-org-fact-"]')).toHaveLength(4);
   });
 
   it("names the org in the description and counts only human members", async () => {
     const wrapper = await mountGeneral();
-    const text = wrapper
-      .find('[data-test="general-settings-danger-zone"]')
-      .text();
+    const text = wrapper.find('[data-test="general-settings-danger-zone"]').text();
 
     expect(text).toContain("Acme Production");
     // Two humans + one service account -> service account is not a member.
@@ -209,9 +197,7 @@ describe("General settings Danger Zone", () => {
 
   it("states the grace period without inventing a duration", async () => {
     const wrapper = await mountGeneral();
-    const text = wrapper
-      .find('[data-test="general-settings-delete-org-fact-grace"]')
-      .text();
+    const text = wrapper.find('[data-test="general-settings-delete-org-fact-grace"]').text();
 
     expect(text).toContain("Grace period");
     // The real value lives in enterprise config and is not exposed to the
@@ -224,9 +210,7 @@ describe("General settings Danger Zone", () => {
   // otherwise it invents a role the user cannot find anywhere in IAM.
   it("describes the permission as Admin, not a non-existent Owner role", async () => {
     const wrapper = await mountGeneral();
-    const text = wrapper
-      .find('[data-test="general-settings-delete-org-fact-owner"]')
-      .text();
+    const text = wrapper.find('[data-test="general-settings-delete-org-fact-owner"]').text();
 
     expect(text).toMatch(/admin/i);
     expect(text).not.toMatch(/owner/i);
@@ -237,9 +221,7 @@ describe("General settings Danger Zone", () => {
   // a self-service restore.
   it("does not promise a self-service restore the API cannot deliver", async () => {
     const wrapper = await mountGeneral();
-    const text = wrapper
-      .find('[data-test="general-settings-danger-zone"]')
-      .text();
+    const text = wrapper.find('[data-test="general-settings-danger-zone"]').text();
 
     expect(text).not.toMatch(/you can (cancel and )?restore/i);
     expect(text).toMatch(/support/i);
@@ -249,24 +231,18 @@ describe("General settings Danger Zone", () => {
     const wrapper = await mountGeneral();
     expect(summarySpy).not.toHaveBeenCalled();
 
-    await wrapper
-      .find('[data-test="general-settings-delete-org-btn"]')
-      .trigger("click");
+    await wrapper.find('[data-test="general-settings-delete-org-btn"]').trigger("click");
     await flushPromises();
 
     expect(summarySpy).toHaveBeenCalledTimes(1);
-    expect((wrapper.vm as any).orgScope).toBe(
-      "32 dashboards · 18 streams · 4.20 TB data",
-    );
+    expect((wrapper.vm as any).orgScope).toBe("32 dashboards · 18 streams · 4.20 TB data");
   });
 
   it("keeps the delete flow usable when /summary fails", async () => {
     summarySpy.mockRejectedValueOnce(new Error("boom"));
     const wrapper = await mountGeneral();
 
-    await wrapper
-      .find('[data-test="general-settings-delete-org-btn"]')
-      .trigger("click");
+    await wrapper.find('[data-test="general-settings-delete-org-btn"]').trigger("click");
     await flushPromises();
 
     expect((wrapper.vm as any).confirmDeleteOrg).toBe(true);

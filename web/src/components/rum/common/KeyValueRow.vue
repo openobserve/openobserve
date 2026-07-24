@@ -16,19 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="flex py-1 px-1.5 text-xs"
-    :class="[
-      showBorder
-        ? 'border-b border-solid border-card-glass-border'
-        : '',
-    ]"
+    class="flex px-1.5 py-1 text-xs"
+    :class="[showBorder ? 'border-card-glass-border border-b border-solid' : '']"
     :data-test="dataTest"
   >
-    <div
-      class="w-25 font-medium text-text-secondary shrink-0"
-    >
-      {{ label }}:
-    </div>
+    <div class="text-text-secondary w-25 shrink-0 font-medium">{{ label }}:</div>
     <div class="flex-1 break-words" :class="valueClass">
       <slot>{{ value }}</slot>
     </div>

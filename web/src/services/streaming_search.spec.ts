@@ -56,7 +56,7 @@ describe("streaming_search service", () => {
       });
 
       expect(url).toBe(
-        "/api/test-org/_search_stream?type=logs&search_type=ui&use_cache=true&trace_id=trace-123"
+        "/api/test-org/_search_stream?type=logs&search_type=ui&use_cache=true&trace_id=trace-123",
       );
     });
 
@@ -70,7 +70,7 @@ describe("streaming_search service", () => {
       });
 
       expect(url).toBe(
-        "/api/test-org/_search_stream?type=logs&search_type=ui&use_cache=false&trace_id=trace-456"
+        "/api/test-org/_search_stream?type=logs&search_type=ui&use_cache=false&trace_id=trace-456",
       );
     });
 
@@ -84,7 +84,7 @@ describe("streaming_search service", () => {
       });
 
       expect(url).toBe(
-        "/api/test-org/_search_stream?type=traces&search_type=ui&use_cache=true&trace_id=trace-789"
+        "/api/test-org/_search_stream?type=traces&search_type=ui&use_cache=true&trace_id=trace-789",
       );
     });
 
@@ -97,7 +97,7 @@ describe("streaming_search service", () => {
       });
 
       expect(url).toBe(
-        "/api/test-org/_search_stream?type=logs&search_type=api&use_cache=true&trace_id=trace-abc"
+        "/api/test-org/_search_stream?type=logs&search_type=api&use_cache=true&trace_id=trace-abc",
       );
     });
   });
@@ -113,7 +113,7 @@ describe("streaming_search service", () => {
       });
 
       expect(url).toBe(
-        "/api/test-org/_search_histogram_stream?type=logs&search_type=ui&use_cache=true&trace_id=trace-hist-1"
+        "/api/test-org/_search_histogram_stream?type=logs&search_type=ui&use_cache=true&trace_id=trace-hist-1",
       );
     });
 
@@ -126,7 +126,7 @@ describe("streaming_search service", () => {
       });
 
       expect(url).toBe(
-        "/api/test-org/_search_histogram_stream?type=metrics&search_type=api&use_cache=true&trace_id=trace-hist-2"
+        "/api/test-org/_search_histogram_stream?type=metrics&search_type=api&use_cache=true&trace_id=trace-hist-2",
       );
     });
 
@@ -154,7 +154,7 @@ describe("streaming_search service", () => {
       });
 
       expect(url).toBe(
-        "/api/test-org/_search_pagecount_stream?type=logs&search_type=ui&use_cache=true&trace_id=trace-pc-1"
+        "/api/test-org/_search_pagecount_stream?type=logs&search_type=ui&use_cache=true&trace_id=trace-pc-1",
       );
     });
 
@@ -184,7 +184,7 @@ describe("streaming_search service", () => {
       });
 
       expect(url).toBe(
-        "/api/test-org/http-logs/_values_stream?fields=status,method&type=logs&use_cache=true&trace_id=trace-fv-1"
+        "/api/test-org/http-logs/_values_stream?fields=status,method&type=logs&use_cache=true&trace_id=trace-fv-1",
       );
     });
 
@@ -229,7 +229,7 @@ describe("streaming_search service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         "/api/test-org/_search_stream?type=logs&search_type=ui&use_cache=true&trace_id=trace-s-1&clear_cache=false",
-        query
+        query,
       );
     });
 
@@ -247,7 +247,7 @@ describe("streaming_search service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         "/api/test-org/_search_stream?type=logs&search_type=ui&use_cache=true&trace_id=trace-s-2&clear_cache=true",
-        query
+        query,
       );
     });
 
@@ -264,7 +264,7 @@ describe("streaming_search service", () => {
       expect(generateTraceContext).toHaveBeenCalled();
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         expect.stringContaining("trace_id=generated-trace-id-abc"),
-        query
+        query,
       );
     });
 
@@ -282,7 +282,7 @@ describe("streaming_search service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         expect.stringContaining("search_type=api"),
-        query
+        query,
       );
     });
 
@@ -300,7 +300,7 @@ describe("streaming_search service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         expect.stringContaining("use_cache=false"),
-        query
+        query,
       );
     });
 
@@ -313,7 +313,7 @@ describe("streaming_search service", () => {
           query: {},
           page_type: "logs",
           traceId: "trace-err",
-        })
+        }),
       ).rejects.toThrow("Search failed");
     });
   });
@@ -332,7 +332,7 @@ describe("streaming_search service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         "/api/test-org/_search_multi_stream?type=logs&search_type=ui&use_cache=true&trace_id=trace-sm-1",
-        query
+        query,
       );
     });
 
@@ -348,7 +348,7 @@ describe("streaming_search service", () => {
       expect(generateTraceContext).toHaveBeenCalled();
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         expect.stringContaining("trace_id=generated-trace-id-abc"),
-        {}
+        {},
       );
     });
 
@@ -361,7 +361,7 @@ describe("streaming_search service", () => {
           query: {},
           page_type: "logs",
           traceId: "trace-sm-err",
-        })
+        }),
       ).rejects.toThrow("Multi search failed");
     });
   });
@@ -380,7 +380,7 @@ describe("streaming_search service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         "/api/test-org/_search_histogram_stream?type=logs&search_type=ui&use_cache=true&trace_id=trace-h-1",
-        query
+        query,
       );
     });
 
@@ -396,7 +396,7 @@ describe("streaming_search service", () => {
       expect(generateTraceContext).toHaveBeenCalled();
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         expect.stringContaining("trace_id=generated-trace-id-abc"),
-        {}
+        {},
       );
     });
 
@@ -409,7 +409,7 @@ describe("streaming_search service", () => {
           query: {},
           page_type: "logs",
           traceId: "trace-h-err",
-        })
+        }),
       ).rejects.toThrow("Histogram failed");
     });
   });
@@ -428,7 +428,7 @@ describe("streaming_search service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         "/api/test-org/_search_pagecount_stream?type=logs&search_type=ui&use_cache=true&trace_id=trace-pcc-1",
-        query
+        query,
       );
     });
 
@@ -453,7 +453,7 @@ describe("streaming_search service", () => {
           query: {},
           page_type: "logs",
           traceId: "trace-pcc-err",
-        })
+        }),
       ).rejects.toThrow("Page count failed");
     });
   });
@@ -474,7 +474,7 @@ describe("streaming_search service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         "/api/test-org/app-logs/_values_stream?fields=status,method,path&type=logs&use_cache=true&trace_id=trace-fv-post-1",
-        query
+        query,
       );
     });
 
@@ -492,7 +492,7 @@ describe("streaming_search service", () => {
       expect(generateTraceContext).toHaveBeenCalled();
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         expect.stringContaining("trace_id=generated-trace-id-abc"),
-        {}
+        {},
       );
     });
 
@@ -511,7 +511,7 @@ describe("streaming_search service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         expect.stringContaining("use_cache=false"),
-        {}
+        {},
       );
     });
 
@@ -526,7 +526,7 @@ describe("streaming_search service", () => {
           query: {},
           page_type: "logs",
           traceId: "trace-fv-err",
-        })
+        }),
       ).rejects.toThrow("Field values failed");
     });
   });
@@ -540,10 +540,9 @@ describe("streaming_search service", () => {
         traceId: "trace-cancel-1",
       });
 
-      expect(mockHttpInstance.put).toHaveBeenCalledWith(
-        "/api/test-org/query_manager/cancel",
-        ["trace-cancel-1"]
-      );
+      expect(mockHttpInstance.put).toHaveBeenCalledWith("/api/test-org/query_manager/cancel", [
+        "trace-cancel-1",
+      ]);
     });
 
     it("should handle different trace IDs", async () => {
@@ -552,10 +551,9 @@ describe("streaming_search service", () => {
       const traceIds = ["abc-123", "uuid-def-456", "long-trace-id-xyz"];
       for (const traceId of traceIds) {
         await stream.cancelStream({ org_identifier: "test-org", traceId });
-        expect(mockHttpInstance.put).toHaveBeenCalledWith(
-          "/api/test-org/query_manager/cancel",
-          [traceId]
-        );
+        expect(mockHttpInstance.put).toHaveBeenCalledWith("/api/test-org/query_manager/cancel", [
+          traceId,
+        ]);
       }
     });
 
@@ -566,7 +564,7 @@ describe("streaming_search service", () => {
         stream.cancelStream({
           org_identifier: "test-org",
           traceId: "trace-cancel-err",
-        })
+        }),
       ).rejects.toThrow("Cancel failed");
     });
   });
@@ -581,7 +579,7 @@ describe("streaming_search service", () => {
       });
 
       expect(url).toBe(
-        "/api/test-org/prometheus/api/v1/query_range?use_streaming=true&use_cache=true&trace_id=trace-promql-1"
+        "/api/test-org/prometheus/api/v1/query_range?use_streaming=true&use_cache=true&trace_id=trace-promql-1",
       );
     });
 
@@ -623,7 +621,7 @@ describe("streaming_search service", () => {
       });
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        "/api/test-org/prometheus/api/v1/query_range?use_streaming=true&use_cache=true&trace_id=trace-pqr-1&start=1700000000&end=1700003600&step=5m&query=up"
+        "/api/test-org/prometheus/api/v1/query_range?use_streaming=true&use_cache=true&trace_id=trace-pqr-1&start=1700000000&end=1700003600&step=5m&query=up",
       );
     });
 
@@ -640,9 +638,7 @@ describe("streaming_search service", () => {
       });
 
       const callArgs = mockHttpInstance.post.mock.calls[0];
-      expect(callArgs[0]).toContain(
-        encodeURIComponent('cpu_usage{instance="server1"}')
-      );
+      expect(callArgs[0]).toContain(encodeURIComponent('cpu_usage{instance="server1"}'));
     });
 
     it("should append dashboard_id when provided", async () => {
@@ -659,7 +655,7 @@ describe("streaming_search service", () => {
       });
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        expect.stringContaining("&dashboard_id=dash-abc")
+        expect.stringContaining("&dashboard_id=dash-abc"),
       );
     });
 
@@ -677,9 +673,7 @@ describe("streaming_search service", () => {
       });
 
       const callArgs = mockHttpInstance.post.mock.calls[0];
-      expect(callArgs[0]).toContain(
-        "&dashboard_name=" + encodeURIComponent("My Dashboard")
-      );
+      expect(callArgs[0]).toContain("&dashboard_name=" + encodeURIComponent("My Dashboard"));
     });
 
     it("should append folder_id when provided", async () => {
@@ -696,7 +690,7 @@ describe("streaming_search service", () => {
       });
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        expect.stringContaining("&folder_id=folder-xyz")
+        expect.stringContaining("&folder_id=folder-xyz"),
       );
     });
 
@@ -716,9 +710,7 @@ describe("streaming_search service", () => {
 
       const callArgs = mockHttpInstance.post.mock.calls[0];
       expect(callArgs[0]).toContain("&panel_id=panel-1");
-      expect(callArgs[0]).toContain(
-        "&panel_name=" + encodeURIComponent("CPU Panel")
-      );
+      expect(callArgs[0]).toContain("&panel_name=" + encodeURIComponent("CPU Panel"));
     });
 
     it("should append run_id when provided", async () => {
@@ -735,7 +727,7 @@ describe("streaming_search service", () => {
       });
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        expect.stringContaining("&run_id=run-001")
+        expect.stringContaining("&run_id=run-001"),
       );
     });
 
@@ -755,9 +747,7 @@ describe("streaming_search service", () => {
 
       const callArgs = mockHttpInstance.post.mock.calls[0];
       expect(callArgs[0]).toContain("&tab_id=tab-2");
-      expect(callArgs[0]).toContain(
-        "&tab_name=" + encodeURIComponent("Metrics Tab")
-      );
+      expect(callArgs[0]).toContain("&tab_name=" + encodeURIComponent("Metrics Tab"));
     });
 
     it("should generate traceId when not provided", async () => {
@@ -773,7 +763,7 @@ describe("streaming_search service", () => {
 
       expect(generateTraceContext).toHaveBeenCalled();
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        expect.stringContaining("trace_id=generated-trace-id-abc")
+        expect.stringContaining("trace_id=generated-trace-id-abc"),
       );
     });
 
@@ -788,7 +778,7 @@ describe("streaming_search service", () => {
           end_time: 1700003600,
           step: "5m",
           traceId: "trace-pqr-err",
-        })
+        }),
       ).rejects.toThrow("PromQL failed");
     });
   });

@@ -64,6 +64,4 @@ export const makeAddEnrichmentTableSchema = (
       }
     });
 
-export type AddEnrichmentTableForm = z.infer<
-  ReturnType<typeof makeAddEnrichmentTableSchema>
->;
+export type AddEnrichmentTableForm = z.infer<ReturnType<typeof makeAddEnrichmentTableSchema>>;

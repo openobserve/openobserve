@@ -129,13 +129,9 @@ describe("UpdateRole", () => {
 
     it("reflects the open prop on the dialog", async () => {
       wrapper = mountComp();
-      expect(
-        wrapper.find('[data-test-stub="o-dialog"]').attributes("data-open"),
-      ).toBe("true");
+      expect(wrapper.find('[data-test-stub="o-dialog"]').attributes("data-open")).toBe("true");
       await wrapper.setProps({ open: false });
-      expect(
-        wrapper.find('[data-test-stub="o-dialog"]').attributes("data-open"),
-      ).toBe("false");
+      expect(wrapper.find('[data-test-stub="o-dialog"]').attributes("data-open")).toBe("false");
     });
   });
 
@@ -217,9 +213,7 @@ describe("UpdateRole", () => {
       expect(wrapper.emitted("updated")).toBeTruthy();
       const updateOpen = wrapper.emitted("update:open");
       expect(updateOpen[updateOpen.length - 1]).toEqual([false]);
-      expect(mockToast).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "success" }),
-      );
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
     });
 
     it("shows an error toast when the service reports error_members", async () => {
@@ -237,9 +231,7 @@ describe("UpdateRole", () => {
 
       await submitForm(wrapper);
 
-      expect(mockToast).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "error" }),
-      );
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
     });
 
     it("does not emit updated when the service rejects", async () => {
@@ -258,16 +250,12 @@ describe("UpdateRole", () => {
       await submitForm(wrapper);
 
       expect(wrapper.emitted("updated")).toBeFalsy();
-      expect(mockToast).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "error" }),
-      );
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
     });
 
     it("handles an empty/malformed response without crashing (success path)", async () => {
       // No `data.error_members` → treated as success: emits + closes, no throw.
-      vi.mocked(organizationsService.update_member_role).mockResolvedValue(
-        {} as any,
-      );
+      vi.mocked(organizationsService.update_member_role).mockResolvedValue({} as any);
       wrapper = mountComp({
         modelValue: {
           org_member_id: "42",

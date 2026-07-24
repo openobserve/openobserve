@@ -9,9 +9,7 @@
       :data-test="`dashboard-add-condition-logical-operator-${conditionIndex}`"
     />
     <OButtonGroup class="axis-field shrink-0" radius="sm">
-      <ODropdown
-        @update:open="(v: boolean) => v && loadFilterItem(condition.column)"
-      >
+      <ODropdown @update:open="(v: boolean) => v && loadFilterItem(condition.column)">
         <template #trigger>
           <OButton
             variant="primary"
@@ -22,7 +20,7 @@
             {{ computedLabel(condition) }}
           </OButton>
         </template>
-        <div class="p-4 w-72">
+        <div class="w-72 p-4">
           <div class="flex items-center gap-1">
             <StreamFieldSelect
               class="w-full"
@@ -69,11 +67,7 @@
                           class="o2-custom-select-dashboard w-full"
                         />
                         <OCombobox
-                          v-if="
-                            !['Is Null', 'Is Not Null'].includes(
-                              condition.operator,
-                            )
-                          "
+                          v-if="!['Is Null', 'Is Not Null'].includes(condition.operator)"
                           :label="t('common.value')"
                           v-model="conditionModel.value"
                           :items="dashboardVariablesFilterItems"
@@ -90,7 +84,9 @@
                         multiple
                         searchable
                         :error="condition.values?.length === 0"
-                        :error-message="condition.values?.length === 0 ? 'At least 1 item required' : ''"
+                        :error-message="
+                          condition.values?.length === 0 ? 'At least 1 item required' : ''
+                        "
                         data-test="dashboard-add-condition-list-tab"
                         class="o2-custom-select-dashboard"
                       />
@@ -125,7 +121,7 @@ import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { type SelectModelValue } from "@/lib/forms/Select/OSelect.types";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { defineComponent, ref, computed, toRef, watch, inject } from "vue";
 import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
 import { useI18n } from "vue-i18n";
@@ -160,15 +156,9 @@ export default defineComponent({
     "conditionIndex",
   ],
   setup(props, { emit }) {
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
-    const {
-      getAllSelectedStreams,
-      getStreamNameFromStreamAlias,
-      dashboardPanelData,
-    } = useDashboardPanelData(dashboardPanelDataPageKey);
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+    const { getAllSelectedStreams, getStreamNameFromStreamAlias, dashboardPanelData } =
+      useDashboardPanelData(dashboardPanelDataPageKey);
     const { t } = useI18n();
     const searchTerm = ref("");
 
@@ -182,19 +172,14 @@ export default defineComponent({
         .find(
           (it: any) =>
             it.column == props?.condition?.column?.field &&
-            it.stream ==
-              getStreamNameFromStreamAlias(
-                props?.condition?.column?.streamAlias,
-              ),
+            it.stream == getStreamNameFromStreamAlias(props?.condition?.column?.streamAlias),
         )
         ?.value?.filter((option: any) =>
           option?.toLowerCase().includes(searchTerm.value.toLowerCase()),
         );
 
       // Sort options alphabetically
-      return options
-        ? options.sort((a: string, b: string) => a.localeCompare(b))
-        : [];
+      return options ? options.sort((a: string, b: string) => a.localeCompare(b)) : [];
     });
 
     const filterListFn = (search: any, update: any) => {

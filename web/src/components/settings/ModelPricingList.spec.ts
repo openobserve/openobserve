@@ -20,7 +20,6 @@ import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import ModelPricingList from "./ModelPricingList.vue";
 
-
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
 vi.mock("@/services/model_pricing", () => ({
@@ -173,9 +172,7 @@ const orgModel = (overrides: Partial<any> = {}) => ({
   source: "org",
   org_id: "test-org",
   enabled: true,
-  tiers: [
-    { condition: null, prices: { input: 0.0000025, output: 0.00001 } },
-  ],
+  tiers: [{ condition: null, prices: { input: 0.0000025, output: 0.00001 } }],
   children: [],
   ...overrides,
 });
@@ -187,9 +184,7 @@ const metaOrgModel = (overrides: Partial<any> = {}) => ({
   source: "meta_org",
   org_id: "_meta_org_",
   enabled: true,
-  tiers: [
-    { condition: null, prices: { input: 0.000003, output: 0.000015 } },
-  ],
+  tiers: [{ condition: null, prices: { input: 0.000003, output: 0.000015 } }],
   children: [],
   ...overrides,
 });
@@ -201,9 +196,7 @@ const builtInModel = (overrides: Partial<any> = {}) => ({
   source: "built_in",
   org_id: "_built_in_",
   enabled: true,
-  tiers: [
-    { condition: null, prices: { input: 0.0000005, output: 0.0000015 } },
-  ],
+  tiers: [{ condition: null, prices: { input: 0.0000005, output: 0.0000015 } }],
   children: [],
   ...overrides,
 });
@@ -288,7 +281,7 @@ const mockI18n = createI18n({
 // ── Global stubs ─────────────────────────────────────────────────────────────
 
 const globalStubs: Record<string, any> = {
-  "OIcon": {
+  OIcon: {
     template: '<span class="OIcon"><slot /></span>',
     props: ["name", "size", "color"],
   },
@@ -685,7 +678,6 @@ describe("ModelPricingList.vue", () => {
     });
   });
 
-
   describe("getDefaultTier", () => {
     it("returns the first unconditional tier", async () => {
       wrapper = mountComponent();
@@ -849,15 +841,11 @@ describe("ModelPricingList.vue", () => {
       await flushPromises();
 
       expect(modelPricingService.delete).toHaveBeenCalledWith("test-org", "org-1");
-      expect(mockToastFn).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "success" }),
-      );
+      expect(mockToastFn).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
     });
 
     it("notifies error (and skips success notify) when delete fails", async () => {
-      vi.mocked(modelPricingService.delete).mockRejectedValueOnce(
-        new Error("boom"),
-      );
+      vi.mocked(modelPricingService.delete).mockRejectedValueOnce(new Error("boom"));
       wrapper = mountComponent();
       await flushPromises();
 
@@ -866,9 +854,7 @@ describe("ModelPricingList.vue", () => {
       await wrapper.vm.confirmDialogMeta.onConfirm();
       await flushPromises();
 
-      expect(mockToastFn).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "error" }),
-      );
+      expect(mockToastFn).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
     });
 
     it("does not notify when API returns 403 (silenced by global interceptor)", async () => {
@@ -883,9 +869,7 @@ describe("ModelPricingList.vue", () => {
       await wrapper.vm.confirmDialogMeta.onConfirm();
       await flushPromises();
 
-      const negativeCalls = mockToastFn.mock.calls.filter(
-        (c) => c[0]?.variant === "error",
-      );
+      const negativeCalls = mockToastFn.mock.calls.filter((c) => c[0]?.variant === "error");
       expect(negativeCalls).toHaveLength(0);
     });
   });
@@ -948,24 +932,18 @@ describe("ModelPricingList.vue", () => {
       await wrapper.vm.toggleEnabled(mockModels[0], true);
       await flushPromises();
 
-      expect(mockToastFn).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "success" }),
-      );
+      expect(mockToastFn).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
     });
 
     it("notifies negative when update fails", async () => {
-      vi.mocked(modelPricingService.update).mockRejectedValueOnce(
-        new Error("update fail"),
-      );
+      vi.mocked(modelPricingService.update).mockRejectedValueOnce(new Error("update fail"));
       wrapper = mountComponent();
       await flushPromises();
 
       await wrapper.vm.toggleEnabled(mockModels[0], false);
       await flushPromises();
 
-      expect(mockToastFn).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "error" }),
-      );
+      expect(mockToastFn).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
     });
   });
 
@@ -1000,24 +978,18 @@ describe("ModelPricingList.vue", () => {
 
       expect(modelPricingService.refreshBuiltIn).toHaveBeenCalledWith("test-org");
       expect(modelPricingService.list).toHaveBeenCalled();
-      expect(mockToastFn).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "success" }),
-      );
+      expect(mockToastFn).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
     });
 
     it("notifies negative when refresh fails", async () => {
       wrapper = mountComponent();
       await flushPromises();
-      vi.mocked(modelPricingService.refreshBuiltIn).mockRejectedValueOnce(
-        new Error("nope"),
-      );
+      vi.mocked(modelPricingService.refreshBuiltIn).mockRejectedValueOnce(new Error("nope"));
 
       await wrapper.vm.refreshBuiltIn();
       await flushPromises();
 
-      expect(mockToastFn).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "error" }),
-      );
+      expect(mockToastFn).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
       expect(wrapper.vm.refreshing).toBe(false);
     });
   });
@@ -1026,15 +998,11 @@ describe("ModelPricingList.vue", () => {
 
   describe("fetchModels errors", () => {
     it("notifies negative when list() rejects", async () => {
-      vi.mocked(modelPricingService.list).mockRejectedValueOnce(
-        new Error("network"),
-      );
+      vi.mocked(modelPricingService.list).mockRejectedValueOnce(new Error("network"));
       wrapper = mountComponent();
       await flushPromises();
 
-      expect(mockToastFn).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "error" }),
-      );
+      expect(mockToastFn).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
       expect(wrapper.vm.loading).toBe(false);
     });
 
@@ -1045,9 +1013,7 @@ describe("ModelPricingList.vue", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-      const negativeCalls = mockToastFn.mock.calls.filter(
-        (c) => c[0]?.variant === "error",
-      );
+      const negativeCalls = mockToastFn.mock.calls.filter((c) => c[0]?.variant === "error");
       expect(negativeCalls).toHaveLength(0);
     });
   });
@@ -1061,12 +1027,8 @@ describe("ModelPricingList.vue", () => {
     let origCreateElement: any;
 
     beforeEach(() => {
-      createObjectURLSpy = vi
-        .spyOn(URL, "createObjectURL")
-        .mockReturnValue("blob://mock");
-      revokeObjectURLSpy = vi
-        .spyOn(URL, "revokeObjectURL")
-        .mockImplementation(() => {});
+      createObjectURLSpy = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob://mock");
+      revokeObjectURLSpy = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
       clickMock = vi.fn();
       origCreateElement = document.createElement.bind(document);
       vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
@@ -1089,9 +1051,7 @@ describe("ModelPricingList.vue", () => {
 
       wrapper.vm.exportSelected();
 
-      expect(mockToastFn).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "warning" }),
-      );
+      expect(mockToastFn).toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
       expect(clickMock).not.toHaveBeenCalled();
     });
 

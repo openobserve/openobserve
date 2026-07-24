@@ -23,12 +23,9 @@ vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
   CURRENT_DASHBOARD_SCHEMA_VERSION: "v3",
 }));
 
-vi.mock(
-  "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json",
-  () => ({
-    default: [],
-  }),
-);
+vi.mock("@/components/dashboards/addPanel/dynamicFunction/functionValidation.json", () => ({
+  default: [],
+}));
 
 describe("panelValidation", () => {
   describe("findFirstValidMappedValue", () => {
@@ -187,7 +184,7 @@ describe("panelValidation", () => {
 
     it("returns error for wrong version", () => {
       const errors = validateDashboardJson({ ...validDashboard, version: "v1" });
-      expect(errors.some(e => e.includes("v3"))).toBe(true);
+      expect(errors.some((e) => e.includes("v3"))).toBe(true);
     });
 
     it("returns error for missing tabs", () => {
@@ -215,7 +212,7 @@ describe("panelValidation", () => {
         tabs: [{ tabId: "tab-001", panels: [] }],
       };
       const errors = validateDashboardJson(dashboard);
-      expect(errors.some(e => e.includes("must have a name"))).toBe(true);
+      expect(errors.some((e) => e.includes("must have a name"))).toBe(true);
     });
 
     it("returns error for duplicate tab IDs", () => {
@@ -227,7 +224,7 @@ describe("panelValidation", () => {
         ],
       };
       const errors = validateDashboardJson(dashboard);
-      expect(errors.some(e => e.includes("Duplicate tab ID"))).toBe(true);
+      expect(errors.some((e) => e.includes("Duplicate tab ID"))).toBe(true);
     });
 
     it("returns error for panel missing ID", () => {
@@ -242,7 +239,7 @@ describe("panelValidation", () => {
         ],
       };
       const errors = validateDashboardJson(dashboard);
-      expect(errors.some(e => e.includes("missing an ID"))).toBe(true);
+      expect(errors.some((e) => e.includes("missing an ID"))).toBe(true);
     });
 
     it("returns error for duplicate panel IDs", () => {
@@ -260,7 +257,7 @@ describe("panelValidation", () => {
         ],
       };
       const errors = validateDashboardJson(dashboard);
-      expect(errors.some(e => e.includes("Duplicate panel ID"))).toBe(true);
+      expect(errors.some((e) => e.includes("Duplicate panel ID"))).toBe(true);
     });
 
     it("can return multiple errors", () => {
@@ -278,7 +275,7 @@ describe("panelValidation", () => {
         tabs: [{ tabId: "tab-001", name: "Tab 1", panels: null }],
       };
       const errors = validateDashboardJson(dashboard);
-      expect(errors.some(e => e.includes("must have a panels array"))).toBe(true);
+      expect(errors.some((e) => e.includes("must have a panels array"))).toBe(true);
     });
   });
 });

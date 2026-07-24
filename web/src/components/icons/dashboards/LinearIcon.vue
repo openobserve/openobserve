@@ -13,27 +13,9 @@
       stroke="currentColor"
       stroke-width="4"
     />
-    <circle
-      data-test="dashboard-icon-linear-circle"
-      cx="59"
-      cy="6"
-      r="6"
-      fill="currentColor"
-    />
-    <circle
-      data-test="dashboard-icon-linear-circle"
-      cx="110"
-      cy="81"
-      r="6"
-      fill="currentColor"
-    />
-    <circle
-      data-test="dashboard-icon-linear-circle"
-      cx="6"
-      cy="81"
-      r="6"
-      fill="currentColor"
-    />
+    <circle data-test="dashboard-icon-linear-circle" cx="59" cy="6" r="6" fill="currentColor" />
+    <circle data-test="dashboard-icon-linear-circle" cx="110" cy="81" r="6" fill="currentColor" />
+    <circle data-test="dashboard-icon-linear-circle" cx="6" cy="81" r="6" fill="currentColor" />
   </svg>
 </template>
 

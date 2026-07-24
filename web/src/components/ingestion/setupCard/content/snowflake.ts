@@ -85,8 +85,7 @@ export default function snowflakeCard(subs: CardSubstitutions): RichCardContent 
       {
         id: "verify",
         title: "Verify Data in OpenObserve",
-        description:
-          "Hit Test below, or check Streams for the `snowflake_*` metrics.",
+        description: "Hit Test below, or check Streams for the `snowflake_*` metrics.",
         chip: { kind: "traces", label: "Metrics" },
         completeOn: "detect",
         detectionAnchor: true,

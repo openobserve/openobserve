@@ -15,45 +15,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="step-anomaly-alerting h-full"
-  >
+  <div class="step-anomaly-alerting h-full">
     <div
-      class="step-content px-3 py-4 rounded-default h-full overflow-y-auto border bg-surface-overlay border-border-default"
+      class="step-content rounded-default bg-surface-overlay border-border-default h-full overflow-y-auto border px-3 py-4"
     >
       <!-- Enable Notifications toggle -->
-      <div class="flex items-start mb-6!  pb-0!">
-        <div
-          class="font-semibold flex items-center"
-          style="width: 190px; height: 36px"
-        >
-          {{ t('alerts.anomaly.notifications') }}
-          <OIcon
-            name="info"
-            size="sm"
-            class="ml-1 cursor-pointer text-icon-color"
-          >
+      <div class="mb-6! flex items-start pb-0!">
+        <div class="flex items-center font-semibold" style="width: 190px; height: 36px">
+          {{ t("alerts.anomaly.notifications") }}
+          <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
             <OTooltip :content="t('alerts.anomaly.notificationsTooltip')" side="right" />
           </OIcon>
         </div>
-        <div class="flex items-center h-11">
+        <div class="flex h-11 items-center">
           <OSwitch
             v-model="configModel.alert_enabled"
-            :label="config.alert_enabled ? t('alerts.anomaly.enabled') : t('alerts.anomaly.disabled')"
+            :label="
+              config.alert_enabled ? t('alerts.anomaly.enabled') : t('alerts.anomaly.disabled')
+            "
             data-test="anomaly-alert-enabled"
           />
         </div>
       </div>
 
       <!-- Destination picker (shown when alert_enabled) -->
-      <div
-        v-if="config.alert_enabled"
-        class="flex items-start mb-6! pb-0!"
-      >
-        <div
-          class="font-semibold flex items-center"
-          style="width: 190px; height: 36px"
-        >
+      <div v-if="config.alert_enabled" class="mb-6! flex items-start pb-0!">
+        <div class="flex items-center font-semibold" style="width: 190px; height: 36px">
           {{ t("alerts.destination") }}
           <span class="text-status-error-text ml-1">*</span>
         </div>
@@ -66,21 +53,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               valueKey="name"
               multiple
               searchable
-              class="min-h-auto! h-auto!"
+              class="h-auto! min-h-auto!"
               style="min-width: 300px; max-width: 420px"
               data-test="anomaly-destination"
             >
               <template #selected-item="{ index, opt, removeAtIndex }">
-                <OTag
-                  v-if="index < visibleChipCount"
-                  type="selectionChip"
-                >
+                <OTag v-if="index < visibleChipCount" type="selectionChip">
                   {{ typeof opt === "object" ? opt.name : opt }}
                   <template #trailing>
                     <button
                       type="button"
                       :aria-label="t('common.remove')"
-                      class="inline-flex items-center justify-center cursor-pointer hover:opacity-70"
+                      class="inline-flex cursor-pointer items-center justify-center hover:opacity-70"
                       @click="removeAtIndex(index)"
                     >
                       <OIcon name="close" size="xs" />
@@ -98,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
               </template>
               <template #empty>
-                <span>{{ t('alerts.anomaly.noDestinationsFound') }}</span>
+                <span>{{ t("alerts.anomaly.noDestinationsFound") }}</span>
               </template>
             </OSelect>
             <OButton
@@ -109,23 +93,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="$emit('refresh:destinations')"
               icon-left="refresh"
             />
-            <OButton
-              variant="outline"
-              size="sm"
-              class="ml-2"
-              @click="openAddDestination"
-            >
-              {{ t('alerts.anomaly.addNewDestination') }}
+            <OButton variant="outline" size="sm" class="ml-2" @click="openAddDestination">
+              {{ t("alerts.anomaly.addNewDestination") }}
             </OButton>
           </div>
           <div
-            v-if="
-              config.alert_enabled && config.alert_destination_ids.length === 0
-            "
-            class="text-xs text-input-error-text pt-1"
+            v-if="config.alert_enabled && config.alert_destination_ids.length === 0"
+            class="text-input-error-text pt-1 text-xs"
             data-test="anomaly-destination-error"
           >
-            {{ t('alerts.anomaly.destinationRequired') }}
+            {{ t("alerts.anomaly.destinationRequired") }}
           </div>
         </div>
       </div>
@@ -133,12 +110,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Info note when notifications disabled -->
       <div
         v-if="!config.alert_enabled"
-        class="flex items-start gap-2 text-xs mt-2"
+        class="mt-2 flex items-start gap-2 text-xs"
         :class="'text-text-secondary'"
       >
-        <OIcon name="info" size="sm"
-class="mt-px flex-shrink-0" />
-        <span>{{ t('alerts.anomaly.disabledNotificationsInfo') }}</span>
+        <OIcon name="info" size="sm" class="mt-px flex-shrink-0" />
+        <span>{{ t("alerts.anomaly.disabledNotificationsInfo") }}</span>
       </div>
     </div>
   </div>
@@ -149,20 +125,17 @@ import { computed, defineComponent, type PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import OButton from '@/lib/core/Button/OButton.vue';
-import OSwitch from '@/lib/forms/Switch/OSwitch.vue';
-import OSelect from '@/lib/forms/Select/OSelect.vue';
-import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 
 export default defineComponent({
   name: "AnomalyAlerting",
-  components: { OButton, OSwitch, OSelect, OTooltip,
-    OIcon,
-    OTag,
-},
+  components: { OButton, OSwitch, OSelect, OTooltip, OIcon, OTag },
 
   props: {
     config: {

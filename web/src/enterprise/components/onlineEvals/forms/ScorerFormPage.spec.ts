@@ -310,9 +310,10 @@ describe("ScorerFormPage", () => {
 
       // RENDERED inputs — must be the survivors in order, NOT shifted/blank.
       expect(renderedRowValues(wrapper, NAME_RE)).toEqual(["alpha", "gamma"]);
-      expect(
-        oform(wrapper).form.state.values.extraMetadataFields.map((f: any) => f.name),
-      ).toEqual(["alpha", "gamma"]);
+      expect(oform(wrapper).form.state.values.extraMetadataFields.map((f: any) => f.name)).toEqual([
+        "alpha",
+        "gamma",
+      ]);
     });
 
     it("deleting a NON-last custom-header row re-renders survivors in order", async () => {
@@ -329,9 +330,10 @@ describe("ScorerFormPage", () => {
       await flushPromises();
 
       expect(renderedRowValues(wrapper, HEADER_KEY_RE)).toEqual(["h1", "h3"]);
-      expect(
-        oform(wrapper).form.state.values.customHeaders.map((h: any) => h.key),
-      ).toEqual(["h1", "h3"]);
+      expect(oform(wrapper).form.state.values.customHeaders.map((h: any) => h.key)).toEqual([
+        "h1",
+        "h3",
+      ]);
     });
   });
 });
