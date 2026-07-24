@@ -31,7 +31,9 @@ use config::{
     utils::time::now_micros,
 };
 use db::workflows::WorkflowTriggerType;
-use infra::table::workflows::{Workflow, WorkflowAssociation, WorkflowRunErrors};
+use infra::table::workflows::{
+    Workflow, WorkflowAssociation, WorkflowRunErrors, WorkflowTriggerEntity,
+};
 use openobserve_api_management::request::alerts::history::escape_like;
 use openobserve_core::auth::UserEmail;
 use search_service::{self as SearchService, query_range::get_settings_max_query_range};
@@ -101,8 +103,15 @@ pub struct WorkflowErrorResponse {
 
 #[derive(Serialize)]
 pub struct WorkflowListItem {
-    workflow: Workflow,
     associations: Vec<WorkflowAssociation>,
+    #[serde(flatten)]
+    workflow: Workflow,
+}
+
+#[derive(Deserialize)]
+pub struct WorkflowCreatePayload {
+    trigger_type: WorkflowTriggerType,
+    workflow: Workflow,
 }
 
 /// CreateWorkflow
@@ -133,21 +142,42 @@ pub struct WorkflowListItem {
 pub async fn save_workflow(
     Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    Json(mut workflow): Json<Workflow>,
+    Json(payload): Json<WorkflowCreatePayload>,
 ) -> Response {
+    let mut workflow = payload.workflow;
     workflow.name = workflow.name.trim().to_lowercase();
-    workflow.org_id = org_id;
+    workflow.org_id = org_id.clone();
     workflow.id = ider::generate();
     workflow.created_by = user_email.user_id;
 
     let id = workflow.id.to_string();
     let name = workflow.name.clone();
     match workflows::save_workflow(workflow).await {
-        Ok(()) => MetaHttpResponse::json(
-            MetaHttpResponse::message(StatusCode::OK, "Workflow created successfully")
-                .with_id(id)
-                .with_name(name),
-        ),
+        Ok(()) => {
+            if payload.trigger_type == WorkflowTriggerType::IncidentEvent
+                && let Err(e) = db::workflows::associate_workflow(
+                    &org_id,
+                    &id,
+                    "system",
+                    WorkflowTriggerEntity::Incident.to_string(),
+                    WorkflowTriggerType::IncidentEvent.to_string(),
+                )
+                .await
+            {
+                log::error!(
+                    "error in associating workflow to incident after successful creation of workflow : {org_id}/{id} : {e}"
+                );
+                MetaHttpResponse::internal_error(format!(
+                    "workflow created successfully , but failed to save the association : {e}"
+                ))
+            } else {
+                MetaHttpResponse::json(
+                    MetaHttpResponse::message(StatusCode::OK, "Workflow created successfully")
+                        .with_id(id)
+                        .with_name(name),
+                )
+            }
+        }
         Err(e) => MetaHttpResponse::bad_request(e),
     }
 }

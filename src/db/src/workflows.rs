@@ -47,7 +47,7 @@ pub enum AssociationDeleteEvent {
     },
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq)]
 pub enum WorkflowTriggerType {
     #[default]
     AlertFired,

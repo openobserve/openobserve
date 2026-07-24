@@ -441,17 +441,19 @@ const buildPayload = () => {
   const triggerKind =
     triggerNode?.data?.trigger_kind || triggerNode?.meta?.trigger_kind;
   return {
-    id: wf.id || "",
-    org_id: "",
-    name: (wf.name || "").trim(),
-    description: wf.description || "",
-    enabled: wf.enabled ?? true,
+      workflow: {
+      id: wf.id || "",
+      org_id: "",
+      name: (wf.name || "").trim(),
+      description: wf.description || "",
+      enabled: wf.enabled ?? true,
+      created_at: wf.created_at || 0,
+      updated_at: wf.updated_at || 0,
+      created_by: "",
+      nodes: (wf.nodes || []).map(serializeNode),
+      edges: wf.edges || [],
+    },
     trigger_type: triggerTypeForKind(triggerKind),
-    created_at: wf.created_at || 0,
-    updated_at: wf.updated_at || 0,
-    created_by: "",
-    nodes: (wf.nodes || []).map(serializeNode),
-    edges: wf.edges || [],
   };
 };
 

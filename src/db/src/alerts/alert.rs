@@ -175,8 +175,6 @@ pub async fn create<C: TransactionTrait>(
     alert: Alert,
     overwrite: bool,
 ) -> Result<Alert, infra::errors::Error> {
-    let workflows = alert.workflows.clone();
-    let alert_id = alert.get_unique_key();
     let alert = table::create(conn, org_id, folder_id, alert, overwrite).await?;
     let schedule_key = scheduler_key(alert.id);
 
@@ -212,15 +210,18 @@ pub async fn create<C: TransactionTrait>(
         e
     });
 
-    for w in workflows {
-        db::workflows::associate_workflow(
-            org_id,
-            &w,
-            &alert_id,
-            WorkflowTriggerEntity::Alert.to_string(),
-            WorkflowTriggerType::AlertFired.to_string(),
-        )
-        .await?;
+    if let Some(ref id) = alert.id {
+        let alert_id = id.to_string();
+        for w in &alert.workflows {
+            db::workflows::associate_workflow(
+                org_id,
+                &w,
+                &alert_id,
+                WorkflowTriggerEntity::Alert.to_string(),
+                WorkflowTriggerType::AlertFired.to_string(),
+            )
+            .await?;
+        }
     }
 
     Ok(alert)

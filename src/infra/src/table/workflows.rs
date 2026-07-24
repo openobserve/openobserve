@@ -508,12 +508,13 @@ pub async fn add_workflow_association(entry: WorkflowAssociation) -> Result<(), 
     let _lock = get_lock().await;
 
     let model = workflow_associations::ActiveModel {
+        id: Default::default(),
         org_id: Set(entry.org_id),
         workflow_id: Set(entry.workflow_id),
         entity_id: Set(entry.entity_id),
         entity_type: Set(entry.entity_type),
         trigger_type: Set(entry.trigger_type),
-        ..Default::default()
+        created_at: Set(entry.created_at),
     };
     workflow_associations::Entity::insert(model)
         .exec(client)
