@@ -46,6 +46,7 @@ vectorscan = [
 db.workspace = true
 audit.workspace = true
 common.workspace = true
+openobserve-node.workspace = true
 transform.workspace = true
 vector-enrichment.workspace = true
 vrl.workspace = true

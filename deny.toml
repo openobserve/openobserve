@@ -30,6 +30,7 @@ exceptions = [
     { name = "openobserve-builtins", allow = ["AGPL-3.0"] },
     { name = "common", allow = ["AGPL-3.0"] },
     { name = "openobserve-core", allow = ["AGPL-3.0"] },
+    { name = "openobserve-node", allow = ["AGPL-3.0"] },
     { name = "openobserve-jobs", allow = ["AGPL-3.0"] },
     { name = "openobserve-mcp", allow = ["AGPL-3.0"] },
     { name = "openobserve-org-storage", allow = ["AGPL-3.0"] },

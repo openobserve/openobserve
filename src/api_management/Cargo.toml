@@ -29,6 +29,7 @@ search_service.workspace = true
 transform.workspace = true
 vrl.workspace = true
 openobserve-core.workspace = true
+openobserve-node.workspace = true
 openobserve-org-storage.workspace = true
 anyhow.workspace = true
 axum.workspace = true

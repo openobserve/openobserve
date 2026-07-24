@@ -58,6 +58,7 @@ common.workspace = true
 audit.workspace = true
 db.workspace = true
 openobserve-core.workspace = true
+openobserve-node.workspace = true
 openobserve-builtins.workspace = true
 openobserve-sourcemaps.workspace = true
 openobserve-tls.workspace = true

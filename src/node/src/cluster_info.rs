@@ -69,7 +69,7 @@ impl proto::cluster_rpc::cluster_info_service_server::ClusterInfoService for Clu
         let req = request.into_inner();
 
         // Get the key from the database
-        match crate::db::compact::compactor_manual_jobs::get_job(&req.ksuid).await {
+        match db::compact::compactor_manual_jobs::get_job(&req.ksuid).await {
             Ok(job) => {
                 // Job still exists, return pending status
                 Ok(Response::new(GetDeleteJobStatusResponse {
