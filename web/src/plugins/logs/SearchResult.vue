@@ -265,24 +265,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <!-- The histogram is pinned in the logs view: this strip does not scroll,
-        the OTable below owns both scrollbars, so scrolling the log lines
-        sideways can never drag the chart out from under the toolbar. The
-        patterns view has no table of its own, so it keeps the older combined
-        scroll where the histogram scrolls away with the list. -->
-      <div
-        ref="scrollContainerRef"
-        :class="[
-          'min-h-0 flex-1',
-          searchObj.meta.logsVisualizeToggle === 'patterns'
-            ? 'overflow-auto'
-            : 'flex flex-col overflow-hidden',
-        ]"
-      >
+      <!-- Combined scroll: histogram + logs/patterns scroll together vertically
+        (the histogram scrolls away with the list and the table's column header
+        sticks to the top of this container). The histogram is pinned only along
+        the X axis (position: sticky; left: 0 with a width locked to this
+        container's visible width — see histogramPinStyle), so horizontally
+        scrolling the wide results table can never drag the chart sideways. -->
+      <div class="min-h-0 flex-1 overflow-auto" ref="scrollContainerRef">
         <div
           ref="histogramRef"
+          :style="histogramPinStyle"
           :class="[
-            'histogram-container shrink-0',
+            'histogram-container histogram-container--pinned-x',
             searchObj.meta.showHistogram
               ? 'histogram-container--visible'
               : 'histogram-container--hidden',
@@ -372,8 +366,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div
+          :style="histogramPinStyle"
           :class="[
-            'histogram-container shrink-0',
+            'histogram-container histogram-container--pinned-x',
             searchObj.meta.showHistogram
               ? 'histogram-container--visible'
               : 'histogram-container--hidden',
@@ -492,9 +487,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :wrap="searchObj.meta.toggleSourceWrap"
             :loading="searchObj.loading"
             :row-key="logsTimestampCol"
-            :row-height="24"
+            :row-height="20"
             virtual-scroll
-            :fill-height="true"
+            :fill-height="false"
+            :scroll-el="scrollContainerRef"
             :horizontal-scroll="true"
             :scroll-margin="0"
             :default-columns="false"
@@ -509,7 +505,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             expansion="multiple"
             :expanded-ids="expandedLogIds"
             data-test="logs-search-result-logs-table"
-            class="logs-results-otable min-h-0 w-full flex-1"
+            class="logs-results-otable w-full"
+            :class="[
+              !searchObj.meta.showHistogram ||
+              (searchObj.meta.showHistogram && searchObj.data.histogram.errorCode == -1)
+                ? 'min-h-full!'
+                : 'min-h-[calc(100%-6.25rem)]!',
+            ]"
             @update:columnSizes="handleColumnSizesUpdate"
             @column-order-change="handleColumnOrderUpdate"
             @close-column="closeColumn"
@@ -1036,6 +1038,21 @@ export default defineComponent({
     // match shouldMoveActionsToMenu threshold: 3 pages when narrow, 5 when wide
     const paginationMaxPages = computed(() => (containerWidth.value < 700 ? 3 : 5));
 
+    // Histogram X-pin: the histogram shares the results' vertical scroll (so it
+    // scrolls away with the log lines) but is `position: sticky; left: 0`, so a
+    // wide table scrolling sideways can't drag it. Sticky-left alone would let
+    // it stretch to the full scroll width and mis-size the ECharts canvas, so we
+    // lock its width to the scroll container's *visible* (client) width, tracked
+    // reactively so it follows splitter / window / scrollbar changes.
+    const histogramPinWidth = ref(0);
+    let histogramResizeObserver: ResizeObserver | null = null;
+    const histogramPinStyle = computed(() =>
+      histogramPinWidth.value ? { width: `${histogramPinWidth.value}px` } : {},
+    );
+    const syncHistogramPinWidth = () => {
+      histogramPinWidth.value = scrollContainerRef.value?.clientWidth ?? 0;
+    };
+
     const noOfRecordsTitle = computed<string>(
       () => (searchObj.data.histogram.chartParams.title as string) || "",
     );
@@ -1419,11 +1436,20 @@ export default defineComponent({
         });
         containerResizeObserver.observe(searchListContainer.value);
       }
+
+      // Keep the pinned histogram's width locked to the scroll container's
+      // visible width (see histogramPinStyle).
+      if (scrollContainerRef.value) {
+        syncHistogramPinWidth();
+        histogramResizeObserver = new ResizeObserver(syncHistogramPinWidth);
+        histogramResizeObserver.observe(scrollContainerRef.value);
+      }
     });
 
     onBeforeUnmount(() => {
       window.removeEventListener("themeColorChanged", handleThemeColorChange);
       containerResizeObserver?.disconnect();
+      histogramResizeObserver?.disconnect();
       // Clear any pending debounce timer
       if (debounceTimer) {
         clearTimeout(debounceTimer);
@@ -1766,14 +1792,7 @@ export default defineComponent({
       return window.innerWidth - (leftSidebarMenu + fieldList) - 5;
     });
 
-    // In the logs view the OTable scrolls itself (the histogram above it is
-    // pinned), so a page change has to reset the table's own scroll element
-    // rather than the pane. The patterns view still scrolls as a whole.
     const scrollTableToTop = (value: number) => {
-      if (searchObj.meta.logsVisualizeToggle !== "patterns") {
-        searchTableRef.value?.scrollToTop?.();
-        return;
-      }
       scrollContainerRef.value?.scrollTo({ top: value });
     };
 
@@ -2107,6 +2126,7 @@ export default defineComponent({
       searchTableRef,
       scrollContainerRef,
       histogramRef,
+      histogramPinStyle,
       searchAroundData,
       addSearchTerm,
       removeSearchTerm,
@@ -2431,6 +2451,16 @@ export default defineComponent({
 .histogram-container {
   border-radius: 0.5rem;
   position: relative;
+
+  /* Pin the histogram along the X axis inside the shared vertical scroll
+     container: it still scrolls away vertically with the log lines, but stays
+     put when the wide results table scrolls sideways (its width is locked to
+     the scroll viewport via histogramPinStyle). */
+  &--pinned-x {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+  }
 
   &--visible {
     height: 6.25rem;
