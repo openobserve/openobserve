@@ -82,7 +82,7 @@ pub async fn token_validator(
                     log::warn!(
                         "Blocked external identity denied at session token validation: {user_id}"
                     );
-                    return Err(AuthError::Unauthorized("Unauthorized Access".to_string()));
+                    return Err((ErrorUnauthorized("Unauthorized Access"), req));
                 }
 
                 // for member sub i.e. invitation, we must check user directly from db, because

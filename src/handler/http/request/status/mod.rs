@@ -991,11 +991,7 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
                     } else {
                         auth_cookie.set_same_site(SameSite::None);
                     }
-                    return Response::builder()
-                        .status(StatusCode::UNAUTHORIZED)
-                        .header(header::SET_COOKIE, auth_cookie.to_string())
-                        .body(Body::empty())
-                        .unwrap();
+                    return HttpResponse::Unauthorized().cookie(auth_cookie).finish();
                 }
             }
 
