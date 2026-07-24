@@ -69,7 +69,7 @@ describe("llmAgentFilter", () => {
       "default",
     );
     expect(where).toContain(
-      "service_deployment_environment_name = 'production'",
+      "gen_ai_agent_env = 'production'",
     );
   });
 
