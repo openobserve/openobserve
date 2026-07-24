@@ -118,6 +118,9 @@ const pivotTotalStyle = computed<Record<string, any>>(() => {
     zIndex: 2,
     width: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     backgroundColor: "var(--color-table-cell-bg)",
+    // Carry the same subtle left-edge separator the sticky total header uses so
+    // the shadow runs down the whole column, not just the header.
+    boxShadow: "-2px 0 4px -2px var(--color-border-default)",
   };
 });
 

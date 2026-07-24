@@ -532,6 +532,9 @@ function pivotTotalColumnStyle(col: OTableColumnDef<TData>): Record<string, any>
     right: `${rightOffset}px`,
     zIndex: 2,
     width: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
+    // Match the sticky total header/body: the same subtle left-edge separator so
+    // the shadow is continuous down the whole total column.
+    boxShadow: "-2px 0 4px -2px var(--color-border-default)",
   };
 }
 

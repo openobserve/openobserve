@@ -192,7 +192,10 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
     minWidth: `${width}px`,
     maxWidth: `${width}px`,
     backgroundColor: "var(--color-table-header-bg)",
-    boxShadow: "-4px 0 8px rgba(0, 0, 0, 0.15)",
+    // Same subtle separator the pinned/actions columns use, instead of the old
+    // heavy blur — and the body + grand-total total cells now carry it too so
+    // the sticky total column reads as one shadowed column, not just a header.
+    boxShadow: "-2px 0 4px -2px var(--color-border-default)",
   };
 }
 </script>
