@@ -188,10 +188,23 @@ test.describe('RUM CDN Data Flow', () => {
       minRows: 1,
       timeoutMs: 30000,
     });
+    // Wait for a row that actually CARRIES a session, rather than reading
+    // dataRows[0]. _rumdata also receives the SDK's own telemetry events (they
+    // post to the same /rum intake) and telemetry is deliberately
+    // session-independent, so it can be emitted before the session manager
+    // resolves. Those rows still match the query above because the backend
+    // stamps `service` onto every record in the request from the `ootags`
+    // query string, not from the event body — so the first queryable row can
+    // legitimately have no session_id, and the wait above can return on it.
+    const sessionRows = await waitForStreamRows(app, {
+      sql: `SELECT * FROM "_rumdata" WHERE service = '${SERVICE}' AND session_id IS NOT NULL`,
+      minRows: 1,
+      timeoutMs: 30000,
+    });
 
     await app.close();
 
-    sessionId = dataRows[0]?.session_id || null;
+    sessionId = sessionRows[0]?.session_id || null;
     testLogger.info('Beacon tallies', beacons);
     testLogger.info('CDN assets loaded', { assets: cdn.assets.map((a) => `${a.status} ${a.url}`) });
     // CDN asset health is OBSERVED, not asserted — the live CDN is outside
