@@ -142,6 +142,11 @@ Tailwind utility classes** (`flex flex-col gap-4 p-6`). **One thing is banned:**
 - ❌ the **`tw:` prefix** — it was removed from this project; `tw:flex` no longer
   resolves. Write `flex`, not `tw:flex`.
 
+The **important modifier is a trailing `!`** in Tailwind v4 — `size-5!`,
+`bg-surface-base!` — reserved for the rare case of overriding an O2 component's own
+utility (a row-exception wash, an icon glyph size). The leading form `!size-5`
+lint-warns (`suggestCanonicalClasses`); always put the `!` at the end.
+
 In the rare case a `<style>` block genuinely cannot be Tailwind, it must **justify
 itself** or CI counts it as debt (`styleKeepComment`, strict-ratcheted — a new
 unjustified block fails the build). The block must open with a keep-comment:

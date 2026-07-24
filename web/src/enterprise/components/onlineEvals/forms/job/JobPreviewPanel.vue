@@ -1,16 +1,14 @@
 <template>
   <aside
-    class="bg-surface-base rounded-default min-w-0 flex-[3.5] overflow-auto p-2 shadow-[0_0_0.313rem_0.063rem_var(--color-hover-shadow)]"
+    class="border-border-default max-[68.75rem]:border-border-default min-w-0 flex-[3.5] overflow-auto border-l p-3 max-[68.75rem]:border-t max-[68.75rem]:border-l-0"
   >
     <section
-      class="rounded-default mb-3 border border-(--color-dialog-header-border,var(--color-border-default)) px-4 py-3.5"
+      class="border-dialog-header-border rounded-default mb-3 border px-4 py-3.5"
       data-test="job-preview-matched-targets"
     >
-      <header
-        class="mb-1.5 flex items-center gap-1.5 text-(--color-text-secondary,var(--color-text-secondary))"
-      >
+      <header class="text-text-secondary mb-1.5 flex items-center gap-1.5">
         <OIcon name="visibility" size="xs" />
-        <span class="text-compact m-0 font-semibold text-(--color-text-heading,currentColor)">{{
+        <span class="text-compact text-text-heading m-0 font-semibold">{{
           t(`onlineEvals.job.preview.scopes.${targetScope}.title`)
         }}</span>
       </header>
@@ -27,28 +25,22 @@
         {{ t("onlineEvals.job.preview.matchedError") }}
       </div>
       <div v-else class="flex items-baseline gap-1.5">
-        <span class="text-text-heading text-2xl font-bold [font-variant-numeric:tabular-nums]">{{
-          formattedCount
-        }}</span>
-        <span class="text-xs text-(--color-text-secondary,var(--color-text-secondary))">
+        <span class="text-text-heading text-2xl font-bold tabular-nums">{{ formattedCount }}</span>
+        <span class="text-text-secondary text-xs">
           {{ t(`onlineEvals.job.preview.scopes.${targetScope}.matchedSuffix`) }}
         </span>
       </div>
     </section>
 
-    <section
-      class="rounded-default mb-0 border border-(--color-dialog-header-border,var(--color-border-default)) px-4 py-3.5"
-    >
-      <header
-        class="mb-1.5 flex items-center gap-1.5 text-(--color-text-secondary,var(--color-text-secondary))"
-      >
+    <section class="border-dialog-header-border rounded-default mb-0 border px-4 py-3.5">
+      <header class="text-text-secondary mb-1.5 flex items-center gap-1.5">
         <OIcon name="info" size="xs" />
-        <span class="text-compact m-0 font-semibold text-(--color-text-heading,currentColor)">{{
+        <span class="text-compact text-text-heading m-0 font-semibold">{{
           t("onlineEvals.job.preview.summaryTitle")
         }}</span>
       </header>
       <dl
-        class="[&_dt]:text-text-secondary [&_dd]:text-text-body m-0 grid grid-cols-[96px_1fr] gap-x-3 gap-y-2 text-xs [&_dd]:m-0"
+        class="[&_dt]:text-text-secondary [&_dd]:text-text-body m-0 grid grid-cols-[6rem_1fr] gap-x-3 gap-y-2 text-xs [&_dd]:m-0"
       >
         <dt>{{ t("onlineEvals.job.preview.summaryName") }}</dt>
         <dd>{{ name || t("onlineEvals.job.preview.emptyValue") }}</dd>

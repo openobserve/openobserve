@@ -78,15 +78,14 @@
           data-test="agent-behavior-agent-selector"
           class="w-56 flex-shrink-0"
         >
-          <SkeletonBox v-if="!agentsLoaded" width="100%" height="2.125rem" :rounded="true" />
           <OSelect
-            v-else
             v-model="activeAgentKey"
             :label="t('aiObservability.agentGraph.agent')"
             label-position="inside"
             :options="agentSelectOptions"
             labelKey="label"
             valueKey="value"
+            :loading="!agentsLoaded"
             class="rounded-default w-full"
           />
         </div>
@@ -130,7 +129,6 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import AgentBehaviorPanel from "./AgentBehaviorPanel.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 import useStreams from "@/composables/useStreams";
 import { useStore } from "vuex";
 import genAiAgentMappingService, {

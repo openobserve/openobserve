@@ -1,21 +1,14 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
-<script lang="ts">
-// Every row registers its own window keydown listener, so they all see the
-// same event — this shared set lets only the first responder act on it.
-const handledNavEvents = new WeakSet<KeyboardEvent>();
-</script>
-
 <script setup lang="ts">
 import type { Row, Table } from "@tanstack/vue-table";
-import { computed, inject, ref, onMounted, onBeforeUnmount, useSlots } from "vue";
+import { computed, inject, ref, onMounted, useSlots } from "vue";
 import OTableBodyCell from "./OTableBodyCell.vue";
 import OTableSelectCheckbox from "./OTableSelectCheckbox.vue";
 import OTableExpandButton from "./OTableExpandButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { OTableTreeContextKey } from "../composables/useTableTree";
 import { TABLE_CHECKBOX_COL_SIZE as TABLE_CHECKBOX_COL_WIDTH } from "../OTable.types";
-import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 const props = defineProps<{
   row: Row<any>;
@@ -136,85 +129,16 @@ function onDblclick(event: MouseEvent) {
   emit("row-dblclick", props.row.original, event);
 }
 
-// ── Row hover keyboard shortcuts ──────────────────────────────────
-// Same pattern as PanelContainer.vue — direct keydown on window, gated
-// by isHovered so only the currently hovered row responds.
-// Pages just need data-row-action="edit|delete|pause" on their action buttons.
-const isHovered = ref(false);
-const isFocused = ref(false);
-
-const ROW_ACTION_KEYS: Record<string, string> = {
-  e: "edit",
-  d: "duplicate",
-  i: "inspect",
-  p: "pause",
-  r: "resume",
-  v: "view",
-  x: "export",
-};
-
-const handleKeydown = (e: KeyboardEvent) => {
-  if ((!isHovered.value && !isFocused.value) || isInputFocused()) return;
-  const rowEl = rowRef.value?.closest("tr");
-  const active = document.activeElement;
-  if (active && active !== rowEl && active !== document.body) return;
-  if (handledNavEvents.has(e)) return;
-  handledNavEvents.add(e);
-
-  // Arrow up/down — move focus to the adjacent row
-  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-    const tr = rowRef.value?.closest("tr");
-    if (!tr) return;
-    let sibling = e.key === "ArrowDown" ? tr.nextElementSibling : tr.previousElementSibling;
-    while (sibling && !sibling.matches("tr[data-test^='o2-table-row-']")) {
-      sibling = e.key === "ArrowDown" ? sibling.nextElementSibling : sibling.previousElementSibling;
-    }
-    if (sibling instanceof HTMLElement) {
-      e.preventDefault();
-      isHovered.value = false;
-      if (sibling.hasAttribute("tabindex")) sibling.focus();
-      else sibling.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
-    }
-    return;
-  }
-
-  // Enter triggers the row's click handler (same as a mouse click)
-  if (e.key === "Enter") {
-    e.preventDefault();
-    rowRef.value?.closest("tr")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    return;
-  }
-
-  const action =
-    e.key === "Delete" || e.key === "Backspace" ? "delete" : ROW_ACTION_KEYS[e.key.toLowerCase()];
-
-  if (!action) return;
-
-  const btn = rowRef.value?.querySelector<HTMLElement>(`[data-row-action='${action}']`);
-  if (btn) {
-    e.preventDefault();
-    btn.click();
-  }
-};
-
-onMounted(() => window.addEventListener("keydown", handleKeydown));
-onBeforeUnmount(() => window.removeEventListener("keydown", handleKeydown));
-
+// Row hover/focus keyboard shortcuts (↑/↓, Enter, action keys) are handled by a
+// SINGLE delegated listener at the table level (useTableRowShortcuts in
+// OTable.vue) instead of one window listener per row. Rows only need to stay
+// hoverable/focusable — the CSS + tabindex on the <tr> below — and surface their
+// hover events for parents that listen.
 function onRowMouseenter(e: MouseEvent) {
-  isHovered.value = true;
   emit("row-mouseenter", props.row.original, e);
 }
 function onRowMouseleave() {
-  isHovered.value = false;
   emit("row-mouseleave", props.row.original);
-}
-
-// focus/blur don't bubble — fires for the <tr> only, not inner action buttons.
-function onRowFocus() {
-  isFocused.value = true;
-}
-function onRowBlur() {
-  isFocused.value = false;
 }
 </script>
 
@@ -244,8 +168,6 @@ function onRowBlur() {
     @dblclick="onDblclick"
     @mouseenter="onRowMouseenter"
     @mouseleave="onRowMouseleave"
-    @focus="onRowFocus"
-    @blur="onRowBlur"
   >
     <!-- Expand button cell -->
     <td

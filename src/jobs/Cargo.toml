@@ -17,6 +17,7 @@ enterprise = [
     "compaction/enterprise",
     "enrichment-data/enterprise",
     "openobserve-core/enterprise",
+    "openobserve-org-storage/enterprise",
     "promql-service/enterprise",
     "search_service/enterprise",
     "stream/enterprise",
@@ -40,6 +41,8 @@ audit.workspace = true
 common.workspace = true
 db.workspace = true
 openobserve-core.workspace = true
+openobserve-builtins.workspace = true
+openobserve-org-storage.workspace = true
 ingestion-common.workspace = true
 schema.workspace = true
 compaction.workspace = true
