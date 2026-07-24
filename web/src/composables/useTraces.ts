@@ -14,11 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { reactive, computed, nextTick, shallowRef } from "vue";
-import {
-  b64EncodeStandard,
-  b64EncodeUnicode,
-  useLocalTraceFilterField,
-} from "@/utils/zincutils";
+import { b64EncodeStandard, b64EncodeUnicode, useLocalTraceFilterField } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -88,19 +84,13 @@ const defaultObject = {
     redirectedFromLogs: false,
     searchApplied: false,
     lastRunAt: undefined as number | undefined,
-    metricsRangeFilters: new Map<
-      string,
-      { panelTitle: string; start: number; end: number }
-    >(),
+    metricsRangeFilters: new Map<string, { panelTitle: string; start: number; end: number }>(),
     queryEditorPlaceholderFlag: true,
     liveMode: localStorage.getItem("oo_toggle_auto_run") === "true",
     searchMode: "spans" as TraceSearchMode,
     serviceGraphVisualizationType:
-      (localStorage.getItem("serviceGraph_visualizationType") as
-        | "tree"
-        | "graph") || "tree",
-    serviceGraphLayoutType:
-      localStorage.getItem("serviceGraph_layoutType") || "horizontal",
+      (localStorage.getItem("serviceGraph_visualizationType") as "tree" | "graph") || "tree",
+    serviceGraphLayoutType: localStorage.getItem("serviceGraph_layoutType") || "horizontal",
   },
   data: {
     query: "",
@@ -191,14 +181,7 @@ const searchObj = reactive(Object.assign({}, defaultObject));
 /** Default ordered column ID lists used when no localStorage entry exists. */
 export const DEFAULT_TRACE_COLUMNS: Record<"traces" | "spans", string[]> = {
   spans: ["service_name", "operation_name", "duration", "span_status"],
-  traces: [
-    "service_name",
-    "operation_name",
-    "duration",
-    "spans",
-    "status",
-    "service_latency",
-  ],
+  traces: ["service_name", "operation_name", "duration", "spans", "status", "service_latency"],
 };
 
 // Shared SQL parser singleton — loaded once by Index.vue in onBeforeMount,
@@ -259,9 +242,7 @@ const useTraces = () => {
    * Persist the current selectedFields for the given mode.
    * Stored as traceFilterField[orgId_stream][mode] = string[].
    */
-  const updatedLocalLogFilterField = (
-    searchMode: "traces" | "spans" = "traces",
-  ): void => {
+  const updatedLocalLogFilterField = (searchMode: "traces" | "spans" = "traces"): void => {
     const identifier: string = searchObj.organizationIdentifier || "default";
     const key = `${identifier}_${searchObj.data.stream.selectedStream.value}`;
     const all: any = useLocalTraceFilterField()?.value ?? {};
@@ -276,9 +257,7 @@ const useTraces = () => {
    * Restore selectedFields for the given mode from localStorage.
    * Falls back to the default ordered column list when no saved value exists.
    */
-  const loadLocalLogFilterField = (
-    searchMode: "traces" | "spans" = "traces",
-  ): void => {
+  const loadLocalLogFilterField = (searchMode: "traces" | "spans" = "traces"): void => {
     const identifier: string = searchObj.organizationIdentifier || "default";
     const key = `${identifier}_${searchObj.data.stream.selectedStream.value}`;
     // storage ref .value is typed {} at this boundary; narrow to the stored map shape
@@ -287,10 +266,9 @@ const useTraces = () => {
       | undefined;
     const saved: Record<string, string[]> | undefined = stored?.[key];
 
-    const fields: string[] =
-      saved?.[searchMode]?.length
-        ? saved?.[searchMode]
-        : [...DEFAULT_TRACE_COLUMNS[searchMode]];
+    const fields: string[] = saved?.[searchMode]?.length
+      ? saved?.[searchMode]
+      : [...DEFAULT_TRACE_COLUMNS[searchMode]];
 
     searchObj.data.stream.selectedFields = fields;
   };
@@ -324,9 +302,7 @@ const useTraces = () => {
     return query;
   }
 
-  const copyTracesUrl = (
-    customTimeRange: { from: string; to: string } | null = null,
-  ) => {
+  const copyTracesUrl = (customTimeRange: { from: string; to: string } | null = null) => {
     const queryParams = getUrlQueryParams(true);
 
     if (customTimeRange) {
@@ -355,10 +331,8 @@ const useTraces = () => {
 
   // Function to build query details for navigation
   const buildQueryDetails = (span: any, isSpan: boolean = true) => {
-    const spanIdField =
-      store.state.organizationData?.organizationSettings?.span_id_field_name;
-    const traceIdField =
-      store.state.organizationData?.organizationSettings?.trace_id_field_name;
+    const spanIdField = store.state.organizationData?.organizationSettings?.span_id_field_name;
+    const traceIdField = store.state.organizationData?.organizationSettings?.trace_id_field_name;
     const traceId = searchObj.data.traceDetails.selectedTrace?.trace_id;
 
     let query: string = isSpan
@@ -436,11 +410,9 @@ const useTraces = () => {
           ? [hit.service_name]
           : [];
       serviceNames.forEach((service: any) => {
-        const serviceName =
-          typeof service === "string" ? service : service.service_name;
+        const serviceName = typeof service === "string" ? service : service.service_name;
         if (serviceName && !searchObj.meta.serviceColors[serviceName]) {
-          searchObj.meta.serviceColors[serviceName] =
-            registryGetOrSetServiceColor(serviceName);
+          searchObj.meta.serviceColors[serviceName] = registryGetOrSetServiceColor(serviceName);
         }
       });
     });
@@ -481,12 +453,9 @@ const useTraces = () => {
       // Build per-trace service span count and duration map
       if (trace.service_name && Array.isArray(trace.service_name)) {
         trace.service_name.forEach((service: any) => {
-          const serviceName =
-            typeof service === "string" ? service : service.service_name;
-          const serviceCount =
-            typeof service === "string" ? 1 : service.count || 1;
-          const serviceDuration =
-            typeof service === "string" ? 0 : service.duration || 0;
+          const serviceName = typeof service === "string" ? service : service.service_name;
+          const serviceCount = typeof service === "string" ? 1 : service.count || 1;
+          const serviceDuration = typeof service === "string" ? 0 : service.duration || 0;
           _trace.services[serviceName] = {
             count: serviceCount,
             duration: serviceDuration,
@@ -508,8 +477,7 @@ const useTraces = () => {
     for (const streamInfo of correlationProps.logStreams) {
       const filters = streamInfo.filters ?? {};
       for (const [field, value] of Object.entries(filters)) {
-        if (!value || value === SELECT_ALL_VALUE || field.startsWith("_"))
-          continue;
+        if (!value || value === SELECT_ALL_VALUE || field.startsWith("_")) continue;
         const groupId = fieldToGroupId.get(field.toLowerCase()) ?? field;
         if (usedGroups.has(groupId)) continue;
         usedGroups.add(groupId);

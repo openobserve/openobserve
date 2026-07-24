@@ -41,7 +41,6 @@
  *        < 0   -> insert before node (id + insertionPoint)
  */
 
-
 // ---------------------------------------------------------------------------
 // Constants (mirror packages/browser-rum sessionReplayConstants.ts)
 // ---------------------------------------------------------------------------
@@ -248,9 +247,7 @@ export function createRecordConverter(): RecordConverter {
       const parentId = prevSibling ? prevSibling.parentId : -1;
       const parent = nodes.get(parentId);
       if (!parent) return { parentId, index: 0 };
-      const idx = parent.node.childNodes.findIndex(
-        (c: any) => c.id === prevSiblingId,
-      );
+      const idx = parent.node.childNodes.findIndex((c: any) => c.id === prevSiblingId);
       return { parentId, index: idx === -1 ? parent.node.childNodes.length : idx + 1 };
     }
     // insertionPoint < 0 : insert before (id + insertionPoint)
@@ -259,9 +256,7 @@ export function createRecordConverter(): RecordConverter {
     const parentId = nextSibling ? nextSibling.parentId : -1;
     const parent = nodes.get(parentId);
     if (!parent) return { parentId, index: 0 };
-    const idx = parent.node.childNodes.findIndex(
-      (c: any) => c.id === nextSiblingId,
-    );
+    const idx = parent.node.childNodes.findIndex((c: any) => c.id === nextSiblingId);
     return { parentId, index: idx === -1 ? parent.node.childNodes.length : idx };
   }
 
@@ -275,10 +270,7 @@ export function createRecordConverter(): RecordConverter {
       if (sheet) {
         node.attributes._cssText = rulesToCssText(sheet.rules);
       }
-    } else if (
-      node.type === NodeType.Document ||
-      node.type === NodeType.DocumentFragment
-    ) {
+    } else if (node.type === NodeType.Document || node.type === NodeType.DocumentFragment) {
       // #document / #shadow-root: adoptedStyleSheets array.
       node.adoptedStyleSheets = sheetIds.map((sid) => {
         const sheet = styleSheets.get(sid);
@@ -461,9 +453,7 @@ export function createRecordConverter(): RecordConverter {
             if (tracked) {
               const parent = nodes.get(parentId);
               if (parent) {
-                const idx = parent.node.childNodes.findIndex(
-                  (c: any) => c.id === nodeId,
-                );
+                const idx = parent.node.childNodes.findIndex((c: any) => c.id === nodeId);
                 if (idx !== -1) parent.node.childNodes.splice(idx, 1);
               }
               nodes.delete(nodeId);

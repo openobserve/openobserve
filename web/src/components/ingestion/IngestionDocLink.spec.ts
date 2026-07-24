@@ -78,8 +78,6 @@ describe("IngestionDocLink.vue", () => {
 
   it("reflects a different href", () => {
     wrapper = createWrapper({ href: "https://example.com/docs" });
-    expect(wrapper.find("a").attributes("href")).toBe(
-      "https://example.com/docs",
-    );
+    expect(wrapper.find("a").attributes("href")).toBe("https://example.com/docs");
   });
 });

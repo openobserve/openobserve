@@ -6,17 +6,17 @@
     :class="[
       'o-splitter',
       horizontal ? 'o-splitter--horizontal' : 'o-splitter--vertical',
-      'flex relative',
-      horizontal ? 'flex-col' : 'flex-row'
+      'relative flex',
+      horizontal ? 'flex-col' : 'flex-row',
     ]"
   >
     <!-- Before slot -->
     <div
       :class="[
         'o-splitter__before',
-        'overflow-hidden shrink-0 relative',
+        'relative shrink-0 overflow-hidden',
         horizontal ? 'w-full' : 'h-full',
-        beforeClass
+        beforeClass,
       ]"
       :style="beforeStyle"
     >
@@ -31,10 +31,10 @@
         'select-none',
         'relative',
         'z-10',
-        'focus:outline-2 focus:outline-accent focus:-outline-offset-2',
-        disable ? 'cursor-default! opacity-50 pointer-events-none' : '',
+        'focus:outline-accent focus:outline-2 focus:-outline-offset-2',
+        disable ? 'pointer-events-none cursor-default! opacity-50' : '',
         horizontal ? 'h-px w-full cursor-row-resize' : 'h-full cursor-col-resize',
-        separatorClass
+        separatorClass,
       ]"
       :style="[separatorStyle]"
       :tabindex="disable ? -1 : 0"
@@ -54,8 +54,8 @@
     <div
       :class="[
         'o-splitter__after',
-        'overflow-hidden flex-1 relative z-0 shrink-0',
-        horizontal ? 'w-full' : 'h-full'
+        'relative z-0 flex-1 shrink-0 overflow-hidden',
+        horizontal ? 'w-full' : 'h-full',
       ]"
     >
       <slot name="after" />
@@ -64,32 +64,32 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, nextTick } from 'vue'
-import useResizer from '@/composables/useResizer'
-import type { OSplitterProps, OSplitterEmits } from './OSplitter.types'
+import { computed, ref, nextTick } from "vue";
+import useResizer from "@/composables/useResizer";
+import type { OSplitterProps, OSplitterEmits } from "./OSplitter.types";
 
 const props = withDefaults(defineProps<OSplitterProps>(), {
   horizontal: false,
   limits: () => [0, 0],
-  unit: '%',
+  unit: "%",
   disable: false,
   separator: true,
-  separatorClass: '',
+  separatorClass: "",
   separatorStyle: () => ({}),
-  beforeClass: '',
-})
+  beforeClass: "",
+});
 
-const emit = defineEmits<OSplitterEmits>()
+const emit = defineEmits<OSplitterEmits>();
 
-const containerRef = ref<HTMLElement | null>(null)
+const containerRef = ref<HTMLElement | null>(null);
 
 // Determine min/max values from limits prop
-const minValue = computed(() => props.limits?.[0] ||  (props.unit ==='%' ? 0 : 0))
-const maxValue = computed(() => props.limits?.[1] || (props.unit ==='%' ? 100 : 1000))
+const minValue = computed(() => props.limits?.[0] || (props.unit === "%" ? 0 : 0));
+const maxValue = computed(() => props.limits?.[1] || (props.unit === "%" ? 100 : 1000));
 
 // Setup resizer composable with faster throttling for smoother movement
 const { value: currentValue, onMouseDown } = useResizer({
-  direction: !props.horizontal ? 'horizontal' : 'vertical',
+  direction: !props.horizontal ? "horizontal" : "vertical",
   initialValue: props.modelValue,
   minValue: minValue.value,
   maxValue: maxValue.value,
@@ -98,56 +98,58 @@ const { value: currentValue, onMouseDown } = useResizer({
   throttleMs: 16, // 60fps for smooth movement
   invert: false, // For horizontal splitters, invert the direction
   onResize: (newValue: number) => {
-    emit('update:modelValue', newValue)
-  }
-})
+    emit("update:modelValue", newValue);
+  },
+});
 
 // Computed styles for before/after sections
 const beforeStyle = computed(() => {
-  const size = `${currentValue.value}${props.unit}`
-  return props.horizontal
-    ? { height: size }
-    : { width: size }
-})
+  const size = `${currentValue.value}${props.unit}`;
+  return props.horizontal ? { height: size } : { width: size };
+});
 
 // Keyboard navigation support
 const handleKeyDown = (event: KeyboardEvent) => {
-  if (props.disable) return
+  if (props.disable) return;
 
-  const step = props.unit === '%' ? 5 : 20 // 5% or 20px steps
-  let newValue = currentValue.value
+  const step = props.unit === "%" ? 5 : 20; // 5% or 20px steps
+  let newValue = currentValue.value;
 
   switch (event.key) {
-    case 'ArrowUp':
-    case 'ArrowLeft':
-      newValue = Math.max(minValue.value, currentValue.value - step)
-      break
-    case 'ArrowDown':
-    case 'ArrowRight':
-      newValue = Math.min(maxValue.value, currentValue.value + step)
-      break
-    case 'Home':
-      newValue = minValue.value
-      break
-    case 'End':
-      newValue = maxValue.value
-      break
+    case "ArrowUp":
+    case "ArrowLeft":
+      newValue = Math.max(minValue.value, currentValue.value - step);
+      break;
+    case "ArrowDown":
+    case "ArrowRight":
+      newValue = Math.min(maxValue.value, currentValue.value + step);
+      break;
+    case "Home":
+      newValue = minValue.value;
+      break;
+    case "End":
+      newValue = maxValue.value;
+      break;
     default:
-      return
+      return;
   }
 
-  event.preventDefault()
-  emit('update:modelValue', newValue)
+  event.preventDefault();
+  emit("update:modelValue", newValue);
   nextTick(() => {
-    currentValue.value = newValue
-  })
-}
+    currentValue.value = newValue;
+  });
+};
 
 // Watch for external prop changes
-import { watch } from 'vue'
-watch(() => props.modelValue, (newValue) => {
-  currentValue.value = newValue
-}, { immediate: true })
+import { watch } from "vue";
+watch(
+  () => props.modelValue,
+  (newValue) => {
+    currentValue.value = newValue;
+  },
+  { immediate: true },
+);
 </script>
 
 <style scoped>

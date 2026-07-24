@@ -67,7 +67,7 @@ export interface CorrelationResult {
 export function extractSemanticDimensions(
   context: TelemetryContext,
   semanticGroups: FieldAlias[],
-  stableOnly: boolean = false
+  stableOnly: boolean = false,
 ): Record<string, string> {
   const dimensions: Record<string, string> = {};
 
@@ -98,9 +98,7 @@ export function extractSemanticDimensions(
  * from multiple correlated streams that may use different field names for the
  * same conceptual dimension.
  */
-export function buildFieldToGroupIdMap(
-  semanticGroups: FieldAlias[],
-): Map<string, string> {
+export function buildFieldToGroupIdMap(semanticGroups: FieldAlias[]): Map<string, string> {
   const map = new Map<string, string>();
   for (const group of semanticGroups) {
     for (const field of group.fields) {
@@ -131,7 +129,7 @@ export function buildFieldToGroupIdMap(
  */
 export function filterDimensionsForCorrelation(
   allDimensions: Record<string, string>,
-  identityConfig: ServiceIdentityConfig
+  identityConfig: ServiceIdentityConfig,
 ): Record<string, string> {
   // Determine selected fields (same logic as backend)
   let selectedFields: string[] = [];
@@ -141,7 +139,7 @@ export function filterDimensionsForCorrelation(
     const allDistinguishByFields = new Set<string>();
     for (const set of identityConfig.sets) {
       if (set.distinguish_by) {
-        set.distinguish_by.forEach(field => allDistinguishByFields.add(field));
+        set.distinguish_by.forEach((field) => allDistinguishByFields.add(field));
       }
     }
     selectedFields = Array.from(allDistinguishByFields);
@@ -163,9 +161,8 @@ export function filterDimensionsForCorrelation(
 
   // Filter dimensions to only include fields we need
   const filtered = Object.fromEntries(
-    Object.entries(allDimensions).filter(([key]) => fieldsToKeep.has(key))
+    Object.entries(allDimensions).filter(([key]) => fieldsToKeep.has(key)),
   );
-
 
   return filtered;
 }
@@ -176,9 +173,7 @@ export function filterDimensionsForCorrelation(
  * Uses the exact field names returned by the _correlate API instead of semantic variations.
  * Skips filters with SELECT_ALL_VALUE (wildcard - means match all values).
  */
-function buildExactDimensionConditions(
-  filters: Record<string, string>
-): string[] {
+function buildExactDimensionConditions(filters: Record<string, string>): string[] {
   const conditions: string[] = [];
 
   for (const [fieldName, value] of Object.entries(filters)) {
@@ -205,7 +200,7 @@ export function buildTraceQuery(
   streamInfo: StreamInfo,
   context: TelemetryContext,
   timeWindowMinutes: number = 5,
-  matchedDimensions: Record<string, string> = {}
+  matchedDimensions: Record<string, string> = {},
 ): CorrelationQuery {
   const conditions: string[] = [];
 
@@ -247,7 +242,7 @@ export function buildMetricQuery(
   streamInfo: StreamInfo,
   context: TelemetryContext,
   timeWindowMinutes: number = 5,
-  matchedDimensions: Record<string, string> = {}
+  matchedDimensions: Record<string, string> = {},
 ): CorrelationQuery {
   const conditions: string[] = [];
 
@@ -286,7 +281,7 @@ export function buildLogQuery(
   streamInfo: StreamInfo,
   context: TelemetryContext,
   timeWindowMinutes: number = 5,
-  matchedDimensions: Record<string, string> = {}
+  matchedDimensions: Record<string, string> = {},
 ): CorrelationQuery {
   const conditions: string[] = [];
 
@@ -329,7 +324,7 @@ export function generateCorrelationQueries(
   sourceType: TelemetryType,
   semanticGroups: FieldAlias[],
   timeWindowMinutes: number = 5,
-  correlationData?: CorrelationResponse
+  correlationData?: CorrelationResponse,
 ): CorrelationQuery[] {
   const queries: CorrelationQuery[] = [];
 
@@ -366,7 +361,7 @@ export function generateCorrelationQueries(
  */
 export function findMatchingService(
   services: ServiceMetadata[],
-  dimensions: Record<string, string>
+  dimensions: Record<string, string>,
 ): ServiceMetadata | null {
   // Find service with most matching dimensions
   let bestMatch: ServiceMetadata | null = null;

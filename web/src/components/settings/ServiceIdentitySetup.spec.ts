@@ -61,8 +61,7 @@ vi.mock("@/components/dashboards/panels/CustomChartRenderer.vue", () => ({
 vi.mock("@/lib/forms/TagInput/OTagInput.vue", () => ({
   default: {
     name: "OTagInput",
-    template:
-      '<div data-test="tag-input" :data-model-value="JSON.stringify(modelValue)" />',
+    template: '<div data-test="tag-input" :data-model-value="JSON.stringify(modelValue)" />',
     props: ["modelValue", "placeholder", "label"],
     emits: ["update:modelValue"],
   },
@@ -72,7 +71,6 @@ import ServiceIdentitySetup from "./ServiceIdentitySetup.vue";
 import serviceStreamsService from "@/services/service_streams";
 
 // ─── Test setup ──────────────────────────────────────────────────────────────
-
 
 // This spec asserts on these specific correlation strings, so they must win
 // over the real app locale.
@@ -254,12 +252,8 @@ describe("ServiceIdentitySetup", () => {
     it("should call getDimensionAnalytics and getIdentityConfig on mount", async () => {
       wrapper = mountComponent();
       await flushPromises();
-      expect(serviceStreamsService.getDimensionAnalytics).toHaveBeenCalledWith(
-        "test-org",
-      );
-      expect(serviceStreamsService.getIdentityConfig).toHaveBeenCalledWith(
-        "test-org",
-      );
+      expect(serviceStreamsService.getDimensionAnalytics).toHaveBeenCalledWith("test-org");
+      expect(serviceStreamsService.getIdentityConfig).toHaveBeenCalledWith("test-org");
     });
   });
 
@@ -269,14 +263,10 @@ describe("ServiceIdentitySetup", () => {
       // block containing the main content should not be present yet.
       wrapper = mountComponent();
       // The save button and the add-distinguish-btn are both inside the v-else block
-      expect(
-        wrapper.find('[data-test="service-identity-save-btn"]').exists(),
-      ).toBe(false);
-      expect(
-        wrapper
-          .find('[data-test="service-identity-add-distinguish-btn"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="service-identity-save-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="service-identity-add-distinguish-btn"]').exists()).toBe(
+        false,
+      );
     });
 
     it("should show main content after data loads", async () => {
@@ -284,11 +274,9 @@ describe("ServiceIdentitySetup", () => {
       await flushPromises();
       // Once loading=false, the v-else block with main content is rendered.
       // The add-distinguish-btn is the empty-state btn visible when no fields are configured.
-      expect(
-        wrapper
-          .find('[data-test="service-identity-add-distinguish-btn"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="service-identity-add-distinguish-btn"]').exists()).toBe(
+        true,
+      );
     });
   });
 
@@ -309,17 +297,13 @@ describe("ServiceIdentitySetup", () => {
       });
       wrapper = mountComponent();
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="service-identity-save-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="service-identity-save-btn"]').exists()).toBe(true);
     });
 
     it("should not render save button while data is still loading", () => {
       wrapper = mountComponent();
       // loading=true: v-else branch (which contains the save btn) is hidden
-      expect(
-        wrapper.find('[data-test="service-identity-save-btn"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="service-identity-save-btn"]').exists()).toBe(false);
     });
   });
 
@@ -327,11 +311,7 @@ describe("ServiceIdentitySetup", () => {
     it("should not show the warnings banner when there are no warnings", async () => {
       wrapper = mountComponent();
       await flushPromises();
-      expect(
-        wrapper
-          .find('[data-test="service-identity-warnings-banner"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="service-identity-warnings-banner"]').exists()).toBe(false);
     });
 
     it("should show the warnings banner when warnings are present", async () => {
@@ -339,15 +319,11 @@ describe("ServiceIdentitySetup", () => {
       await flushPromises();
 
       // Directly set warnings via vm — no public API exists to reach this state
-       
+
       (wrapper.vm as any).warnings = ["Service name field not configured"];
       await wrapper.vm.$nextTick();
 
-      expect(
-        wrapper
-          .find('[data-test="service-identity-warnings-banner"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="service-identity-warnings-banner"]').exists()).toBe(true);
     });
 
     it("should display the warning text inside the banner", async () => {
@@ -355,15 +331,13 @@ describe("ServiceIdentitySetup", () => {
       await flushPromises();
 
       const warningText = "Ambiguous service names detected";
-       
+
       (wrapper.vm as any).warnings = [warningText];
       await wrapper.vm.$nextTick();
 
-      expect(
-        wrapper
-          .find('[data-test="service-identity-warnings-banner"]')
-          .text(),
-      ).toContain(warningText);
+      expect(wrapper.find('[data-test="service-identity-warnings-banner"]').text()).toContain(
+        warningText,
+      );
     });
   });
 
@@ -375,9 +349,7 @@ describe("ServiceIdentitySetup", () => {
       // The "Customize Field Mappings" link is inside the expanded service name
       // section (v-if="serviceNameExpanded"). Expand it first by clicking the
       // collapsed header row, then find and click the link.
-      const collapsedRow = wrapper.find(
-        '[data-test="service-identity-service-name-header"]',
-      );
+      const collapsedRow = wrapper.find('[data-test="service-identity-service-name-header"]');
       await collapsedRow.trigger("click");
       await wrapper.vm.$nextTick();
 
@@ -393,9 +365,7 @@ describe("ServiceIdentitySetup", () => {
 
     it("should emit navigate-to-services when the services link is clicked in the workload section", async () => {
       // Make availableGroups non-empty with dimension analytics so the workload detection section renders
-      vi.mocked(
-        serviceStreamsService.getDimensionAnalytics,
-      ).mockResolvedValueOnce({
+      vi.mocked(serviceStreamsService.getDimensionAnalytics).mockResolvedValueOnce({
         data: {
           org_id: "test-org",
           total_dimensions: 1,
@@ -454,21 +424,14 @@ describe("ServiceIdentitySetup", () => {
       expect(dialogs.length).toBeGreaterThanOrEqual(2);
 
       const fieldMappingDialog = dialogs.find(
-        (d) =>
-          d.attributes("data-title") === "Customize Field Mappings",
+        (d) => d.attributes("data-title") === "Customize Field Mappings",
       );
       expect(fieldMappingDialog).toBeDefined();
       expect(fieldMappingDialog!.attributes("data-open")).toBe("false");
       expect(fieldMappingDialog!.attributes("data-size")).toBe("sm");
-      expect(fieldMappingDialog!.attributes("data-sub-title")).toBe(
-        "Map fields to service names",
-      );
-      expect(fieldMappingDialog!.attributes("data-primary-label")).toBe(
-        "Save",
-      );
-      expect(fieldMappingDialog!.attributes("data-secondary-label")).toBe(
-        "Cancel",
-      );
+      expect(fieldMappingDialog!.attributes("data-sub-title")).toBe("Map fields to service names");
+      expect(fieldMappingDialog!.attributes("data-primary-label")).toBe("Save");
+      expect(fieldMappingDialog!.attributes("data-secondary-label")).toBe("Cancel");
     });
 
     it("should open the field-mapping ODialog when openFieldMappingDialog() is called", async () => {
@@ -477,16 +440,13 @@ describe("ServiceIdentitySetup", () => {
 
       // No public DOM trigger exists in the empty-state layout, so call the
       // exposed component method directly.
-       
+
       (wrapper.vm as any).openFieldMappingDialog();
       await wrapper.vm.$nextTick();
 
       const fieldMappingDialog = wrapper
         .findAll('[data-test="o-dialog-stub"]')
-        .find(
-          (d) =>
-            d.attributes("data-title") === "Customize Field Mappings",
-        );
+        .find((d) => d.attributes("data-title") === "Customize Field Mappings");
       expect(fieldMappingDialog).toBeDefined();
       expect(fieldMappingDialog!.attributes("data-open")).toBe("true");
     });
@@ -495,30 +455,21 @@ describe("ServiceIdentitySetup", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-       
       (wrapper.vm as any).openFieldMappingDialog();
       await wrapper.vm.$nextTick();
 
       let fieldMappingDialog = wrapper
         .findAll('[data-test="o-dialog-stub"]')
-        .find(
-          (d) =>
-            d.attributes("data-title") === "Customize Field Mappings",
-        );
+        .find((d) => d.attributes("data-title") === "Customize Field Mappings");
       expect(fieldMappingDialog!.attributes("data-open")).toBe("true");
 
       // Click the stub's secondary button → component should set showFieldMappingDialog=false
-      await fieldMappingDialog!
-        .find('[data-test="o-dialog-stub-secondary"]')
-        .trigger("click");
+      await fieldMappingDialog!.find('[data-test="o-dialog-stub-secondary"]').trigger("click");
       await wrapper.vm.$nextTick();
 
       fieldMappingDialog = wrapper
         .findAll('[data-test="o-dialog-stub"]')
-        .find(
-          (d) =>
-            d.attributes("data-title") === "Customize Field Mappings",
-        );
+        .find((d) => d.attributes("data-title") === "Customize Field Mappings");
       expect(fieldMappingDialog!.attributes("data-open")).toBe("false");
     });
 
@@ -528,28 +479,22 @@ describe("ServiceIdentitySetup", () => {
 
       // Seed editableServiceFields via the public open-method so the saved
       // value reflects what the dialog would actually send.
-       
+
       (wrapper.vm as any).openFieldMappingDialog();
       await wrapper.vm.$nextTick();
 
       // Drive the TagInput → editable list update through the v-model pipeline
       const tagInput = wrapper.find('[data-test="tag-input"]');
       expect(tagInput.exists()).toBe(true);
-      await tagInput.findComponent({ name: "OTagInput" }).vm.$emit(
-        "update:modelValue",
-        ["service.name", "k8s.deployment"],
-      );
+      await tagInput
+        .findComponent({ name: "OTagInput" })
+        .vm.$emit("update:modelValue", ["service.name", "k8s.deployment"]);
       await wrapper.vm.$nextTick();
 
       const fieldMappingDialog = wrapper
         .findAll('[data-test="o-dialog-stub"]')
-        .find(
-          (d) =>
-            d.attributes("data-title") === "Customize Field Mappings",
-        );
-      await fieldMappingDialog!
-        .find('[data-test="o-dialog-stub-primary"]')
-        .trigger("click");
+        .find((d) => d.attributes("data-title") === "Customize Field Mappings");
+      await fieldMappingDialog!.find('[data-test="o-dialog-stub-primary"]').trigger("click");
       await flushPromises();
 
       expect(wrapper.emitted("update-service-fields")).toBeTruthy();
@@ -560,10 +505,7 @@ describe("ServiceIdentitySetup", () => {
       // After save the dialog closes
       const closedDialog = wrapper
         .findAll('[data-test="o-dialog-stub"]')
-        .find(
-          (d) =>
-            d.attributes("data-title") === "Customize Field Mappings",
-        );
+        .find((d) => d.attributes("data-title") === "Customize Field Mappings");
       expect(closedDialog!.attributes("data-open")).toBe("false");
     });
 
@@ -571,7 +513,6 @@ describe("ServiceIdentitySetup", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-       
       const vm = wrapper.vm as any;
       vm.openFieldMappingDialog();
       vm.savingFieldMappings = true;
@@ -579,13 +520,8 @@ describe("ServiceIdentitySetup", () => {
 
       const fieldMappingDialog = wrapper
         .findAll('[data-test="o-dialog-stub"]')
-        .find(
-          (d) =>
-            d.attributes("data-title") === "Customize Field Mappings",
-        );
-      expect(fieldMappingDialog!.attributes("data-primary-loading")).toBe(
-        "true",
-      );
+        .find((d) => d.attributes("data-title") === "Customize Field Mappings");
+      expect(fieldMappingDialog!.attributes("data-primary-loading")).toBe("true");
     });
   });
 
@@ -626,9 +562,9 @@ describe("ServiceIdentitySetup", () => {
     };
 
     beforeEach(() => {
-      vi.mocked(
-        serviceStreamsService.getDimensionAnalytics,
-      ).mockResolvedValue(workloadAnalytics as any);
+      vi.mocked(serviceStreamsService.getDimensionAnalytics).mockResolvedValue(
+        workloadAnalytics as any,
+      );
     });
 
     it("should render the workload insight ODrawer closed by default", async () => {
@@ -644,7 +580,6 @@ describe("ServiceIdentitySetup", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-       
       const vm = wrapper.vm as any;
       vm.openInsightDialog("k8s-namespace", "primary");
       await flushPromises();
@@ -659,21 +594,14 @@ describe("ServiceIdentitySetup", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-       
       (wrapper.vm as any).openInsightDialog("k8s-namespace", "primary");
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="o-drawer-stub"]').attributes("data-open"),
-      ).toBe("true");
+      expect(wrapper.find('[data-test="o-drawer-stub"]').attributes("data-open")).toBe("true");
 
-      await wrapper
-        .find('[data-test="o-drawer-stub-close"]')
-        .trigger("click");
+      await wrapper.find('[data-test="o-drawer-stub-close"]').trigger("click");
       await wrapper.vm.$nextTick();
 
-      expect(
-        wrapper.find('[data-test="o-drawer-stub"]').attributes("data-open"),
-      ).toBe("false");
+      expect(wrapper.find('[data-test="o-drawer-stub"]').attributes("data-open")).toBe("false");
     });
   });
 
@@ -684,9 +612,7 @@ describe("ServiceIdentitySetup", () => {
 
       const dialogs = wrapper.findAll('[data-test="o-dialog-stub"]');
       // The field-details dialog is the only md-sized ODialog in the template.
-      const detailsDialog = dialogs.find(
-        (d) => d.attributes("data-size") === "md",
-      );
+      const detailsDialog = dialogs.find((d) => d.attributes("data-size") === "md");
       expect(detailsDialog).toBeDefined();
       expect(detailsDialog!.attributes("data-open")).toBe("false");
     });
@@ -695,7 +621,6 @@ describe("ServiceIdentitySetup", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-       
       const vm = wrapper.vm as any;
       // Drive open + populate the values we expect to be cleared on close.
       vm.detailsDialogVisible = true;
@@ -708,9 +633,7 @@ describe("ServiceIdentitySetup", () => {
       const detailsDialog = wrapper
         .findAll('[data-test="o-dialog-stub"]')
         .find((d) => d.attributes("data-size") === "md");
-      await detailsDialog!
-        .find('[data-test="o-dialog-stub-close"]')
-        .trigger("click");
+      await detailsDialog!.find('[data-test="o-dialog-stub-close"]').trigger("click");
       await wrapper.vm.$nextTick();
 
       expect(vm.detailsDialogVisible).toBe(false);

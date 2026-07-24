@@ -4,6 +4,7 @@ import typescript from "@typescript-eslint/eslint-plugin";
 import typescriptParser from "@typescript-eslint/parser";
 import vueParser from "vue-eslint-parser";
 import prettier from "eslint-plugin-prettier";
+import vuePrettierSkipFormatting from "@vue/eslint-config-prettier/skip-formatting";
 import cypress from "eslint-plugin-cypress";
 import fs from "fs";
 
@@ -121,10 +122,35 @@ export default [
       vue,
       "@typescript-eslint": typescript,
       prettier,
-      "local": noLegacyO2Tokens,
+      local: noLegacyO2Tokens,
     },
     rules: {
       "local/no-legacy-o2-tokens": ["error"],
+
+      // Catches components used in <template> but never imported/registered
+      // (e.g. <date-time> instead of <DateTime>) — this class of bug is
+      // invisible to vue-tsc (unresolved tags aren't a template type error
+      // without vueCompilerOptions.strictTemplates) and wasn't caught before.
+      // Ignore patterns cover framework-global components (vue-router,
+      // vue-i18n, and Vue's own built-ins) that have no local import.
+      "vue/no-undef-components": [
+        "error",
+        {
+          ignorePatterns: [
+            "router-view",
+            "router-link",
+            "i18n-t",
+            "i18n-d",
+            "i18n-n",
+            "transition",
+            "transition-group",
+            "keep-alive",
+            "component",
+            "slot",
+            "teleport",
+          ],
+        },
+      ],
 
       // Dark-mode schema (O2_TOKEN_MIGRATION_PLAN §3.R.3) — warn now, error at Phase G.
       // The two sanctioned seams (useTheme.ts / chartTheme.ts) turn this off below.
@@ -155,6 +181,12 @@ export default [
       "prettier/prettier": "off",
       "vue/max-attributes-per-line": "off",
       "vue/multi-word-component-names": "off",
+      // Always use PascalCase for component tags in templates (auto-fixable).
+      "vue/component-name-in-template-casing": [
+        "error",
+        "PascalCase",
+        { registeredComponentsOnly: true, ignores: [] },
+      ],
       //
       // Zero current violations → locked straight to "error".
       "no-shadow-restricted-names": "error",
@@ -210,7 +242,6 @@ export default [
       "vue/no-mutating-props": "error",
       "vue/no-unused-components": "error",
       "vue/no-unused-vars": "error",
-
     },
   },
   {
@@ -230,4 +261,8 @@ export default [
       ...cypress.configs.recommended.rules,
     },
   },
+  // Must be last: disables core/TS/Vue stylistic rules that could conflict
+  // with Prettier's formatting decisions. Formatting is owned by `format:check`,
+  // not this lint gate — see "prettier/prettier": "off" above.
+  vuePrettierSkipFormatting,
 ];

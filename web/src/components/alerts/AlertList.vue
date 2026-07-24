@@ -17,514 +17,520 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div
-    data-test="alert-list-page"
-    class="flex flex-col h-full"
-  >
-    <OPageLayout bleed
+  <div data-test="alert-list-page" class="flex h-full flex-col">
+    <OPageLayout
+      bleed
       v-if="!showAddAlertDialog && !showImportAlertDialog"
       :title="t('alerts.header')"
       :subtitle="t('alerts.subtitle')"
       icon="shield-alert-outline"
     >
-          <template #actions>
-            <!-- Import button -->
-            <OButton
-              :class="isCompactToolbar ? 'py-0! px-2! min-w-0!' : ''"
-              variant="outline"
-              size="sm"
-              @click="importAlert"
-              data-test="alert-import"
-              icon-left="upload-file"
-            >
-              <template v-if="!isCompactToolbar">{{ t(`dashboard.import`) }}</template>
-              <OTooltip v-if="isCompactToolbar" :content="t('dashboard.import')" side="bottom" shortcut-id="alertsImport" />
-            </OButton>
-            <!-- Add button — routes to anomaly creation on anomaly tab, alert creation otherwise -->
-            <OButton
-              data-test="alert-list-add-alert-btn"
-              variant="primary"
-              size="sm"
-              :disabled="!destinations.length || !templates.length"
-              :title="!destinations.length ? t('alerts.noDestinations') : ''"
-              @click="
-                activeTab === 'anomalyDetection'
-                  ? router.push({
-                      name: 'addAnomalyDetection',
-                      query: {
-                        org_identifier:
-                          store.state.selectedOrganization.identifier,
-                        folder: activeFolderId,
-                        tab: activeTab,
-                      },
-                    })
-                  : showAddUpdateFn({})
-              "
-            >{{ t(`alerts.add`) }}</OButton>
-          </template>
-
-    <div
-      data-test="alert-list-splitter"
-      class="flex-1 flex min-h-0"
-    >
-      <!-- Left: FolderList -->
-      <div class="shrink-0 h-full w-rail">
-        <div class="h-full">
-          <FolderList
-            type="alerts"
-            @update:activeFolderId="updateActiveFolderId"
+      <template #actions>
+        <!-- Import button -->
+        <OButton
+          :class="isCompactToolbar ? 'min-w-0! px-2! py-0!' : ''"
+          variant="outline"
+          size="sm"
+          @click="importAlert"
+          data-test="alert-import"
+          icon-left="upload-file"
+        >
+          <template v-if="!isCompactToolbar">{{ t(`dashboard.import`) }}</template>
+          <OTooltip
+            v-if="isCompactToolbar"
+            :content="t('dashboard.import')"
+            side="bottom"
+            shortcut-id="alertsImport"
           />
+        </OButton>
+        <!-- Add button — routes to anomaly creation on anomaly tab, alert creation otherwise -->
+        <OButton
+          data-test="alert-list-add-alert-btn"
+          variant="primary"
+          size="sm"
+          :disabled="!destinations.length || !templates.length"
+          :title="!destinations.length ? t('alerts.noDestinations') : ''"
+          @click="
+            activeTab === 'anomalyDetection'
+              ? router.push({
+                  name: 'addAnomalyDetection',
+                  query: {
+                    org_identifier: store.state.selectedOrganization.identifier,
+                    folder: activeFolderId,
+                    tab: activeTab,
+                  },
+                })
+              : showAddUpdateFn({})
+          "
+          >{{ t(`alerts.add`) }}</OButton
+        >
+      </template>
+
+      <div data-test="alert-list-splitter" class="flex min-h-0 flex-1">
+        <!-- Left: FolderList -->
+        <div class="w-rail h-full shrink-0">
+          <div class="h-full">
+            <FolderList type="alerts" @update:activeFolderId="updateActiveFolderId" />
+          </div>
         </div>
-      </div>
-      <!-- Right: Table -->
-      <div class="flex-1 min-w-0 h-full">
-        <div class="h-full bg-card-glass-bg">
-              <!-- Alert List Table (shows all alert types including anomaly detection rows) -->
-              <OTable
-                :frame="false"
-                v-model:selected-ids="selectedAlertIds"
-                selection="multiple"
-                data-test="alert-list-table"
-                :data="filteredResults || []"
-                :columns="columns"
-                show-index
-                row-key="alert_id"
-                :loading="loading"
-                pagination="client"
-                :page-size="pageSize"
-                :page-size-options="pageSizeOptions"
-                width="100%"
-                :show-global-filter="false"
-                :default-columns="false"
-                :enable-column-resize="true"
-                :persist-columns="true"
-                table-id="alerts-alert-list"
-                @row-click="triggerExpand"
-              >
-                <!-- Toolbar: alert-type filter + search (inline folder scope) + refresh. -->
-                <template #toolbar>
-                  <div class="flex items-center gap-2 w-full">
-                    <OToggleGroup
-                      :model-value="activeTab"
-                      @update:model-value="(v) => { activeTab = v as string; filterAlertsByTab(); }"
-                    >
-                      <OToggleGroupItem value="all" size="sm" data-test="tab-all">
-                        <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
-                        {{ t("alerts.all") }}
-                      </OToggleGroupItem>
-                      <OToggleGroupItem value="scheduled" size="sm" data-test="tab-scheduled">
-                        <template #icon-left><OIcon name="schedule" size="sm" /></template>
-                        {{ t("alerts.scheduled") }}
-                      </OToggleGroupItem>
-                      <OToggleGroupItem value="realTime" size="sm" data-test="tab-realTime">
-                        <template #icon-left><OIcon name="bolt" size="sm" /></template>
-                        {{ t("alerts.realTime") }}
-                      </OToggleGroupItem>
-                      <OToggleGroupItem v-if="isAnomalyDetectionEnabled" value="anomalyDetection" size="sm" data-test="tab-anomalyDetection">
-                        <template #icon-left><OIcon name="query-stats" size="sm" /></template>
-                        {{ t("alerts.anomalyDetection") }}
-                      </OToggleGroupItem>
-                    </OToggleGroup>
-                    <div class="flex-1 min-w-0">
-                      <OInput
-                        v-model="dynamicQueryModel"
-                        :placeholder="searchAcrossFolders ? t('dashboard.searchAcross') : t('alerts.search')"
-                        :clearable="searchAcrossFolders"
-                        @clear="clearSearchHistory"
-                        data-test="alert-list-search-input"
-                        class="w-full"
-                      >
-                        <template #icon-left>
-                          <OIcon name="search" size="sm" />
-                        </template>
-                        <template #icon-right>
-                          <OToggleGroup
-                            :model-value="searchAcrossFolders ? 'all' : 'this'"
-                            type="single"
-                            class="self-center mr-1"
-                            @update:model-value="(v) => (searchAcrossFolders = v === 'all')"
-                          >
-                            <OToggleGroupItem
-                              value="this"
-                              size="xs"
-                              icon-left="folder-outline"
-                              data-test="alert-list-search-scope-current"
-                              title="Search only this folder"
-                            >{{ t('alerts.searchThisFolder') }}</OToggleGroupItem>
-                            <OToggleGroupItem
-                              value="all"
-                              size="xs"
-                              icon-left="search"
-                              data-test="alert-list-search-across-folders-toggle"
-                              title="Search across all folders"
-                            >{{ t('alerts.searchAllFolders') }}</OToggleGroupItem>
-                          </OToggleGroup>
-                        </template>
-                      </OInput>
-                    </div>
-                  </div>
-                </template>
-                <template #toolbar-trailing>
-                  <OButton
-                    variant="outline"
-                    size="icon-sm"
-                    icon-left="refresh"
-                    :loading="loading"
-                    data-test="alert-list-refresh-btn"
-                    @click="refreshAlerts"
-                  >
-                    <OTooltip side="bottom" content="Reload alerts" shortcut-id="alertsRefresh" />
-                  </OButton>
-                </template>
-
-
-                <template #cell-name="{ row }">
-                  <div class="flex items-center gap-1.5 min-w-0 overflow-hidden">
-                    <OIcon
-                      v-if="row.is_real_time === 'anomaly'"
-                      name="query-stats"
-                      size="sm"
-                      class="text-status-info-text shrink-0"
-                    />
-                    <OIcon
-                      v-else-if="row.is_real_time"
-                      name="bolt"
-                      size="sm"
-                      class="text-status-warning-text shrink-0"
-                    />
-                    <OIcon
-                      v-else
-                      name="schedule"
-                      size="sm"
-                      class="text-icon-color shrink-0"
-                    />
-                    <span class="truncate">{{ row.name || "--" }}</span>
-                  </div>
-                  <OTooltip
-                    v-if="row.name"
-                    :content="row.name"
-                    content-class="max-w-100 whitespace-normal break-words text-xs"
-                  />
-                </template>
-
-                <template #cell-owner="{ row }">
-                  <OUserCell :value="row.owner" />
-                </template>
-
-                <template #cell-last_triggered_at="{ row }">
-                  <OTimeCell
-                    :value="row.last_triggered_at"
-                    unit="iso"
-                    mode="absolute"
-                    :timezone="store.state.timezone"
-                    empty-label="Never"
-                  />
-                </template>
-
-                <template #cell-last_satisfied_at="{ row }">
-                  <OTimeCell
-                    :value="row.last_satisfied_at"
-                    unit="iso"
-                    mode="absolute"
-                    :timezone="store.state.timezone"
-                    empty-label="Never"
-                  />
-                </template>
-
-                <template #cell-last_trained_at="{ row }">
-                  <OTimeCell
-                    :value="row.last_trained_at"
-                    unit="iso"
-                    mode="absolute"
-                    :timezone="store.state.timezone"
-                    empty-label="—"
-                  />
-                </template>
-
-                <template #cell-status="{ row }">
-                  <span
-                    v-if="row.status && row.status !== '--'"
-                    class="relative inline-flex"
-                  >
-                    <OTag type="alertStatus" :value="row.status" />
-                    <OTooltip
-                      v-if="row.status === 'failed' && row.last_error"
-                      :max-width="'400px'"
-                      :content="row.last_error"
-                    />
-                  </span>
-                  <span v-else class="text-text-body">—</span>
-                </template>
-
-                <template #cell-period="{ row }">
-                  {{
-                    row.period
-                      ? row.period >= 60
-                        ? row.period % 60 === 0
-                          ? `${Math.floor(row.period / 60)} Hours`
-                          : `${Math.floor(row.period / 60)} Hours ${row.period % 60} Mins`
-                        : `${row.period} Mins`
-                      : "--"
-                  }}
-                </template>
-
-                <template #cell-frequency="{ row }">
-                  {{
-                    row.frequency
-                      ? row.frequency +
-                        (row.frequency_type == "cron"
-                          ? ""
-                          : " Mins")
-                      : "--"
-                  }}
-                </template>
-
-                <template #cell-folder_name="{ row }">
-                  <div
-                    @click.stop="
-                      updateActiveFolderId(row.folder_name.id)
+        <!-- Right: Table -->
+        <div class="h-full min-w-0 flex-1">
+          <div class="bg-card-glass-bg h-full">
+            <!-- Alert List Table (shows all alert types including anomaly detection rows) -->
+            <OTable
+              :frame="false"
+              v-model:selected-ids="selectedAlertIds"
+              selection="multiple"
+              data-test="alert-list-table"
+              :data="filteredResults || []"
+              :columns="columns"
+              show-index
+              row-key="alert_id"
+              :loading="loading"
+              pagination="client"
+              :page-size="pageSize"
+              :page-size-options="pageSizeOptions"
+              width="100%"
+              :show-global-filter="false"
+              :default-columns="false"
+              :enable-column-resize="true"
+              :persist-columns="true"
+              table-id="alerts-alert-list"
+              @row-click="triggerExpand"
+            >
+              <!-- Toolbar: alert-type filter + search (inline folder scope) + refresh. -->
+              <template #toolbar>
+                <div class="flex w-full items-center gap-2">
+                  <OToggleGroup
+                    :model-value="activeTab"
+                    @update:model-value="
+                      (v) => {
+                        activeTab = v as string;
+                        filterAlertsByTab();
+                      }
                     "
                   >
-                    {{ row.folder_name.name }}
-                  </div>
-                </template>
-
-                <template #cell-actions="{ row }">
-                  <div class="flex items-center actions-container">
-                    <div
-                      data-test="alert-list-loading-alert"
-                      v-if="alertStateLoadingMap[row.uuid]"
-                      style="
-                        display: inline-block;
-                        width: 33.14px;
-                        height: auto;
+                    <OToggleGroupItem value="all" size="sm" data-test="tab-all">
+                      <template #icon-left
+                        ><OIcon name="format-list-bulleted" size="sm"
+                      /></template>
+                      {{ t("alerts.all") }}
+                    </OToggleGroupItem>
+                    <OToggleGroupItem value="scheduled" size="sm" data-test="tab-scheduled">
+                      <template #icon-left><OIcon name="schedule" size="sm" /></template>
+                      {{ t("alerts.scheduled") }}
+                    </OToggleGroupItem>
+                    <OToggleGroupItem value="realTime" size="sm" data-test="tab-realTime">
+                      <template #icon-left><OIcon name="bolt" size="sm" /></template>
+                      {{ t("alerts.realTime") }}
+                    </OToggleGroupItem>
+                    <OToggleGroupItem
+                      v-if="isAnomalyDetectionEnabled"
+                      value="anomalyDetection"
+                      size="sm"
+                      data-test="tab-anomalyDetection"
+                    >
+                      <template #icon-left><OIcon name="query-stats" size="sm" /></template>
+                      {{ t("alerts.anomalyDetection") }}
+                    </OToggleGroupItem>
+                  </OToggleGroup>
+                  <div class="min-w-0 flex-1">
+                    <OInput
+                      v-model="dynamicQueryModel"
+                      :placeholder="
+                        searchAcrossFolders ? t('dashboard.searchAcross') : t('alerts.search')
                       "
-                      class="flex justify-center items-center ml-1"
-                      :title="`Turning ${row.enabled ? 'Off' : 'On'}`"
+                      :clearable="searchAcrossFolders"
+                      @clear="clearSearchHistory"
+                      data-test="alert-list-search-input"
+                      class="w-full"
                     >
-                      <OSpinner size="xs" />
-                    </div>
-                    <OButton
-                      v-else
-                      :data-row-action="row.enabled ? 'pause' : 'resume'"
-                      :data-test="`alert-list-${row.name}-pause-start-alert`"
-                      class="ml-1"
-                      :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
-                      size="icon-sm"
-                      :icon-left="row.enabled ? 'pause' : 'play-arrow'"
-                      @click.stop="toggleAlertState(row)"
-                    >
-                      <OTooltip
-                        side="bottom"
-                        :content="row.enabled ? t('alerts.pause') : t('alerts.start')"
-                        :shortcut-id="row.enabled ? 'alertsRowPause' : undefined"
-                      />
-                    </OButton>
-                    <OButton
-                      data-row-action="edit"
-                      :data-test="`alert-list-${row.name}-update-alert`"
-                      variant="ghost"
-                      size="icon-sm"
-                      icon-left="edit"
-                      @click.stop="editAlert(row)"
-                    >
-                      <OTooltip side="bottom" :content="t('alerts.edit')" shortcut-id="alertsRowEdit" />
-                    </OButton>
-                    <OButton
-                      data-row-action="duplicate"
-                      variant="ghost"
-                      size="icon-sm"
-                      icon-left="content-copy"
-                      @click.stop="duplicateAlert(row)"
-                      :data-test="`alert-list-${row.name}-clone-alert`"
-                    >
-                      <OTooltip side="bottom" :content="t('alerts.clone')" shortcut-id="alertsRowDuplicate" />
-                    </OButton>
-                    <!-- Hidden proxies so the row-hover shortcuts work for
+                      <template #icon-left>
+                        <OIcon name="search" size="sm" />
+                      </template>
+                      <template #icon-right>
+                        <OToggleGroup
+                          :model-value="searchAcrossFolders ? 'all' : 'this'"
+                          type="single"
+                          class="mr-1 self-center"
+                          @update:model-value="(v) => (searchAcrossFolders = v === 'all')"
+                        >
+                          <OToggleGroupItem
+                            value="this"
+                            size="xs"
+                            icon-left="folder-outline"
+                            data-test="alert-list-search-scope-current"
+                            title="Search only this folder"
+                            >{{ t("alerts.searchThisFolder") }}</OToggleGroupItem
+                          >
+                          <OToggleGroupItem
+                            value="all"
+                            size="xs"
+                            icon-left="search"
+                            data-test="alert-list-search-across-folders-toggle"
+                            title="Search across all folders"
+                            >{{ t("alerts.searchAllFolders") }}</OToggleGroupItem
+                          >
+                        </OToggleGroup>
+                      </template>
+                    </OInput>
+                  </div>
+                </div>
+              </template>
+              <template #toolbar-trailing>
+                <OButton
+                  variant="outline"
+                  size="icon-sm"
+                  icon-left="refresh"
+                  :loading="loading"
+                  data-test="alert-list-refresh-btn"
+                  @click="refreshAlerts"
+                >
+                  <OTooltip side="bottom" content="Reload alerts" shortcut-id="alertsRefresh" />
+                </OButton>
+              </template>
+
+              <template #cell-name="{ row }">
+                <div class="flex min-w-0 items-center gap-1.5 overflow-hidden">
+                  <OIcon
+                    v-if="row.is_real_time === 'anomaly'"
+                    name="query-stats"
+                    size="sm"
+                    class="text-status-info-text shrink-0"
+                  />
+                  <OIcon
+                    v-else-if="row.is_real_time"
+                    name="bolt"
+                    size="sm"
+                    class="text-status-warning-text shrink-0"
+                  />
+                  <OIcon v-else name="schedule" size="sm" class="text-icon-color shrink-0" />
+                  <span class="truncate">{{ row.name || "--" }}</span>
+                </div>
+                <OTooltip
+                  v-if="row.name"
+                  :content="row.name"
+                  content-class="max-w-100 whitespace-normal break-words text-xs"
+                />
+              </template>
+
+              <template #cell-owner="{ row }">
+                <OUserCell :value="row.owner" />
+              </template>
+
+              <template #cell-last_triggered_at="{ row }">
+                <OTimeCell
+                  :value="row.last_triggered_at"
+                  unit="iso"
+                  mode="absolute"
+                  :timezone="store.state.timezone"
+                  empty-label="Never"
+                />
+              </template>
+
+              <template #cell-last_satisfied_at="{ row }">
+                <OTimeCell
+                  :value="row.last_satisfied_at"
+                  unit="iso"
+                  mode="absolute"
+                  :timezone="store.state.timezone"
+                  empty-label="Never"
+                />
+              </template>
+
+              <template #cell-last_trained_at="{ row }">
+                <OTimeCell
+                  :value="row.last_trained_at"
+                  unit="iso"
+                  mode="absolute"
+                  :timezone="store.state.timezone"
+                  empty-label="—"
+                />
+              </template>
+
+              <template #cell-status="{ row }">
+                <span v-if="row.status && row.status !== '--'" class="relative inline-flex">
+                  <OTag type="alertStatus" :value="row.status" />
+                  <OTooltip
+                    v-if="row.status === 'failed' && row.last_error"
+                    :max-width="'400px'"
+                    :content="row.last_error"
+                  />
+                </span>
+                <span v-else class="text-text-body">—</span>
+              </template>
+
+              <template #cell-period="{ row }">
+                {{
+                  row.period
+                    ? row.period >= 60
+                      ? row.period % 60 === 0
+                        ? `${Math.floor(row.period / 60)} Hours`
+                        : `${Math.floor(row.period / 60)} Hours ${row.period % 60} Mins`
+                      : `${row.period} Mins`
+                    : "--"
+                }}
+              </template>
+
+              <template #cell-frequency="{ row }">
+                {{
+                  row.frequency
+                    ? row.frequency + (row.frequency_type == "cron" ? "" : " Mins")
+                    : "--"
+                }}
+              </template>
+
+              <template #cell-folder_name="{ row }">
+                <div @click.stop="updateActiveFolderId(row.folder_name.id)">
+                  {{ row.folder_name.name }}
+                </div>
+              </template>
+
+              <template #cell-actions="{ row }">
+                <div class="actions-container flex items-center">
+                  <div
+                    data-test="alert-list-loading-alert"
+                    v-if="alertStateLoadingMap[row.uuid]"
+                    style="display: inline-block; width: 33.14px; height: auto"
+                    class="ml-1 flex items-center justify-center"
+                    :title="`Turning ${row.enabled ? 'Off' : 'On'}`"
+                  >
+                    <OSpinner size="xs" />
+                  </div>
+                  <OButton
+                    v-else
+                    :data-row-action="row.enabled ? 'pause' : 'resume'"
+                    :data-test="`alert-list-${row.name}-pause-start-alert`"
+                    class="ml-1"
+                    :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
+                    size="icon-sm"
+                    :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                    @click.stop="toggleAlertState(row)"
+                  >
+                    <OTooltip
+                      side="bottom"
+                      :content="row.enabled ? t('alerts.pause') : t('alerts.start')"
+                      :shortcut-id="row.enabled ? 'alertsRowPause' : undefined"
+                    />
+                  </OButton>
+                  <OButton
+                    data-row-action="edit"
+                    :data-test="`alert-list-${row.name}-update-alert`"
+                    variant="ghost"
+                    size="icon-sm"
+                    icon-left="edit"
+                    @click.stop="editAlert(row)"
+                  >
+                    <OTooltip
+                      side="bottom"
+                      :content="t('alerts.edit')"
+                      shortcut-id="alertsRowEdit"
+                    />
+                  </OButton>
+                  <OButton
+                    data-row-action="duplicate"
+                    variant="ghost"
+                    size="icon-sm"
+                    icon-left="content-copy"
+                    @click.stop="duplicateAlert(row)"
+                    :data-test="`alert-list-${row.name}-clone-alert`"
+                  >
+                    <OTooltip
+                      side="bottom"
+                      :content="t('alerts.clone')"
+                      shortcut-id="alertsRowDuplicate"
+                    />
+                  </OButton>
+                  <!-- Hidden proxies so the row-hover shortcuts work for
                          actions that live in the more-menu dropdown (which is
                          teleported out of the row DOM): x = export, Del = delete. -->
-                    <button
-                      type="button"
-                      data-row-action="export"
-                      class="hidden"
-                      tabindex="-1"
-                      aria-hidden="true"
-                      @click.stop="exportAlert(row)"
-                    />
-                    <button
-                      type="button"
-                      data-row-action="delete"
-                      class="hidden"
-                      tabindex="-1"
-                      aria-hidden="true"
-                      @click.stop="showDeleteDialogFn({ row })"
-                    />
-                    <ODropdown>
-                      <template #trigger>
-                        <OButton
-                          variant="ghost"
-                          size="icon-sm"
-                          icon-left="more-vert"
-                          @click.stop="openMenu($event, row)"
-                          :data-test="`alert-list-${row.name}-more-options`"
-                        />
+                  <button
+                    type="button"
+                    data-row-action="export"
+                    class="hidden"
+                    tabindex="-1"
+                    aria-hidden="true"
+                    @click.stop="exportAlert(row)"
+                  />
+                  <button
+                    type="button"
+                    data-row-action="delete"
+                    class="hidden"
+                    tabindex="-1"
+                    aria-hidden="true"
+                    @click.stop="showDeleteDialogFn({ row })"
+                  />
+                  <ODropdown>
+                    <template #trigger>
+                      <OButton
+                        variant="ghost"
+                        size="icon-sm"
+                        icon-left="more-vert"
+                        @click.stop="openMenu($event, row)"
+                        :data-test="`alert-list-${row.name}-more-options`"
+                      />
+                    </template>
+                    <ODropdownItem
+                      :data-test="`alert-list-${row.name}-move-alert`"
+                      @select="moveAlertToAnotherFolder(row)"
+                    >
+                      <template #icon-left>
+                        <OIcon name="drive-file-move" size="sm" />
                       </template>
-                      <ODropdownItem
-                        :data-test="`alert-list-${row.name}-move-alert`"
-                        @select="moveAlertToAnotherFolder(row)"
-                      >
-                        <template #icon-left>
-                          <OIcon name="drive-file-move" size="sm" />
-                        </template>
-                        Move
-                      </ODropdownItem>
-                      <ODropdownSeparator />
-                      <ODropdownItem
-                        :data-test="`alert-list-${row.name}-delete-alert`"
-                        variant="destructive"
-                        shortcut-id="alertsRowDelete"
-                        @select="showDeleteDialogFn({ row })"
-                      >
-                        <template #icon-left>
-                          <OIcon name="delete" size="sm" />
-                        </template>
-                        {{ t("alerts.delete") }}
-                      </ODropdownItem>
-                      <ODropdownSeparator />
-                      <ODropdownItem
-                        :data-test="`alert-list-${row.name}-export-alert`"
-                        shortcut-id="alertsRowExport"
-                        @select="exportAlert(row)"
-                      >
-                        <template #icon-left>
-                          <OIcon size="sm" name="download" />
-                        </template>
-                        Export
-                      </ODropdownItem>
-                      <ODropdownSeparator />
-                      <!-- Anomaly Detection: Trigger Detection + Re-train -->
-                      <template v-if="row.type === 'anomaly'">
-                        <ODropdownItem
-                          :data-test="`alert-list-${row.name}-trigger-detection`"
-                          @select="triggerAlert(row)"
-                        >
-                          <template #icon-left>
-                            <OIcon size="sm" name="sound-sampler" />
-                          </template>
-                          Trigger Detection
-                        </ODropdownItem>
-                        <ODropdownItem
-                          :data-test="`alert-list-${row.name}-retrain-anomaly`"
-                          @select="retrainAnomaly(row)"
-                        >
-                          <template #icon-left>
-                            <OIcon size="sm" name="replay" />
-                          </template>
-                          Re-train
-                        </ODropdownItem>
+                      Move
+                    </ODropdownItem>
+                    <ODropdownSeparator />
+                    <ODropdownItem
+                      :data-test="`alert-list-${row.name}-delete-alert`"
+                      variant="destructive"
+                      shortcut-id="alertsRowDelete"
+                      @select="showDeleteDialogFn({ row })"
+                    >
+                      <template #icon-left>
+                        <OIcon name="delete" size="sm" />
                       </template>
-                      <!-- Regular alerts: Trigger Alert item -->
+                      {{ t("alerts.delete") }}
+                    </ODropdownItem>
+                    <ODropdownSeparator />
+                    <ODropdownItem
+                      :data-test="`alert-list-${row.name}-export-alert`"
+                      shortcut-id="alertsRowExport"
+                      @select="exportAlert(row)"
+                    >
+                      <template #icon-left>
+                        <OIcon size="sm" name="download" />
+                      </template>
+                      Export
+                    </ODropdownItem>
+                    <ODropdownSeparator />
+                    <!-- Anomaly Detection: Trigger Detection + Re-train -->
+                    <template v-if="row.type === 'anomaly'">
                       <ODropdownItem
-                        v-else
-                        :data-test="`alert-list-${row.name}-trigger-alert`"
+                        :data-test="`alert-list-${row.name}-trigger-detection`"
                         @select="triggerAlert(row)"
                       >
                         <template #icon-left>
                           <OIcon size="sm" name="sound-sampler" />
                         </template>
-                        {{ t("alerts.triggerAlert") }}
+                        Trigger Detection
                       </ODropdownItem>
-                    </ODropdown>
-                  </div>
-                </template>
-
-                <template #empty>
-                  <OEmptyState
-                    v-if="!templates.length"
-                    size="hero"
-                    preset="no-alert-templates"
-                    :description="t('alerts.noTemplatesMsg')"
-                    data-test="alert-list-create-template-text"
-                    @action="routeTo('alertTemplates')"
-                  />
-                  <OEmptyState
-                    v-else-if="!destinations.length"
-                    size="hero"
-                    preset="no-alert-destinations"
-                    :description="t('alerts.noDestinationsMsg')"
-                    data-test="alert-list-create-destination-text"
-                    @action="routeTo('alertDestinations')"
-                  />
-                  <OEmptyState
-                    v-else
-                    size="hero"
-                    preset="no-alerts"
-                    :filtered="!!(filterQuery || searchQuery)"
-                    @action="
-                      (id) =>
-                        id === 'clear-filters'
-                          ? ((filterQuery = ''), (searchQuery = ''))
-                          : showAddUpdateFn({})
-                    "
-                  />
-                </template>
-
-                <template #bottom>
-                  <div class="flex w-full justify-between items-center h-12 gap-1">
-                    <div
-                      class="text-xs font-normal flex items-center min-w-25"
+                      <ODropdownItem
+                        :data-test="`alert-list-${row.name}-retrain-anomaly`"
+                        @select="retrainAnomaly(row)"
+                      >
+                        <template #icon-left>
+                          <OIcon size="sm" name="replay" />
+                        </template>
+                        Re-train
+                      </ODropdownItem>
+                    </template>
+                    <!-- Regular alerts: Trigger Alert item -->
+                    <ODropdownItem
+                      v-else
+                      :data-test="`alert-list-${row.name}-trigger-alert`"
+                      @select="triggerAlert(row)"
                     >
-                      <template v-if="selectedAlerts.length > 0">{{ selectedAlerts.length }} of {{ resultTotal }} selected</template>
-                      <template v-else>{{ resultTotal }} {{ t("alerts.header") }}</template>
-                    </div>
+                      <template #icon-left>
+                        <OIcon size="sm" name="sound-sampler" />
+                      </template>
+                      {{ t("alerts.triggerAlert") }}
+                    </ODropdownItem>
+                  </ODropdown>
+                </div>
+              </template>
 
-                    <OButton
-                      v-if="selectedAlerts.length > 0"
-                      data-test="alert-list-move-across-folders-btn"
-                      variant="outline"
-                      size="sm"
-                      icon-left="drive-file-move"
-                      @click="moveMultipleAlerts"
-                    >Move</OButton>
-                    <OButton
-                      v-if="selectedAlerts.length > 0"
-                      data-test="alert-list-export-alerts-btn"
-                      variant="outline"
-                      size="sm"
-                      icon-left="download"
-                      @click="multipleExportAlert"
-                    >Export</OButton>
-                    <OButton
-                      v-if="selectedAlerts.length > 0"
-                      data-test="alert-list-pause-alerts-btn"
-                      variant="outline"
-                      size="sm"
-                      icon-left="pause"
-                      @click="bulkToggleAlerts('pause')"
-                    >Pause</OButton>
-                    <OButton
-                      v-if="selectedAlerts.length > 0"
-                      data-test="alert-list-unpause-alerts-btn"
-                      variant="outline"
-                      size="sm"
-                      icon-left="play-arrow"
-                      @click="bulkToggleAlerts('resume')"
-                    >Resume</OButton>
-                    <OButton
-                      v-if="selectedAlerts.length > 0"
-                      data-test="alert-list-delete-alerts-btn"
-                      variant="outline-destructive"
-                      size="sm"
-                      icon-left="delete"
-                      :loading="bulkDeleteLoading"
-                      @click="openBulkDeleteDialog"
-                    >Delete</OButton>
+              <template #empty>
+                <OEmptyState
+                  v-if="!templates.length"
+                  size="hero"
+                  preset="no-alert-templates"
+                  :description="t('alerts.noTemplatesMsg')"
+                  data-test="alert-list-create-template-text"
+                  @action="routeTo('alertTemplates')"
+                />
+                <OEmptyState
+                  v-else-if="!destinations.length"
+                  size="hero"
+                  preset="no-alert-destinations"
+                  :description="t('alerts.noDestinationsMsg')"
+                  data-test="alert-list-create-destination-text"
+                  @action="routeTo('alertDestinations')"
+                />
+                <OEmptyState
+                  v-else
+                  size="hero"
+                  preset="no-alerts"
+                  :filtered="!!(filterQuery || searchQuery)"
+                  @action="
+                    (id) =>
+                      id === 'clear-filters'
+                        ? ((filterQuery = ''), (searchQuery = ''))
+                        : showAddUpdateFn({})
+                  "
+                />
+              </template>
+
+              <template #bottom>
+                <div class="flex h-12 w-full items-center justify-between gap-1">
+                  <div class="flex min-w-25 items-center text-xs font-normal">
+                    <template v-if="selectedAlerts.length > 0"
+                      >{{ selectedAlerts.length }} of {{ resultTotal }} selected</template
+                    >
+                    <template v-else>{{ resultTotal }} {{ t("alerts.header") }}</template>
                   </div>
-                </template>
-              </OTable>
+
+                  <OButton
+                    v-if="selectedAlerts.length > 0"
+                    data-test="alert-list-move-across-folders-btn"
+                    variant="outline"
+                    size="sm"
+                    icon-left="drive-file-move"
+                    @click="moveMultipleAlerts"
+                    >Move</OButton
+                  >
+                  <OButton
+                    v-if="selectedAlerts.length > 0"
+                    data-test="alert-list-export-alerts-btn"
+                    variant="outline"
+                    size="sm"
+                    icon-left="download"
+                    @click="multipleExportAlert"
+                    >Export</OButton
+                  >
+                  <OButton
+                    v-if="selectedAlerts.length > 0"
+                    data-test="alert-list-pause-alerts-btn"
+                    variant="outline"
+                    size="sm"
+                    icon-left="pause"
+                    @click="bulkToggleAlerts('pause')"
+                    >Pause</OButton
+                  >
+                  <OButton
+                    v-if="selectedAlerts.length > 0"
+                    data-test="alert-list-unpause-alerts-btn"
+                    variant="outline"
+                    size="sm"
+                    icon-left="play-arrow"
+                    @click="bulkToggleAlerts('resume')"
+                    >Resume</OButton
+                  >
+                  <OButton
+                    v-if="selectedAlerts.length > 0"
+                    data-test="alert-list-delete-alerts-btn"
+                    variant="outline-destructive"
+                    size="sm"
+                    icon-left="delete"
+                    :loading="bulkDeleteLoading"
+                    @click="openBulkDeleteDialog"
+                    >Delete</OButton
+                  >
+                </div>
+              </template>
+            </OTable>
+          </div>
         </div>
       </div>
-    </div>
     </OPageLayout>
     <template v-else-if="showAddAlertDialog && !showImportAlertDialog">
       <AddAlert
@@ -542,11 +548,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <ImportAlert
         :destinations="destinations"
         :templates="templates"
-        :alerts="
-          store?.state?.organizationData?.allAlertsListByFolderId[
-            activeFolderId
-          ]
-        "
+        :alerts="store?.state?.organizationData?.allAlertsListByFolderId[activeFolderId]"
         :folderId="activeFolderId"
         @update:alerts="refreshImportedAlerts"
         @update:destinations="refreshDestination"
@@ -571,7 +573,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <template>
-      <ODialog data-test="alert-list-form-dialog"
+      <ODialog
+        data-test="alert-list-form-dialog"
         v-model:open="showForm"
         persistent
         size="sm"
@@ -639,7 +642,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-
 import {
   defineComponent,
   ref,
@@ -669,11 +671,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import ImportAlert from "@/components/alerts/ImportAlert.vue";
-import {
-  getImageURL,
-  getUUID,
-  verifyOrganizationStatus,
-} from "@/utils/zincutils";
+import { getImageURL, getUUID, verifyOrganizationStatus } from "@/utils/zincutils";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useReo } from "@/services/reodotdev_analytics";
 import type { Alert } from "@/ts/interfaces/index";
@@ -688,11 +686,11 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
-import OButton from '@/lib/core/Button/OButton.vue';
-import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
-import ODropdown from '@/lib/overlay/Dropdown/ODropdown.vue';
-import ODropdownItem from '@/lib/overlay/Dropdown/ODropdownItem.vue';
-import ODropdownSeparator from '@/lib/overlay/Dropdown/ODropdownSeparator.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -711,9 +709,7 @@ export default defineComponent({
   name: "AlertList",
   components: {
     OPageLayout,
-    AddAlert: defineAsyncComponent(
-      () => import("@/components/alerts/AddAlert.vue"),
-    ),
+    AddAlert: defineAsyncComponent(() => import("@/components/alerts/AddAlert.vue")),
     OEmptyState,
     ConfirmDialog,
     ImportAlert,
@@ -738,10 +734,7 @@ export default defineComponent({
     OUserCell,
     OTag,
   },
-  emits: [
-    "update:changeRecordPerPage",
-    "update:maxRecordToReturn",
-  ],
+  emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup() {
     const store = useStore();
     const { t } = useI18n();
@@ -782,7 +775,6 @@ export default defineComponent({
       () => store.state.isAiChatEnabled && windowWidth.value <= 1440,
     );
 
-
     const showImportAlertDialog = ref(false);
     const showHistoryDrawer = ref(false);
     const selectedHistoryAlertId = ref("");
@@ -806,9 +798,7 @@ export default defineComponent({
         name: "folder2",
       },
     ]);
-    const activeFolderId = ref<any>(
-      router.currentRoute.value.query.folder ?? "default",
-    );
+    const activeFolderId = ref<any>(router.currentRoute.value.query.folder ?? "default");
     const showMoveAlertDialog = ref(false);
     const showAlertDetailsDrawer = ref(false);
     const selectedAlertDetails: Ref<any> = ref(null);
@@ -828,14 +818,9 @@ export default defineComponent({
           if (conditionData?.filterType === "group") {
             // V2 format: {filterType: "group", logicalOperator: "AND", conditions: [...]}
             displayConditions = transformV2ToExpression(conditionData);
-          } else if (
-            conditionData?.version === 2 &&
-            conditionData?.conditions
-          ) {
+          } else if (conditionData?.version === 2 && conditionData?.conditions) {
             // V2 format with version wrapper: {version: 2, conditions: {filterType: "group", ...}}
-            displayConditions = transformV2ToExpression(
-              conditionData.conditions,
-            );
+            displayConditions = transformV2ToExpression(conditionData.conditions);
           } else if (conditionData?.or || conditionData?.and) {
             // V1 format: {or: [...]} or {and: [...]}
             displayConditions = transformToExpression(conditionData);
@@ -845,16 +830,13 @@ export default defineComponent({
             const parts = conditionData.map((item: any) => {
               const column = item.column || "field";
               const operator = item.operator || "=";
-              const value =
-                typeof item.value === "string" ? `'${item.value}'` : item.value;
+              const value = typeof item.value === "string" ? `'${item.value}'` : item.value;
               return `${column} ${operator} ${value}`;
             });
-            displayConditions =
-              parts.length > 0 ? `(${parts.join(" AND ")})` : "--";
+            displayConditions = parts.length > 0 ? `(${parts.join(" AND ")})` : "--";
           } else {
             // Unknown format or empty
-            displayConditions =
-              typeof conditionData === "string" ? conditionData : "--";
+            displayConditions = typeof conditionData === "string" ? conditionData : "--";
           }
         } else if (alert.rawCondition.sql) {
           displayConditions = alert.rawCondition.sql;
@@ -900,9 +882,7 @@ export default defineComponent({
     // Prevent forcing anomalyDetection tab when the feature is not available.
     const rawTab = (router.currentRoute.value.query.tab as string) || "all";
     const activeTab = ref(
-      rawTab === "anomalyDetection" && !isAnomalyDetectionEnabled.value
-        ? "all"
-        : rawTab,
+      rawTab === "anomalyDetection" && !isAnomalyDetectionEnabled.value ? "all" : rawTab,
     );
 
     const filteredResults: Ref<any[]> = ref([]);
@@ -1079,9 +1059,7 @@ export default defineComponent({
     const selectedAlertIds = ref<string[]>([]);
     const selectedAlerts = computed({
       get: () =>
-        filteredResults.value.filter((row: any) =>
-          selectedAlertIds.value.includes(row.alert_id),
-        ),
+        filteredResults.value.filter((row: any) => selectedAlertIds.value.includes(row.alert_id)),
       set: (val) => {
         if (val.length === 0) {
           selectedAlertIds.value = [];
@@ -1093,14 +1071,10 @@ export default defineComponent({
 
     const searchQuery = ref<any>(savedAlertListFilters.searchQuery || "");
     const filterQuery = ref<any>(savedAlertListFilters.filterQuery || "");
-    const searchAcrossFolders = ref<any>(
-      savedAlertListFilters.searchAcrossFolders || false,
-    );
+    const searchAcrossFolders = ref<any>(savedAlertListFilters.searchAcrossFolders || false);
     const selectedAlertToMove: Ref<any[]> = ref([]);
     const selectedAnomalyConfigsToMove: Ref<any[]> = ref([]);
-    const folderIdToBeCloned = ref<any>(
-      router.currentRoute.value.query.folder ?? "default",
-    );
+    const folderIdToBeCloned = ref<any>(router.currentRoute.value.query.folder ?? "default");
     // ---------------------------------------------------------------------------
     // Anomaly detection scaffolding — TEMPORARY until backend returns anomaly
     // data as part of the alert list API. Remove this block when that happens.
@@ -1171,20 +1145,14 @@ export default defineComponent({
       } else {
         //this is the condition where we are assigning the alerts to the filteredResults so whenever
         // we are not fetching the alerts again, we are just assigning the alerts to the filteredResults
-        allAlerts.value =
-          store.state.organizationData.allAlertsListByFolderId[folderId];
+        allAlerts.value = store.state.organizationData.allAlertsListByFolderId[folderId];
         // Data is served synchronously from cache — clear the loading flag
         // (it starts true to avoid the empty-state flash) so the table renders
         // the cached rows instead of staying stuck on the skeleton.
         loading.value = false;
       }
     };
-    const getAlertsFn = async (
-      store: any,
-      folderId: any,
-      query = "",
-      refreshResults = true,
-    ) => {
+    const getAlertsFn = async (store: any, folderId: any, query = "", refreshResults = true) => {
       //why refreshResults flag is used
       // this is the only used for one edge case when we move alerts from one folder to another folder
       //we forcing the destination and source folder to fetch the alerts again
@@ -1204,8 +1172,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Please wait while loading alerts...",
-              timeout: 0,
-});
+        timeout: 0,
+      });
       if (query) {
         folderId = "";
       }
@@ -1265,12 +1233,8 @@ export default defineComponent({
             period: data.is_real_time ? "" : data?.trigger_condition?.period,
             frequency: data.is_real_time ? "" : frequency,
             frequency_type: data?.trigger_condition?.frequency_type,
-            last_triggered_at: convertUnixToDateFormat(
-              data.last_triggered_at,
-            ),
-            last_satisfied_at: convertUnixToDateFormat(
-              data.last_satisfied_at,
-            ),
+            last_triggered_at: convertUnixToDateFormat(data.last_triggered_at),
+            last_satisfied_at: convertUnixToDateFormat(data.last_satisfied_at),
             last_trained_at: "",
             status: "--",
             selected: false,
@@ -1343,8 +1307,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Please wait while loading alert...",
-              timeout: 0,
-});
+        timeout: 0,
+      });
       try {
         const res = await alertsService.get_by_alert_id(
           store.state.selectedOrganization.identifier,
@@ -1374,14 +1338,10 @@ export default defineComponent({
       }
       if (activeTab.value === "scheduled") {
         // Scheduled: is_real_time is falsy (false / undefined / null) — anomaly rows ("anomaly") excluded
-        filteredResults.value = allAlerts.value.filter(
-          (alert: any) => !alert.is_real_time,
-        );
+        filteredResults.value = allAlerts.value.filter((alert: any) => !alert.is_real_time);
       } else if (activeTab.value === "realTime") {
         // Real-time: strictly boolean true — anomaly rows excluded
-        filteredResults.value = allAlerts.value.filter(
-          (alert: any) => alert.is_real_time === true,
-        );
+        filteredResults.value = allAlerts.value.filter((alert: any) => alert.is_real_time === true);
       } else if (activeTab.value === "anomalyDetection") {
         // Anomaly Detection: rows injected by normalizeAnomalyToAlertRow with is_real_time === "anomaly"
         filteredResults.value = allAlerts.value.filter(
@@ -1425,9 +1385,7 @@ export default defineComponent({
         if (!folders) return;
 
         const folderQuery = router.currentRoute.value.query.folder;
-        const matchingFolder = folders.find(
-          (it: any) => it.folderId === folderQuery,
-        );
+        const matchingFolder = folders.find((it: any) => it.folderId === folderQuery);
 
         activeFolderId.value = matchingFolder ? folderQuery : "default";
         filterAlertsByTab();
@@ -1652,8 +1610,8 @@ export default defineComponent({
         const dismiss = toast({
           variant: "loading",
           message: "Please wait...",
-                  timeout: 0,
-});
+          timeout: 0,
+        });
         try {
           await alertsService.clone_by_id(
             store.state.selectedOrganization.identifier,
@@ -1678,8 +1636,7 @@ export default defineComponent({
           dismiss();
           toast({
             variant: "error",
-            message:
-              e?.response?.data?.message || "Failed to clone anomaly detection",
+            message: e?.response?.data?.message || "Failed to clone anomaly detection",
           });
         } finally {
           isSubmitting.value = false;
@@ -1712,8 +1669,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Please wait...",
-              timeout: 0,
-});
+        timeout: 0,
+      });
 
       toBeClonedAlert.value.name = toBeCloneAlertName.value;
       toBeClonedAlert.value.stream_name = toBeClonestreamName.value;
@@ -1863,9 +1820,7 @@ export default defineComponent({
       }
       update(() => {
         const value = val.toLowerCase();
-        filteredOptions = options.filter(
-          (column: any) => column.toLowerCase().indexOf(value) > -1,
-        );
+        filteredOptions = options.filter((column: any) => column.toLowerCase().indexOf(value) > -1);
       });
       return filteredOptions;
     };
@@ -1876,11 +1831,9 @@ export default defineComponent({
       if (resetStream) toBeClonestreamName.value = "";
       if (streams.value[toBeClonestreamType.value]) {
         schemaList.value = streams.value[toBeClonestreamType.value];
-        indexOptions.value = streams.value[toBeClonestreamType.value].map(
-          (data: any) => {
-            return data.name;
-          },
-        );
+        indexOptions.value = streams.value[toBeClonestreamType.value].map((data: any) => {
+          return data.name;
+        });
         updateStreamName(toBeClonestreamName.value);
 
         return;
@@ -1923,9 +1876,7 @@ export default defineComponent({
           });
           toast({
             variant: "success",
-            message: isEnabled
-              ? "Alert Resumed Successfully"
-              : "Alert Paused Successfully",
+            message: isEnabled ? "Alert Resumed Successfully" : "Alert Paused Successfully",
           });
         })
         .finally(() => {
@@ -2055,8 +2006,7 @@ export default defineComponent({
       } catch (error: any) {
         toast({
           variant: "error",
-          message:
-            error?.response?.data?.message || "Failed to trigger retraining",
+          message: error?.response?.data?.message || "Failed to trigger retraining",
         });
       }
     };
@@ -2162,10 +2112,7 @@ export default defineComponent({
       activeFolderToMove.value = activeFolderId.value;
     };
 
-    const updateAcrossFolders = async (
-      activeFolderId: any,
-      selectedFolderId: any,
-    ) => {
+    const updateAcrossFolders = async (activeFolderId: any, selectedFolderId: any) => {
       //here we are fetching the alerts of the selected folder first and then fetching the alerts of the active folder
       await getAlertsFn(store, selectedFolderId, "", false);
       await getAlertsFn(store, activeFolderId);
@@ -2190,9 +2137,7 @@ export default defineComponent({
 
     const dynamicQueryModel = computed({
       get() {
-        return searchAcrossFolders.value
-          ? searchQuery.value
-          : filterQuery.value;
+        return searchAcrossFolders.value ? searchQuery.value : filterQuery.value;
       },
       set(value) {
         if (searchAcrossFolders.value) {
@@ -2215,8 +2160,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Please wait while searching for dashboards...",
-              timeout: 0,
-});
+        timeout: 0,
+      });
       dismiss();
       await getAlertsFn(store, activeFolderId.value, query);
     }, 600);
@@ -2243,9 +2188,7 @@ export default defineComponent({
         //here we are restoring the current folder's alerts and re-filtering by the active tab
         //this ensures cross-folder results are cleared and only the current folder's data is shown
         const currentFolderAlerts =
-          store.state.organizationData.allAlertsListByFolderId[
-            activeFolderId.value
-          ] || [];
+          store.state.organizationData.allAlertsListByFolderId[activeFolderId.value] || [];
         allAlerts.value = currentFolderAlerts;
         filterQuery.value = null;
         searchQuery.value = null;
@@ -2292,9 +2235,7 @@ export default defineComponent({
         });
 
         const alertToBeExported = [];
-        const selectedAlertsToExport = selectedAlerts.value.map(
-          (alert: any) => alert.alert_id,
-        );
+        const selectedAlertsToExport = selectedAlerts.value.map((alert: any) => alert.alert_id);
 
         const alertsData = await Promise.all(
           selectedAlertsToExport.map(async (alertId: string) => {
@@ -2371,8 +2312,7 @@ export default defineComponent({
         } else {
           const column = item.column;
           const operator = item.operator;
-          const value =
-            typeof item.value === "string" ? `'${item.value}'` : item.value;
+          const value = typeof item.value === "string" ? `'${item.value}'` : item.value;
           return `${column} ${operator} ${value}`;
         }
       });

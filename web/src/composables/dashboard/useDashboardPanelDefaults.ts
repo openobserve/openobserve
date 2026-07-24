@@ -48,8 +48,7 @@ export const getDefaultDashboardPanelData: any = (store: any) => ({
       },
       axis_label_rotate: 0,
       axis_label_truncate_width: null,
-      show_symbol:
-        store?.state?.zoConfig?.dashboard_show_symbol_enabled ?? false,
+      show_symbol: store?.state?.zoConfig?.dashboard_show_symbol_enabled ?? false,
       line_interpolation: "smooth",
       legend_width: {
         value: null,
@@ -181,10 +180,7 @@ export const getDefaultDashboardPanelData: any = (store: any) => ({
     hiddenQueries: [],
   },
   meta: {
-    queryFields: {} as Record<
-      number,
-      { customQueryFields: any[]; vrlFunctionFieldList: any[] }
-    >,
+    queryFields: {} as Record<number, { customQueryFields: any[]; vrlFunctionFieldList: any[] }>,
     parsedQuery: "",
     dragAndDrop: {
       dragging: false,

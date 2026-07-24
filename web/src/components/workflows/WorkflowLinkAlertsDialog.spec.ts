@@ -161,15 +161,7 @@ describe("WorkflowLinkAlertsDialog", () => {
       // puts them in the URL) and the endpoint returns ALL matches when
       // page_size is absent. Pinned so nobody reintroduces a plausible-looking
       // page size here, which would read as a silent truncation of the picker.
-      expect(mockList).toHaveBeenCalledWith(
-        0,
-        0,
-        "name",
-        false,
-        "",
-        "default",
-        "",
-      );
+      expect(mockList).toHaveBeenCalledWith(0, 0, "name", false, "", "default", "");
       // The 7th arg is the folder id: empty = every folder, not just "default".
       expect(mockList.mock.calls[0][6]).toBe("");
       expect(mockList).toHaveBeenCalledTimes(1);
@@ -209,29 +201,21 @@ describe("WorkflowLinkAlertsDialog", () => {
     it("shows the empty state when the org has no alerts", async () => {
       mockList.mockResolvedValue({ data: { list: [] } });
       const wrapper = await mountDialog();
-      expect(wrapper.text()).toContain(
-        i18n.global.t("workflow.linkAlerts.empty"),
-      );
+      expect(wrapper.text()).toContain(i18n.global.t("workflow.linkAlerts.empty"));
       expect(selects(wrapper)).toHaveLength(0);
     });
 
     it("tolerates a response with no list field", async () => {
       mockList.mockResolvedValue({ data: {} });
       const wrapper = await mountDialog();
-      expect(wrapper.text()).toContain(
-        i18n.global.t("workflow.linkAlerts.empty"),
-      );
+      expect(wrapper.text()).toContain(i18n.global.t("workflow.linkAlerts.empty"));
     });
 
     it("shows the load-error state (and no empty state) when the list call fails", async () => {
       mockList.mockRejectedValue(new Error("boom"));
       const wrapper = await mountDialog();
-      expect(wrapper.text()).toContain(
-        i18n.global.t("workflow.linkAlerts.loadError"),
-      );
-      expect(wrapper.text()).not.toContain(
-        i18n.global.t("workflow.linkAlerts.empty"),
-      );
+      expect(wrapper.text()).toContain(i18n.global.t("workflow.linkAlerts.loadError"));
+      expect(wrapper.text()).not.toContain(i18n.global.t("workflow.linkAlerts.empty"));
       expect(selects(wrapper)).toHaveLength(0);
     });
 
@@ -279,12 +263,8 @@ describe("WorkflowLinkAlertsDialog", () => {
       expect(wrapper.text()).toContain(
         i18n.global.t("workflow.linkAlerts.selectedCount", { count: 2 }),
       );
-      expect(
-        wrapper.find('[data-test="workflow-link-alerts-chip-a1"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="workflow-link-alerts-chip-a4"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="workflow-link-alerts-chip-a1"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="workflow-link-alerts-chip-a4"]').exists()).toBe(true);
     });
 
     it("deselecting in a folder only clears that folder's slice", async () => {
@@ -296,12 +276,8 @@ describe("WorkflowLinkAlertsDialog", () => {
 
       await switchFolder(wrapper, "f-ops");
       await pick(wrapper, ["a2"]); // drop a1
-      expect(
-        wrapper.find('[data-test="workflow-link-alerts-chip-a1"]').exists(),
-      ).toBe(false);
-      expect(
-        wrapper.find('[data-test="workflow-link-alerts-chip-a4"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="workflow-link-alerts-chip-a1"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="workflow-link-alerts-chip-a4"]').exists()).toBe(true);
       expect(wrapper.text()).toContain(
         i18n.global.t("workflow.linkAlerts.selectedCount", { count: 2 }),
       );
@@ -312,12 +288,8 @@ describe("WorkflowLinkAlertsDialog", () => {
       await switchFolder(wrapper, "f-ops");
       await pick(wrapper, ["a1", "a2"]);
 
-      await wrapper
-        .find('[data-test="workflow-link-alerts-chip-a1"] .o-icon')
-        .trigger("click");
-      expect(
-        wrapper.find('[data-test="workflow-link-alerts-chip-a1"]').exists(),
-      ).toBe(false);
+      await wrapper.find('[data-test="workflow-link-alerts-chip-a1"] .o-icon').trigger("click");
+      expect(wrapper.find('[data-test="workflow-link-alerts-chip-a1"]').exists()).toBe(false);
       expect(alertSelect(wrapper).props("modelValue")).toEqual(["a2"]);
     });
 
@@ -331,17 +303,13 @@ describe("WorkflowLinkAlertsDialog", () => {
       await clear.trigger("click");
 
       expect(wrapper.findAll('[data-test^="workflow-link-alerts-chip-"]')).toHaveLength(0);
-      expect(wrapper.text()).toContain(
-        i18n.global.t("workflow.linkAlerts.noneSelected"),
-      );
+      expect(wrapper.text()).toContain(i18n.global.t("workflow.linkAlerts.noneSelected"));
       expect(clear.attributes("disabled")).toBeDefined();
     });
 
     it("labels the primary button with the count, and disables it with none selected", async () => {
       const wrapper = await mountDialog();
-      expect(primary(wrapper).text()).toBe(
-        i18n.global.t("workflow.linkAlerts.link"),
-      );
+      expect(primary(wrapper).text()).toBe(i18n.global.t("workflow.linkAlerts.link"));
       expect(primary(wrapper).attributes("disabled")).toBeDefined();
 
       await switchFolder(wrapper, "f-ops");
@@ -355,9 +323,7 @@ describe("WorkflowLinkAlertsDialog", () => {
     it("coerces a numeric alert_id to a string id", async () => {
       const wrapper = await mountDialog();
       await pick(wrapper, ["3"]); // default folder holds the numeric-id alert
-      expect(
-        wrapper.find('[data-test="workflow-link-alerts-chip-3"]').text(),
-      ).toContain("Disk");
+      expect(wrapper.find('[data-test="workflow-link-alerts-chip-3"]').text()).toContain("Disk");
     });
   });
 
@@ -403,10 +369,7 @@ describe("WorkflowLinkAlertsDialog", () => {
       await primary(wrapper).trigger("click");
       await flushPromises();
 
-      expect(mockUpdateAlert.mock.calls[0][1].workflows).toEqual([
-        "wf-other",
-        "wf1",
-      ]);
+      expect(mockUpdateAlert.mock.calls[0][1].workflows).toEqual(["wf-other", "wf1"]);
     });
 
     it("is idempotent — an already-linked alert is not double-added", async () => {
@@ -429,9 +392,7 @@ describe("WorkflowLinkAlertsDialog", () => {
 
     it("warns with a partial result when some alerts fail", async () => {
       mockUpdateAlert.mockImplementation((_o: string, alert: any) =>
-        alert.id === "a2"
-          ? Promise.reject(new Error("409"))
-          : Promise.resolve({ data: {} }),
+        alert.id === "a2" ? Promise.reject(new Error("409")) : Promise.resolve({ data: {} }),
       );
       const wrapper = await mountDialog();
       await selectOps(wrapper, ["a1", "a2"]);
@@ -523,9 +484,7 @@ describe("WorkflowLinkAlertsDialog", () => {
   describe("closing", () => {
     it("emits close from the Skip button", async () => {
       const wrapper = await mountDialog();
-      expect(wrapper.find(".dlg-secondary").text()).toBe(
-        i18n.global.t("workflow.linkAlerts.skip"),
-      );
+      expect(wrapper.find(".dlg-secondary").text()).toBe(i18n.global.t("workflow.linkAlerts.skip"));
       await wrapper.find(".dlg-secondary").trigger("click");
       expect(wrapper.emitted("close")).toHaveLength(1);
     });

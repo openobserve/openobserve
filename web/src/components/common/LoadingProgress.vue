@@ -1,48 +1,36 @@
 <template>
   <div
-    class="absolute top-0 left-0 w-full z-[999] transition-opacity duration-500 ease-out"
+    class="absolute top-0 left-0 z-999 w-full transition-opacity duration-500 ease-out"
     :class="{
       'opacity-0': !loading && !isFadingOut,
       'opacity-100': loading || isFadingOut,
     }"
   >
-    <div
-      class="w-full h-0.5 relative overflow-x-hidden bg-progress-bar-track"
-    >
+    <div class="bg-progress-bar-track relative h-0.5 w-full overflow-x-hidden">
       <div
-        class="h-full relative overflow-hidden"
-        :class="
-          'bg-brand-indigo'
-        "
+        class="relative h-full overflow-hidden"
+        :class="'bg-brand-indigo'"
         :style="{
           width: `${displayPercentage}%`,
-          transition: shouldAnimate
-            ? 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-            : 'none',
+          transition: shouldAnimate ? 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
           willChange: loading ? 'width' : 'auto',
           transform: 'translateZ(0)', // Force GPU acceleration
         }"
       >
         <div
-          class="loading-progress__shimmer absolute inset-0 bg-gradient-to-r from-transparent to-transparent via-white/40 dark:via-grey-300/40"
+          class="loading-progress__shimmer absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
         ></div>
       </div>
       <!-- Moving circle indicator -->
       <div
-        class="absolute top-0 w-0.75 h-0.5 rounded-full shadow-[0_0_0.625rem_0.125rem_color-mix(in_srgb,var(--color-brand-indigo)_50%,transparent)] transform -translate-x-1/2"
-        :class="
-          'bg-brand-indigo'
-        "
+        class="absolute top-0 h-0.5 w-0.75 -translate-x-1/2 transform rounded-full shadow-[0_0_0.625rem_0.125rem_color-mix(in_srgb,var(--color-brand-indigo)_50%,transparent)]"
+        :class="'bg-brand-indigo'"
         :style="{
           left: `${displayPercentage}%`,
-          transition: shouldAnimate
-            ? 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-            : 'none',
+          transition: shouldAnimate ? 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
         }"
       >
-        <div
-          class="loading-progress__head-glow absolute inset-0 rounded-full bg-white/20 dark:bg-grey-300/20"
-        ></div>
+        <div class="loading-progress__head-glow absolute inset-0 rounded-full bg-white/20"></div>
       </div>
     </div>
   </div>
@@ -161,4 +149,3 @@ export default defineComponent({
   }
 }
 </style>
-

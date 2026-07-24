@@ -53,19 +53,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("workflow.linkAlerts.intro", { name: workflowName }) }}
       </OText>
 
-      <div
-        v-if="loadError"
-        class="py-6 text-center"
-      >
+      <div v-if="loadError" class="py-6 text-center">
         <OText variant="meta" as="p" class="text-input-error-text">
           {{ t("workflow.linkAlerts.loadError") }}
         </OText>
       </div>
 
-      <div
-        v-else-if="!loading && !alerts.length"
-        class="py-6 text-center"
-      >
+      <div v-else-if="!loading && !alerts.length" class="py-6 text-center">
         <OText variant="meta" as="p">
           {{ t("workflow.linkAlerts.empty") }}
         </OText>
@@ -91,9 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchable
             data-test="workflow-link-alerts-select"
           >
-            <template #empty>{{
-              t("workflow.linkAlerts.noAlertsInFolder")
-            }}</template>
+            <template #empty>{{ t("workflow.linkAlerts.noAlertsInFolder") }}</template>
           </OSelect>
         </div>
 
@@ -117,13 +109,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
           <div
-            class="h-20 overflow-y-auto content-start flex flex-wrap gap-1 rounded-default border border-border-default p-2"
+            class="rounded-default border-border-default flex h-20 flex-wrap content-start gap-1 overflow-y-auto border p-2"
           >
             <span
               v-for="row in selectedAlertRows"
               :key="row.alert_id"
               :title="row.folder_name"
-              class="inline-flex items-center gap-1 rounded-default px-2 py-0.5 text-xs leading-none max-w-40 h-fit bg-select-item-selected-bg text-select-item-selected-text"
+              class="rounded-default bg-select-item-selected-bg text-select-item-selected-text inline-flex h-fit max-w-40 items-center gap-1 px-2 py-0.5 text-xs leading-none"
               :data-test="`workflow-link-alerts-chip-${row.alert_id}`"
             >
               <span class="truncate">{{ row.name }}</span>
@@ -134,12 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="removeAlert(row.alert_id)"
               />
             </span>
-            <OText
-              v-if="!selected.length"
-              variant="meta"
-              as="span"
-              class="text-text-secondary"
-            >
+            <OText v-if="!selected.length" variant="meta" as="span" class="text-text-secondary">
               {{ t("workflow.linkAlerts.noneSelected") }}
             </OText>
           </div>
@@ -207,15 +194,7 @@ const loadAlerts = async () => {
     // /api/v2/{org}/alerts returns EVERY match when `page_size` is absent. They
     // are passed as 0 rather than a plausible-looking page size so this does not
     // read as a silent 1000-row truncation — the picker does see every alert.
-    const res = await alertsService.listByFolderId(
-      0,
-      0,
-      "name",
-      false,
-      "",
-      orgId(),
-      "",
-    );
+    const res = await alertsService.listByFolderId(0, 0, "name", false, "", orgId(), "");
     const list = res.data?.list ?? [];
     alerts.value = list
       // Anomaly-detection alerts use a separate update path; keep this to
@@ -269,10 +248,7 @@ const folderSelection = computed<string[]>({
   },
   set: (vals: string[]) => {
     const inFolder = new Set(alertOptions.value.map((o) => o.value));
-    selected.value = [
-      ...selected.value.filter((id) => !inFolder.has(id)),
-      ...vals,
-    ];
+    selected.value = [...selected.value.filter((id) => !inFolder.has(id)), ...vals];
   },
 });
 
@@ -306,11 +282,7 @@ const linkSelected = async () => {
       const wfs: string[] = Array.isArray(alert.workflows) ? alert.workflows : [];
       if (!wfs.includes(props.workflowId)) wfs.push(props.workflowId);
       alert.workflows = wfs;
-      await alertsService.update_by_alert_id(
-        org,
-        alert,
-        byId.get(alertId)?.folder_id,
-      );
+      await alertsService.update_by_alert_id(org, alert, byId.get(alertId)?.folder_id);
       ok += 1;
     } catch (e) {
       failed += 1;

@@ -19,14 +19,14 @@
     <!-- Looping agents. Same card/header/table shape as the sibling LLM Insights
          panels (LLMErrorTable) so the whole page reads as one surface. -->
     <div
-      class="bg-card-glass-bg llm-trend-panel rounded-default flex flex-col flex-1 min-h-0 overflow-hidden border border-border-default"
+      class="bg-card-glass-bg llm-trend-panel rounded-default border-border-default flex min-h-0 flex-1 flex-col overflow-hidden border"
       data-test="agent-behavior-loops-card"
     >
-      <div class="flex flex-col mb-2 px-4 pt-4">
-        <div class="text-sm font-semibold text-text-heading">
+      <div class="mb-2 flex flex-col px-4 pt-4">
+        <div class="text-text-heading text-sm font-semibold">
           {{ t("aiObservability.behavior.loopsTitle") }}
         </div>
-        <div class="text-2xs leading-normal mt-0.5 text-text-secondary">
+        <div class="text-2xs text-text-secondary mt-0.5 leading-normal">
           {{ t("aiObservability.behavior.loopsHint") }}
         </div>
       </div>
@@ -37,7 +37,7 @@
         :default-columns="false"
         :frame="false"
         :show-global-filter="false"
-        class="flex-1 min-h-0"
+        class="min-h-0 flex-1"
         show-index
         pagination="client"
         :empty-message="t('aiObservability.behavior.noLoops')"
@@ -47,14 +47,14 @@
 
     <!-- Failure taxonomy -->
     <div
-      class="bg-card-glass-bg llm-trend-panel rounded-default flex flex-col flex-1 min-h-0 overflow-hidden border border-border-default"
+      class="bg-card-glass-bg llm-trend-panel rounded-default border-border-default flex min-h-0 flex-1 flex-col overflow-hidden border"
       data-test="agent-behavior-failures-card"
     >
-      <div class="flex flex-col mb-2 px-4 pt-4">
-        <div class="text-sm font-semibold text-text-heading">
+      <div class="mb-2 flex flex-col px-4 pt-4">
+        <div class="text-text-heading text-sm font-semibold">
           {{ t("aiObservability.behavior.failuresTitle") }}
         </div>
-        <div class="text-2xs leading-normal mt-0.5 text-text-secondary">
+        <div class="text-2xs text-text-secondary mt-0.5 leading-normal">
           {{ t("aiObservability.behavior.failuresHint") }}
         </div>
       </div>
@@ -65,7 +65,7 @@
         :default-columns="false"
         :frame="false"
         :show-global-filter="false"
-        class="flex-1 min-h-0"
+        class="min-h-0 flex-1"
         show-index
         pagination="client"
         :empty-message="t('aiObservability.behavior.noFailures')"
@@ -95,9 +95,7 @@ import { useStore } from "vuex";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import AgentSignalDetailPanel from "./AgentSignalDetailPanel.vue";
-import agentSignalsService, {
-  type AgentSignalRecord,
-} from "@/services/agent_signals";
+import agentSignalsService, { type AgentSignalRecord } from "@/services/agent_signals";
 
 const props = defineProps<{
   startTime?: number;
@@ -120,17 +118,12 @@ const detailOpen = ref(false);
 const detailRow = ref<any>(null);
 
 /** Open the details panel for a clicked Behavior row (maps the table row to a signal). */
-const openDetail = (
-  signalType: "loop" | "failure" | "cost",
-  row: Record<string, any>,
-) => {
+const openDetail = (signalType: "loop" | "failure" | "cost", row: Record<string, any>) => {
   detailRow.value = { signalType, ...row };
   detailOpen.value = true;
 };
 
-const orgId = computed(
-  () => store.state.selectedOrganization?.identifier as string,
-);
+const orgId = computed(() => store.state.selectedOrganization?.identifier as string);
 
 /** Signals scoped to the selected agent (Agent mode) or all agents (Stream mode). */
 const scopedSignals = computed(() => {
@@ -256,10 +249,7 @@ const fetchSignals = async () => {
 };
 
 onMounted(fetchSignals);
-watch(
-  () => [props.startTime, props.endTime, props.sourceStream, orgId.value],
-  fetchSignals,
-);
+watch(() => [props.startTime, props.endTime, props.sourceStream, orgId.value], fetchSignals);
 
 defineExpose({ refresh: fetchSignals, lastRunAt, loading });
 </script>

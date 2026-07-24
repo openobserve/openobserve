@@ -19,7 +19,6 @@ import i18n from "@/locales";
 import MetricsSummaryCard from "./MetricsSummaryCard.vue";
 import type { SummaryMetrics } from "@/utils/queryPlanParser";
 
-
 const defaultMetrics: SummaryMetrics = {
   totalTime: "1.23ms",
   totalRows: "1,000",

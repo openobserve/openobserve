@@ -60,15 +60,11 @@ export function latestScoresFromSql(whereClause?: string | null): string {
     "      FROM (",
     "        SELECT",
     "          *,",
-    "          " +
-      NORMALIZED_TARGET_ID_SQL.replace(/\n/g, "\n          ") +
-      " AS _target_id",
+    "          " + NORMALIZED_TARGET_ID_SQL.replace(/\n/g, "\n          ") + " AS _target_id",
     "        FROM (",
     "          SELECT",
     "            *,",
-    "            " +
-      NORMALIZED_SCOPE_SQL.replace(/\n/g, "\n            ") +
-      " AS _target_scope",
+    "            " + NORMALIZED_SCOPE_SQL.replace(/\n/g, "\n            ") + " AS _target_scope",
     '          FROM "_llm_scores"',
     "        ) AS scope_normalized_scores",
     "      ) AS target_normalized_scores",
@@ -90,9 +86,7 @@ export function latestScoresFromSql(whereClause?: string | null): string {
  * later tasks that re-evaluate the same target and is therefore the correct
  * source for execution-volume trends.
  */
-export function latestScoreAttemptsFromSql(
-  whereClause?: string | null,
-): string {
+export function latestScoreAttemptsFromSql(whereClause?: string | null): string {
   const where = whereClause?.trim();
   return [
     "(",
@@ -117,15 +111,11 @@ export function latestScoreAttemptsFromSql(
     "      FROM (",
     "        SELECT",
     "          *,",
-    "          " +
-      NORMALIZED_TARGET_ID_SQL.replace(/\n/g, "\n          ") +
-      " AS _target_id",
+    "          " + NORMALIZED_TARGET_ID_SQL.replace(/\n/g, "\n          ") + " AS _target_id",
     "        FROM (",
     "          SELECT",
     "            *,",
-    "            " +
-      NORMALIZED_SCOPE_SQL.replace(/\n/g, "\n            ") +
-      " AS _target_scope",
+    "            " + NORMALIZED_SCOPE_SQL.replace(/\n/g, "\n            ") + " AS _target_scope",
     '          FROM "_llm_scores"',
     "        ) AS scope_normalized_attempts",
     "      ) AS target_normalized_attempts",

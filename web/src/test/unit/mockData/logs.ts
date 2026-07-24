@@ -22,11 +22,9 @@ export default {
         kubernetes_annotations_kubernetes_io_psp: "eks.privileged",
         kubernetes_container_hash:
           "058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox@sha256:3dbbb0dc1eab2d5a3b3e4a75fd87d194e8095c92d7b2b62e7cdbd07020f54589",
-        kubernetes_container_image:
-          "058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox:v0.0.3",
+        kubernetes_container_image: "058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox:v0.0.3",
         kubernetes_container_name: "ziox",
-        kubernetes_docker_id:
-          "56510ea4003f201fa7913c18d7c8dc639c576e5d1c4bbf0ead911d2d68ae8f31",
+        kubernetes_docker_id: "56510ea4003f201fa7913c18d7c8dc639c576e5d1c4bbf0ead911d2d68ae8f31",
         kubernetes_host: "ip-10-2-56-221.us-east-2.compute.internal",
         kubernetes_labels_app: "ziox",
         kubernetes_labels_name: "ziox-querier",
@@ -43,11 +41,9 @@ export default {
         kubernetes_annotations_kubernetes_io_psp: "eks.privileged",
         kubernetes_container_hash:
           "058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox@sha256:3dbbb0dc1eab2d5a3b3e4a75fd87d194e8095c92d7b2b62e7cdbd07020f54589",
-        kubernetes_container_image:
-          "058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox:v0.0.3",
+        kubernetes_container_image: "058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox:v0.0.3",
         kubernetes_container_name: "ziox",
-        kubernetes_docker_id:
-          "56510ea4003f201fa7913c18d7c8dc639c576e5d1c4bbf0ead911d2d68ae8f31",
+        kubernetes_docker_id: "56510ea4003f201fa7913c18d7c8dc639c576e5d1c4bbf0ead911d2d68ae8f31",
         kubernetes_host: "ip-10-2-56-221.us-east-2.compute.internal",
         kubernetes_labels_app: "ziox",
         kubernetes_labels_name: "ziox-querier",

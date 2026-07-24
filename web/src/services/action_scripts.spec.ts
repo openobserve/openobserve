@@ -53,7 +53,7 @@ describe("action_scripts service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/${org_identifier}/actions/upload`,
-        data
+        data,
       );
     });
 
@@ -68,7 +68,7 @@ describe("action_scripts service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/${org_identifier}/actions/upload`,
-        data
+        data,
       );
     });
 
@@ -82,7 +82,7 @@ describe("action_scripts service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/${org_identifier}/actions/upload`,
-        data
+        data,
       );
     });
   });
@@ -99,7 +99,7 @@ describe("action_scripts service", () => {
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/${org_identifier}/actions/${action_id}`,
-        data
+        data,
       );
     });
 
@@ -114,7 +114,7 @@ describe("action_scripts service", () => {
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/${org_identifier}/actions/${action_id}`,
-        data
+        data,
       );
     });
   });
@@ -127,9 +127,7 @@ describe("action_scripts service", () => {
 
       await actions.list(org_identifier);
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${org_identifier}/actions`
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(`/api/${org_identifier}/actions`);
     });
 
     it("should make GET request with a different org identifier", async () => {
@@ -141,9 +139,7 @@ describe("action_scripts service", () => {
 
       await actions.list(org_identifier);
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${org_identifier}/actions`
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(`/api/${org_identifier}/actions`);
     });
   });
 
@@ -157,7 +153,7 @@ describe("action_scripts service", () => {
       await actions.get_by_id(org_identifier, ksuid);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${org_identifier}/actions/${encodeURIComponent(ksuid)}`
+        `/api/${org_identifier}/actions/${encodeURIComponent(ksuid)}`,
       );
     });
 
@@ -170,7 +166,7 @@ describe("action_scripts service", () => {
       await actions.get_by_id(org_identifier, ksuid);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${org_identifier}/actions/${encodeURIComponent(ksuid)}`
+        `/api/${org_identifier}/actions/${encodeURIComponent(ksuid)}`,
       );
     });
 
@@ -183,7 +179,7 @@ describe("action_scripts service", () => {
       await actions.get_by_id(org_identifier, ksuid);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${org_identifier}/actions/action%20with%20spaces`
+        `/api/${org_identifier}/actions/action%20with%20spaces`,
       );
     });
   });
@@ -198,7 +194,7 @@ describe("action_scripts service", () => {
       await actions.delete(org_identifier, action_id);
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/${org_identifier}/actions/${encodeURIComponent(action_id)}`
+        `/api/${org_identifier}/actions/${encodeURIComponent(action_id)}`,
       );
     });
 
@@ -211,7 +207,7 @@ describe("action_scripts service", () => {
       await actions.delete(org_identifier, action_id);
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/${org_identifier}/actions/${encodeURIComponent(action_id)}`
+        `/api/${org_identifier}/actions/${encodeURIComponent(action_id)}`,
       );
     });
   });
@@ -225,10 +221,9 @@ describe("action_scripts service", () => {
 
       await actions.bulkDelete(org_identifier, data);
 
-      expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/${org_identifier}/actions/bulk`,
-        { data }
-      );
+      expect(mockHttpInstance.delete).toHaveBeenCalledWith(`/api/${org_identifier}/actions/bulk`, {
+        data,
+      });
     });
 
     it("should make DELETE request with single-item bulk payload", async () => {
@@ -239,10 +234,9 @@ describe("action_scripts service", () => {
 
       await actions.bulkDelete(org_identifier, data);
 
-      expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/${org_identifier}/actions/bulk`,
-        { data }
-      );
+      expect(mockHttpInstance.delete).toHaveBeenCalledWith(`/api/${org_identifier}/actions/bulk`, {
+        data,
+      });
     });
 
     it("should make DELETE request with empty ids array", async () => {
@@ -253,10 +247,9 @@ describe("action_scripts service", () => {
 
       await actions.bulkDelete(org_identifier, data);
 
-      expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/${org_identifier}/actions/bulk`,
-        { data }
-      );
+      expect(mockHttpInstance.delete).toHaveBeenCalledWith(`/api/${org_identifier}/actions/bulk`, {
+        data,
+      });
     });
   });
 
@@ -265,18 +258,18 @@ describe("action_scripts service", () => {
       const error = new Error("Upload failed");
       mockHttpInstance.post.mockRejectedValue(error);
 
-      await expect(
-        actions.create("org123", "", { name: "fail-action" })
-      ).rejects.toThrow("Upload failed");
+      await expect(actions.create("org123", "", { name: "fail-action" })).rejects.toThrow(
+        "Upload failed",
+      );
     });
 
     it("should propagate errors from update", async () => {
       const error = new Error("Not found");
       mockHttpInstance.put.mockRejectedValue(error);
 
-      await expect(
-        actions.update("org123", "missing-id", { name: "updated" })
-      ).rejects.toThrow("Not found");
+      await expect(actions.update("org123", "missing-id", { name: "updated" })).rejects.toThrow(
+        "Not found",
+      );
     });
 
     it("should propagate errors from list", async () => {
@@ -290,27 +283,23 @@ describe("action_scripts service", () => {
       const error = new Error("Forbidden");
       mockHttpInstance.get.mockRejectedValue(error);
 
-      await expect(
-        actions.get_by_id("org123", "some-ksuid")
-      ).rejects.toThrow("Forbidden");
+      await expect(actions.get_by_id("org123", "some-ksuid")).rejects.toThrow("Forbidden");
     });
 
     it("should propagate errors from delete", async () => {
       const error = new Error("Server error");
       mockHttpInstance.delete.mockRejectedValue(error);
 
-      await expect(
-        actions.delete("org123", "action-id")
-      ).rejects.toThrow("Server error");
+      await expect(actions.delete("org123", "action-id")).rejects.toThrow("Server error");
     });
 
     it("should propagate errors from bulkDelete", async () => {
       const error = new Error("Bulk delete failed");
       mockHttpInstance.delete.mockRejectedValue(error);
 
-      await expect(
-        actions.bulkDelete("org123", { ids: ["a", "b"] })
-      ).rejects.toThrow("Bulk delete failed");
+      await expect(actions.bulkDelete("org123", { ids: ["a", "b"] })).rejects.toThrow(
+        "Bulk delete failed",
+      );
     });
   });
 });

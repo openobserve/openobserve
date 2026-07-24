@@ -25,13 +25,7 @@ vi.mock("@/components/common/FieldValuesPanel.vue", () => ({
   default: {
     name: "FieldValuesPanel",
     template: '<div class="field-values-panel-stub"></div>',
-    props: [
-      "fieldName",
-      "fieldValues",
-      "showMultiSelect",
-      "defaultValuesCount",
-      "theme",
-    ],
+    props: ["fieldName", "fieldValues", "showMultiSelect", "defaultValuesCount", "theme"],
     emits: [
       "add-search-term",
       "add-multiple-search-terms",
@@ -79,15 +73,13 @@ function createWrapper(props = {}) {
       stubs: {
         OCollapsible: {
           name: "OCollapsible",
-          template:
-            '<div class="o-expansion-item-stub"><slot name="trigger" /><slot /></div>',
+          template: '<div class="o-expansion-item-stub"><slot name="trigger" /><slot /></div>',
           props: ["modelValue", "label", "dense", "hideExpandIcon"],
           emits: ["before-show", "before-hide", "update:modelValue"],
         },
         OButton: {
           name: "OButton",
-          template:
-            '<button v-bind="$attrs" @click="$emit(\'click\', $event)"><slot /></button>',
+          template: '<button v-bind="$attrs" @click="$emit(\'click\', $event)"><slot /></button>',
           emits: ["click"],
         },
         OIcon: {
@@ -120,25 +112,21 @@ describe("FieldExpansion", () => {
 
     it("renders the field label header element", () => {
       const wrapper = createWrapper();
-      const header = wrapper.find(
-        `[data-test="logs-field-list-item-${defaultField.name}"]`
-      );
+      const header = wrapper.find(`[data-test="logs-field-list-item-${defaultField.name}"]`);
       expect(header.exists()).toBe(true);
     });
 
     it("renders the expand button with correct data-test", () => {
       const wrapper = createWrapper();
       const expandBtn = wrapper.find(
-        `[data-test="log-search-expand-${defaultField.name}-field-btn"]`
+        `[data-test="log-search-expand-${defaultField.name}-field-btn"]`,
       );
       expect(expandBtn.exists()).toBe(true);
     });
 
     it("displays the field name text in header", () => {
       const wrapper = createWrapper();
-      const headerDiv = wrapper.find(
-        `[data-test="logs-field-list-item-${defaultField.name}"]`
-      );
+      const headerDiv = wrapper.find(`[data-test="logs-field-list-item-${defaultField.name}"]`);
       expect(headerDiv.text()).toContain(defaultField.name);
     });
 
@@ -146,9 +134,7 @@ describe("FieldExpansion", () => {
       const wrapper = createWrapper();
       // The chevron_right icon is shown when not expanded
       const icons = wrapper.findAll(".OIcon-stub");
-      const expandIcon = icons.find(
-        (i) => i.attributes("data-name") === "chevron-right"
-      );
+      const expandIcon = icons.find((i) => i.attributes("data-name") === "chevron-right");
       expect(expandIcon).toBeDefined();
     });
   });
@@ -157,7 +143,7 @@ describe("FieldExpansion", () => {
     it("shows add-to-table icon when field is NOT in selectedFields", () => {
       const wrapper = createWrapper({ selectedFields: [] });
       const addIcon = wrapper.find(
-        `[data-test="log-search-index-list-add-${defaultField.name}-field-btn"]`
+        `[data-test="log-search-index-list-add-${defaultField.name}-field-btn"]`,
       );
       expect(addIcon.exists()).toBe(true);
     });
@@ -167,7 +153,7 @@ describe("FieldExpansion", () => {
         selectedFields: [defaultField.name],
       });
       const removeIcon = wrapper.find(
-        `[data-test="log-search-index-list-remove-${defaultField.name}-field-btn"]`
+        `[data-test="log-search-index-list-remove-${defaultField.name}-field-btn"]`,
       );
       expect(removeIcon.exists()).toBe(true);
     });
@@ -177,7 +163,7 @@ describe("FieldExpansion", () => {
         selectedFields: [defaultField.name],
       });
       const addIcon = wrapper.find(
-        `[data-test="log-search-index-list-add-${defaultField.name}-field-btn"]`
+        `[data-test="log-search-index-list-add-${defaultField.name}-field-btn"]`,
       );
       expect(addIcon.exists()).toBe(false);
     });
@@ -185,7 +171,7 @@ describe("FieldExpansion", () => {
     it("hides remove icon when field is not selected", () => {
       const wrapper = createWrapper({ selectedFields: [] });
       const removeIcon = wrapper.find(
-        `[data-test="log-search-index-list-remove-${defaultField.name}-field-btn"]`
+        `[data-test="log-search-index-list-remove-${defaultField.name}-field-btn"]`,
       );
       expect(removeIcon.exists()).toBe(false);
     });
@@ -195,7 +181,7 @@ describe("FieldExpansion", () => {
     it("hides interesting field icon when showQuickMode is false", () => {
       const wrapper = createWrapper({ showQuickMode: false });
       const interestingIcon = wrapper.find(
-        `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`
+        `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`,
       );
       expect(interestingIcon.exists()).toBe(false);
     });
@@ -203,7 +189,7 @@ describe("FieldExpansion", () => {
     it("shows interesting field icon in overlay when showQuickMode is true", () => {
       const wrapper = createWrapper({ showQuickMode: true });
       const interestingIcons = wrapper.findAll(
-        `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`
+        `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`,
       );
       expect(interestingIcons.length).toBeGreaterThan(0);
     });
@@ -216,9 +202,7 @@ describe("FieldExpansion", () => {
       // The OIcon stub renders data-name on a span inside the OButton stub.
       // Find all OIcon stubs whose data-name is "info-filled".
       const iconSpans = wrapper.findAll(".OIcon-stub");
-      const infoIcon = iconSpans.find(
-        (i) => i.attributes("data-name") === "info-filled"
-      );
+      const infoIcon = iconSpans.find((i) => i.attributes("data-name") === "info-filled");
       expect(infoIcon).toBeDefined();
     });
 
@@ -230,9 +214,7 @@ describe("FieldExpansion", () => {
       // The OIcon stub renders data-name on a span inside the OButton stub.
       // Find all OIcon stubs whose data-name is "info-outline".
       const iconSpans = wrapper.findAll(".OIcon-stub");
-      const outlineIcon = iconSpans.find(
-        (i) => i.attributes("data-name") === "info-outline"
-      );
+      const outlineIcon = iconSpans.find((i) => i.attributes("data-name") === "info-outline");
       expect(outlineIcon).toBeDefined();
     });
   });
@@ -243,7 +225,7 @@ describe("FieldExpansion", () => {
         field: { ...defaultField, isSchemaField: true },
       });
       const filterBtn = wrapper.find(
-        `[data-test="log-search-index-list-filter-${defaultField.name}-field-btn"]`
+        `[data-test="log-search-index-list-filter-${defaultField.name}-field-btn"]`,
       );
       expect(filterBtn.exists()).toBe(true);
     });
@@ -253,7 +235,7 @@ describe("FieldExpansion", () => {
         field: { ...defaultField, isSchemaField: false },
       });
       const filterBtn = wrapper.find(
-        `[data-test="log-search-index-list-filter-${defaultField.name}-field-btn"]`
+        `[data-test="log-search-index-list-filter-${defaultField.name}-field-btn"]`,
       );
       expect(filterBtn.exists()).toBe(false);
     });
@@ -265,13 +247,11 @@ describe("FieldExpansion", () => {
         field: { ...defaultField, isSchemaField: true },
       });
       const filterBtn = wrapper.find(
-        `[data-test="log-search-index-list-filter-${defaultField.name}-field-btn"]`
+        `[data-test="log-search-index-list-filter-${defaultField.name}-field-btn"]`,
       );
       await filterBtn.trigger("click");
       expect(wrapper.emitted("add-to-filter")).toBeTruthy();
-      expect(wrapper.emitted("add-to-filter")![0]).toEqual([
-        `${defaultField.name}=''`,
-      ]);
+      expect(wrapper.emitted("add-to-filter")![0]).toEqual([`${defaultField.name}=''`]);
     });
   });
 
@@ -279,7 +259,7 @@ describe("FieldExpansion", () => {
     it("emits toggle-field when add icon is clicked (field not selected)", async () => {
       const wrapper = createWrapper({ selectedFields: [] });
       const addIcon = wrapper.find(
-        `[data-test="log-search-index-list-add-${defaultField.name}-field-btn"]`
+        `[data-test="log-search-index-list-add-${defaultField.name}-field-btn"]`,
       );
       await addIcon.trigger("click");
       expect(wrapper.emitted("toggle-field")).toBeTruthy();
@@ -291,7 +271,7 @@ describe("FieldExpansion", () => {
         selectedFields: [defaultField.name],
       });
       const removeIcon = wrapper.find(
-        `[data-test="log-search-index-list-remove-${defaultField.name}-field-btn"]`
+        `[data-test="log-search-index-list-remove-${defaultField.name}-field-btn"]`,
       );
       await removeIcon.trigger("click");
       expect(wrapper.emitted("toggle-field")).toBeTruthy();
@@ -308,16 +288,13 @@ describe("FieldExpansion", () => {
       });
       // In the overlay section, click the interesting icon
       const allInterestingIcons = wrapper.findAll(
-        `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`
+        `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`,
       );
       // The overlay icon is the last one (inside field_overlay div)
       const overlayIcon = allInterestingIcons[allInterestingIcons.length - 1];
       await overlayIcon.trigger("click");
       expect(wrapper.emitted("toggle-interesting")).toBeTruthy();
-      expect(wrapper.emitted("toggle-interesting")![0]).toEqual([
-        fieldWithInterest,
-        false,
-      ]);
+      expect(wrapper.emitted("toggle-interesting")![0]).toEqual([fieldWithInterest, false]);
     });
   });
 
@@ -327,9 +304,7 @@ describe("FieldExpansion", () => {
       // The expansion item stub gets modelValue from isExpanded ref
       // We verify the chevron_right icon is shown (not expanded)
       const icons = wrapper.findAll(".OIcon-stub");
-      const chevronIcon = icons.find(
-        (i) => i.attributes("data-name") === "chevron-right"
-      );
+      const chevronIcon = icons.find((i) => i.attributes("data-name") === "chevron-right");
       expect(chevronIcon).toBeDefined();
     });
 
@@ -345,9 +320,7 @@ describe("FieldExpansion", () => {
       const wrapper = createWrapper({
         field: { ...defaultField, dataType: "Utf8" },
       });
-      const expandBtn = wrapper.find(
-        '[data-test="log-search-expand-log_level-field-btn"]',
-      );
+      const expandBtn = wrapper.find('[data-test="log-search-expand-log_level-field-btn"]');
       expect(expandBtn.exists()).toBe(true);
     });
 
@@ -355,9 +328,7 @@ describe("FieldExpansion", () => {
       const wrapper = createWrapper({
         field: { ...defaultField, dataType: undefined },
       });
-      const expandBtn = wrapper.find(
-        '[data-test="log-search-expand-log_level-field-btn"]',
-      );
+      const expandBtn = wrapper.find('[data-test="log-search-expand-log_level-field-btn"]');
       expect(expandBtn.exists()).toBe(true);
     });
   });

@@ -45,10 +45,7 @@ const stream = {
     }
 
     if (schema) {
-      url +=
-        url.indexOf("?") > 0
-          ? "&fetchSchema=" + schema
-          : "?fetchSchema=" + schema;
+      url += url.indexOf("?") > 0 ? "&fetchSchema=" + schema : "?fetchSchema=" + schema;
     }
     return http().get(url);
   },
@@ -62,12 +59,7 @@ const stream = {
     return http().get(url);
   },
 
-  updateSettings: (
-    org_identifier: string,
-    stream_name: string,
-    type: string,
-    data: any,
-  ) => {
+  updateSettings: (org_identifier: string, stream_name: string, type: string, data: any) => {
     let url = `/api/${org_identifier}/streams/${stream_name}/settings`;
 
     if (type != "") {
@@ -76,12 +68,7 @@ const stream = {
 
     return http().put(url, data);
   },
-  createStream: (
-    org_identifier: string,
-    stream_name: string,
-    type: string,
-    data: any,
-  ) => {
+  createStream: (org_identifier: string, stream_name: string, type: string, data: any) => {
     let url = `/api/${org_identifier}/streams/${stream_name}`;
 
     if (type != "") {
@@ -146,13 +133,7 @@ const stream = {
     return http().get(url);
   },
 
-  labelValues: ({
-    org_identifier,
-    stream_name,
-    start_time,
-    end_time,
-    label,
-  }: any) => {
+  labelValues: ({ org_identifier, stream_name, start_time, end_time, label }: any) => {
     const url = `/api/${org_identifier}/prometheus/api/v1/label/${label}/values?&match[]=${stream_name}&start=${start_time}&end=${end_time}`;
     return http().get(url);
   },

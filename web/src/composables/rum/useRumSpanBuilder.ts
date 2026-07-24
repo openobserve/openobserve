@@ -18,23 +18,16 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 import searchService from "@/services/search";
-import {
-  SPAN_KIND_CLIENT,
-  SPAN_KIND_UNSPECIFIED,
-} from "@/utils/traces/constants";
+import { SPAN_KIND_CLIENT, SPAN_KIND_UNSPECIFIED } from "@/utils/traces/constants";
 
 const ACTION_PROXIMITY_MS = 10_000; // ±10s — actions beyond this are collapsed
 
-export default function useRumSpanBuilder(
-  logStreams: Ref<string[]>,
-  searchObj: any,
-) {
+export default function useRumSpanBuilder(logStreams: Ref<string[]>, searchObj: any) {
   const store = useStore();
   const router = useRouter();
   const { getStream } = useStreams();
 
-  const sanitizeTraceId = (id: string): string =>
-    String(id).replace(/['"\\]/g, "");
+  const sanitizeTraceId = (id: string): string => String(id).replace(/['"\\]/g, "");
 
   const getOrgId = () =>
     (router.currentRoute.value.query?.org_identifier as string) ||
@@ -155,11 +148,7 @@ export default function useRumSpanBuilder(
    * Fetch RUM events that have the matching trace_id, plus the full view context.
    * Returns structured data for building the Session→View→Action→Resource hierarchy.
    */
-  const fetchRumEventsForTrace = async (
-    traceId: string,
-    startTime: number,
-    endTime: number,
-  ) => {
+  const fetchRumEventsForTrace = async (traceId: string, startTime: number, endTime: number) => {
     const empty = {
       tracedResources: [] as any[],
       viewEvents: [] as any[],
@@ -203,13 +192,7 @@ export default function useRumSpanBuilder(
       const tracedResources: any[] = tracedRes.data?.hits || [];
       if (!tracedResources.length) return empty;
 
-      const viewIds = [
-        ...new Set(
-          tracedResources
-            .map((r: any) => r.view_id)
-            .filter(Boolean),
-        ),
-      ];
+      const viewIds = [...new Set(tracedResources.map((r: any) => r.view_id).filter(Boolean))];
 
       // Parse action_id from traced resource (stringified JSON array)
       let parsedActionIds: string[] = [];
@@ -240,9 +223,7 @@ export default function useRumSpanBuilder(
 
   const resolveParentSpanId = (event: any, actionEvents: any[] = []): string => {
     // Build a lookup of action IDs that were actually fetched and have a span in the tree.
-    const fetchedActionIds = new Set(
-      actionEvents.map((a: any) => String(a.action_id)),
-    );
+    const fetchedActionIds = new Set(actionEvents.map((a: any) => String(a.action_id)));
 
     let actionIds: string[] = [];
     try {
@@ -264,13 +245,10 @@ export default function useRumSpanBuilder(
     return "";
   };
 
-  const createLeafSpan = (
-    event: any,
-    parentSpanId: string,
-  ) => {
+  const createLeafSpan = (event: any, parentSpanId: string) => {
     const eventDate = event.date || 0;
     const duration =
-      (event.resource_duration/1000000) || (event[`${event.type}_duration`])/1000000 || 0;
+      event.resource_duration / 1000000 || event[`${event.type}_duration`] / 1000000 || 0;
     const isTraced = !!event._oo_trace_id;
 
     let operationName = "Unknown RUM Event";
@@ -279,7 +257,7 @@ export default function useRumSpanBuilder(
     } else if (event.type === "error") {
       operationName = `Error: ${event.error_message || event.error_type || "Unknown Error"}`;
     } else if (event.type === "long_task") {
-      operationName = `Long Task: ${(event.long_task_duration/1000) || duration}ms`;
+      operationName = `Long Task: ${event.long_task_duration / 1000 || duration}ms`;
     }
 
     return {
@@ -295,12 +273,10 @@ export default function useRumSpanBuilder(
       operation_name: operationName,
       service_name: event.service || "Frontend",
       span_status:
-        event.type === "error" ||
-        (event.type === "resource" && event.resource_status_code >= 400)
+        event.type === "error" || (event.type === "resource" && event.resource_status_code >= 400)
           ? "ERROR"
           : "OK",
-      span_kind:
-        event.type === "resource" ? SPAN_KIND_CLIENT : SPAN_KIND_UNSPECIFIED,
+      span_kind: event.type === "resource" ? SPAN_KIND_CLIENT : SPAN_KIND_UNSPECIFIED,
       rum_event_type: event.type,
       rum_session_id: event.session_id,
       _is_trace_bridge: isTraced,
@@ -334,10 +310,7 @@ export default function useRumSpanBuilder(
     };
   };
 
-  const buildViewSpans = (
-    viewEvents: any[],
-    traceId: string,
-  ): any[] => {
+  const buildViewSpans = (viewEvents: any[], traceId: string): any[] => {
     const dedupedViews = new Map<string, any>();
     for (const view of viewEvents) {
       const existing = dedupedViews.get(view.view_id);
@@ -347,13 +320,12 @@ export default function useRumSpanBuilder(
     }
 
     return [...dedupedViews.values()].map((view) => {
-      const viewDuration =
-        view.view_time_spent || view.view_loading_time;
+      const viewDuration = view.view_time_spent || view.view_loading_time;
       return {
         [tsCol()]: view.date,
         start_time: (view.date || 0) * 1_000_000,
-        end_time: ((view.date || 0) + (viewDuration/1000000)) * 1_000_000,
-        duration: viewDuration/1000,
+        end_time: ((view.date || 0) + viewDuration / 1000000) * 1_000_000,
+        duration: viewDuration / 1000,
         span_id: `rum_view_${view.view_id}`,
         reference_parent_span_id: "",
         trace_id: traceId || undefined,
@@ -399,13 +371,10 @@ export default function useRumSpanBuilder(
       spans.push({
         [tsCol()]: action.date,
         start_time: (action.date || 0) * 1_000_000,
-        end_time:
-          ((action.date || 0) + ((action.action_loading_time/1000000) || 0)) * 1_000_000,
-        duration: (action.action_loading_time/1000),
+        end_time: ((action.date || 0) + (action.action_loading_time / 1000000 || 0)) * 1_000_000,
+        duration: action.action_loading_time / 1000,
         span_id: `rum_action_${action.action_id}`,
-        reference_parent_span_id: action.view_id
-          ? `rum_view_${action.view_id}`
-          : "",
+        reference_parent_span_id: action.view_id ? `rum_view_${action.view_id}` : "",
         trace_id: traceId || undefined,
         operation_name: `Action: ${action.action_type || "Unknown"} on ${action.action_target_name || "Unknown"}`,
         service_name: action.service || "Frontend",
@@ -462,9 +431,7 @@ export default function useRumSpanBuilder(
   };
 
   const buildResourceSpans = (apiCalls: any[], actionEvents: any[]): any[] =>
-    apiCalls.map((event) =>
-      createLeafSpan(event, resolveParentSpanId(event, actionEvents)),
-    );
+    apiCalls.map((event) => createLeafSpan(event, resolveParentSpanId(event, actionEvents)));
 
   const buildErrorSpans = (
     errors: any[],
@@ -504,21 +471,13 @@ export default function useRumSpanBuilder(
 
     if (staticAssets.length <= 5) {
       return staticAssets.map((event) =>
-        createLeafSpan(
-          event,
-          event.view_id ? `rum_view_${event.view_id}` : "",
-        ),
+        createLeafSpan(event, event.view_id ? `rum_view_${event.view_id}` : ""),
       );
     }
 
     const spans: any[] = [];
     for (const event of staticAssets.slice(0, 3)) {
-      spans.push(
-        createLeafSpan(
-          event,
-          event.view_id ? `rum_view_${event.view_id}` : "",
-        ),
-      );
+      spans.push(createLeafSpan(event, event.view_id ? `rum_view_${event.view_id}` : ""));
     }
 
     const remaining = staticAssets.length - 3;
@@ -544,10 +503,7 @@ export default function useRumSpanBuilder(
 
     if (longTasks.length <= 2) {
       return longTasks.map((event) =>
-        createLeafSpan(
-          event,
-          event.view_id ? `rum_view_${event.view_id}` : "",
-        ),
+        createLeafSpan(event, event.view_id ? `rum_view_${event.view_id}` : ""),
       );
     }
 
@@ -566,9 +522,7 @@ export default function useRumSpanBuilder(
     const traceObj = searchObj.data.traceDetails.selectedTrace as any;
     if (!traceObj?.service_name) return;
 
-    const uniqueServices = new Set(
-      spans.map((s: any) => s.service_name).filter(Boolean),
-    );
+    const uniqueServices = new Set(spans.map((s: any) => s.service_name).filter(Boolean));
     for (const svc of uniqueServices) {
       if (!traceObj.service_name.find((s: any) => s.service_name === svc)) {
         traceObj.service_name.push({ service_name: svc, count: 1 });
@@ -592,8 +546,7 @@ export default function useRumSpanBuilder(
     const traceId = firstTracedResource?._oo_trace_id || "";
     const tracedTimestamp = firstTracedResource?.date || 0;
 
-    const { staticAssets, apiCalls, errors, longTasks } =
-      classifyLeafEvents(allViewEvents);
+    const { staticAssets, apiCalls, errors, longTasks } = classifyLeafEvents(allViewEvents);
 
     const spans: any[] = [
       ...buildViewSpans(viewEvents, traceId),
@@ -604,9 +557,7 @@ export default function useRumSpanBuilder(
       ...buildLongTaskSpans(longTasks, firstTracedResource, traceId),
     ];
 
-    spans.sort(
-      (a: any, b: any) => (a[tsCol()] || 0) - (b[tsCol()] || 0),
-    );
+    spans.sort((a: any, b: any) => (a[tsCol()] || 0) - (b[tsCol()] || 0));
 
     registerServiceColors(spans);
 

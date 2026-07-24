@@ -75,7 +75,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
             format!("search_job_worker_{}", i),
             get_config().limit.search_job_scheduler_interval,
             {
-                if let Err(e) = openobserve_core::search_jobs::run(i).await {
+                if let Err(e) = search_service::search_jobs::run(i).await {
                     log::error!("[SEARCH JOB {i}] run search jobs error: {e}");
                 }
             }
@@ -126,7 +126,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         get_config().limit.search_job_delete_interval,
         {
             log::debug!("[SEARCH JOB] Running delete jobs");
-            if let Err(e) = openobserve_core::search_jobs::delete_jobs().await {
+            if let Err(e) = search_service::search_jobs::delete_jobs().await {
                 log::error!("[SEARCH JOB] run delete jobs error: {e}");
             }
         }

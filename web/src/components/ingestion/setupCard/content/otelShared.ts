@@ -22,11 +22,7 @@
 // in each card's own file (e.g. sqlServer.ts, postgres.ts).
 
 import { getImageURL } from "@/utils/zincutils";
-import type {
-  CardSubstitutions,
-  RichCardStep,
-  RichCardStepVariant,
-} from "../types";
+import type { CardSubstitutions, RichCardStep, RichCardStepVariant } from "../types";
 import { applySubs, applySubsMasked } from "../subs";
 
 /** Pinned collector release used by the install commands. Bump in one place. */
@@ -65,15 +61,12 @@ const MAC_QUARANTINE_NOTE =
  * with the matching download command. The sqlserver/postgresql/etc. receivers
  * all ship only in the Contrib build.
  */
-export function collectorInstallStep(
-  version: string = COLLECTOR_VERSION,
-): RichCardStep {
+export function collectorInstallStep(version: string = COLLECTOR_VERSION): RichCardStep {
   const icon = osIcons();
   return {
     id: "install",
     title: "Install OpenTelemetry Collector Contrib",
-    description:
-      "The receiver is in the Contrib build only — pick your platform.",
+    description: "The receiver is in the Contrib build only — pick your platform.",
     chip: { kind: "terminal", label: "Terminal" },
     completeOn: "copy",
     // The OS chosen here also drives the configure step (shared "os" group).
@@ -153,8 +146,20 @@ export function writeConfigVariants(
   return [
     { id: "linux-amd64", label: "Linux (x86_64)", icon: icon.linux, code: bashCfg },
     { id: "linux-arm64", label: "Linux (ARM64)", icon: icon.linux, code: bashCfg },
-    { id: "darwin-arm64", label: "macOS (Apple Silicon)", icon: icon.mac, iconInvertDark: true, code: bashCfg },
-    { id: "darwin-amd64", label: "macOS (Intel)", icon: icon.mac, iconInvertDark: true, code: bashCfg },
+    {
+      id: "darwin-arm64",
+      label: "macOS (Apple Silicon)",
+      icon: icon.mac,
+      iconInvertDark: true,
+      code: bashCfg,
+    },
+    {
+      id: "darwin-amd64",
+      label: "macOS (Intel)",
+      icon: icon.mac,
+      iconInvertDark: true,
+      code: bashCfg,
+    },
     { id: "windows-amd64", label: "Windows (x86_64)", icon: icon.windows, code: psCfg },
   ];
 }

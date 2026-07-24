@@ -14,11 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 export const associate_members = {
-    "data": [
-        {
-            "email": "tulsiraval2828@gmail.com",
-            "status": "accepted"
-        }
-    ],
-    "message": "Organization members fetched successfully"
-}
+  data: [
+    {
+      email: "tulsiraval2828@gmail.com",
+      status: "accepted",
+    },
+  ],
+  message: "Organization members fetched successfully",
+};

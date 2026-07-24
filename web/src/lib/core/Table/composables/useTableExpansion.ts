@@ -30,16 +30,14 @@ export function useTableExpansion<TData>(
   /** Resolve the expanded IDs, falling back to empty array. */
   const resolveExpandedIds = () => props.expandedIds?.() ?? [];
 
-  const localExpandedIds = ref<Set<string>>(
-    new Set(resolveExpandedIds()),
-  );
+  const localExpandedIds = ref<Set<string>>(new Set(resolveExpandedIds()));
 
   watch(
     () => resolveExpandedIds(),
     (ids) => {
       localExpandedIds.value = new Set(ids);
     },
-    { flush: 'sync' },
+    { flush: "sync" },
   );
 
   function getRowId(row: TData): string {

@@ -107,12 +107,7 @@ describe("buildTrendSeries", () => {
     ];
 
     expect(
-      buildTrendSeries(
-        rows,
-        startMs * 1000,
-        (startMs + 18 * 3_600_000) * 1000,
-        "6 hour",
-      ),
+      buildTrendSeries(rows, startMs * 1000, (startMs + 18 * 3_600_000) * 1000, "6 hour"),
     ).toEqual({ "answer-quality": [1, 0, 4, 0] });
   });
 });
@@ -153,9 +148,7 @@ describe("useQualityScoreConfigs volume trend", () => {
 
     expect(mockExecuteQueryOnce).toHaveBeenCalledTimes(1);
     expect(mockExecuteQueryOnce.mock.calls[0][0]).toContain("histogram(");
-    expect(mockExecuteQueryOnce.mock.calls[0][0]).toContain(
-      "PARTITION BY _score_attempt_key",
-    );
+    expect(mockExecuteQueryOnce.mock.calls[0][0]).toContain("PARTITION BY _score_attempt_key");
     expect(mockExecuteQueryOnce.mock.calls[0][0]).toContain("task_id");
     expect(rows.value[0].trendSparkline).toEqual([1, 0, 4, 0]);
   });

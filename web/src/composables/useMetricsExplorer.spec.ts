@@ -118,8 +118,7 @@ describe("useMetricsExplorer", () => {
     });
 
     it("resets queries array to one default query", () => {
-      const { dashboardPanelData, resetDashboardPanelData, addQuery } =
-        getInstance();
+      const { dashboardPanelData, resetDashboardPanelData, addQuery } = getInstance();
       addQuery();
       expect(dashboardPanelData.data.queries.length).toBe(2);
       resetDashboardPanelData();
@@ -209,9 +208,7 @@ describe("useMetricsExplorer", () => {
       const { addXAxisItem, dashboardPanelData } = getInstance();
       addXAxisItem({ name: "timestamp" });
       expect(
-        dashboardPanelData.data.queries[0].fields.x.some(
-          (f: any) => f.column === "timestamp",
-        ),
+        dashboardPanelData.data.queries[0].fields.x.some((f: any) => f.column === "timestamp"),
       ).toBe(true);
     });
 
@@ -244,14 +241,11 @@ describe("useMetricsExplorer", () => {
     });
 
     it("removeXAxisItem removes field by name", () => {
-      const { addXAxisItem, removeXAxisItem, dashboardPanelData } =
-        getInstance();
+      const { addXAxisItem, removeXAxisItem, dashboardPanelData } = getInstance();
       addXAxisItem({ name: "service_name" });
       removeXAxisItem("service_name");
       expect(
-        dashboardPanelData.data.queries[0].fields.x.find(
-          (f: any) => f.column === "service_name",
-        ),
+        dashboardPanelData.data.queries[0].fields.x.find((f: any) => f.column === "service_name"),
       ).toBeUndefined();
     });
 
@@ -297,14 +291,11 @@ describe("useMetricsExplorer", () => {
     });
 
     it("removeYAxisItem removes field by name", () => {
-      const { addYAxisItem, removeYAxisItem, dashboardPanelData } =
-        getInstance();
+      const { addYAxisItem, removeYAxisItem, dashboardPanelData } = getInstance();
       addYAxisItem({ name: "latency" });
       removeYAxisItem("latency");
       expect(
-        dashboardPanelData.data.queries[0].fields.y.find(
-          (f: any) => f.column === "latency",
-        ),
+        dashboardPanelData.data.queries[0].fields.y.find((f: any) => f.column === "latency"),
       ).toBeUndefined();
     });
 
@@ -327,21 +318,16 @@ describe("useMetricsExplorer", () => {
       const { addZAxisItem, dashboardPanelData } = getInstance();
       addZAxisItem({ name: "weight" });
       expect(
-        dashboardPanelData.data.queries[0].fields.z.find(
-          (f: any) => f.column === "weight",
-        ),
+        dashboardPanelData.data.queries[0].fields.z.find((f: any) => f.column === "weight"),
       ).toBeDefined();
     });
 
     it("removeZAxisItem removes field by name", () => {
-      const { addZAxisItem, removeZAxisItem, dashboardPanelData } =
-        getInstance();
+      const { addZAxisItem, removeZAxisItem, dashboardPanelData } = getInstance();
       addZAxisItem({ name: "weight" });
       removeZAxisItem("weight");
       expect(
-        dashboardPanelData.data.queries[0].fields.z.find(
-          (f: any) => f.column === "weight",
-        ),
+        dashboardPanelData.data.queries[0].fields.z.find((f: any) => f.column === "weight"),
       ).toBeUndefined();
     });
   });
@@ -354,28 +340,20 @@ describe("useMetricsExplorer", () => {
       const { addLatitude, dashboardPanelData } = getInstance();
       addLatitude({ name: "lat" });
       expect(dashboardPanelData.data.queries[0].fields.latitude).not.toBeNull();
-      expect(dashboardPanelData.data.queries[0].fields.latitude?.column).toBe(
-        "lat",
-      );
+      expect(dashboardPanelData.data.queries[0].fields.latitude?.column).toBe("lat");
     });
 
     it("addLongitude sets longitude field", () => {
       const { addLongitude, dashboardPanelData } = getInstance();
       addLongitude({ name: "lng" });
-      expect(
-        dashboardPanelData.data.queries[0].fields.longitude?.column,
-      ).toBe("lng");
+      expect(dashboardPanelData.data.queries[0].fields.longitude?.column).toBe("lng");
     });
 
     it("addWeight sets weight field with count aggregation", () => {
       const { addWeight, dashboardPanelData } = getInstance();
       addWeight({ name: "w" });
-      expect(dashboardPanelData.data.queries[0].fields.weight?.column).toBe(
-        "w",
-      );
-      expect(
-        dashboardPanelData.data.queries[0].fields.weight?.aggregationFunction,
-      ).toBe("count");
+      expect(dashboardPanelData.data.queries[0].fields.weight?.column).toBe("w");
+      expect(dashboardPanelData.data.queries[0].fields.weight?.aggregationFunction).toBe("count");
     });
 
     it("removeLatitude sets latitude to null", () => {
@@ -386,8 +364,7 @@ describe("useMetricsExplorer", () => {
     });
 
     it("removeLongitude sets longitude to null", () => {
-      const { addLongitude, removeLongitude, dashboardPanelData } =
-        getInstance();
+      const { addLongitude, removeLongitude, dashboardPanelData } = getInstance();
       addLongitude({ name: "lng" });
       removeLongitude();
       expect(dashboardPanelData.data.queries[0].fields.longitude).toBeNull();
@@ -404,9 +381,7 @@ describe("useMetricsExplorer", () => {
       const { addLatitude, dashboardPanelData } = getInstance();
       addLatitude({ name: "lat1" });
       addLatitude({ name: "lat2" });
-      expect(dashboardPanelData.data.queries[0].fields.latitude?.column).toBe(
-        "lat1",
-      );
+      expect(dashboardPanelData.data.queries[0].fields.latitude?.column).toBe("lat1");
     });
   });
 
@@ -420,8 +395,7 @@ describe("useMetricsExplorer", () => {
     });
 
     it("isAddXAxisNotAllowed is true for pie chart with one x field", () => {
-      const { addXAxisItem, isAddXAxisNotAllowed, dashboardPanelData } =
-        getInstance();
+      const { addXAxisItem, isAddXAxisNotAllowed, dashboardPanelData } = getInstance();
       dashboardPanelData.data.type = "pie";
       addXAxisItem({ name: "slice" });
       expect(isAddXAxisNotAllowed.value).toBe(true);
@@ -445,16 +419,14 @@ describe("useMetricsExplorer", () => {
     });
 
     it("isAddYAxisNotAllowed is true for pie chart with one y field", () => {
-      const { addYAxisItem, isAddYAxisNotAllowed, dashboardPanelData } =
-        getInstance();
+      const { addYAxisItem, isAddYAxisNotAllowed, dashboardPanelData } = getInstance();
       dashboardPanelData.data.type = "pie";
       addYAxisItem({ name: "value" });
       expect(isAddYAxisNotAllowed.value).toBe(true);
     });
 
     it("isAddZAxisNotAllowed is true for heatmap with one z field", () => {
-      const { addZAxisItem, isAddZAxisNotAllowed, dashboardPanelData } =
-        getInstance();
+      const { addZAxisItem, isAddZAxisNotAllowed, dashboardPanelData } = getInstance();
       dashboardPanelData.data.type = "heatmap";
       addZAxisItem({ name: "heat" });
       expect(isAddZAxisNotAllowed.value).toBe(true);
@@ -472,8 +444,7 @@ describe("useMetricsExplorer", () => {
   // -------------------------------------------------------------------------
   describe("updateArrayAlias", () => {
     it("updates x axis alias to x_axis_1 for non-custom query", () => {
-      const { addXAxisItem, updateArrayAlias, dashboardPanelData } =
-        getInstance();
+      const { addXAxisItem, updateArrayAlias, dashboardPanelData } = getInstance();
       dashboardPanelData.data.queries[0].customQuery = false;
       addXAxisItem({ name: "myField" });
       updateArrayAlias();
@@ -482,8 +453,7 @@ describe("useMetricsExplorer", () => {
     });
 
     it("updates y axis alias to y_axis_1 for non-custom query", () => {
-      const { addYAxisItem, updateArrayAlias, dashboardPanelData } =
-        getInstance();
+      const { addYAxisItem, updateArrayAlias, dashboardPanelData } = getInstance();
       dashboardPanelData.data.queries[0].customQuery = false;
       addYAxisItem({ name: "metric" });
       updateArrayAlias();
@@ -519,8 +489,7 @@ describe("useMetricsExplorer", () => {
     it("removeFilterItem removes the filter entry", () => {
       mockFieldValues.mockResolvedValue({ data: { hits: [] } });
 
-      const { addFilteredItem, removeFilterItem, dashboardPanelData } =
-        getInstance();
+      const { addFilteredItem, removeFilterItem, dashboardPanelData } = getInstance();
       dashboardPanelData.meta.dateTime = {
         start_time: new Date("2024-01-01"),
         end_time: new Date("2024-01-02"),
@@ -561,12 +530,7 @@ describe("useMetricsExplorer", () => {
   // -------------------------------------------------------------------------
   describe("removeXYFilters", () => {
     it("clears x, y, z and filter arrays in non-custom SQL mode", () => {
-      const {
-        addXAxisItem,
-        addYAxisItem,
-        removeXYFilters,
-        dashboardPanelData,
-      } = getInstance();
+      const { addXAxisItem, addYAxisItem, removeXYFilters, dashboardPanelData } = getInstance();
 
       dashboardPanelData.data.queryType = "sql";
       dashboardPanelData.data.queries[0].customQuery = false;
@@ -581,11 +545,7 @@ describe("useMetricsExplorer", () => {
     });
 
     it("does not clear fields when customQuery is true and not promql mode", () => {
-      const {
-        addXAxisItem,
-        removeXYFilters,
-        dashboardPanelData,
-      } = getInstance();
+      const { addXAxisItem, removeXYFilters, dashboardPanelData } = getInstance();
 
       dashboardPanelData.data.queryType = "sql";
       dashboardPanelData.data.queries[0].customQuery = true;
@@ -603,21 +563,17 @@ describe("useMetricsExplorer", () => {
   // -------------------------------------------------------------------------
   describe("resetAggregationFunction", () => {
     it("sets y aggregation to null for heatmap type", () => {
-      const { addYAxisItem, resetAggregationFunction, dashboardPanelData } =
-        getInstance();
+      const { addYAxisItem, resetAggregationFunction, dashboardPanelData } = getInstance();
 
       addYAxisItem({ name: "value" });
       dashboardPanelData.data.type = "heatmap";
       resetAggregationFunction();
 
-      expect(
-        dashboardPanelData.data.queries[0].fields.y[0].aggregationFunction,
-      ).toBeNull();
+      expect(dashboardPanelData.data.queries[0].fields.y[0].aggregationFunction).toBeNull();
     });
 
     it("restores y aggregation to count for non-heatmap types", () => {
-      const { addYAxisItem, resetAggregationFunction, dashboardPanelData } =
-        getInstance();
+      const { addYAxisItem, resetAggregationFunction, dashboardPanelData } = getInstance();
 
       addYAxisItem({ name: "value" });
       // manually set to null
@@ -625,14 +581,11 @@ describe("useMetricsExplorer", () => {
       dashboardPanelData.data.type = "bar";
       resetAggregationFunction();
 
-      expect(
-        dashboardPanelData.data.queries[0].fields.y[0].aggregationFunction,
-      ).toBe("count");
+      expect(dashboardPanelData.data.queries[0].fields.y[0].aggregationFunction).toBe("count");
     });
 
     it("clears geomap x/y/z/filter fields", () => {
-      const { addXAxisItem, resetAggregationFunction, dashboardPanelData } =
-        getInstance();
+      const { addXAxisItem, resetAggregationFunction, dashboardPanelData } = getInstance();
 
       addXAxisItem({ name: "lat" });
       dashboardPanelData.data.type = "geomap";

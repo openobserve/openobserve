@@ -134,10 +134,7 @@ export function buildLegendConfig(
   const legend: any = {
     show: true,
     type: legendType,
-    orient:
-      legendPosition === "bottom" || legendPosition === "top"
-        ? "horizontal"
-        : "vertical",
+    orient: legendPosition === "bottom" || legendPosition === "top" ? "horizontal" : "vertical",
     padding: [10, 20, 10, 10],
     textStyle: {
       width: 150, // Same as line charts
@@ -234,10 +231,8 @@ export function buildPieChartConfig(
 
   // Outside labels need a band around the pie for leader lines + text
   // (donut outer radius must stay above its 40% inner radius)
-  const outsideLabels =
-    config.show_label !== false && config.label_position !== "inside";
-  if (outsideLabels)
-    radiusPercent = Math.max(isDonut ? 45 : 30, radiusPercent - 12);
+  const outsideLabels = config.show_label !== false && config.label_position !== "inside";
+  if (outsideLabels) radiusPercent = Math.max(isDonut ? 45 : 30, radiusPercent - 12);
 
   // Set radius based on chart type
   const radius = isDonut

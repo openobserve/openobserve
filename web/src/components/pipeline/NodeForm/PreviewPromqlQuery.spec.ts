@@ -19,7 +19,6 @@ import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 vi.mock("vue-router", async () => {
   const actual = await vi.importActual("vue-router");
   return {
@@ -88,15 +87,11 @@ describe("PreviewPromqlQuery - rendering", () => {
   });
 
   it("renders the data-test='alert-preview-chart' element", () => {
-    expect(wrapper.find('[data-test="alert-preview-chart"]').exists()).toBe(
-      true
-    );
+    expect(wrapper.find('[data-test="alert-preview-chart"]').exists()).toBe(true);
   });
 
   it("renders the PanelSchemaRenderer stub inside the chart container", () => {
-    expect(
-      wrapper.find('[data-test="panel-schema-renderer-stub"]').exists()
-    ).toBe(true);
+    expect(wrapper.find('[data-test="panel-schema-renderer-stub"]').exists()).toBe(true);
   });
 
   it("passes searchType='ui' to PanelSchemaRenderer", () => {

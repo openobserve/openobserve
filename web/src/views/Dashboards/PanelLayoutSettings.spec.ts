@@ -288,18 +288,14 @@ describe("PanelLayoutSettings.vue", () => {
       expect(contentDiv.exists()).toBe(true);
       expect(contentDiv.attributes("class")).toContain("p-0");
       expect(contentDiv.attributes("class")).not.toContain("bg-white");
-      expect(contentDiv.attributes("class")).not.toContain(
-        "bg-(--color-surface-base)",
-      );
+      expect(contentDiv.attributes("class")).not.toContain("bg-(--color-surface-base)");
     });
 
     it("should keep the content area theme-agnostic in light mode", () => {
       const contentDiv = wrapper.find('[data-test="panel-layout-settings-content"]');
       expect(contentDiv.exists()).toBe(true);
       expect(contentDiv.attributes("class")).toContain("p-0");
-      expect(contentDiv.attributes("class")).not.toContain(
-        "bg-(--color-surface-base)",
-      );
+      expect(contentDiv.attributes("class")).not.toContain("bg-(--color-surface-base)");
     });
 
     it("should expose panel layout title via ODrawer prop", () => {
@@ -313,18 +309,14 @@ describe("PanelLayoutSettings.vue", () => {
 
     it("should still expose getImageURL helper on the instance", () => {
       expect(wrapper.vm.getImageURL).toBeDefined();
-      expect(wrapper.vm.getImageURL("images/common/close_icon.svg")).toBe(
-        "mocked-image-url",
-      );
+      expect(wrapper.vm.getImageURL("images/common/close_icon.svg")).toBe("mocked-image-url");
     });
   });
 
   describe("data-test preservation", () => {
     it("keeps the height input data-test", () => {
       wrapper = mountComponent();
-      expect(
-        wrapper.find('[data-test="panel-layout-settings-height-input"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="panel-layout-settings-height-input"]').exists()).toBe(true);
     });
   });
 });

@@ -1,9 +1,8 @@
-import { describe, it, expect, afterEach, vi } from 'vitest';
-import { mount, VueWrapper } from '@vue/test-utils';
-import ServiceMapIcon from '@/components/icons/ServiceMapIcon.vue';
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { mount, VueWrapper } from "@vue/test-utils";
+import ServiceMapIcon from "@/components/icons/ServiceMapIcon.vue";
 
-
-describe('ServiceMapIcon.vue', () => {
+describe("ServiceMapIcon.vue", () => {
   let wrapper: VueWrapper;
 
   afterEach(() => {
@@ -12,93 +11,97 @@ describe('ServiceMapIcon.vue', () => {
 
   const createWrapper = () => mount(ServiceMapIcon, { global: { plugins: [] } });
 
-  describe('Component Rendering', () => {
-    it('renders the component correctly', () => {
+  describe("Component Rendering", () => {
+    it("renders the component correctly", () => {
       wrapper = createWrapper();
       expect(wrapper.exists()).toBe(true);
     });
 
-    it('has correct component name', () => {
+    it("has correct component name", () => {
       wrapper = createWrapper();
-      expect(wrapper.vm.$options.name).toBe('ServiceMapIcon');
+      expect(wrapper.vm.$options.name).toBe("ServiceMapIcon");
     });
 
-    it('renders an SVG element', () => {
+    it("renders an SVG element", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('svg').exists()).toBe(true);
+      expect(wrapper.find("svg").exists()).toBe(true);
     });
 
-    it('has correct SVG dimensions', () => {
+    it("has correct SVG dimensions", () => {
       wrapper = createWrapper();
-      const svg = wrapper.find('svg');
-      expect(svg.attributes('width')).toBe('28');
-      expect(svg.attributes('height')).toBe('24');
+      const svg = wrapper.find("svg");
+      expect(svg.attributes("width")).toBe("28");
+      expect(svg.attributes("height")).toBe("24");
     });
 
-    it('has correct viewBox', () => {
+    it("has correct viewBox", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('svg').attributes('viewBox')).toBe('0 0 28 24');
+      expect(wrapper.find("svg").attributes("viewBox")).toBe("0 0 28 24");
     });
 
-    it('contains a path element', () => {
+    it("contains a path element", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('path').exists()).toBe(true);
+      expect(wrapper.find("path").exists()).toBe(true);
     });
 
-    it('path uses currentColor fill', () => {
+    it("path uses currentColor fill", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('path').attributes('fill')).toBe('currentColor');
+      expect(wrapper.find("path").attributes("fill")).toBe("currentColor");
     });
 
-    it('has non-empty path data', () => {
+    it("has non-empty path data", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('path').attributes('d')?.length).toBeGreaterThan(50);
+      expect(wrapper.find("path").attributes("d")?.length).toBeGreaterThan(50);
     });
   });
 
-  describe('Vue 3 Integration', () => {
-    it('uses defineComponent correctly', () => {
+  describe("Vue 3 Integration", () => {
+    it("uses defineComponent correctly", () => {
       wrapper = createWrapper();
       expect(wrapper.vm).toBeTruthy();
     });
 
-    it('has no reactive state', () => {
+    it("has no reactive state", () => {
       wrapper = createWrapper();
       expect(wrapper.vm.$data).toEqual({});
     });
 
-    it('mounts without errors', () => {
-      expect(() => { wrapper = createWrapper(); }).not.toThrow();
+    it("mounts without errors", () => {
+      expect(() => {
+        wrapper = createWrapper();
+      }).not.toThrow();
     });
 
-    it('unmounts cleanly', () => {
+    it("unmounts cleanly", () => {
       wrapper = createWrapper();
-      expect(() => { wrapper.unmount(); }).not.toThrow();
+      expect(() => {
+        wrapper.unmount();
+      }).not.toThrow();
     });
 
-    it('has no side effects on mount', () => {
-      const spy = vi.spyOn(console, 'warn');
+    it("has no side effects on mount", () => {
+      const spy = vi.spyOn(console, "warn");
       wrapper = createWrapper();
       expect(spy).not.toHaveBeenCalled();
       spy.mockRestore();
     });
   });
 
-  describe('Icon Specifics', () => {
-    it('renders at the SVG root level', () => {
+  describe("Icon Specifics", () => {
+    it("renders at the SVG root level", () => {
       wrapper = createWrapper();
-      expect(wrapper.element.tagName).toBe('svg');
+      expect(wrapper.element.tagName).toBe("svg");
     });
 
-    it('has xmlns attribute', () => {
+    it("has xmlns attribute", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('svg').attributes('xmlns')).toBe('http://www.w3.org/2000/svg');
+      expect(wrapper.find("svg").attributes("xmlns")).toBe("http://www.w3.org/2000/svg");
     });
 
-    it('is not a square icon (28x24)', () => {
+    it("is not a square icon (28x24)", () => {
       wrapper = createWrapper();
-      const svg = wrapper.find('svg');
-      expect(svg.attributes('width')).not.toBe(svg.attributes('height'));
+      const svg = wrapper.find("svg");
+      expect(svg.attributes("width")).not.toBe(svg.attributes("height"));
     });
   });
 });

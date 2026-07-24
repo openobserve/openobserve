@@ -50,7 +50,6 @@ vi.mock("@/components/logs/ChunkedContent.vue", () => ({
 import JsonPreview from "./JsonPreview.vue";
 import * as clipboardUtils from "@/utils/clipboard";
 
-
 // ── Mount factory ─────────────────────────────────────────────────────────────
 
 function mountJsonPreview(
@@ -104,9 +103,7 @@ describe("JsonPreview", () => {
       // but with no field-dropdown slot there are none either.
       const buttons = wrapper.findAll("button");
       // None of the buttons should be the copy button — identified by the content_copy icon text.
-      const hasCopyButton = buttons.some((b) =>
-        b.html().includes("content_copy"),
-      );
+      const hasCopyButton = buttons.some((b) => b.html().includes("content_copy"));
       expect(hasCopyButton).toBe(false);
     });
   });
@@ -117,15 +114,9 @@ describe("JsonPreview", () => {
         value: { level: "info", message: "hello", status: 200 },
       });
 
-      expect(
-        wrapper.find('[data-test="json-preview-key-level"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="json-preview-key-message"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="json-preview-key-status"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="json-preview-key-level"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="json-preview-key-message"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="json-preview-key-status"]').exists()).toBe(true);
     });
 
     it("should render the key label text inside the key span", () => {
@@ -143,9 +134,7 @@ describe("JsonPreview", () => {
     });
 
     it("should NOT render the field-dropdown button when no field-dropdown slot is provided", () => {
-      expect(
-        wrapper.find('[data-test="json-preview-field-dropdown-btn"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="json-preview-field-dropdown-btn"]').exists()).toBe(false);
     });
   });
 
@@ -160,9 +149,7 @@ describe("JsonPreview", () => {
     });
 
     it("should render the field-dropdown button when the field-dropdown slot is provided", () => {
-      expect(
-        wrapper.find('[data-test="json-preview-field-dropdown-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="json-preview-field-dropdown-btn"]').exists()).toBe(true);
     });
   });
 
@@ -208,20 +195,14 @@ describe("JsonPreview", () => {
         },
       );
 
-      expect(
-        wrapper.find('[data-test="custom-toolbar-btn"]').exists(),
-      ).toBe(true);
-      expect(wrapper.find('[data-test="custom-toolbar-btn"]').text()).toBe(
-        "View Trace",
-      );
+      expect(wrapper.find('[data-test="custom-toolbar-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="custom-toolbar-btn"]').text()).toBe("View Trace");
     });
 
     it("should not render any toolbar content when toolbar slot is not provided", () => {
       wrapper = mountJsonPreview({ value: { field: "val" } });
 
-      expect(
-        wrapper.find('[data-test="custom-toolbar-btn"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="custom-toolbar-btn"]').exists()).toBe(false);
     });
   });
 });

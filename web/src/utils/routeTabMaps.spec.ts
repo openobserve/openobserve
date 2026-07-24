@@ -24,9 +24,7 @@ describe("resolveTab", () => {
   // --- known section / known route -------------------------------------------
   describe("returns the mapped tab value when section and route are known", () => {
     it("databases – sqlserver", () => {
-      expect(resolveTab("databases", "sqlserver", "sqlserver")).toBe(
-        "sqlserver"
-      );
+      expect(resolveTab("databases", "sqlserver", "sqlserver")).toBe("sqlserver");
     });
 
     it("databases – postgres", () => {
@@ -50,27 +48,19 @@ describe("resolveTab", () => {
     });
 
     it("databases – snowflake", () => {
-      expect(resolveTab("databases", "snowflake", "sqlserver")).toBe(
-        "snowflake"
-      );
+      expect(resolveTab("databases", "snowflake", "sqlserver")).toBe("snowflake");
     });
 
     it("databases – zookeeper", () => {
-      expect(resolveTab("databases", "zookeeper", "sqlserver")).toBe(
-        "zookeeper"
-      );
+      expect(resolveTab("databases", "zookeeper", "sqlserver")).toBe("zookeeper");
     });
 
     it("databases – cassandra", () => {
-      expect(resolveTab("databases", "cassandra", "sqlserver")).toBe(
-        "cassandra"
-      );
+      expect(resolveTab("databases", "cassandra", "sqlserver")).toBe("cassandra");
     });
 
     it("databases – aerospike", () => {
-      expect(resolveTab("databases", "aerospike", "sqlserver")).toBe(
-        "aerospike"
-      );
+      expect(resolveTab("databases", "aerospike", "sqlserver")).toBe("aerospike");
     });
 
     it("databases – dynamodb", () => {
@@ -78,9 +68,7 @@ describe("resolveTab", () => {
     });
 
     it("databases – databricks", () => {
-      expect(resolveTab("databases", "databricks", "sqlserver")).toBe(
-        "databricks"
-      );
+      expect(resolveTab("databases", "databricks", "sqlserver")).toBe("databricks");
     });
 
     it("devops – jenkins", () => {
@@ -96,9 +84,7 @@ describe("resolveTab", () => {
     });
 
     it("devops – github-actions", () => {
-      expect(resolveTab("devops", "github-actions", "jenkins")).toBe(
-        "github-actions"
-      );
+      expect(resolveTab("devops", "github-actions", "jenkins")).toBe("github-actions");
     });
 
     it("languages – python", () => {
@@ -106,15 +92,11 @@ describe("resolveTab", () => {
     });
 
     it("languages – dotnettracing", () => {
-      expect(resolveTab("languages", "dotnettracing", "python")).toBe(
-        "dotnettracing"
-      );
+      expect(resolveTab("languages", "dotnettracing", "python")).toBe("dotnettracing");
     });
 
     it("languages – dotnetlogs", () => {
-      expect(resolveTab("languages", "dotnetlogs", "python")).toBe(
-        "dotnetlogs"
-      );
+      expect(resolveTab("languages", "dotnetlogs", "python")).toBe("dotnetlogs");
     });
 
     it("languages – nodejs", () => {
@@ -126,9 +108,7 @@ describe("resolveTab", () => {
     });
 
     it("message-queues – rabbitmq", () => {
-      expect(resolveTab("message-queues", "rabbitmq", "rabbitmq")).toBe(
-        "rabbitmq"
-      );
+      expect(resolveTab("message-queues", "rabbitmq", "rabbitmq")).toBe("rabbitmq");
     });
 
     it("message-queues – kafka", () => {
@@ -160,59 +140,45 @@ describe("resolveTab", () => {
     });
 
     it("recommended – ingestFromKubernetes", () => {
-      expect(
-        resolveTab(
-          "recommended",
-          "ingestFromKubernetes",
-          "ingestFromKubernetes"
-        )
-      ).toBe("ingestFromKubernetes");
+      expect(resolveTab("recommended", "ingestFromKubernetes", "ingestFromKubernetes")).toBe(
+        "ingestFromKubernetes",
+      );
     });
 
     it("recommended – ingestFromWindows", () => {
-      expect(
-        resolveTab("recommended", "ingestFromWindows", "ingestFromKubernetes")
-      ).toBe("ingestFromWindows");
+      expect(resolveTab("recommended", "ingestFromWindows", "ingestFromKubernetes")).toBe(
+        "ingestFromWindows",
+      );
     });
 
     it("recommended – ingestFromLinux", () => {
-      expect(
-        resolveTab("recommended", "ingestFromLinux", "ingestFromKubernetes")
-      ).toBe("ingestFromLinux");
+      expect(resolveTab("recommended", "ingestFromLinux", "ingestFromKubernetes")).toBe(
+        "ingestFromLinux",
+      );
     });
 
     it("recommended – AWSConfig", () => {
-      expect(
-        resolveTab("recommended", "AWSConfig", "ingestFromKubernetes")
-      ).toBe("AWSConfig");
+      expect(resolveTab("recommended", "AWSConfig", "ingestFromKubernetes")).toBe("AWSConfig");
     });
 
     it("recommended – GCPConfig", () => {
-      expect(
-        resolveTab("recommended", "GCPConfig", "ingestFromKubernetes")
-      ).toBe("GCPConfig");
+      expect(resolveTab("recommended", "GCPConfig", "ingestFromKubernetes")).toBe("GCPConfig");
     });
 
     it("recommended – AzureConfig", () => {
-      expect(
-        resolveTab("recommended", "AzureConfig", "ingestFromKubernetes")
-      ).toBe("AzureConfig");
+      expect(resolveTab("recommended", "AzureConfig", "ingestFromKubernetes")).toBe("AzureConfig");
     });
 
     it("recommended – ingestFromTraces", () => {
-      expect(
-        resolveTab("recommended", "ingestFromTraces", "ingestFromKubernetes")
-      ).toBe("ingestFromTraces");
+      expect(resolveTab("recommended", "ingestFromTraces", "ingestFromKubernetes")).toBe(
+        "ingestFromTraces",
+      );
     });
 
     it("recommended – frontendMonitoring", () => {
-      expect(
-        resolveTab(
-          "recommended",
-          "frontendMonitoring",
-          "ingestFromKubernetes"
-        )
-      ).toBe("frontendMonitoring");
+      expect(resolveTab("recommended", "frontendMonitoring", "ingestFromKubernetes")).toBe(
+        "frontendMonitoring",
+      );
     });
 
     it("security – falco", () => {
@@ -240,9 +206,7 @@ describe("resolveTab", () => {
     });
 
     it("security – google-workspace", () => {
-      expect(resolveTab("security", "google-workspace", "falco")).toBe(
-        "google-workspace"
-      );
+      expect(resolveTab("security", "google-workspace", "falco")).toBe("google-workspace");
     });
 
     it("servers – nginx", () => {
@@ -254,39 +218,29 @@ describe("resolveTab", () => {
     });
 
     it("ingestMetrics – prometheus", () => {
-      expect(resolveTab("ingestMetrics", "prometheus", "prometheus")).toBe(
-        "prometheus"
-      );
+      expect(resolveTab("ingestMetrics", "prometheus", "prometheus")).toBe("prometheus");
     });
 
     it("ingestMetrics – vmagent", () => {
-      expect(resolveTab("ingestMetrics", "vmagent", "prometheus")).toBe(
-        "vmagent"
-      );
+      expect(resolveTab("ingestMetrics", "vmagent", "prometheus")).toBe("vmagent");
     });
 
     it("ingestMetrics – nightingale", () => {
-      expect(resolveTab("ingestMetrics", "nightingale", "prometheus")).toBe(
-        "nightingale"
-      );
+      expect(resolveTab("ingestMetrics", "nightingale", "prometheus")).toBe("nightingale");
     });
 
     it("ingestMetrics – otelCollector", () => {
-      expect(resolveTab("ingestMetrics", "otelCollector", "prometheus")).toBe(
-        "otelCollector"
-      );
+      expect(resolveTab("ingestMetrics", "otelCollector", "prometheus")).toBe("otelCollector");
     });
 
     it("ingestMetrics – telegraf", () => {
-      expect(resolveTab("ingestMetrics", "telegraf", "prometheus")).toBe(
-        "telegraf"
-      );
+      expect(resolveTab("ingestMetrics", "telegraf", "prometheus")).toBe("telegraf");
     });
 
     it("ingestMetrics – cloudwatchMetrics", () => {
-      expect(
-        resolveTab("ingestMetrics", "cloudwatchMetrics", "prometheus")
-      ).toBe("cloudwatchMetrics");
+      expect(resolveTab("ingestMetrics", "cloudwatchMetrics", "prometheus")).toBe(
+        "cloudwatchMetrics",
+      );
     });
 
     it("ingestLogs – curl", () => {
@@ -310,9 +264,7 @@ describe("resolveTab", () => {
     });
 
     it("ingestLogs – ingestLogsFromOtel", () => {
-      expect(resolveTab("ingestLogs", "ingestLogsFromOtel", "curl")).toBe(
-        "ingestLogsFromOtel"
-      );
+      expect(resolveTab("ingestLogs", "ingestLogsFromOtel", "curl")).toBe("ingestLogsFromOtel");
     });
 
     it("ingestLogs – logstash", () => {
@@ -324,9 +276,7 @@ describe("resolveTab", () => {
     });
 
     it("ingestLogs – loongcollector", () => {
-      expect(resolveTab("ingestLogs", "loongcollector", "curl")).toBe(
-        "loongcollector"
-      );
+      expect(resolveTab("ingestLogs", "loongcollector", "curl")).toBe("loongcollector");
     });
 
     it("billings – usage", () => {
@@ -338,15 +288,11 @@ describe("resolveTab", () => {
     });
 
     it("billings – invoice_history", () => {
-      expect(resolveTab("billings", "invoice_history", "usage")).toBe(
-        "invoice_history"
-      );
+      expect(resolveTab("billings", "invoice_history", "usage")).toBe("invoice_history");
     });
 
     it("billings – billing_group", () => {
-      expect(resolveTab("billings", "billing_group", "usage")).toBe(
-        "billing_group"
-      );
+      expect(resolveTab("billings", "billing_group", "usage")).toBe("billing_group");
     });
 
     it("iam – users", () => {
@@ -354,9 +300,7 @@ describe("resolveTab", () => {
     });
 
     it("iam – serviceAccounts", () => {
-      expect(resolveTab("iam", "serviceAccounts", "users")).toBe(
-        "serviceAccounts"
-      );
+      expect(resolveTab("iam", "serviceAccounts", "users")).toBe("serviceAccounts");
     });
 
     it("iam – groups", () => {
@@ -383,16 +327,12 @@ describe("resolveTab", () => {
   // --- unknown route → fallback ----------------------------------------------
   describe("returns the fallback when the route is not in the map", () => {
     it("unknown child route under databases falls back to sqlserver", () => {
-      expect(resolveTab("databases", "someNewRoute", "sqlserver")).toBe(
-        "sqlserver"
-      );
+      expect(resolveTab("databases", "someNewRoute", "sqlserver")).toBe("sqlserver");
     });
 
     it("parent route name itself is not in the map → falls back", () => {
       // e.g. navigating to the parent "databases" route before a child is selected
-      expect(resolveTab("databases", "databases", "sqlserver")).toBe(
-        "sqlserver"
-      );
+      expect(resolveTab("databases", "databases", "sqlserver")).toBe("sqlserver");
     });
 
     it("unknown child under ingestLogs falls back to curl", () => {
@@ -408,9 +348,7 @@ describe("resolveTab", () => {
     });
 
     it("custom fallback is respected", () => {
-      expect(resolveTab("servers", "unknownServer", "customFallback")).toBe(
-        "customFallback"
-      );
+      expect(resolveTab("servers", "unknownServer", "customFallback")).toBe("customFallback");
     });
   });
 
@@ -432,9 +370,7 @@ describe("resolveTab", () => {
   // --- unknown section -------------------------------------------------------
   describe("returns the fallback when the section is not in ROUTE_TAB_MAPS", () => {
     it("completely unknown section", () => {
-      expect(
-        resolveTab("nonExistentSection" as any, "someRoute", "myFallback")
-      ).toBe("myFallback");
+      expect(resolveTab("nonExistentSection" as any, "someRoute", "myFallback")).toBe("myFallback");
     });
   });
 });
@@ -465,19 +401,16 @@ describe("ROUTE_TAB_MAPS", () => {
     "iam",
   ];
 
-  it.each(expectedSections)(
-    "contains the '%s' section",
-    (section) => {
-      expect(ROUTE_TAB_MAPS[section]).toBeDefined();
-      expect(typeof ROUTE_TAB_MAPS[section]).toBe("object");
-    }
-  );
+  it.each(expectedSections)("contains the '%s' section", (section) => {
+    expect(ROUTE_TAB_MAPS[section]).toBeDefined();
+    expect(typeof ROUTE_TAB_MAPS[section]).toBe("object");
+  });
 
   it("every section has at least one entry", () => {
     for (const section of Object.keys(ROUTE_TAB_MAPS)) {
       expect(
         Object.keys(ROUTE_TAB_MAPS[section]).length,
-        `Section '${section}' should have at least one entry`
+        `Section '${section}' should have at least one entry`,
       ).toBeGreaterThan(0);
     }
   });
@@ -485,14 +418,8 @@ describe("ROUTE_TAB_MAPS", () => {
   it("all map values are non-empty strings", () => {
     for (const [section, map] of Object.entries(ROUTE_TAB_MAPS)) {
       for (const [route, tab] of Object.entries(map)) {
-        expect(
-          typeof tab,
-          `${section}.${route} should be a string`
-        ).toBe("string");
-        expect(
-          tab.length,
-          `${section}.${route} tab value should not be empty`
-        ).toBeGreaterThan(0);
+        expect(typeof tab, `${section}.${route} should be a string`).toBe("string");
+        expect(tab.length, `${section}.${route} tab value should not be empty`).toBeGreaterThan(0);
       }
     }
   });

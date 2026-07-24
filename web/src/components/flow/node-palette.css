@@ -43,39 +43,11 @@
  * be scoped or folded into flow-canvas.css.
  * ───────────────────────────────────────────────────────────────────────────── */
 
-/* ── Header: title with a brand-accent underline ─────────────────────────── */
-.np-header {
-  color: var(--color-text-heading);
-  border-bottom: 0.125rem solid var(--color-primary-600);
-}
-
-/* ── Panel wrapping the node cards ───────────────────────────────────────────
- * Plain grey primitives, no brand tint:
- *   light  --color-grey-200 (#e5e5e5)
- *   dark   --color-grey-900 (#171717) — the primitive is a FIXED value, so dark
- *          must be stated explicitly or the panel renders as a near-white slab
- *          on the #0d1117 canvas. #171717 is 1.7 from the app's own dark panel
- *          surface (--d-panel #181818), so it matches the other rails anyway. */
-.np-panel {
-  background: var(--color-blue-50);
-  backdrop-filter: blur(0.75rem);
-  border: 1px solid var(--color-border-default);
-  border-radius: 0.75rem;
-  box-shadow: 0 0.25rem 1rem color-mix(in srgb, var(--color-black) 8%, transparent);
-  padding: 0.75rem 0.5rem;
-  margin: 0.25rem 0.125rem;
-  transition: all 0.3s ease-in-out;
-}
-.np-panel:hover {
-  box-shadow: 0 0.375rem 1.25rem color-mix(in srgb, var(--color-black) 12%, transparent);
-}
-.dark .np-panel {
-  background: var(--color-grey-900);
-  box-shadow: 0 0.375rem 1.5rem color-mix(in srgb, var(--color-black) 40%, transparent);
-}
-.dark .np-panel:hover {
-  box-shadow: 0 0.5rem 2rem color-mix(in srgb, var(--color-black) 50%, transparent);
-}
+/* The palette is a RAIL (same shape as the Dashboards/Alerts folder rail): a
+ * flush, full-height column with a border-r against the canvas, carrying its
+ * node cards directly. It has no header rule here because it has no header —
+ * both the old floating `.np-panel` card and the "Nodes" title were dropped, so
+ * the cards below are the only surfaces the rail draws. */
 
 /* Drag-affordance dots. (The old `.drag-handle:hover .dot` rules were dropped —
    no element in this template ever carried `.drag-handle`, so they were dead.) */
@@ -126,6 +98,72 @@
   background: var(--color-amber-50);
   box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-amber-600) 20%, transparent);
   border-color: color-mix(in srgb, var(--color-amber-500) 60%, transparent);
+}
+
+/* ── Palette-card layout + status-token skin (moved out of PipelineEditor.vue) ─
+ * These `.o2vf_node .o2vf_node_input|_default` rules were an unscoped <style>
+ * block in PipelineEditor — the LAST reason that component carried any CSS.
+ * They only ever styled the PALETTE (the `.o2vf_node_*` classes live solely on
+ * NodePalette's OButtons; canvas nodes use `.vue-flow__node-*`), so they belong
+ * here, not in a pipeline component.
+ *
+ * PLACEMENT is deliberate: after the light base rules above (0-2-0 beats the
+ * 0-1-0 base, so these status-token colours win in light, exactly as before)
+ * and BEFORE the `.dark` block below (whose `!important` colours then win in
+ * dark, so the designed dark palette skin stays authoritative). The layout
+ * props (min-height / padding / grab cursor) are unique to these rules, so they
+ * apply in both themes. */
+.o2vf_node .o2vf_node_input {
+  border: 1px solid var(--color-status-info-text);
+  color: var(--color-text-body);
+  border-radius: var(--radius-surface);
+  background: var(--color-status-info-bg);
+  box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-status-info-text) 10%, transparent);
+  transition:
+    background 0.3s ease,
+    box-shadow 0.3s ease,
+    border-color 0.3s ease;
+  cursor: grab;
+  min-height: 2.25rem;
+  padding: 0.5rem 1rem;
+}
+.o2vf_node .o2vf_node_input:active,
+.o2vf_node .o2vf_node_input.dragging {
+  cursor: grabbing;
+  transition: none !important;
+}
+.o2vf_node .o2vf_node_input:active *,
+.o2vf_node .o2vf_node_input.dragging * {
+  transition: none !important;
+}
+.o2vf_node .o2vf_node_default {
+  border: 1px solid var(--color-status-warning-text);
+  color: var(--color-text-body);
+  border-radius: var(--radius-surface);
+  background: var(--color-status-warning-bg);
+  box-shadow: 0 0.25rem 0.75rem
+    color-mix(in srgb, var(--color-status-warning-text) 10%, transparent);
+  transition:
+    background 0.3s ease,
+    box-shadow 0.3s ease,
+    border-color 0.3s ease;
+  cursor: grab;
+  min-height: 2.25rem;
+  padding: 0.5rem 1rem;
+}
+.o2vf_node .o2vf_node_default:hover {
+  border: 1px solid var(--color-status-warning-text) !important;
+  background: var(--color-status-warning-bg) !important;
+  box-shadow: 0 0.375rem 1rem color-mix(in srgb, var(--color-status-warning-text) 20%, transparent) !important;
+}
+.o2vf_node .o2vf_node_default:active,
+.o2vf_node .o2vf_node_default.dragging {
+  cursor: grabbing;
+  transition: none !important;
+}
+.o2vf_node .o2vf_node_default:active *,
+.o2vf_node .o2vf_node_default.dragging * {
+  transition: none !important;
 }
 
 /* ── Dark mode (`.dark`, mirrors the canvas node colours) ────────────────── */

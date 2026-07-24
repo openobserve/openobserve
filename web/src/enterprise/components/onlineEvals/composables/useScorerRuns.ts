@@ -70,8 +70,7 @@ function bucketToMs(bucket: unknown): number {
 
 function parseStatus(raw: unknown): RunStatus {
   const s = typeof raw === "string" ? raw.toLowerCase() : "";
-  if (s === "success" || s === "error" || s === "timeout" || s === "skipped")
-    return s;
+  if (s === "success" || s === "error" || s === "timeout" || s === "skipped") return s;
   return "unknown";
 }
 
@@ -215,12 +214,7 @@ export function useScorerRuns(
     const { startUs, endUs } = dateWindow.value;
     isLoadingKpis.value = true;
     try {
-      const kpiHits = await executeQuery(
-        kpiSql.value,
-        startUs,
-        endUs,
-        "traces",
-      ).catch((err) => {
+      const kpiHits = await executeQuery(kpiSql.value, startUs, endUs, "traces").catch((err) => {
         console.warn("[ScorerRuns:kpis] failed", err);
         return [] as KpiRow[];
       });
@@ -247,21 +241,14 @@ export function useScorerRuns(
     const { startUs, endUs } = dateWindow.value;
     isLoadingRuns.value = true;
     try {
-      const runHits = await executeQuery(
-        runsSql.value,
-        startUs,
-        endUs,
-        "traces",
-      ).catch((err) => {
+      const runHits = await executeQuery(runsSql.value, startUs, endUs, "traces").catch((err) => {
         console.warn("[ScorerRuns:runs] failed", err);
         return [] as RawRunRow[];
       });
       runs.value = (runHits as RawRunRow[]).map((r): RunRow => {
         const score = extractScore(r.attributes_response);
         return {
-          id:
-            r.span_id ??
-            `${r._timestamp ?? ""}-${r.attributes_target_span_id ?? ""}`,
+          id: r.span_id ?? `${r._timestamp ?? ""}-${r.attributes_target_span_id ?? ""}`,
           timestampMs: bucketToMs(r._timestamp),
           status: parseStatus(r.attributes_status),
           jobId: r.attributes_job_id ?? "",

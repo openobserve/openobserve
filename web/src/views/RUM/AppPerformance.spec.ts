@@ -179,7 +179,8 @@ describe("AppPerformance.vue", () => {
             },
           },
           "router-view": {
-            template: '<div data-test="router-view"><slot v-bind="{ Component: { template: \'<div>Child Component</div>\' } }" /></div>',
+            template:
+              '<div data-test="router-view"><slot v-bind="{ Component: { template: \'<div>Child Component</div>\' } }" /></div>',
           },
           "keep-alive": {
             template: '<div data-test="keep-alive"><slot /></div>',
@@ -219,7 +220,7 @@ describe("AppPerformance.vue", () => {
       // Since key is a special Vue attribute, let's check the component props instead
       const componentInstance = wrapper.vm;
       expect(componentInstance.store.state.selectedOrganization.identifier).toBe("test-org-123");
-      
+
       // Verify the store state is accessible
       expect(wrapper.vm.store.state.selectedOrganization.identifier).toBe("test-org-123");
     });
@@ -260,13 +261,13 @@ describe("AppPerformance.vue", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-                        QSeparator: { template: '<hr />' },
-            QBtn: { template: '<button></button>' },
-            AutoRefreshInterval: { template: '<div></div>' },
-            AppTabs: { template: '<div></div>' },
-            DateTimePickerDashboard: { template: '<div></div>' },
-            "router-view": { template: '<div></div>' },
-            "keep-alive": { template: '<div></div>' },
+            QSeparator: { template: "<hr />" },
+            QBtn: { template: "<button></button>" },
+            AutoRefreshInterval: { template: "<div></div>" },
+            AppTabs: { template: "<div></div>" },
+            DateTimePickerDashboard: { template: "<div></div>" },
+            "router-view": { template: "<div></div>" },
+            "keep-alive": { template: "<div></div>" },
           },
         },
       });
@@ -284,13 +285,13 @@ describe("AppPerformance.vue", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-                        QSeparator: { template: '<hr />' },
-            QBtn: { template: '<button></button>' },
-            AutoRefreshInterval: { template: '<div></div>' },
-            AppTabs: { template: '<div></div>' },
-            DateTimePickerDashboard: { template: '<div></div>' },
-            "router-view": { template: '<div></div>' },
-            "keep-alive": { template: '<div></div>' },
+            QSeparator: { template: "<hr />" },
+            QBtn: { template: "<button></button>" },
+            AutoRefreshInterval: { template: "<div></div>" },
+            AppTabs: { template: "<div></div>" },
+            DateTimePickerDashboard: { template: "<div></div>" },
+            "router-view": { template: "<div></div>" },
+            "keep-alive": { template: "<div></div>" },
           },
         },
       });
@@ -308,13 +309,13 @@ describe("AppPerformance.vue", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-            AutoRefreshInterval: { template: '<div></div>' },
-            OTabs: { template: '<div></div>' },
-            OTab: { template: '<div></div>' },
-            OButton: { template: '<button></button>' },
-            DateTimePickerDashboard: { template: '<div></div>' },
-            "router-view": { template: '<div></div>' },
-            "keep-alive": { template: '<div></div>' },
+            AutoRefreshInterval: { template: "<div></div>" },
+            OTabs: { template: "<div></div>" },
+            OTab: { template: "<div></div>" },
+            OButton: { template: "<button></button>" },
+            DateTimePickerDashboard: { template: "<div></div>" },
+            "router-view": { template: "<div></div>" },
+            "keep-alive": { template: "<div></div>" },
           },
         },
       });
@@ -326,7 +327,7 @@ describe("AppPerformance.vue", () => {
 
     it("should update route when active tab changes", async () => {
       const routerPushSpy = vi.spyOn(router, "push");
-      
+
       wrapper.vm.activePerformanceTab = "web_vitals";
       await nextTick();
 
@@ -363,13 +364,13 @@ describe("AppPerformance.vue", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-            AutoRefreshInterval: { template: '<div></div>' },
-            OTabs: { template: '<div></div>' },
-            OTab: { template: '<div></div>' },
-            OButton: { template: '<button></button>' },
-            DateTimePickerDashboard: { template: '<div></div>' },
-            "router-view": { template: '<div></div>' },
-            "keep-alive": { template: '<div></div>' },
+            AutoRefreshInterval: { template: "<div></div>" },
+            OTabs: { template: "<div></div>" },
+            OTab: { template: "<div></div>" },
+            OButton: { template: "<button></button>" },
+            DateTimePickerDashboard: { template: "<div></div>" },
+            "router-view": { template: "<div></div>" },
+            "keep-alive": { template: "<div></div>" },
           },
         },
       });
@@ -441,7 +442,7 @@ describe("AppPerformance.vue", () => {
       const mockRefresh = vi.fn();
       wrapper.vm.dateTimePicker = { refresh: mockRefresh };
 
-      const refreshBtn = wrapper.find('button');
+      const refreshBtn = wrapper.find("button");
       await refreshBtn.trigger("click");
 
       expect(mockRefresh).toHaveBeenCalled();
@@ -569,10 +570,10 @@ describe("AppPerformance.vue", () => {
 
     it("should dispatch resize event on activation", async () => {
       vi.spyOn(window, "dispatchEvent");
-      
+
       // Simulate the activation process
       await nextTick();
-      
+
       // The component should dispatch a resize event
       expect(wrapper.exists()).toBe(true);
     });

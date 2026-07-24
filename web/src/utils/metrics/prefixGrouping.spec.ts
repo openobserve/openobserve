@@ -80,19 +80,13 @@ describe("computePrefixGroups", () => {
     // `envoy` covers 3 names so it qualifies, but two of them prefer the deeper
     // `envoy_cluster`, leaving `envoy` with a single member. No rendered group
     // may be smaller than minGroupSize.
-    const groups = computePrefixGroups([
-      "envoy_cluster_a",
-      "envoy_cluster_b",
-      "envoy_http_x",
-    ]);
+    const groups = computePrefixGroups(["envoy_cluster_a", "envoy_cluster_b", "envoy_http_x"]);
 
     expect(groups).toEqual<PrefixGroup[]>([
       { id: "envoy_cluster", label: "envoy_cluster", count: 2, depth: 2 },
       { id: MISC_GROUP_ID, label: MISC_GROUP_LABEL, count: 1, depth: 0 },
     ]);
-    expect(groups.every((g) => g.id === MISC_GROUP_ID || g.count >= 2)).toBe(
-      true,
-    );
+    expect(groups.every((g) => g.id === MISC_GROUP_ID || g.count >= 2)).toBe(true);
   });
 
   it("assigns every name to exactly one group (counts sum to total)", () => {
@@ -197,24 +191,18 @@ describe("computePrefixGroups", () => {
     const names = ["svc_a_1", "svc_a_2", "svc_b_1"];
 
     // minGroupSize 3: `svc_a` (2) no longer qualifies, `svc` (3) does
-    expect(computePrefixGroups(names, { minGroupSize: 3 })).toEqual<
-      PrefixGroup[]
-    >([{ id: "svc", label: "svc", count: 3, depth: 1 }]);
+    expect(computePrefixGroups(names, { minGroupSize: 3 })).toEqual<PrefixGroup[]>([
+      { id: "svc", label: "svc", count: 3, depth: 1 },
+    ]);
 
     // minGroupSize 4: nothing qualifies -> everything is misc
-    expect(computePrefixGroups(names, { minGroupSize: 4 })).toEqual<
-      PrefixGroup[]
-    >([{ id: MISC_GROUP_ID, label: MISC_GROUP_LABEL, count: 3, depth: 0 }]);
+    expect(computePrefixGroups(names, { minGroupSize: 4 })).toEqual<PrefixGroup[]>([
+      { id: MISC_GROUP_ID, label: MISC_GROUP_LABEL, count: 3, depth: 0 },
+    ]);
   });
 
   it("ignores blanks and duplicates", () => {
-    const groups = computePrefixGroups([
-      "node_cpu_a",
-      "node_cpu_a",
-      "  node_cpu_b  ",
-      "",
-      "   ",
-    ]);
+    const groups = computePrefixGroups(["node_cpu_a", "node_cpu_a", "  node_cpu_b  ", "", "   "]);
 
     expect(groups).toEqual<PrefixGroup[]>([
       { id: "node_cpu", label: "node_cpu", count: 2, depth: 2 },
@@ -269,12 +257,7 @@ describe("computeSuffixGroups", () => {
 
   it("ignores empty trailing segments, blanks and duplicates", () => {
     expect(
-      computeSuffixGroups([
-        "http_requests_total",
-        "http_requests_total",
-        "trailing_",
-        "",
-      ]),
+      computeSuffixGroups(["http_requests_total", "http_requests_total", "trailing_", ""]),
     ).toEqual([{ id: "total", label: "total", count: 1 }]);
   });
 
@@ -321,9 +304,7 @@ describe("matchesSearch", () => {
     // underscores are part of a term
     expect(matchesSearch(NAME, HELP, "cpu_seconds")).toBe(true);
     // colons are part of a term (recording-rule style names)
-    expect(matchesSearch("job:http_requests:rate5m", undefined, "job:http")).toBe(
-      true,
-    );
+    expect(matchesSearch("job:http_requests:rate5m", undefined, "job:http")).toBe(true);
     expect(matchesSearch(NAME, HELP, "cpu-seconds")).toBe(true); // -> ["cpu","seconds"]
   });
 

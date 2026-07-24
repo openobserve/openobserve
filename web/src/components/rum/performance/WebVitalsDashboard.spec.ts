@@ -14,7 +14,9 @@ vi.mock("@/views/Dashboards/RenderDashboardCharts.vue", () => ({
     template: '<div data-test="render-dashboard-charts"><slot /></div>',
     props: ["viewOnly", "dashboardData", "currentTimeObj", "searchType"],
     emits: ["variablesManagerReady"],
-    setup() { return { layoutUpdate: vi.fn() }; },
+    setup() {
+      return { layoutUpdate: vi.fn() };
+    },
   },
 }));
 
@@ -91,7 +93,9 @@ function createWrapper(props: Record<string, any> = {}) {
           template: '<div data-test="render-dashboard-charts"><slot /></div>',
           props: ["viewOnly", "dashboardData", "currentTimeObj", "searchType"],
           emits: ["variablesManagerReady"],
-          setup() { return { layoutUpdate: vi.fn() }; },
+          setup() {
+            return { layoutUpdate: vi.fn() };
+          },
         },
         OSpinner: { template: '<div data-test="spinner" />' },
         OIcon: { name: "OIcon", template: '<span data-test="o-icon" />', props: ["name", "size"] },
@@ -131,7 +135,12 @@ describe("WebVitalsDashboard", () => {
 
     it("accepts custom dateTime prop", () => {
       // Arrange
-      const custom = { startTime: 1609459200, endTime: 1609545600, relativeTimePeriod: "1h", valueType: "absolute" };
+      const custom = {
+        startTime: 1609459200,
+        endTime: 1609545600,
+        relativeTimePeriod: "1h",
+        valueType: "absolute",
+      };
 
       // Act
       wrapper = createWrapper({ dateTime: custom });

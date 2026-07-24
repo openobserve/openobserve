@@ -15,7 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog data-test="add-service-account-dialog"
+  <ODialog
+    data-test="add-service-account-dialog"
     :open="open"
     size="sm"
     :title="beingUpdated ? t('serviceAccounts.update') : t('serviceAccounts.add')"
@@ -64,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="iam-add-service-account-roles-select"
             class="showLabelOnTop mt-2"
           />
-          <div class="flex justify-end mt-1">
+          <div class="mt-1 flex justify-end">
             <OButton
               variant="ghost"
               size="sm"
@@ -73,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="iam-add-service-account-create-role-btn"
               @click="showAddRoleDialog = true"
             >
-              {{ t('serviceAccounts.form.roles.create') }}
+              {{ t("serviceAccounts.form.roles.create") }}
             </OButton>
           </div>
           <OFormSelect
@@ -95,10 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          and auto-selected; the "Read-only" preset is seeded headlessly (see
          readonlyPreset.ts) so the role is usable without a trip to the Roles
          page. -->
-    <AddRole
-      v-model:open="showAddRoleDialog"
-      @added:role="onRoleAdded"
-    />
+    <AddRole v-model:open="showAddRoleDialog" @added:role="onRoleAdded" />
   </ODialog>
 </template>
 
@@ -161,38 +159,32 @@ export default defineComponent({
     // Form-base: the OForm owns the only editable fields (name + first_name +
     // roles + groups). Update mode is derived from the externally-provided
     // modelValue (it carries an existing email) or the isUpdated flag.
-    const beingUpdated = computed(
-      () => !!props.modelValue?.email || props.isUpdated,
-    );
+    const beingUpdated = computed(() => !!props.modelValue?.email || props.isUpdated);
 
-    const orgId = computed(
-      () => store.state.selectedOrganization.identifier as string,
-    );
+    const orgId = computed(() => store.state.selectedOrganization.identifier as string);
 
     // The stored identifier is `<name>.<org_id>@sa.internal` — shown in the
     // name field's help text so the user knows what they are creating.
-    const identifierSuffix = computed(
-      () => `.${orgId.value}@${SERVICE_ACCOUNT_EMAIL_DOMAIN}`.toLowerCase(),
+    const identifierSuffix = computed(() =>
+      `.${orgId.value}@${SERVICE_ACCOUNT_EMAIL_DOMAIN}`.toLowerCase(),
     );
 
     // Schema mode follows beingUpdated (name is create-only). The dialog body
     // remounts per open, so OForm always reads the correct variant at mount.
     const addServiceAccountSchema = computed(() =>
-      makeAddServiceAccountSchema(
-        beingUpdated.value,
-        t,
-        maxServiceAccountNameLength(orgId.value),
-      ),
+      makeAddServiceAccountSchema(beingUpdated.value, t, maxServiceAccountNameLength(orgId.value)),
     );
 
     // The OForm owns all editable fields. Name/roles/groups are always blank on
     // create; the description prefills from modelValue in update mode.
-    const addServiceAccountDefaults = computed((): AddServiceAccountForm => ({
-      name: "",
-      first_name: props.modelValue?.first_name ?? "",
-      roles: [],
-      groups: [],
-    }));
+    const addServiceAccountDefaults = computed(
+      (): AddServiceAccountForm => ({
+        name: "",
+        first_name: props.modelValue?.first_name ?? "",
+        roles: [],
+        groups: [],
+      }),
+    );
 
     // Roles/groups exist only on enterprise/cloud (OSS has no RBAC UI).
     const showAccessPickers = computed(
@@ -258,13 +250,7 @@ export default defineComponent({
     // role has usable rights without a separate trip to the Roles UI. A
     // seeding failure downgrades to a warning — the role still exists and is
     // still selected; only its permissions need to be granted manually.
-    async onRoleAdded({
-      role_name,
-      startFrom,
-    }: {
-      role_name: string;
-      startFrom?: string;
-    }) {
+    async onRoleAdded({ role_name, startFrom }: { role_name: string; startFrom?: string }) {
       if (!this.roleOptions.some((o: any) => o.value === role_name)) {
         this.roleOptions.push({ label: role_name, value: role_name });
       }
@@ -278,14 +264,9 @@ export default defineComponent({
 
       if (startFrom === "readonly") {
         const organization = this.store.state.selectedOrganization.identifier;
-        const isMetaOrg =
-          organization === this.store.state.zoConfig?.meta_org;
+        const isMetaOrg = organization === this.store.state.zoConfig?.meta_org;
         try {
-          const granted = await seedReadonlyRolePermissions(
-            role_name,
-            organization,
-            isMetaOrg,
-          );
+          const granted = await seedReadonlyRolePermissions(role_name, organization, isMetaOrg);
           // Zero applicable grants means the role is still empty — say so
           // instead of claiming success.
           if (granted > 0) {
@@ -329,11 +310,7 @@ export default defineComponent({
         const { email: userEmail, ...rest } = this.modelValue ?? {};
         const payload: any = { ...rest, organization, first_name: value.first_name };
         try {
-          const res = await service_accounts.update(
-            payload,
-            organization,
-            userEmail,
-          );
+          const res = await service_accounts.update(payload, organization, userEmail);
           this.$emit("updated", res.data, { ...payload, email: userEmail }, "updated");
           this.$emit("update:open", false);
         } catch (err: any) {
@@ -341,9 +318,7 @@ export default defineComponent({
           // plain-text body) must not leave the dialog silently open.
           if (err.response?.status != 403) {
             toast({
-              message:
-                err?.response?.data?.message ||
-                this.t("serviceAccounts.updateFailed"),
+              message: err?.response?.data?.message || this.t("serviceAccounts.updateFailed"),
               variant: "error",
             });
           }
@@ -388,9 +363,7 @@ export default defineComponent({
           // plain-text body) must not leave the dialog silently open.
           if (err.response?.status != 403) {
             toast({
-              message:
-                err?.response?.data?.message ||
-                this.t("serviceAccounts.createFailed"),
+              message: err?.response?.data?.message || this.t("serviceAccounts.createFailed"),
               variant: "error",
             });
           }

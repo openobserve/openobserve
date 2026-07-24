@@ -376,6 +376,12 @@
     "datetimeMessage": "* 你可以选择多个日期",
     "datetimeRelative": "相对",
     "datetimeAbsolute": "绝对",
+    "dateRange": "日期范围",
+    "copyRange": "复制时间范围到剪贴板",
+    "pasteRange": "粘贴时间范围",
+    "dateRangeCopied": "日期范围已复制",
+    "dateRangePasted": "日期范围已粘贴",
+    "dateRangePasteError": "无法解析日期范围",
     "relative": "相对的",
     "absolute": "绝对",
     "move": "移动",
@@ -512,7 +518,6 @@
   },
   "flow": {
     "stepPicker": {
-      "title": "添加步骤",
       "search": "搜索步骤…",
       "noMatch": "没有匹配的步骤"
     },
@@ -900,7 +905,7 @@
     "language": "语言",
     "actions": "操作",
     "keyboardShortcuts": "键盘快捷键",
-    "synthetic": "合成的"
+    "synthetic": "合成监控"
   },
   "rum": {
     "title": "用户体验监控",
@@ -2217,7 +2222,7 @@
       "linkPartial": "已链接到 {ok} 个告警，{failed} 个失败",
       "linkError": "无法链接告警。"
     },
-    "canvasEmpty": "添加触发器以开始构建您的工作流",
+    "chooseTrigger": "选择触发器",
     "node": {
       "kindTrigger": "触发器",
       "kindLogic": "逻辑",
@@ -2229,8 +2234,6 @@
       "notConfigured": "尚未配置",
       "configComingSoon": "{node} 配置将在后续步骤中完成",
       "addNext": "添加下一步",
-      "stepDialogTitle": "添加步骤",
-      "paletteTitle": "节点",
       "sectionTransform": "转换",
       "sectionDestination": "目标",
       "paletteCollapse": "折叠",
@@ -2376,7 +2379,11 @@
     "deleteNodeTitle": "删除节点",
     "deleteNodeLlmEvalConfirm": "您确定要删除此 LLM 评估节点吗？",
     "cancel": "取消",
-    "dragDropNodesHere": "将节点拖放到此处",
+    "collapseNodes": "折叠节点",
+    "openNodes": "展开节点",
+    "chooseSource": "选择数据源",
+    "sourceStreamDesc": "在数据被摄入流时实时处理",
+    "sourceQueryDesc": "按计划运行查询并处理其结果",
     "promqlOnlyForMetrics": "PromQL 仅适用于指标流类型",
     "invalidCronExpression": "无效的 cron 表达式",
     "cronRequired": "Cron 表达式为必填项",
@@ -3325,6 +3332,8 @@
     "seriesName": "系列名称",
     "seriesValue": "系列价值",
     "axisValue": "轴值",
+    "expandAllSections": "展开所有部分",
+    "collapseAllSections": "折叠所有部分",
     "configSectionGeneral": "普通的",
     "configSectionPromqlTable": "PromQL 表格模式",
     "configSectionGeographic": "地理配置",
@@ -5654,6 +5663,7 @@
     "groupDestinationsTemplates": "目标与模板",
     "groupDataAI": "数据与 AI",
     "groupOperations": "运维",
+    "groupSynthetics": "合成监控",
     "groupAccount": "账户",
     "generalDesc": "主题、查询默认值和核心首选项",
     "orgDesc": "组织参数和标识符",
@@ -6351,6 +6361,7 @@
     "description": "描述",
     "cron": "Cron Job",
     "cronExpression": "Cron 表达式",
+    "cronFormatTooltip": "模式：* * * * * * 表示每秒。\n格式：[秒（可选）0-59] [分钟 0-59] [小时 0-23] [日期（月）1-31，'L'] [月份 1-12] [星期 0-7 或 '1L-7L'，0 和 7 代表星期日]。\n使用 '*' 表示任意值，'L' 表示最后一天/最后一个工作日。\n示例：0 0 12 * * ? - 每天中午12:00触发。",
     "timeRange": "时间范围",
     "frequency": "频率",
     "lastTriggeredAt": "上次触发时间",
@@ -7719,7 +7730,7 @@
       "sessions": "依次浏览和检查代理会话",
       "agentGraph": "查看您的代理与工具、模型、服务和数据存储的交互",
       "agentBehavior": "发现陷入循环的代理以及导致它们失败的错误",
-      "quality": "对您的 LLM 回复进行评分和跟踪",
+      "quality": "跨 span、trace 和 session 评估跟踪评分质量",
       "evalJobs": "在会话中运行和监控评估作业",
       "scorers": "创建和管理对 LLM 输出进行评分的记分员",
       "scoreConfigs": "配置评估时使用的评分标准"
@@ -7727,7 +7738,11 @@
     "agentGraph": {
       "allAgents": "所有代理",
       "stream": "流",
-      "agent": "代理"
+      "agent": "代理",
+      "noAgentsTitle": "未找到代理",
+      "noAgentsDescription": "在此时间范围内未发现任何代理。请尝试扩大时间范围，或检查您的追踪是否包含 gen_ai 代理属性。",
+      "agentCountSingular": "代理",
+      "agentCountPlural": "代理"
     },
     "kpi": {
       "totalCost": "总成本",
@@ -7869,7 +7884,22 @@
     },
     "quality": {
       "scopeLabel": "此工作空间中的所有质量维度",
+      "agentLabel": "代理",
       "agentPlaceholder": "所有代理",
+      "kpisAriaLabel": "一级KPI",
+      "dataTypes": {
+        "numericShort": "数值",
+        "categoricalShort": "分类",
+        "booleanShort": "布尔"
+      },
+      "scopes": {
+        "filterLabel": "评分范围",
+        "filterHint": "在不同评估目标范围内比较此评分配置。",
+        "all": "全部",
+        "span": "Span",
+        "trace": "Trace",
+        "session": "Session"
+      },
       "timeRange": {
         "label": "时间范围",
         "last1h": "过去 1 小时",
@@ -7883,20 +7913,20 @@
       },
       "refresh": "刷新",
       "kpis": {
-        "evaluated": {
-          "title": "评估过的追踪",
+        "scoreResults": {
+          "title": "评分结果",
           "unit": "",
-          "hint": "窗口中 _llm_scores 中的不同跟踪 ID"
+          "hint": "窗口中跨 span、trace 和 session 评估的最新评分结果"
         },
         "evaluationCost": {
           "title": "评估成本",
           "unit": "$",
           "hint": "窗口中 LLM Judge 评分器成本的总和"
         },
-        "jobSuccess": {
-          "title": "工作成功",
+        "scorerSuccess": {
+          "title": "评分器成功率",
           "unit": "%",
-          "hint": "在线评测任务运行成功率"
+          "hint": "成功评分器调用占所有评分器调用的百分比"
         },
         "scorerFailures": {
           "title": "记分手失败",
@@ -7904,11 +7934,12 @@
           "hint": "窗口中的评分器调用失败"
         },
         "latencyP95": {
-          "title": "延迟 p95",
+          "title": "评分器延迟 p95",
           "unit": "s",
-          "hint": "Scorer-call p95 延迟"
+          "hint": "第95百分位评分器调用延迟"
         },
         "vsPrev": "vs 上一页",
+        "noPriorData": "无先前数据",
         "noData": "—"
       },
       "loading": "正在加载质量数据...",
@@ -7917,7 +7948,9 @@
         "noData": "此窗口中此配置尚无分数。",
         "empty": {
           "title": "正在等待您的首批评分",
-          "description": "在所选时间范围内，此配置尚无评分。一旦使用它的评分器运行，评分将自动显示在此处。"
+          "titleScoped": "此窗口中无{scope}评分",
+          "description": "在所选时间范围内，此配置尚无评分。一旦使用它的评分器运行，评分将自动显示在此处。",
+          "descriptionScoped": "在所选时间范围内，此配置尚无{scope}评分。请选择其他范围或扩大时间范围。"
         },
         "drillTitle": "钻到追踪",
         "trendTitle": "趋势",
@@ -7926,12 +7959,18 @@
         "compositionTitle": "随着时间的推移构成",
         "categoryDistributionTitle": "类别分布",
         "passRateTitle": "一段时间内的及格率",
+        "healthyRateTitle": "随时间变化的健康率",
+        "trueRateTitle": "随时间变化的真实率",
         "trueFalseTitle": "对与错",
         "legendAvg": "平均值",
         "legendP95": "p95",
         "legendThreshold": "阈值 {方向} {值}",
         "legendHealthy": "健康",
         "legendUnhealthy": "不健康",
+        "legendHealthyRate": "健康率",
+        "legendTrueRate": "真实率",
+        "legendTrueCount": "true ({count})",
+        "legendFalseCount": "false ({count})",
         "kpis": {
           "average": "平均值",
           "p50": "P50",
@@ -7939,11 +7978,49 @@
           "p50p95": "P50/P95",
           "unhealthy": "不健康",
           "healthy": "健康",
-          "coverage": "覆盖范围"
+          "trueRate": "真实率",
+          "falseRate": "假比率",
+          "coverage": "覆盖范围",
+          "targetsScored": "已评分目标"
+        },
+        "health": {
+          "title": "健康状态",
+          "noThreshold": "尚未配置健康阈值。评分尚无法分类为健康或降级。",
+          "thresholdOnly": "如果{threshold}则健康",
+          "summary": "低于阈值{percent}% · 如果{threshold}则健康"
+        }
+      },
+      "runs": {
+        "title": "评估评分",
+        "hint": "评分和推理来自 _llm_scores。选择一次运行以打开其评估器跟踪进行进一步调查。",
+        "filterLabel": "筛选评估评分",
+        "footerTitle": "评估评分",
+        "noThresholdHint": "在此评分配置上设置健康阈值，以分类和突出显示不健康的评分。",
+        "noReasoning": "未记录推理",
+        "unknownAgent": "未知代理",
+        "unknownScope": "未知作用域",
+        "queryError": "评估分数无法刷新。仍显示最后成功的页面。",
+        "empty": "此时间范围内没有评估分数。",
+        "emptyUnhealthy": "此时间范围内没有不健康分数。",
+        "filters": {
+          "all": "所有分数",
+          "unhealthy": "不健康"
+        },
+        "health": {
+          "healthy": "健康",
+          "unhealthy": "不健康"
+        },
+        "columns": {
+          "time": "已评估",
+          "result": "分数",
+          "reasoning": "原因",
+          "target": "目标",
+          "agent": "代理"
         }
       },
       "sidebar": {
         "allConfigs": "所有配置",
+        "scoreCount": "{count} 个分数",
         "empty": "没有与该过滤器匹配的配置。"
       },
       "overview": {
@@ -7960,13 +8037,30 @@
         "waitingPrimaryCta": "空缺评测任务",
         "waitingRefreshCta": "刷新",
         "noThreshold": "没有限制",
+        "relativeTime": {
+          "daysAgo": "{day} 天前",
+          "monthsAgo": "{month} 个月前"
+        },
+        "status": {
+          "healthy": "健康",
+          "unhealthy": "需要注意",
+          "noThreshold": "阈值未设置",
+          "noData": "无分数数据"
+        },
+        "health": {
+          "thresholdSummary": "{percent}% 低于 · 如果 {threshold} 则为健康",
+          "noThresholdHint": "设置健康阈值",
+          "noDataHint": "此窗口内无分数"
+        },
         "columns": {
+          "health": "健康",
           "scoreConfig": "分数配置",
           "type": "类型",
+          "quality": "质量",
           "totalScores": "总分数",
-          "coverage": "覆盖范围",
+          "scopeMix": "作用域混合",
           "unhealthy": "不健康",
-          "trend": "趋势",
+          "volumeTrend": "容量趋势",
           "threshold": "如果是健康的",
           "updated": "已更新"
         }
@@ -7994,11 +8088,10 @@
     "buttons": {
       "cancel": "取消",
       "close": "关闭",
-      "create": "创建",
       "remove": "移除",
       "save": "保存",
       "saveAsDraft": "保存为草稿",
-      "createAndActivate": "创建并激活"
+      "createAndActivate": "保存并激活"
     },
     "scorerTypeDialog": {
       "title": "创建新的评分器",
@@ -8082,8 +8175,7 @@
         "createdLabel": "创建于",
         "updatedLabel": "更新于"
       },
-      "createTitle": "新的分数配置",
-      "editTitlePrefix": "编辑",
+      "createTitle": "新建分数配置",
       "subtitle": "分数配置定义分数类型、生命值阈值和类别。",
       "eyebrow": "评分配置",
       "sectionTitle": "评分配置",
@@ -8092,8 +8184,6 @@
       "searchPlaceholder": "搜索配置",
       "allTypes": "所有类型",
       "newButton": "新建评分配置",
-      "saveButton": "保存更改",
-      "createButton": "创建",
       "columns": {
         "index": "#",
         "name": "名称",
@@ -8298,14 +8388,13 @@
       "backTo": "返回评分器",
       "badgeRemote": "远程评分器",
       "badgeLlm": "LLM评分器",
-      "createTitleRemote": "创建远程评分器",
-      "createTitleLlm": "创建 LLM 评分器",
-      "editTitleRemote": "编辑远程评分器",
-      "editTitleLlm": "编辑 LLM 评分器",
+      "createTitleRemote": "新建远程评分器",
+      "createTitleLlm": "新建 LLM 评判评分器",
+      "editTitleRemote": "更新远程评分器",
+      "editTitleLlm": "更新 LLM 评判评分器",
       "subtitleRemote": "调用您托管的 HTTP 端点。我们提出请求；你返回一个分数。",
-      "subtitleLlm": "语言模型使用您提供的提示来判断每条轨迹。",
+      "subtitleLlm": "语言模型使用您提供的提示对每个评估目标进行评判。",
       "descriptionPlaceholder": "此评分器衡量内容的简短摘要。",
-      "producesScoreHelp": "此评分器衡量哪个维度？",
       "providerHelp": "选择此评判器调用的 LLM 提供商。在 {settingsLink} 中管理提供商。",
       "providerHelpSettingsLink": "设置",
       "refreshProviders": "刷新提供商",
@@ -8318,8 +8407,49 @@
       "rangeLabel": "范围：",
       "healthyLabel": "健康：",
       "typeLabel": "类型：",
-      "promptVariablesLabel": "变量：",
-      "promptHelp": "专注于评估逻辑。使用 {inputVar} 和 {outputVar} 作为占位符。",
+      "promptVariablesLabel": "此提示中的变量：",
+      "promptVariableGuide": {
+        "title": "可用的提示变量",
+        "description": "这些变量可用于上述提示。每个变量如何填充取决于评估作业评估的内容。",
+        "columns": {
+          "variable": "提示变量"
+        },
+        "scopes": {
+          "span": "跨度",
+          "trace": "追踪",
+          "session": "会话"
+        },
+        "statuses": {
+          "jobMapped": "在评估作业中映射",
+          "systemProvided": "系统提供",
+          "requiresSelector": "系统提供 · 需要跨度选择器",
+          "selectorRequired": "需要跨度选择器",
+          "unavailable": "不可用"
+        },
+        "variables": {
+          "inputOutput": {
+            "span": "将这些映射到包含输入和输出的跨度字段。",
+            "trace": "来自追踪根跨度的输入和输出。",
+            "session": "不可用 — 会话没有单一的输入或输出。"
+          },
+          "statistics": {
+            "span": "在评估单个跨度时，像其他评分变量一样映射此名称。",
+            "trace": "跟踪指标：跨度计数、持续时间、LLM 和工具调用、错误、令牌和成本。",
+            "session": "会话指标：跟踪和轮次计数、持续时间和错误。"
+          },
+          "spans": {
+            "span": "在评估单个跨度时，像其他评分变量一样映射此名称。",
+            "trace": "由评估任务的跨度选择器选择的跟踪跨度子集（已过滤）。",
+            "session": "不适用于会话。"
+          },
+          "steps": {
+            "span": "在评估单个跨度时，像其他评分变量一样映射此名称。",
+            "trace": "按时间顺序排列的跨度；当跟踪很长时，中间部分会折叠。",
+            "session": "按时间顺序排列的跟踪，表示为对话轮次。"
+          }
+        },
+        "indexDescription": "{spansVar} 和 {stepsVar} 以 JSON 数组形式提供。引用整个变量 — 不支持像 {indexedVar} 这样的索引访问。"
+      },
       "identitySection": "身份",
       "judgeSection": "LLM配置",
       "endpointSection": "网址",
@@ -8337,10 +8467,9 @@
       "modelPlaceholder": "gpt-4o",
       "promptLabel": "法官提示音",
       "includeReasoningLabel": "包含推理",
-      "includeReasoningHint": "LLM 解释其评分。存储在 score.metadata.reasoning 中。",
-      "extraFieldsLabel": "额外元数据字段",
-      "extraFieldsOptional": "可选",
-      "extraFieldsHint": "添加 LLM 应在评分旁输出的字段。存储在 score.metadata 中以供后续分析。",
+      "includeReasoningHint": "评估者解释为何给出该分数，并随每个结果一起保存。",
+      "extraFieldsLabel": "额外元数据字段（可选）",
+      "extraFieldsHint": "要求评估者随每个分数返回额外值 — 例如类别或置信度。",
       "extraFields": {
         "colName": "字段名称",
         "colType": "类型",
@@ -8442,9 +8571,12 @@
         "eyebrow": "评估作业",
         "refresh": "刷新",
         "descriptionSection": "描述",
-        "targetSection": "目标",
+        "targetSection": "评估目标",
         "streamLabel": "流",
         "streamTypeLabel": "流类型",
+        "targetScopeLabel": "评估每个",
+        "idleWindowLabel": "空闲窗口",
+        "maxAgeLabel": "最大时长",
         "filterLabel": "筛选器",
         "filterEmpty": "无筛选器 — 评估每个 span",
         "scorersSection": "评分器",
@@ -8454,13 +8586,30 @@
         "scorerTypeRemote": "远程",
         "producesPrefix": "产生",
         "viewScorerHint": "查看",
-        "inputMappingSection": "输入映射",
+        "inputMappingSection": "提示变量",
         "samplingSection": "采样",
         "samplingModeLabel": "模式",
         "samplingValueLabel": "值",
         "samplingAll": "评估每个匹配项",
         "samplingRate": "按比率随机采样",
         "samplingCount": "前 N 个匹配项",
+        "manualSection": "手动评估",
+        "manualHelp": "将此任务的评分器排入一个明确的目标。手动运行绕过自动采样，并在评分元数据上记录原因。",
+        "manualTargetIdLabel": "目标 ID",
+        "manualSpanIdLabel": "跨度 ID",
+        "manualSpanIdPlaceholder": "span_id",
+        "manualTraceIdLabel": "跟踪 ID",
+        "manualTraceIdPlaceholder": "trace_id",
+        "manualSessionIdLabel": "会话 ID",
+        "manualSessionIdPlaceholder": "session_id",
+        "manualReasonLabel": "原因",
+        "manualReasonPlaceholder": "您为什么要重新运行此目标？",
+        "manualVariablesLabel": "变量 JSON",
+        "manualVariablesObjectError": "变量必须是 JSON 对象",
+        "manualTargetRequired": "目标 ID 为必填项",
+        "manualSubmit": "运行手动评估",
+        "manualSuccess": "已排队 {count} 项评估任务",
+        "manualError": "手动评估失败",
         "metadataSection": "元数据",
         "versionLabel": "版本",
         "pipelineLabel": "管道 ID",
@@ -8513,6 +8662,7 @@
         "name": "名称",
         "status": "状态",
         "stream": "流",
+        "targetScope": "范围",
         "scorers": "评分器",
         "successRate": "成功率",
         "created": "创建于",
@@ -8526,9 +8676,10 @@
         "chipSampling": "采样控制"
       },
       "descriptionPlaceholder": "此作业监控什么？",
-      "samplingValueHelp": "请输入 0 到 1 之间的采样率。",
-      "samplingValueAllHelp": "当模式为“全部”时不适用 — 每个匹配的事件都将被评估。",
-      "samplingHelp": "在筛选器之后应用。控制成本 — 只有匹配的 span 计入比率。",
+      "samplingValueHelp": "输入介于 0 和 1 之间的比率。",
+      "samplingValuePreview": "评估匹配目标的 {percent}%。",
+      "samplingValueAllHelp": "每个匹配的目标都会被评估。",
+      "samplingHelp": "过滤后运行，以控制成本。",
       "presets": {
         "label": "快速预设",
         "rootSpans": "仅根 span",
@@ -8536,23 +8687,46 @@
         "toolCalls": "工具调用"
       },
       "backTo": "返回评测任务",
-      "createTitle": "创建在线评测任务",
-      "editTitle": "编辑在线评测任务",
+      "createTitle": "新建评估任务",
+      "editTitle": "更新评估任务",
       "stepper": {
         "target": "目标",
         "scorers": "评分器",
         "mapping": "映射",
         "sampling": "采样"
       },
-      "targetSection": "目标",
+      "detailsSection": "详情",
+      "targetSection": "评估目标",
       "filteringSection": "筛选",
       "scorersSection": "评分器和制图",
       "nameLabel": "名称",
       "namePlaceholder": "任务名称",
-      "streamLabel": "数据流",
-      "streamPlaceholder": "默认",
+      "streamLabel": "流",
+      "streamPlaceholder": "选择流",
       "streamTypeLabel": "数据流类型",
       "streamTypePlaceholder": "追踪",
+      "targetScopeLabel": "评估每个",
+      "targetScopes": {
+        "span": "跨度",
+        "trace": "跟踪",
+        "session": "会话"
+      },
+      "targetScopeHelp": {
+        "span": "独立评估每个匹配的跨度。",
+        "trace": "在完成窗口关闭后评估整个跟踪。",
+        "session": "在完成窗口关闭后评估跨跟踪的会话。"
+      },
+      "completionSection": "完成条件",
+      "completionHelp": {
+        "trace": "只要满足这些条件中的第一个，就会评估跟踪。",
+        "session": "只要满足这些条件中的第一个，就会评估会话。"
+      },
+      "idleWindowLabel": "空闲窗口（秒）",
+      "idleWindowHelp": "在 {duration} 没有新跨度后评估。",
+      "idleWindowHelpEmpty": "一旦没有新跨度到达，就会评估。",
+      "maxAgeLabel": "最大时长（秒）",
+      "maxAgeHelp": "在第一个跨度后等待 {duration} 后评估。",
+      "maxAgeHelpEmpty": "在固定时长后评估，即使跨度仍在到达。",
       "descriptionLabel": "描述",
       "samplingModeLabel": "采样模式",
       "samplingValueLabel": "采样率",
@@ -8563,7 +8737,11 @@
       },
       "scorerPicker": {
         "title": "评分器",
-        "hint": "选择一个或多个评分器在每个匹配的时间段内运行。",
+        "hint": {
+          "span": "选择要为每个匹配跨度运行的一个或多个评分器。",
+          "trace": "选择要为每个符合条件的跟踪运行的一个或多个评分器。",
+          "session": "选择要为每个符合条件的会话运行的一个或多个评分器。"
+        },
         "meta": "{类型} · v {版本}",
         "placeholder": "选择评分器",
         "searchPlaceholder": "搜索评分器…",
@@ -8571,21 +8749,113 @@
       },
       "filter": {
         "title": "过滤条件",
-        "hint": "只有符合此条件的跨度才能进入抽样和评分。"
+        "hint": {
+          "span": "只有匹配此条件的跨度才会进入采样和评分环节。",
+          "trace": "如果跟踪中的任何跨度匹配此条件，则跟踪进入采样和评分环节。",
+          "session": "如果会话中的任何跨度匹配此条件，则会话进入采样和评分环节。"
+        }
+      },
+      "selector": {
+        "title": "哪些跨度（可选）",
+        "hint": {
+          "trace": "留空以包括跟踪中的每个跨度。"
+        }
+      },
+      "endSignal": {
+        "title": "结束信号（可选）",
+        "hint": {
+          "trace": "定义一个跨度条件，当任何跨度匹配时立即关闭跟踪。",
+          "session": "定义一个跨度条件，当任何跨度匹配时立即关闭会话。"
+        }
       },
       "inputMapping": {
-        "title": "输入映射",
-        "hint": "将跨度字段映射到每个评分器模板变量中。",
+        "title": "提示变量",
+        "hint": {
+          "span": "将每个变量映射到提供其值的跨度字段。",
+          "trace": "跟踪值自动填充。将其他任何内容映射到跨度字段。",
+          "session": "会话值自动填充。将其他任何内容映射到跨度字段。"
+        },
         "selectScorers": "选择评分器来配置他们的映射。",
         "noVariables": "此评分器没有模板变量可供映射。",
-        "variableCount": "{count} 变量"
+        "variableCount": "{count} 变量",
+        "systemProvided": {
+          "title": "{scope} 变量",
+          "description": "OpenObserve 从 {scope} 本身提供这些值。评分器提示可以直接使用它们，无需映射。",
+          "badge": "系统提供",
+          "selectorRequired": "需要跨度选择器",
+          "columns": {
+            "variable": "提示变量",
+            "source": "来源",
+            "description": "提供的值"
+          },
+          "variables": {
+            "input": {
+              "trace": "来自跟踪根跨度的输入。"
+            },
+            "output": {
+              "trace": "来自跟踪根跨度的输出。"
+            },
+            "statistics": {
+              "trace": "跟踪指标：跨度计数、持续时间、LLM 和工具调用、错误、令牌和成本。",
+              "session": "会话指标：跟踪和轮次计数、持续时间和错误。"
+            },
+            "spans": {
+              "trace": "由作业的跨度选择器选择的跨度的过滤子集。"
+            },
+            "steps": {
+              "trace": "按时间顺序排列的跨度；当跟踪很长时，中间部分会被折叠。",
+              "session": "按时间顺序排列的跟踪，表示为对话轮次。"
+            }
+          }
+        }
+      },
+      "spanSelector": {
+        "select": "选择跨度选择器",
+        "bindingHelp": "跟踪可能有数百个跨度。选择此评分器应关注的那些。",
+        "createForScorer": "为评分器创建",
+        "createForScorerTitle": "为此评分器创建跨度选择器",
+        "editorTitle": "跨度选择器",
+        "name": "选择器名称",
+        "schemaMode": "读取字段",
+        "defaultSchema": "标准 GenAI 字段",
+        "customSchema": "自定义字段",
+        "defaultSchemaHelp": "这些八个字段从每个匹配的跨度中读取。缺失的任何内容将作为空值传输。",
+        "fields": "字段",
+        "fieldsHelp": "仅读取这些字段——其他内容不会发送给评分器。",
+        "maximumSpans": "最大跨度数",
+        "budget": "限制从跟踪中选择的跨度数量。",
+        "validation": {
+          "name": "输入选择器名称。",
+          "duplicateName": "在此作业中，选择器名称必须唯一。",
+          "filter": "完成或删除未完成的过滤条件。",
+          "fields": "为自定义模式至少选择一个字段。",
+          "maximumSpans": "最大跨度数必须为正整数。",
+          "budget": "所选字段的跨度过多。减少跨度数量，或读取更少的字段。",
+          "binding": "为每个评分器选择一个跨度选择器。"
+        }
       },
       "preview": {
-        "title": "预览",
-        "hint": "使用左边的字段定义生产评估目标。",
-        "matchedSuffix": "匹配的跨度·最近 24 小时",
+        "scopes": {
+          "span": {
+            "title": "匹配的跨度数",
+            "hint": "一旦您选择了流和过滤器，此面板将显示您的作业将匹配多少个跨度。",
+            "matchedSuffix": "匹配的跨度数 · 过去24小时",
+            "matchedLoading": "正在计算匹配的跨度数…"
+          },
+          "trace": {
+            "title": "匹配的跟踪数",
+            "hint": "一旦您选择了流和过滤器，此面板将显示您的作业将匹配多少个跟踪。",
+            "matchedSuffix": "匹配的跟踪数 · 过去24小时",
+            "matchedLoading": "正在计算匹配的跟踪数…"
+          },
+          "session": {
+            "title": "匹配的会话数",
+            "hint": "一旦您选择了流和过滤器，此面板将显示您的作业将匹配多少个会话。",
+            "matchedSuffix": "匹配的会话数 · 过去24小时",
+            "matchedLoading": "正在计算匹配的会话数…"
+          }
+        },
         "matchedError": "无法加载比赛计数",
-        "matchedLoading": "正在计算匹配的跨度...",
         "matchedIncomplete": "完成筛选条件以更新计数。",
         "summaryTitle": "摘要",
         "summaryName": "名称",
@@ -8602,6 +8872,7 @@
       "validation": {
         "nameRequired": "Job name is required",
         "streamRequired": "A stream is required",
+        "idleWindowMinimum": "空闲窗口必须至少为45秒",
         "samplingValueRequired": "A sampling value is required"
       }
     }
@@ -8724,7 +8995,9 @@
     "cellActions": {
       "copy": "复制",
       "includeTerm": "包含术语",
-      "excludeTerm": "排除术语"
+      "excludeTerm": "排除术语",
+      "sendValueToAi": "将值发送到AI",
+      "sendRowToAi": "将行发送到AI"
     },
     "indexList": {
       "noMatchingFields": "未找到匹配的字段",
@@ -9108,12 +9381,20 @@
       "stepJourney": "旅程",
       "untitledCheck": "未命名的检查",
       "variablesHint": "支持 {variables} 如 {baseUrl}。",
-      "setupStep2Title": "启用无痕模式",
-      "setupIncognitoHint": "打开 chrome://extensions，点击 {details}，然后启用 {setting}。"
+      "setupStep2Title": "单击工具栏中的OpenObserve Recorder图标",
+      "setupIncognitoHint": "打开 chrome://extensions，点击 {details}，然后启用 {setting}。",
+      "setupStep2Description": "Chrome无法自动连接到您在安装扩展之前打开的页面。单击扩展图标将记录器注入到此选项卡中——这是一次性步骤。",
+      "setupIconActivateHint": "单击工具栏中的{icon}以激活此页面的记录器。",
+      "setupStep3Title": "启用隐身模式",
+      "setupStep3IncognitoHint": "打开chrome://extensions，单击{details}，然后启用{setting}。",
+      "setupReady": "已连接 ✓",
+      "setupConnected": "已连接 ✓"
     },
     "dialog": {
       "bulkDeleteBody": "确定要删除 {count} 个检查吗？此操作无法撤消。",
       "bulkDeleteTitle": "删除检查",
+      "deleteSingleBody": "您确定要删除“{name}”吗？此操作无法撤销。",
+      "deleteSingleTitle": "删除检查",
       "duplicateTitle": "复制检查"
     },
     "empty": {
@@ -9213,11 +9494,88 @@
       "unknown": "未知"
     },
     "locations": {
+      "addLocation": "添加位置",
+      "bottomHeader": "位置",
+      "bulkDeleteConfirmMessage": "您确定要删除 {count} 个位置吗？",
+      "bulkDeleteConfirmTitle": "删除位置",
+      "bulkDeleteFailed": "删除位置失败",
+      "bulkDeletePartial": "已删除 {total} 个位置中的 {success} 个",
+      "bulkDeleteSuccess": "已删除 {count} 个位置",
+      "cancel": "取消",
       "comingSoon": "更多区域和私人地点 — 即将推出",
+      "createClose": "创建并关闭",
+      "createFailed": "创建位置失败",
+      "createSuccess": "位置创建成功",
+      "createTitle": "添加位置",
+      "customProviderLabel": "自定义提供程序",
+      "customProviderPlaceholder": "输入提供程序名称",
+      "customProviderRequired": "自定义提供程序名称是必需的",
+      "deleteConfirmMessage": "您确定要删除此位置吗？",
+      "deleteConfirmTitle": "删除位置",
+      "deleteFailed": "删除位置失败",
+      "deleteSuccess": "位置已成功删除",
+      "description": "管理合成监控的公共探测位置",
+      "disable": "禁用",
+      "disabledSuccess": "位置已禁用",
+      "disabling": "正在禁用…",
+      "editTitle": "编辑位置",
       "empty": "没有可用位置",
+      "enable": "启用",
+      "enabled": "已启用",
+      "enabledSuccess": "位置已启用",
+      "enabling": "正在启用…",
+      "exportFailed": "导出位置失败",
+      "exportSuccess": "位置已成功导出",
+      "exportTitle": "导出",
+      "fetchFailed": "获取位置失败",
+      "bulkDisableFailed": "禁用位置失败",
+      "bulkDisabledPartial": "已禁用 {total} 个位置中的 {success} 个",
+      "bulkDisabledSuccess": "已禁用 {count} 个位置",
+      "bulkEnableFailed": "启用位置失败",
+      "bulkEnabledPartial": "已启用 {total} 个位置中的 {success} 个",
+      "bulkEnabledSuccess": "已启用 {count} 个位置",
+      "importFailed": "导入位置失败",
+      "importJsonLabel": "JSON 输入",
+      "importLabelRequired": "项目 {index} 的标签是必填的",
+      "importPlaceholder": "在此处粘贴位置的 JSON 数组...",
+      "importProviderRequired": "项目 {index} 的提供商是必填的",
+      "importRegionRequired": "项目 {index} 的区域是必填的",
+      "importSuccess": "已成功导入 {count} 个位置",
+      "importTitle": "导入",
+      "invalidJson": "JSON 格式无效",
+      "label": "标签",
+      "labelPlaceholder": "例如：AWS US East（弗吉尼亚北部）",
+      "labelRequired": "标签是必填的",
       "locationAwsEast": "AWS · us-east-1",
+      "locationId": "位置 ID",
+      "noPreview": "输入有效的 JSON 以预览位置",
+      "preview": "预览",
+      "provider": "提供商",
+      "providerOther": "其他",
+      "providerPlaceholder": "选择提供商",
+      "providerRequired": "提供商是必填的",
+      "region": "区域",
+      "regionPlaceholder": "例如：us-east-1",
+      "regionRequired": "区域是必填的",
+      "searchPlaceholder": "搜索位置…",
+      "selectedCount": "已选择 {total} 个位置中的 {selected} 个",
       "subtitle": "选择旅程运行的位置",
-      "title": "地点"
+      "title": "地点",
+      "privateBadge": "私有",
+      "publicTitle": "公共",
+      "privateTitle": "私有位置",
+      "setupAgent": "设置私有代理",
+      "privateEmptyBody": "从您自己的 VPC 或本地网络运行此检查。",
+      "offlineWarning": "没有在线代理 — 在代理重新上线之前，检查不会在此运行。",
+      "liveAgents": "{count} 个在线代理",
+      "liveAgentsNamed": "{count} 个在线代理 ({names})",
+      "offlineSince": "离线 · 上次在线 {ago}",
+      "pendingAgent": "等待第一个代理注册",
+      "toggleFailed": "切换位置失败",
+      "updateClose": "更新并关闭",
+      "updateFailed": "更新位置失败",
+      "updateSuccess": "位置更新成功",
+      "uploadFile": "上传 JSON 文件"
     },
     "newCheck": {
       "back": "检查",
@@ -9230,6 +9588,7 @@
       "httpDesc": "检查端点、状态码和响应体",
       "leave": "离开",
       "loadEditFailed": "加载检查进行编辑失败 — 表单显示默认值，请勿保存",
+      "notFoundInOrg": "此检查在当前组织中不存在。",
       "modalSubtitle": "选择您要监控的内容",
       "modalTitle": "创建检查",
       "pageTitle": "新建 {label} 检查",
@@ -9252,7 +9611,7 @@
       "willBeCreatedIn": "将创建于"
     },
     "pageSubtitle": "从全球位置主动监控正常运行时间、性能和用户旅程",
-    "pageTitle": "综合检查",
+    "pageTitle": "合成监测",
     "protocolConfig": {
       "http": {
         "addAssertion": "添加断言",
@@ -9349,6 +9708,7 @@
       "failed": "失败",
       "failedRuns": "运行失败",
       "jumpToLastRun": "跳转到上次运行",
+      "jumpToLatestData": "跳转到最新数据",
       "lastRun": "最后一次运行",
       "location": "地点",
       "monitors": "显示器",
@@ -9488,10 +9848,13 @@
       "tabSteps": "步骤",
       "timelineAllFailed": "全部 {count} 次失败",
       "timelineAllPassed": "全部 {count} 次通过",
+      "timelineAllWarning": "所有 {count} 个警告",
       "timelineMixed": "{total} 中 {passed} 通过，{failed} 失败",
       "timelineNow": "现在",
       "triggerManual": "手动",
       "triggerSchedule": "计划",
+      "warning": "警告",
+      "warningRuns": "警告运行",
       "window24h": "过去 24 小时",
       "window1h": "过去 1 小时",
       "windowDays": "过去 {days} 天",
@@ -9631,10 +9994,12 @@
     "tabs": {
       "all": "全部",
       "browser": "浏览器",
+      "checks": "检查",
       "http": "HTTP",
       "ssh": "SSH",
       "tcp": "TCP",
-      "tls": "TLS"
+      "tls": "TLS",
+      "private": "私有位置"
     },
     "timeline": {
       "failed": "失败",
@@ -9673,7 +10038,79 @@
       "nameRequired": "名称是必填项",
       "selectorRequired": "“{step}”需要选择器",
       "urlInvalid": "输入以 http:// 或 https:// 开头的有效 URL",
-      "urlRequired": "起始 URL 是必填项"
+      "urlRequired": "起始 URL 是必填项",
+      "fixHighlightedFields": "保存前请修正高亮字段"
+    },
+    "privateLocations": {
+      "searchPlaceholder": "搜索位置...",
+      "setupAgent": "设置代理",
+      "copySetupCmd": "安装命令",
+      "deleteTitle": "删除位置",
+      "deleteBody": "删除私有位置 \"{name}\"? 其代理将停止接收任务。",
+      "deleteBlocked": "被 {count} 个检查使用 — 请先取消分配",
+      "status": {
+        "online": "在线",
+        "offline": "离线",
+        "pending": "待定"
+      },
+      "table": {
+        "name": "名称",
+        "region": "区域",
+        "agents": "代理",
+        "types": "类型",
+        "checks": "检查",
+        "checksPerMin": "C/分钟",
+        "lastSeen": "最后在线"
+      },
+      "empty": {
+        "title": "暂无私有位置",
+        "description": "在网络中部署代理并设置 AGENT_LOCATION — 位置会自动注册并显示在此处。无需在 UI 中手动设置。",
+        "action": "设置代理"
+      },
+      "toast": {
+        "deleted": "位置已删除",
+        "deleteFailed": "删除位置失败",
+        "copied": "安装命令已复制",
+        "copyFailed": "复制到剪贴板失败",
+        "locationRequired": "复制安装命令前请输入位置名称。"
+      },
+      "setup": {
+        "title": "设置私有代理",
+        "step1Title": "部署代理",
+        "step1Body": "在网络中的任何机器上运行容器 — Docker、Kubernetes 或原生二进制。AGENT_LOCATION 命名位置；应在服务于该位置的每个代理上使用相同的名称。",
+        "step2Title": "观察位置出现",
+        "step2Body": "首次注册时，位置行会自动创建并变为在线 — 无需在 UI 中添加任何内容。具有相同 AGENT_LOCATION 的更多代理会加入同一位置。",
+        "step3Title": "分配给检查",
+        "step3Body": "创建或编辑任何检查时选择此位置。检查将从您自己的基础设施运行。",
+        "noToken": "无法加载安装命令 — 请检查您的权限并重试。",
+        "browserNote": "浏览器测试目前无法从私有位置运行 — 仅支持协议检查（HTTP、TCP、TLS、SSH）。",
+        "locationNameLabel": "位置名称",
+        "locationNamePlaceholder": "公司总部",
+        "tabDocker": "Docker",
+        "tabK8s": "Kubernetes",
+        "tabLinux": "Linux",
+        "tabWindows": "Windows",
+        "agentNameLabel": "代理名称（可选）",
+        "agentNamePlaceholder": "从主机名自动生成",
+        "agentNameHint": "留空以让代理从主机名自动命名 — 在单个位置运行多个代理时有用。"
+      },
+      "detail": {
+        "title": "私有位置",
+        "back": "私有位置",
+        "version": "版本",
+        "pool": "池",
+        "agentsTitle": "代理",
+        "agentsSubtitle": "代理从您的基础设施中自行注册，在此处为只读。",
+        "agentName": "代理",
+        "recoverAgent": "恢复此代理 — 复制预填名称的设置命令",
+        "noAgents": "尚无代理为此位置注册。",
+        "checksTitle": "从此位置运行的检查",
+        "checkName": "名称",
+        "noChecks": "尚未为此位置分配任何检查。",
+        "notFound": "未找到位置"
+      },
+      "urlRequired": "起始 URL 是必填项",
+      "fixHighlightedFields": "保存前请修复高亮显示的字段"
     }
   },
   "shortcuts": {
@@ -9789,6 +10226,8 @@
       "panelEditorQueryInspector": "打开查询检查器",
       "metricsRunQuery": "运行 PromQL 查询",
       "metricsRefresh": "刷新",
+      "metricsAddToDashboard": "添加到仪表盘",
+      "metricsCopyUrl": "复制共享链接",
       "tracesSearch": "搜索痕迹",
       "tracesRefresh": "刷新",
       "alertsCreate": "创建新警报",

@@ -57,9 +57,7 @@ describe("PatternVolumeCell peak marker", () => {
   // minute or a day, so the tooltip names the bucket width too.
   it("names the bucket duration alongside the exact peak", () => {
     const wrapper = mountCell([10, 31_430, 500]);
-    const title = wrapper
-      .find('[data-test="pattern-volume-peak"]')
-      .attributes("title");
+    const title = wrapper.find('[data-test="pattern-volume-peak"]').attributes("title");
     expect(title).toContain("31,430");
     expect(title).toContain("28 minutes");
   });

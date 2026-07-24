@@ -23,11 +23,7 @@
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
-import {
-  collectorInstallStep,
-  writeConfigVariants,
-  sharedToolIcons,
-} from "./otelShared";
+import { collectorInstallStep, writeConfigVariants, sharedToolIcons } from "./otelShared";
 
 // Step 1 — the monitoring login + the grants the receiver actually needs
 // (verified). On SQL Server 2019 and older, VIEW SERVER STATE replaces
@@ -72,9 +68,7 @@ service:
       processors: [batch]
       exporters: [otlphttp/openobserve]`;
 
-export default function sqlServerCard(
-  subs: CardSubstitutions,
-): RichCardContent {
+export default function sqlServerCard(subs: CardSubstitutions): RichCardContent {
   const tool = sharedToolIcons();
   return {
     provider: {
@@ -89,8 +83,7 @@ export default function sqlServerCard(
       {
         id: "prepare",
         title: "Prepare SQL Server",
-        description:
-          "Create the monitoring login — run it in a SQL client, **not** your shell.",
+        description: "Create the monitoring login — run it in a SQL client, **not** your shell.",
         chip: { kind: "terminal", label: "Terminal" },
         completeOn: "copy",
         variants: [
@@ -100,9 +93,7 @@ export default function sqlServerCard(
             icon: tool.terminal,
             code: {
               lang: "bash",
-              raw: applyGrants(
-                'sqlcmd -S localhost,1433 -U sa -P "YOUR_SA_PASSWORD" -C',
-              ),
+              raw: applyGrants('sqlcmd -S localhost,1433 -U sa -P "YOUR_SA_PASSWORD" -C'),
             },
             note: "Replace YOUR_SA_PASSWORD.",
           },
@@ -165,8 +156,7 @@ export default function sqlServerCard(
       {
         id: "verify",
         title: "Verify Data in OpenObserve",
-        description:
-          "Hit Test below, or check Streams for the `sqlserver_*` metrics.",
+        description: "Hit Test below, or check Streams for the `sqlserver_*` metrics.",
         chip: { kind: "traces", label: "Metrics" },
         completeOn: "detect",
         detectionAnchor: true,

@@ -61,14 +61,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @remove-group="(id) => removeGroup(id)"
           @input:update="onInputUpdate"
         />
-        <div v-else class="p-3 text-text-muted">{{ t("flow.condition.loading") }}</div>
+        <div v-else class="text-text-muted p-3">{{ t("flow.condition.loading") }}</div>
       </div>
 
       <!-- The saved condition could not be parsed, so the builder reset to an
            empty group. Warn BEFORE the user saves over it. -->
       <div
         v-if="loadError"
-        class="text-xs text-input-error-text mt-1"
+        class="text-input-error-text mt-1 text-xs"
         data-test="condition-builder-load-error"
       >
         {{ t("flow.condition.loadError") }}
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            renders it, so surface the form-level `conditions` error here). -->
       <div
         v-if="conditionsError"
-        class="text-xs text-input-error-text mt-1"
+        class="text-input-error-text mt-1 text-xs"
         data-test="add-condition-error"
       >
         {{ conditionsError }}
@@ -140,8 +140,7 @@ const OPERATOR_NORMALIZE_MAP: Record<string, string> = {
   not_contains: "NotContains",
 };
 const normalizeConditionOperators = (group: any): any => {
-  if (!group || group.filterType !== "group" || !Array.isArray(group.conditions))
-    return group;
+  if (!group || group.filterType !== "group" || !Array.isArray(group.conditions)) return group;
   group.conditions = group.conditions.map((item: any) => {
     if (item.filterType === "group") return normalizeConditionOperators(item);
     if (item.filterType === "condition" && item.operator) {
@@ -185,9 +184,7 @@ const initGroup = () => {
       let group: any;
       if (version === 0) group = ensureIds(convertV0ToV2(clone));
       else if (version === 1)
-        group = ensureIds(
-          clone.and || clone.or ? convertV1BEToV2(clone) : convertV1ToV2(clone),
-        );
+        group = ensureIds(clone.and || clone.or ? convertV1BEToV2(clone) : convertV1ToV2(clone));
       else group = ensureIds(clone);
       return props.normalizeOperators ? normalizeConditionOperators(group) : group;
     } catch (e) {
@@ -221,22 +218,16 @@ const form = useOForm<ConditionForm>({
 // Reactive READ-VIEW of the form-owned tree, exposed as a WRITABLE computed:
 // reads drive FilterGroup's `:group`, writes go through the form. Still one
 // source of truth — no copy.
-const conditionGroupStore = form.useStore(
-  (s: any) => s.values.conditions ?? initialGroup,
-);
+const conditionGroupStore = form.useStore((s: any) => s.values.conditions ?? initialGroup);
 const conditionGroup = computed({
   get: () => conditionGroupStore.value,
   set: (v: any) => form.setFieldValue("conditions", v),
 });
 
 // Reactive view of the SAME form (no mirror) — rendered under the FilterGroup.
-const conditionsErrors = form.useStore(
-  (s: any) => s.fieldMeta?.conditions?.errors ?? [],
-);
+const conditionsErrors = form.useStore((s: any) => s.fieldMeta?.conditions?.errors ?? []);
 const conditionsError = computed(() =>
-  conditionsErrors.value.length
-    ? String(firstFieldError(conditionsErrors.value))
-    : "",
+  conditionsErrors.value.length ? String(firstFieldError(conditionsErrors.value)) : "",
 );
 
 // FilterGroup edits flow through the shared alert utilities, which expect a

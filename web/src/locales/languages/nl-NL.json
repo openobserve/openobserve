@@ -376,6 +376,12 @@
     "datetimeMessage": "* Je kunt meerdere datums kiezen",
     "datetimeRelative": "FAMILIELID",
     "datetimeAbsolute": "ABSOLUUT",
+    "dateRange": "Datumbereik",
+    "copyRange": "Kopieer tijdsbereik naar klembord",
+    "pasteRange": "Plak tijdsbereik",
+    "dateRangeCopied": "Datumbereik gekopieerd",
+    "dateRangePasted": "Datumbereik geplakt",
+    "dateRangePasteError": "Kon datumbereik niet parseren",
     "relative": "Relatief",
     "absolute": "Absoluut",
     "move": "Verplaatsen",
@@ -512,7 +518,6 @@
   },
   "flow": {
     "stepPicker": {
-      "title": "Stap toevoegen",
       "search": "Stappen doorzoeken…",
       "noMatch": "Geen overeenkomende stappen"
     },
@@ -900,7 +905,7 @@
     "language": "taal",
     "actions": "Acties",
     "keyboardShortcuts": "Sneltoetsen",
-    "synthetic": "Synthetisch"
+    "synthetic": "Synthetics"
   },
   "rum": {
     "title": "Monitoring van echte gebruikers",
@@ -2217,7 +2222,7 @@
       "linkPartial": "Gekoppeld aan {ok} melding(en), {failed} mislukt",
       "linkError": "Kan meldingen niet koppelen."
     },
-    "canvasEmpty": "Voeg een trigger toe om te beginnen met het bouwen van uw workflow",
+    "chooseTrigger": "Kies een trigger",
     "node": {
       "kindTrigger": "Trigger",
       "kindLogic": "Logica",
@@ -2229,8 +2234,6 @@
       "notConfigured": "Nog niet geconfigureerd",
       "configComingSoon": "Configuratie van {node} komt in een latere stap",
       "addNext": "Volgende stap toevoegen",
-      "stepDialogTitle": "Een stap toevoegen",
-      "paletteTitle": "Knooppunten",
       "sectionTransform": "Transformeren",
       "sectionDestination": "Bestemming",
       "paletteCollapse": "Inklappen",
@@ -2376,7 +2379,11 @@
     "deleteNodeTitle": "Knooppunt verwijderen",
     "deleteNodeLlmEvalConfirm": "Weet u zeker dat u dit LLM-evaluatieknooppunt wilt verwijderen?",
     "cancel": "Annuleer",
-    "dragDropNodesHere": "Knooppunten hierheen slepen en neerzetten",
+    "collapseNodes": "Knooppunten samenvouwen",
+    "openNodes": "Knooppunten openen",
+    "chooseSource": "Kies een bron",
+    "sourceStreamDesc": "Verwerk gegevens in realtime terwijl ze in een stream worden opgenomen",
+    "sourceQueryDesc": "Voer een query uit volgens een schema en verwerk de resultaten",
     "promqlOnlyForMetrics": "ProMQL is alleen beschikbaar voor het streamtype voor statistieken",
     "invalidCronExpression": "Ongeldige cron-expressie",
     "cronRequired": "Cron-expressie is verplicht",
@@ -3325,6 +3332,8 @@
     "seriesName": "Naam van de serie",
     "seriesValue": "Seriewaarde",
     "axisValue": "Axiswaarde",
+    "expandAllSections": "Alle secties uitvouwen",
+    "collapseAllSections": "Alle secties samenvouwen",
     "configSectionGeneral": "Generaal",
     "configSectionPromqlTable": "ProMQL-tabelmodus",
     "configSectionGeographic": "Geografische configuratie",
@@ -5654,6 +5663,7 @@
     "groupDestinationsTemplates": "Bestemmingen en sjablonen",
     "groupDataAI": "Data en AI",
     "groupOperations": "Operaties",
+    "groupSynthetics": "Synthetics",
     "groupAccount": "Account",
     "generalDesc": "Thema, standaardwaarden voor query's en kernvoorkeuren",
     "orgDesc": "Organisatieparameters en -identificaties",
@@ -6351,6 +6361,7 @@
     "description": "Omschrijving",
     "cron": "Cron-baan",
     "cronExpression": "Cron-expressie",
+    "cronFormatTooltip": "Patroon: * * * * * * betekent elke seconde.\nFormaat: [Seconde (optioneel) 0-59] [Minuut 0-59] [Uur 0-23] [Dag van de Maand 1-31, 'L'] [Maand 1-12] [Dag van de Week 0-7 of '1L-7L', 0 en 7 voor zondag].\nGebruik '*' voor elke waarde, 'L' voor de laatste dag/werkdag.\nVoorbeeld: 0 0 12 * * ? - Start dagelijks om 12:00 's middags.",
     "timeRange": "Tijdbereik",
     "frequency": "Frequentie",
     "lastTriggeredAt": "Laatst geactiveerd op",
@@ -7719,7 +7730,7 @@
       "sessions": "Bekijk en inspecteer de sessies van agenten beurtelings",
       "agentGraph": "Zie waarmee uw agenten interageren — tools, modellen, services en datastores",
       "agentBehavior": "Identificeer agenten die vastzitten in lussen en de fouten die ze laten falen",
-      "quality": "Scoor en volg de kwaliteit van je LLM-reacties",
+      "quality": "Volg de scorekwaliteit bij span-, trace- en sessie-evaluaties",
       "evalJobs": "Voer evaluatietaken uit en controleer ze tijdens al je sessies",
       "scorers": "Creëer en beheer de scorers die LLM-resultaten beoordelen",
       "scoreConfigs": "Configureer de scorerubrieken die voor uw evaluaties worden gebruikt"
@@ -7727,7 +7738,11 @@
     "agentGraph": {
       "allAgents": "Alle agenten",
       "stream": "Stream",
-      "agent": "Agent"
+      "agent": "Agent",
+      "noAgentsTitle": "Geen agents gevonden",
+      "noAgentsDescription": "Er zijn geen agents gevonden in dit tijdsbereik. Probeer het tijdsbereik te vergroten of controleer of uw traces gen_ai agent-attributen bevatten.",
+      "agentCountSingular": "agent",
+      "agentCountPlural": "agenten"
     },
     "kpi": {
       "totalCost": "Totale kosten",
@@ -7869,7 +7884,22 @@
     },
     "quality": {
       "scopeLabel": "Alle kwaliteitsdimensies in deze werkruimte",
+      "agentLabel": "Agent",
       "agentPlaceholder": "Alle agenten",
+      "kpisAriaLabel": "Tier 1 KPI's",
+      "dataTypes": {
+        "numericShort": "Getal",
+        "categoricalShort": "Categorie",
+        "booleanShort": "Boolean"
+      },
+      "scopes": {
+        "filterLabel": "Scorebereik",
+        "filterHint": "Vergelijk deze Scoreconfiguratie over evaluatiedoelbereiken heen.",
+        "all": "Alle",
+        "span": "Span",
+        "trace": "Trace",
+        "session": "Sessie"
+      },
       "timeRange": {
         "label": "Tijdbereik",
         "last1h": "Afgelopen 1 uur",
@@ -7883,20 +7913,20 @@
       },
       "refresh": "Vernieuwen",
       "kpis": {
-        "evaluated": {
-          "title": "Geëvalueerde sporen",
+        "scoreResults": {
+          "title": "Scoreresultaten",
           "unit": "",
-          "hint": "Verschillende trace-ID's in _llm_scores in het venster"
+          "hint": "Nieuwste scoreresultaten van span-, trace- en sessie-evaluaties in het venster"
         },
         "evaluationCost": {
           "title": "Evaluatiekosten",
           "unit": "$",
           "hint": "De som van de kosten van de LLM Judge-scorer in het venster"
         },
-        "jobSuccess": {
-          "title": "Succes op het werk",
+        "scorerSuccess": {
+          "title": "Scorer Succes",
           "unit": "%",
-          "hint": "Succespercentage voor online Eval Job Run"
+          "hint": "Succesvolle scorer-aanroepen als percentage van alle scorer-aanroepen"
         },
         "scorerFailures": {
           "title": "Mislukkingen van de scorer",
@@ -7904,11 +7934,12 @@
           "hint": "Mislukte aanroepen van de scorer in het venster"
         },
         "latencyP95": {
-          "title": "Latentie p95",
+          "title": "Scorer-latentie p95",
           "unit": "s",
-          "hint": "Latentie van Scorer-call p95"
+          "hint": "95e percentiel latentie van scorer-aanroepen"
         },
         "vsPrev": "versus de vorige",
+        "noPriorData": "geen eerdere gegevens",
         "noData": "—"
       },
       "loading": "Kwaliteitsgegevens worden geladen...",
@@ -7917,7 +7948,9 @@
         "noData": "Nog geen scores voor deze configuratie in dit venster.",
         "empty": {
           "title": "Wachten op je eerste scores",
-          "description": "Er zijn nog geen scores binnengekomen voor deze configuratie in het geselecteerde tijdsbereik. Ze verschijnen hier automatisch zodra een scorer die deze gebruikt wordt uitgevoerd."
+          "titleScoped": "Geen {scope} scores in dit venster",
+          "description": "Er zijn nog geen scores binnengekomen voor deze configuratie in het geselecteerde tijdsbereik. Ze verschijnen hier automatisch zodra een scorer die deze gebruikt wordt uitgevoerd.",
+          "descriptionScoped": "Er zijn geen {scope} scores voor deze configuratie in het geselecteerde tijdsbereik. Kies een andere scope of vergroot het tijdsbereik."
         },
         "drillTitle": "Tot in de sporen boren",
         "trendTitle": "Trend",
@@ -7926,12 +7959,18 @@
         "compositionTitle": "Samenstelling in de loop van de tijd",
         "categoryDistributionTitle": "Distributie van categorieën",
         "passRateTitle": "Slagpercentage in de loop van de tijd",
+        "healthyRateTitle": "Gezondheidspercentage in de tijd",
+        "trueRateTitle": "Waarheidspercentage in de tijd",
         "trueFalseTitle": "Waar versus onwaar",
         "legendAvg": "Gem",
         "legendP95": "p95",
         "legendThreshold": "drempelwaarde {richting} {waarde}",
         "legendHealthy": "gezond",
         "legendUnhealthy": "ongezond",
+        "legendHealthyRate": "Gezondheidspercentage",
+        "legendTrueRate": "Waarheidspercentage",
+        "legendTrueCount": "waar ({count})",
+        "legendFalseCount": "onwaar ({count})",
         "kpis": {
           "average": "Gemiddeld",
           "p50": "P50",
@@ -7939,11 +7978,49 @@
           "p50p95": "P50/P95",
           "unhealthy": "Ongezond",
           "healthy": "Gezond",
-          "coverage": "Dekking"
+          "trueRate": "Waarheidspercentage",
+          "falseRate": "Onwaarheidspercentage",
+          "coverage": "Dekking",
+          "targetsScored": "Doelen gescoord"
+        },
+        "health": {
+          "title": "Gezondheidsstatus",
+          "noThreshold": "Er is geen gezonde drempel geconfigureerd. Scores kunnen nog niet worden geclassificeerd als gezond of verslechterend.",
+          "thresholdOnly": "Gezond als {threshold}",
+          "summary": "{percent}% onder drempel · Gezond als {threshold}"
+        }
+      },
+      "runs": {
+        "title": "Evaluatiescores",
+        "hint": "Scores en onderbouwing komen van _llm_scores. Selecteer een run om de evaluator-trace te openen voor verder onderzoek.",
+        "filterLabel": "Filter evaluatiescores",
+        "footerTitle": "Evaluatiescores",
+        "noThresholdHint": "Stel een gezonde drempel in op deze Scoreconfiguratie om ongezonde scores te classificeren en te markeren.",
+        "noReasoning": "Geen onderbouwing vastgelegd",
+        "unknownAgent": "Onbekende agent",
+        "unknownScope": "Onbekend bereik",
+        "queryError": "Evaluatiescores konden niet worden vernieuwd. De laatste succesvolle pagina wordt nog getoond.",
+        "empty": "Geen evaluatiescores in dit tijdsbereik.",
+        "emptyUnhealthy": "Geen ongezonde scores in dit tijdsbereik.",
+        "filters": {
+          "all": "Alle scores",
+          "unhealthy": "Ongezond"
+        },
+        "health": {
+          "healthy": "Gezond",
+          "unhealthy": "Ongezond"
+        },
+        "columns": {
+          "time": "Geëvalueerd",
+          "result": "Score",
+          "reasoning": "Redenering",
+          "target": "Doelwit",
+          "agent": "Agent"
         }
       },
       "sidebar": {
         "allConfigs": "Alle configuraties",
+        "scoreCount": "{count} scores",
         "empty": "Er zijn geen configuraties die overeenkomen met dit filter."
       },
       "overview": {
@@ -7960,13 +8037,30 @@
         "waitingPrimaryCta": "Openstaande vacatures bij Eval",
         "waitingRefreshCta": "Vernieuwen",
         "noThreshold": "geen drempel",
+        "relativeTime": {
+          "daysAgo": "{day}d geleden",
+          "monthsAgo": "{month}ma geleden"
+        },
+        "status": {
+          "healthy": "Gezond",
+          "unhealthy": "Aandacht nodig",
+          "noThreshold": "Drempel niet ingesteld",
+          "noData": "Geen scoregegevens"
+        },
+        "health": {
+          "thresholdSummary": "{percent}% onder · Gezond als {threshold}",
+          "noThresholdHint": "Stel een gezonde drempel in",
+          "noDataHint": "Geen scores in dit venster"
+        },
         "columns": {
+          "health": "Gezondheid",
           "scoreConfig": "Scoreconfiguratie",
           "type": "Typ",
+          "quality": "Kwaliteit",
           "totalScores": "Totale scores",
-          "coverage": "Dekking",
+          "scopeMix": "Bereikmix",
           "unhealthy": "Ongezond",
-          "trend": "Trend",
+          "volumeTrend": "Volumetrend",
           "threshold": "Gezond als",
           "updated": "Bijgewerkt"
         }
@@ -7994,11 +8088,10 @@
     "buttons": {
       "cancel": "Annuleer",
       "close": "Sluiten",
-      "create": "Creëren",
       "remove": "Verwijderen",
       "save": "Opslaan",
       "saveAsDraft": "Opslaan als concept",
-      "createAndActivate": "Aanmaken en activeren"
+      "createAndActivate": "Opslaan en activeren"
     },
     "scorerTypeDialog": {
       "title": "Maak een nieuwe scorer",
@@ -8083,7 +8176,6 @@
         "updatedLabel": "Bijgewerkt"
       },
       "createTitle": "Nieuwe scoreconfiguratie",
-      "editTitlePrefix": "Bewerken",
       "subtitle": "Scoreconfiguraties definiëren het scoretype, gezondheidsdrempels en categorieën.",
       "eyebrow": "Scoreconfiguraties",
       "sectionTitle": "Scoreconfiguraties",
@@ -8092,8 +8184,6 @@
       "searchPlaceholder": "Configuraties zoeken",
       "allTypes": "Alle typen",
       "newButton": "Nieuwe scoreconfiguratie",
-      "saveButton": "Wijzigingen opslaan",
-      "createButton": "Aanmaken",
       "columns": {
         "index": "#",
         "name": "Naam",
@@ -8298,14 +8388,13 @@
       "backTo": "Terug naar Scorers",
       "badgeRemote": "Op afstand",
       "badgeLlm": "LLM-jurylid",
-      "createTitleRemote": "Remote Scorer aanmaken",
-      "createTitleLlm": "Creëer een LLM Judge Scorer",
-      "editTitleRemote": "Remote Scorer bewerken",
-      "editTitleLlm": "LLM Judge Scorer bewerken",
+      "createTitleRemote": "Nieuwe externe scorer",
+      "createTitleLlm": "Nieuwe LLM-beoordelingsscorer",
+      "editTitleRemote": "Externe scorer bijwerken",
+      "editTitleLlm": "LLM-beoordelingsscorer bijwerken",
       "subtitleRemote": "Roep een HTTP-eindpunt aan dat u host. Wij maken het verzoek; u geeft een score terug.",
-      "subtitleLlm": "Een taalmodel beoordeelt elk spoor aan de hand van de prompt die u geeft.",
+      "subtitleLlm": "Een taalmodel beoordeelt elk evaluatiedoelwit met behulp van de prompt die u verstrekt.",
       "descriptionPlaceholder": "Een korte samenvatting van wat deze scorer meet.",
-      "producesScoreHelp": "Welke dimensie meet deze scorer?",
       "providerHelp": "Kies de LLM-provider die deze judge aanroept. Beheer providers in {settingsLink}.",
       "providerHelpSettingsLink": "Instellingen",
       "refreshProviders": "Providers vernieuwen",
@@ -8318,8 +8407,49 @@
       "rangeLabel": "Bereik:",
       "healthyLabel": "Gezond:",
       "typeLabel": "Type:",
-      "promptVariablesLabel": "Variabelen:",
-      "promptHelp": "Richt je op de evaluatielogica. Gebruik {inputVar} en {outputVar} als placeholders.",
+      "promptVariablesLabel": "Variabelen in deze prompt:",
+      "promptVariableGuide": {
+        "title": "Beschikbare promptvariabelen",
+        "description": "Deze variabelen kunnen in de bovenstaande prompt worden gebruikt. Hoe elk wordt ingevuld, hangt af van wat de evaluatietaak evalueert.",
+        "columns": {
+          "variable": "Promptvariabele"
+        },
+        "scopes": {
+          "span": "Span",
+          "trace": "Trace",
+          "session": "Sessie"
+        },
+        "statuses": {
+          "jobMapped": "Toewijzen in evaluatietaak",
+          "systemProvided": "Door systeem verstrekt",
+          "requiresSelector": "Door systeem verstrekt · vereist Span-selector",
+          "selectorRequired": "Span-selector vereist",
+          "unavailable": "Niet beschikbaar"
+        },
+        "variables": {
+          "inputOutput": {
+            "span": "Wijs deze toe aan de span-velden die de invoer en uitvoer bevatten.",
+            "trace": "Invoer en uitvoer van de root-span van de trace.",
+            "session": "Niet beschikbaar — een sessie heeft geen enkele invoer of uitvoer."
+          },
+          "statistics": {
+            "span": "Wijs deze naam toe zoals elke andere scorer-variabele bij het evalueren van een enkele span.",
+            "trace": "Trace-statistieken: aantal spans, duur, LLM- en tool-aanroepen, fouten, tokens en kosten.",
+            "session": "Sessie-statistieken: aantal traces en turns, duur en fouten."
+          },
+          "spans": {
+            "span": "Wijs deze naam toe zoals elke andere scorer-variabele bij het evalueren van een enkele span.",
+            "trace": "Een gefilterde subset van de spans van de trace, gekozen door de Span Selector van de Eval Job.",
+            "session": "Niet beschikbaar voor sessies."
+          },
+          "steps": {
+            "span": "Wijs deze naam toe zoals elke andere scorer-variabele bij het evalueren van een enkele span.",
+            "trace": "Spans in tijdsvolgorde; het midden wordt gevouwen als de trace erg lang is.",
+            "session": "Traces in tijdsvolgorde, weergegeven als gespreksbeurten."
+          }
+        },
+        "indexDescription": "{spansVar} en {stepsVar} arriveren als JSON-arrays. Verwijs naar de hele variabele — geïndexeerde toegang zoals {indexedVar} wordt niet ondersteund."
+      },
       "identitySection": "Identiteit",
       "judgeSection": "Configuratie van de rechter",
       "endpointSection": "Eindpunt",
@@ -8337,10 +8467,9 @@
       "modelPlaceholder": "gpt-4o",
       "promptLabel": "Prompt van de rechter",
       "includeReasoningLabel": "Redenering opnemen",
-      "includeReasoningHint": "LLM legt zijn score uit. Opgeslagen in score.metadata.reasoning.",
-      "extraFieldsLabel": "Extra metadatavelden",
-      "extraFieldsOptional": "Optioneel",
-      "extraFieldsHint": "Voeg velden toe die de LLM naast de score moet uitvoeren. Opgeslagen in score.metadata voor latere analyse.",
+      "includeReasoningHint": "De beoordelaar legt uit waarom het die score gaf, opgeslagen bij elk resultaat.",
+      "extraFieldsLabel": "Extra Metadata-velden (Optioneel)",
+      "extraFieldsHint": "Vraag de beoordelaar om extra waarden bij elke score te retourneren — bijvoorbeeld een categorie of een vertrouwensniveau.",
       "extraFields": {
         "colName": "Veldnaam",
         "colType": "Type",
@@ -8442,9 +8571,12 @@
         "eyebrow": "Evaluatietaak",
         "refresh": "Vernieuwen",
         "descriptionSection": "Beschrijving",
-        "targetSection": "Doel",
+        "targetSection": "Evaluatiedoel",
         "streamLabel": "Stream",
         "streamTypeLabel": "Streamtype",
+        "targetScopeLabel": "Evalueer Elke",
+        "idleWindowLabel": "Inactief Venster",
+        "maxAgeLabel": "Maximale Leeftijd",
         "filterLabel": "Filter",
         "filterEmpty": "Geen filter — elke span wordt geëvalueerd",
         "scorersSection": "Scorers",
@@ -8454,13 +8586,30 @@
         "scorerTypeRemote": "Remote",
         "producesPrefix": "Produceert",
         "viewScorerHint": "Bekijken",
-        "inputMappingSection": "Invoertoewijzing",
+        "inputMappingSection": "Promptvariabelen",
         "samplingSection": "Sampling",
         "samplingModeLabel": "Modus",
         "samplingValueLabel": "Waarde",
         "samplingAll": "Elke match evalueren",
         "samplingRate": "Willekeurige steekproef op basis van percentage",
         "samplingCount": "Eerste N matches",
+        "manualSection": "Handmatige Evaluatie",
+        "manualHelp": "Zet de scorers van deze job in de wachtrij voor één expliciet doel. Handmatige runs omzeilen automatische sampling en registreren de reden in de score-metadata.",
+        "manualTargetIdLabel": "Doel-ID",
+        "manualSpanIdLabel": "Span-ID",
+        "manualSpanIdPlaceholder": "span_id",
+        "manualTraceIdLabel": "Trace-ID",
+        "manualTraceIdPlaceholder": "trace_id",
+        "manualSessionIdLabel": "Sessie-ID",
+        "manualSessionIdPlaceholder": "session_id",
+        "manualReasonLabel": "Reden",
+        "manualReasonPlaceholder": "Waarom voer je dit doel opnieuw uit?",
+        "manualVariablesLabel": "Variabelen JSON",
+        "manualVariablesObjectError": "Variabelen moeten een JSON-object zijn",
+        "manualTargetRequired": "Doel-ID is vereist",
+        "manualSubmit": "Start Handmatige Evaluatie",
+        "manualSuccess": "In wachtrij gezet: {count} evaluatieta(a)k(en)",
+        "manualError": "Handmatige evaluatie mislukt",
         "metadataSection": "Metadata",
         "versionLabel": "Versie",
         "pipelineLabel": "Pipeline-ID",
@@ -8513,6 +8662,7 @@
         "name": "Naam",
         "status": "Status",
         "stream": "Stream",
+        "targetScope": "Bereik",
         "scorers": "Scorers",
         "successRate": "Slagingspercentage",
         "created": "Aangemaakt",
@@ -8526,9 +8676,10 @@
         "chipSampling": "Samplingbeheer"
       },
       "descriptionPlaceholder": "Wat bewaakt deze taak?",
-      "samplingValueHelp": "Voer een percentage tussen 0 en 1 in.",
-      "samplingValueAllHelp": "Niet van toepassing wanneer de modus Alles is — elke overeenkomende gebeurtenis wordt geëvalueerd.",
-      "samplingHelp": "Toepassen na Filter. Beheert de kosten — alleen overeenkomende spans tellen mee voor het percentage.",
+      "samplingValueHelp": "Voer een waarde in tussen 0 en 1.",
+      "samplingValuePreview": "Evalueert {percent}% van de overeenkomende doelen.",
+      "samplingValueAllHelp": "Elk overeenkomend doel wordt geëvalueerd.",
+      "samplingHelp": "Wordt uitgevoerd na filteren, om kosten te beheersen.",
       "presets": {
         "label": "Snelle presets",
         "rootSpans": "Alleen root-spans",
@@ -8536,26 +8687,49 @@
         "toolCalls": "Toolaanroepen"
       },
       "backTo": "Terug naar Eval Jobs",
-      "createTitle": "Maak een online evaluatieopdracht",
-      "editTitle": "Online Eval-opdracht bewerken",
+      "createTitle": "Nieuwe Eval Job",
+      "editTitle": "Eval Job bijwerken",
       "stepper": {
         "target": "Doelwit",
         "scorers": "Scorers",
         "mapping": "In kaart brengen",
         "sampling": "Bemonstering"
       },
-      "targetSection": "Doelwit",
+      "detailsSection": "Details",
+      "targetSection": "Evaluatiedoel",
       "filteringSection": "Filteren",
       "scorersSection": "Scorers en kaarten",
       "nameLabel": "Naam",
       "namePlaceholder": "Monitor voor de getrouwheid van de productie",
-      "streamLabel": "Invoerstroom",
-      "streamPlaceholder": "standaard",
+      "streamLabel": "Stream",
+      "streamPlaceholder": "Selecteer Stream",
       "streamTypeLabel": "Soort stream",
       "streamTypePlaceholder": "sporen",
+      "targetScopeLabel": "Evalueer Elke",
+      "targetScopes": {
+        "span": "Span",
+        "trace": "Trace",
+        "session": "Sessie"
+      },
+      "targetScopeHelp": {
+        "span": "Evalueer elke overeenkomende span onafhankelijk.",
+        "trace": "Evalueer een hele trace nadat het voltooiingsvenster sluit.",
+        "session": "Evalueer een sessie over traces heen nadat het voltooiingsvenster sluit."
+      },
+      "completionSection": "Voltooiingscriteria",
+      "completionHelp": {
+        "trace": "De trace wordt geëvalueerd zodra aan de eerste van deze criteria is voldaan.",
+        "session": "De sessie wordt geëvalueerd zodra aan de eerste van deze criteria is voldaan."
+      },
+      "idleWindowLabel": "Inactief venster (seconden)",
+      "idleWindowHelp": "Geëvalueerd na {duration} zonder nieuwe spans.",
+      "idleWindowHelpEmpty": "Geëvalueerd zodra er geen nieuwe spans meer binnenkomen.",
+      "maxAgeLabel": "Maximale leeftijd (seconden)",
+      "maxAgeHelp": "Geëvalueerd {duration} na de eerste span.",
+      "maxAgeHelpEmpty": "Geëvalueerd op een vaste leeftijd, zelfs als er nog spans binnenkomen.",
       "descriptionLabel": "Omschrijving",
       "samplingModeLabel": "Bemonsteringsmodus",
-      "samplingValueLabel": "Bemonsteringspercentage",
+      "samplingValueLabel": "Samplingfrequentie",
       "samplingModes": {
         "rate": "Tarief",
         "all": "Alles",
@@ -8563,7 +8737,11 @@
       },
       "scorerPicker": {
         "title": "Scorers",
-        "hint": "Selecteer een of meer scorers om mee te doen voor elke gematchte reeks.",
+        "hint": {
+          "span": "Selecteer een of meerdere scorers die voor elke overeenkomende span moeten worden uitgevoerd.",
+          "trace": "Selecteer een of meerdere scorers die voor elke in aanmerking komende trace moeten worden uitgevoerd.",
+          "session": "Selecteer een of meerdere scorers die voor elke in aanmerking komende sessie moeten worden uitgevoerd."
+        },
         "meta": "{type} · v {versie}",
         "placeholder": "Scorers selecteren",
         "searchPlaceholder": "Scorers zoeken…",
@@ -8571,21 +8749,113 @@
       },
       "filter": {
         "title": "Staat van het filter",
-        "hint": "Alleen overspanningen die aan deze voorwaarde voldoen, worden meegenomen in de steekproef en de score."
+        "hint": {
+          "span": "Alleen spans die aan deze voorwaarde voldoen, komen in aanmerking voor sampling en scoring.",
+          "trace": "Een trace komt in aanmerking voor sampling en scoring als een van de spans aan deze voorwaarde voldoet.",
+          "session": "Een sessie komt in aanmerking voor sampling en scoring als een van de spans aan deze voorwaarde voldoet."
+        }
+      },
+      "selector": {
+        "title": "Welke spans (optioneel)",
+        "hint": {
+          "trace": "Laat leeg om elke span in de trace op te nemen."
+        }
+      },
+      "endSignal": {
+        "title": "Eindsignaal (optioneel)",
+        "hint": {
+          "trace": "Definieer een span-voorwaarde die de trace onmiddellijk sluit wanneer een span eraan voldoet.",
+          "session": "Definieer een span-voorwaarde die de sessie onmiddellijk sluit wanneer een span eraan voldoet."
+        }
       },
       "inputMapping": {
-        "title": "Invoertoewijzing",
-        "hint": "Wijs spanvelden toe aan elke sjabloonvariabele voor de scorer.",
+        "title": "Promptvariabelen",
+        "hint": {
+          "span": "Wijs elke variabele toe aan het span-veld dat de waarde levert.",
+          "trace": "Trace-waarden worden automatisch ingevuld. Wijs al het andere toe aan een span-veld.",
+          "session": "Sessiewaarden worden automatisch ingevuld. Wijs al het andere toe aan een span-veld."
+        },
         "selectScorers": "Selecteer scorers om hun mappings te configureren.",
         "noVariables": "Deze scorer heeft geen sjabloonvariabelen om in kaart te brengen.",
-        "variableCount": "{count} variabelen"
+        "variableCount": "{count} variabelen",
+        "systemProvided": {
+          "title": "{scope} Variabelen",
+          "description": "OpenObserve levert deze waarden vanuit de {scope} zelf. Een scorer-prompt kan ze direct gebruiken — geen toewijzing nodig.",
+          "badge": "Systeem geleverd",
+          "selectorRequired": "Span Selector vereist",
+          "columns": {
+            "variable": "Promptvariabele",
+            "source": "Bron",
+            "description": "Waarde geleverd"
+          },
+          "variables": {
+            "input": {
+              "trace": "Invoer van de root-span van de trace."
+            },
+            "output": {
+              "trace": "Uitvoer van de root-span van de trace."
+            },
+            "statistics": {
+              "trace": "Trace-statistieken: aantal spans, duur, LLM- en toolaanroepen, fouten, tokens en kosten.",
+              "session": "Sessie-statistieken: aantal traces en beurten, duur en fouten."
+            },
+            "spans": {
+              "trace": "Een gefilterde subset van spans, gekozen door de Span Selector van de taak."
+            },
+            "steps": {
+              "trace": "Spans in tijdsvolgorde; het middelste deel wordt ingeklapt als de trace erg lang is.",
+              "session": "Traces in tijdsvolgorde, weergegeven als conversatiebeurten."
+            }
+          }
+        }
+      },
+      "spanSelector": {
+        "select": "Selecteer Span Selector",
+        "bindingHelp": "Traces kunnen honderden spans bevatten. Kies de spans waar deze scorer naar moet kijken.",
+        "createForScorer": "Maak voor scorer",
+        "createForScorerTitle": "Maak een Span Selector voor deze scorer",
+        "editorTitle": "Span Selector",
+        "name": "Selectornaam",
+        "schemaMode": "Te lezen velden",
+        "defaultSchema": "Standaard GenAI-velden",
+        "customSchema": "Aangepaste velden",
+        "defaultSchemaHelp": "Deze acht velden worden uitgelezen uit elke overeenkomende span. Ontbrekende gegevens worden leeg doorgegeven.",
+        "fields": "Velden",
+        "fieldsHelp": "Alleen deze velden worden uitgelezen — er wordt niets anders naar de scorer gestuurd.",
+        "maximumSpans": "Maximum aantal spans",
+        "budget": "Beperkt hoeveel spans uit de trace worden geselecteerd.",
+        "validation": {
+          "name": "Voer een selectornaam in.",
+          "duplicateName": "Selectornamen moeten uniek zijn in deze taak.",
+          "filter": "Voltooi of verwijder de onvoltooide filterconditie.",
+          "fields": "Selecteer ten minste één veld voor een aangepast schema.",
+          "maximumSpans": "Maximum aantal spans moet een positief geheel getal zijn.",
+          "budget": "Te veel spans voor de geselecteerde velden. Verlaag het aantal spans of lees minder velden.",
+          "binding": "Selecteer een Span Selector voor elke scorer."
+        }
       },
       "preview": {
-        "title": "voorsmaak",
-        "hint": "Gebruik de velden aan de linkerkant om het doel van de productie-evaluatie te definiëren.",
-        "matchedSuffix": "bijpassende overspanningen · laatste 24 uur",
+        "scopes": {
+          "span": {
+            "title": "Overeenkomende spans",
+            "hint": "Zodra u een stream en filter hebt gekozen, toont dit paneel hoeveel spans uw taak zal matchen.",
+            "matchedSuffix": "spans gematcht · laatste 24 uur",
+            "matchedLoading": "Overeenkomende spans tellen…"
+          },
+          "trace": {
+            "title": "Overeenkomende traces",
+            "hint": "Zodra u een stream en filter hebt gekozen, toont dit paneel hoeveel traces uw taak zal matchen.",
+            "matchedSuffix": "traces gematcht · laatste 24 uur",
+            "matchedLoading": "Overeenkomende traces tellen…"
+          },
+          "session": {
+            "title": "Overeenkomende sessies",
+            "hint": "Zodra u een stream en filter hebt gekozen, toont dit paneel hoeveel sessies uw taak zal matchen.",
+            "matchedSuffix": "sessies gematcht · laatste 24 uur",
+            "matchedLoading": "Overeenkomende sessies tellen…"
+          }
+        },
         "matchedError": "Kon het aantal wedstrijden niet laden",
-        "matchedLoading": "Overeenkomende overspanningen tellen...",
         "matchedIncomplete": "Voltooi de filterconditie om de telling bij te werken.",
         "summaryTitle": "Samenvatting",
         "summaryName": "Naam",
@@ -8602,6 +8872,7 @@
       "validation": {
         "nameRequired": "Job name is required",
         "streamRequired": "A stream is required",
+        "idleWindowMinimum": "Inactief venster moet ten minste 45 seconden zijn",
         "samplingValueRequired": "A sampling value is required"
       }
     }
@@ -8724,7 +8995,9 @@
     "cellActions": {
       "copy": "Kopiëren",
       "includeTerm": "Term opnemen",
-      "excludeTerm": "Term uitsluiten"
+      "excludeTerm": "Term uitsluiten",
+      "sendValueToAi": "Waarde naar AI sturen",
+      "sendRowToAi": "Rij naar AI sturen"
     },
     "indexList": {
       "noMatchingFields": "Geen overeenkomende velden gevonden",
@@ -9108,12 +9381,20 @@
       "stepJourney": "Reis",
       "untitledCheck": "Naamloze controle",
       "variablesHint": "Ondersteunt {variables} zoals {baseUrl}.",
-      "setupStep2Title": "Incognitomodus inschakelen",
-      "setupIncognitoHint": "Open chrome://extensions, klik op {details} en schakel vervolgens {setting} in."
+      "setupStep2Title": "Klik op het OpenObserve Recorder-pictogram in uw werkbalk",
+      "setupIncognitoHint": "Open chrome://extensions, klik op {details} en schakel vervolgens {setting} in.",
+      "setupStep2Description": "Chrome kan geen automatische verbinding maken met pagina's die open waren voordat u de extensie installeerde. Door op het extensiepictogram te klikken, wordt de recorder in dit tabblad geïnjecteerd — een eenmalige stap.",
+      "setupIconActivateHint": "Klik op {icon} in uw werkbalk om de recorder voor deze pagina te activeren.",
+      "setupStep3Title": "Incognitomodus inschakelen",
+      "setupStep3IncognitoHint": "Open chrome://extensions, klik op {details} en schakel vervolgens {setting} in.",
+      "setupReady": "Verbonden ✓",
+      "setupConnected": "Verbonden ✓"
     },
     "dialog": {
       "bulkDeleteBody": "Weet u zeker dat u {count} controle(s) wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.",
       "bulkDeleteTitle": "Controles verwijderen",
+      "deleteSingleBody": "Weet u zeker dat u \"{name}\" wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.",
+      "deleteSingleTitle": "Controle verwijderen",
       "duplicateTitle": "Controle dupliceren"
     },
     "empty": {
@@ -9213,11 +9494,88 @@
       "unknown": "Onbekend"
     },
     "locations": {
+      "addLocation": "Locatie toevoegen",
+      "bottomHeader": "locaties",
+      "bulkDeleteConfirmMessage": "Weet u zeker dat u {count} locaties wilt verwijderen?",
+      "bulkDeleteConfirmTitle": "Locaties verwijderen",
+      "bulkDeleteFailed": "Locaties verwijderen mislukt",
+      "bulkDeletePartial": "{success} van {total} locaties verwijderd",
+      "bulkDeleteSuccess": "{count} locaties verwijderd",
+      "cancel": "Annuleren",
       "comingSoon": "Meer regio's en privélocaties — Binnenkort beschikbaar",
+      "createClose": "Aanmaken en sluiten",
+      "createFailed": "Locatie aanmaken mislukt",
+      "createSuccess": "Locatie succesvol aangemaakt",
+      "createTitle": "Locatie toevoegen",
+      "customProviderLabel": "Aangepaste provider",
+      "customProviderPlaceholder": "Voer providernaam in",
+      "customProviderRequired": "Aangepaste providernaam is vereist",
+      "deleteConfirmMessage": "Weet u zeker dat u deze locatie wilt verwijderen?",
+      "deleteConfirmTitle": "Locatie verwijderen",
+      "deleteFailed": "Locatie verwijderen mislukt",
+      "deleteSuccess": "Locatie succesvol verwijderd",
+      "description": "Openbare proeflocaties beheren voor synthetische monitoring",
+      "disable": "Uitschakelen",
+      "disabledSuccess": "Locatie uitgeschakeld",
+      "disabling": "Uitschakelen…",
+      "editTitle": "Locatie bewerken",
       "empty": "Geen locaties beschikbaar",
+      "enable": "Inschakelen",
+      "enabled": "Ingeschakeld",
+      "enabledSuccess": "Locatie ingeschakeld",
+      "enabling": "Inschakelen…",
+      "exportFailed": "Locaties exporteren mislukt",
+      "exportSuccess": "Locaties succesvol geëxporteerd",
+      "exportTitle": "Exporteren",
+      "fetchFailed": "Locaties ophalen mislukt",
+      "bulkDisableFailed": "Locaties uitschakelen mislukt",
+      "bulkDisabledPartial": "{success} van {total} locaties uitgeschakeld",
+      "bulkDisabledSuccess": "{count} locaties uitgeschakeld",
+      "bulkEnableFailed": "Locaties inschakelen mislukt",
+      "bulkEnabledPartial": "{success} van {total} locaties ingeschakeld",
+      "bulkEnabledSuccess": "{count} locaties ingeschakeld",
+      "importFailed": "Locaties importeren mislukt",
+      "importJsonLabel": "JSON-invoer",
+      "importLabelRequired": "Label is vereist voor item {index}",
+      "importPlaceholder": "Plak hier de JSON-array met locaties...",
+      "importProviderRequired": "Provider is vereist voor item {index}",
+      "importRegionRequired": "Regio is vereist voor item {index}",
+      "importSuccess": "{count} locaties succesvol geïmporteerd",
+      "importTitle": "Importeren",
+      "invalidJson": "Ongeldig JSON-formaat",
+      "label": "Label",
+      "labelPlaceholder": "bijv. AWS US East (N. Virginia)",
+      "labelRequired": "Label is vereist",
       "locationAwsEast": "AWS · oost-amerikaan-1",
+      "locationId": "Locatie-ID",
+      "noPreview": "Voer geldige JSON in om locaties te bekijken",
+      "preview": "Voorbeeld",
+      "provider": "Provider",
+      "providerOther": "Anders",
+      "providerPlaceholder": "Selecteer een provider",
+      "providerRequired": "Provider is vereist",
+      "region": "Regio",
+      "regionPlaceholder": "bijv. us-east-1",
+      "regionRequired": "Regio is vereist",
+      "searchPlaceholder": "Locaties zoeken…",
+      "selectedCount": "{selected} van {total} locaties geselecteerd",
       "subtitle": "Selecteer de locaties van waaruit de reis wordt uitgevoerd",
-      "title": "Locaties"
+      "title": "Locaties",
+      "privateBadge": "Privé",
+      "publicTitle": "Openbaar",
+      "privateTitle": "Privélocaties",
+      "setupAgent": "Privé-agent instellen",
+      "privateEmptyBody": "Voer deze controle uit vanuit uw eigen VPC of on-premise netwerk.",
+      "offlineWarning": "Geen live agent — de controle wordt vanaf hier niet uitgevoerd totdat er weer een agent is.",
+      "liveAgents": "{count} live agenten",
+      "liveAgentsNamed": "{count} live agenten ({names})",
+      "offlineSince": "Offline · laatst gezien {ago}",
+      "pendingAgent": "Wachten tot de eerste agent zich registreert",
+      "toggleFailed": "Locatie omschakelen mislukt",
+      "updateClose": "Bijwerken en sluiten",
+      "updateFailed": "Locatie bijwerken mislukt",
+      "updateSuccess": "Locatie succesvol bijgewerkt",
+      "uploadFile": "JSON-bestand uploaden"
     },
     "newCheck": {
       "back": "Controles",
@@ -9230,6 +9588,7 @@
       "httpDesc": "Controleer eindpunten, statuscodes en responslichamen",
       "leave": "Verlaten",
       "loadEditFailed": "Kan de controle niet laden voor bewerking — het formulier toont standaardwaarden, niet opslaan",
+      "notFoundInOrg": "Deze controle bestaat niet in de huidige organisatie.",
       "modalSubtitle": "Kies wat u wilt monitoren",
       "modalTitle": "Maak een Check",
       "pageTitle": "Nieuwe {label}-controle",
@@ -9252,7 +9611,7 @@
       "willBeCreatedIn": "Wordt gemaakt in"
     },
     "pageSubtitle": "Proactief uptime, prestaties en gebruikersreizen monitoren vanuit wereldwijde locaties",
-    "pageTitle": "Synthetische controles",
+    "pageTitle": "Synthetics",
     "protocolConfig": {
       "http": {
         "addAssertion": "Assertie toevoegen",
@@ -9349,6 +9708,7 @@
       "failed": "Mislukt",
       "failedRuns": "Mislukte runs",
       "jumpToLastRun": "Ga naar laatste run",
+      "jumpToLatestData": "Ga naar nieuwste gegevens",
       "lastRun": "Laatste run",
       "location": "Locatie",
       "monitors": "Monitoren",
@@ -9488,10 +9848,13 @@
       "tabSteps": "Stappen",
       "timelineAllFailed": "Alle {count} mislukt",
       "timelineAllPassed": "Alle {count} geslaagd",
+      "timelineAllWarning": "Alle {count} waarschuwingen",
       "timelineMixed": "{passed} geslaagd, {failed} mislukt van {total}",
       "timelineNow": "Nu",
       "triggerManual": "Handmatig",
       "triggerSchedule": "Schema",
+      "warning": "Waarschuwing",
+      "warningRuns": "Waarschuwingsuitvoeringen",
       "window24h": "Afgelopen 24 uur",
       "window1h": "Afgelopen 1 uur",
       "windowDays": "Afgelopen {days} dagen",
@@ -9631,10 +9994,12 @@
     "tabs": {
       "all": "Alle",
       "browser": "Browser",
+      "checks": "Controles",
       "http": "HTTP",
       "ssh": "SSH",
       "tcp": "TCP",
-      "tls": "TLS"
+      "tls": "TLS",
+      "private": "Privélocaties"
     },
     "timeline": {
       "failed": "Mislukt",
@@ -9673,7 +10038,79 @@
       "nameRequired": "Naam is verplicht",
       "selectorRequired": "Selector is vereist voor \"{step}\"",
       "urlInvalid": "Voer een geldige URL in die begint met http:// of https://",
-      "urlRequired": "Start-URL is verplicht"
+      "urlRequired": "Start-URL is verplicht",
+      "fixHighlightedFields": "Corrigeer de gemarkeerde velden voordat u opslaat"
+    },
+    "privateLocations": {
+      "searchPlaceholder": "Locaties doorzoeken...",
+      "setupAgent": "Een agent instellen",
+      "copySetupCmd": "Installatiecommando",
+      "deleteTitle": "Locatie verwijderen",
+      "deleteBody": "Privélocatie \"{name}\" verwijderen? De agenten zullen geen taken meer ontvangen.",
+      "deleteBlocked": "In gebruik bij {count} controles — wijs ze eerst los",
+      "status": {
+        "online": "Online",
+        "offline": "Offline",
+        "pending": "In behandeling"
+      },
+      "table": {
+        "name": "Naam",
+        "region": "Regio",
+        "agents": "Agenten",
+        "types": "Types",
+        "checks": "Controles",
+        "checksPerMin": "C/min",
+        "lastSeen": "Laatst gezien"
+      },
+      "empty": {
+        "title": "Nog geen privélocaties",
+        "description": "Implementeer de agent in uw netwerk met AGENT_LOCATION ingesteld — de locatie registreert zichzelf en verschijnt hier automatisch. Geen handmatige installatie in de UI.",
+        "action": "Een agent instellen"
+      },
+      "toast": {
+        "deleted": "Locatie verwijderd",
+        "deleteFailed": "Locatie verwijderen mislukt",
+        "copied": "Installatiecommando gekopieerd",
+        "copyFailed": "Kopiëren naar klembord mislukt",
+        "locationRequired": "Voer een locatienaam in voordat u het installatiecommando kopieert."
+      },
+      "setup": {
+        "title": "Privé-agent instellen",
+        "step1Title": "Agent implementeren",
+        "step1Body": "Voer de container uit op elke machine in uw netwerk — Docker, Kubernetes, of native binary. AGENT_LOCATION geeft de locatie een naam; gebruik dezelfde naam op elke agent die deze moet bedienen.",
+        "step2Title": "Zie de locatie verschijnen",
+        "step2Body": "Bij eerste registratie wordt de locatierij automatisch aangemaakt en wordt Online — niets toevoegen in de UI. Meer agenten met dezelfde AGENT_LOCATION voegen zich bij dezelfde locatie.",
+        "step3Title": "Toewijzen aan controles",
+        "step3Body": "Selecteer deze locatie bij het maken of bewerken van een controle. Controles worden uitgevoerd vanuit uw eigen infrastructuur.",
+        "noToken": "Kon het installatiecommando niet laden — controleer uw machtigingen en probeer het opnieuw.",
+        "browserNote": "Browser tests kunnen nog niet vanaf privélocaties worden uitgevoerd — alleen protocolcontroles (HTTP, TCP, TLS, SSH).",
+        "locationNameLabel": "Locatienaam",
+        "locationNamePlaceholder": "Corp hoofdkantoor",
+        "tabDocker": "Docker",
+        "tabK8s": "Kubernetes",
+        "tabLinux": "Linux",
+        "tabWindows": "Windows",
+        "agentNameLabel": "Agentnaam (optioneel)",
+        "agentNamePlaceholder": "automatisch gegenereerd op basis van hostnaam",
+        "agentNameHint": "Laat leeg om de agent zichzelf te laten benoemen op basis van zijn hostnaam — handig bij het uitvoeren van meerdere agenten op één locatie."
+      },
+      "detail": {
+        "title": "Privélocatie",
+        "back": "Privélocaties",
+        "version": "Versie",
+        "pool": "Pool",
+        "agentsTitle": "Agenten",
+        "agentsSubtitle": "Agenten registreren zichzelf vanuit uw infrastructuur en zijn hier alleen-lezen.",
+        "agentName": "Agent",
+        "recoverAgent": "Herstel deze agent — kopieer een installatieopdracht vooraf ingevuld met zijn naam",
+        "noAgents": "Er hebben zich nog geen agenten geregistreerd voor deze locatie.",
+        "checksTitle": "Controles die vanaf deze locatie worden uitgevoerd",
+        "checkName": "Naam",
+        "noChecks": "Er zijn nog geen controles toegewezen aan deze locatie.",
+        "notFound": "Locatie niet gevonden"
+      },
+      "urlRequired": "Start-URL is vereist",
+      "fixHighlightedFields": "Corrigeer de gemarkeerde velden voordat u opslaat"
     }
   },
   "shortcuts": {
@@ -9789,6 +10226,8 @@
       "panelEditorQueryInspector": "Inspector voor query's openen",
       "metricsRunQuery": "Voer een ProMQL-query uit",
       "metricsRefresh": "Vernieuwen",
+      "metricsAddToDashboard": "Toevoegen aan dashboard",
+      "metricsCopyUrl": "Deellink kopiëren",
       "tracesSearch": "Zoek naar sporen",
       "tracesRefresh": "Vernieuwen",
       "alertsCreate": "Nieuwe waarschuwing aanmaken",

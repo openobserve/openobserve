@@ -108,11 +108,7 @@ export function isLLMTrace(data: any): boolean {
  * still persist their request and response on the evaluator attributes. */
 export function hasTracePreview(data: any): boolean {
   if (!data) return false;
-  return (
-    isLLMTrace(data) ||
-    hasValue(data.attributes_prompt) ||
-    hasValue(data.attributes_response)
-  );
+  return isLLMTrace(data) || hasValue(data.attributes_prompt) || hasValue(data.attributes_response);
 }
 
 /**
@@ -225,8 +221,7 @@ function extractMessageContent(content: any): string {
   if (Array.isArray(content)) {
     // Find first text content
     const textPart = content.find(
-      (part: any) =>
-        part && typeof part === "object" && part.type === "text" && part.text,
+      (part: any) => part && typeof part === "object" && part.type === "text" && part.text,
     );
     if (textPart) {
       return textPart.text;
@@ -262,10 +257,7 @@ function extractMessageContent(content: any): string {
  * - Simple arrays: [{}] or ["text"]
  * - Plain strings
  */
-export function truncateLLMContent(
-  content: string | object,
-  maxLength: number = 100,
-): string {
+export function truncateLLMContent(content: string | object, maxLength: number = 100): string {
   if (!content) return "N/A";
 
   let text: string = "";
@@ -295,9 +287,7 @@ export function truncateLLMContent(
         text = parsed.inputs.query;
       } else {
         // Try to get first string value from inputs
-        const firstValue = Object.values(parsed.inputs).find(
-          (v) => typeof v === "string",
-        );
+        const firstValue = Object.values(parsed.inputs).find((v) => typeof v === "string");
         if (firstValue) {
           text = firstValue as string;
         }
@@ -307,9 +297,7 @@ export function truncateLLMContent(
     // Handle message arrays: [{role: "user", content: "text"}, ...]
     else if (Array.isArray(parsed)) {
       // Look for user messages
-      const userMsg = parsed.find(
-        (m: any) => m && m.role === "user" && m.content,
-      );
+      const userMsg = parsed.find((m: any) => m && m.role === "user" && m.content);
       if (userMsg) {
         text = extractMessageContent(userMsg.content);
       } else {
@@ -319,9 +307,7 @@ export function truncateLLMContent(
           text = extractMessageContent(anyMsg.content);
         } else {
           // Look for first string in array
-          const firstString = parsed.find(
-            (item: any) => typeof item === "string",
-          );
+          const firstString = parsed.find((item: any) => typeof item === "string");
           if (firstString) {
             text = firstString;
           } else if (parsed.length > 0 && parsed[0]) {
@@ -338,9 +324,7 @@ export function truncateLLMContent(
 
     // Handle object with nested messages array: {tools: [...], messages: [...]}
     else if (parsed.messages && Array.isArray(parsed.messages)) {
-      const userMsg = parsed.messages.find(
-        (m: any) => m && m.role === "user" && m.content,
-      );
+      const userMsg = parsed.messages.find((m: any) => m && m.role === "user" && m.content);
       if (userMsg) {
         text = extractMessageContent(userMsg.content);
       } else {
@@ -354,13 +338,7 @@ export function truncateLLMContent(
     // Handle other object formats
     else {
       // Try common fields
-      text =
-        parsed.input ||
-        parsed.query ||
-        parsed.question ||
-        parsed.prompt ||
-        parsed.text ||
-        "";
+      text = parsed.input || parsed.query || parsed.question || parsed.prompt || parsed.text || "";
 
       // If still no text, stringify the object
       if (!text) {
@@ -426,8 +404,7 @@ export function parseEvaluationScores(data: any): EvaluationScores | null {
     qualityScore: quality != null ? Number(quality) : null,
     relevance: relevance != null ? Number(relevance) : null,
     completeness: completeness != null ? Number(completeness) : null,
-    toolEffectiveness:
-      toolEffectiveness != null ? Number(toolEffectiveness) : null,
+    toolEffectiveness: toolEffectiveness != null ? Number(toolEffectiveness) : null,
     groundedness: groundedness != null ? Number(groundedness) : null,
     safety: safety != null ? Number(safety) : null,
     durationMs: durationMs != null ? Number(durationMs) : null,
@@ -458,9 +435,7 @@ export function getQualityScoreColor(score: number | null): string {
 /**
  * Get color for observation type badge
  */
-export function getObservationTypeColor(
-  type: string | null | undefined,
-): string {
+export function getObservationTypeColor(type: string | null | undefined): string {
   if (!type) return "grey";
 
   const colorMap: Record<string, string> = {
@@ -501,8 +476,7 @@ export function extractLLMData(span: any): LLMData | null {
   return {
     provider: span.gen_ai_system || span.gen_ai_provider_name || "unknown",
     observationType: span.gen_ai_operation_name || "span",
-    modelName:
-      span.gen_ai_response_model || span.gen_ai_request_model || "unknown",
+    modelName: span.gen_ai_response_model || span.gen_ai_request_model || "unknown",
     input: span.gen_ai_input_messages,
     output: span.gen_ai_output_messages,
     modelParameters: modelParams,
@@ -532,10 +506,7 @@ export function formatModelParameters(params: Record<string, any>): string {
 /**
  * Truncate session ID for display
  */
-export function truncateSessionId(
-  sessionId: string,
-  maxLength: number = 16,
-): string {
+export function truncateSessionId(sessionId: string, maxLength: number = 16): string {
   if (!sessionId) return "N/A";
   if (sessionId.length <= maxLength) return sessionId;
 

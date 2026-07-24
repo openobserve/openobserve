@@ -28,7 +28,7 @@
  * @param obj - The object to search in (can be null/undefined)
  * @param alias - The key to search for (string or number, can be null/undefined)
  * @returns The value if found, undefined otherwise (never throws errors)
- * 
+ *
  * @example
  * getDataValue({ xAxis: 'time' }, 'xAxis') // Returns 'time'
  * getDataValue({ xaxis: 'time' }, 'xAxis') // Returns 'time' (lowercase fallback)
@@ -45,5 +45,5 @@ export const getDataValue = (obj: any, alias: string | number): any => {
   if (value !== undefined) return value;
 
   // Lowercase fallback only for string keys; numeric keys don't need it.
-  return typeof alias === 'string' ? obj[alias.toLowerCase()] : undefined;
+  return typeof alias === "string" ? obj[alias.toLowerCase()] : undefined;
 };

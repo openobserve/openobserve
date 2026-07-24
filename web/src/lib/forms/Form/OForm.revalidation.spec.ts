@@ -13,7 +13,11 @@ import OForm from "./OForm.vue";
 import OFormInput from "../Input/OFormInput.vue";
 
 const schema = z.object({
-  name: z.string().trim().min(1, "Required").regex(/^[a-zA-Z0-9_:]+$/, "Bad chars"),
+  name: z
+    .string()
+    .trim()
+    .min(1, "Required")
+    .regex(/^[a-zA-Z0-9_:]+$/, "Bad chars"),
 });
 
 const Host = defineComponent({

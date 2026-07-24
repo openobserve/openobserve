@@ -46,10 +46,7 @@ export const attemptTokenRefresh = (requestUrl: string = ""): Promise<void> => {
     return Promise.reject(new Error("Cloud environment: direct logout"));
   }
 
-  if (
-    config.isEnterprise == "true" &&
-    (store.state as any).zoConfig.sso_enabled
-  ) {
+  if (config.isEnterprise == "true" && (store.state as any).zoConfig.sso_enabled) {
     if (!refreshPromise) {
       const refreshInstance = axios.create({
         withCredentials: true,
@@ -115,10 +112,7 @@ const http = ({ headers } = {} as any) => {
           case 400:
             break;
           case 401:
-            if (
-              config.isCloud == "true" &&
-              !error.request.responseURL.includes("/auth/login")
-            ) {
+            if (config.isCloud == "true" && !error.request.responseURL.includes("/auth/login")) {
               store.dispatch("logout");
               useLocalCurrentUser("", true);
               useLocalUserInfo("", true);
@@ -128,10 +122,7 @@ const http = ({ headers } = {} as any) => {
             // Delegate to the shared refresh helper — it owns the URL exclusion
             // checks and the logout-on-failure path. Retry the original request
             // once the token is refreshed.
-            else if (
-              config.isEnterprise == "true" &&
-              (store.state as any).zoConfig.sso_enabled
-            ) {
+            else if (config.isEnterprise == "true" && (store.state as any).zoConfig.sso_enabled) {
               return attemptTokenRefresh(error.config.url)
                 .then(() => instance.request(error.config))
                 .catch(() => Promise.reject(error));
@@ -147,8 +138,7 @@ const http = ({ headers } = {} as any) => {
             break;
           case 403:
             if (config.isEnterprise == "true" || config.isCloud == "true") {
-              const responseUrl =
-                error.request?.responseURL || error.config?.url || "";
+              const responseUrl = error.request?.responseURL || error.config?.url || "";
               addUnauthorizedError(responseUrl);
             }
             break;

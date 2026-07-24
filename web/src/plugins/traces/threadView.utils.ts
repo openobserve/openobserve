@@ -30,9 +30,7 @@
  * Uses the OTEL gen_ai.operation.name value directly.
  */
 export function getOp(span: any): string {
-  return String(
-    span?.gen_ai_operation_name || "",
-  );
+  return String(span?.gen_ai_operation_name || "");
 }
 
 /**
@@ -40,9 +38,7 @@ export function getOp(span: any): string {
  * the call) over the request model (what was asked for).
  */
 export function getModel(span: any): string {
-  return String(
-    span?.gen_ai_response_model || span?.gen_ai_request_model || "",
-  );
+  return String(span?.gen_ai_response_model || span?.gen_ai_request_model || "");
 }
 
 /**
@@ -66,22 +62,14 @@ export function getOutputRaw(span: any): unknown {
  * Returns 0 for missing / unparseable values (instead of NaN).
  */
 export function getCost(span: any): number {
-  return (
-    Number(span?.gen_ai_usage_cost) ||
-    Number(span?.llm_usage_cost_total) ||
-    0
-  );
+  return Number(span?.gen_ai_usage_cost) || Number(span?.llm_usage_cost_total) || 0;
 }
 
 /**
  * Read the total token count. Falls back to llm_usage_tokens_total.
  */
 export function getTokens(span: any): number {
-  return (
-    Number(span?.gen_ai_usage_total_tokens) ||
-    Number(span?.llm_usage_tokens_total) ||
-    0
-  );
+  return Number(span?.gen_ai_usage_total_tokens) || Number(span?.llm_usage_tokens_total) || 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -121,10 +109,7 @@ export function classify(span: any): SpanKind {
   if (obs === "execute_tool") return "tool_call";
   const AGENT_OPS = new Set(["invoke_agent", "create_agent"]);
   if (AGENT_OPS.has(obs)) return "agent";
-  if (
-    String(span?.span_kind || "") === "2" &&
-    !span?.reference_parent_span_id
-  ) {
+  if (String(span?.span_kind || "") === "2" && !span?.reference_parent_span_id) {
     return "root";
   }
   return "other";
@@ -399,9 +384,7 @@ export function buildTraceGroup(spans: any[]): TraceGroup | null {
   const inp0 = messagesFromInput(getInputRaw(llmTurns[0]));
   const sys = inp0.find((m) => m.role === "system");
 
-  const rootSpan = spans.find(
-    (s) => s.span_kind === "2" && !s.reference_parent_span_id,
-  );
+  const rootSpan = spans.find((s) => s.span_kind === "2" && !s.reference_parent_span_id);
   const explicit = String(rootSpan?.user_query || "").trim();
   let derived = "";
   for (let j = inp0.length - 1; j >= 0; j--) {
@@ -429,9 +412,7 @@ export function buildTraceGroup(spans: any[]): TraceGroup | null {
     if (attached.length === 0) {
       const start = Number(turnSpan.start_time);
       const end =
-        i + 1 < llmTurns.length
-          ? Number(llmTurns[i + 1].start_time)
-          : Number.POSITIVE_INFINITY;
+        i + 1 < llmTurns.length ? Number(llmTurns[i + 1].start_time) : Number.POSITIVE_INFINITY;
       attached = toolSpans.filter((t) => {
         const ts = Number(t.start_time);
         return ts >= start && ts < end;
@@ -451,21 +432,15 @@ export function buildTraceGroup(spans: any[]): TraceGroup | null {
 
     return {
       span: turnSpan,
-      toolCalls: attached.sort(
-        (a, b) => Number(a.start_time) - Number(b.start_time),
-      ),
+      toolCalls: attached.sort((a, b) => Number(a.start_time) - Number(b.start_time)),
       assistant: messagesFromOutput(getOutputRaw(turnSpan)),
       followupUsers,
     };
   });
 
   const totalCost = turns.reduce((s, t) => s + getCost(t.span), 0);
-  const startNs = Math.min(
-    ...spans.map((s) => Number(s.start_time)).filter(Number.isFinite),
-  );
-  const endNs = Math.max(
-    ...spans.map((s) => Number(s.end_time)).filter(Number.isFinite),
-  );
+  const startNs = Math.min(...spans.map((s) => Number(s.start_time)).filter(Number.isFinite));
+  const endNs = Math.max(...spans.map((s) => Number(s.end_time)).filter(Number.isFinite));
   const totalDurationNs = isFinite(endNs - startNs) ? endNs - startNs : 0;
   const errorCount = spans.filter((s) => s.span_status === "ERROR").length;
 

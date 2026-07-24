@@ -12,9 +12,7 @@ import type { OTableColumnDef } from "../OTable.types";
  * Converts OTableColumnDef[] to TanStack ColumnDef[].
  * Handles default values and formatting.
  */
-export function buildColumnDefs<TData>(
-  columns: OTableColumnDef<TData>[],
-): ColumnDef<TData>[] {
+export function buildColumnDefs<TData>(columns: OTableColumnDef<TData>[]): ColumnDef<TData>[] {
   return columns.map((col) => ({
     id: col.id,
     header: col.header as any,

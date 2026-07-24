@@ -14,17 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { flushPromises, mount } from "@vue/test-utils";
-import {
-  describe,
-  expect,
-  it,
-  beforeEach,
-  afterEach,
-  vi,
-} from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { nextTick } from "vue";
 import i18n from "@/locales";
-
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -115,8 +107,7 @@ const createWrapper = (props: Record<string, any> = {}) =>
       stubs: {
         ODialog: {
           name: "ODialog",
-          template:
-            '<div data-test-stub="o-dialog" v-if="open"><slot /></div>',
+          template: '<div data-test-stub="o-dialog" v-if="open"><slot /></div>',
           props: ["open", "showClose", "width"],
           emits: ["update:open"],
         },
@@ -127,7 +118,7 @@ const createWrapper = (props: Record<string, any> = {}) =>
           props: ["variant", "size", "disabled", "loading"],
           emits: ["click"],
         },
-        "OIcon": {
+        OIcon: {
           template: '<i data-test-stub="OIcon" :data-name="name"></i>',
           props: ["name", "size"],
         },
@@ -211,7 +202,9 @@ describe("EnterpriseUpgradeDialog", () => {
       expect(wrapper.find('[data-test="enterprise-upgrade-features-list-cloud"]').exists()).toBe(
         false,
       );
-      expect(wrapper.find('[data-test="enterprise-upgrade-features-list-standard"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="enterprise-upgrade-features-list-standard"]').exists()).toBe(
+        true,
+      );
     });
   });
 
@@ -362,9 +355,7 @@ describe("EnterpriseUpgradeDialog", () => {
     });
 
     it("falls back to default license data when the API call fails", async () => {
-      const consoleSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       mockGetLicense.mockRejectedValueOnce(new Error("boom"));
 
       const wrapper = createWrapper({ modelValue: false });
@@ -411,10 +402,7 @@ describe("EnterpriseUpgradeDialog", () => {
     it("opens the generic docs URL for Open Source", () => {
       const wrapper = createWrapper();
       (wrapper.vm as any).openDocsLink();
-      expect(openSpy).toHaveBeenCalledWith(
-        "https://o2.ws/ent_install_guide",
-        "_blank",
-      );
+      expect(openSpy).toHaveBeenCalledWith("https://o2.ws/ent_install_guide", "_blank");
     });
 
     it("opens the license guide for Enterprise without license", () => {
@@ -422,10 +410,7 @@ describe("EnterpriseUpgradeDialog", () => {
       mockStore = buildStore({ zoConfig: { license_expiry: 0 } });
       const wrapper = createWrapper();
       (wrapper.vm as any).openDocsLink();
-      expect(openSpy).toHaveBeenCalledWith(
-        "https://o2.ws/license_guide",
-        "_blank",
-      );
+      expect(openSpy).toHaveBeenCalledWith("https://o2.ws/license_guide", "_blank");
     });
 
     it("opens the enterprise installation guide for Cloud", () => {
@@ -433,10 +418,7 @@ describe("EnterpriseUpgradeDialog", () => {
       (config as any).isCloud = "true";
       const wrapper = createWrapper();
       (wrapper.vm as any).openDocsLink();
-      expect(openSpy).toHaveBeenCalledWith(
-        "https://o2.ws/ent_install_guide",
-        "_blank",
-      );
+      expect(openSpy).toHaveBeenCalledWith("https://o2.ws/ent_install_guide", "_blank");
     });
 
     it("opens the default docs URL when Enterprise has a license", () => {
@@ -449,10 +431,7 @@ describe("EnterpriseUpgradeDialog", () => {
       });
       const wrapper = createWrapper();
       (wrapper.vm as any).openDocsLink();
-      expect(openSpy).toHaveBeenCalledWith(
-        "https://openobserve.ai/docs/",
-        "_blank",
-      );
+      expect(openSpy).toHaveBeenCalledWith("https://openobserve.ai/docs/", "_blank");
     });
   });
 
@@ -460,19 +439,13 @@ describe("EnterpriseUpgradeDialog", () => {
     it("openDownloadPage opens the download URL", () => {
       const wrapper = createWrapper();
       (wrapper.vm as any).openDownloadPage();
-      expect(openSpy).toHaveBeenCalledWith(
-        "https://o2.ws/download_resources",
-        "_blank",
-      );
+      expect(openSpy).toHaveBeenCalledWith("https://o2.ws/download_resources", "_blank");
     });
 
     it("contactSales opens the contact us URL", () => {
       const wrapper = createWrapper();
       (wrapper.vm as any).contactSales();
-      expect(openSpy).toHaveBeenCalledWith(
-        "https://o2.ws/contact_us",
-        "_blank",
-      );
+      expect(openSpy).toHaveBeenCalledWith("https://o2.ws/contact_us", "_blank");
     });
 
     it("openFeatureLink opens the provided URL in a new tab", () => {
@@ -497,10 +470,7 @@ describe("EnterpriseUpgradeDialog", () => {
     it("opens the download page for Open Source", () => {
       const wrapper = createWrapper();
       (wrapper.vm as any).handlePrimaryButtonClick();
-      expect(openSpy).toHaveBeenCalledWith(
-        "https://o2.ws/download_resources",
-        "_blank",
-      );
+      expect(openSpy).toHaveBeenCalledWith("https://o2.ws/download_resources", "_blank");
     });
 
     it("opens the download page for Cloud", () => {
@@ -508,10 +478,7 @@ describe("EnterpriseUpgradeDialog", () => {
       (config as any).isEnterprise = "true";
       const wrapper = createWrapper();
       (wrapper.vm as any).handlePrimaryButtonClick();
-      expect(openSpy).toHaveBeenCalledWith(
-        "https://o2.ws/download_resources",
-        "_blank",
-      );
+      expect(openSpy).toHaveBeenCalledWith("https://o2.ws/download_resources", "_blank");
     });
 
     it("navigates to the license page for Enterprise without license", () => {
@@ -578,9 +545,7 @@ describe("EnterpriseUpgradeDialog", () => {
     it("shows a negative notification when the meta org is not accessible", () => {
       mockStore = buildStore({
         zoConfig: { license_expiry: 0, meta_org: "other_meta" },
-        organizations: [
-          { identifier: "default", id: 1, name: "Default Org" },
-        ],
+        organizations: [{ identifier: "default", id: 1, name: "Default Org" }],
       });
       const wrapper = createWrapper();
 
@@ -654,15 +619,11 @@ describe("EnterpriseUpgradeDialog", () => {
       const offerBadgeSkeleton = wrapper.find(
         '[data-test="enterprise-upgrade-offer-badge-skeleton"]',
       );
-      const chartSkeleton = wrapper.find(
-        '[data-test="enterprise-upgrade-chart-skeleton"]',
-      );
+      const chartSkeleton = wrapper.find('[data-test="enterprise-upgrade-chart-skeleton"]');
       // At least one skeleton variant should be present while loading.
-      expect(
-        usageSkeleton.exists() ||
-          offerBadgeSkeleton.exists() ||
-          chartSkeleton.exists(),
-      ).toBe(true);
+      expect(usageSkeleton.exists() || offerBadgeSkeleton.exists() || chartSkeleton.exists()).toBe(
+        true,
+      );
     });
 
     it("does not render skeletons after data has loaded", async () => {

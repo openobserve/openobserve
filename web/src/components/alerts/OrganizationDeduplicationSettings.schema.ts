@@ -43,8 +43,7 @@ export const makeOrgDedupSettingsSchema = (t: (_key: string) => string) =>
       if (
         val.enabled &&
         val.alert_dedup_enabled &&
-        (!val.alert_fingerprint_groups ||
-          val.alert_fingerprint_groups.length === 0)
+        (!val.alert_fingerprint_groups || val.alert_fingerprint_groups.length === 0)
       ) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -54,9 +53,7 @@ export const makeOrgDedupSettingsSchema = (t: (_key: string) => string) =>
       }
     });
 
-export type OrgDedupSettingsForm = z.infer<
-  ReturnType<typeof makeOrgDedupSettingsSchema>
->;
+export type OrgDedupSettingsForm = z.infer<ReturnType<typeof makeOrgDedupSettingsSchema>>;
 
 /**
  * Typed defaults, mapped from an optional persisted config. A null config yields

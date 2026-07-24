@@ -19,7 +19,6 @@ import { mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import store from "@/test/unit/helpers/store";
 
-
 // Create i18n instance
 const i18n = createI18n({
   legacy: false,
@@ -179,13 +178,9 @@ describe("useHistogram Composable", () => {
     const ts2 = "2026-04-24T10:01:00";
     const ts3 = "2026-04-24T10:02:00";
 
-    const setAggs = (
-      aggs: any[],
-      breakdownField: string | null = "severity",
-    ) => {
+    const setAggs = (aggs: any[], breakdownField: string | null = "severity") => {
       mockState.searchObj.data.queryResults.aggs = aggs;
-      mockState.searchObj.data.queryResults.histogram_breakdown_field =
-        breakdownField;
+      mockState.searchObj.data.queryResults.histogram_breakdown_field = breakdownField;
     };
 
     it("enters breakdown path and populates breakdownField + breakdownSeries", () => {
@@ -234,8 +229,10 @@ describe("useHistogram Composable", () => {
       ]);
 
       wrapper.vm.generateHistogramData();
-      const series = mockState.searchObj.data.histogram
-        .breakdownSeries as unknown as Map<string, number[]>;
+      const series = mockState.searchObj.data.histogram.breakdownSeries as unknown as Map<
+        string,
+        number[]
+      >;
 
       expect([...series.keys()]).toEqual(["trace", "info", "warn", "error"]);
     });
@@ -247,8 +244,10 @@ describe("useHistogram Composable", () => {
       ]);
 
       wrapper.vm.generateHistogramData();
-      const series = mockState.searchObj.data.histogram
-        .breakdownSeries as unknown as Map<string, number[]>;
+      const series = mockState.searchObj.data.histogram.breakdownSeries as unknown as Map<
+        string,
+        number[]
+      >;
 
       expect([...series.keys()]).toEqual(["Info", "ERROR"]);
     });
@@ -261,8 +260,10 @@ describe("useHistogram Composable", () => {
       ]);
 
       wrapper.vm.generateHistogramData();
-      const series = mockState.searchObj.data.histogram
-        .breakdownSeries as unknown as Map<string, number[]>;
+      const series = mockState.searchObj.data.histogram.breakdownSeries as unknown as Map<
+        string,
+        number[]
+      >;
 
       expect([...series.keys()]).toEqual(["error", "alpha", "zeta"]);
     });
@@ -278,8 +279,10 @@ describe("useHistogram Composable", () => {
       );
 
       wrapper.vm.generateHistogramData();
-      const series = mockState.searchObj.data.histogram
-        .breakdownSeries as unknown as Map<string, number[]>;
+      const series = mockState.searchObj.data.histogram.breakdownSeries as unknown as Map<
+        string,
+        number[]
+      >;
 
       // All keys are strings (alphabetical since none match severity)
       expect([...series.keys()]).toEqual(["200", "404", "500"]);
@@ -298,8 +301,10 @@ describe("useHistogram Composable", () => {
       );
 
       wrapper.vm.generateHistogramData();
-      const series = mockState.searchObj.data.histogram
-        .breakdownSeries as unknown as Map<string, number[]>;
+      const series = mockState.searchObj.data.histogram.breakdownSeries as unknown as Map<
+        string,
+        number[]
+      >;
 
       expect(series.has("0")).toBe(true);
       expect(series.get("0")).toEqual([5]);
@@ -314,8 +319,10 @@ describe("useHistogram Composable", () => {
       ]);
 
       wrapper.vm.generateHistogramData();
-      const series = mockState.searchObj.data.histogram
-        .breakdownSeries as unknown as Map<string, number[]>;
+      const series = mockState.searchObj.data.histogram.breakdownSeries as unknown as Map<
+        string,
+        number[]
+      >;
 
       expect([...series.keys()]).toEqual(["info"]);
       expect(series.get("info")).toEqual([3]);
@@ -331,8 +338,10 @@ describe("useHistogram Composable", () => {
       ]);
 
       wrapper.vm.generateHistogramData();
-      const series = mockState.searchObj.data.histogram
-        .breakdownSeries as unknown as Map<string, number[]>;
+      const series = mockState.searchObj.data.histogram.breakdownSeries as unknown as Map<
+        string,
+        number[]
+      >;
 
       expect(series.get("info")).toEqual([12]);
     });
@@ -344,8 +353,10 @@ describe("useHistogram Composable", () => {
       ]);
 
       wrapper.vm.generateHistogramData();
-      const series = mockState.searchObj.data.histogram
-        .breakdownSeries as unknown as Map<string, number[]>;
+      const series = mockState.searchObj.data.histogram.breakdownSeries as unknown as Map<
+        string,
+        number[]
+      >;
 
       // If parseInt was skipped we'd see "1020" → 1020 after final parse.
       expect(series.get("info")).toEqual([30]);
@@ -362,8 +373,10 @@ describe("useHistogram Composable", () => {
       ]);
 
       wrapper.vm.generateHistogramData();
-      const series = mockState.searchObj.data.histogram
-        .breakdownSeries as unknown as Map<string, number[]>;
+      const series = mockState.searchObj.data.histogram.breakdownSeries as unknown as Map<
+        string,
+        number[]
+      >;
 
       // info at ts1 = 5 (seed) + 3 (page) = 8; error at ts2 = 4 (page only)
       expect(series.get("info")).toEqual([8, 0]);
@@ -379,9 +392,7 @@ describe("useHistogram Composable", () => {
         { zo_sql_key: ts1, zo_sql_num: 0 }, // skeleton
         { zo_sql_key: ts2, zo_sql_num: 0 }, // skeleton
       ];
-      setAggs([
-        { zo_sql_key: ts1, zo_sql_breakdown: "info", zo_sql_num: 4 },
-      ]);
+      setAggs([{ zo_sql_key: ts1, zo_sql_breakdown: "info", zo_sql_num: 4 }]);
 
       wrapper.vm.generateHistogramData();
       const hist = mockState.searchObj.data.histogram;
@@ -425,8 +436,10 @@ describe("useHistogram Composable", () => {
       ]);
 
       wrapper.vm.generateHistogramData();
-      const series = mockState.searchObj.data.histogram
-        .breakdownSeries as unknown as Map<string, number[]>;
+      const series = mockState.searchObj.data.histogram.breakdownSeries as unknown as Map<
+        string,
+        number[]
+      >;
 
       expect(series.get("info")).toEqual([3, 0]);
       expect(series.get("error")).toEqual([0, 7]);
@@ -450,9 +463,7 @@ describe("useHistogram Composable", () => {
 
     it("falls through to flat path when breakdownField is empty string", () => {
       setAggs(
-        [
-          { zo_sql_key: ts1, zo_sql_breakdown: "info", zo_sql_num: 3 },
-        ],
+        [{ zo_sql_key: ts1, zo_sql_breakdown: "info", zo_sql_num: 3 }],
         "", // falsy
       );
 
@@ -499,14 +510,10 @@ describe("useHistogram Composable", () => {
     });
 
     it("writes chartParams.timezone from the store", () => {
-      setAggs([
-        { zo_sql_key: ts1, zo_sql_breakdown: "info", zo_sql_num: 1 },
-      ]);
+      setAggs([{ zo_sql_key: ts1, zo_sql_breakdown: "info", zo_sql_num: 1 }]);
 
       wrapper.vm.generateHistogramData();
-      expect(
-        mockState.searchObj.data.histogram.chartParams.timezone,
-      ).toBe("UTC");
+      expect(mockState.searchObj.data.histogram.chartParams.timezone).toBe("UTC");
     });
 
     it("resets errorCode/errorMsg/errorDetail on successful breakdown build", () => {
@@ -514,9 +521,7 @@ describe("useHistogram Composable", () => {
       mockState.searchObj.data.histogram.errorMsg = "stale";
       mockState.searchObj.data.histogram.errorDetail = "stale detail";
 
-      setAggs([
-        { zo_sql_key: ts1, zo_sql_breakdown: "info", zo_sql_num: 1 },
-      ]);
+      setAggs([{ zo_sql_key: ts1, zo_sql_breakdown: "info", zo_sql_num: 1 }]);
 
       wrapper.vm.generateHistogramData();
       const hist = mockState.searchObj.data.histogram;
@@ -527,8 +532,7 @@ describe("useHistogram Composable", () => {
 
     it("handles empty aggs array — neither path sets histogram", () => {
       mockState.searchObj.data.queryResults.aggs = [];
-      mockState.searchObj.data.queryResults.histogram_breakdown_field =
-        "severity";
+      mockState.searchObj.data.queryResults.histogram_breakdown_field = "severity";
 
       wrapper.vm.generateHistogramData();
       // aggs is truthy (empty array) but .some() returns false → flat path,

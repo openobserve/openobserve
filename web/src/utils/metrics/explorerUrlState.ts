@@ -74,18 +74,14 @@ export function explorerFiltersToQuery(
 ): Record<string, string | string[]> {
   const query: Record<string, string | string[]> = {};
   if (state.searchTerm) query.search = state.searchTerm;
-  if (state.selectedPrefixes.size)
-    query.prefix = joinSet(state.selectedPrefixes);
-  if (state.selectedSuffixes.size)
-    query.suffix = joinSet(state.selectedSuffixes);
+  if (state.selectedPrefixes.size) query.prefix = joinSet(state.selectedPrefixes);
+  if (state.selectedSuffixes.size) query.suffix = joinSet(state.selectedSuffixes);
   if (state.selectedTypes.size) query.type = joinSet(state.selectedTypes);
   // One param per filter, in PromQL matcher form (`code=~5..`). Values are
   // arbitrary strings, but a label NAME cannot contain `=` or `!`, so the
   // first operator token splits unambiguously — no JSON needed.
   if (state.labelFilters.length) {
-    query.labels = state.labelFilters.map(
-      (f) => `${f.label}${f.operator ?? "="}${f.value}`,
-    );
+    query.labels = state.labelFilters.map((f) => `${f.label}${f.operator ?? "="}${f.value}`);
   }
   // `showFavoritesOnly` is NOT serialized: it is now derived from the mode
   // (Workspace ⇒ pinned-only), so `?mode=workspace` already implies it. Keeping
@@ -94,8 +90,7 @@ export function explorerFiltersToQuery(
   if (state.sortBy === "z-a") query.sort = "z-a";
   if (state.viewMode === "rows") query.view = "rows";
   // Explore is the default landing mode, so only the non-default is serialized.
-  if (state.mode === "visualize" || state.mode === "workspace")
-    query.mode = state.mode;
+  if (state.mode === "visualize" || state.mode === "workspace") query.mode = state.mode;
   return query;
 }
 
@@ -105,8 +100,7 @@ export function queryToExplorerFilters(
 ): Partial<ExplorerFilterState> {
   const out: Partial<ExplorerFilterState> = {};
 
-  if (typeof query.search === "string" && query.search)
-    out.searchTerm = query.search;
+  if (typeof query.search === "string" && query.search) out.searchTerm = query.search;
 
   const prefixes = splitList(query.prefix);
   if (prefixes.length) out.selectedPrefixes = new Set(prefixes);
@@ -122,9 +116,7 @@ export function queryToExplorerFilters(
     : query.labels != null
       ? [query.labels]
       : [];
-  const labelFilters = rawLabels
-    .map(parseMatcher)
-    .filter((f): f is LabelFilter => f !== null);
+  const labelFilters = rawLabels.map(parseMatcher).filter((f): f is LabelFilter => f !== null);
   if (labelFilters.length) out.labelFilters = labelFilters;
 
   // `favorites` is intentionally not read from the URL — the mode drives
@@ -132,8 +124,7 @@ export function queryToExplorerFilters(
   if (query.show_empty === "true") out.hideEmptyPanels = false;
   if (query.sort === "z-a") out.sortBy = "z-a";
   if (query.view === "rows") out.viewMode = "rows";
-  if (query.mode === "visualize" || query.mode === "workspace")
-    out.mode = query.mode;
+  if (query.mode === "visualize" || query.mode === "workspace") out.mode = query.mode;
 
   return out;
 }

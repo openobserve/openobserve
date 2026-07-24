@@ -29,6 +29,7 @@ use db::{self, org_users, user::is_root_user};
 use infra::table::{self, org_users::UserOrgExpandedRecord};
 #[cfg(feature = "enterprise")]
 use o2_openfga::config::get_config as get_openfga_config;
+use stream::get_streams;
 #[cfg(feature = "cloud")]
 use {
     chrono::{Duration, Utc},
@@ -56,7 +57,6 @@ use crate::{
         },
     },
     ingestion_tokens, self_reporting,
-    stream::get_streams,
     users::add_admin_to_org,
 };
 

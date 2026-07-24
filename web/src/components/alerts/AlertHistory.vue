@@ -22,65 +22,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :back="{ label: t('alerts.header'), onClick: goBack, dataTest: 'alert-history-back-btn' }"
     bleed
   >
-      <template #actions>
-        <DateTime
-          ref="dateTimeRef"
-          auto-apply
-          :default-type="dateTimeType"
-          :default-absolute-time="{
-            startTime: absoluteTime.startTime,
-            endTime: absoluteTime.endTime,
-          }"
-          :default-relative-time="relativeTime"
-          data-test="alert-history-date-picker"
-          @on:date-change="updateDateTime"
-        />
-        <OSelect
-          v-model="selectedAlert"
-          :options="filteredAlertOptions"
-          labelKey="label"
-          valueKey="value"
-          @update:model-value="onAlertSelected"
-          :placeholder="t(`alerts.searcHistory`) || 'Select or search alert...'"
-          data-test="alert-history-search-select"
-          class="o2-search-input min-w-62.5"
-          clearable
-          @clear="clearSearch"
-        >
-          <template #icon-left>
-            <OIcon
-              class="o2-search-input-icon"
-              name="search" size="sm"
-            />
-          </template>
-          <template #empty>
-            <div class="px-3 py-2 text-muted-foreground">
-              No alerts found
-            </div>
-          </template>
-        </OSelect>
-        <OButton
-          variant="ghost"
-          icon-left="search"
-          size="icon-sm"
-          @click="manualSearch"
-          data-test="alert-history-manual-search-btn"
-          :disabled="loading"
-        >
-          <OTooltip :content="t('common.search') || 'Search'" />
-        </OButton>
-        <OButton
-          variant="ghost"
-          size="icon-sm"
-          icon-left="refresh"
-          @click="refreshData"
-          data-test="alert-history-refresh-btn"
-          :loading="loading"
-        >
-          <OTooltip :content="t('common.refresh') || 'Refresh'" />
-        </OButton>
-      </template>
-    <div class="flex-1 min-h-0 overflow-hidden">
+    <template #actions>
+      <DateTime
+        ref="dateTimeRef"
+        auto-apply
+        :default-type="dateTimeType"
+        :default-absolute-time="{
+          startTime: absoluteTime.startTime,
+          endTime: absoluteTime.endTime,
+        }"
+        :default-relative-time="relativeTime"
+        data-test="alert-history-date-picker"
+        @on:date-change="updateDateTime"
+      />
+      <OSelect
+        v-model="selectedAlert"
+        :options="filteredAlertOptions"
+        labelKey="label"
+        valueKey="value"
+        @update:model-value="onAlertSelected"
+        :placeholder="t(`alerts.searcHistory`) || 'Select or search alert...'"
+        data-test="alert-history-search-select"
+        class="o2-search-input min-w-62.5"
+        clearable
+        @clear="clearSearch"
+      >
+        <template #icon-left>
+          <OIcon class="o2-search-input-icon" name="search" size="sm" />
+        </template>
+        <template #empty>
+          <div class="text-muted-foreground px-3 py-2">No alerts found</div>
+        </template>
+      </OSelect>
+      <OButton
+        variant="ghost"
+        icon-left="search"
+        size="icon-sm"
+        @click="manualSearch"
+        data-test="alert-history-manual-search-btn"
+        :disabled="loading"
+      >
+        <OTooltip :content="t('common.search') || 'Search'" />
+      </OButton>
+      <OButton
+        variant="ghost"
+        size="icon-sm"
+        icon-left="refresh"
+        @click="refreshData"
+        data-test="alert-history-refresh-btn"
+        :loading="loading"
+      >
+        <OTooltip :content="t('common.refresh') || 'Refresh'" />
+      </OButton>
+    </template>
+    <div class="min-h-0 flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <OTable
           data-test="alert-history-table"
@@ -106,20 +101,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #empty>
             <div class="h-screen w-full">
-              <no-data />
+              <NoData />
             </div>
           </template>
 
           <template #cell-timestamp="{ value }">
-            <OTimeCell :value="value" unit="us" mode="absolute" :timezone="store.state.timezone" empty-label="—" />
+            <OTimeCell
+              :value="value"
+              unit="us"
+              mode="absolute"
+              :timezone="store.state.timezone"
+              empty-label="—"
+            />
           </template>
 
           <template #cell-start_time="{ value }">
-            <OTimeCell :value="value" unit="us" mode="absolute" :timezone="store.state.timezone" empty-label="—" />
+            <OTimeCell
+              :value="value"
+              unit="us"
+              mode="absolute"
+              :timezone="store.state.timezone"
+              empty-label="—"
+            />
           </template>
 
           <template #cell-end_time="{ value }">
-            <OTimeCell :value="value" unit="us" mode="absolute" :timezone="store.state.timezone" empty-label="—" />
+            <OTimeCell
+              :value="value"
+              unit="us"
+              mode="absolute"
+              :timezone="store.state.timezone"
+              empty-label="—"
+            />
           </template>
 
           <template #cell-status="{ value }">
@@ -158,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #content>
                     Suppressed by deduplication
                     <div v-if="row.dedup_count">
-                      {{ row.dedup_count }} occurrence{{ row.dedup_count > 1 ? 's' : '' }}
+                      {{ row.dedup_count }} occurrence{{ row.dedup_count > 1 ? "s" : "" }}
                     </div>
                   </template>
                 </OTooltip>
@@ -173,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                 </OTooltip>
               </OIcon>
-              <span class="text-xs ml-1">×{{ row.group_size || 1 }}</span>
+              <span class="ml-1 text-xs">×{{ row.group_size || 1 }}</span>
             </div>
             <div v-else class="text-status-positive flex items-center justify-center">
               <OIcon name="check-circle" size="md">
@@ -186,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                 </OTooltip>
               </OIcon>
-              <span v-if="row.dedup_count && row.dedup_count > 1" class="text-xs ml-1">
+              <span v-if="row.dedup_count && row.dedup_count > 1" class="ml-1 text-xs">
                 ×{{ row.dedup_count }}
               </span>
             </div>
@@ -210,7 +223,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="error"
               @click.stop="showErrorDialog(row)"
             >
-              <OTooltip :content="`Last error: ${new Date(row.timestamp / 1000).toLocaleString()}`" />
+              <OTooltip
+                :content="`Last error: ${new Date(row.timestamp / 1000).toLocaleString()}`"
+              />
             </OButton>
           </template>
         </OTable>
@@ -218,7 +233,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Details Dialog -->
-    <ODialog data-test="alert-history-details-dialog"
+    <ODialog
+      data-test="alert-history-details-dialog"
       v-model:open="detailsDialog"
       :width="55"
       title="Alert Execution Details"
@@ -226,189 +242,162 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:primary="detailsDialog = false"
     >
       <div v-if="selectedRow" class="gap-2">
-            <!-- Basic Information -->
-            <div class="py-1 px-0">
-              <div class="flex gap-3">
-                <div class="w-1/2">
-                  <div class="text-xs text-text-secondary mb-1">Alert Name</div>
-                  <div class="text-sm font-medium">
-                    {{ selectedRow.alert_name }}
-                  </div>
-                </div>
-                <div class="w-1/2">
-                  <div class="text-xs text-text-secondary mb-1">Status</div>
-                  <OTag type="alertState" :value="selectedRow.status" />
-                </div>
+        <!-- Basic Information -->
+        <div class="px-0 py-1">
+          <div class="flex gap-3">
+            <div class="w-1/2">
+              <div class="text-text-secondary mb-1 text-xs">Alert Name</div>
+              <div class="text-sm font-medium">
+                {{ selectedRow.alert_name }}
               </div>
             </div>
+            <div class="w-1/2">
+              <div class="text-text-secondary mb-1 text-xs">Status</div>
+              <OTag type="alertState" :value="selectedRow.status" />
+            </div>
+          </div>
+        </div>
 
-            <OSeparator class="my-2" />
+        <OSeparator class="my-2" />
 
-            <!-- Time Information -->
-            <div class="py-1 px-0">
-              <div class="flex gap-3">
-                <div class="w-1/2">
-                  <div class="text-xs text-text-secondary mb-1">Timestamp</div>
-                  <div class="text-sm">
-                    {{ formatHistoryDate(selectedRow.timestamp) }}
-                  </div>
-                </div>
-                <div class="w-1/2">
-                  <div class="text-xs text-text-secondary mb-1">Duration</div>
-                  <div class="text-sm">
-                    {{
-                      formatDuration(
-                        selectedRow.end_time - selectedRow.start_time,
-                      )
-                    }}
-                  </div>
-                </div>
+        <!-- Time Information -->
+        <div class="px-0 py-1">
+          <div class="flex gap-3">
+            <div class="w-1/2">
+              <div class="text-text-secondary mb-1 text-xs">Timestamp</div>
+              <div class="text-sm">
+                {{ formatHistoryDate(selectedRow.timestamp) }}
               </div>
             </div>
-
-            <OSeparator class="my-2" />
-
-            <!-- Alert Configuration -->
-            <div class="py-1 px-0">
-              <div class="flex gap-3">
-                <div class="w-1/2">
-                  <div class="text-xs text-text-secondary mb-1">Type</div>
-                  <div class="text-sm">
-                    <OIcon
-                      :name="selectedRow.is_realtime ? 'speed' : 'schedule'"
-                      class="mr-1"
-                      size="xs"
-                    />
-                    {{ selectedRow.is_realtime ? "Real-time" : "Scheduled" }}
-                  </div>
-                </div>
-                <div class="w-1/2">
-                  <div class="text-xs text-text-secondary mb-1">Silenced</div>
-                  <div class="text-sm">
-                    <OIcon
-                      v-if="selectedRow.is_silenced"
-                      name="volume-off"
-                      size="xs"
-                      class="mr-1"
-                    />
-                    <OIcon
-                      v-else
-                      name="volume-up"
-                      size="xs"
-                      class="mr-1"
-                    />
-                    {{ selectedRow.is_silenced ? "Yes" : "No" }}
-                  </div>
-                </div>
+            <div class="w-1/2">
+              <div class="text-text-secondary mb-1 text-xs">Duration</div>
+              <div class="text-sm">
+                {{ formatDuration(selectedRow.end_time - selectedRow.start_time) }}
               </div>
             </div>
+          </div>
+        </div>
 
-            <!-- Performance Metrics (if available) -->
-            <template
-              v-if="
-                selectedRow.evaluation_took_in_secs ||
-                selectedRow.query_took ||
-                selectedRow.retries > 0
-              "
+        <OSeparator class="my-2" />
+
+        <!-- Alert Configuration -->
+        <div class="px-0 py-1">
+          <div class="flex gap-3">
+            <div class="w-1/2">
+              <div class="text-text-secondary mb-1 text-xs">Type</div>
+              <div class="text-sm">
+                <OIcon
+                  :name="selectedRow.is_realtime ? 'speed' : 'schedule'"
+                  class="mr-1"
+                  size="xs"
+                />
+                {{ selectedRow.is_realtime ? "Real-time" : "Scheduled" }}
+              </div>
+            </div>
+            <div class="w-1/2">
+              <div class="text-text-secondary mb-1 text-xs">Silenced</div>
+              <div class="text-sm">
+                <OIcon v-if="selectedRow.is_silenced" name="volume-off" size="xs" class="mr-1" />
+                <OIcon v-else name="volume-up" size="xs" class="mr-1" />
+                {{ selectedRow.is_silenced ? "Yes" : "No" }}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Performance Metrics (if available) -->
+        <template
+          v-if="
+            selectedRow.evaluation_took_in_secs || selectedRow.query_took || selectedRow.retries > 0
+          "
+        >
+          <OSeparator class="my-2" />
+          <div class="px-0 py-1">
+            <div class="flex gap-3">
+              <div v-if="selectedRow.evaluation_took_in_secs" class="w-1/3">
+                <div class="text-text-secondary mb-1 text-xs">Evaluation Time</div>
+                <div class="text-sm">{{ selectedRow.evaluation_took_in_secs.toFixed(2) }}s</div>
+              </div>
+              <div v-if="selectedRow.query_took" class="w-1/3">
+                <div class="text-text-secondary mb-1 text-xs">Query Time</div>
+                <div class="text-sm">{{ (selectedRow.query_took / 1000).toFixed(2) }}ms</div>
+              </div>
+              <div v-if="selectedRow.retries > 0" class="w-1/3">
+                <div class="text-text-secondary mb-1 text-xs">Retries</div>
+                <div class="text-sm">{{ selectedRow.retries }}</div>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <!-- Source Node (if available) -->
+        <template v-if="selectedRow.source_node">
+          <OSeparator class="my-2" />
+          <div class="px-0 py-1">
+            <div class="text-text-secondary mb-1 text-xs">Source Node</div>
+            <div class="font-mono text-sm">
+              {{ selectedRow.source_node }}
+            </div>
+          </div>
+        </template>
+
+        <!-- Error Details (if available) -->
+        <template v-if="selectedRow.error">
+          <OSeparator class="my-2" />
+          <div class="px-0 py-1">
+            <div class="text-text-secondary mb-1 text-xs">
+              <OIcon name="error" size="xs" class="mr-1" />
+              Error Details
+            </div>
+            <div
+              class="rounded-default border-negative/30 bg-status-error-bg mt-2 border border-solid p-2"
             >
-              <OSeparator class="my-2" />
-              <div class="py-1 px-0">
-                <div class="flex gap-3">
-                  <div v-if="selectedRow.evaluation_took_in_secs" class="w-1/3">
-                    <div class="text-xs text-text-secondary mb-1">
-                      Evaluation Time
-                    </div>
-                    <div class="text-sm">
-                      {{ selectedRow.evaluation_took_in_secs.toFixed(2) }}s
-                    </div>
-                  </div>
-                  <div v-if="selectedRow.query_took" class="w-1/3">
-                    <div class="text-xs text-text-secondary mb-1">
-                      Query Time
-                    </div>
-                    <div class="text-sm">
-                      {{ (selectedRow.query_took / 1000).toFixed(2) }}ms
-                    </div>
-                  </div>
-                  <div v-if="selectedRow.retries > 0" class="w-1/3">
-                    <div class="text-xs text-text-secondary mb-1">Retries</div>
-                    <div class="text-sm">{{ selectedRow.retries }}</div>
-                  </div>
-                </div>
-              </div>
-            </template>
+              <pre
+                class="text-sm"
+                style="
+                  white-space: pre-wrap;
+                  word-break: break-word;
+                  margin: 0;
+                  font-family: var(--font-mono);
+                  font-size: var(--text-xs);
+                "
+                >{{ selectedRow.error }}</pre
+              >
+            </div>
+          </div>
+        </template>
 
-            <!-- Source Node (if available) -->
-            <template v-if="selectedRow.source_node">
-              <OSeparator class="my-2" />
-              <div class="py-1 px-0">
-                <div class="text-xs text-text-secondary mb-1">Source Node</div>
-                <div class="text-sm font-mono">
-                  {{ selectedRow.source_node }}
-                </div>
-              </div>
-            </template>
-
-            <!-- Error Details (if available) -->
-            <template v-if="selectedRow.error">
-              <OSeparator class="my-2" />
-              <div class="py-1 px-0">
-                <div class="text-xs text-text-secondary mb-1">
-                  <OIcon
-                    name="error"
-                    size="xs"
-                    class="mr-1"
-                  />
-                  Error Details
-                </div>
-                <div class="rounded-default border border-solid border-negative/30 p-2 mt-2 bg-status-error-bg">
-                  <pre
-                    class="text-sm"
-                    style="
-                      white-space: pre-wrap;
-                      word-break: break-word;
-                      margin: 0;
-                      font-family: var(--font-mono);
-                      font-size: var(--text-xs);
-                    "
-                    >{{ selectedRow.error }}</pre
-                  >
-                </div>
-              </div>
-            </template>
-
-            <!-- Success Response (if available) -->
-            <template v-if="selectedRow.success_response">
-              <OSeparator class="my-2" />
-              <div class="py-1 px-0">
-                <div class="text-xs text-text-secondary mb-1">
-                  <OIcon
-                    name="check-circle"
-                    size="xs"
-                    class="mr-1"
-                  />
-                  Response
-                </div>
-                <div class="rounded-default border border-solid border-positive/30 p-2 mt-2 bg-status-success-bg">
-                  <pre
-                    class="text-sm"
-                    style="
-                      white-space: pre-wrap;
-                      word-break: break-word;
-                      margin: 0;
-                      font-family: var(--font-mono);
-                      font-size: var(--text-xs);
-                    "
-                    >{{ selectedRow.success_response }}</pre
-                  >
-                </div>
-              </div>
-            </template>
+        <!-- Success Response (if available) -->
+        <template v-if="selectedRow.success_response">
+          <OSeparator class="my-2" />
+          <div class="px-0 py-1">
+            <div class="text-text-secondary mb-1 text-xs">
+              <OIcon name="check-circle" size="xs" class="mr-1" />
+              Response
+            </div>
+            <div
+              class="rounded-default border-positive/30 bg-status-success-bg mt-2 border border-solid p-2"
+            >
+              <pre
+                class="text-sm"
+                style="
+                  white-space: pre-wrap;
+                  word-break: break-word;
+                  margin: 0;
+                  font-family: var(--font-mono);
+                  font-size: var(--text-xs);
+                "
+                >{{ selectedRow.success_response }}</pre
+              >
+            </div>
+          </div>
+        </template>
       </div>
     </ODialog>
 
     <!-- Error Dialog -->
-    <ODialog data-test="alert-history-error-dialog"
+    <ODialog
+      data-test="alert-history-error-dialog"
       v-model:open="errorDialog"
       size="md"
       :title="errorMessage.alert_name"
@@ -419,16 +408,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="error" size="sm" class="text-status-error-text" />
       </template>
       <template #header-right>
-        <div class="flex items-center text-compact opacity-70 ml-9 text-xs">
+        <div class="text-compact ml-9 flex items-center text-xs opacity-70">
           <span class="mr-1">Last error:</span>
           <OIcon name="schedule" size="xs" class="mr-1" />
-          {{ errorMessage.last_error_timestamp && new Date(errorMessage.last_error_timestamp / 1000).toLocaleString() }}
+          {{
+            errorMessage.last_error_timestamp &&
+            new Date(errorMessage.last_error_timestamp / 1000).toLocaleString()
+          }}
         </div>
       </template>
 
       <div class="mb-4">
-        <div class="text-sm font-semibold tracking-[0.02em] opacity-80 mb-2">Error Summary</div>
-        <div class="p-4 rounded-default font-mono text-compact leading-[1.6] whitespace-pre-wrap wrap-break-word bg-status-error-bg border border-solid border-status-negative text-status-error-text">
+        <div class="mb-2 text-sm font-semibold tracking-[0.02em] opacity-80">Error Summary</div>
+        <div
+          class="rounded-default text-compact bg-status-error-bg border-status-negative text-status-error-text border border-solid p-4 font-mono leading-[1.6] wrap-break-word whitespace-pre-wrap"
+        >
           {{ errorMessage.error }}
         </div>
       </div>
@@ -437,7 +431,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-
 import { ref, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -452,12 +445,12 @@ import NoData from "@/components/shared/grid/NoData.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OButton from '@/lib/core/Button/OButton.vue';
-import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 
 const { t } = useI18n();
@@ -655,9 +648,9 @@ const fetchAlertsList = async () => {
 const onAlertSelected = (val: any) => {
   if (val) {
     // Extract the alert_id from the selected object
-    if (typeof val === 'object' && val.value) {
+    if (typeof val === "object" && val.value) {
       searchQuery.value = val.value;
-    } else if (typeof val === 'string') {
+    } else if (typeof val === "string") {
       searchQuery.value = val;
     }
   }
@@ -717,10 +710,7 @@ const fetchAlertHistory = async () => {
     console.error("Error response:", error.response);
     toast({
       variant: "error",
-      message:
-        error.response?.data?.message ||
-        error.message ||
-        "Failed to fetch alert history",
+      message: error.response?.data?.message || error.message || "Failed to fetch alert history",
     });
   } finally {
     loading.value = false;
@@ -805,7 +795,10 @@ const closeErrorDialog = () => {
 };
 
 const goBack = () => {
-  router.push({ name: "alertList", query: { org_identifier: store.state.selectedOrganization.identifier } });
+  router.push({
+    name: "alertList",
+    query: { org_identifier: store.state.selectedOrganization.identifier },
+  });
 };
 
 // Lifecycle

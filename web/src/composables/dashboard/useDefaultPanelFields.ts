@@ -14,14 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
-import {
-  buildDefaultSqlFields,
-  SKIP_SEED_TYPES,
-} from "@/utils/dashboard/defaultFields";
-import {
-  applyPromqlSeed,
-  isAutoSeededSlot,
-} from "@/utils/dashboard/promqlSeed";
+import { buildDefaultSqlFields, SKIP_SEED_TYPES } from "@/utils/dashboard/defaultFields";
+import { applyPromqlSeed, isAutoSeededSlot } from "@/utils/dashboard/promqlSeed";
 
 /**
  * Shared default-field seeding for the Add Panel and Metrics pages (both render

@@ -13,10 +13,7 @@ import { getColorPalette } from "./colorPalette";
  */
 export const applySeriesColorMappings = (
   series: any[],
-  colorBySeries:
-    | Array<{ value: string; color: string | null }>
-    | undefined
-    | null,
+  colorBySeries: Array<{ value: string; color: string | null }> | undefined | null,
   theme: string,
 ): void => {
   if (!Array.isArray(series) || !colorBySeries?.length) return;
@@ -34,8 +31,7 @@ export const applySeriesColorMappings = (
 
   const usedColors = new Set<string>(configuredColors);
 
-  const getSeriesColor = (s: any): string | undefined =>
-    s?.color ?? s?.itemStyle?.color;
+  const getSeriesColor = (s: any): string | undefined => s?.color ?? s?.itemStyle?.color;
   const setSeriesColor = (s: any, clr: string) => {
     if (!s) return;
     if (s.color !== undefined) s.color = clr;
@@ -55,10 +51,7 @@ export const applySeriesColorMappings = (
   });
 
   // Generate a unique non-conflicting color
-  const generateUniqueColor = (
-    used: Set<string>,
-    themeName: string,
-  ): string => {
+  const generateUniqueColor = (used: Set<string>, themeName: string): string => {
     const palette = getColorPalette(themeName);
     for (const c of palette) {
       if (!used.has(c)) return c;
@@ -101,17 +94,16 @@ export const isColorDark = (hex: string): boolean => {
 
 export const getContrastColor = (
   backgroundColor: string,
-  isDarkTheme: boolean,
+  defaultColor: string,
+  threshold: number,
 ): string => {
-  // If no background color, return based on theme
+  // No background: use the caller-provided default (a --color-chart-metric-text token).
   if (!backgroundColor) {
-    return isDarkTheme ? "#FFFFFF" : "#000000";
+    return defaultColor;
   }
 
   // Normalize input (support hex, rgb, rgba)
-  const normalizeColor = (
-    color: string,
-  ): { r: number; g: number; b: number } => {
+  const normalizeColor = (color: string): { r: number; g: number; b: number } => {
     // Remove spaces and convert to lowercase
     color = color.replace(/\s/g, "").toLowerCase();
 
@@ -147,12 +139,6 @@ export const getContrastColor = (
   // Calculate relative luminance
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
 
-  // Return black or white based on luminance and theme
-  if (isDarkTheme) {
-    // In dark theme, prefer white text unless background is very light
-    return luminance > 0.8 ? "#000000" : "#FFFFFF";
-  } else {
-    // In light theme, prefer black text unless background is very dark
-    return luminance > 0.5 ? "#000000" : "#FFFFFF";
-  }
+  // Above the (theme-provided) luminance threshold → dark text, else light text.
+  return luminance > threshold ? "#000000" : "#FFFFFF";
 };

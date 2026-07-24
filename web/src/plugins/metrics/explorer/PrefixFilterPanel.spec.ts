@@ -43,12 +43,7 @@ const createWrapper = (props: Record<string, any> = {}) =>
 const renderedIds = (wrapper: VueWrapper<any>, mode = "prefix") =>
   wrapper
     .findAll(`[data-test^="metrics-explorer-${mode}-facet-"]`)
-    .map((el) =>
-      (el.attributes("data-test") ?? "").replace(
-        `metrics-explorer-${mode}-facet-`,
-        "",
-      ),
-    );
+    .map((el) => (el.attributes("data-test") ?? "").replace(`metrics-explorer-${mode}-facet-`, ""));
 
 describe("PrefixFilterPanel", () => {
   let wrapper: VueWrapper<any>;
@@ -63,18 +58,14 @@ describe("PrefixFilterPanel", () => {
     it("labels the facet group with the prefix title in prefix mode", () => {
       wrapper = createWrapper({ mode: "prefix" });
       expect(
-        wrapper
-          .find('[data-test="metrics-explorer-prefix-facets"]')
-          .attributes("aria-label"),
+        wrapper.find('[data-test="metrics-explorer-prefix-facets"]').attributes("aria-label"),
       ).toBe("Filter by prefix");
     });
 
     it("labels the facet group with the suffix title in suffix mode", () => {
       wrapper = createWrapper({ mode: "suffix" });
       expect(
-        wrapper
-          .find('[data-test="metrics-explorer-suffix-facets"]')
-          .attributes("aria-label"),
+        wrapper.find('[data-test="metrics-explorer-suffix-facets"]').attributes("aria-label"),
       ).toBe("Filter by suffix");
     });
 
@@ -85,9 +76,7 @@ describe("PrefixFilterPanel", () => {
       // with no selection it is disabled and the count reads "0 selected", so the
       // row never changes size.
       wrapper = createWrapper({ selected: new Set(), hasSelection: false });
-      const clear = wrapper.find(
-        '[data-test="metrics-explorer-prefix-clear"]',
-      );
+      const clear = wrapper.find('[data-test="metrics-explorer-prefix-clear"]');
       expect(clear.exists()).toBe(true);
       expect(clear.attributes("disabled")).toBeDefined();
       expect(wrapper.text()).toContain("0 selected");
@@ -100,9 +89,7 @@ describe("PrefixFilterPanel", () => {
         selected: new Set(["node_cpu", "node_memory"]),
         hasSelection: true,
       });
-      const clear = wrapper.find(
-        '[data-test="metrics-explorer-prefix-clear"]',
-      );
+      const clear = wrapper.find('[data-test="metrics-explorer-prefix-clear"]');
       expect(clear.text()).toContain("Clear filters");
       expect(clear.attributes("disabled")).toBeUndefined();
       expect(wrapper.text()).toContain("2 selected");
@@ -113,9 +100,7 @@ describe("PrefixFilterPanel", () => {
         selected: new Set(["node_cpu"]),
         hasSelection: true,
       });
-      await wrapper
-        .find('[data-test="metrics-explorer-prefix-clear"]')
-        .trigger("click");
+      await wrapper.find('[data-test="metrics-explorer-prefix-clear"]').trigger("click");
       expect(wrapper.emitted("clear")).toHaveLength(1);
     });
   });
@@ -133,33 +118,25 @@ describe("PrefixFilterPanel", () => {
         mode: "suffix",
         facets: [{ id: "total", label: "total", count: 4 }],
       });
-      expect(
-        wrapper
-          .find('[data-test="metrics-explorer-suffix-facet-total"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="metrics-explorer-suffix-facet-total"]').exists()).toBe(true);
     });
 
     it("renders the facet label and its count", () => {
       wrapper = createWrapper();
       expect(wrapper.text()).toContain("node_cpu");
-      expect(
-        wrapper
-          .find('[data-test="metrics-explorer-prefix-count-node_cpu"]')
-          .text(),
-      ).toBe("12");
+      expect(wrapper.find('[data-test="metrics-explorer-prefix-count-node_cpu"]').text()).toBe(
+        "12",
+      );
     });
 
-    it("renders a count of 0 as \"0\", not as a blank chip", () => {
+    it('renders a count of 0 as "0", not as a blank chip', () => {
       // A selected facet is the only zero-count row still shown, and its count
       // has to say 0 — that IS the information (this selection now matches
       // nothing), and a blank chip would read as "still loading".
       wrapper = createWrapper({ selected: new Set(["http_requests"]) });
-      expect(
-        wrapper
-          .find('[data-test="metrics-explorer-prefix-count-http_requests"]')
-          .text(),
-      ).toBe("0");
+      expect(wrapper.find('[data-test="metrics-explorer-prefix-count-http_requests"]').text()).toBe(
+        "0",
+      );
     });
   });
 
@@ -186,9 +163,7 @@ describe("PrefixFilterPanel", () => {
     it("shows an empty state when nothing matches", async () => {
       wrapper = createWrapper();
       await wrapper.find("input").setValue("zzzz");
-      expect(
-        wrapper.find('[data-test="metrics-explorer-prefix-empty"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="metrics-explorer-prefix-empty"]').exists()).toBe(true);
     });
 
     it("restores the full list when the search is cleared", async () => {
@@ -214,9 +189,7 @@ describe("PrefixFilterPanel", () => {
   describe("selection", () => {
     it("emits update:selected with the id added when an unchecked row is clicked", async () => {
       wrapper = createWrapper();
-      await wrapper
-        .find('[data-test="metrics-explorer-prefix-facet-node_cpu"]')
-        .trigger("click");
+      await wrapper.find('[data-test="metrics-explorer-prefix-facet-node_cpu"]').trigger("click");
 
       const emitted = wrapper.emitted("update:selected");
       expect(emitted).toBeTruthy();
@@ -225,9 +198,7 @@ describe("PrefixFilterPanel", () => {
 
     it("emits update:selected with the id removed when a checked row is clicked", async () => {
       wrapper = createWrapper({ selected: new Set(["node_cpu", "misc"]) });
-      await wrapper
-        .find('[data-test="metrics-explorer-prefix-facet-node_cpu"]')
-        .trigger("click");
+      await wrapper.find('[data-test="metrics-explorer-prefix-facet-node_cpu"]').trigger("click");
 
       const emitted = wrapper.emitted("update:selected");
       expect([...(emitted![0][0] as Set<string>)]).toEqual(["misc"]);
@@ -241,10 +212,7 @@ describe("PrefixFilterPanel", () => {
         .trigger("click");
 
       const emitted = wrapper.emitted("update:selected");
-      expect([...(emitted![0][0] as Set<string>)].sort()).toEqual([
-        "node_cpu",
-        "node_memory",
-      ]);
+      expect([...(emitted![0][0] as Set<string>)].sort()).toEqual(["node_cpu", "node_memory"]);
     });
 
     it("emits a NEW Set and never mutates the prop", async () => {

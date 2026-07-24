@@ -112,7 +112,16 @@ function mountTraceErrorTab(props: Record<string, unknown> = {}) {
               </div>
             </template>
           </div>`,
-          props: ["data", "columns", "rowKey", "expandedIds", "loading", "pagination", "showGlobalFilter", "expansion"],
+          props: [
+            "data",
+            "columns",
+            "rowKey",
+            "expandedIds",
+            "loading",
+            "pagination",
+            "showGlobalFilter",
+            "expansion",
+          ],
           emits: ["update:expanded-ids"],
         },
       },
@@ -142,9 +151,7 @@ describe("TraceErrorTab", () => {
     it("should render the no-error message", () => {
       wrapper = mountTraceErrorTab();
 
-      const noError = wrapper.find(
-        '[data-test="trace-details-sidebar-no-error"]',
-      );
+      const noError = wrapper.find('[data-test="trace-details-sidebar-no-error"]');
       expect(noError.exists()).toBe(true);
       expect(noError.text()).toBe("No error present for this span");
     });
@@ -152,30 +159,23 @@ describe("TraceErrorTab", () => {
     it("should not render any error summary banners", () => {
       wrapper = mountTraceErrorTab();
 
+      expect(wrapper.find('[data-test="trace-details-sidebar-error-summary"]').exists()).toBe(
+        false,
+      );
       expect(
-        wrapper.find('[data-test="trace-details-sidebar-error-summary"]')
-          .exists(),
+        wrapper.find('[data-test="trace-details-sidebar-db-response-status-code"]').exists(),
       ).toBe(false);
-      expect(
-        wrapper.find(
-          '[data-test="trace-details-sidebar-db-response-status-code"]',
-        ).exists(),
-      ).toBe(false);
-      expect(
-        wrapper.find(
-          '[data-test="trace-details-sidebar-process-exit-code"]',
-        ).exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="trace-details-sidebar-process-exit-code"]').exists()).toBe(
+        false,
+      );
     });
 
     it("should not render the exceptions table", () => {
       wrapper = mountTraceErrorTab();
 
-      expect(
-        wrapper.find(
-          '[data-test="trace-details-sidebar-exceptions-table"]',
-        ).exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="trace-details-sidebar-exceptions-table"]').exists()).toBe(
+        false,
+      );
     });
   });
 
@@ -198,37 +198,28 @@ describe("TraceErrorTab", () => {
     it("should render the HTTP status code summary banner", () => {
       wrapper = mountTraceErrorTab();
 
-      expect(
-        wrapper.find('[data-test="trace-details-sidebar-error-summary"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="trace-details-sidebar-error-summary"]').exists()).toBe(true);
       expect(wrapper.text()).toContain("HTTP Status Code");
     });
 
     it("should display the status code title", () => {
       wrapper = mountTraceErrorTab();
 
-      expect(
-        wrapper
-          .find('[data-test="trace-details-sidebar-error-summary-title"]')
-          .text(),
-      ).toBe("Internal Server Error");
+      expect(wrapper.find('[data-test="trace-details-sidebar-error-summary-title"]').text()).toBe(
+        "Internal Server Error",
+      );
     });
 
     it("should not show the no-error message", () => {
       wrapper = mountTraceErrorTab();
 
-      expect(
-        wrapper.find('[data-test="trace-details-sidebar-no-error"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="trace-details-sidebar-no-error"]').exists()).toBe(false);
     });
 
     it("should render the SpanStatusCodeBadge component", () => {
       wrapper = mountTraceErrorTab();
 
-      expect(
-        wrapper.findComponent({ name: "SpanStatusCodeBadge" }).exists(),
-      ).toBe(true);
+      expect(wrapper.findComponent({ name: "SpanStatusCodeBadge" }).exists()).toBe(true);
     });
   });
 
@@ -251,29 +242,22 @@ describe("TraceErrorTab", () => {
     it("should render the gRPC status code summary banner", () => {
       wrapper = mountTraceErrorTab();
 
-      expect(
-        wrapper.find('[data-test="trace-details-sidebar-error-summary"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="trace-details-sidebar-error-summary"]').exists()).toBe(true);
       expect(wrapper.text()).toContain("gRPC Status Code");
     });
 
     it("should display the gRPC status code title", () => {
       wrapper = mountTraceErrorTab();
 
-      expect(
-        wrapper
-          .find('[data-test="trace-details-sidebar-error-summary-title"]')
-          .text(),
-      ).toBe("Unknown");
+      expect(wrapper.find('[data-test="trace-details-sidebar-error-summary-title"]').text()).toBe(
+        "Unknown",
+      );
     });
 
     it("should render the SpanStatusCodeBadge with grpc-code prop", () => {
       wrapper = mountTraceErrorTab();
 
-      expect(
-        wrapper.findComponent({ name: "SpanStatusCodeBadge" }).exists(),
-      ).toBe(true);
+      expect(wrapper.findComponent({ name: "SpanStatusCodeBadge" }).exists()).toBe(true);
     });
   });
 
@@ -295,9 +279,7 @@ describe("TraceErrorTab", () => {
       wrapper = mountTraceErrorTab();
 
       expect(
-        wrapper.find(
-          '[data-test="trace-details-sidebar-db-response-status-code"]',
-        ).exists(),
+        wrapper.find('[data-test="trace-details-sidebar-db-response-status-code"]').exists(),
       ).toBe(true);
       expect(wrapper.text()).toContain("DB Response Status Code");
     });
@@ -306,11 +288,7 @@ describe("TraceErrorTab", () => {
       wrapper = mountTraceErrorTab();
 
       expect(
-        wrapper
-          .find(
-            '[data-test="trace-details-sidebar-db-response-status-code-value"]',
-          )
-          .text(),
+        wrapper.find('[data-test="trace-details-sidebar-db-response-status-code-value"]').text(),
       ).toBe("DB_TIMEOUT");
     });
 
@@ -320,9 +298,7 @@ describe("TraceErrorTab", () => {
       // The HTTP/gRPC summary uses the same data-test but is not rendered
       // because spanStatusCode and spanGrpcStatusCode are null
       expect(
-        wrapper.find(
-          '[data-test="trace-details-sidebar-db-response-status-code"]',
-        ).exists(),
+        wrapper.find('[data-test="trace-details-sidebar-db-response-status-code"]').exists(),
       ).toBe(true);
     });
   });
@@ -344,11 +320,9 @@ describe("TraceErrorTab", () => {
     it("should render the process exit code banner", () => {
       wrapper = mountTraceErrorTab();
 
-      expect(
-        wrapper.find(
-          '[data-test="trace-details-sidebar-process-exit-code"]',
-        ).exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="trace-details-sidebar-process-exit-code"]').exists()).toBe(
+        true,
+      );
       expect(wrapper.text()).toContain("Process Exit Code");
     });
 
@@ -356,11 +330,7 @@ describe("TraceErrorTab", () => {
       wrapper = mountTraceErrorTab();
 
       expect(
-        wrapper
-          .find(
-            '[data-test="trace-details-sidebar-process-exit-code-value"]',
-          )
-          .text(),
+        wrapper.find('[data-test="trace-details-sidebar-process-exit-code-value"]').text(),
       ).toBe("1");
     });
 
@@ -368,9 +338,7 @@ describe("TraceErrorTab", () => {
       wrapper = mountTraceErrorTab();
 
       expect(
-        wrapper.find(
-          '[data-test="trace-details-sidebar-db-response-status-code"]',
-        ).exists(),
+        wrapper.find('[data-test="trace-details-sidebar-db-response-status-code"]').exists(),
       ).toBe(false);
     });
   });
@@ -394,9 +362,7 @@ describe("TraceErrorTab", () => {
     it("should render the generic error banner with title", () => {
       wrapper = mountTraceErrorTab();
 
-      const titleEl = wrapper.find(
-        '[data-test="trace-details-sidebar-error-summary-title"]',
-      );
+      const titleEl = wrapper.find('[data-test="trace-details-sidebar-error-summary-title"]');
       expect(titleEl.exists()).toBe(true);
       expect(titleEl.text()).toBe("ConnectionError");
     });
@@ -404,9 +370,7 @@ describe("TraceErrorTab", () => {
     it("should render the error message", () => {
       wrapper = mountTraceErrorTab();
 
-      const msgEl = wrapper.find(
-        '[data-test="trace-details-sidebar-error-summary-message"]',
-      );
+      const msgEl = wrapper.find('[data-test="trace-details-sidebar-error-summary-message"]');
       expect(msgEl.exists()).toBe(true);
       expect(msgEl.text()).toBe("Failed to connect to database");
     });
@@ -444,9 +408,7 @@ describe("TraceErrorTab", () => {
 
       // The HTTP code banner and generic error banner share the same data-test
       // since both use data-test="trace-details-sidebar-error-summary"
-      const summaryBanners = wrapper.findAll(
-        '[data-test="trace-details-sidebar-error-summary"]',
-      );
+      const summaryBanners = wrapper.findAll('[data-test="trace-details-sidebar-error-summary"]');
       // Both banners should be present (HTTP code + generic error)
       expect(summaryBanners.length).toBe(2);
     });
@@ -454,27 +416,21 @@ describe("TraceErrorTab", () => {
     it("should show 'HTTP STATUS CODE' label in the first banner", () => {
       wrapper = mountTraceErrorTab();
 
-      const summaryBanners = wrapper.findAll(
-        '[data-test="trace-details-sidebar-error-summary"]',
-      );
+      const summaryBanners = wrapper.findAll('[data-test="trace-details-sidebar-error-summary"]');
       expect(summaryBanners[0].text()).toContain("HTTP Status Code");
     });
 
     it("should show the status code title in the first banner", () => {
       wrapper = mountTraceErrorTab();
 
-      const titles = wrapper.findAll(
-        '[data-test="trace-details-sidebar-error-summary-title"]',
-      );
+      const titles = wrapper.findAll('[data-test="trace-details-sidebar-error-summary-title"]');
       expect(titles[0].text()).toBe("Internal Server Error");
     });
 
     it("should show the error message in the second (generic) banner", () => {
       wrapper = mountTraceErrorTab();
 
-      const messages = wrapper.findAll(
-        '[data-test="trace-details-sidebar-error-summary-message"]',
-      );
+      const messages = wrapper.findAll('[data-test="trace-details-sidebar-error-summary-message"]');
       expect(messages[0].text()).toBe("The server encountered an error");
     });
   });
@@ -503,11 +459,9 @@ describe("TraceErrorTab", () => {
     it("should render the exceptions table", () => {
       wrapper = mountTraceErrorTab();
 
-      expect(
-        wrapper
-          .find('[data-test="trace-details-sidebar-exceptions-table"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="trace-details-sidebar-exceptions-table"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should show the exception count in the header", () => {
@@ -520,14 +474,10 @@ describe("TraceErrorTab", () => {
       wrapper = mountTraceErrorTab();
 
       expect(
-        wrapper
-          .find(`[data-test="trace-event-detail-${exceptionEvent1._timestamp}"]`)
-          .exists(),
+        wrapper.find(`[data-test="trace-event-detail-${exceptionEvent1._timestamp}"]`).exists(),
       ).toBe(true);
       expect(
-        wrapper
-          .find(`[data-test="trace-event-detail-${exceptionEvent2._timestamp}"]`)
-          .exists(),
+        wrapper.find(`[data-test="trace-event-detail-${exceptionEvent2._timestamp}"]`).exists(),
       ).toBe(true);
     });
 
@@ -535,18 +485,10 @@ describe("TraceErrorTab", () => {
       wrapper = mountTraceErrorTab();
 
       expect(
-        wrapper
-          .find(
-            '[data-test="trace-details-sidebar-exceptions-table-expand-btn-0"]',
-          )
-          .exists(),
+        wrapper.find('[data-test="trace-details-sidebar-exceptions-table-expand-btn-0"]').exists(),
       ).toBe(true);
       expect(
-        wrapper
-          .find(
-            '[data-test="trace-details-sidebar-exceptions-table-expand-btn-1"]',
-          )
-          .exists(),
+        wrapper.find('[data-test="trace-details-sidebar-exceptions-table-expand-btn-1"]').exists(),
       ).toBe(true);
     });
 
@@ -573,9 +515,7 @@ describe("TraceErrorTab", () => {
         wrapper = mountTraceErrorTab();
 
         await wrapper
-          .find(
-            '[data-test="trace-details-sidebar-exceptions-table-expand-btn-0"]',
-          )
+          .find('[data-test="trace-details-sidebar-exceptions-table-expand-btn-0"]')
           .trigger("click");
 
         const expandedRow = wrapper.find(
@@ -593,17 +533,17 @@ describe("TraceErrorTab", () => {
         // First click — collapse (row is auto-expanded)
         await expandBtn.trigger("click");
         expect(
-          wrapper.find(
-            '[data-test="trace-details-sidebar-exceptions-table-expanded-row-0"]',
-          ).exists(),
+          wrapper
+            .find('[data-test="trace-details-sidebar-exceptions-table-expanded-row-0"]')
+            .exists(),
         ).toBe(false);
 
         // Second click — re-expand
         await expandBtn.trigger("click");
         expect(
-          wrapper.find(
-            '[data-test="trace-details-sidebar-exceptions-table-expanded-row-0"]',
-          ).exists(),
+          wrapper
+            .find('[data-test="trace-details-sidebar-exceptions-table-expanded-row-0"]')
+            .exists(),
         ).toBe(true);
       });
 
@@ -680,7 +620,9 @@ describe("TraceErrorTab", () => {
           const expandedRow = wrapper.find(
             '[data-test="trace-details-sidebar-exceptions-table-expanded-row-0"]',
           );
-          expect(expandedRow.find('[data-test="exception-copy-stacktrace-btn"]').exists()).toBe(false);
+          expect(expandedRow.find('[data-test="exception-copy-stacktrace-btn"]').exists()).toBe(
+            false,
+          );
         });
       });
     });
@@ -734,70 +676,43 @@ describe("TraceErrorTab", () => {
 
   describe("highlightTextMatch helper", () => {
     it("should return escaped HTML when no query is provided", () => {
-      mockUseTraceDetails.mockReturnValue(
-        defaultTraceDetails({ hasSpanError: true }),
-      );
+      mockUseTraceDetails.mockReturnValue(defaultTraceDetails({ hasSpanError: true }));
       wrapper = mountTraceErrorTab();
 
-      const result = wrapper.vm.highlightTextMatch(
-        'hello <world> & "friends"',
-        "",
-      );
-      expect(result).toBe(
-        "hello &lt;world&gt; &amp; &quot;friends&quot;",
-      );
+      const result = wrapper.vm.highlightTextMatch('hello <world> & "friends"', "");
+      expect(result).toBe("hello &lt;world&gt; &amp; &quot;friends&quot;");
     });
 
     it("should highlight matching text when query is present", () => {
-      mockUseTraceDetails.mockReturnValue(
-        defaultTraceDetails({ hasSpanError: true }),
-      );
+      mockUseTraceDetails.mockReturnValue(defaultTraceDetails({ hasSpanError: true }));
       wrapper = mountTraceErrorTab();
 
       const result = wrapper.vm.highlightTextMatch("hello world hello", "hello");
       // Should contain highlight spans around matched "hello" strings
-      const matches = result.match(
-        /<span class="highlight">hello<\/span>/g,
-      );
+      const matches = result.match(/<span class="highlight">hello<\/span>/g);
       expect(matches).not.toBeNull();
       expect(matches!.length).toBe(2);
     });
 
     it("should escape special regex characters in the query", () => {
-      mockUseTraceDetails.mockReturnValue(
-        defaultTraceDetails({ hasSpanError: true }),
-      );
+      mockUseTraceDetails.mockReturnValue(defaultTraceDetails({ hasSpanError: true }));
       wrapper = mountTraceErrorTab();
 
       // The dot is a regex special char — should be escaped so it matches literally
-      const result = wrapper.vm.highlightTextMatch(
-        "test.value.found",
-        "test.value",
-      );
-      expect(result).toContain(
-        '<span class="highlight">test.value</span>',
-      );
+      const result = wrapper.vm.highlightTextMatch("test.value.found", "test.value");
+      expect(result).toContain('<span class="highlight">test.value</span>');
     });
 
     it("should be case-insensitive when highlighting", () => {
-      mockUseTraceDetails.mockReturnValue(
-        defaultTraceDetails({ hasSpanError: true }),
-      );
+      mockUseTraceDetails.mockReturnValue(defaultTraceDetails({ hasSpanError: true }));
       wrapper = mountTraceErrorTab();
 
-      const result = wrapper.vm.highlightTextMatch(
-        "Hello World",
-        "hello",
-      );
-      expect(result).toContain(
-        '<span class="highlight">Hello</span>',
-      );
+      const result = wrapper.vm.highlightTextMatch("Hello World", "hello");
+      expect(result).toContain('<span class="highlight">Hello</span>');
     });
 
     it("should return escaped text without highlights when there is no match", () => {
-      mockUseTraceDetails.mockReturnValue(
-        defaultTraceDetails({ hasSpanError: true }),
-      );
+      mockUseTraceDetails.mockReturnValue(defaultTraceDetails({ hasSpanError: true }));
       wrapper = mountTraceErrorTab();
 
       const result = wrapper.vm.highlightTextMatch("abc def", "xyz");
@@ -806,16 +721,11 @@ describe("TraceErrorTab", () => {
     });
 
     it("should handle null/undefined text gracefully", () => {
-      mockUseTraceDetails.mockReturnValue(
-        defaultTraceDetails({ hasSpanError: true }),
-      );
+      mockUseTraceDetails.mockReturnValue(defaultTraceDetails({ hasSpanError: true }));
       wrapper = mountTraceErrorTab();
 
       // escapeHtml(null) returns "" per the implementation
-      const result = wrapper.vm.highlightTextMatch(
-        null as unknown as string,
-        "query",
-      );
+      const result = wrapper.vm.highlightTextMatch(null as unknown as string, "query");
       expect(result).toBe("");
     });
   });
@@ -826,9 +736,7 @@ describe("TraceErrorTab", () => {
 
   describe("formatStackTrace helper", () => {
     beforeEach(() => {
-      mockUseTraceDetails.mockReturnValue(
-        defaultTraceDetails({ hasSpanError: true }),
-      );
+      mockUseTraceDetails.mockReturnValue(defaultTraceDetails({ hasSpanError: true }));
     });
 
     describe("Python stack trace", () => {
@@ -959,9 +867,7 @@ describe("TraceErrorTab", () => {
 
   describe("formatExceptionMessage helper", () => {
     beforeEach(() => {
-      mockUseTraceDetails.mockReturnValue(
-        defaultTraceDetails({ hasSpanError: true }),
-      );
+      mockUseTraceDetails.mockReturnValue(defaultTraceDetails({ hasSpanError: true }));
     });
 
     it("should return empty string for falsy input", () => {
@@ -981,8 +887,7 @@ describe("TraceErrorTab", () => {
 
     it("should pretty-print JSON in the message", () => {
       wrapper = mountTraceErrorTab();
-      const messageWithJson =
-        'Error occurred: {"code": 500, "reason": "timeout"}';
+      const messageWithJson = 'Error occurred: {"code": 500, "reason": "timeout"}';
 
       const formatted = wrapper.vm.formatExceptionMessage(messageWithJson);
 
@@ -995,8 +900,7 @@ describe("TraceErrorTab", () => {
 
     it("should handle malformed JSON gracefully", () => {
       wrapper = mountTraceErrorTab();
-      const messageWithBadJson =
-        'Error occurred: {"code": 500, invalid json}';
+      const messageWithBadJson = 'Error occurred: {"code": 500, invalid json}';
 
       const formatted = wrapper.vm.formatExceptionMessage(messageWithBadJson);
 

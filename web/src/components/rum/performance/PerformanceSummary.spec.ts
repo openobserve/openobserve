@@ -78,8 +78,7 @@ vi.mock("vue-router", () => ({
 vi.mock("@/views/Dashboards/RenderDashboardCharts.vue", () => ({
   default: {
     name: "RenderDashboardCharts",
-    template:
-      '<div data-test="render-dashboard-charts"><slot name="before_panels"></slot></div>',
+    template: '<div data-test="render-dashboard-charts"><slot name="before_panels"></slot></div>',
     props: ["viewOnly", "dashboardData", "currentTimeObj", "searchType"],
     methods: {
       layoutUpdate: vi.fn(),
@@ -147,12 +146,9 @@ describe("PerformanceSummary", () => {
     const { deletePanel } = await import("@/utils/commons.ts");
     mockDeletePanel = vi.mocked(deletePanel);
 
-    const { convertDashboardSchemaVersion } = await import(
-      "@/utils/dashboard/convertDashboardSchemaVersion"
-    );
-    mockConvertDashboardSchemaVersion = vi.mocked(
-      convertDashboardSchemaVersion,
-    );
+    const { convertDashboardSchemaVersion } =
+      await import("@/utils/dashboard/convertDashboardSchemaVersion");
+    mockConvertDashboardSchemaVersion = vi.mocked(convertDashboardSchemaVersion);
 
     mockRouterPush.mockClear();
     mockRouterReplace.mockClear();
@@ -265,9 +261,7 @@ describe("PerformanceSummary", () => {
     await nextTick();
 
     // Assert
-    expect(
-      wrapper.find('[data-test="performance-summary-loading-indicator"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="performance-summary-loading-indicator"]').exists()).toBe(true);
     expect(wrapper.text()).toContain("Loading Dashboard");
   });
 
@@ -575,9 +569,7 @@ describe("PerformanceSummary", () => {
     wrapper = mountComponent({ dashboard: "test-dashboard" });
 
     // Assert
-    await expect(wrapper.vm.onDeletePanel("panel-123")).rejects.toThrow(
-      "Delete failed",
-    );
+    await expect(wrapper.vm.onDeletePanel("panel-123")).rejects.toThrow("Delete failed");
   });
 
   // -------------------------------------------------------------------------
@@ -620,12 +612,8 @@ describe("PerformanceSummary", () => {
     await nextTick();
 
     // Assert
-    expect(wrapper.vm.currentTimeObj.start_time).toEqual(
-      new Date(newDate.startTime),
-    );
-    expect(wrapper.vm.currentTimeObj.end_time).toEqual(
-      new Date(newDate.endTime),
-    );
+    expect(wrapper.vm.currentTimeObj.start_time).toEqual(new Date(newDate.startTime));
+    expect(wrapper.vm.currentTimeObj.end_time).toEqual(new Date(newDate.endTime));
   });
 
   it("handles date range calculations for a 2-hour window", async () => {
@@ -641,12 +629,8 @@ describe("PerformanceSummary", () => {
     await nextTick();
 
     // Assert
-    expect(wrapper.vm.currentTimeObj.start_time).toEqual(
-      new Date(dateRange.startTime),
-    );
-    expect(wrapper.vm.currentTimeObj.end_time).toEqual(
-      new Date(dateRange.endTime),
-    );
+    expect(wrapper.vm.currentTimeObj.start_time).toEqual(new Date(dateRange.startTime));
+    expect(wrapper.vm.currentTimeObj.end_time).toEqual(new Date(dateRange.endTime));
   });
 
   // -------------------------------------------------------------------------
@@ -786,9 +770,7 @@ describe("PerformanceSummary", () => {
 
     // Assert
     expect(wrapper.vm.store).toBeDefined();
-    expect(wrapper.vm.store.state.selectedOrganization.identifier).toBe(
-      "test-org",
-    );
+    expect(wrapper.vm.store.state.selectedOrganization.identifier).toBe("test-org");
   });
 
   it("exposes the i18n translation function", () => {
@@ -869,9 +851,7 @@ describe("PerformanceSummary", () => {
     window.dispatchEvent(new Event("resize"));
 
     // Assert
-    expect(dispatchEventSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "resize" }),
-    );
+    expect(dispatchEventSpy).toHaveBeenCalledWith(expect.objectContaining({ type: "resize" }));
   });
 
   // -------------------------------------------------------------------------
@@ -908,9 +888,7 @@ describe("PerformanceSummary", () => {
 
     // Assert
     expect(wrapper.vm.isLoading.length).toBe(3);
-    expect(
-      wrapper.find('[data-test="performance-summary-loading-indicator"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="performance-summary-loading-indicator"]').exists()).toBe(true);
   });
 
   it("shows loading indicator text when multiple loading states are active", async () => {
@@ -964,7 +942,12 @@ describe("PerformanceSummary", () => {
   it("performs full component workflow: mount, load dashboard, navigate, delete panel, open settings", async () => {
     // Arrange
     wrapper = mountComponent(
-      { dashboard: "test-dashboard", folder: "test-folder", refresh: "1h", "var-service": "web-app" },
+      {
+        dashboard: "test-dashboard",
+        folder: "test-folder",
+        refresh: "1h",
+        "var-service": "web-app",
+      },
       { dateTime: { start_time: new Date("2023-01-01"), end_time: new Date("2023-01-02") } },
     );
 

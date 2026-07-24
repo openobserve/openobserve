@@ -16,8 +16,7 @@
 
 import { z } from "zod";
 
-const isFilled = (v: any): boolean =>
-  v !== undefined && v !== null && String(v).trim() !== "";
+const isFilled = (v: any): boolean => v !== undefined && v !== null && String(v).trim() !== "";
 
 // A V2 group node — its children live in `conditions` (or legacy V1 `items`).
 const isGroupNode = (item: any): boolean =>
@@ -41,8 +40,7 @@ const collectLeafConditions = (group: any): any[] => {
 
 // A leaf is "blank" when the user hasn't started it (no column, no value). The
 // operator carries a default ("="), so it's ignored for the blank check.
-const isBlankCondition = (c: any): boolean =>
-  !isFilled(c?.column) && !isFilled(c?.value);
+const isBlankCondition = (c: any): boolean => !isFilled(c?.column) && !isFilled(c?.value);
 
 // A leaf is usable only when all three fields are present.
 const isCompleteCondition = (c: any): boolean =>

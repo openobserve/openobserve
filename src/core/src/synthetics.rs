@@ -173,6 +173,7 @@ fn build_plain_text(n: &CheckNotification) -> String {
 /// HTML card for email destinations (lettre sends it as the HTML alternative).
 #[cfg(feature = "enterprise")]
 fn build_email_html(n: &CheckNotification) -> String {
+    // TODO: update with a better template for all the checks
     let color = match n.status.as_str() {
         "warning" => "#b58105",
         "error" => "#b45309",

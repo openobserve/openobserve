@@ -30,7 +30,7 @@ vi.stubGlobal(
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
     dispatchEvent: vi.fn(),
-  }))
+  })),
 );
 
 class ResizeObserver {
@@ -51,9 +51,7 @@ class ResizeObserver {
           contentRect: rect,
           borderBoxSize: [{ inlineSize: rect.width, blockSize: rect.height }],
           contentBoxSize: [{ inlineSize: rect.width, blockSize: rect.height }],
-          devicePixelContentBoxSize: [
-            { inlineSize: rect.width, blockSize: rect.height },
-          ],
+          devicePixelContentBoxSize: [{ inlineSize: rect.width, blockSize: rect.height }],
         },
       ] as any,
       this,

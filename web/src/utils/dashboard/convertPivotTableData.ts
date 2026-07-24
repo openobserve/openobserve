@@ -65,10 +65,7 @@ function buildPivotHeaderLevels(
     if (!value) return value;
     const fieldAlias = breakdownFields[levelIndex]?.alias;
     if (!fieldAlias || !timestampFieldAliases.has(fieldAlias)) return value;
-    if (
-      value === PIVOT_TABLE_TOTAL_LABEL ||
-      value === PIVOT_TABLE_OTHERS_LABEL
-    ) {
+    if (value === PIVOT_TABLE_TOTAL_LABEL || value === PIVOT_TABLE_OTHERS_LABEL) {
       return value;
     }
     return parseTimestampValue(value, timezone) || value;
@@ -90,9 +87,7 @@ function buildPivotHeaderLevels(
         parsedKeys[i + span][lvl] === groupValue &&
         parsedKeys[i + span]
           .slice(0, lvl)
-          .every(
-            (v: string, idx: number) => v === parsedKeys[i].slice(0, lvl)[idx],
-          )
+          .every((v: string, idx: number) => v === parsedKeys[i].slice(0, lvl)[idx])
       ) {
         span++;
       }
@@ -229,11 +224,7 @@ export const convertPivotTableData = (
   const yFields = query.fields?.y || [];
   const breakdownFields = query.fields?.breakdown || [];
 
-  if (
-    breakdownFields.length === 0 ||
-    yFields.length === 0 ||
-    xFields.length === 0
-  ) {
+  if (breakdownFields.length === 0 || yFields.length === 0 || xFields.length === 0) {
     return empty;
   }
 
@@ -384,22 +375,16 @@ export const convertPivotTableData = (
   }
 
   // --- Step 5: Build column definitions ---
-  const { colorConfigMap, unitConfigMap } = parseOverrideConfigs(
-    config.override_config,
-  );
+  const { colorConfigMap, unitConfigMap } = parseOverrideConfigs(config.override_config);
 
   const columns: any[] = [];
   const isSingleValueField = yAliases.length === 1;
-  const needsMultiRowHeader =
-    breakdownAliases.length > 1 || yAliases.length > 1;
+  const needsMultiRowHeader = breakdownAliases.length > 1 || yAliases.length > 1;
 
   // Row field columns (x-axis) — marked with _isRowField for header rendering
   const timezone = store.state.timezone;
   const timestampFieldAliases = detectTimestampFields(xFields, tableRows);
-  const breakdownTimestampAliases = detectTimestampFields(
-    breakdownFields,
-    tableRows,
-  );
+  const breakdownTimestampAliases = detectTimestampFields(breakdownFields, tableRows);
 
   for (const xField of xFields) {
     const col: any = {
@@ -431,9 +416,7 @@ export const convertPivotTableData = (
       // When multi-row headers are used, parent headers provide context,
       // so the leaf column label is just the value field label ("Count").
       // When single-row, use the full label ("GET" or "GET - Count").
-      const formattedPivotKey = breakdownTimestampAliases.has(
-        breakdownFields[0]?.alias,
-      )
+      const formattedPivotKey = breakdownTimestampAliases.has(breakdownFields[0]?.alias)
         ? parseTimestampValue(pk, timezone) || pk
         : pk;
       const label = needsMultiRowHeader
@@ -444,8 +427,7 @@ export const convertPivotTableData = (
 
       const yAliasLower = yField.alias.toLowerCase();
       const unitToUse = unitConfigMap[yAliasLower]?.unit || config.unit;
-      const customUnitToUse =
-        unitConfigMap[yAliasLower]?.customUnit || config.unit_custom;
+      const customUnitToUse = unitConfigMap[yAliasLower]?.customUnit || config.unit_custom;
       const decimals = config.decimals ?? 2;
 
       columns.push({
@@ -457,7 +439,14 @@ export const convertPivotTableData = (
         _groupStart: isGroupStart,
         sort: (a: any, b: any) => (Number(a) || 0) - (Number(b) || 0),
         format: (val: any) =>
-          formatNumericValue(val, valueMappingCache, unitToUse, customUnitToUse, decimals, missingValue),
+          formatNumericValue(
+            val,
+            valueMappingCache,
+            unitToUse,
+            customUnitToUse,
+            decimals,
+            missingValue,
+          ),
       });
     }
   }
@@ -475,8 +464,7 @@ export const convertPivotTableData = (
 
       const yAliasLower = yField.alias.toLowerCase();
       const unitToUse = unitConfigMap[yAliasLower]?.unit || config.unit;
-      const customUnitToUse =
-        unitConfigMap[yAliasLower]?.customUnit || config.unit_custom;
+      const customUnitToUse = unitConfigMap[yAliasLower]?.customUnit || config.unit_custom;
       const decimals = config.decimals ?? 2;
 
       columns.push({
@@ -490,7 +478,14 @@ export const convertPivotTableData = (
         _totalColRightIndex: yFields.length - 1 - tIdx,
         sort: (a: any, b: any) => (Number(a) || 0) - (Number(b) || 0),
         format: (val: any) =>
-          formatNumericValue(val, valueMappingCache, unitToUse, customUnitToUse, decimals, missingValue),
+          formatNumericValue(
+            val,
+            valueMappingCache,
+            unitToUse,
+            customUnitToUse,
+            decimals,
+            missingValue,
+          ),
         headerStyle: "font-weight: bold",
       });
     }

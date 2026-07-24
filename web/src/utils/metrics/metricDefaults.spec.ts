@@ -32,13 +32,8 @@ import {
 const W = "4m";
 
 /** Shorthand: the default (index 0) query for a metric, with no filters. */
-const defaultQuery = (
-  name: string,
-  type?: string,
-  ctx?: Record<string, any>,
-) =>
-  getMetricDefaults(name, type, undefined, { rateWindow: W, ...ctx })
-    .defaultQuery;
+const defaultQuery = (name: string, type?: string, ctx?: Record<string, any>) =>
+  getMetricDefaults(name, type, undefined, { rateWindow: W, ...ctx }).defaultQuery;
 
 const unitOf = (name: string, type?: string, ctx?: Record<string, any>) =>
   getMetricDefaults(name, type, undefined, { rateWindow: W, ...ctx }).unit;
@@ -47,17 +42,13 @@ const streamNames = (...names: string[]) => new Set(names);
 
 describe("buildSelector", () => {
   it("always emits the __name__ form, never a bare identifier", () => {
-    expect(buildSelector("http_requests_total")).toBe(
-      '{__name__="http_requests_total"}',
-    );
+    expect(buildSelector("http_requests_total")).toBe('{__name__="http_requests_total"}');
   });
 
   it("handles metric names that are not valid PromQL identifiers", () => {
     // OpenObserve stream-name normalization strips only [^a-zA-Z0-9_:], so a
     // name may begin with a digit. As a bare identifier this would not parse.
-    expect(buildSelector("5xx_errors_total")).toBe(
-      '{__name__="5xx_errors_total"}',
-    );
+    expect(buildSelector("5xx_errors_total")).toBe('{__name__="5xx_errors_total"}');
   });
 
   it("orders matchers deterministically so the cache key is stable", () => {
@@ -77,15 +68,11 @@ describe("buildSelector", () => {
     expect(buildSelector("m", [{ label: "path", value: 'a"b\\c' }])).toBe(
       '{__name__="m",path="a\\"b\\\\c"}',
     );
-    expect(buildSelector("m", [{ label: "l", value: "a\nb" }])).toBe(
-      '{__name__="m",l="a\\nb"}',
-    );
+    expect(buildSelector("m", [{ label: "l", value: "a\nb" }])).toBe('{__name__="m",l="a\\nb"}');
   });
 
   it("keeps an explicitly empty value", () => {
-    expect(buildSelector("m", [{ label: "l", value: "" }])).toBe(
-      '{__name__="m",l=""}',
-    );
+    expect(buildSelector("m", [{ label: "l", value: "" }])).toBe('{__name__="m",l=""}');
   });
 
   it("rejects invalid label names rather than silently dropping them", () => {
@@ -93,18 +80,16 @@ describe("buildSelector", () => {
     expect(() => buildSelector("m", [{ label: "bad-label", value: "x" }])).toThrow(
       /invalid label name/,
     );
-    expect(() => buildSelector("m", [{ label: "1abc", value: "x" }])).toThrow(
-      /invalid label name/,
-    );
+    expect(() => buildSelector("m", [{ label: "1abc", value: "x" }])).toThrow(/invalid label name/);
   });
 
   it("supports the non-equality matcher operators", () => {
-    expect(
-      buildSelector("m", [{ label: "job", value: "api.*", operator: "=~" }]),
-    ).toBe('{__name__="m",job=~"api.*"}');
-    expect(() =>
-      buildSelector("m", [{ label: "job", value: "x", operator: ">" }]),
-    ).toThrow(/invalid operator/);
+    expect(buildSelector("m", [{ label: "job", value: "api.*", operator: "=~" }])).toBe(
+      '{__name__="m",job=~"api.*"}',
+    );
+    expect(() => buildSelector("m", [{ label: "job", value: "x", operator: ">" }])).toThrow(
+      /invalid operator/,
+    );
   });
 });
 
@@ -154,18 +139,14 @@ describe("type resolution (PRD 6.1)", () => {
         streamNames: streamNames("foo_seconds_count"),
       }),
     ).toBe(CARD_KIND.MEAN_PAIR);
-    expect(resolveCardKind("foo_bucket", "counter")).toBe(
-      CARD_KIND.CLASSIC_HISTOGRAM_BUCKETS,
-    );
+    expect(resolveCardKind("foo_bucket", "counter")).toBe(CARD_KIND.CLASSIC_HISTOGRAM_BUCKETS);
   });
 
   it("compares the declared type case-insensitively", () => {
     // The backend serializes MetricType in PascalCase: "Counter", "GaugeHistogram".
     expect(resolveCardKind("foo", "Counter")).toBe(CARD_KIND.COUNTER_RATE);
     expect(resolveCardKind("foo", "Summary")).toBe(CARD_KIND.SUMMARY_QUANTILES);
-    expect(resolveCardKind("foo_bucket", "GaugeHistogram")).toBe(
-      CARD_KIND.OTHER,
-    );
+    expect(resolveCardKind("foo_bucket", "GaugeHistogram")).toBe(CARD_KIND.OTHER);
     expect(resolveCardKind("foo_bucket", "ExponentialHistogram")).toBe(
       CARD_KIND.EXP_HISTOGRAM_FALLBACK,
     );
@@ -194,12 +175,12 @@ describe("type resolution (PRD 6.1)", () => {
         familyType: "exponentialhistogram",
       }),
     ).toBe(CARD_KIND.EXP_HISTOGRAM_FALLBACK);
-    expect(
-      resolveCardKind("foo_bucket", "counter", { familyType: "gaugehistogram" }),
-    ).toBe(CARD_KIND.OTHER);
-    expect(
-      resolveCardKind("foo_bucket", "counter", { familyType: "histogram" }),
-    ).toBe(CARD_KIND.CLASSIC_HISTOGRAM_BUCKETS);
+    expect(resolveCardKind("foo_bucket", "counter", { familyType: "gaugehistogram" })).toBe(
+      CARD_KIND.OTHER,
+    );
+    expect(resolveCardKind("foo_bucket", "counter", { familyType: "histogram" })).toBe(
+      CARD_KIND.CLASSIC_HISTOGRAM_BUCKETS,
+    );
   });
 
   it("maps the remaining family suffixes", () => {
@@ -239,24 +220,18 @@ describe("PRD 6.2 truth table", () => {
   });
 
   it("foo_total -> sum(rate), count/sec", () => {
-    expect(defaultQuery("foo_total")).toBe(
-      'sum(rate({__name__="foo_total"}[4m]))',
-    );
+    expect(defaultQuery("foo_total")).toBe('sum(rate({__name__="foo_total"}[4m]))');
     expect(unitOf("foo_total")).toBe("count-per-sec");
   });
 
   it("foo_seconds_count -> sum(rate), count/sec (no lookback)", () => {
-    expect(defaultQuery("foo_seconds_count")).toBe(
-      'sum(rate({__name__="foo_seconds_count"}[4m]))',
-    );
+    expect(defaultQuery("foo_seconds_count")).toBe('sum(rate({__name__="foo_seconds_count"}[4m]))');
     // _count counts events, not seconds: it must NOT rate to s/s.
     expect(unitOf("foo_seconds_count")).toBe("count-per-sec");
   });
 
   it("foo_seconds_total -> sum(rate), unitless (s/s)", () => {
-    expect(defaultQuery("foo_seconds_total")).toBe(
-      'sum(rate({__name__="foo_seconds_total"}[4m]))',
-    );
+    expect(defaultQuery("foo_seconds_total")).toBe('sum(rate({__name__="foo_seconds_total"}[4m]))');
     expect(unitOf("foo_seconds_total")).toBe("none");
   });
 
@@ -288,9 +263,7 @@ describe("PRD 6.2 truth table", () => {
     const d = getMetricDefaults("foo_bucket", "histogram", undefined, {
       rateWindow: W,
     });
-    expect(d.defaultQuery).toBe(
-      'sum by (le) (rate({__name__="foo_bucket"}[4m]))',
-    );
+    expect(d.defaultQuery).toBe('sum by (le) (rate({__name__="foo_bucket"}[4m]))');
     expect(d.chartType).toBe("heatmap");
     expect(d.unit).toBe("short");
     expect(d.legendTemplate).toBe("{le}");
@@ -311,11 +284,7 @@ describe("PRD 6.2 truth table", () => {
       'histogram_quantile(0.9, sum by (le) (rate({__name__="foo_seconds_bucket"}[4m])))',
       'histogram_quantile(0.99, sum by (le) (rate({__name__="foo_seconds_bucket"}[4m])))',
     ]);
-    expect(pct.queries.map((q: any) => q.legendTemplate)).toEqual([
-      "p50",
-      "p90",
-      "p99",
-    ]);
+    expect(pct.queries.map((q: any) => q.legendTemplate)).toEqual(["p50", "p90", "p99"]);
   });
 });
 
@@ -353,18 +322,14 @@ describe("unit inference (PRD 7.1 / 7.2)", () => {
     expect(getMetricDefaults("foo_widgets", "gauge", "By").unit).toBe("bytes");
     expect(getMetricDefaults("foo_widgets", "gauge", "s").unit).toBe("seconds");
     // Rated: the declared observation unit goes through the rated mapping.
-    expect(getMetricDefaults("foo_widgets_total", "counter", "By").unit).toBe(
-      "bytes-per-sec",
-    );
+    expect(getMetricDefaults("foo_widgets_total", "counter", "By").unit).toBe("bytes-per-sec");
     // Unrecognized declared unit falls through to name inference.
     expect(getMetricDefaults("foo_bytes", "gauge", "zorkmids").unit).toBe("bytes");
   });
 
   it("never lets a _count member inherit the family observation unit", () => {
     // A family declaring `seconds` must still yield count/s on X_count.
-    expect(getMetricDefaults("foo_seconds_count", "counter", "s").unit).toBe(
-      "count-per-sec",
-    );
+    expect(getMetricDefaults("foo_seconds_count", "counter", "s").unit).toBe("count-per-sec");
   });
 
   it("always treats _created as seconds-since-epoch", () => {
@@ -416,9 +381,7 @@ describe("variants (PRD 6.3)", () => {
     // Queries also carry `builder` state for the Select handoff; that is the
     // subject of metricDefaults.builder.spec.ts, so pick out the two fields
     // this test is actually about.
-    expect(
-      minmax.queries.map((q: any) => [q.expr, q.legendTemplate]),
-    ).toEqual([
+    expect(minmax.queries.map((q: any) => [q.expr, q.legendTemplate])).toEqual([
       ['min({__name__="foo_bytes"})', "min"],
       ['max({__name__="foo_bytes"})', "max"],
     ]);
@@ -448,9 +411,7 @@ describe("variants (PRD 6.3)", () => {
     expect(d.defaultQuery).toBe("");
     expect(d.configurable).toBe(false);
     // Select still works: buckets are snapshots, so no rate().
-    expect(d.variants[0].queries[0].expr).toBe(
-      'sum by (le) ({__name__="foo_bucket"})',
-    );
+    expect(d.variants[0].queries[0].expr).toBe('sum by (le) ({__name__="foo_bucket"})');
   });
 
   it("gives _gsum / _gcount plain gauge treatment with no rate", () => {
@@ -511,9 +472,7 @@ describe("variants (PRD 6.3)", () => {
     expect(bucketOf("a", "gauge")).toBe("gauge");
     expect(bucketOf("a_bucket", "histogram")).toBe("histogram");
     expect(bucketOf("a_bucket", "exponentialhistogram")).toBe("histogram");
-    expect(
-      bucketOf("a_sum", "", { streamNames: streamNames("a_count") }),
-    ).toBe("summary");
+    expect(bucketOf("a_sum", "", { streamNames: streamNames("a_count") })).toBe("summary");
     expect(bucketOf("a", "summary")).toBe("summary");
     expect(bucketOf("a_info", "info")).toBe("other");
     expect(bucketOf("a_created", "counter")).toBe("other");
@@ -547,9 +506,7 @@ describe("resolveVariant", () => {
     const r = resolveVariant(histogram(), "count-rate");
     expect(r?.chartType).toBe("line");
     expect(r?.unit).toBe("count-per-sec");
-    expect(r?.queries[0].expr).toBe(
-      'sum(rate({__name__="foo_seconds_count"}[4m]))',
-    );
+    expect(r?.queries[0].expr).toBe('sum(rate({__name__="foo_seconds_count"}[4m]))');
   });
 });
 
@@ -637,8 +594,7 @@ describe("extreme-value guard (all-NaN retry)", () => {
 });
 
 describe("percentile checkbox sets are honoured", () => {
-  const gauge = () =>
-    getMetricDefaults("queue_depth", "gauge", undefined, { rateWindow: W });
+  const gauge = () => getMetricDefaults("queue_depth", "gauge", undefined, { rateWindow: W });
 
   it("builds a query for EVERY percentile the dialog offers", () => {
     // The dialog renders a checkbox per `availablePercentiles`. Any offered
@@ -646,9 +602,7 @@ describe("percentile checkbox sets are honoured", () => {
     // nothing — the subset filter empties and falls back to all of them.
     const variant = gauge().variants.find((v: any) => v.id === "percentiles");
     const offered = variant.availablePercentiles;
-    const built = variant.queries.map((q: any) =>
-      Number(/^p(\d+)$/.exec(q.legendTemplate)![1]),
-    );
+    const built = variant.queries.map((q: any) => Number(/^p(\d+)$/.exec(q.legendTemplate)![1]));
     expect(built.sort((a, b) => a - b)).toEqual([...offered].sort((a, b) => a - b));
   });
 
@@ -666,11 +620,7 @@ describe("percentile checkbox sets are honoured", () => {
 
   it("defaults to p50/p90/p99 out of the five offered", () => {
     const r = resolveVariant(gauge(), "percentiles");
-    expect(r?.queries.map((q: any) => q.legendTemplate)).toEqual([
-      "p50",
-      "p90",
-      "p99",
-    ]);
+    expect(r?.queries.map((q: any) => q.legendTemplate)).toEqual(["p50", "p90", "p99"]);
   });
 });
 
@@ -689,9 +639,7 @@ describe("the card footer names the function actually in effect", () => {
     // Deriving it from the card kind left it reading "sum(rate)" forever, so
     // switching to avg(rate) looked like it had done nothing.
     expect(resolveVariant(counter(), "rate-avg")?.footerLabel).toBe("avg(rate)");
-    expect(resolveVariant(counter(), "increase")?.footerLabel).toBe(
-      "sum(increase)",
-    );
+    expect(resolveVariant(counter(), "increase")?.footerLabel).toBe("sum(increase)");
   });
 
   it("gives every variant of every card kind a footer label", () => {
@@ -736,13 +684,12 @@ describe("units the chart actually needs (found in review)", () => {
     // An OTLP `Cel` gauge, or a byte counter with no unit segment in its name.
     // Name inference alone cannot know either; the declared unit is the only
     // source, which is why dropping it silently degraded these to numbers/count.
-    expect(
-      getMetricDefaults("cpu_temperature", "gauge", "Cel", { rateWindow: W }).unit,
-    ).toBe("celsius");
+    expect(getMetricDefaults("cpu_temperature", "gauge", "Cel", { rateWindow: W }).unit).toBe(
+      "celsius",
+    );
 
     expect(
-      getMetricDefaults("network_ingress_total", "counter", "By", { rateWindow: W })
-        .unit,
+      getMetricDefaults("network_ingress_total", "counter", "By", { rateWindow: W }).unit,
     ).toBe("bytes-per-sec");
   });
 });

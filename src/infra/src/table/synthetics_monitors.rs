@@ -336,6 +336,10 @@ pub struct DueMonitor {
     pub frequency: SyntheticFrequency,
     /// Minutes from UTC — used for cron scheduling. 0 = UTC.
     pub tz_offset: i32,
+    /// The scheduled due time that made this monitor eligible. The scheduler
+    /// anchors the NEXT run to this (fixed-rate) instead of `now`, so the tick
+    /// lag doesn't accumulate into schedule drift.
+    pub next_run_at: i64,
     /// Populated only for browser monitors (parsed from config.browser_devices).
     pub browser_devices: Vec<config::meta::synthetics::BrowserDevice>,
     pub tags: Vec<String>,
@@ -396,6 +400,7 @@ pub async fn fetch_due<C: ConnectionTrait>(
                 locations,
                 frequency,
                 tz_offset: m.tz_offset,
+                next_run_at: m.next_run_at,
                 browser_devices,
                 tags,
             })

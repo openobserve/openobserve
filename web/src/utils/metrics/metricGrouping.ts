@@ -209,7 +209,7 @@ export const MEMORY_PATTERNS: RegExp[] = [
  */
 export const STORAGE_PATTERNS: RegExp[] = [
   /\bdisk\b/i,
-  /_disk_/i,         // e.g. system_disk_io, system_disk_operations
+  /_disk_/i, // e.g. system_disk_io, system_disk_operations
   /\bfilesystem\b/i,
   /\b_fs\b/,
   /\bfs_/,
@@ -217,14 +217,14 @@ export const STORAGE_PATTERNS: RegExp[] = [
   /^node_disk/,
   /^container_fs/,
   /^node_filesystem/,
-  /^system_disk/,    // system_disk_io, system_disk_operations
+  /^system_disk/, // system_disk_io, system_disk_operations
   /^system_filesystem/, // system_filesystem_usage
   /^k8s_.*_storage/,
   /^k8s_.*_filesystem/,
   /inode/,
   /volume/i,
-  /\bdisk_io\b/i,    // explicit disk_io compound
-  /_disk_io/i,       // system_disk_io
+  /\bdisk_io\b/i, // explicit disk_io compound
+  /_disk_io/i, // system_disk_io
 ];
 
 /**
@@ -392,9 +392,7 @@ export function getDefaultMetricSelections(
           (s) =>
             s.stream_name === metric.streamName &&
             (!metric.filters ||
-              Object.entries(metric.filters).every(
-                ([k, v]) => s.filters?.[k] === v,
-              )),
+              Object.entries(metric.filters).every(([k, v]) => s.filters?.[k] === v)),
         );
         if (match) results.push(match);
       }
@@ -414,10 +412,7 @@ export function getDefaultMetricSelections(
  * @param groupDefs  - Ordered group definitions (controls priority)
  * @returns The id of the matched group
  */
-export function classifyMetric(
-  metricName: string,
-  groupDefs: MetricGroupDefinition[],
-): string {
+export function classifyMetric(metricName: string, groupDefs: MetricGroupDefinition[]): string {
   const nameLower = metricName.toLowerCase();
 
   for (const group of groupDefs) {

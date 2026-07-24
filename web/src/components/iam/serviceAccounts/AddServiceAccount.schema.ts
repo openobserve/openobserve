@@ -32,8 +32,7 @@ export const SERVICE_ACCOUNT_EMAIL_DOMAIN = "sa.internal";
 export const serviceAccountNameRegex = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
 
 // Email local parts are capped at 64 chars; the local part is `<name>.<org>`.
-export const maxServiceAccountNameLength = (orgId: string) =>
-  Math.max(1, 64 - orgId.length - 1);
+export const maxServiceAccountNameLength = (orgId: string) => Math.max(1, 64 - orgId.length - 1);
 
 const serviceAccountSuffix = (orgId: string) =>
   `.${orgId}@${SERVICE_ACCOUNT_EMAIL_DOMAIN}`.toLowerCase();

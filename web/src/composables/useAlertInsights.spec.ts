@@ -187,14 +187,24 @@ describe("useAlertInsights", () => {
 
     it("builds timestamp filter for Alert Volume Over Time with start and end", () => {
       const { addRangeFilter, getBaseFilters } = useAlertInsights();
-      addRangeFilter({ panelId: "p1", panelTitle: "Alert Volume Over Time", start: 1000, end: 2000 });
+      addRangeFilter({
+        panelId: "p1",
+        panelTitle: "Alert Volume Over Time",
+        start: 1000,
+        end: 2000,
+      });
       const filters = getBaseFilters();
       expect(filters).toContain("_timestamp >= 1000 AND _timestamp <= 2000");
     });
 
     it("does not add timestamp filter for Alert Volume Over Time when start or end is null", () => {
       const { addRangeFilter, getBaseFilters } = useAlertInsights();
-      addRangeFilter({ panelId: "p1", panelTitle: "Alert Volume Over Time", start: null, end: 2000 });
+      addRangeFilter({
+        panelId: "p1",
+        panelTitle: "Alert Volume Over Time",
+        start: null,
+        end: 2000,
+      });
       expect(getBaseFilters()).toHaveLength(0);
     });
 
@@ -276,8 +286,14 @@ describe("useAlertInsights", () => {
     });
 
     it("combines multiple filter types in a single call", () => {
-      const { addRangeFilter, showFailedOnly, selectedAlertName, getBaseFilters } = useAlertInsights();
-      addRangeFilter({ panelId: "p1", panelTitle: "Alert Volume Over Time", start: 1000, end: 2000 });
+      const { addRangeFilter, showFailedOnly, selectedAlertName, getBaseFilters } =
+        useAlertInsights();
+      addRangeFilter({
+        panelId: "p1",
+        panelTitle: "Alert Volume Over Time",
+        start: 1000,
+        end: 2000,
+      });
       showFailedOnly.value = true;
       selectedAlertName.value = "mem-alert";
       const filters = getBaseFilters();

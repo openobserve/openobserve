@@ -30,7 +30,8 @@ use infra::table::compactor_manual_jobs::{
     CompactorManualJob, CompactorManualJobResEntry, CompactorManualJobStatusRes,
     Status as CompactorManualJobStatus,
 };
-use openobserve_core::auth::UserEmail;
+use openobserve_core::{auth::UserEmail, stream as stream_orchestrator};
+use stream as stream_service;
 
 use crate::{
     common::{
@@ -42,7 +43,6 @@ use crate::{
         utils::http::{get_stream_type_from_request, get_ts_from_request_with_key},
     },
     handler::http::extractors::Headers,
-    service::stream,
 };
 
 /// GetSchema
@@ -83,7 +83,7 @@ pub async fn schema(
         stream_name = format_stream_name(stream_name);
     }
     let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
-    let schema = stream::get_stream(&org_id, &stream_name, stream_type).await;
+    let schema = stream_service::get_stream(&org_id, &stream_name, stream_type).await;
     let Some(mut schema) = schema else {
         return (
             StatusCode::NOT_FOUND,
@@ -189,7 +189,7 @@ pub async fn create(
         )
             .into_response();
     }
-    match stream::create_stream(&org_id, &stream_name, stream_type, stream).await {
+    match stream_service::create_stream(&org_id, &stream_name, stream_type, stream).await {
         Ok(resp) => resp,
         Err(e) => MetaHttpResponse::internal_error(e),
     }
@@ -246,7 +246,7 @@ pub async fn update_settings(
         )
             .into_response();
     }
-    match stream::update_stream_settings(
+    match stream_service::update_stream_settings(
         &org_id,
         &stream_name,
         stream_type,
@@ -303,7 +303,9 @@ pub async fn update_fields(
         )
             .into_response();
     }
-    match stream::update_fields_type(&org_id, &stream_name, stream_type, &payload.fields).await {
+    match stream_service::update_fields_type(&org_id, &stream_name, stream_type, &payload.fields)
+        .await
+    {
         Ok(_) => (
             StatusCode::OK,
             Json(MetaHttpResponse::message(
@@ -362,7 +364,7 @@ pub async fn delete_fields(
         stream_name = format_stream_name(stream_name);
     }
     let stream_type = get_stream_type_from_request(&query);
-    match stream::delete_fields(&org_id, &stream_name, stream_type, &fields.fields).await {
+    match stream_service::delete_fields(&org_id, &stream_name, stream_type, &fields.fields).await {
         Ok(_) => (
             StatusCode::OK,
             Json(MetaHttpResponse::message(StatusCode::OK, "fields deleted")),
@@ -413,7 +415,7 @@ pub async fn delete(
         .get("delete_all")
         .and_then(|v| v.parse::<bool>().ok())
         .unwrap_or_default();
-    match stream::delete_stream(
+    match stream_orchestrator::delete_stream(
         &org_id,
         &stream_name,
         stream_type,
@@ -509,7 +511,7 @@ pub async fn list(
         // Get List of allowed objects ends
     }
 
-    let mut indices = stream::get_streams(
+    let mut indices = stream_service::get_streams(
         org_id.as_str(),
         stream_type,
         fetch_schema,
@@ -745,7 +747,7 @@ pub async fn delete_stream_data_by_time_range(
         }
     };
     let time_range = TimeRange::new(start, end);
-    let job_id = match openobserve_core::stream::delete_stream_data_by_time_range(
+    let job_id = match stream_service::delete_stream_data_by_time_range(
         &org_id,
         stream_type,
         &stream_name,

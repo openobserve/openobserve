@@ -82,7 +82,7 @@ describe("cipher_keys service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/${org_identifier}/cipher_keys`,
-        mockCipherKeyData
+        mockCipherKeyData,
       );
     });
 
@@ -106,7 +106,7 @@ describe("cipher_keys service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/production-org/cipher_keys`,
-        expect.any(Object)
+        expect.any(Object),
       );
     });
   });
@@ -122,7 +122,7 @@ describe("cipher_keys service", () => {
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/${org_identifier}/cipher_keys/${name}`,
-        mockCipherKeyData
+        mockCipherKeyData,
       );
     });
 
@@ -136,7 +136,7 @@ describe("cipher_keys service", () => {
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/staging-org/cipher_keys/another-key`,
-        mockCipherKeyData
+        mockCipherKeyData,
       );
     });
 
@@ -162,9 +162,7 @@ describe("cipher_keys service", () => {
 
       await cipherKeys.list(org_identifier);
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${org_identifier}/cipher_keys`
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(`/api/${org_identifier}/cipher_keys`);
     });
 
     it("should use the org_identifier in the URL path", async () => {
@@ -174,9 +172,7 @@ describe("cipher_keys service", () => {
 
       await cipherKeys.list(org_identifier);
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/production-org/cipher_keys`
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(`/api/production-org/cipher_keys`);
     });
   });
 
@@ -190,7 +186,7 @@ describe("cipher_keys service", () => {
       await cipherKeys.get_by_name(org_identifier, name);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${org_identifier}/cipher_keys/${name}`
+        `/api/${org_identifier}/cipher_keys/${name}`,
       );
     });
 
@@ -203,7 +199,7 @@ describe("cipher_keys service", () => {
       await cipherKeys.get_by_name(org_identifier, name);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/staging-org/cipher_keys/specific-key-123`
+        `/api/staging-org/cipher_keys/specific-key-123`,
       );
     });
   });
@@ -218,7 +214,7 @@ describe("cipher_keys service", () => {
       await cipherKeys.delete(org_identifier, name);
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/${org_identifier}/cipher_keys/${name}`
+        `/api/${org_identifier}/cipher_keys/${name}`,
       );
     });
 
@@ -231,7 +227,7 @@ describe("cipher_keys service", () => {
       await cipherKeys.delete(org_identifier, name);
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        `/api/prod-org/cipher_keys/key-to-remove`
+        `/api/prod-org/cipher_keys/key-to-remove`,
       );
     });
   });
@@ -247,7 +243,7 @@ describe("cipher_keys service", () => {
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
         `/api/${org_identifier}/cipher_keys/bulk`,
-        { data }
+        { data },
       );
     });
 
@@ -270,18 +266,18 @@ describe("cipher_keys service", () => {
       const error = new Error("Validation error");
       mockHttpInstance.post.mockRejectedValue(error);
 
-      await expect(
-        cipherKeys.create("org123", mockCipherKeyData)
-      ).rejects.toThrow("Validation error");
+      await expect(cipherKeys.create("org123", mockCipherKeyData)).rejects.toThrow(
+        "Validation error",
+      );
     });
 
     it("should propagate errors from update", async () => {
       const error = new Error("Not found");
       mockHttpInstance.put.mockRejectedValue(error);
 
-      await expect(
-        cipherKeys.update("org123", mockCipherKeyData, "missing-key")
-      ).rejects.toThrow("Not found");
+      await expect(cipherKeys.update("org123", mockCipherKeyData, "missing-key")).rejects.toThrow(
+        "Not found",
+      );
     });
 
     it("should propagate errors from list", async () => {
@@ -295,27 +291,25 @@ describe("cipher_keys service", () => {
       const error = new Error("Unauthorized");
       mockHttpInstance.get.mockRejectedValue(error);
 
-      await expect(
-        cipherKeys.get_by_name("org123", "protected-key")
-      ).rejects.toThrow("Unauthorized");
+      await expect(cipherKeys.get_by_name("org123", "protected-key")).rejects.toThrow(
+        "Unauthorized",
+      );
     });
 
     it("should propagate errors from delete", async () => {
       const error = new Error("Forbidden");
       mockHttpInstance.delete.mockRejectedValue(error);
 
-      await expect(
-        cipherKeys.delete("org123", "locked-key")
-      ).rejects.toThrow("Forbidden");
+      await expect(cipherKeys.delete("org123", "locked-key")).rejects.toThrow("Forbidden");
     });
 
     it("should propagate errors from bulkDelete", async () => {
       const error = new Error("Server error");
       mockHttpInstance.delete.mockRejectedValue(error);
 
-      await expect(
-        cipherKeys.bulkDelete("org123", { key_names: ["key1"] })
-      ).rejects.toThrow("Server error");
+      await expect(cipherKeys.bulkDelete("org123", { key_names: ["key1"] })).rejects.toThrow(
+        "Server error",
+      );
     });
   });
 });

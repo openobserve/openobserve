@@ -77,10 +77,7 @@ export function modelVendorSlug(modelName: string | undefined): string | undefin
  * must treat "" as "no logo — use the chip-icon fallback"). `isDark` picks the
  * dark-mode variant when the vendor ships one.
  */
-export function resolveModelVendorLogo(
-  modelName: string | undefined,
-  isDark = false,
-): string {
+export function resolveModelVendorLogo(modelName: string | undefined, isDark = false): string {
   const slug = modelVendorSlug(modelName);
   if (!slug) return "";
   const b = logosBySlug[slug];

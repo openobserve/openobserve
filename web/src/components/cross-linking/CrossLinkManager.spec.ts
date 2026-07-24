@@ -8,13 +8,11 @@ import store from "@/test/unit/helpers/store";
 vi.mock("./CrossLinkDialog.vue", () => ({
   default: {
     name: "CrossLinkDialog",
-    template:
-      '<div data-test="cross-link-dialog"><slot /></div>',
+    template: '<div data-test="cross-link-dialog"><slot /></div>',
     props: ["modelValue", "link", "availableFields"],
     emits: ["update:modelValue", "save", "cancel"],
   },
 }));
-
 
 describe("CrossLinkManager Component", () => {
   let wrapper: any;
@@ -107,9 +105,7 @@ describe("CrossLinkManager Component", () => {
     });
 
     it("should default modelValue to empty array", () => {
-      expect(typeof wrapper?.vm?.$options.props.modelValue.default).toBe(
-        "function",
-      );
+      expect(typeof wrapper?.vm?.$options.props.modelValue.default).toBe("function");
     });
   });
 
@@ -121,7 +117,7 @@ describe("CrossLinkManager Component", () => {
       // which also start with "cross-link-item-".
       const list = wrapper.find('[data-test="cross-link-list"]');
       const items = list.findAll('[data-test^="cross-link-item-"]').filter((el) => {
-        const val = el.attributes('data-test') ?? '';
+        const val = el.attributes("data-test") ?? "";
         return /^cross-link-item-\d+$/.test(val);
       });
       expect(items.length).toBe(2);
@@ -135,9 +131,7 @@ describe("CrossLinkManager Component", () => {
 
     it("should display link URLs", () => {
       wrapper = createWrapper({ modelValue: sampleLinks });
-      expect(wrapper.text()).toContain(
-        "https://example.com/trace/${trace_id}",
-      );
+      expect(wrapper.text()).toContain("https://example.com/trace/${trace_id}");
     });
 
     it("should display field badges", () => {
@@ -249,9 +243,7 @@ describe("CrossLinkManager Component", () => {
       wrapper.vm.removeLink(0);
 
       expect(wrapper.emitted("update:modelValue")).toBeTruthy();
-      expect(wrapper.emitted("update:modelValue")[0][0]).toEqual([
-        sampleLinks[1],
-      ]);
+      expect(wrapper.emitted("update:modelValue")[0][0]).toEqual([sampleLinks[1]]);
     });
 
     it("should emit change event", () => {

@@ -23,208 +23,212 @@
     size="md"
     form-id="drilldown-popup-form"
     data-test="dashboard-drilldown-popup"
-    @update:open="(v) => { if (!v) $emit('close') }"
+    @update:open="
+      (v) => {
+        if (!v) $emit('close');
+      }
+    "
     @click:secondary="$emit('close')"
   >
     <template #header-right>
       <DrilldownUserGuide />
     </template>
     <OForm id="drilldown-popup-form" :form="form">
-    <OFormInput
-      name="name"
-      :label="t('dashboard.nameOfVariable')"
-      required
-      data-test="dashboard-config-panel-drilldown-name"
-    />
-    <div class="mt-3">
-      <OFormToggleGroup name="type" :label="t('dashboard.goTo')">
-        <OToggleGroupItem
-          value="byDashboard"
-          size="sm"
-          icon-left="dashboard"
-          data-test="dashboard-drilldown-by-dashboard-btn"
-        >
-          {{ t("menu.dashboard") }}
-        </OToggleGroupItem>
-        <OToggleGroupItem
-          value="byUrl"
-          size="sm"
-          icon-left="link"
-          data-test="dashboard-drilldown-by-url-btn"
-        >
-          {{ t("common.url") }}
-        </OToggleGroupItem>
-        <OToggleGroupItem
-          value="logs"
-          size="sm"
-          icon-left="search"
-          data-test="dashboard-drilldown-by-logs-btn"
-        >
-          {{ t("common.logs") }}
-        </OToggleGroupItem>
-      </OFormToggleGroup>
-    </div>
-
-    <div class="mt-2.5" v-if="drilldownData.type === 'logs'">
-      <div>
-        <OFormToggleGroup
-          name="data.logsMode"
-          :label="t('dashboard.selectLogsMode')"
-        >
-          <OToggleGroupItem value="auto" size="sm">{{ t("common.auto") }}</OToggleGroupItem>
-          <OToggleGroupItem value="custom" size="sm">{{ t("common.custom") }}</OToggleGroupItem>
+      <OFormInput
+        name="name"
+        :label="t('dashboard.nameOfVariable')"
+        required
+        data-test="dashboard-config-panel-drilldown-name"
+      />
+      <div class="mt-3">
+        <OFormToggleGroup name="type" :label="t('dashboard.goTo')">
+          <OToggleGroupItem
+            value="byDashboard"
+            size="sm"
+            icon-left="dashboard"
+            data-test="dashboard-drilldown-by-dashboard-btn"
+          >
+            {{ t("menu.dashboard") }}
+          </OToggleGroupItem>
+          <OToggleGroupItem
+            value="byUrl"
+            size="sm"
+            icon-left="link"
+            data-test="dashboard-drilldown-by-url-btn"
+          >
+            {{ t("common.url") }}
+          </OToggleGroupItem>
+          <OToggleGroupItem
+            value="logs"
+            size="sm"
+            icon-left="search"
+            data-test="dashboard-drilldown-by-logs-btn"
+          >
+            {{ t("common.logs") }}
+          </OToggleGroupItem>
         </OFormToggleGroup>
       </div>
-      <component
-        :is="form.Field"
-        name="data.logsQuery"
-        v-if="drilldownData.data.logsMode === 'custom'"
-      >
-        <template #default="{ field }">
-          <div class="mt-2.5">
-            <label class="o-input-label text-compact font-medium leading-tight text-input-label-text">{{ t("dashboard.enterCustomQuery") }}</label>
-            <!-- Fixed-height wrapper: CodeQueryEditor's root is h-full, so it
+
+      <div class="mt-2.5" v-if="drilldownData.type === 'logs'">
+        <div>
+          <OFormToggleGroup name="data.logsMode" :label="t('dashboard.selectLogsMode')">
+            <OToggleGroupItem value="auto" size="sm">{{ t("common.auto") }}</OToggleGroupItem>
+            <OToggleGroupItem value="custom" size="sm">{{ t("common.custom") }}</OToggleGroupItem>
+          </OFormToggleGroup>
+        </div>
+        <component
+          :is="form.Field"
+          name="data.logsQuery"
+          v-if="drilldownData.data.logsMode === 'custom'"
+        >
+          <template #default="{ field }">
+            <div class="mt-2.5">
+              <label
+                class="o-input-label text-compact text-input-label-text leading-tight font-medium"
+                >{{ t("dashboard.enterCustomQuery") }}</label
+              >
+              <!-- Fixed-height wrapper: CodeQueryEditor's root is h-full, so it
                  fills this box. Putting h-20 on the editor itself collides with
                  that h-full and collapses the editor. -->
-            <div class="h-20 mt-1">
-              <query-editor
-                class="h-full"
-                data-test="scheduled-alert-sql-editor"
-                ref="queryEditorRef"
-                editor-id="alerts-query-editor"
-                :debounceTime="300"
-                :query="drilldownData.data.logsQuery"
-                @update:query="updateQueryValue"
-              />
+              <div class="mt-1 h-20">
+                <QueryEditor
+                  class="h-full"
+                  data-test="scheduled-alert-sql-editor"
+                  ref="queryEditorRef"
+                  editor-id="alerts-query-editor"
+                  :debounceTime="300"
+                  :query="drilldownData.data.logsQuery"
+                  @update:query="updateQueryValue"
+                />
+              </div>
+              <span
+                v-if="field.state.meta.errors.length > 0"
+                class="text-input-error-text mt-1 block text-xs leading-none"
+                role="alert"
+                data-test="dashboard-drilldown-logs-query-error"
+              >
+                {{ firstFieldError(field.state.meta.errors) }}
+              </span>
             </div>
-            <span
-              v-if="field.state.meta.errors.length > 0"
-              class="text-xs text-input-error-text leading-none mt-1 block"
-              role="alert"
-              data-test="dashboard-drilldown-logs-query-error"
-            >
-              {{ firstFieldError(field.state.meta.errors) }}
-            </span>
-          </div>
-        </template>
-      </component>
-    </div>
-    <div v-if="drilldownData.type == 'byUrl'">
-      <div class="mt-2.5 flex flex-col">
-        <OFormTextarea
-          name="data.url"
-          :label="t('dashboard.enterUrl')"
-          required
-          data-test="dashboard-drilldown-url-textarea"
-        />
+          </template>
+        </component>
       </div>
-    </div>
+      <div v-if="drilldownData.type == 'byUrl'">
+        <div class="mt-2.5 flex flex-col">
+          <OFormTextarea
+            name="data.url"
+            :label="t('dashboard.enterUrl')"
+            required
+            data-test="dashboard-drilldown-url-textarea"
+          />
+        </div>
+      </div>
 
-    <div v-if="drilldownData.type == 'byDashboard'">
-      <div class="mt-2.5">
-        <div class="flex items-center my-2.5 w-full">
-          <OFormSelect
-            name="data.folder"
-            :options="folderList"
-            :label="t('dashboard.selectFolderDrilldown')"
-            required
-            class="w-full"
-            :disabled="getFoldersListLoading.isLoading.value"
-            data-test="dashboard-drilldown-folder-select"
-          />
-        </div>
-        <div class="flex items-center my-2.5 w-full" v-if="drilldownData.data.folder">
-          <OFormSelect
-            name="data.dashboard"
-            :options="dashboardList"
-            :label="t('dashboard.selectDashboardDrilldown')"
-            required
-            class="w-full"
-            :disabled="getDashboardListLoading.isLoading.value"
-            data-test="dashboard-drilldown-dashboard-select"
-          />
-        </div>
-        <div class="flex items-center my-2.5 w-full" v-if="drilldownData.data.dashboard">
-          <OFormSelect
-            name="data.tab"
-            :options="tabList"
-            :label="t('dashboard.selectTabDrilldown')"
-            required
-            class="w-full"
-            :disabled="getTabListLoading.isLoading.value"
-            data-test="dashboard-drilldown-tab-select"
-          />
-        </div>
-
-        <!-- array of variables name and its values -->
-        <div class="mt-7.5">
-          <div class="flex justify-between mb-2.5 items-center"
-          >
-            <span class="o-input-label text-compact font-medium leading-tight text-input-label-text">{{ t("dashboard.variables") }}</span>
-            <OButton
-              variant="primary"
-              size="sm"
-              @click="addVariableRow"
-              data-test="dashboard-drilldown-add-variable"
-              icon-left="add"
-            >
-              {{ t("common.add") }}
-            </OButton>
+      <div v-if="drilldownData.type == 'byDashboard'">
+        <div class="mt-2.5">
+          <div class="my-2.5 flex w-full items-center">
+            <OFormSelect
+              name="data.folder"
+              :options="folderList"
+              :label="t('dashboard.selectFolderDrilldown')"
+              required
+              class="w-full"
+              :disabled="getFoldersListLoading.isLoading.value"
+              data-test="dashboard-drilldown-folder-select"
+            />
           </div>
-          <div
-            v-for="(variable, index) in drilldownData.data.variables"
-            :key="index"
-          >
-            <div class="flex gap-2.5 mb-2.5 items-center"
-              :key="JSON.stringify(variableNamesFn ?? {})"
-            >
-              <OFormCombobox
-                :name="`data.variables[${index}].name`"
-                :placeholder="t('dashboard.name')"
-                search-regex="(.*)"
-                :items="variableNamesFn"
-              />
-              <OFormCombobox
-                :name="`data.variables[${index}].value`"
-                :placeholder="t('panel.value')"
-                search-regex="(.*)"
-                :items="options.selectedValue"
-              />
+          <div class="my-2.5 flex w-full items-center" v-if="drilldownData.data.folder">
+            <OFormSelect
+              name="data.dashboard"
+              :options="dashboardList"
+              :label="t('dashboard.selectDashboardDrilldown')"
+              required
+              class="w-full"
+              :disabled="getDashboardListLoading.isLoading.value"
+              data-test="dashboard-drilldown-dashboard-select"
+            />
+          </div>
+          <div class="my-2.5 flex w-full items-center" v-if="drilldownData.data.dashboard">
+            <OFormSelect
+              name="data.tab"
+              :options="tabList"
+              :label="t('dashboard.selectTabDrilldown')"
+              required
+              class="w-full"
+              :disabled="getTabListLoading.isLoading.value"
+              data-test="dashboard-drilldown-tab-select"
+            />
+          </div>
 
-              <OIcon class="cursor-pointer shrink-0"
+          <!-- array of variables name and its values -->
+          <div class="mt-7.5">
+            <div class="mb-2.5 flex items-center justify-between">
+              <span
+                class="o-input-label text-compact text-input-label-text leading-tight font-medium"
+                >{{ t("dashboard.variables") }}</span
+              >
+              <OButton
+                variant="primary"
                 size="sm"
-                name="close"
-                @click="() => removeVariableRow(index)"
-                :data-test="`dashboard-drilldown-variable-remove-${index}`"
-              />
+                @click="addVariableRow"
+                data-test="dashboard-drilldown-add-variable"
+                icon-left="add"
+              >
+                {{ t("common.add") }}
+              </OButton>
+            </div>
+            <div v-for="(variable, index) in drilldownData.data.variables" :key="index">
+              <div
+                class="mb-2.5 flex items-center gap-2.5"
+                :key="JSON.stringify(variableNamesFn ?? {})"
+              >
+                <OFormCombobox
+                  :name="`data.variables[${index}].name`"
+                  :placeholder="t('dashboard.name')"
+                  search-regex="(.*)"
+                  :items="variableNamesFn"
+                />
+                <OFormCombobox
+                  :name="`data.variables[${index}].value`"
+                  :placeholder="t('panel.value')"
+                  search-regex="(.*)"
+                  :items="options.selectedValue"
+                />
+
+                <OIcon
+                  class="shrink-0 cursor-pointer"
+                  size="sm"
+                  name="close"
+                  @click="() => removeVariableRow(index)"
+                  :data-test="`dashboard-drilldown-variable-remove-${index}`"
+                />
+              </div>
             </div>
           </div>
         </div>
+        <!-- radio button for new tab -->
+        <div class="mt-2.5">
+          <OFormSwitch
+            name="data.passAllVariables"
+            :label="t('dashboard.passAllCurrentVariables')"
+            labelPosition="left"
+            data-test="dashboard-drilldown-pass-all-variables"
+            size="lg"
+          />
+        </div>
       </div>
+
       <!-- radio button for new tab -->
       <div class="mt-2.5">
         <OFormSwitch
-          name="data.passAllVariables"
-          :label="t('dashboard.passAllCurrentVariables')"
+          name="targetBlank"
+          :label="t('dashboard.openInNewTab')"
           labelPosition="left"
-          data-test="dashboard-drilldown-pass-all-variables"
+          data-test="dashboard-drilldown-open-in-new-tab"
           size="lg"
         />
       </div>
-    </div>
-
-    <!-- radio button for new tab -->
-    <div class="mt-2.5">
-      <OFormSwitch
-        name="targetBlank"
-        :label="t('dashboard.openInNewTab')"
-        labelPosition="left"
-        data-test="dashboard-drilldown-open-in-new-tab"
-        size="lg"
-      />
-    </div>
     </OForm>
-
   </ODialog>
 </template>
 
@@ -238,11 +242,7 @@ import { watch } from "vue";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
 import { computed } from "vue";
-import {
-  getAllDashboardsByFolderId,
-  getDashboard,
-  getFoldersList,
-} from "../../../utils/commons";
+import { getAllDashboardsByFolderId, getDashboard, getFoldersList } from "../../../utils/commons";
 import { onMounted } from "vue";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import DrilldownUserGuide from "@/components/dashboards/addPanel/DrilldownUserGuide.vue";
@@ -258,13 +258,8 @@ import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import {
-  makeDrilldownPopUpSchema,
-  type DrilldownPopUpForm,
-} from "./DrilldownPopUp.schema";
-const QueryEditor = defineAsyncComponent(
-  () => import("@/components/CodeQueryEditor.vue"),
-);
+import { makeDrilldownPopUpSchema, type DrilldownPopUpForm } from "./DrilldownPopUp.schema";
+const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
 export default defineComponent({
   name: "DrilldownPopUp",
@@ -308,13 +303,8 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
     const route = useRoute();
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
-    const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
 
     // Inject variablesManager to access all dashboard variables
     const variablesManager = inject<any>("variablesManager", null);
@@ -350,11 +340,7 @@ export default defineComponent({
     const getRecordData = () =>
       props?.isEditMode
         ? JSON.parse(
-            JSON.stringify(
-              dashboardPanelData.data.config.drilldown[
-                props?.drilldownDataIndex
-              ],
-            ),
+            JSON.stringify(dashboardPanelData.data.config.drilldown[props?.drilldownDataIndex]),
           )
         : getDefaultDrilldownData();
 
@@ -376,20 +362,17 @@ export default defineComponent({
 
     // Bridge the Monaco logsQuery + cascade resets + array-row mutations into the
     // single form.
-    const setField = form.setFieldValue as (
-      name: string,
-      val: unknown,
-    ) => void;
+    const setField = form.setFieldValue as (name: string, val: unknown) => void;
     const setFormField = (name: string, val: unknown) => {
       setField(name, val);
     };
     // Casts: array-field helpers need real array paths; this facade writes by
     // field keys don't survive DeepKeysOfType and resolve to `never`.
     const addVariableRow = () =>
-      (form.pushFieldValue as (field: string, value: unknown) => void)(
-        "data.variables",
-        { name: "", value: "" },
-      );
+      (form.pushFieldValue as (field: string, value: unknown) => void)("data.variables", {
+        name: "",
+        value: "",
+      });
     const removeVariableRow = (index: number | string) =>
       (form.removeFieldValue as (field: string, index: number) => void)(
         "data.variables",
@@ -489,10 +472,7 @@ export default defineComponent({
       }
 
       // get all dashboards from folder
-      const allDashboardList = await getAllDashboardsByFolderId(
-        store,
-        folderData?.folderId,
-      );
+      const allDashboardList = await getAllDashboardsByFolderId(store, folderData?.folderId);
 
       // make list of dashboards
       dashboardList.value =
@@ -519,15 +499,11 @@ export default defineComponent({
       // want dashboardId from dashboard name
       // by using dashboard name, find dashboard data
       // get all dashboards from folder
-      const allDashboardList = await getAllDashboardsByFolderId(
-        store,
-        folderData?.folderId,
-      );
+      const allDashboardList = await getAllDashboardsByFolderId(store, folderData?.folderId);
 
       // get dashboardId from allDashboardList by dashboard name
       const dashboardId = allDashboardList?.find(
-        (dashboard: any) =>
-          dashboard.title === drilldownData.value.data.dashboard,
+        (dashboard: any) => dashboard.title === drilldownData.value.data.dashboard,
       )?.dashboardId;
 
       if (!dashboardId) {
@@ -537,11 +513,7 @@ export default defineComponent({
 
       // get dashboard data
       // by using dashboard name, find dashboard data
-      const dashboardData = await getDashboard(
-        store,
-        dashboardId,
-        folderData?.folderId,
-      );
+      const dashboardData = await getDashboard(store, dashboardId, folderData?.folderId);
 
       // if no dashboard with same dashboard name found, return
       if (!dashboardData) {
@@ -568,8 +540,7 @@ export default defineComponent({
       // if editmode then made changes
       // else add new drilldown
       if (props?.isEditMode) {
-        dashboardPanelData.data.config.drilldown[props?.drilldownDataIndex] =
-          record;
+        dashboardPanelData.data.config.drilldown[props?.drilldownDataIndex] = record;
       } else {
         dashboardPanelData.data.config.drilldown.push(record);
       }
@@ -594,27 +565,18 @@ export default defineComponent({
         const currentPanelId = dashboardPanelData.data.id;
         // Get current tab ID from route query or first tab in dashboard
         const currentTabId =
-          (route.query.tab as string) ||
-          currentDashboardData?.data?.tabs?.[0]?.tabId ||
-          "";
+          (route.query.tab as string) || currentDashboardData?.data?.tabs?.[0]?.tabId || "";
 
         // Use getAllVisibleVariables to get only global + current tab + current panel variables
         if (variablesManager.getAllVisibleVariables) {
-          allVariables = variablesManager.getAllVisibleVariables(
-            currentTabId,
-            currentPanelId,
-          );
+          allVariables = variablesManager.getAllVisibleVariables(currentTabId, currentPanelId);
         } else {
           // Fallback: manually merge global + current tab + current panel
           const globalVars = variablesManager.variablesData.global || [];
           const tabVars =
-            (currentTabId &&
-              variablesManager.variablesData.tabs?.[currentTabId]) ||
-            [];
+            (currentTabId && variablesManager.variablesData.tabs?.[currentTabId]) || [];
           const panelVars =
-            (currentPanelId &&
-              variablesManager.variablesData.panels?.[currentPanelId]) ||
-            [];
+            (currentPanelId && variablesManager.variablesData.panels?.[currentPanelId]) || [];
 
           allVariables = [...globalVars, ...tabVars, ...panelVars];
         }
@@ -656,9 +618,7 @@ export default defineComponent({
             });
           });
         });
-      } else if (
-        ["pie", "donut", "gauge"].includes(dashboardPanelData.data.type)
-      ) {
+      } else if (["pie", "donut", "gauge"].includes(dashboardPanelData.data.type)) {
         selectedValues = [
           { label: "Series Name", value: "${series.__name}" },
           { label: "Series Value", value: "${series.__value}" },
@@ -686,41 +646,28 @@ export default defineComponent({
     const variableNamesFn = ref([]);
 
     const getvariableNames = async () => {
-      if (
-        drilldownData.value.data.folder &&
-        drilldownData.value.data.dashboard
-      ) {
+      if (drilldownData.value.data.folder && drilldownData.value.data.dashboard) {
         const folder = store.state.organizationData.folders.find(
           (folder: any) => folder.name === drilldownData.value.data.folder,
         );
 
-        const allDashboardData = await getAllDashboardsByFolderId(
-          store,
-          folder.folderId,
-        );
+        const allDashboardData = await getAllDashboardsByFolderId(store, folder.folderId);
 
         const dashboardId = allDashboardData?.find(
-          (dashboard: any) =>
-            dashboard.title === drilldownData.value.data.dashboard,
+          (dashboard: any) => dashboard.title === drilldownData.value.data.dashboard,
         )?.dashboardId;
 
         if (!dashboardId) {
           variableNamesFn.value = [];
           return;
         }
-        const dashboardData = await getDashboard(
-          store,
-          dashboardId,
-          folder?.folderId,
-        );
+        const dashboardData = await getDashboard(store, dashboardId, folder?.folderId);
 
         if (dashboardData) {
-          const optionsList = dashboardData.variables.list.map(
-            (variable: any) => ({
-              label: variable.name,
-              value: variable.name,
-            }),
-          );
+          const optionsList = dashboardData.variables.list.map((variable: any) => ({
+            label: variable.name,
+            value: variable.name,
+          }));
           variableNamesFn.value = optionsList;
         } else {
           variableNamesFn.value = [];
@@ -728,13 +675,17 @@ export default defineComponent({
       }
     };
 
-    watch(drilldownData, async (newData) => {
-      if (newData.data.folder && newData.data.dashboard) {
-        await getvariableNames();
-      } else {
-        variableNamesFn.value = [];
-      }
-    }, { deep: true });
+    watch(
+      drilldownData,
+      async (newData) => {
+        if (newData.data.folder && newData.data.dashboard) {
+          await getvariableNames();
+        } else {
+          variableNamesFn.value = [];
+        }
+      },
+      { deep: true },
+    );
 
     watch(
       () => props.open,
@@ -775,7 +726,7 @@ export default defineComponent({
       firstFieldError,
       dashboardPanelData,
       drilldownData,
-      "delete": "delete",
+      delete: "delete",
       store,
       folderList,
       dashboardList,

@@ -31,12 +31,12 @@ use config::{
 use db;
 use infra::schema::get_partition_time_level;
 use serde::{Deserialize, Serialize};
+use stream;
 
 use crate::{
     common::meta::stream::SchemaRecords,
     ingestion::{self, get_thread_id},
     metadata::{Metadata, MetadataItem},
-    stream,
 };
 
 const STREAM_NAME: &str = "trace_list_index";

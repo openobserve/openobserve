@@ -99,7 +99,7 @@ describe("OBadge", () => {
     ["primary", "bg-badge-primary-soft-bg"],
     ["success", "bg-badge-success-soft-bg"],
     ["warning", "bg-badge-warning-soft-bg"],
-    ["error",   "bg-badge-error-soft-bg"],
+    ["error", "bg-badge-error-soft-bg"],
   ] as const)("applies %s solid variant classes (now soft-styled)", (variant, expectedClass) => {
     const wrapper = mount(OBadge, {
       props: { variant },
@@ -113,7 +113,7 @@ describe("OBadge", () => {
     ["primary-outline", "text-badge-primary-ol-text"],
     ["success-outline", "text-badge-success-ol-text"],
     ["warning-outline", "text-badge-warning-ol-text"],
-    ["error-outline",   "text-badge-error-ol-text"],
+    ["error-outline", "text-badge-error-ol-text"],
   ] as const)("applies %s outline variant classes", (variant, expectedClass) => {
     const wrapper = mount(OBadge, {
       props: { variant },
@@ -128,7 +128,7 @@ describe("OBadge", () => {
     ["primary-soft", "bg-badge-primary-soft-bg"],
     ["success-soft", "bg-badge-success-soft-bg"],
     ["warning-soft", "bg-badge-warning-soft-bg"],
-    ["error-soft",   "bg-badge-error-soft-bg"],
+    ["error-soft", "bg-badge-error-soft-bg"],
   ] as const)("applies %s soft variant classes", (variant, expectedClass) => {
     const wrapper = mount(OBadge, {
       props: { variant },
@@ -138,9 +138,18 @@ describe("OBadge", () => {
   });
 
   it.each([
-    "default", "primary", "success", "warning", "error",
-    "default-soft", "primary-soft", "success-soft", "warning-soft", "error-soft",
-    "default-outline", "primary-outline",
+    "default",
+    "primary",
+    "success",
+    "warning",
+    "error",
+    "default-soft",
+    "primary-soft",
+    "success-soft",
+    "warning-soft",
+    "error-soft",
+    "default-outline",
+    "primary-outline",
   ] as const)("renders an inset border ring for the %s variant", (variant) => {
     const wrapper = mount(OBadge, {
       props: { variant },

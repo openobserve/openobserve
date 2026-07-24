@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="justify-between w-full py-px px-1 border-t border-card-glass-border bg-card-glass-bg"
+    class="border-card-glass-border bg-card-glass-bg w-full justify-between border-t px-1 py-px"
     :class="showSchemaToggle || showQuickMode ? 'flex' : ''"
   >
     <!-- Schema Toggle Buttons -->
@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :model-value="useUserDefinedSchemas"
         @update:model-value="$emit('toggle-schema', $event as string)"
         :data-test="`${dataTestPrefix}-fields-list-user-defined-schema-toggle`"
-        class="schema-field-toggle p-0 mt-1"
+        class="schema-field-toggle mt-1 p-0"
       >
         <OToggleGroupItem
           v-for="opt in schemaToggleOptions"
@@ -52,11 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template v-else-if="opt.slot === 'all_fields_slot'">
             <OIcon name="schema" size="xs" class="text-3xs!"></OIcon>
-            <OTooltip
-              max-width="18.75rem"
-              side="right"
-              align="center"
-            >
+            <OTooltip max-width="18.75rem" side="right" align="center">
               <template #content>
                 <span class="font-bold">{{ t("search.allFieldsLabel") }}</span>
                 <hr class="my-1 opacity-50" />
@@ -64,9 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </OTooltip>
           </template>
-          <template
-            v-else-if="opt.slot === 'interesting_fields_slot' && showQuickMode"
-          >
+          <template v-else-if="opt.slot === 'interesting_fields_slot' && showQuickMode">
             <OIcon name="info-outline" size="xs" class="text-3xs!" />
             <OIcon name="schema" size="xs" class="text-3xs!"></OIcon>
             <OTooltip
@@ -94,15 +88,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="opt.value"
           :value="opt.value"
           size="xs"
-          :data-test="opt.slot === 'all_fields_slot' ? `${dataTestPrefix}-all-fields-btn` : `${dataTestPrefix}-interesting-fields-btn`"
+          :data-test="
+            opt.slot === 'all_fields_slot'
+              ? `${dataTestPrefix}-all-fields-btn`
+              : `${dataTestPrefix}-interesting-fields-btn`
+          "
         >
           <template v-if="opt.slot === 'all_fields_slot'">
             <OIcon name="schema" size="xs" class="text-3xs!"></OIcon>
-            <OTooltip
-              max-width="18.75rem"
-              side="right"
-              align="center"
-            >
+            <OTooltip max-width="18.75rem" side="right" align="center">
               <template #content>
                 <span class="font-bold">{{ t("search.allFieldsLabel") }}</span>
                 <hr class="my-1 opacity-50" />
@@ -110,9 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </OTooltip>
           </template>
-          <template
-            v-else-if="opt.slot === 'interesting_fields_slot' && showQuickMode"
-          >
+          <template v-else-if="opt.slot === 'interesting_fields_slot' && showQuickMode">
             <OIcon name="info-outline" size="xs" class="text-3xs!" />
             <OIcon name="schema" size="xs" class="text-3xs!"></OIcon>
             <OTooltip

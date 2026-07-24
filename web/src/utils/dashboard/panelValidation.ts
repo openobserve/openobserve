@@ -3,11 +3,7 @@ import functionValidation from "@/components/dashboards/addPanel/dynamicFunction
 import { parseRegexPattern } from "@/utils/dashboard/tableConfigUtils";
 
 // will find first valid mapped value based on given fieldToCheck
-export const findFirstValidMappedValue = (
-  value: any,
-  mappings: any[],
-  fieldToCheck: string,
-) => {
+export const findFirstValidMappedValue = (value: any, mappings: any[], fieldToCheck: string) => {
   return mappings?.find((v: any) => {
     let isMatch = false;
 
@@ -15,12 +11,7 @@ export const findFirstValidMappedValue = (
     if (v?.type == "value") {
       isMatch = v?.value == value;
     } else if (v?.type == "range") {
-      if (
-        v?.from &&
-        v?.to &&
-        !Number.isNaN(+v?.from) &&
-        !Number.isNaN(+v?.to)
-      ) {
+      if (v?.from && v?.to && !Number.isNaN(+v?.from) && !Number.isNaN(+v?.to)) {
         isMatch = +v?.from <= +value && +v?.to >= +value;
       }
     } else if (v?.type == "regex") {
@@ -48,9 +39,7 @@ export const findFirstValidMappedValue = (
  */
 const validateConditionItem = (condition: any, errors: string[]) => {
   if (condition.type === "list" && !condition.values?.length) {
-    errors.push(
-      `Filter: ${condition.column}: Select at least 1 item from the list`,
-    );
+    errors.push(`Filter: ${condition.column}: Select at least 1 item from the list`);
   }
 
   if (condition.type === "condition") {
@@ -74,16 +63,9 @@ const validateConditionItem = (condition: any, errors: string[]) => {
  * @param index Argument index
  * @param errors Array to collect errors
  */
-const validateFieldArgument = (
-  arg: any,
-  fieldPath: string,
-  index: number,
-  errors: string[],
-) => {
+const validateFieldArgument = (arg: any, fieldPath: string, index: number, errors: string[]) => {
   if (!arg.value || typeof arg.value !== "object" || !("field" in arg.value)) {
-    errors.push(
-      `${fieldPath}: Argument ${index + 1} is a field but haven't selected any field`,
-    );
+    errors.push(`${fieldPath}: Argument ${index + 1} is a field but haven't selected any field`);
   }
 };
 
@@ -94,16 +76,9 @@ const validateFieldArgument = (
  * @param index Argument index
  * @param errors Array to collect errors
  */
-const validateNumberArgument = (
-  arg: any,
-  fieldPath: string,
-  index: number,
-  errors: string[],
-) => {
+const validateNumberArgument = (arg: any, fieldPath: string, index: number, errors: string[]) => {
   if (arg.value === null || arg.value === undefined || arg.value === "") {
-    errors.push(
-      `${fieldPath}: Argument ${index + 1} is a number but no value entered`,
-    );
+    errors.push(`${fieldPath}: Argument ${index + 1} is a number but no value entered`);
   } else if (typeof arg.value !== "number" || isNaN(arg.value)) {
     errors.push(`${fieldPath}: Argument ${index + 1} must be a valid number`);
   }
@@ -116,20 +91,11 @@ const validateNumberArgument = (
  * @param index Argument index
  * @param errors Array to collect errors
  */
-const validateStringArgument = (
-  arg: any,
-  fieldPath: string,
-  index: number,
-  errors: string[],
-) => {
+const validateStringArgument = (arg: any, fieldPath: string, index: number, errors: string[]) => {
   if (arg.value === null || arg.value === undefined) {
-    errors.push(
-      `${fieldPath}: Argument ${index + 1} is a string but no value entered`,
-    );
+    errors.push(`${fieldPath}: Argument ${index + 1} is a string but no value entered`);
   } else if (typeof arg.value !== "string" || arg.value.trim() === "") {
-    errors.push(
-      `${fieldPath}: Argument ${index + 1} must be a non-empty string`,
-    );
+    errors.push(`${fieldPath}: Argument ${index + 1} must be a non-empty string`);
   }
 };
 
@@ -148,9 +114,7 @@ const validateHistogramIntervalArgument = (
 ) => {
   // if arg value is null, value not present or not a string
   if (!(arg.value === null || !arg.value || typeof arg.value === "string")) {
-    errors.push(
-      `${fieldPath}: Argument ${index + 1} must be a valid histogram interval`,
-    );
+    errors.push(`${fieldPath}: Argument ${index + 1} must be a valid histogram interval`);
   }
 };
 
@@ -206,11 +170,7 @@ function validateConditions(conditions: any, errors: any) {
  * @param fieldPath - Path for error messages (e.g., "Field", "Field ΓåÆ Arg 2")
  * @param errors - Array to collect errors
  */
-const validateFunction = (
-  funcConfig: any,
-  fieldPath: string,
-  errors: string[],
-) => {
+const validateFunction = (funcConfig: any, fieldPath: string, errors: string[]) => {
   // Handle raw query fields
   if (funcConfig.type === "raw") {
     if (
@@ -284,8 +244,7 @@ const validateFunction = (
     // Skip null/undefined args only if they're optional
     if (!arg) {
       // Check if this position is required
-      const isOptional =
-        index < argsDefinition.length && !argsDefinition[index]?.required;
+      const isOptional = index < argsDefinition.length && !argsDefinition[index]?.required;
       if (!isOptional && !hasVariableArgs) {
         // This is a required arg that's missing - will be caught in "missing required" check below
       }
@@ -311,9 +270,7 @@ const validateFunction = (
       argDefIndex = variableArgPosition;
     }
 
-    const allowedTypes = argsDefinition[argDefIndex].type.map(
-      (t: any) => t.value,
-    );
+    const allowedTypes = argsDefinition[argDefIndex].type.map((t: any) => t.value);
 
     // Check if current argument type is among the allowed types
     if (arg && !allowedTypes.includes(arg.type)) {
@@ -329,9 +286,7 @@ const validateFunction = (
     } else if (arg.type === "function") {
       // RECURSIVE VALIDATION: If argument is a function, validate it recursively
       if (!arg.value || typeof arg.value !== "object") {
-        errors.push(
-          `${fieldPath}: Argument ${index + 1} is a function but has invalid structure`,
-        );
+        errors.push(`${fieldPath}: Argument ${index + 1} is a function but has invalid structure`);
       } else {
         // Recursively validate the nested function
         const nestedPath = `${fieldPath} ΓåÆ Arg ${index + 1}`;
@@ -358,9 +313,7 @@ const validateFunction = (
 
     // Check if required argument is missing or null/undefined
     if (argDef.required && (index >= args.length || !args[index])) {
-      errors.push(
-        `${fieldPath}: Missing required argument at position ${index + 1}`,
-      );
+      errors.push(`${fieldPath}: Missing required argument at position ${index + 1}`);
     }
   });
 };
@@ -666,11 +619,7 @@ export const validateSQLPanelFields = (
  * @param errors Array to collect error messages
  * @param customMessage Optional custom error message
  */
-const validateQueriesNotEmpty = (
-  queries: any[] = [],
-  errors: string[],
-  customMessage?: string,
-) => {
+const validateQueriesNotEmpty = (queries: any[] = [], errors: string[], customMessage?: string) => {
   queries.forEach((q: any, index: number) => {
     if (q && q?.query === "") {
       errors.push(customMessage || `Query-${index + 1} is empty`);
@@ -684,11 +633,7 @@ const validateQueriesNotEmpty = (
  * @param errors Array to collect error messages
  * @param errorMessage Error message to add if validation fails
  */
-const validateContentNotEmpty = (
-  content: string = "",
-  errors: string[],
-  errorMessage: string,
-) => {
+const validateContentNotEmpty = (content: string = "", errors: string[], errorMessage: string) => {
   if (content.trim() === "") {
     errors.push(errorMessage);
   }
@@ -711,25 +656,13 @@ const validatePanelContentByType = (panel: any, errors: string[]) => {
       validateQueriesNotEmpty(panel?.queries, errors);
       break;
     case "html":
-      validateContentNotEmpty(
-        panel?.htmlContent,
-        errors,
-        "Please enter your HTML code",
-      );
+      validateContentNotEmpty(panel?.htmlContent, errors, "Please enter your HTML code");
       break;
     case "markdown":
-      validateContentNotEmpty(
-        panel?.markdownContent,
-        errors,
-        "Please enter your markdown code",
-      );
+      validateContentNotEmpty(panel?.markdownContent, errors, "Please enter your markdown code");
       break;
     case "custom_chart":
-      validateQueriesNotEmpty(
-        [panel?.queries?.[0]],
-        errors,
-        "Please enter query for custom chart",
-      );
+      validateQueriesNotEmpty([panel?.queries?.[0]], errors, "Please enter query for custom chart");
       break;
   }
 };
@@ -756,23 +689,17 @@ const validateJoinField = (join: any, errors: string[], joinIndex: number) => {
   join?.conditions?.forEach((condition: any, conditionIndex: number) => {
     // validate leftField
     if (!condition?.leftField?.field) {
-      errors.push(
-        `Join #${joinIndex + 1}: Clause ${conditionIndex + 1}: Left field is required`,
-      );
+      errors.push(`Join #${joinIndex + 1}: Clause ${conditionIndex + 1}: Left field is required`);
     }
 
     // validate rightField
     if (!condition?.rightField?.field) {
-      errors.push(
-        `Join #${joinIndex + 1}: Clause ${conditionIndex + 1}: Right field is required`,
-      );
+      errors.push(`Join #${joinIndex + 1}: Clause ${conditionIndex + 1}: Right field is required`);
     }
 
     // validate operation
     if (!condition?.operation) {
-      errors.push(
-        `Join #${joinIndex + 1}: Clause ${conditionIndex + 1}: Operation is required`,
-      );
+      errors.push(`Join #${joinIndex + 1}: Clause ${conditionIndex + 1}: Operation is required`);
     }
   });
 };
@@ -780,9 +707,7 @@ const validateJoinField = (join: any, errors: string[], joinIndex: number) => {
 const validateJoinFields = (joins: any, errors: string[]) => {
   // validate join fields
   if (joins) {
-    joins.forEach((join: any, index: number) =>
-      validateJoinField(join, errors, index),
-    );
+    joins.forEach((join: any, index: number) => validateJoinField(join, errors, index));
   }
 };
 
@@ -814,9 +739,7 @@ const validatePanelFields = (panel: any, errors: string[] = []) => {
     );
 
     // Check filter conditions validity
-    if (
-      panel?.queries?.[currentQueryIndex]?.fields?.filter?.conditions?.length
-    ) {
+    if (panel?.queries?.[currentQueryIndex]?.fields?.filter?.conditions?.length) {
       // Validate the conditions
       validateConditions(
         panel?.queries?.[currentQueryIndex]?.fields?.filter?.conditions ?? [],
@@ -869,9 +792,7 @@ const validatePanelContent = (panel: any): string[] => {
   ];
 
   if (!allowedTypes.includes(panel?.type)) {
-    errors.push(
-      `Panel ${panel?.id}: Chart type "${panel?.type}" is not supported.`,
-    );
+    errors.push(`Panel ${panel?.id}: Chart type "${panel?.type}" is not supported.`);
   }
 
   if (!panel?.title) {
@@ -915,22 +836,20 @@ export const validatePanel = (
   const currentQueryIndex = panelData?.layout?.currentQueryIndex || 0;
 
   // Check if panel has promQL query type
-  const isPromQLMode = panelData?.data?.queryType === "promql" || panelData?.data?.queryType === "promql-builder";
+  const isPromQLMode =
+    panelData?.data?.queryType === "promql" || panelData?.data?.queryType === "promql-builder";
 
   // Validate panel content based on type
   validatePanelContentByType(panelData?.data, errors);
 
   // Validate timestamp alias for SQL queries with custom query mode
   if (panelData?.data?.queryType === "sql") {
-    const timestampColumn =
-      store.state.zoConfig.timestamp_column || "_timestamp";
+    const timestampColumn = store.state.zoConfig.timestamp_column || "_timestamp";
 
     panelData?.data?.queries?.forEach((queryObj: any) => {
       if (queryObj?.query && queryObj?.customQuery) {
         if (!checkTimestampAlias(queryObj.query)) {
-          errors.push(
-            `Alias '${timestampColumn}' is not allowed.`,
-          );
+          errors.push(`Alias '${timestampColumn}' is not allowed.`);
         }
       }
     });
@@ -960,31 +879,20 @@ export const validatePanel = (
       "h-stacked",
     ];
     if (!allowedChartTypes.includes(panelData?.data?.type)) {
-      errors.push(
-        "Selected chart type is not supported for PromQL. Only line chart is supported.",
-      );
+      errors.push("Selected chart type is not supported for PromQL. Only line chart is supported.");
     }
 
     // 2. x axis, y axis, filters should be blank for PromQL
     if (panelData?.data?.queries?.[currentQueryIndex]?.fields?.x?.length > 0) {
-      errors.push(
-        "X-Axis is not supported for PromQL. Remove anything added to the X-Axis.",
-      );
+      errors.push("X-Axis is not supported for PromQL. Remove anything added to the X-Axis.");
     }
 
     if (panelData?.data?.queries?.[currentQueryIndex]?.fields?.y?.length > 0) {
-      errors.push(
-        "Y-Axis is not supported for PromQL. Remove anything added to the Y-Axis.",
-      );
+      errors.push("Y-Axis is not supported for PromQL. Remove anything added to the Y-Axis.");
     }
 
-    if (
-      panelData?.data?.queries?.[currentQueryIndex]?.fields?.filter?.conditions
-        ?.length > 0
-    ) {
-      errors.push(
-        "Filters are not supported for PromQL. Remove anything added to the Filters.",
-      );
+    if (panelData?.data?.queries?.[currentQueryIndex]?.fields?.filter?.conditions?.length > 0) {
+      errors.push("Filters are not supported for PromQL. Remove anything added to the Filters.");
     }
   } else {
     // Calculate the x and y axis labels based on chart type
@@ -1028,9 +936,7 @@ export const validatePanel = (
 
       // Prefix errors with query number when multiple queries exist
       if (hasMultipleQueries) {
-        queryErrors.forEach((err) =>
-          errors.push(`Query ${queryIndex + 1}: ${err}`),
-        );
+        queryErrors.forEach((err) => errors.push(`Query ${queryIndex + 1}: ${err}`));
       } else {
         errors.push(...queryErrors);
       }
@@ -1068,16 +974,11 @@ export const validateDashboardJson = (dashboardJson: any): string[] => {
   if (!dashboardJson?.version) {
     errors.push("Dashboard version is required");
   } else if (dashboardJson.version !== CURRENT_DASHBOARD_SCHEMA_VERSION) {
-    errors.push(
-      `Dashboard version must be ${CURRENT_DASHBOARD_SCHEMA_VERSION}.`,
-    );
+    errors.push(`Dashboard version must be ${CURRENT_DASHBOARD_SCHEMA_VERSION}.`);
   }
 
   // Check tabs
-  if (
-    !Array.isArray(dashboardJson?.tabs) ||
-    dashboardJson?.tabs?.length === 0
-  ) {
+  if (!Array.isArray(dashboardJson?.tabs) || dashboardJson?.tabs?.length === 0) {
     errors.push("Dashboard must have at least one tab");
     return errors;
   }
@@ -1126,13 +1027,8 @@ export const validateDashboardJson = (dashboardJson: any): string[] => {
         errors.push(`Panel ${panel?.id} is missing a layout.i value`);
       } else {
         const tabLayoutValues = layoutIValues.get(tab?.tabId);
-        if (
-          tabLayoutValues &&
-          tabLayoutValues.has(panel?.layout?.i?.toString())
-        ) {
-          errors.push(
-            `Duplicate layout.i value found in tab ${tab?.tabId}: ${panel?.layout?.i}`,
-          );
+        if (tabLayoutValues && tabLayoutValues.has(panel?.layout?.i?.toString())) {
+          errors.push(`Duplicate layout.i value found in tab ${tab?.tabId}: ${panel?.layout?.i}`);
         } else if (tabLayoutValues) {
           tabLayoutValues.add(panel?.layout?.i?.toString());
         }
@@ -1160,9 +1056,7 @@ export const validateDashboardJson = (dashboardJson: any): string[] => {
           // If validation fails
           errors.push(
             `Panel ${panel?.id || "unknown"}: ${
-              error instanceof Error
-                ? error?.message
-                : "Unable to validate panel configuration"
+              error instanceof Error ? error?.message : "Unable to validate panel configuration"
             }`,
           );
         }

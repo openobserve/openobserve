@@ -110,20 +110,28 @@ const mountComponent = async () => {
       plugins: [i18n, store, router],
       stubs: {
         ODialog: ODialogStub,
-        DateTime: { template: '<div data-test="alert-history-date-picker" />', props: [], emits: ["on:date-change"] },
-        OTable: { template: '<div data-test="alert-history-table"><slot name="empty" /></div>', props: ["data", "columns", "loading"] },
+        DateTime: {
+          template: '<div data-test="alert-history-date-picker" />',
+          props: [],
+          emits: ["on:date-change"],
+        },
+        OTable: {
+          template: '<div data-test="alert-history-table"><slot name="empty" /></div>',
+          props: ["data", "columns", "loading"],
+        },
         OSelect: { template: '<div data-test="alert-history-search-select" />', props: [] },
         OButton: {
-          template: '<button :data-test="$attrs[\'data-test\']" :disabled="disabled" @click="$emit(\'click\')"><slot /></button>',
+          template:
+            '<button :data-test="$attrs[\'data-test\']" :disabled="disabled" @click="$emit(\'click\')"><slot /></button>',
           props: ["disabled", "loading"],
           emits: ["click"],
           inheritAttrs: false,
         },
-        OIcon: { template: '<span />', props: [] },
-        OBadge: { template: '<span><slot /></span>', props: [] },
-        OTooltip: { template: '<span />', props: [] },
-        OSeparator: { template: '<hr />' },
-        NoData: { template: '<div />' },
+        OIcon: { template: "<span />", props: [] },
+        OBadge: { template: "<span><slot /></span>", props: [] },
+        OTooltip: { template: "<span />", props: [] },
+        OSeparator: { template: "<hr />" },
+        NoData: { template: "<div />" },
       },
     },
   });
@@ -344,7 +352,11 @@ describe("AlertHistory.vue", () => {
 
     it("showErrorDialog opens the error dialog", async () => {
       await mountComponent();
-      const errorObj = { alert_name: "Alert 1", error: "oops", last_error_timestamp: 1699900000000000 };
+      const errorObj = {
+        alert_name: "Alert 1",
+        error: "oops",
+        last_error_timestamp: 1699900000000000,
+      };
 
       (wrapper.vm as any).showErrorDialog(errorObj);
       await wrapper.vm.$nextTick();
@@ -354,7 +366,11 @@ describe("AlertHistory.vue", () => {
 
     it("closeErrorDialog closes the error dialog", async () => {
       await mountComponent();
-      const errorObj = { alert_name: "Alert 1", error: "oops", last_error_timestamp: 1699900000000000 };
+      const errorObj = {
+        alert_name: "Alert 1",
+        error: "oops",
+        last_error_timestamp: 1699900000000000,
+      };
       (wrapper.vm as any).showErrorDialog(errorObj);
       await wrapper.vm.$nextTick();
 

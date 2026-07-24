@@ -31,9 +31,7 @@ export const makeSemanticGroupItemSchema = (t: (_key: string) => string) =>
     fields: z.array(z.string()).optional(),
   });
 
-export type SemanticGroupItemForm = z.infer<
-  ReturnType<typeof makeSemanticGroupItemSchema>
->;
+export type SemanticGroupItemForm = z.infer<ReturnType<typeof makeSemanticGroupItemSchema>>;
 
 /**
  * Typed default values for the form, projected from the (optional) group record

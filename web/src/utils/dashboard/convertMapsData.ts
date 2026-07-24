@@ -101,9 +101,7 @@ export const convertMapsData = (panelSchema: any, mapData: any) => {
         },
       },
       data: mapData[index]?.map((item: any) => {
-        const countryName = getCountryName(
-          getDataValue(item, query.fields.name.alias),
-        ); // Map to full country name
+        const countryName = getCountryName(getDataValue(item, query.fields.name.alias)); // Map to full country name
         const value = getDataValue(item, query.fields.value_for_maps.alias);
 
         if (query.customQuery) {
@@ -128,13 +126,9 @@ export const convertMapsData = (panelSchema: any, mapData: any) => {
   if (seriesData.length > 0) {
     const numericValues = seriesData
       .map((item: any) => item.value)
-      .filter(
-        (value: any): value is number =>
-          typeof value === "number" && !Number.isNaN(value),
-      );
+      .filter((value: any): value is number => typeof value === "number" && !Number.isNaN(value));
 
-    const minValue =
-      numericValues.length === 1 ? 0 : Math.min(...numericValues); 
+    const minValue = numericValues.length === 1 ? 0 : Math.min(...numericValues);
     const maxValue = Math.max(...numericValues);
 
     options.visualMap.min = minValue;

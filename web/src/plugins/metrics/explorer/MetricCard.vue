@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     ref="root"
-    class="group relative flex flex-col h-full overflow-hidden border border-border-default rounded-default hover:border-primary focus-within:border-primary"
+    class="group border-border-default rounded-default hover:border-primary focus-within:border-primary relative flex h-full flex-col overflow-hidden border"
     role="group"
     :aria-label="
       t('metrics.explorer.card.ariaLabel', {
@@ -38,15 +38,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          dashboard-panel-bar): same min-height, padding and bottom border, no
          tint. -->
     <div
-      class="relative flex items-center gap-2 min-w-0 min-h-7 py-1 px-2 border-b border-border-default"
+      class="border-border-default relative flex min-h-7 min-w-0 items-center gap-2 border-b px-2 py-1"
     >
       <!-- The name gets the full header width; the type badge sits in the
            footer, where it cannot truncate the name it describes. -->
-      <div class="flex items-center gap-1.5 min-w-0">
+      <div class="flex min-w-0 items-center gap-1.5">
         <!-- Matches the dashboard panel title's classes (PanelContainer's
              dashboard-panel-header): same size, weight, tracking and token. -->
         <span
-          class="whitespace-nowrap overflow-hidden text-ellipsis text-compact font-medium text-text-heading tracking-[0.02em]"
+          class="text-compact text-text-heading overflow-hidden font-medium tracking-[0.02em] text-ellipsis whitespace-nowrap"
           :title="card.name"
           >{{ card.name }}</span
         >
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- The action row: `size="icon"` buttons sitting adjacent (no gap).
            Order (left→right): Help → Configure → Open → Pin → 🕑 clock → Refresh. -->
-      <div class="flex flex-nowrap items-center shrink-0">
+      <div class="flex shrink-0 flex-nowrap items-center">
         <!-- Help — the SAME element the dashboard panel bar uses for its panel
              description (PanelContainer `dashboard-panel-description-info`): an
              info-outline icon with a width-capped, pre-wrapped OTooltip. NOT a
@@ -91,9 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon"
           icon-left="settings"
-          :aria-label="
-            t('metrics.explorer.card.configureAria', { name: card.name })
-          "
+          :aria-label="t('metrics.explorer.card.configureAria', { name: card.name })"
           :data-test="`metrics-explorer-card-fn-${card.name}`"
           @click="$emit('configure', card)"
         >
@@ -150,10 +148,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              its data really is instead of passing it off as live. -->
         <span
           v-if="preview?.lastTriggeredAt"
-          class="lastRefreshedAt ml-1.25 mr-0.5 text-[smaller] whitespace-nowrap overflow-hidden text-ellipsis shrink-0"
+          class="lastRefreshedAt mr-0.5 ml-1.25 shrink-0 overflow-hidden text-[smaller] text-ellipsis whitespace-nowrap"
           :data-test="`metrics-explorer-card-last-refreshed-${card.name}`"
         >
-          <span class="text-[smaller] mr-0.5">
+          <span class="mr-0.5 text-[smaller]">
             🕑
             <OTooltip side="bottom" align="end">
               <template #content
@@ -177,9 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon"
           icon-left="refresh"
           :loading="preview?.status === 'loading'"
-          :aria-label="
-            t('metrics.explorer.card.refreshAria', { name: card.name })
-          "
+          :aria-label="t('metrics.explorer.card.refreshAria', { name: card.name })"
           :data-test="`metrics-explorer-card-refresh-${card.name}`"
           @click="$emit('refresh', card)"
         >
@@ -190,21 +186,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Flush to the frame, like a panel body — the chart's own converter
          margins are the only inset, same as dashboards. -->
-    <div class="relative flex-1 min-h-0">
+    <div class="relative min-h-0 flex-1">
       <!-- The SAME loader a dashboard panel shows (PanelSchemaRenderer): a thin
            progress bar over the body, with whatever chart is already there kept
            visible beneath it. The card has no chunk-level progress to report,
            so the bar runs at its indeterminate floor with the shimmer. -->
-      <LoadingProgress
-        :loading="preview?.status === 'loading'"
-        :loading-progress-percentage="0"
-      />
+      <LoadingProgress :loading="preview?.status === 'loading'" :loading-progress-percentage="0" />
 
       <!-- Unsupported: a placeholder rather than a wrong chart. The open-in-
            editor icon still works, so the metric stays explorable. -->
       <div
         v-if="card.unsupported"
-        class="flex flex-col items-center justify-center gap-1.5 h-full text-2xs opacity-65 text-text-secondary"
+        class="text-2xs text-text-secondary flex h-full flex-col items-center justify-center gap-1.5 opacity-65"
         :data-test="`metrics-explorer-card-unsupported-${card.name}`"
       >
         <OIcon name="help-outline" size="sm" />
@@ -216,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            not use. The drill-in works: the editor renders the table properly. -->
       <div
         v-else-if="preview?.status === 'unavailable'"
-        class="flex flex-col items-center justify-center gap-1.5 h-full text-2xs opacity-65 text-text-secondary"
+        class="text-2xs text-text-secondary flex h-full flex-col items-center justify-center gap-1.5 opacity-65"
         :data-test="`metrics-explorer-card-nopreview-${card.name}`"
       >
         <OIcon name="table-chart" size="sm" />
@@ -225,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div
         v-else-if="preview?.status === 'error'"
-        class="flex flex-col items-center justify-center gap-1.5 h-full text-2xs opacity-65 text-text-secondary"
+        class="text-2xs text-text-secondary flex h-full flex-col items-center justify-center gap-1.5 opacity-65"
         :data-test="`metrics-explorer-card-error-${card.name}`"
       >
         <!-- The backend's message is the only thing that distinguishes a
@@ -238,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              AND the label — so the hover target is a readable block rather than
              a 16px dot. -->
         <span
-          class="inline-flex flex-col items-center gap-1.5 cursor-help"
+          class="inline-flex cursor-help flex-col items-center gap-1.5"
           :aria-label="
             t('metrics.explorer.card.queryFailedAria', {
               name: card.name,
@@ -272,9 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="xs"
-            :aria-label="
-              t('metrics.explorer.card.copyErrorAria', { name: card.name })
-            "
+            :aria-label="t('metrics.explorer.card.copyErrorAria', { name: card.name })"
             :data-test="`metrics-explorer-card-copy-error-${card.name}`"
             @click.stop="copyErrorReport"
           >
@@ -314,7 +305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`metrics-explorer-card-sparse-${card.name}`"
       >
         <template #title>
-          <span class="inline-flex items-center gap-1 cursor-help">
+          <span class="inline-flex cursor-help items-center gap-1">
             <OTooltip
               :content="t('metrics.explorer.card.sparseHint')"
               content-class="whitespace-pre-line"
@@ -340,10 +331,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            status "done" and none of the error branches above catch it. -->
       <div
         v-else-if="renderError"
-        class="flex flex-col items-center justify-center gap-1.5 h-full text-2xs text-text-secondary"
+        class="text-2xs text-text-secondary flex h-full flex-col items-center justify-center gap-1.5"
         :data-test="`metrics-explorer-card-render-error-${card.name}`"
       >
-        <span class="inline-flex items-center gap-1 cursor-help">
+        <span class="inline-flex cursor-help items-center gap-1">
           <OTooltip
             :content="renderError"
             content-class="whitespace-pre-line"
@@ -391,11 +382,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`metrics-explorer-card-nan-guard-${card.name}`"
       >
         <span class="inline-flex cursor-help">
-          <OTooltip
-            :content="t('metrics.explorer.card.nanGuard')"
-            max-width="360px"
-            :delay="200"
-          />
+          <OTooltip :content="t('metrics.explorer.card.nanGuard')" max-width="360px" :delay="200" />
           <OIcon name="info-outline" size="xs" />
         </span>
       </div>
@@ -412,9 +399,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <button
           type="button"
           class="inline-flex cursor-pointer"
-          :aria-label="
-            t('metrics.explorer.card.staleCopyAria', { name: card.name })
-          "
+          :aria-label="t('metrics.explorer.card.staleCopyAria', { name: card.name })"
           :data-test="`metrics-explorer-card-stale-copy-${card.name}`"
           @click.stop="copyErrorReport"
         >
@@ -431,19 +416,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- The footer pads itself now that the frame is flush, mirroring how the
          panel bar pads itself. -->
-    <div class="flex items-center justify-between gap-2 text-3xs px-2 py-1">
+    <div class="text-3xs flex items-center justify-between gap-2 px-2 py-1">
       <!-- The function actually in effect, so a ⚙ override is visible on the
            card rather than silently identical to the default. -->
-      <span class="opacity-70 text-text-secondary truncate">{{
+      <span class="text-text-secondary truncate opacity-70">{{
         preview?.footerLabel || card.footerLabel
       }}</span>
 
-      <div class="flex items-center gap-1.5 flex-none">
+      <div class="flex flex-none items-center gap-1.5">
         <!-- Cached data fetched for a differently-sized window. Same warning the
              dashboards raise on a panel. -->
         <span
           v-if="preview?.cachedDataDiffersFromTimeRange"
-          class="inline-flex text-warning-600 cursor-help"
+          class="text-warning-600 inline-flex cursor-help"
           :data-test="`metrics-explorer-card-cached-differs-${card.name}`"
         >
           <OTooltip
@@ -454,7 +439,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="running-with-errors" size="xs" />
         </span>
 
-        <span class="opacity-70 text-text-secondary">{{ unitLabel }}</span>
+        <span class="text-text-secondary opacity-70">{{ unitLabel }}</span>
         <!-- Badge text is never the sole carrier of meaning — the footer
              function label sits right beside it. -->
         <OTag
@@ -464,7 +449,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
-
   </div>
 </template>
 
@@ -493,10 +477,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import { BADGE_LABELS, cardColorForIndex } from "@/utils/metrics/metricPalette";
 import { toO2Unit } from "@/utils/metrics/metricDefaults";
 import type { MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
-import {
-  hasSamples,
-  type CardPreview,
-} from "@/composables/metrics/useMetricsExplorerGrid";
+import { hasSamples, type CardPreview } from "@/composables/metrics/useMetricsExplorerGrid";
 
 /** Human-facing unit text for the card footer. */
 const UNIT_LABELS: Record<string, string> = {
@@ -582,17 +563,13 @@ export default defineComponent({
       () => BADGE_LABELS[props.card.typeFilterBucket] ?? t("metrics.metricCard.other"),
     );
 
-    const o2Unit = computed(() =>
-      toO2Unit(props.preview?.unit ?? props.card.unit),
-    );
+    const o2Unit = computed(() => toO2Unit(props.preview?.unit ?? props.card.unit));
     const bucketO2Unit = computed(() =>
       props.preview?.bucketUnit
         ? toO2Unit(props.preview.bucketUnit)
         : { unit: null, unitCustom: null },
     );
-    const unitLabel = computed(
-      () => UNIT_LABELS[props.preview?.unit ?? props.card.unit] ?? "",
-    );
+    const unitLabel = computed(() => UNIT_LABELS[props.preview?.unit ?? props.card.unit] ?? "");
 
     /**
      * The failure, in full: the message, then the backend's internal cause and
@@ -610,9 +587,7 @@ export default defineComponent({
       return [
         preview.error,
         preview.errorDetail,
-        preview.errorTraceId
-          ? t("metrics.metricCard.traceId", { id: preview.errorTraceId })
-          : "",
+        preview.errorTraceId ? t("metrics.metricCard.traceId", { id: preview.errorTraceId }) : "",
       ]
         .filter(Boolean)
         .join("\n");
@@ -650,9 +625,7 @@ export default defineComponent({
         preview.errorDetail
           ? t("metrics.metricCard.causeLabel", { cause: preview.errorDetail })
           : "",
-        preview.errorTraceId
-          ? t("metrics.metricCard.traceId", { id: preview.errorTraceId })
-          : "",
+        preview.errorTraceId ? t("metrics.metricCard.traceId", { id: preview.errorTraceId }) : "",
       ]
         .filter(Boolean)
         .join("\n");
@@ -715,9 +688,7 @@ export default defineComponent({
      * one sparse series would otherwise invent a two-day axis — so it must pin to
      * the window that is actually true of the data.
      */
-    const dataTimeRange = computed(
-      () => props.preview?.cachedTimeRange ?? props.timeRange,
-    );
+    const dataTimeRange = computed(() => props.preview?.cachedTimeRange ?? props.timeRange);
 
     // Lazy queries: only cards in (or within one viewport of) the scroll window
     // fetch anything.

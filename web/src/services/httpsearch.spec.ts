@@ -90,7 +90,7 @@ describe("httpsearch service", () => {
       httpsearch();
 
       expect(axios.create).toHaveBeenCalledWith(
-        expect.objectContaining({ baseURL: "http://localhost:5080" })
+        expect.objectContaining({ baseURL: "http://localhost:5080" }),
       );
     });
 

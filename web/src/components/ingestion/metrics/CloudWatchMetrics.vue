@@ -20,13 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <IngestionDocLink
       href="https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-metric-streams-setup-datalake.html"
     >
-      to explore the process of setting up a CloudWatch custom metric stream
-      with Data Firehose to OpenObserve. You may choose JSON or OpenTelemetry
-      1.0 as the output format.</IngestionDocLink
+      to explore the process of setting up a CloudWatch custom metric stream with Data Firehose to
+      OpenObserve. You may choose JSON or OpenTelemetry 1.0 as the output format.</IngestionDocLink
     >
     <div class="italic">
-      Note: Output is available under Logs with stream name
-      'cloudwatch_metrics'.
+      Note: Output is available under Logs with stream name 'cloudwatch_metrics'.
     </div>
   </IngestionContent>
 </template>

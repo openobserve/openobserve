@@ -45,7 +45,9 @@ const {
   mockServiceGet: vi.fn().mockResolvedValue({ data: {} }),
   mockServiceCreate: vi.fn().mockResolvedValue({ data: { id: "new-1" } }),
   mockServiceGetLocations: vi.fn().mockResolvedValue({ data: { locations: [] } }),
-  mockServiceGetAgentSetup: vi.fn().mockResolvedValue({ data: { install: "curl ...", token: "abc123" } }),
+  mockServiceGetAgentSetup: vi
+    .fn()
+    .mockResolvedValue({ data: { install: "curl ...", token: "abc123" } }),
   mockRouterPush: vi.fn(),
 }));
 
@@ -138,7 +140,7 @@ const baseStubs = {
     props: ["iconLeft", "dataTest"],
   },
   OIcon: {
-    template: '<span />',
+    template: "<span />",
     props: ["name", "size", "class"],
   },
   ODialog: {
@@ -162,7 +164,7 @@ const baseStubs = {
     inheritAttrs: true,
   },
   OSelect: {
-    template: '<select :data-test="$attrs[\'data-test\']" />',
+    template: "<select :data-test=\"$attrs['data-test']\" />",
     props: ["modelValue", "options", "size"],
   },
   OInput: {
@@ -172,12 +174,11 @@ const baseStubs = {
     emits: ["update:modelValue"],
   },
   OToggleGroup: {
-    template: '<div><slot /></div>',
+    template: "<div><slot /></div>",
     props: ["modelValue"],
   },
   OToggleGroupItem: {
-    template:
-      '<button :data-test="$attrs[\'data-test\']"><slot /></button>',
+    template: "<button :data-test=\"$attrs['data-test']\"><slot /></button>",
     props: ["value", "size", "iconLeft"],
     inheritAttrs: true,
   },
@@ -192,7 +193,7 @@ const baseStubs = {
     props: ["value", "name", "label", "icon", "disable", "tooltip"],
   },
   OText: {
-    template: '<span><slot /></span>',
+    template: "<span><slot /></span>",
     props: ["variant"],
   },
   // ── Stubs for Private Locations functionality ────────────────────────
@@ -233,23 +234,17 @@ describe("SyntheticMonitoring", () => {
     it("should render the page shell with the new check button", () => {
       wrapper = mountPage();
       expect(wrapper.exists()).toBe(true);
-      expect(
-        wrapper.find('[data-test="synthetic-monitoring-new-check-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetic-monitoring-new-check-btn"]').exists()).toBe(true);
     });
 
     it("should render the sidebar folder list", () => {
       wrapper = mountPage();
-      expect(
-        wrapper.find('[data-test="synthetic-monitoring-folder-list"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetic-monitoring-folder-list"]').exists()).toBe(true);
     });
 
     it("should render the MonitorTable", () => {
       wrapper = mountPage();
-      expect(
-        wrapper.find('[data-test="synthetic-monitoring-monitors-table"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetic-monitoring-monitors-table"]').exists()).toBe(true);
     });
   });
 
@@ -368,12 +363,10 @@ describe("SyntheticMonitoring", () => {
   describe("conditional header action button", () => {
     it("shows New Check button when on Checks tab and hides Setup agent button", () => {
       wrapper = mountPage();
-      expect(
-        wrapper.find('[data-test="synthetic-monitoring-new-check-btn"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="synthetic-monitoring-setup-agent-btn"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="synthetic-monitoring-new-check-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="synthetic-monitoring-setup-agent-btn"]').exists()).toBe(
+        false,
+      );
     });
 
     it("shows Setup an agent button when on Private tab and hides New Check button", async () => {
@@ -381,21 +374,17 @@ describe("SyntheticMonitoring", () => {
       (wrapper.vm as any).activeSection = "private";
       await nextTick();
 
-      expect(
-        wrapper.find('[data-test="synthetic-monitoring-new-check-btn"]').exists(),
-      ).toBe(false);
-      expect(
-        wrapper.find('[data-test="synthetic-monitoring-setup-agent-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetic-monitoring-new-check-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="synthetic-monitoring-setup-agent-btn"]').exists()).toBe(
+        true,
+      );
     });
 
     it("clicking New Check button sets showTypePicker to true", async () => {
       wrapper = mountPage();
       expect((wrapper.vm as any).showTypePicker).toBe(false);
 
-      await wrapper
-        .find('[data-test="synthetic-monitoring-new-check-btn"]')
-        .trigger("click");
+      await wrapper.find('[data-test="synthetic-monitoring-new-check-btn"]').trigger("click");
 
       expect((wrapper.vm as any).showTypePicker).toBe(true);
     });
@@ -405,9 +394,7 @@ describe("SyntheticMonitoring", () => {
       (wrapper.vm as any).activeSection = "private";
       await nextTick();
 
-      await wrapper
-        .find('[data-test="synthetic-monitoring-setup-agent-btn"]')
-        .trigger("click");
+      await wrapper.find('[data-test="synthetic-monitoring-setup-agent-btn"]').trigger("click");
 
       // openSetupDrawer sets showSetupDrawer synchronously before any async call
       expect((wrapper.vm as any).showSetupDrawer).toBe(true);
@@ -422,30 +409,24 @@ describe("SyntheticMonitoring", () => {
   describe("sidebar and main content visibility", () => {
     it("shows sidebar folder list only on Checks tab", async () => {
       wrapper = mountPage();
-      expect(
-        wrapper.find('[data-test="synthetic-monitoring-folder-list"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetic-monitoring-folder-list"]').exists()).toBe(true);
 
       (wrapper.vm as any).activeSection = "private";
       await nextTick();
 
-      expect(
-        wrapper.find('[data-test="synthetic-monitoring-folder-list"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="synthetic-monitoring-folder-list"]').exists()).toBe(false);
     });
 
     it("shows MonitorTable only on Checks tab", async () => {
       wrapper = mountPage();
-      expect(
-        wrapper.find('[data-test="synthetic-monitoring-monitors-table"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetic-monitoring-monitors-table"]').exists()).toBe(true);
 
       (wrapper.vm as any).activeSection = "private";
       await nextTick();
 
-      expect(
-        wrapper.find('[data-test="synthetic-monitoring-monitors-table"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="synthetic-monitoring-monitors-table"]').exists()).toBe(
+        false,
+      );
     });
 
     it("renders PrivateLocations on Private Locations tab", async () => {
@@ -469,12 +450,8 @@ describe("SyntheticMonitoring", () => {
       (wrapper.vm as any).activeSection = "checks";
       await nextTick();
 
-      expect(
-        wrapper.find('[data-test="synthetic-monitoring-folder-list"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="synthetic-monitoring-monitors-table"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetic-monitoring-folder-list"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="synthetic-monitoring-monitors-table"]').exists()).toBe(true);
       expect(
         wrapper.find('[data-test="synthetic-monitoring-private-locations-stub"]').exists(),
       ).toBe(false);

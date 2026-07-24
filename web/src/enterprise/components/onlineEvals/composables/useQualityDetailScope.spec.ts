@@ -42,24 +42,15 @@ describe("Quality detail scope queries", () => {
       healthyThreshold: { healthy_categories: ["high"] },
     });
     const scope = ref<QualityScope>("trace");
-    const detail = useQualityConfigDetail(
-      config,
-      ref(DATE_WINDOW),
-      ref(null),
-      scope,
-    );
+    const detail = useQualityConfigDetail(config, ref(DATE_WINDOW), ref(null), scope);
 
     await detail.refresh();
 
     expect(mockExecuteQuery).toHaveBeenCalledTimes(2);
     expect(
-      mockExecuteQuery.mock.calls.every(([sql]) =>
-        sql.includes("_target_scope = 'trace'"),
-      ),
+      mockExecuteQuery.mock.calls.every(([sql]) => sql.includes("_target_scope = 'trace'")),
     ).toBe(true);
-    expect(detail.kpis.value.find((kpi) => kpi.id === "targetsScored")?.value).toBe(
-      4,
-    );
+    expect(detail.kpis.value.find((kpi) => kpi.id === "targetsScored")?.value).toBe(4);
 
     mockExecuteQuery.mockClear();
     scope.value = "session";
@@ -67,13 +58,9 @@ describe("Quality detail scope queries", () => {
 
     expect(mockExecuteQuery).toHaveBeenCalledTimes(2);
     expect(
-      mockExecuteQuery.mock.calls.every(([sql]) =>
-        sql.includes("_target_scope = 'session'"),
-      ),
+      mockExecuteQuery.mock.calls.every(([sql]) => sql.includes("_target_scope = 'session'")),
     ).toBe(true);
-    expect(detail.kpis.value.find((kpi) => kpi.id === "targetsScored")?.value).toBe(
-      1,
-    );
+    expect(detail.kpis.value.find((kpi) => kpi.id === "targetsScored")?.value).toBe(1);
   });
 
   it("scopes every chart query and refreshes chart data when scope changes", async () => {
@@ -97,20 +84,13 @@ describe("Quality detail scope queries", () => {
       numericRange: { min: 0, max: 5 },
     });
     const scope = ref<QualityScope>("trace");
-    const charts = useQualityDetailCharts(
-      config,
-      ref(DATE_WINDOW),
-      ref(null),
-      scope,
-    );
+    const charts = useQualityDetailCharts(config, ref(DATE_WINDOW), ref(null), scope);
 
     await charts.refresh();
 
     expect(mockExecuteQuery).toHaveBeenCalledTimes(2);
     expect(
-      mockExecuteQuery.mock.calls.every(([sql]) =>
-        sql.includes("_target_scope = 'trace'"),
-      ),
+      mockExecuteQuery.mock.calls.every(([sql]) => sql.includes("_target_scope = 'trace'")),
     ).toBe(true);
     expect(charts.numericTrend.value[0]?.avg).toBe(4);
 
@@ -120,9 +100,7 @@ describe("Quality detail scope queries", () => {
 
     expect(mockExecuteQuery).toHaveBeenCalledTimes(2);
     expect(
-      mockExecuteQuery.mock.calls.every(([sql]) =>
-        sql.includes("_target_scope = 'session'"),
-      ),
+      mockExecuteQuery.mock.calls.every(([sql]) => sql.includes("_target_scope = 'session'")),
     ).toBe(true);
     expect(charts.numericTrend.value[0]?.avg).toBe(1);
   });

@@ -18,9 +18,7 @@ function mountTooltip(
   props: Record<string, unknown>,
   slots: Record<string, () => ReturnType<typeof h> | string> = {},
 ) {
-  return mount(
-    { render: () => h(TooltipProvider, () => h(OTooltip, props, slots)) },
-  );
+  return mount({ render: () => h(TooltipProvider, () => h(OTooltip, props, slots)) });
 }
 
 describe("OTooltip", () => {
@@ -96,9 +94,7 @@ describe("OTooltip", () => {
       const wrapper = mount(
         {
           render: () =>
-            h("button", { "data-testid": "t" }, [
-              h(OTooltip, { content: "Hello", delay: 10 }),
-            ]),
+            h("button", { "data-testid": "t" }, [h(OTooltip, { content: "Hello", delay: 10 })]),
         },
         { attachTo: document.body },
       );

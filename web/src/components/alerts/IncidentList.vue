@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @row-click="viewIncident"
       >
         <template #toolbar>
-          <div class="flex items-center justify-between gap-2 w-full">
+          <div class="flex w-full items-center justify-between gap-2">
             <OToggleGroup
               :model-value="statusFilter"
               @update:model-value="(v) => filterByStatus(v as string)"
@@ -58,11 +58,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #icon-left><OIcon name="radio-button-unchecked" size="sm" /></template>
                 {{ t("alerts.incidents.statusOpen") }}
               </OToggleGroupItem>
-              <OToggleGroupItem value="acknowledged" size="sm" data-test="incident-status-filter-acknowledged">
+              <OToggleGroupItem
+                value="acknowledged"
+                size="sm"
+                data-test="incident-status-filter-acknowledged"
+              >
                 <template #icon-left><OIcon name="visibility" size="sm" /></template>
                 {{ t("alerts.incidents.statusAcknowledged") }}
               </OToggleGroupItem>
-              <OToggleGroupItem value="resolved" size="sm" data-test="incident-status-filter-resolved">
+              <OToggleGroupItem
+                value="resolved"
+                size="sm"
+                data-test="incident-status-filter-resolved"
+              >
                 <template #icon-left><OIcon name="task-alt" size="sm" /></template>
                 {{ t("alerts.incidents.statusResolved") }}
               </OToggleGroupItem>
@@ -85,7 +93,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="incident-list-refresh-btn"
             @click="refreshIncidents"
           >
-            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="alertIncidentsRefresh" />
+            <OTooltip
+              side="bottom"
+              :content="t('common.refresh')"
+              shortcut-id="alertIncidentsRefresh"
+            />
           </OButton>
         </template>
         <template #cell-status="{ row }">
@@ -113,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #cell-dimensions="{ row }">
-          <div class="flex flex-nowrap items-center gap-1 min-w-0 overflow-hidden">
+          <div class="flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden">
             <ODimensionChip
               v-for="[key, value] in getSortedDimensions(row.group_values).slice(0, 2)"
               :key="key"
@@ -136,7 +148,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-for="[key, value] in getSortedDimensions(row.group_values).slice(2)"
                       :key="key"
                     >
-                      <span>{{ key }}</span>=<span>{{ value }}</span>
+                      <span>{{ key }}</span
+                      >=<span>{{ value }}</span>
                     </div>
                   </div>
                 </template>
@@ -154,53 +167,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #cell-actions="{ row }">
-          <div class="flex justify-end items-center">
+          <div class="flex items-center justify-end">
             <OButton
               v-if="row.status === 'open'"
               variant="ghost-warning"
               size="icon-sm"
               @click.stop="acknowledgeIncident(row)"
               data-test="incident-ack-btn"
-            ><OIcon name="visibility" size="sm" /><OTooltip :content="t('alerts.incidents.acknowledge')" /></OButton>
+              ><OIcon name="visibility" size="sm" /><OTooltip
+                :content="t('alerts.incidents.acknowledge')"
+            /></OButton>
             <OButton
               v-if="row.status !== 'resolved'"
               variant="ghost-primary"
               size="icon-sm"
               @click.stop="resolveIncident(row)"
               data-test="incident-resolve-btn"
-            ><OIcon name="task-alt" size="sm" /><OTooltip :content="t('alerts.incidents.resolve')" /></OButton>
+              ><OIcon name="task-alt" size="sm" /><OTooltip
+                :content="t('alerts.incidents.resolve')"
+            /></OButton>
             <OButton
               v-if="row.status === 'resolved'"
               variant="ghost-warning"
               size="icon-sm"
               @click.stop="reopenIncident(row)"
               data-test="incident-reopen-btn"
-            ><OIcon name="restart-alt" size="sm" /><OTooltip :content="t('alerts.incidents.reopen')" /></OButton>
+              ><OIcon name="restart-alt" size="sm" /><OTooltip
+                :content="t('alerts.incidents.reopen')"
+            /></OButton>
           </div>
         </template>
 
         <!-- Empty state -->
         <template #empty>
-          <div v-if="!loading" class="flex items-center justify-center w-full h-full">
+          <div v-if="!loading" class="flex h-full w-full items-center justify-center">
             <OEmptyState
               size="hero"
               preset="no-incidents"
               :filtered="!!searchQuery || statusFilter !== 'all'"
               :hide-action="!searchQuery && statusFilter === 'all'"
-              @action="(id) => id === 'clear-filters' ? clearFilters() : null"
+              @action="(id) => (id === 'clear-filters' ? clearFilters() : null)"
             />
           </div>
         </template>
 
         <!-- Bottom -->
         <template #bottom>
-          <div class="flex w-full justify-between items-center h-12">
-            <div class="text-xs font-normal flex items-center w-25 mr-md">
-              {{ visibleIncidents.length }} {{ visibleIncidents.length === 1 ? 'Incident' : 'Incidents' }}
+          <div class="flex h-12 w-full items-center justify-between">
+            <div class="mr-md flex w-25 items-center text-xs font-normal">
+              {{ visibleIncidents.length }}
+              {{ visibleIncidents.length === 1 ? "Incident" : "Incidents" }}
             </div>
           </div>
         </template>
-        </OTable>
+      </OTable>
     </OPageLayout>
   </div>
 </template>
@@ -245,7 +265,7 @@ export default defineComponent({
     OTimeCell,
     OToggleGroup,
     OToggleGroupItem,
-},
+  },
   setup() {
     const { t } = useI18n();
     const store = useStore();
@@ -258,9 +278,7 @@ export default defineComponent({
     const searchQuery = ref("");
     const validStatuses = ["all", "open", "acknowledged", "resolved"];
     const statusFilter = ref(
-      validStatuses.includes(route.query.status as string)
-        ? (route.query.status as string)
-        : "all"
+      validStatuses.includes(route.query.status as string) ? (route.query.status as string) : "all",
     );
     const isRestoringState = ref(false);
     const pageSize = ref(20);
@@ -342,7 +360,11 @@ export default defineComponent({
         const title = incident.title || formatDimensions(incident.group_values);
         if (title.toLowerCase().includes(searchLower)) return true;
         const statusLabel = getStatusLabel(incident.status).toLowerCase();
-        if (statusLabel.includes(searchLower) || incident.status.toLowerCase().includes(searchLower)) return true;
+        if (
+          statusLabel.includes(searchLower) ||
+          incident.status.toLowerCase().includes(searchLower)
+        )
+          return true;
         if (incident.severity.toLowerCase().includes(searchLower)) return true;
         if (incident.group_values) {
           const dimensionsStr = Object.entries(incident.group_values)
@@ -372,16 +394,10 @@ export default defineComponent({
         const offset = 0;
         const keyword = undefined;
 
-        const response = await incidentsService.list(
-          org,
-          undefined,
-          limit,
-          offset,
-          keyword
-        );
+        const response = await incidentsService.list(org, undefined, limit, offset, keyword);
 
         allIncidents.value = response.data.incidents;
-        store.dispatch('incidents/setCachedData', response.data.incidents);
+        store.dispatch("incidents/setCachedData", response.data.incidents);
       } catch (error: any) {
         toast({
           variant: "error",
@@ -394,11 +410,11 @@ export default defineComponent({
     };
 
     const viewIncident = (incident: Incident) => {
-      store.dispatch('incidents/setIncidents', {
+      store.dispatch("incidents/setIncidents", {
         searchQuery: searchQuery.value,
         statusFilter: statusFilter.value,
         pagination: { page: 1, rowsPerPage: 20 },
-        organizationIdentifier: store.state.selectedOrganization.identifier
+        organizationIdentifier: store.state.selectedOrganization.identifier,
       });
 
       router.push({
@@ -410,17 +426,17 @@ export default defineComponent({
 
     const savePageState = () => {
       if (isRestoringState.value) return;
-      store.dispatch('incidents/setIncidents', {
+      store.dispatch("incidents/setIncidents", {
         searchQuery: searchQuery.value,
         statusFilter: statusFilter.value,
         pagination: { page: 1, rowsPerPage: 20 },
-        organizationIdentifier: store.state.selectedOrganization.identifier
+        organizationIdentifier: store.state.selectedOrganization.identifier,
       });
     };
 
     const filterByStatus = (value: string) => {
       statusFilter.value = value;
-      store.dispatch('incidents/setStatusFilter', value);
+      store.dispatch("incidents/setStatusFilter", value);
       savePageState();
     };
 
@@ -429,7 +445,10 @@ export default defineComponent({
       filterByStatus("all");
     };
 
-    const updateStatus = async (incident: Incident, newStatus: "open" | "acknowledged" | "resolved") => {
+    const updateStatus = async (
+      incident: Incident,
+      newStatus: "open" | "acknowledged" | "resolved",
+    ) => {
       try {
         const org = store.state.selectedOrganization.identifier;
         await incidentsService.updateStatus(org, incident.id, newStatus);
@@ -438,7 +457,7 @@ export default defineComponent({
           message: t("alerts.incidents.statusUpdated"),
         });
         loadIncidents();
-        store.dispatch('incidents/setShouldRefresh', true);
+        store.dispatch("incidents/setShouldRefresh", true);
       } catch (error: any) {
         toast({
           variant: "error",
@@ -462,19 +481,27 @@ export default defineComponent({
 
     const getStatusColorClass = (status: string) => {
       switch (status) {
-        case "open": return "status-open";
-        case "acknowledged": return "status-acknowledged";
-        case "resolved": return "status-resolved";
-        default: return "status-default";
+        case "open":
+          return "status-open";
+        case "acknowledged":
+          return "status-acknowledged";
+        case "resolved":
+          return "status-resolved";
+        default:
+          return "status-default";
       }
     };
 
     const getStatusLabel = (status: string) => {
       switch (status) {
-        case "open": return t("alerts.incidents.statusOpen");
-        case "acknowledged": return t("alerts.incidents.statusAcknowledged");
-        case "resolved": return t("alerts.incidents.statusResolved");
-        default: return status;
+        case "open":
+          return t("alerts.incidents.statusOpen");
+        case "acknowledged":
+          return t("alerts.incidents.statusAcknowledged");
+        case "resolved":
+          return t("alerts.incidents.statusResolved");
+        default:
+          return status;
       }
     };
 
@@ -482,9 +509,7 @@ export default defineComponent({
       return formatToReadable(timestamp);
     };
 
-    const formatDimensions = (
-      dimensions: Record<string, string> | undefined,
-    ) => {
+    const formatDimensions = (dimensions: Record<string, string> | undefined) => {
       if (!dimensions || Object.keys(dimensions).length === 0) {
         return "Unknown";
       }
@@ -493,44 +518,42 @@ export default defineComponent({
         .join(", ");
     };
 
-    const getSortedDimensions = (
-      dimensions: Record<string, string> | undefined,
-    ) => {
+    const getSortedDimensions = (dimensions: Record<string, string> | undefined) => {
       if (!dimensions || Object.keys(dimensions).length === 0) return [];
       return Object.keys(dimensions)
         .sort()
-        .map(key => [key, dimensions[key]] as [string, string]);
+        .map((key) => [key, dimensions[key]] as [string, string]);
     };
 
     const getDimensionColorClass = (key: string) => {
       const colorMap: Record<string, string> = {
-        'k8s-deployment': 'badge-blue',
-        'k8s-namespace': 'badge-orange',
-        'deployment': 'badge-blue',
-        'namespace': 'badge-orange',
-        'env': 'badge-green',
-        'environment': 'badge-green',
-        'host': 'badge-purple',
-        'hostname': 'badge-purple',
-        'service': 'badge-cyan',
-        'service_name': 'badge-cyan',
-        'region': 'badge-pink',
-        'zone': 'badge-pink',
-        'cluster': 'badge-indigo',
-        'pod': 'badge-teal',
-        'container': 'badge-red',
-        'app': 'badge-yellow',
-        'application': 'badge-yellow',
+        "k8s-deployment": "badge-blue",
+        "k8s-namespace": "badge-orange",
+        deployment: "badge-blue",
+        namespace: "badge-orange",
+        env: "badge-green",
+        environment: "badge-green",
+        host: "badge-purple",
+        hostname: "badge-purple",
+        service: "badge-cyan",
+        service_name: "badge-cyan",
+        region: "badge-pink",
+        zone: "badge-pink",
+        cluster: "badge-indigo",
+        pod: "badge-teal",
+        container: "badge-red",
+        app: "badge-yellow",
+        application: "badge-yellow",
       };
       if (colorMap[key]) return colorMap[key];
       const lowerKey = key.toLowerCase();
       for (const [pattern, className] of Object.entries(colorMap)) {
         if (lowerKey.includes(pattern)) return className;
       }
-      const classes = ['badge-gray', 'badge-amber', 'badge-violet', 'badge-rose'];
+      const classes = ["badge-gray", "badge-amber", "badge-violet", "badge-rose"];
       let hash = 0;
       for (let i = 0; i < key.length; i++) {
-        hash = ((hash << 5) - hash) + key.charCodeAt(i);
+        hash = (hash << 5) - hash + key.charCodeAt(i);
         hash = hash & hash;
       }
       return classes[Math.abs(hash) % classes.length];
@@ -542,15 +565,17 @@ export default defineComponent({
       const isInitialized = store.state.incidents.isInitialized;
       const currentOrg = store.state.selectedOrganization.identifier;
 
-      if (isInitialized && savedState && savedState.organizationIdentifier &&
-          savedState.organizationIdentifier !== currentOrg) {
-        store.dispatch('incidents/resetIncidents');
+      if (
+        isInitialized &&
+        savedState &&
+        savedState.organizationIdentifier &&
+        savedState.organizationIdentifier !== currentOrg
+      ) {
+        store.dispatch("incidents/resetIncidents");
         searchQuery.value = "";
         allIncidents.value = [];
         return false;
-      }
-      else if (isInitialized && savedState &&
-               savedState.organizationIdentifier === currentOrg) {
+      } else if (isInitialized && savedState && savedState.organizationIdentifier === currentOrg) {
         isRestoringState.value = true;
         if (cachedData && cachedData.length > 0) {
           allIncidents.value = cachedData;
@@ -573,20 +598,20 @@ export default defineComponent({
       if (allIncidents.value.length === 0 || shouldRefresh) {
         await loadIncidents();
         if (shouldRefresh) {
-          store.dispatch('incidents/setShouldRefresh', false);
+          store.dispatch("incidents/setShouldRefresh", false);
         }
       }
 
       if (!store.state.incidents.isInitialized) {
-        store.dispatch('incidents/setIsInitialized', true);
+        store.dispatch("incidents/setIsInitialized", true);
       }
 
       if (hasRestoredState) {
-        store.dispatch('incidents/setIncidents', {
+        store.dispatch("incidents/setIncidents", {
           searchQuery: searchQuery.value,
           statusFilter: statusFilter.value,
           pagination: { page: 1, rowsPerPage: 20 },
-          organizationIdentifier: store.state.selectedOrganization.identifier
+          organizationIdentifier: store.state.selectedOrganization.identifier,
         });
       }
 
@@ -606,7 +631,12 @@ export default defineComponent({
     };
 
     useShortcuts([
-      { id: "alertIncidentsRefresh", handler: () => { if (!isInputFocused()) refreshIncidents(); } },
+      {
+        id: "alertIncidentsRefresh",
+        handler: () => {
+          if (!isInputFocused()) refreshIncidents();
+        },
+      },
     ]);
 
     return {

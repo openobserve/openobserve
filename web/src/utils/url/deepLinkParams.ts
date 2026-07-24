@@ -45,20 +45,14 @@ const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const keysOf = (d: ParamDescriptor): string[] => [d.key, ...(d.aliases ?? [])];
 
-const decodeValue = (d: ParamDescriptor, raw: any) =>
-  d.decode ? d.decode(String(raw)) : raw;
+const decodeValue = (d: ParamDescriptor, raw: any) => (d.decode ? d.decode(String(raw)) : raw);
 
 const encodeValue = (d: ParamDescriptor, value: any): string | null =>
   d.encode ? d.encode(value) : String(value);
 
-export const indexedKey = (key: string, i: number): string =>
-  i === 0 ? key : `${key}.${i}`;
+export const indexedKey = (key: string, i: number): string => (i === 0 ? key : `${key}.${i}`);
 
-export const readIndexed = (
-  query: Record<string, any>,
-  key: string,
-  i: number,
-): any => {
+export const readIndexed = (query: Record<string, any>, key: string, i: number): any => {
   const dotted = query[`${key}.${i}`];
   if (dotted !== undefined) return dotted; // explicit .i wins (incl. .0)
   if (i === 0) return query[key]; // bare ≡ .0
@@ -95,11 +89,7 @@ export const hasAnyDeepLinkParam = (
     }),
   );
 
-export const buildUrlFromRegistry = (
-  url: URL,
-  registry: ParamDescriptor[],
-  intent: any,
-): URL => {
+export const buildUrlFromRegistry = (url: URL, registry: ParamDescriptor[], intent: any): URL => {
   const p = url.searchParams;
 
   for (const d of registry) {
@@ -130,8 +120,7 @@ export const applyOverridesFromRegistry = (
   state: any,
   options: ApplyOptions = {},
 ): void => {
-  const getQueries =
-    options.getQueries ?? ((s: any) => s?.data?.queries as any[] | undefined);
+  const getQueries = options.getQueries ?? ((s: any) => s?.data?.queries as any[] | undefined);
   const makeDefaultQuery = options.makeDefaultQuery ?? (() => ({}));
 
   const panelDescriptors = registry.filter((d) => d.scope === "panel");
@@ -139,8 +128,7 @@ export const applyOverridesFromRegistry = (
 
   for (const d of panelDescriptors) {
     const key = keysOf(d).find((k) => query[k] != null); // first key/alias wins
-    if (key != null)
-      d.apply(state, decodeValue(d, query[key]), { panelData: state });
+    if (key != null) d.apply(state, decodeValue(d, query[key]), { panelData: state });
   }
 
   const queries = getQueries(state);
@@ -163,8 +151,7 @@ export const applyOverridesFromRegistry = (
           raw = readIndexed(query, key, i);
           if (raw !== undefined) break;
         }
-        if (raw != null)
-          d.apply(slot, decodeValue(d, raw), { index: target, panelData: state });
+        if (raw != null) d.apply(slot, decodeValue(d, raw), { index: target, panelData: state });
       }
       options.onIndexApplied?.(slot, target, state);
     });

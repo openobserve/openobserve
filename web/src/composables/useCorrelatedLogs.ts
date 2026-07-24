@@ -73,7 +73,8 @@ export interface SearchResponse {
  */
 export function useCorrelatedLogs(props: CorrelatedLogsProps) {
   const store = useStore();
-  const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreamingSearch();
+  const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
+    useHttpStreamingSearch();
 
   // State
   const loading = ref(false);
@@ -91,7 +92,7 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
     const merged: Record<string, string> = {};
     for (const stream of props.logStreams) {
       for (const [k, v] of Object.entries(stream.filters ?? {})) {
-        if (v && v !== SELECT_ALL_VALUE && !k.startsWith('_')) merged[k] = v;
+        if (v && v !== SELECT_ALL_VALUE && !k.startsWith("_")) merged[k] = v;
       }
     }
     // matchedDimensions and additionalDimensions take priority over stream filters
@@ -151,8 +152,8 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
 
       for (const [field, value] of Object.entries(effectiveFilters)) {
         if (value === SELECT_ALL_VALUE) continue;
-        if (field.startsWith('_')) continue;
-        if (value === null || value === undefined || value === '') continue;
+        if (field.startsWith("_")) continue;
+        if (value === null || value === undefined || value === "") continue;
 
         const quotedField = `"${field.replace(/"/g, '""')}"`;
         const escapedValue = String(value).replace(/'/g, "''");
@@ -163,9 +164,11 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
       const quotedStream = `"${streamInfo.stream_name.replace(/"/g, '""')}"`;
 
       // Build WHERE clause
-      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-      queries.push(`SELECT '${streamInfo.stream_name}' as stream_name,* FROM ${quotedStream} ${whereClause} ORDER BY ${store.state.zoConfig.timestamp_column || '_timestamp'} DESC`);
+      queries.push(
+        `SELECT '${streamInfo.stream_name}' as stream_name,* FROM ${quotedStream} ${whereClause} ORDER BY ${store.state.zoConfig.timestamp_column || "_timestamp"} DESC`,
+      );
     }
 
     return queries;
@@ -187,8 +190,8 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
 
     // Validate that we have log streams
     if (!props.logStreams || props.logStreams.length === 0) {
-      console.error('[useCorrelatedLogs] No log streams available');
-      error.value = 'No log stream available for correlation';
+      console.error("[useCorrelatedLogs] No log streams available");
+      error.value = "No log stream available for correlation";
       return;
     }
 
@@ -211,7 +214,7 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
 
       // Generate trace context for streaming
       const traceContext = generateTraceContext();
-      const traceId = traceContext?.traceId || '';
+      const traceId = traceContext?.traceId || "";
       currentTraceId = traceId;
 
       // Build search query with array of SQL queries
@@ -220,7 +223,7 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
       const searchQuery = {
         query: {
           sql: sqlQueries, // string[] — triggers multi-stream mode in useHttpStreaming
-          sql_mode: 'full',
+          sql_mode: "full",
           start_time: startTimeMicros,
           end_time: endTimeMicros,
           size: pageSize.value,
@@ -231,16 +234,16 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
       await fetchQueryDataWithHttpStream(
         {
           queryReq: searchQuery,
-          type: 'search',
+          type: "search",
           traceId: traceId,
           org_id: store.state.selectedOrganization.identifier,
-          pageType: 'logs',
-          searchType: 'UI',
+          pageType: "logs",
+          searchType: "UI",
         },
         {
           data: (_data: any, response: any) => {
             // Handle metadata event
-            if (response.type === 'search_response_metadata') {
+            if (response.type === "search_response_metadata") {
               const results = response.content?.results;
               if (results) {
                 // Accumulate across multi-stream metadata events
@@ -253,7 +256,7 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
             // Handle hits event (this has the actual data)
             // Raw backend response: {"hits": [{...}, {...}]}
             // After wsMapper: response.content.results = {"hits": [{...}, {...}]}
-            if (response.type === 'search_response_hits') {
+            if (response.type === "search_response_hits") {
               // The results object IS the hits container {"hits": [...]}
               const resultsObj = response.content?.results;
               const hits = resultsObj?.hits || [];
@@ -262,13 +265,13 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
               if (hits.length > 0) {
                 searchResults.value.push(...hits);
               } else {
-                console.warn('[useCorrelatedLogs] No hits found in response!');
+                console.warn("[useCorrelatedLogs] No hits found in response!");
               }
             }
           },
           error: (_data: any, response: any) => {
-            console.error('[useCorrelatedLogs] Stream error:', response);
-            error.value = response.content?.message || 'Failed to fetch correlated logs';
+            console.error("[useCorrelatedLogs] Stream error:", response);
+            error.value = response.content?.message || "Failed to fetch correlated logs";
             loading.value = false;
             searchResults.value = [];
             totalHits.value = 0;
@@ -277,22 +280,22 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
             // Sort merged results from all streams by _timestamp descending
             // _search_multi_stream streams results per-query as they complete,
             // so hits arrive in arbitrary order and need a final global sort
-            const timestamp = store.state.zoConfig.timestamp_column || '_timestamp';
+            const timestamp = store.state.zoConfig.timestamp_column || "_timestamp";
             searchResults.value.sort((a, b) => b[timestamp] - a[timestamp]);
             loading.value = false;
             currentTraceId = null;
           },
           reset: () => {},
-        }
+        },
       );
     } catch (e: any) {
-      console.error('[useCorrelatedLogs] Failed to fetch logs:', e);
-      console.error('[useCorrelatedLogs] Error details:', {
+      console.error("[useCorrelatedLogs] Failed to fetch logs:", e);
+      console.error("[useCorrelatedLogs] Error details:", {
         message: e.message,
         response: e?.response?.data,
-        status: e?.response?.status
+        status: e?.response?.status,
       });
-      error.value = e?.response?.data?.message || e.message || 'Failed to fetch correlated logs';
+      error.value = e?.response?.data?.message || e.message || "Failed to fetch correlated logs";
 
       // Clear results on error
       searchResults.value = [];
@@ -378,16 +381,24 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
   };
 
   // Watch for prop changes and refetch
-  watch(() => props.timeRange, (newRange) => {
-    currentTimeRange.value = { ...newRange };
-    fetchCorrelatedLogs();
-  }, { deep: true });
+  watch(
+    () => props.timeRange,
+    (newRange) => {
+      currentTimeRange.value = { ...newRange };
+      fetchCorrelatedLogs();
+    },
+    { deep: true },
+  );
 
-  watch(() => props.logStreams, () => {
-    // Re-seed currentFilters when the stream list changes (e.g. new correlation result)
-    currentFilters.value = buildInitialFilters();
-    fetchCorrelatedLogs();
-  }, { deep: true });
+  watch(
+    () => props.logStreams,
+    () => {
+      // Re-seed currentFilters when the stream list changes (e.g. new correlation result)
+      currentFilters.value = buildInitialFilters();
+      fetchCorrelatedLogs();
+    },
+    { deep: true },
+  );
 
   // Cleanup on unmount
   onUnmounted(() => {

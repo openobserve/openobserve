@@ -47,9 +47,18 @@ const o2Stubs = {
       </div>
     `,
     props: [
-      "data", "columns", "rowKey", "globalFilter", "pagination",
-      "pageSize", "sorting", "filterMode", "defaultColumns",
-      "showGlobalFilter", "footerTitle", "dense",
+      "data",
+      "columns",
+      "rowKey",
+      "globalFilter",
+      "pagination",
+      "pageSize",
+      "sorting",
+      "filterMode",
+      "defaultColumns",
+      "showGlobalFilter",
+      "footerTitle",
+      "dense",
     ],
   },
   OCheckbox: {
@@ -529,7 +538,9 @@ describe("GroupUsers Component", () => {
   describe("User Selection", () => {
     it("renders checkboxes for user selection", () => {
       // After mount, rows have user1@example.com and admin@example.com (isInGroup users)
-      const checkbox = wrapper.find('[data-test="iam-users-selection-table-body-row-user1@example.com-checkbox"]');
+      const checkbox = wrapper.find(
+        '[data-test="iam-users-selection-table-body-row-user1@example.com-checkbox"]',
+      );
       expect(checkbox.exists()).toBe(true);
     });
 
@@ -1051,7 +1062,9 @@ describe("GroupUsers Component", () => {
 
       // After mount, rows contain isInGroup users; checkboxes confirm
       // OTable is rendering with the correct row-key bound ("email").
-      const checkbox = wrapper.find('[data-test="iam-users-selection-table-body-row-user1@example.com-checkbox"]');
+      const checkbox = wrapper.find(
+        '[data-test="iam-users-selection-table-body-row-user1@example.com-checkbox"]',
+      );
       expect(checkbox.exists()).toBe(true);
     });
   });

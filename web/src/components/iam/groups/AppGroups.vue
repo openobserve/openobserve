@@ -16,22 +16,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OPageLayout :title="t('iam.groups')" icon="group" bleed>
-      <template #subtitle>
-        <span data-test="iam-groups-subtitle">
-          {{ t('iam.groupsPage.subtitle') }}
-        </span>
-      </template>
-      <template #actions>
-        <OButton
-          data-test="iam-groups-add-group-btn"
-          variant="primary"
-          size="sm"
-          @click="addGroup"
-        >
-          {{ t('iam.addGroup') }}
-        </OButton>
-      </template>
-    <div class="w-full flex-1 min-h-0 overflow-hidden">
+    <template #subtitle>
+      <span data-test="iam-groups-subtitle">
+        {{ t("iam.groupsPage.subtitle") }}
+      </span>
+    </template>
+    <template #actions>
+      <OButton data-test="iam-groups-add-group-btn" variant="primary" size="sm" @click="addGroup">
+        {{ t("iam.addGroup") }}
+      </OButton>
+    </template>
+    <div class="min-h-0 w-full flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <OTable
           :frame="false"
@@ -55,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:selected-ids="handleSelectedIdsUpdate"
         >
           <template #toolbar>
-            <div class="flex items-center gap-2 w-full">
+            <div class="flex w-full items-center gap-2">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('iam.searchGroup')"
@@ -73,7 +68,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="iam-groups-refresh-btn"
               @click="setupGroups"
             >
-              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="iamGroupsRefresh" />
+              <OTooltip
+                side="bottom"
+                :content="t('common.refresh')"
+                shortcut-id="iamGroupsRefresh"
+              />
             </OButton>
           </template>
           <template #cell-actions="{ row }">
@@ -105,11 +104,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="hero"
               preset="no-groups"
               :filtered="!!filterQuery"
-              @action="(id) => id === 'create' ? addGroup() : (filterQuery = '')"
+              @action="(id) => (id === 'create' ? addGroup() : (filterQuery = ''))"
             />
           </template>
           <template #bottom>
-            <span class="text-xs font-normal">{{ rows.length }} {{ t('iam.groups') }}</span>
+            <span class="text-xs font-normal">{{ rows.length }} {{ t("iam.groups") }}</span>
             <OButton
               v-if="selectedGroups.length > 0"
               data-test="iam-groups-bulk-delete-btn"
@@ -119,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="openBulkDeleteDialog"
               icon-left="delete"
             >
-              {{ t('common.delete') }}
+              {{ t("common.delete") }}
             </OButton>
           </template>
         </OTable>
@@ -132,7 +131,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <ConfirmDialog
       :title="t('iam.appGroups.deleteGroupTitle')"
-      :message="t('iam.appGroups.deleteGroupConfirm', { name: deleteConformDialog?.data?.group_name })"
+      :message="
+        t('iam.appGroups.deleteGroupConfirm', { name: deleteConformDialog?.data?.group_name })
+      "
       :warning-message="deleteImpactMessage"
       @update:ok="_deleteGroup"
       @update:cancel="deleteConformDialog.show = false"
@@ -189,16 +190,13 @@ const { groupsState } = usePermissions();
 
 const filterQuery = ref("");
 
-
 const deleteConformDialog = ref({
   show: false,
   data: null as any,
 });
 
 const selectedGroups: any = ref([]);
-const selectedGroupNames = computed(() =>
-  selectedGroups.value.map((g: any) => g.group_name),
-);
+const selectedGroupNames = computed(() => selectedGroups.value.map((g: any) => g.group_name));
 
 const handleSelectedIdsUpdate = (ids: string[]) => {
   const groupsMap = new Map(rows.value.map((g: any) => [g.group_name, g]));
@@ -239,7 +237,7 @@ const updateTable = () => {
 const addGroup = () => {
   track("Button Click", {
     button: "Add Group",
-    page: "Groups"
+    page: "Groups",
   });
   showAddGroup.value = true;
 };
@@ -320,10 +318,7 @@ const deleteUserGroup = (group: any) => {
 const deleteImpactMessage = ref("");
 
 const fetchGroupMemberCount = async (groupName: string): Promise<number> => {
-  const res = await getGroup(
-    groupName,
-    store.state.selectedOrganization.identifier,
-  );
+  const res = await getGroup(groupName, store.state.selectedOrganization.identifier);
   return Array.isArray(res.data?.users) ? res.data.users.length : 0;
 };
 
@@ -359,9 +354,7 @@ const openBulkDeleteDialog = async () => {
       count: 0,
     });
     try {
-      const count = await fetchGroupMemberCount(
-        selectedGroups.value[0].group_name,
-      );
+      const count = await fetchGroupMemberCount(selectedGroups.value[0].group_name);
       bulkDeleteImpactMessage.value = t("iam.groupsPage.delete.impact", {
         count,
       });
@@ -414,7 +407,8 @@ const bulkDeleteUserGroups = async () => {
   } catch (error: any) {
     if (error.response?.status != 403 || error?.status != 403) {
       toast({
-        message: error.response?.data?.message || error?.message || t("iam.appGroups.errorDeletingGroups"),
+        message:
+          error.response?.data?.message || error?.message || t("iam.appGroups.errorDeletingGroups"),
         variant: "error",
       });
     }
@@ -428,11 +422,15 @@ const bulkDeleteUserGroups = async () => {
 useShortcuts([
   {
     id: "iamGroupsAdd",
-    handler: () => { if (!isInputFocused()) addGroup(); },
+    handler: () => {
+      if (!isInputFocused()) addGroup();
+    },
   },
   {
     id: "iamGroupsRefresh",
-    handler: () => { if (!isInputFocused()) setupGroups(); },
+    handler: () => {
+      if (!isInputFocused()) setupGroups();
+    },
   },
   {
     id: "iamGroupsFocusSearch",
@@ -441,6 +439,4 @@ useShortcuts([
     },
   },
 ]);
-
 </script>
-

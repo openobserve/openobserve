@@ -24,15 +24,7 @@ import i18n from "@/locales";
 // emits directly. Mirrors the same shape used by other migrated specs.
 const ODrawerStub = {
   name: "ODrawer",
-  props: [
-    "open",
-    "width",
-    "showClose",
-    "persistent",
-    "size",
-    "title",
-    "subTitle",
-  ],
+  props: ["open", "width", "showClose", "persistent", "size", "title", "subTitle"],
   emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
   template: `
     <div data-test-stub="o-drawer" :data-open="open">
@@ -555,9 +547,7 @@ describe("PatternDetailsDialog", () => {
       const drawer = wrapperClosed.findComponent({ name: "ODrawer" });
       expect(drawer.props("open")).toBe(false);
       // No body content rendered while closed.
-      expect(
-        wrapperClosed.find('[data-test-stub="o-drawer-body"]').exists(),
-      ).toBe(false);
+      expect(wrapperClosed.find('[data-test-stub="o-drawer-body"]').exists()).toBe(false);
     });
   });
 
@@ -611,10 +601,7 @@ describe("PatternDetailsDialog", () => {
       expect(popover.exists()).toBe(true);
       await popover.vm.$emit("filter-value", "192.168.1.1", "include");
       expect(wrapper.emitted("filter-value")).toBeTruthy();
-      expect(wrapper.emitted("filter-value")![0]).toEqual([
-        "192.168.1.1",
-        "include",
-      ]);
+      expect(wrapper.emitted("filter-value")![0]).toEqual(["192.168.1.1", "include"]);
     });
   });
 });

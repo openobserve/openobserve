@@ -88,9 +88,7 @@ describe("a fresh panel gets the rule set's default", () => {
     });
 
     expect(seed.chartType).toBe("heatmap");
-    expect(seed.query).toBe(
-      "sum by (le) (rate(lat_seconds_bucket{}[$__rate_interval]))",
-    );
+    expect(seed.query).toBe("sum by (le) (rate(lat_seconds_bucket{}[$__rate_interval]))");
     expect(seed.config.heatmap_mode).toBe("prometheus_histogram");
     expect(seed.config.bucket_unit).toBe("seconds");
   });
@@ -194,16 +192,14 @@ describe("re-seeding only overwrites what we generated", () => {
   });
 
   it("treats the legacy bare selector as auto-seeded", () => {
-    expect(
-      isAutoSeededQuery("http_requests_total{}", "http_requests_total", COUNTER, opts),
-    ).toBe(true);
+    expect(isAutoSeededQuery("http_requests_total{}", "http_requests_total", COUNTER, opts)).toBe(
+      true,
+    );
   });
 
   it("treats our own previous seed as auto-seeded", () => {
     const previous = buildPromqlSeed("http_requests_total", COUNTER, opts).query;
-    expect(isAutoSeededQuery(previous, "http_requests_total", COUNTER, opts)).toBe(
-      true,
-    );
+    expect(isAutoSeededQuery(previous, "http_requests_total", COUNTER, opts)).toBe(true);
   });
 
   it("NEVER overwrites a query the user wrote", () => {
@@ -246,9 +242,7 @@ describe("regressions found in review", () => {
     expect(fresh.query).toContain("sum by (le)"); // the heatmap variant
 
     // The user then picks `line` themselves. The query is still OURS.
-    expect(
-      isAutoSeededQuery(fresh.query, "lat_seconds_bucket", HIST, opts),
-    ).toBe(true);
+    expect(isAutoSeededQuery(fresh.query, "lat_seconds_bucket", HIST, opts)).toBe(true);
   });
 
   it("still refuses to overwrite a query the user wrote", () => {
@@ -270,9 +264,9 @@ describe("regressions found in review", () => {
       // what turned an explicitly-chosen Table into a line chart the moment the panel
       // was switched from SQL to PromQL — that switch clears the query.
       expect(seedOwnsChartType("", "http_requests_total", COUNTER, opts)).toBe(false);
-      expect(
-        seedOwnsChartType("http_requests_total{}", "http_requests_total", COUNTER, opts),
-      ).toBe(false);
+      expect(seedOwnsChartType("http_requests_total{}", "http_requests_total", COUNTER, opts)).toBe(
+        false,
+      );
     });
 
     it("yes on an empty slot when the panel type is still the new-panel default", () => {
@@ -284,9 +278,7 @@ describe("regressions found in review", () => {
 
     it("yes when the query and the chart type still agree — we authored both", () => {
       const seeded = buildPromqlSeed("http_requests_total", COUNTER, opts).query;
-      expect(seedOwnsChartType(seeded, "http_requests_total", COUNTER, opts)).toBe(
-        true,
-      );
+      expect(seedOwnsChartType(seeded, "http_requests_total", COUNTER, opts)).toBe(true);
     });
 
     it("NO once the user has picked a chart type of their own", () => {
@@ -299,12 +291,8 @@ describe("regressions found in review", () => {
         allowChartTypeChange: true,
         requireBuilder: true,
       }).query;
-      expect(seedOwnsChartType(asHeatmap, "lat_seconds_bucket", HIST, opts)).toBe(
-        false,
-      );
-      expect(isAutoSeededQuery(asHeatmap, "lat_seconds_bucket", HIST, opts)).toBe(
-        true,
-      );
+      expect(seedOwnsChartType(asHeatmap, "lat_seconds_bucket", HIST, opts)).toBe(false);
+      expect(isAutoSeededQuery(asHeatmap, "lat_seconds_bucket", HIST, opts)).toBe(true);
     });
 
     it("NO for a hand-written query", () => {

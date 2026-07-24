@@ -160,12 +160,7 @@ describe("applySeedPanelShape", () => {
   });
 });
 
-const metric = (
-  name: string,
-  type: string,
-  unit = "",
-  docs = 100,
-): MetricStream => ({
+const metric = (name: string, type: string, unit = "", docs = 100): MetricStream => ({
   name,
   stream_type: "metrics",
   metrics_meta: {
@@ -191,9 +186,7 @@ const editorPanel = (type: string, query: string, newStream: string) => ({
   data: {
     type,
     config: {},
-    queries: [
-      { query, customQuery: false, fields: { stream: newStream }, config: {} },
-    ],
+    queries: [{ query, customQuery: false, fields: { stream: newStream }, config: {} }],
   },
   meta: { stream: { streamResultsType: "metrics", streamResults: STREAMS } },
 });
@@ -218,9 +211,7 @@ describe("promqlSeedFor — which metric was the current query seeded for?", () 
     });
 
     expect(seed.chartType).toBe("heatmap");
-    expect(seed.query).toBe(
-      "sum by (le) (rate(lat_seconds_bucket{}[$__rate_interval]))",
-    );
+    expect(seed.query).toBe("sum by (le) (rate(lat_seconds_bucket{}[$__rate_interval]))");
     expect(seed.config.heatmap_mode).toBe("prometheus_histogram");
   });
 
@@ -295,11 +286,9 @@ describe("isAutoSeededSlot — may the slot be re-seeded?", () => {
   });
 
   it("says yes for a query we generated ourselves", () => {
-    expect(
-      isAutoSeededSlot(
-        slotWith("sum(rate(http_requests_total{}[$__rate_interval]))"),
-      ),
-    ).toBe(true);
+    expect(isAutoSeededSlot(slotWith("sum(rate(http_requests_total{}[$__rate_interval]))"))).toBe(
+      true,
+    );
   });
 
   it("says no once the user has built something", () => {
@@ -318,9 +307,7 @@ describe("isAutoSeededSlot — may the slot be re-seeded?", () => {
     // It renders to nothing, so the query is still the bare selector — only the
     // rows themselves show that there is a chip on screen to protect.
     expect(
-      isAutoSeededSlot(
-        slotWith("http_requests_total{}", [{ label: "", op: "=", value: "" }]),
-      ),
+      isAutoSeededSlot(slotWith("http_requests_total{}", [{ label: "", op: "=", value: "" }])),
     ).toBe(false);
   });
 });
@@ -357,7 +344,9 @@ describe("applyPromqlSeed and the Custom/Builder mode", () => {
       data: {
         type: "line",
         config: {},
-        queries: [{ query: "", customQuery: false, fields: { stream: "lat_seconds_sum" }, config: {} }],
+        queries: [
+          { query: "", customQuery: false, fields: { stream: "lat_seconds_sum" }, config: {} },
+        ],
       },
       meta: { stream: { streamResultsType: "metrics", streamResults: STREAMS } },
     };

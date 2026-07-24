@@ -15,8 +15,7 @@
 
 import { describe, it, expect } from "vitest";
 import {
-  LIGHT_SPAN_COLORS,
-  DARK_SPAN_COLORS,
+  SPAN_COLOR_COUNT,
   getSpanColor,
   getSpanColorHex,
   getServiceColor,
@@ -29,31 +28,15 @@ import {
   statusColors,
   spanKindColors,
 } from "./traceColors";
+import { chartColor } from "../chartTheme";
 
 describe("traceColors", () => {
-  describe("LIGHT_SPAN_COLORS", () => {
-    it("should be an array of hex color strings", () => {
-      expect(Array.isArray(LIGHT_SPAN_COLORS)).toBe(true);
-      LIGHT_SPAN_COLORS.forEach((color) => {
-        expect(color).toMatch(/^#[0-9A-Fa-f]{6}$/);
-      });
-    });
-
-    it("should have at least one color", () => {
-      expect(LIGHT_SPAN_COLORS.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe("DARK_SPAN_COLORS", () => {
-    it("should be an array of hex color strings", () => {
-      expect(Array.isArray(DARK_SPAN_COLORS)).toBe(true);
-      DARK_SPAN_COLORS.forEach((color) => {
-        expect(color).toMatch(/^#[0-9A-Fa-f]{6}$/);
-      });
-    });
-
-    it("should have at least one color", () => {
-      expect(DARK_SPAN_COLORS.length).toBeGreaterThan(0);
+  describe("SPAN_COLOR_COUNT", () => {
+    it("resolves to the 35 --color-trace-span-* tokens in base/dark.css", () => {
+      // Concrete pin: guards against the FALLBACKS-key derivation matching the
+      // wrong set (renamed prefix, added/removed token) — the length assertions
+      // elsewhere use SPAN_COLOR_COUNT on both sides and can't catch that.
+      expect(SPAN_COLOR_COUNT).toBe(35);
     });
   });
 
@@ -190,20 +173,21 @@ describe("traceColors", () => {
       });
     });
 
-    it("should return light colors for light theme", () => {
+    it("should return one entry per --color-trace-span-* token (light)", () => {
       const colors = getAllSpanColors("light");
-      expect(colors.length).toBe(LIGHT_SPAN_COLORS.length);
+      expect(colors.length).toBe(SPAN_COLOR_COUNT);
     });
 
-    it("should return dark colors for dark theme", () => {
+    it("should return one entry per --color-trace-span-* token (dark)", () => {
       const colors = getAllSpanColors("dark");
-      expect(colors.length).toBe(DARK_SPAN_COLORS.length);
+      expect(colors.length).toBe(SPAN_COLOR_COUNT);
     });
 
-    it("should return colors in reversed order", () => {
-      const lightColors = getAllSpanColors("light");
-      const originalColors = [...LIGHT_SPAN_COLORS];
-      expect(lightColors).toEqual(originalColors.reverse());
+    it("should return the trace-span tokens in reversed order", () => {
+      const expected = Array.from({ length: SPAN_COLOR_COUNT }, (_v, i) =>
+        chartColor(`--color-trace-span-${i + 1}`),
+      );
+      expect(getAllSpanColors("light")).toEqual(expected.reverse());
     });
   });
 
@@ -258,9 +242,7 @@ describe("traceColors", () => {
       expect(traceUIColors.surface).toBe("var(--color-trace-surface)");
       expect(traceUIColors.border).toBe("var(--color-trace-border)");
       expect(traceUIColors.textPrimary).toBe("var(--color-trace-text-primary)");
-      expect(traceUIColors.textSecondary).toBe(
-        "var(--color-trace-text-secondary)",
-      );
+      expect(traceUIColors.textSecondary).toBe("var(--color-trace-text-secondary)");
       expect(traceUIColors.hover).toBe("var(--color-trace-hover)");
       expect(traceUIColors.selected).toBe("var(--color-trace-selected)");
     });

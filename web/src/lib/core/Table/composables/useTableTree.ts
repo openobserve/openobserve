@@ -91,12 +91,7 @@ export function useTableTree<TData extends Record<string, any>>(
     if (!enabled.value) {
       return { rows: props.data, meta };
     }
-    const walk = (
-      row: TData,
-      depth: number,
-      parentId: string | null,
-      isLastChild: boolean,
-    ) => {
+    const walk = (row: TData, depth: number, parentId: string | null, isLastChild: boolean) => {
       const children = getChildrenOf(row);
       const hasChildren = children.length > 0;
       const id = rowId(row);
@@ -111,9 +106,7 @@ export function useTableTree<TData extends Record<string, any>>(
       });
       rows.push(row);
       if (hasChildren && isExpanded) {
-        children.forEach((child, i) =>
-          walk(child, depth + 1, id, i === children.length - 1),
-        );
+        children.forEach((child, i) => walk(child, depth + 1, id, i === children.length - 1));
       }
     };
     for (const row of props.data ?? []) walk(row, 0, null, false);

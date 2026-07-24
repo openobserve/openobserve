@@ -36,7 +36,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template #description>
       <!-- Filter applied within an overlapping window: relax the query. -->
-      <span v-if="windowHasStreamData && hasFilters" v-html="t('traces.noEvents.descWithFilters')" />
+      <span
+        v-if="windowHasStreamData && hasFilters"
+        v-html="t('traces.noEvents.descWithFilters')"
+      />
       <!-- We know where the stream's last data is: offer to jump to it. -->
       <span v-else-if="jumpTarget">{{ t("traces.noEvents.descOutOfRange") }}</span>
       <!-- No stream stats: generic fallback. -->
@@ -59,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template #extra>
-      <div class="flex items-center justify-center gap-2 flex-wrap">
+      <div class="flex flex-wrap items-center justify-center gap-2">
         <OButton
           v-if="aiEnabled && windowHasStreamData && !jumpTarget"
           variant="ghost"
@@ -69,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="emit('ask-ai')"
         >
           <template #icon-left>
-            <img :src="aiIconSrc" class="w-4 h-4 shrink-0" alt="" />
+            <img :src="aiIconSrc" class="h-4 w-4 shrink-0" alt="" />
           </template>
           {{ t("traces.noEvents.askAi") }}
         </OButton>

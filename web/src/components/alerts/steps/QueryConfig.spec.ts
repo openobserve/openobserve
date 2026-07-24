@@ -29,17 +29,13 @@ import i18n from "@/locales";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import {
-  makeAddAlertSchema,
-  defaultAddAlertMeta,
-} from "@/components/alerts/AddAlert.schema";
+import { makeAddAlertSchema, defaultAddAlertMeta } from "@/components/alerts/AddAlert.schema";
 
 // The composed orchestrator schema — messages resolve through the real locale.
 const t = (key: string, named?: Record<string, unknown>): string =>
   (i18n.global.t as any)(key, named);
 const addAlertSchema = makeAddAlertSchema(t);
 const FIELD_REQUIRED_MESSAGE = t("alerts.validation.fieldRequired");
-
 
 // Mock store
 const createMockStore = (overrides = {}) => ({
@@ -52,9 +48,7 @@ const createMockStore = (overrides = {}) => ({
       identifier: "test-org",
     },
     organizationData: {
-      functions: [
-        { name: "test_func", function: "// test function" },
-      ],
+      functions: [{ name: "test_func", function: "// test function" }],
     },
     userInfo: {
       email: "test@example.com",
@@ -90,8 +84,27 @@ vi.mock("@/components/alerts/QueryEditorDialog.vue", () => ({
   default: {
     name: "QueryEditorDialog",
     template: "<div data-test='mock-query-editor-dialog'></div>",
-    props: ["modelValue", "tab", "sqlQuery", "promqlQuery", "vrlFunction", "streamName", "streamType", "columns", "period", "multiTimeRange", "savedFunctions", "sqlQueryErrorMsg"],
-    emits: ["update:modelValue", "update:sqlQuery", "update:promqlQuery", "update:vrlFunction", "validate-sql"],
+    props: [
+      "modelValue",
+      "tab",
+      "sqlQuery",
+      "promqlQuery",
+      "vrlFunction",
+      "streamName",
+      "streamType",
+      "columns",
+      "period",
+      "multiTimeRange",
+      "savedFunctions",
+      "sqlQueryErrorMsg",
+    ],
+    emits: [
+      "update:modelValue",
+      "update:sqlQuery",
+      "update:promqlQuery",
+      "update:vrlFunction",
+      "validate-sql",
+    ],
   },
 }));
 
@@ -120,7 +133,16 @@ let mockStoreInstance: any;
 // Mock useSuggestions composable
 vi.mock("@/composables/useSuggestions", () => ({
   default: vi.fn(() => ({
-    autoCompleteData: { value: { query: "", cursorIndex: 0, org: "", streamType: "", streamName: "", popup: { open: null } } },
+    autoCompleteData: {
+      value: {
+        query: "",
+        cursorIndex: 0,
+        org: "",
+        streamType: "",
+        streamName: "",
+        popup: { open: null },
+      },
+    },
     autoCompleteIsSuggesting: { value: false },
     updateFieldValues: vi.fn(),
     updateFieldKeywords: vi.fn(),
@@ -249,8 +271,7 @@ describe("QueryConfig.vue", () => {
   }
 
   /** The host form (the ONE form the step binds into). */
-  const hostForm = () =>
-    (host.findComponent({ name: "OForm" }).vm as any).form;
+  const hostForm = () => (host.findComponent({ name: "OForm" }).vm as any).form;
 
   /** Reactive stand-in for the old wrapper.setProps (the step is no longer the
    *  mount root). */
@@ -354,7 +375,7 @@ describe("QueryConfig.vue", () => {
     });
 
     it("should handle VRL function prop", async () => {
-      const vrlFunction = ".field = \"value\"";
+      const vrlFunction = '.field = "value"';
       await setQCProps({ vrlFunction });
       expect(wrapper.props().vrlFunction).toBe(vrlFunction);
     });
@@ -445,8 +466,7 @@ describe("QueryConfig.vue", () => {
       wrapper = host.findComponent(QueryConfig) as unknown as VueWrapper<any>;
     };
 
-    const formConditions = () =>
-      hostForm().state.values.query_condition.conditions.conditions;
+    const formConditions = () => hostForm().state.values.query_condition.conditions.conditions;
 
     it("EMPTIES the form's conditions when switching to custom with one blank condition", async () => {
       mountWithConditions([emptyCondition()]);
@@ -757,9 +777,7 @@ describe("QueryConfig.vue", () => {
       hostForm().setFieldValue("query_condition.conditions", {
         filterType: "group",
         logicalOperator: "AND",
-        conditions: [
-          { filterType: "condition", column: "", operator: "=", value: "" },
-        ],
+        conditions: [{ filterType: "condition", column: "", operator: "=", value: "" }],
       });
       await flushPromises();
 
@@ -1102,11 +1120,7 @@ describe("QueryConfig.vue", () => {
         organizationData: { functions: [] },
       });
       mockStoreInstance = emptyStore;
-      const { h } = mountHost(
-        { columns: [], streamFieldsMap: {} },
-        {},
-        emptyStore,
-      );
+      const { h } = mountHost({ columns: [], streamFieldsMap: {} }, {}, emptyStore);
       const emptyWrapper = h.findComponent(QueryConfig);
 
       expect((emptyWrapper.vm as any).functionsList).toEqual([]);
@@ -1603,8 +1617,7 @@ describe("QueryConfig.vue", () => {
           frequency_type,
           timezone: "UTC",
         };
-        const isHours =
-          frequency_type !== "cron" && mins >= 60 && mins % 60 === 0;
+        const isHours = frequency_type !== "cron" && mins >= 60 && mins % 60 === 0;
         const { h, props } = mountHost(
           { triggerCondition: tc },
           {
@@ -1661,9 +1674,7 @@ describe("QueryConfig.vue", () => {
         expect(Number(display(form))).toBe(3);
         expect(Number(stored(form))).toBe(180);
         // frequency_type stays 'minutes' — "hours" is display-only.
-        expect(form.getFieldValue("trigger_condition.frequency_type")).toBe(
-          "minutes",
-        );
+        expect(form.getFieldValue("trigger_condition.frequency_type")).toBe("minutes");
       });
 
       // #3 — minutes mode writes through unchanged.
@@ -1783,9 +1794,7 @@ describe("QueryConfig.vue", () => {
       form.setFieldValue("query_condition.conditions", {
         filterType: "group",
         logicalOperator: "AND",
-        conditions: [
-          { filterType: "condition", column: "", operator: "=", value: "" },
-        ],
+        conditions: [{ filterType: "condition", column: "", operator: "=", value: "" }],
       });
       await flushPromises();
       await form.handleSubmit();
@@ -1823,9 +1832,11 @@ describe("QueryConfig.vue", () => {
       // 3 rendered rows, values in order.
       let rows = namesFor();
       expect(rows.length).toBe(3);
-      expect(
-        rows.map((c: any) => c.findComponent(OSelect).props("modelValue")),
-      ).toEqual(["field1", "field2", "field3"]);
+      expect(rows.map((c: any) => c.findComponent(OSelect).props("modelValue"))).toEqual([
+        "field1",
+        "field2",
+        "field3",
+      ]);
 
       // Delete the MIDDLE (non-last) row.
       wrapper.vm.deleteLogGroupByColumn(1);
@@ -1835,9 +1846,10 @@ describe("QueryConfig.vue", () => {
       rows = namesFor();
       expect(rows.length).toBe(2);
       // The RENDERED inputs (not just form.state.values) must be ["field1","field3"].
-      expect(
-        rows.map((c: any) => c.findComponent(OSelect).props("modelValue")),
-      ).toEqual(["field1", "field3"]);
+      expect(rows.map((c: any) => c.findComponent(OSelect).props("modelValue"))).toEqual([
+        "field1",
+        "field3",
+      ]);
     });
   });
 

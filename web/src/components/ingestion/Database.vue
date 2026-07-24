@@ -22,9 +22,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     searchable
     search-data-test="database-list-search-input"
   >
-    <div class="w-full h-full">
+    <div class="h-full w-full">
       <div class="bg-card-glass-bg h-full">
-        <div class="overflow-auto h-full pt-0.5">
+        <div class="h-full overflow-auto pt-0.5">
           <router-view
             :title="tabs"
             :currOrgIdentifier="currOrgIdentifier"
@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import DataSourceSidebarLayout from '@/components/ingestion/DataSourceSidebarLayout.vue'
+import DataSourceSidebarLayout from "@/components/ingestion/DataSourceSidebarLayout.vue";
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, onUpdated } from "vue";
 import { useI18n } from "vue-i18n";
@@ -62,11 +62,11 @@ export default defineComponent({
     const store = useStore();
     const router: any = useRouter();
     const tabs = ref("");
-    const currentOrgIdentifier: any = ref(
-      store.state.selectedOrganization.identifier,
-    );
+    const currentOrgIdentifier: any = ref(store.state.selectedOrganization.identifier);
 
-    const ingestTabType = ref(resolveTab("databases", router.currentRoute.value.name as string, "sqlserver"));
+    const ingestTabType = ref(
+      resolveTab("databases", router.currentRoute.value.name as string, "sqlserver"),
+    );
 
     onBeforeMount(() => {
       if (router.currentRoute.value.name === "databases") {
@@ -102,7 +102,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/sqlserver.png"),
-        label: t('ingestion.sqlserver'),
+        label: t("ingestion.sqlserver"),
         contentClass: "tab_content",
       },
       {
@@ -272,7 +272,7 @@ export default defineComponent({
         icon: "img:" + getImageURL("images/ingestion/databricks.svg"),
         label: t("ingestion.databricks"),
         contentClass: "tab_content",
-      }
+      },
     ];
 
     return {
@@ -291,4 +291,3 @@ export default defineComponent({
   },
 });
 </script>
-

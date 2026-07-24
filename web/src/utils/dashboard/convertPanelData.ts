@@ -15,10 +15,7 @@
 
 import { convertPromQLData } from "@/utils/dashboard/convertPromQLData";
 import { convertMultiSQLData } from "@/utils/dashboard/convertSQLData";
-import {
-  convertTableData,
-  convertMultiQueryTableData,
-} from "@/utils/dashboard/convertTableData";
+import { convertTableData, convertMultiQueryTableData } from "@/utils/dashboard/convertTableData";
 import { convertPivotTableData } from "@/utils/dashboard/convertPivotTableData";
 import { convertGeoMapData } from "@/utils/dashboard/convertGeoMapData";
 import { convertMapsData } from "@/utils/dashboard/convertMapsData";
@@ -69,9 +66,7 @@ export const convertPanelData = async (
         !query?.fields?.x?.length &&
         !query?.fields?.y?.length
       ) {
-        throw new Error(
-          "Please select required fields to render the chart",
-        );
+        throw new Error("Please select required fields to render the chart");
       }
 
       if (
@@ -240,8 +235,7 @@ export const convertPanelData = async (
           ...safeResult,
         };
       } else {
-        if (panelSchema?.queries?.[0]?.query?.trim() == "")
-          throw new Error("No data found");
+        if (panelSchema?.queries?.[0]?.query?.trim() == "") throw new Error("No data found");
       }
     }
     // falls through — custom chart without data resolves to the default empty result

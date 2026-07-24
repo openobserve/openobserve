@@ -11,10 +11,7 @@ import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
 import EvalListShell from "./EvalListShell.vue";
 
-function makeWrapper(
-  propsOverride: Record<string, any> = {},
-  slots: Record<string, string> = {},
-) {
+function makeWrapper(propsOverride: Record<string, any> = {}, slots: Record<string, string> = {}) {
   return mount(EvalListShell, {
     props: {
       dataTest: "scorer",

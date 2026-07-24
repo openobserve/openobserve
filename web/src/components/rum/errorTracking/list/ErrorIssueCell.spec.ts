@@ -46,9 +46,7 @@ const baseIssue = {
   view_url: "https://a.com/checkout?step=2",
 };
 
-function mountCell(
-  issue: Record<string, unknown> = baseIssue,
-): VueWrapper {
+function mountCell(issue: Record<string, unknown> = baseIssue): VueWrapper {
   return mount(ErrorIssueCell, {
     props: { issue },
     global: { plugins: [i18n] },
@@ -73,21 +71,17 @@ describe("ErrorIssueCell", () => {
 
   describe("rendering", () => {
     it("renders the root cell element", () => {
-      expect(wrapper.find('[data-test="rum-error-issue-cell"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="rum-error-issue-cell"]').exists()).toBe(true);
     });
 
     it("renders error_type text", () => {
-      expect(
-        wrapper.find('[data-test="rum-error-issue-cell-type"]').text(),
-      ).toContain("TypeError");
+      expect(wrapper.find('[data-test="rum-error-issue-cell-type"]').text()).toContain("TypeError");
     });
 
     it("renders error_message text", () => {
-      expect(
-        wrapper.find('[data-test="rum-error-issue-cell-message"]').text(),
-      ).toContain("Cannot read property 'foo' of undefined");
+      expect(wrapper.find('[data-test="rum-error-issue-cell-message"]').text()).toContain(
+        "Cannot read property 'foo' of undefined",
+      );
     });
 
     it("renders with minimum required props (empty issue object)", () => {
@@ -107,9 +101,7 @@ describe("ErrorIssueCell", () => {
 
   describe("type label", () => {
     it("shows error_type when provided", () => {
-      expect(
-        wrapper.find('[data-test="rum-error-issue-cell-type"]').text(),
-      ).toContain("TypeError");
+      expect(wrapper.find('[data-test="rum-error-issue-cell-type"]').text()).toContain("TypeError");
     });
 
     it("falls back to 'Error' translation when error_type is missing", () => {
@@ -117,9 +109,7 @@ describe("ErrorIssueCell", () => {
       const w = mountCell({ ...baseIssue, error_type: undefined });
 
       // Assert
-      expect(
-        w.find('[data-test="rum-error-issue-cell-type"]').text(),
-      ).toContain("Error");
+      expect(w.find('[data-test="rum-error-issue-cell-type"]').text()).toContain("Error");
 
       w.unmount();
     });
@@ -129,9 +119,7 @@ describe("ErrorIssueCell", () => {
       const w = mountCell({ ...baseIssue, error_type: "" });
 
       // Assert
-      expect(
-        w.find('[data-test="rum-error-issue-cell-type"]').text(),
-      ).toContain("Error");
+      expect(w.find('[data-test="rum-error-issue-cell-type"]').text()).toContain("Error");
 
       w.unmount();
     });
@@ -143,11 +131,9 @@ describe("ErrorIssueCell", () => {
 
   describe("message title attribute", () => {
     it("sets title attribute to the full error_message", () => {
-      expect(
-        wrapper
-          .find('[data-test="rum-error-issue-cell-message"]')
-          .attributes("title"),
-      ).toBe("Cannot read property 'foo' of undefined");
+      expect(wrapper.find('[data-test="rum-error-issue-cell-message"]').attributes("title")).toBe(
+        "Cannot read property 'foo' of undefined",
+      );
     });
 
     it("title attribute matches full message for very long strings", () => {
@@ -156,11 +142,9 @@ describe("ErrorIssueCell", () => {
       const w = mountCell({ ...baseIssue, error_message: longMsg });
 
       // Assert
-      expect(
-        w
-          .find('[data-test="rum-error-issue-cell-message"]')
-          .attributes("title"),
-      ).toBe(longMsg);
+      expect(w.find('[data-test="rum-error-issue-cell-message"]').attributes("title")).toBe(
+        longMsg,
+      );
 
       w.unmount();
     });
@@ -171,9 +155,7 @@ describe("ErrorIssueCell", () => {
       const w = mountCell({ ...baseIssue, error_message: unicodeMsg });
 
       // Assert
-      expect(
-        w.find('[data-test="rum-error-issue-cell-message"]').text(),
-      ).toContain(unicodeMsg);
+      expect(w.find('[data-test="rum-error-issue-cell-message"]').text()).toContain(unicodeMsg);
 
       w.unmount();
     });
@@ -185,19 +167,12 @@ describe("ErrorIssueCell", () => {
 
   describe("handling tag", () => {
     it("shows handling tag when error_handling is 'unhandled'", () => {
-      expect(
-        wrapper
-          .find('[data-test="rum-error-issue-cell-handling-tag"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-error-issue-cell-handling-tag"]').exists()).toBe(true);
     });
 
     it("handling tag text contains 'unhandled'", () => {
       expect(
-        wrapper
-          .find('[data-test="rum-error-issue-cell-handling-tag"]')
-          .text()
-          .toLowerCase(),
+        wrapper.find('[data-test="rum-error-issue-cell-handling-tag"]').text().toLowerCase(),
       ).toContain("unhandled");
     });
 
@@ -206,9 +181,7 @@ describe("ErrorIssueCell", () => {
       const w = mountCell({ ...baseIssue, error_handling: "handled" });
 
       // Assert
-      expect(
-        w.find('[data-test="rum-error-issue-cell-handling-tag"]').exists(),
-      ).toBe(true);
+      expect(w.find('[data-test="rum-error-issue-cell-handling-tag"]').exists()).toBe(true);
 
       w.unmount();
     });
@@ -219,10 +192,7 @@ describe("ErrorIssueCell", () => {
 
       // Assert
       expect(
-        w
-          .find('[data-test="rum-error-issue-cell-handling-tag"]')
-          .text()
-          .toLowerCase(),
+        w.find('[data-test="rum-error-issue-cell-handling-tag"]').text().toLowerCase(),
       ).toContain("handled");
 
       w.unmount();
@@ -233,9 +203,7 @@ describe("ErrorIssueCell", () => {
       const w = mountCell({ ...baseIssue, error_handling: undefined });
 
       // Assert
-      expect(
-        w.find('[data-test="rum-error-issue-cell-handling-tag"]').exists(),
-      ).toBe(false);
+      expect(w.find('[data-test="rum-error-issue-cell-handling-tag"]').exists()).toBe(false);
 
       w.unmount();
     });
@@ -245,9 +213,7 @@ describe("ErrorIssueCell", () => {
       const w = mountCell({ ...baseIssue, error_handling: "" });
 
       // Assert
-      expect(
-        w.find('[data-test="rum-error-issue-cell-handling-tag"]').exists(),
-      ).toBe(false);
+      expect(w.find('[data-test="rum-error-issue-cell-handling-tag"]').exists()).toBe(false);
 
       w.unmount();
     });
@@ -259,15 +225,13 @@ describe("ErrorIssueCell", () => {
 
   describe("frame chip", () => {
     it("renders code element when stack is parseable", () => {
-      expect(
-        wrapper.find('[data-test="rum-error-issue-cell-frame"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-error-issue-cell-frame"]').exists()).toBe(true);
     });
 
     it("renders 'checkout.js:214' from the stack example", () => {
-      expect(
-        wrapper.find('[data-test="rum-error-issue-cell-frame"]').text(),
-      ).toBe("checkout.js:214");
+      expect(wrapper.find('[data-test="rum-error-issue-cell-frame"]').text()).toBe(
+        "checkout.js:214",
+      );
     });
 
     it("uses <code> element for the frame chip", () => {
@@ -280,9 +244,7 @@ describe("ErrorIssueCell", () => {
       const w = mountCell({ ...baseIssue, error_stack: undefined });
 
       // Assert
-      expect(
-        w.find('[data-test="rum-error-issue-cell-frame"]').exists(),
-      ).toBe(false);
+      expect(w.find('[data-test="rum-error-issue-cell-frame"]').exists()).toBe(false);
 
       w.unmount();
     });
@@ -292,9 +254,7 @@ describe("ErrorIssueCell", () => {
       const w = mountCell({ ...baseIssue, error_stack: "" });
 
       // Assert
-      expect(
-        w.find('[data-test="rum-error-issue-cell-frame"]').exists(),
-      ).toBe(false);
+      expect(w.find('[data-test="rum-error-issue-cell-frame"]').exists()).toBe(false);
 
       w.unmount();
     });
@@ -307,9 +267,7 @@ describe("ErrorIssueCell", () => {
       });
 
       // Assert
-      expect(
-        w.find('[data-test="rum-error-issue-cell-frame"]').exists(),
-      ).toBe(false);
+      expect(w.find('[data-test="rum-error-issue-cell-frame"]').exists()).toBe(false);
 
       w.unmount();
     });
@@ -322,9 +280,7 @@ describe("ErrorIssueCell", () => {
       });
 
       // Assert
-      expect(
-        w.find('[data-test="rum-error-issue-cell-frame"]').text(),
-      ).toBe("app.js:42");
+      expect(w.find('[data-test="rum-error-issue-cell-frame"]').text()).toBe("app.js:42");
 
       w.unmount();
     });
@@ -336,22 +292,20 @@ describe("ErrorIssueCell", () => {
 
   describe("route chip", () => {
     it("renders route chip with pathname from view_url", () => {
-      expect(
-        wrapper.find('[data-test="rum-error-issue-cell-route-tag"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-error-issue-cell-route-tag"]').exists()).toBe(true);
     });
 
     it("shows pathname '/checkout' from 'https://a.com/checkout?step=2'", () => {
-      expect(
-        wrapper.find('[data-test="rum-error-issue-cell-route-tag"]').text(),
-      ).toContain("/checkout");
+      expect(wrapper.find('[data-test="rum-error-issue-cell-route-tag"]').text()).toContain(
+        "/checkout",
+      );
     });
 
     it("strips query string from pathname", () => {
       // Assert — no '?step=2' in the tag
-      expect(
-        wrapper.find('[data-test="rum-error-issue-cell-route-tag"]').text(),
-      ).not.toContain("?step=2");
+      expect(wrapper.find('[data-test="rum-error-issue-cell-route-tag"]').text()).not.toContain(
+        "?step=2",
+      );
     });
 
     it("does not render route chip when view_url is missing", () => {
@@ -359,9 +313,7 @@ describe("ErrorIssueCell", () => {
       const w = mountCell({ ...baseIssue, view_url: undefined });
 
       // Assert
-      expect(
-        w.find('[data-test="rum-error-issue-cell-route-tag"]').exists(),
-      ).toBe(false);
+      expect(w.find('[data-test="rum-error-issue-cell-route-tag"]').exists()).toBe(false);
 
       w.unmount();
     });
@@ -371,9 +323,7 @@ describe("ErrorIssueCell", () => {
       const w = mountCell({ ...baseIssue, view_url: "" });
 
       // Assert
-      expect(
-        w.find('[data-test="rum-error-issue-cell-route-tag"]').exists(),
-      ).toBe(false);
+      expect(w.find('[data-test="rum-error-issue-cell-route-tag"]').exists()).toBe(false);
 
       w.unmount();
     });
@@ -383,9 +333,7 @@ describe("ErrorIssueCell", () => {
       const w = mountCell({ ...baseIssue, view_url: "not-a-url" });
 
       // Assert
-      expect(
-        w.find('[data-test="rum-error-issue-cell-route-tag"]').exists(),
-      ).toBe(false);
+      expect(w.find('[data-test="rum-error-issue-cell-route-tag"]').exists()).toBe(false);
 
       w.unmount();
     });
@@ -395,9 +343,7 @@ describe("ErrorIssueCell", () => {
       const w = mountCell({ ...baseIssue, view_url: "/dashboard?tab=1" });
 
       // Assert
-      expect(
-        w.find('[data-test="rum-error-issue-cell-route-tag"]').text(),
-      ).toContain("/dashboard");
+      expect(w.find('[data-test="rum-error-issue-cell-route-tag"]').text()).toContain("/dashboard");
 
       w.unmount();
     });
@@ -409,23 +355,17 @@ describe("ErrorIssueCell", () => {
 
   describe("service", () => {
     it("shows service text when service is present", () => {
-      expect(
-        wrapper.find('[data-test="rum-error-issue-cell-service"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-error-issue-cell-service"]').exists()).toBe(true);
     });
 
     it("renders the service name text", () => {
-      expect(
-        wrapper.find('[data-test="rum-error-issue-cell-service"]').text(),
-      ).toBe("web-frontend");
+      expect(wrapper.find('[data-test="rum-error-issue-cell-service"]').text()).toBe(
+        "web-frontend",
+      );
     });
 
     it("uses <small> element for the service", () => {
-      expect(
-        wrapper
-          .find("small[data-test='rum-error-issue-cell-service']")
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find("small[data-test='rum-error-issue-cell-service']").exists()).toBe(true);
     });
 
     it("does not render service element when service is missing", () => {
@@ -433,9 +373,7 @@ describe("ErrorIssueCell", () => {
       const w = mountCell({ ...baseIssue, service: undefined });
 
       // Assert
-      expect(
-        w.find('[data-test="rum-error-issue-cell-service"]').exists(),
-      ).toBe(false);
+      expect(w.find('[data-test="rum-error-issue-cell-service"]').exists()).toBe(false);
 
       w.unmount();
     });
@@ -445,9 +383,7 @@ describe("ErrorIssueCell", () => {
       const w = mountCell({ ...baseIssue, service: "" });
 
       // Assert
-      expect(
-        w.find('[data-test="rum-error-issue-cell-service"]').exists(),
-      ).toBe(false);
+      expect(w.find('[data-test="rum-error-issue-cell-service"]').exists()).toBe(false);
 
       w.unmount();
     });
@@ -465,9 +401,9 @@ describe("ErrorIssueCell", () => {
       });
 
       // Assert
-      expect(
-        wrapper.find('[data-test="rum-error-issue-cell-type"]').text(),
-      ).toContain("ReferenceError");
+      expect(wrapper.find('[data-test="rum-error-issue-cell-type"]').text()).toContain(
+        "ReferenceError",
+      );
     });
 
     it("updates message when error_message prop changes", async () => {
@@ -476,9 +412,7 @@ describe("ErrorIssueCell", () => {
       await wrapper.setProps({ issue: { ...baseIssue, error_message: newMsg } });
 
       // Assert
-      expect(
-        wrapper.find('[data-test="rum-error-issue-cell-message"]').text(),
-      ).toContain(newMsg);
+      expect(wrapper.find('[data-test="rum-error-issue-cell-message"]').text()).toContain(newMsg);
     });
 
     it("hides frame chip after stack is removed", async () => {
@@ -486,9 +420,7 @@ describe("ErrorIssueCell", () => {
       await wrapper.setProps({ issue: { ...baseIssue, error_stack: undefined } });
 
       // Assert
-      expect(
-        wrapper.find('[data-test="rum-error-issue-cell-frame"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="rum-error-issue-cell-frame"]').exists()).toBe(false);
     });
   });
 
@@ -519,9 +451,7 @@ describe("ErrorIssueCell", () => {
       const w = mountCell({ ...baseIssue, error_message: "Error 🔥 occurred" });
 
       // Assert
-      expect(
-        w.find('[data-test="rum-error-issue-cell-message"]').text(),
-      ).toContain("🔥");
+      expect(w.find('[data-test="rum-error-issue-cell-message"]').text()).toContain("🔥");
 
       w.unmount();
     });
@@ -531,9 +461,7 @@ describe("ErrorIssueCell", () => {
       const w = mountCell({ ...baseIssue, service: "web-app_v2.0" });
 
       // Assert
-      expect(
-        w.find('[data-test="rum-error-issue-cell-service"]').text(),
-      ).toBe("web-app_v2.0");
+      expect(w.find('[data-test="rum-error-issue-cell-service"]').text()).toBe("web-app_v2.0");
 
       w.unmount();
     });
@@ -543,9 +471,7 @@ describe("ErrorIssueCell", () => {
       const w = mountCell({ ...baseIssue, error_type: "Error" });
 
       // Assert — type label should contain 'Error'
-      expect(
-        w.find('[data-test="rum-error-issue-cell-type"]').text(),
-      ).toContain("Error");
+      expect(w.find('[data-test="rum-error-issue-cell-type"]').text()).toContain("Error");
 
       w.unmount();
     });

@@ -29,7 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ]"
       class="h-full"
     >
-      <OPageLayout bleed
+      <OPageLayout
+        bleed
         :main-panel="false"
         :header-class="
           isFullscreen || store.state.printMode === true
@@ -40,250 +41,252 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :icon="!isFullscreen && store.state.printMode !== true ? undefined : 'dashboard'"
         :back="
           !isFullscreen && store.state.printMode !== true
-            ? { label: t('dashboard.header'), onClick: goBackToDashboardList, dataTest: 'dashboard-back-btn' }
+            ? {
+                label: t('dashboard.header'),
+                onClick: goBackToDashboardList,
+                dataTest: 'dashboard-back-btn',
+              }
             : undefined
         "
       >
-          <template #title>
-            <span data-test="dashboard-name-title">{{ currentDashboardData.data?.title }}</span>
-          </template>
-          <template #actions>
-            <!-- Add panel is the most-used action, so it leads the toolbar. -->
-            <OButton
-              v-if="!isFullscreen"
-              v-show="store.state.printMode !== true"
-              variant="outline"
-              size="icon-toolbar"
-              @click="addPanelData"
-              data-test="dashboard-panel-add"
-              icon-left="add"
-            >
-              <OTooltip :content="t('panel.add')" shortcut-id="dashboardAddPanel" />
-            </OButton>
-            <!-- <DateTimePicker 
+        <template #title>
+          <span data-test="dashboard-name-title">{{ currentDashboardData.data?.title }}</span>
+        </template>
+        <template #actions>
+          <!-- Add panel is the most-used action, so it leads the toolbar. -->
+          <OButton
+            v-if="!isFullscreen"
+            v-show="store.state.printMode !== true"
+            variant="outline"
+            size="icon-toolbar"
+            @click="addPanelData"
+            data-test="dashboard-panel-add"
+            icon-left="add"
+          >
+            <OTooltip :content="t('panel.add')" shortcut-id="dashboardAddPanel" />
+          </OButton>
+          <!-- <DateTimePicker 
             class="ml-2"
             ref="refDateTime"
             v-model="selectedDate"
             /> -->
-            <!-- for Print Mode -->
-            <!-- if time is relative, show start and end time -->
-            <!-- format: YYYY/MM/DD HH:mm - YYYY/MM/DD HH:mm (TIMEZONE) -->
-            <div class="pt-1.25"
-              v-if="
-                store.state.printMode === true &&
-                currentTimeObj.start_time &&
-                currentTimeObj.end_time
+          <!-- for Print Mode -->
+          <!-- if time is relative, show start and end time -->
+          <!-- format: YYYY/MM/DD HH:mm - YYYY/MM/DD HH:mm (TIMEZONE) -->
+          <div
+            class="pt-1.25"
+            v-if="
+              store.state.printMode === true && currentTimeObj.start_time && currentTimeObj.end_time
+            "
+          >
+            {{ timeString }} ({{ store.state.timezone }})
+          </div>
+          <!-- do not show date time picker for print mode -->
+          <DateTimePickerDashboard
+            v-if="selectedDate"
+            v-show="store.state.printMode === false"
+            ref="dateTimePicker"
+            class="dashboard-icons h-7.5 [transition:all_0.2s_ease]"
+            size="sm"
+            v-model="selectedDate"
+            :initialTimezone="initialTimezone"
+            :disable="arePanelsLoading"
+            @hide="setTimeForVariables"
+            data-test="dashboard-global-date-time-picker"
+          />
+          <AutoRefreshInterval
+            v-model="refreshInterval"
+            trigger
+            :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
+            @trigger="refreshData"
+            class="dashboard-icons hideOnPrintMode h-7.5 [transition:all_0.2s_ease]"
+            size="sm"
+          />
+          <OButton
+            v-if="config.isEnterprise == 'true' && arePanelsLoading"
+            v-show="store.state.printMode !== true"
+            variant="outline-destructive"
+            size="icon-toolbar"
+            @click="cancelQuery"
+            data-test="dashboard-cancel-btn"
+            icon-left="cancel"
+          >
+            <OTooltip :content="t('panel.cancel')" />
+          </OButton>
+          <OButton
+            v-else
+            v-show="store.state.printMode !== true"
+            :variant="isVariablesChanged ? 'warning' : 'outline'"
+            size="icon-toolbar"
+            @click="refreshData"
+            :disabled="arePanelsLoading"
+            :loading="arePanelsLoading"
+            data-test="dashboard-refresh-btn"
+            icon-left="refresh"
+          >
+            <OTooltip
+              :content="
+                isVariablesChanged
+                  ? t('dashboard.viewDashboard.refreshToApplyVariables')
+                  : t('dashboard.viewDashboard.refresh')
               "
-            >
-              {{ timeString }} ({{ store.state.timezone }})
-            </div>
-            <!-- do not show date time picker for print mode -->
-            <DateTimePickerDashboard
-              v-if="selectedDate"
-              v-show="store.state.printMode === false"
-              ref="dateTimePicker"
-              class="dashboard-icons h-7.5 [transition:all_0.2s_ease]"
-              size="sm"
-              v-model="selectedDate"
-              :initialTimezone="initialTimezone"
-              :disable="arePanelsLoading"
-              @hide="setTimeForVariables"
-              data-test="dashboard-global-date-time-picker"
+              shortcut-id="dashboardRefresh"
             />
-            <AutoRefreshInterval
-              v-model="refreshInterval"
-              trigger
-              :min-refresh-interval="
-                store.state?.zoConfig?.min_auto_refresh_interval || 5
-              "
-              @trigger="refreshData"
-              class="dashboard-icons hideOnPrintMode h-7.5 [transition:all_0.2s_ease]"
-              size="sm"
-            />
-            <OButton
-              v-if="config.isEnterprise == 'true' && arePanelsLoading"
-              v-show="store.state.printMode !== true"
-              variant="outline-destructive"
-              size="icon-toolbar"
-              @click="cancelQuery"
-              data-test="dashboard-cancel-btn"
-              icon-left="cancel"
-            >
-              <OTooltip :content="t('panel.cancel')" />
-            </OButton>
-            <OButton
-              v-else
-              v-show="store.state.printMode !== true"
-              :variant="isVariablesChanged ? 'warning' : 'outline'"
-              size="icon-toolbar"
-              @click="refreshData"
-              :disabled="arePanelsLoading"
-              :loading="arePanelsLoading"
-              data-test="dashboard-refresh-btn"
-              icon-left="refresh"
-            >
-              <OTooltip :content="isVariablesChanged ? t('dashboard.viewDashboard.refreshToApplyVariables') : t('dashboard.viewDashboard.refresh')" shortcut-id="dashboardRefresh" />
-            </OButton>
+          </OButton>
 
-            <ExportDashboard
-              v-if="!isFullscreen"
-              v-show="store.state.printMode !== true"
-              :dashboardId="currentDashboardData.data?.dashboardId"
+          <ExportDashboard
+            v-if="!isFullscreen"
+            v-show="store.state.printMode !== true"
+            :dashboardId="currentDashboardData.data?.dashboardId"
+          />
+          <ShareButton
+            v-if="!isFullscreen"
+            v-show="store.state.printMode !== true"
+            :url="dashboardShareURL"
+            variant="outline"
+            size="icon-toolbar"
+            data-test="dashboard-share-btn"
+          />
+          <OButton
+            v-if="!isFullscreen"
+            v-show="store.state.printMode !== true"
+            variant="outline"
+            size="icon-toolbar"
+            data-test="dashboard-setting-btn"
+            @click="openSettingsDialog"
+            icon-left="settings"
+          >
+            <OTooltip :content="t('dashboard.setting')" />
+          </OButton>
+          <OButton
+            variant="outline"
+            size="icon-toolbar"
+            @click="printDashboard"
+            data-test="dashboard-print-btn"
+          >
+            <template #icon-left
+              ><OIcon :name="store.state.printMode === true ? 'close' : 'print'" size="sm"
+            /></template>
+            <OTooltip
+              :content="store.state.printMode === true ? t('common.close') : t('dashboard.print')"
             />
-            <share-button
-              v-if="!isFullscreen"
-              v-show="store.state.printMode !== true"
-              :url="dashboardShareURL"
-              variant="outline"
-              size="icon-toolbar"
-              data-test="dashboard-share-btn"
+          </OButton>
+          <OButton
+            v-show="store.state.printMode !== true"
+            variant="outline"
+            size="icon-toolbar"
+            @click="toggleFullscreen"
+            data-test="dashboard-fullscreen-btn"
+          >
+            <template #icon-left
+              ><OIcon :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'" size="sm"
+            /></template>
+            <OTooltip
+              :content="isFullscreen ? t('dashboard.exitFullscreen') : t('dashboard.fullscreen')"
+              shortcut-id="dashboardFullscreen"
             />
-            <OButton
-              v-if="!isFullscreen"
-              v-show="store.state.printMode !== true"
-              variant="outline"
-              size="icon-toolbar"
-              data-test="dashboard-setting-btn"
-              @click="openSettingsDialog"
-              icon-left="settings"
-            >
-              <OTooltip :content="t('dashboard.setting')" />
-            </OButton>
-            <OButton
-              variant="outline"
-              size="icon-toolbar"
-              @click="printDashboard"
-              data-test="dashboard-print-btn"
-            >
-              <template #icon-left><OIcon
-                  :name="store.state.printMode === true ? 'close' : 'print'" size="sm"
-              /></template>
-              <OTooltip :content="store.state.printMode === true ? t('common.close') : t('dashboard.print')" />
-            </OButton>
-            <OButton
-              v-show="store.state.printMode !== true"
-              variant="outline"
-              size="icon-toolbar"
-              @click="toggleFullscreen"
-              data-test="dashboard-fullscreen-btn"
-            >
-              <template #icon-left><OIcon
-                  :name="
-                    isFullscreen ? 'fullscreen-exit' : 'fullscreen'
-                  " size="sm"
-              /></template>
-              <OTooltip :content="isFullscreen ? t('dashboard.exitFullscreen') : t('dashboard.fullscreen')" shortcut-id="dashboardFullscreen" />
-            </OButton>
-            <OButton
-              v-if="!isFullscreen"
-              v-show="store.state.printMode !== true"
-              variant="outline"
-              size="icon-toolbar"
-              @click="openScheduledReports"
-              data-test="view-dashboard-scheduled-reports"
-            >
-              <template #icon-left><OIcon name="description" size="sm"
-              /></template>
-              <OTooltip :content="t('dashboard.scheduledDashboards')" />
-            </OButton>
-            <OButton
-              v-if="!isFullscreen"
-              v-show="store.state.printMode !== true"
-              variant="outline"
-              size="icon-toolbar"
-              data-test="dashboard-json-edit-btn"
-              @click="openJsonEditor"
-              icon-left="code"
-            >
-              <OTooltip :content="t('dashboard.editJson')" />
-            </OButton>
-            <!-- Pin as org-wide home dashboard: a low-frequency, set-once
+          </OButton>
+          <OButton
+            v-if="!isFullscreen"
+            v-show="store.state.printMode !== true"
+            variant="outline"
+            size="icon-toolbar"
+            @click="openScheduledReports"
+            data-test="view-dashboard-scheduled-reports"
+          >
+            <template #icon-left><OIcon name="description" size="sm" /></template>
+            <OTooltip :content="t('dashboard.scheduledDashboards')" />
+          </OButton>
+          <OButton
+            v-if="!isFullscreen"
+            v-show="store.state.printMode !== true"
+            variant="outline"
+            size="icon-toolbar"
+            data-test="dashboard-json-edit-btn"
+            @click="openJsonEditor"
+            icon-left="code"
+          >
+            <OTooltip :content="t('dashboard.editJson')" />
+          </OButton>
+          <!-- Pin as org-wide home dashboard: a low-frequency, set-once
                  action, so it sits at the far right, icon-only. Filled pin +
                  highlighted variant signal the "already home" state. -->
-            <OButton
-              v-if="!isFullscreen"
-              v-show="store.state.printMode !== true"
-              :variant="isHome(dashboardId) ? 'secondary' : 'outline'"
-              size="icon-toolbar"
-              :class="
-                isHome(dashboardId)
-                  ? 'text-primary border border-button-outline-border'
-                  : ''
+          <OButton
+            v-if="!isFullscreen"
+            v-show="store.state.printMode !== true"
+            :variant="isHome(dashboardId) ? 'secondary' : 'outline'"
+            size="icon-toolbar"
+            :class="isHome(dashboardId) ? 'text-primary border-button-outline-border border' : ''"
+            @click="toggleHomeDashboard"
+            data-test="dashboard-view-set-home-btn"
+            :icon-left="isHome(dashboardId) ? 'keep' : 'keep-outline'"
+          >
+            <OTooltip
+              :content="
+                isHome(dashboardId) ? t('dashboard.removeFromHome') : t('dashboard.setAsHomeDesc')
               "
-              @click="toggleHomeDashboard"
-              data-test="dashboard-view-set-home-btn"
-              :icon-left="isHome(dashboardId) ? 'keep' : 'keep-outline'"
-            >
-              <OTooltip
-                :content="
-                  isHome(dashboardId)
-                    ? t('dashboard.removeFromHome')
-                    : t('dashboard.setAsHomeDesc')
-                "
-              />
-            </OButton>
-          </template>
+            />
+          </OButton>
+        </template>
 
         <RenderDashboardCharts
-        :frame="false"
-        :class="store.state.printMode ? '' : 'flex-1 min-h-0'"
-        :key="
-          currentDashboardData.data?.dashboardId + '-' + dashboardRemountKey
-        "
-        v-if="selectedDate"
-        ref="renderDashboardChartsRef"
-        @variablesData="variablesDataUpdated"
-        @refreshedVariablesDataUpdated="refreshedVariablesDataUpdated"
-        @variablesManagerReady="onVariablesManagerReady"
-        :initialVariableValues="initialVariableValues"
-        :viewOnly="store.state.printMode"
-        :dashboardData="currentDashboardData.data"
-        :folderId="route.query.folder"
-        :reportId="reportId"
-        :currentTimeObj="currentTimeObjPerPanel"
-        :shouldRefreshWithoutCacheObj="shouldRefreshWithoutCachePerPanel"
-        :dashboardName="currentDashboardData.data?.title"
-        :folderName="folderNameFromFolderId"
-        :selectedDateForViewPanel="selectedDate"
-        :allowAlertCreation="true"
-        @onDeletePanel="onDeletePanel"
-        @onMovePanel="onMovePanel"
-        @updated:data-zoom="onDataZoom"
-        @refresh="loadDashboard"
-        @refreshPanelRequest="refreshPanelRequest"
-        @openEditLayout="openLayoutConfig"
-        :showTabs="true"
-        :forceLoad="store.state.printMode"
-        :searchType="searchType"
-        :showLegendsButton="true"
-        @panelsValues="handleEmittedData"
-        @searchRequestTraceIds="searchRequestTraceIds"
-        :runId="runId"
-        @update:runId="updateRunId"
+          :frame="false"
+          :class="store.state.printMode ? '' : 'min-h-0 flex-1'"
+          :key="currentDashboardData.data?.dashboardId + '-' + dashboardRemountKey"
+          v-if="selectedDate"
+          ref="renderDashboardChartsRef"
+          @variablesData="variablesDataUpdated"
+          @refreshedVariablesDataUpdated="refreshedVariablesDataUpdated"
+          @variablesManagerReady="onVariablesManagerReady"
+          :initialVariableValues="initialVariableValues"
+          :viewOnly="store.state.printMode"
+          :dashboardData="currentDashboardData.data"
+          :folderId="route.query.folder"
+          :reportId="reportId"
+          :currentTimeObj="currentTimeObjPerPanel"
+          :shouldRefreshWithoutCacheObj="shouldRefreshWithoutCachePerPanel"
+          :dashboardName="currentDashboardData.data?.title"
+          :folderName="folderNameFromFolderId"
+          :selectedDateForViewPanel="selectedDate"
+          :allowAlertCreation="true"
+          @onDeletePanel="onDeletePanel"
+          @onMovePanel="onMovePanel"
+          @updated:data-zoom="onDataZoom"
+          @refresh="loadDashboard"
+          @refreshPanelRequest="refreshPanelRequest"
+          @openEditLayout="openLayoutConfig"
+          :showTabs="true"
+          :forceLoad="store.state.printMode"
+          :searchType="searchType"
+          :showLegendsButton="true"
+          @panelsValues="handleEmittedData"
+          @searchRequestTraceIds="searchRequestTraceIds"
+          :runId="runId"
+          @update:runId="updateRunId"
         />
-      <DashboardSettings
-        v-model:open="showDashboardSettingsDialog"
-        @refresh="loadDashboard"
-        @close="showDashboardSettingsDialog = false"
-      />
+        <DashboardSettings
+          v-model:open="showDashboardSettingsDialog"
+          @refresh="loadDashboard"
+          @close="showDashboardSettingsDialog = false"
+        />
 
-      <PanelLayoutSettings
-        v-if="selectedPanelConfig.data"
-        v-model:open="selectedPanelConfig.show"
-        :layout="selectedPanelConfig.data.layout"
-        @save:layout="savePanelLayout"
-        @close="selectedPanelConfig.show = false"
-      />
+        <PanelLayoutSettings
+          v-if="selectedPanelConfig.data"
+          v-model:open="selectedPanelConfig.show"
+          :layout="selectedPanelConfig.data.layout"
+          @save:layout="savePanelLayout"
+          @close="selectedPanelConfig.show = false"
+        />
 
-      <ScheduledDashboards
-        v-model:open="showScheduledReportsDialog"
-        :reports="scheduledReports"
-        :loading="isLoadingReports"
-        :folderId="folderId"
-        :dashboardId="dashboardId"
-        :tabId="tabId"
-        :tabs="currentDashboardData?.data?.tabs || []"
-      />
+        <ScheduledDashboards
+          v-model:open="showScheduledReportsDialog"
+          :reports="scheduledReports"
+          :loading="isLoadingReports"
+          :folderId="folderId"
+          :dashboardId="dashboardId"
+          :tabId="tabId"
+          :tabs="currentDashboardData?.data?.tabs || []"
+        />
 
         <DashboardJsonEditor
           v-model:open="showJsonEditorDialog"
@@ -315,16 +318,8 @@ import { useI18n } from "vue-i18n";
 import ShareButton from "@/components/common/ShareButton.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import { useRouter } from "vue-router";
-import {
-  getDashboard,
-  movePanelToAnotherTab,
-  getFoldersList,
-} from "../../utils/commons.ts";
-import {
-  parseDuration,
-  generateDurationLabel,
-  getConsumableRelativeTime,
-} from "../../utils/date";
+import { getDashboard, movePanelToAnotherTab, getFoldersList } from "../../utils/commons.ts";
+import { parseDuration, generateDurationLabel, getConsumableRelativeTime } from "../../utils/date";
 import { useRoute } from "vue-router";
 import { deletePanel } from "../../utils/commons";
 import {
@@ -349,10 +344,7 @@ import { useLoading } from "@/composables/useLoading";
 import { isEqual } from "lodash-es";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { getUUID } from "@/utils/zincutils";
-import {
-  createDashboardsContextProvider,
-  contextRegistry,
-} from "@/composables/contextProviders";
+import { createDashboardsContextProvider, contextRegistry } from "@/composables/contextProviders";
 import { hasPanelTime } from "@/utils/dashboard/panelTimeUtils";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
@@ -388,7 +380,7 @@ export default defineComponent({
     OButton,
     OIcon,
     OTooltip,
-},
+  },
   setup() {
     const { t } = useI18n();
     const route = useRoute();
@@ -435,8 +427,7 @@ export default defineComponent({
 
     // Set/remove this dashboard as the single org-wide home dashboard, shared
     // reactive state with the dashboard list and HomeView via the composable.
-    const { isHome, setHomeDashboard, clearHomeDashboard } =
-      useHomeDashboard();
+    const { isHome, setHomeDashboard, clearHomeDashboard } = useHomeDashboard();
     const toggleHomeDashboard = () => {
       const id = dashboardId.value as string | undefined;
       if (!id) return;
@@ -477,11 +468,7 @@ export default defineComponent({
      * Retrieves the selected date from the query parameters.
      */
     const getSelectedDateFromQueryParams = (params) => ({
-      valueType: params.period
-        ? "relative"
-        : params.from && params.to
-          ? "absolute"
-          : "relative",
+      valueType: params.period ? "relative" : params.from && params.to ? "absolute" : "relative",
       startTime: params.from ? params.from : null,
       endTime: params.to ? params.to : null,
       relativeTimePeriod: params.period ? params.period : "15m",
@@ -620,9 +607,7 @@ export default defineComponent({
           normalized.values = normalized.values
             .map((variable) => {
               if (Array.isArray(variable.value)) {
-                variable.value.sort((a, b) =>
-                  JSON.stringify(a).localeCompare(JSON.stringify(b)),
-                );
+                variable.value.sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
               }
               return variable;
             })
@@ -676,9 +661,7 @@ export default defineComponent({
 
     const setTimeString = () => {
       if (!moment()) return;
-      timeString.value = ` ${moment(
-        currentTimeObj.value?.start_time?.getTime() / 1000,
-      )
+      timeString.value = ` ${moment(currentTimeObj.value?.start_time?.getTime() / 1000)
         .tz(store.state.timezone)
         .format("YYYY/MM/DD HH:mm")}
               -
@@ -728,8 +711,7 @@ export default defineComponent({
 
           const sortedStringify = (obj: Record<string, any>) =>
             JSON.stringify(Object.fromEntries(Object.entries(obj).sort()));
-          const hasVarChanges =
-            sortedStringify(urlVarParams) !== sortedStringify(currentVarParams);
+          const hasVarChanges = sortedStringify(urlVarParams) !== sortedStringify(currentVarParams);
 
           if (!hasVarChanges) {
             return; // Truly nothing changed
@@ -746,22 +728,13 @@ export default defineComponent({
           route.query.folder ?? "default",
         );
 
-        if (
-          !dashboard ||
-          typeof dashboard !== "object" ||
-          !Object.keys(dashboard).length
-        ) {
-          showErrorNotification(
-            t("dashboard.viewDashboard.dashboardNotFound"),
-          );
+        if (!dashboard || typeof dashboard !== "object" || !Object.keys(dashboard).length) {
+          showErrorNotification(t("dashboard.viewDashboard.dashboardNotFound"));
           goBackToDashboardList();
           return;
         }
       } catch (error: any) {
-        showErrorNotification(
-          error?.message ||
-            t("dashboard.viewDashboard.failedToLoadDashboard"),
-        );
+        showErrorNotification(error?.message || t("dashboard.viewDashboard.failedToLoadDashboard"));
         goBackToDashboardList();
         return;
       }
@@ -770,13 +743,9 @@ export default defineComponent({
       currentDashboardData.data = dashboard;
 
       // set selected tab from query params
-      const selectedTab = dashboard?.tabs?.find(
-        (tab: any) => tab.tabId === route.query.tab,
-      );
+      const selectedTab = dashboard?.tabs?.find((tab: any) => tab.tabId === route.query.tab);
 
-      selectedTabId.value = selectedTab
-        ? selectedTab.tabId
-        : dashboard?.tabs?.[0]?.tabId;
+      selectedTabId.value = selectedTab ? selectedTab.tabId : dashboard?.tabs?.[0]?.tabId;
 
       // if variables data is null, set it to empty list
       if (!(dashboard?.variables && dashboard?.variables?.list.length)) {
@@ -791,23 +760,19 @@ export default defineComponent({
       if (!((route.query.from && route.query.to) || route.query.period)) {
         // if dashboard has relative time settings
         if (
-          (currentDashboardData.data?.defaultDatetimeDuration?.type ??
-            "relative") === "relative"
+          (currentDashboardData.data?.defaultDatetimeDuration?.type ?? "relative") === "relative"
         ) {
           selectedDate.value = {
             valueType: "relative",
             relativeTimePeriod:
-              currentDashboardData.data?.defaultDatetimeDuration
-                ?.relativeTimePeriod ?? "15m",
+              currentDashboardData.data?.defaultDatetimeDuration?.relativeTimePeriod ?? "15m",
           };
         } else {
           // else, dashboard will have absolute time settings
           selectedDate.value = {
             valueType: "absolute",
-            startTime:
-              currentDashboardData.data?.defaultDatetimeDuration?.startTime,
-            endTime:
-              currentDashboardData.data?.defaultDatetimeDuration?.endTime,
+            startTime: currentDashboardData.data?.defaultDatetimeDuration?.startTime,
+            endTime: currentDashboardData.data?.defaultDatetimeDuration?.endTime,
           };
         }
       } else {
@@ -845,10 +810,7 @@ export default defineComponent({
     };
 
     const savePanelLayout = async (layout) => {
-      const panel = getPanelFromTab(
-        selectedTabId.value,
-        selectedPanelConfig.value.data.id,
-      );
+      const panel = getPanelFromTab(selectedTabId.value, selectedPanelConfig.value.data.id);
       if (panel) panel.layout = layout;
 
       selectedPanelConfig.value.show = false;
@@ -867,13 +829,8 @@ export default defineComponent({
     const convertPickerToTimeObj = (pickerValue: any) => {
       if (!pickerValue) return null;
 
-      if (
-        pickerValue.valueType === "relative" &&
-        pickerValue.relativeTimePeriod
-      ) {
-        const result = getConsumableRelativeTime(
-          pickerValue.relativeTimePeriod,
-        );
+      if (pickerValue.valueType === "relative" && pickerValue.relativeTimePeriod) {
+        const result = getConsumableRelativeTime(pickerValue.relativeTimePeriod);
         if (result) {
           return {
             start_time: new Date(result.startTime),
@@ -904,9 +861,7 @@ export default defineComponent({
 
       // Priority 2: Use panel's configured time range (if set)
       if (panel.config?.panel_time_range) {
-        const pickerValue = convertPanelTimeRangeToPicker(
-          panel.config.panel_time_range,
-        );
+        const pickerValue = convertPanelTimeRangeToPicker(panel.config.panel_time_range);
         if (pickerValue) {
           return convertPickerToTimeObj(pickerValue);
         }
@@ -937,12 +892,8 @@ export default defineComponent({
       }
 
       const globalTime = {
-        start_time: new Date(
-          dateTimePicker.value.getConsumableDateTime().startTime,
-        ),
-        end_time: new Date(
-          dateTimePicker.value.getConsumableDateTime().endTime,
-        ),
+        start_time: new Date(dateTimePicker.value.getConsumableDateTime().startTime),
+        end_time: new Date(dateTimePicker.value.getConsumableDateTime().endTime),
       };
 
       // Check if panel has its own time configuration
@@ -980,19 +931,14 @@ export default defineComponent({
       }
 
       const globalTime = {
-        start_time: new Date(
-          dateTimePicker.value.getConsumableDateTime().startTime,
-        ),
-        end_time: new Date(
-          dateTimePicker.value.getConsumableDateTime().endTime,
-        ),
+        start_time: new Date(dateTimePicker.value.getConsumableDateTime().startTime),
+        end_time: new Date(dateTimePicker.value.getConsumableDateTime().endTime),
       };
 
       // CRITICAL FIX: Preserve existing __global reference if time hasn't changed
       // This prevents unnecessary refreshes of panels that depend on global time
       const existingGlobalTime = currentTimeObjPerPanel.value.__global;
-      const shouldUpdateGlobal =
-        forceRefresh || !areTimesEqual(existingGlobalTime, globalTime);
+      const shouldUpdateGlobal = forceRefresh || !areTimesEqual(existingGlobalTime, globalTime);
 
       // Build the new panel times object
       const newPanelTimes: Record<string, any> = {
@@ -1202,9 +1148,7 @@ export default defineComponent({
     );
 
     const getPanelFromTab = (tabId: string, panelId: string) => {
-      const tab = currentDashboardData.data.tabs.find(
-        (tab) => tab.tabId === tabId,
-      );
+      const tab = currentDashboardData.data.tabs.find((tab) => tab.tabId === tabId);
 
       if (!tab || !tab.panels) {
         return null;
@@ -1223,11 +1167,7 @@ export default defineComponent({
         return {
           period: data.relativeTimePeriod,
         };
-      } else if (
-        data.valueType === "absolute" &&
-        data.startTime &&
-        data.endTime
-      ) {
+      } else if (data.valueType === "absolute" && data.startTime && data.endTime) {
         return {
           from: data.startTime,
           to: data.endTime,
@@ -1329,9 +1269,7 @@ export default defineComponent({
       if (params.refresh) {
         const refreshInSecs = parseDuration(params.refresh);
         if (store.state?.zoConfig?.min_auto_refresh_interval) {
-          if (
-            refreshInSecs < store.state?.zoConfig?.min_auto_refresh_interval
-          ) {
+          if (refreshInSecs < store.state?.zoConfig?.min_auto_refresh_interval) {
             refreshInterval.value = 0;
           } else {
             refreshInterval.value = refreshInSecs;
@@ -1434,58 +1372,40 @@ export default defineComponent({
 
               // Check if panel already has URL params (highest priority - preserve user changes)
               const hasExistingUrlParams = !!(
-                route.query[`pt-period.${panelId}`] ||
-                route.query[`pt-from.${panelId}`]
+                route.query[`pt-period.${panelId}`] || route.query[`pt-from.${panelId}`]
               );
 
               if (hasExistingUrlParams) {
                 // Preserve existing URL params (they may have been set by panel refresh)
                 if (route.query[`pt-period.${panelId}`]) {
-                  panelTimeParams[`pt-period.${panelId}`] =
-                    route.query[`pt-period.${panelId}`];
+                  panelTimeParams[`pt-period.${panelId}`] = route.query[`pt-period.${panelId}`];
                 }
-                if (
-                  route.query[`pt-from.${panelId}`] &&
-                  route.query[`pt-to.${panelId}`]
-                ) {
-                  panelTimeParams[`pt-from.${panelId}`] =
-                    route.query[`pt-from.${panelId}`];
-                  panelTimeParams[`pt-to.${panelId}`] =
-                    route.query[`pt-to.${panelId}`];
+                if (route.query[`pt-from.${panelId}`] && route.query[`pt-to.${panelId}`]) {
+                  panelTimeParams[`pt-from.${panelId}`] = route.query[`pt-from.${panelId}`];
+                  panelTimeParams[`pt-to.${panelId}`] = route.query[`pt-to.${panelId}`];
                 }
               } else if (panel.config?.panel_time_range) {
                 // Panel has an explicit custom time range configured (no URL params yet)
                 const panelTimeRange = panel.config.panel_time_range;
 
-                if (
-                  panelTimeRange.type === "relative" &&
-                  panelTimeRange.relativeTimePeriod
-                ) {
-                  panelTimeParams[`pt-period.${panelId}`] =
-                    panelTimeRange.relativeTimePeriod;
+                if (panelTimeRange.type === "relative" && panelTimeRange.relativeTimePeriod) {
+                  panelTimeParams[`pt-period.${panelId}`] = panelTimeRange.relativeTimePeriod;
                 } else if (
                   panelTimeRange.type === "absolute" &&
                   panelTimeRange.startTime &&
                   panelTimeRange.endTime
                 ) {
-                  panelTimeParams[`pt-from.${panelId}`] =
-                    panelTimeRange.startTime.toString();
-                  panelTimeParams[`pt-to.${panelId}`] =
-                    panelTimeRange.endTime.toString();
+                  panelTimeParams[`pt-from.${panelId}`] = panelTimeRange.startTime.toString();
+                  panelTimeParams[`pt-to.${panelId}`] = panelTimeRange.endTime.toString();
                 }
               } else if (panel.config?.panel_time_enabled) {
                 // Panel has time picker enabled but no custom range → use global time (initial load only)
-                const globalTimeParams = getQueryParamsForDuration(
-                  selectedDate.value,
-                );
+                const globalTimeParams = getQueryParamsForDuration(selectedDate.value);
                 if (globalTimeParams.period) {
-                  panelTimeParams[`pt-period.${panelId}`] =
-                    globalTimeParams.period;
+                  panelTimeParams[`pt-period.${panelId}`] = globalTimeParams.period;
                 } else if (globalTimeParams.from && globalTimeParams.to) {
-                  panelTimeParams[`pt-from.${panelId}`] =
-                    globalTimeParams.from.toString();
-                  panelTimeParams[`pt-to.${panelId}`] =
-                    globalTimeParams.to.toString();
+                  panelTimeParams[`pt-from.${panelId}`] = globalTimeParams.from.toString();
+                  panelTimeParams[`pt-to.${panelId}`] = globalTimeParams.to.toString();
                 }
               }
             });
@@ -1540,9 +1460,7 @@ export default defineComponent({
         // CRITICAL: Only update URL if query has actually changed
         // This prevents unnecessary route updates and panel recomputations
         const hasQueryChanged =
-          Object.keys(newQuery).some(
-            (key) => newQuery[key] !== route.query[key],
-          ) ||
+          Object.keys(newQuery).some((key) => newQuery[key] !== route.query[key]) ||
           Object.keys(route.query).some(
             (key) => !Object.prototype.hasOwnProperty.call(newQuery, key),
           );
@@ -1595,9 +1513,12 @@ export default defineComponent({
               t("dashboard.viewDashboard.panelDeletionFailed"),
           );
         } else {
-          showErrorNotification(error?.message ?? t("dashboard.viewDashboard.panelDeletionFailed"), {
-            timeout: 2000,
-          });
+          showErrorNotification(
+            error?.message ?? t("dashboard.viewDashboard.panelDeletionFailed"),
+            {
+              timeout: 2000,
+            },
+          );
         }
       }
     };
@@ -1646,10 +1567,7 @@ export default defineComponent({
       // if relative time period, convert to absolute time
       if (urlSearchParams?.has("period")) {
         urlSearchParams.delete("period");
-        urlSearchParams.set(
-          "from",
-          currentTimeObj?.value?.start_time?.getTime(),
-        );
+        urlSearchParams.set("from", currentTimeObj?.value?.start_time?.getTime());
         urlSearchParams.set("to", currentTimeObj?.value?.end_time?.getTime());
       }
 
@@ -1682,16 +1600,14 @@ export default defineComponent({
       isLoadingReports.value = true;
 
       reports
-        .list(
-          store.state.selectedOrganization.identifier,
-          folderId.value,
-          dashboardId.value,
-        )
+        .list(store.state.selectedOrganization.identifier, folderId.value, dashboardId.value)
         .then((response) => {
           scheduledReports.value = response.data;
         })
         .catch((error) => {
-          showErrorNotification(error?.message || t("dashboard.viewDashboard.failedToFetchReports"));
+          showErrorNotification(
+            error?.message || t("dashboard.viewDashboard.failedToFetchReports"),
+          );
           isLoadingReports.value = false;
         })
         .finally(() => {
@@ -1721,17 +1637,14 @@ export default defineComponent({
     const dashboardRemountKey = ref(0);
 
     // Listen for AI assistant dashboard mutations to auto-refresh
-    const { on: onDashboardEvent, off: offDashboardEvent } =
-      useAiDashboardEvents();
+    const { on: onDashboardEvent, off: offDashboardEvent } = useAiDashboardEvents();
     const handleAiDashboardEvent = async (event: AiDashboardEvent) => {
       const currentDashboardId = route.query.dashboard as string;
       const shouldReload = event.dashboardId === currentDashboardId;
 
       if (shouldReload && currentDashboardId) {
         // Clear cached dashboard data so getDashboard() fetches fresh from API
-        delete store.state.organizationData.allDashboardData[
-          currentDashboardId
-        ];
+        delete store.state.organizationData.allDashboardData[currentDashboardId];
         await loadDashboard();
         // Bump key to force RenderDashboardCharts to fully remount with new data
         dashboardRemountKey.value++;
@@ -1804,14 +1717,10 @@ export default defineComponent({
           // Reload the dashboard to reflect changes
           await loadDashboard();
         } else {
-          showErrorNotification(
-            t("dashboard.viewDashboard.failedToUpdateJson"),
-          );
+          showErrorNotification(t("dashboard.viewDashboard.failedToUpdateJson"));
         }
       } catch (error) {
-        showErrorNotification(
-          error?.message || t("dashboard.viewDashboard.failedToSaveChanges"),
-        );
+        showErrorNotification(error?.message || t("dashboard.viewDashboard.failedToSaveChanges"));
       } finally {
         showJsonEditorDialog.value = false;
       }
@@ -1849,11 +1758,7 @@ export default defineComponent({
         handler: () => {
           if (isInputFocused()) return;
           // Trigger the whole-dashboard export (ExportDashboard button).
-          (
-            document.querySelector(
-              '[data-test="export-dashboard"]',
-            ) as HTMLElement | null
-          )?.click();
+          (document.querySelector('[data-test="export-dashboard"]') as HTMLElement | null)?.click();
         },
       },
     ]);
@@ -1992,5 +1897,4 @@ export default defineComponent({
     overflow: visible !important;
   }
 }
-
 </style>

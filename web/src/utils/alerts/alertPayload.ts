@@ -79,10 +79,7 @@ export const stripFormExtras = <T>(obj: T): T => {
   return obj;
 };
 
-export const getAlertPayload = (
-  formData: PayloadFormData,
-  context: PayloadContext,
-): any => {
+export const getAlertPayload = (formData: PayloadFormData, context: PayloadContext): any => {
   const { store, isAggregationEnabled, getSelectedTab, beingUpdated } = context;
   const payload = cloneDeep(formData);
 
@@ -97,13 +94,10 @@ export const getAlertPayload = (
 
   payload.context_attributes = {} as any;
 
-  payload.query_condition.type = payload.is_real_time
-    ? "custom"
-    : formData.query_condition.type;
+  payload.query_condition.type = payload.is_real_time ? "custom" : formData.query_condition.type;
 
   formData.context_attributes.forEach((attr: any) => {
-    if (attr.key?.trim() && attr.value?.trim())
-      payload.context_attributes[attr.key] = attr.value;
+    if (attr.key?.trim() && attr.value?.trim()) payload.context_attributes[attr.key] = attr.value;
   });
 
   payload.trigger_condition.threshold = parseInt(formData.trigger_condition.threshold as any);
@@ -195,19 +189,9 @@ export const getAlertPayload = (
   return payload;
 };
 
-export const prepareAndSaveAlert = async (
-  data: any,
-  context: SaveAlertContext,
-): Promise<void> => {
-  const {
-    store,
-    props,
-    emit,
-    router,
-    isAggregationEnabled,
-    activeFolderId,
-    handleAlertError,
-  } = context;
+export const prepareAndSaveAlert = async (data: any, context: SaveAlertContext): Promise<void> => {
+  const { store, props, emit, router, isAggregationEnabled, activeFolderId, handleAlertError } =
+    context;
 
   const payload = cloneDeep(data);
 
@@ -218,7 +202,7 @@ export const prepareAndSaveAlert = async (
   if (!isAggregationEnabled.value) {
     payload.query_condition.aggregation = null;
   }
-  
+
   if (Array.isArray(payload.context_attributes) && payload.context_attributes.length === 0) {
     payload.context_attributes = {};
   }
@@ -253,8 +237,8 @@ export const prepareAndSaveAlert = async (
     const dismiss = toast({
       variant: "loading",
       message: "Please wait...",
-          timeout: 0,
-});
+      timeout: 0,
+    });
 
     if (props.isUpdated) {
       await alertsService.update_by_alert_id(

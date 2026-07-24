@@ -32,19 +32,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <circle cx="120" cy="84" r="58" fill="var(--color-primary-500)" opacity="0.05" />
     <ellipse cx="120" cy="150" rx="54" ry="9" fill="var(--color-primary-900)" opacity="0.1" />
     <g fill="var(--color-border-default)" opacity="0.5">
-      <circle cx="34" cy="52" r="2" /><circle cx="206" cy="120" r="2" /><circle cx="202" cy="48" r="1.6" />
+      <circle cx="34" cy="52" r="2" />
+      <circle cx="206" cy="120" r="2" />
+      <circle cx="202" cy="48" r="1.6" />
     </g>
 
     <!-- bell (swings) -->
     <g class="es-bell">
       <!-- top loop -->
-      <path d="M114 50 Q114 43 120 43 Q126 43 126 50" stroke="var(--color-border-strong)" stroke-width="3" fill="none" stroke-linecap="round" />
+      <path
+        d="M114 50 Q114 43 120 43 Q126 43 126 50"
+        stroke="var(--color-border-strong)"
+        stroke-width="3"
+        fill="none"
+        stroke-linecap="round"
+      />
       <!-- body -->
-      <path d="M94 116 Q94 74 120 64 Q146 74 146 116 Z" fill="var(--color-surface-base)" stroke="var(--color-border-strong)" stroke-width="2.5" stroke-linejoin="round" />
+      <path
+        d="M94 116 Q94 74 120 64 Q146 74 146 116 Z"
+        fill="var(--color-surface-base)"
+        stroke="var(--color-border-strong)"
+        stroke-width="2.5"
+        stroke-linejoin="round"
+      />
       <!-- inner accent band -->
-      <path d="M104 104 Q120 110 136 104" stroke="var(--color-primary-400)" stroke-width="2.5" fill="none" stroke-linecap="round" />
+      <path
+        d="M104 104 Q120 110 136 104"
+        stroke="var(--color-primary-400)"
+        stroke-width="2.5"
+        fill="none"
+        stroke-linecap="round"
+      />
       <!-- rim -->
-      <rect x="88" y="114" width="64" height="7" rx="3.5" fill="var(--color-surface-subtle)" stroke="var(--color-border-strong)" stroke-width="2" />
+      <rect
+        x="88"
+        y="114"
+        width="64"
+        height="7"
+        rx="3.5"
+        fill="var(--color-surface-subtle)"
+        stroke="var(--color-border-strong)"
+        stroke-width="2"
+      />
       <!-- clapper -->
       <circle cx="120" cy="128" r="5.5" fill="var(--color-border-strong)" />
     </g>
@@ -52,17 +81,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- notification badge (pulses) -->
     <g class="es-badge">
       <circle cx="146" cy="58" r="11" fill="var(--color-error-500)" />
-      <line x1="146" y1="53" x2="146" y2="60" stroke="var(--color-white)" stroke-width="2.5" stroke-linecap="round" />
+      <line
+        x1="146"
+        y1="53"
+        x2="146"
+        y2="60"
+        stroke="var(--color-white)"
+        stroke-width="2.5"
+        stroke-linecap="round"
+      />
       <circle cx="146" cy="64" r="1.6" fill="var(--color-white)" />
     </g>
   </svg>
 </template>
 
 <script setup lang="ts">
-withDefaults(
-  defineProps<{ width?: number; animated?: boolean }>(),
-  { width: 260, animated: true },
-);
+withDefaults(defineProps<{ width?: number; animated?: boolean }>(), { width: 260, animated: true });
 </script>
 
 <style scoped>

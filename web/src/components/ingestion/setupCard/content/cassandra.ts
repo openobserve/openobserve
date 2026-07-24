@@ -61,8 +61,7 @@ export default function cassandraCard(subs: CardSubstitutions): RichCardContent 
       {
         id: "jmx-jar",
         title: "Download the JMX Metrics Jar",
-        description:
-          "The JMX receiver runs this helper jar (requires Java on the collector host).",
+        description: "The JMX receiver runs this helper jar (requires Java on the collector host).",
         chip: { kind: "terminal", label: "Terminal" },
         completeOn: "copy",
         code: { lang: "bash", raw: JMX_JAR },
@@ -95,8 +94,7 @@ export default function cassandraCard(subs: CardSubstitutions): RichCardContent 
       {
         id: "verify",
         title: "Verify Data in OpenObserve",
-        description:
-          "Hit Test below, or check Streams for the `cassandra_*` metrics.",
+        description: "Hit Test below, or check Streams for the `cassandra_*` metrics.",
         chip: { kind: "traces", label: "Metrics" },
         completeOn: "detect",
         detectionAnchor: true,

@@ -17,15 +17,9 @@ import { markRaw, toRaw, nextTick } from "vue";
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
 import { convertOffsetToSeconds } from "@/utils/dashboard/dateTimeUtils";
 import logsUtils from "@/composables/useLogs/logsUtils";
-import {
-  detectChunkingDirection,
-  shouldPrependChunk,
-} from "@/utils/dashboard/chunkingDirection";
+import { detectChunkingDirection, shouldPrependChunk } from "@/utils/dashboard/chunkingDirection";
 
-const adjustTimestampByTimeRangeGap = (
-  timestamp: number,
-  timeRangeGapSeconds: number,
-) => {
+const adjustTimestampByTimeRangeGap = (timestamp: number, timeRangeGapSeconds: number) => {
   return timestamp - timeRangeGapSeconds * 1000;
 };
 
@@ -241,8 +235,8 @@ export const usePanelSQLExecutor = (ctx: {
 
         if (it.config?.time_shift && it.config?.time_shift?.length > 0) {
           // convert time shift to milliseconds
-          const timeShiftInMilliSecondsArray = it.config?.time_shift?.map(
-            (it: any) => convertOffsetToSeconds(it.offSet, endISOTimestamp),
+          const timeShiftInMilliSecondsArray = it.config?.time_shift?.map((it: any) =>
+            convertOffsetToSeconds(it.offSet, endISOTimestamp),
           );
 
           // append 0 seconds to the timeShiftInMilliSecondsArray at 0th index
@@ -258,19 +252,15 @@ export const usePanelSQLExecutor = (ctx: {
             const timeRangeGap = timeShiftInMilliSecondsArray[i];
             const { query: query1, metadata: metadata1 } = replaceQueryValue(
               it.query,
-              adjustTimestampByTimeRangeGap(
-                startISOTimestamp,
-                timeRangeGap.seconds,
-              ),
-              adjustTimestampByTimeRangeGap(
-                endISOTimestamp,
-                timeRangeGap.seconds,
-              ),
+              adjustTimestampByTimeRangeGap(startISOTimestamp, timeRangeGap.seconds),
+              adjustTimestampByTimeRangeGap(endISOTimestamp, timeRangeGap.seconds),
               panelSchema.value.queryType,
             );
 
-            const { query: query2, metadata: metadata2 } =
-              await applyDynamicVariables(query1, panelSchema.value.queryType);
+            const { query: query2, metadata: metadata2 } = await applyDynamicVariables(
+              query1,
+              panelSchema.value.queryType,
+            );
             const query = query2;
 
             // Validate that timestamp column is not used as an alias for other fields
@@ -289,14 +279,8 @@ export const usePanelSQLExecutor = (ctx: {
             const metadata: any = {
               originalQuery: it.query,
               query: query,
-              startTime: adjustTimestampByTimeRangeGap(
-                startISOTimestamp,
-                timeRangeGap.seconds,
-              ),
-              endTime: adjustTimestampByTimeRangeGap(
-                endISOTimestamp,
-                timeRangeGap.seconds,
-              ),
+              startTime: adjustTimestampByTimeRangeGap(startISOTimestamp, timeRangeGap.seconds),
+              endTime: adjustTimestampByTimeRangeGap(endISOTimestamp, timeRangeGap.seconds),
               queryType: panelSchema.value.queryType,
               variables: [...(metadata1 || []), ...(metadata2 || [])],
               timeRangeGap: timeRangeGap,
@@ -308,14 +292,8 @@ export const usePanelSQLExecutor = (ctx: {
               metadata,
               searchRequestObj: {
                 sql: query,
-                start_time: adjustTimestampByTimeRangeGap(
-                  startISOTimestamp,
-                  timeRangeGap.seconds,
-                ),
-                end_time: adjustTimestampByTimeRangeGap(
-                  endISOTimestamp,
-                  timeRangeGap.seconds,
-                ),
+                start_time: adjustTimestampByTimeRangeGap(startISOTimestamp, timeRangeGap.seconds),
+                end_time: adjustTimestampByTimeRangeGap(endISOTimestamp, timeRangeGap.seconds),
                 query_fn: null,
               },
             });
@@ -328,10 +306,7 @@ export const usePanelSQLExecutor = (ctx: {
                 if (!shouldFetchAnnotations()) {
                   return [];
                 }
-                const annotationList = await refreshAnnotations(
-                  startISOTimestamp,
-                  endISOTimestamp,
-                );
+                const annotationList = await refreshAnnotations(startISOTimestamp, endISOTimestamp);
                 return annotationList || [];
               } catch (annotationError) {
                 console.error("Failed to fetch annotations:", annotationError);
@@ -340,9 +315,7 @@ export const usePanelSQLExecutor = (ctx: {
             })();
 
             // get search queries
-            const searchQueries = timeShiftQueries.map(
-              (it: any) => it.searchRequestObj,
-            );
+            const searchQueries = timeShiftQueries.map((it: any) => it.searchRequestObj);
 
             const { traceId } = generateTraceContext();
             addTraceId(traceId);
@@ -447,20 +420,17 @@ export const usePanelSQLExecutor = (ctx: {
 
                 if (response.type === "search_response_hits") {
                   // The hits come directly in response.content.hits or response.content.results.hits
-                  const hits =
-                    response?.content?.results?.hits ?? response?.content?.hits;
+                  const hits = response?.content?.results?.hits ?? response?.content?.hits;
                   // Get query_index from results metadata
                   const results = response?.content?.results;
 
                   // Use query_index from the event, or from the last metadata event, or find next empty
-                  let queryIndex =
-                    results?.query_index ?? currentQueryIndexInStream;
+                  let queryIndex = results?.query_index ?? currentQueryIndexInStream;
 
                   // If query_index is still not available, find the first query that doesn't have hits yet
                   if (queryIndex === undefined || queryIndex === null) {
                     queryIndex = state.resultMetaData.findIndex(
-                      (meta: any, idx: number) =>
-                        !state.data[idx] || state.data[idx].length === 0,
+                      (meta: any, idx: number) => !state.data[idx] || state.data[idx].length === 0,
                     );
                   }
 
@@ -472,8 +442,7 @@ export const usePanelSQLExecutor = (ctx: {
                   ) {
                     // Check if streaming_aggs is enabled
                     const streaming_aggs =
-                      state.resultMetaData[queryIndex]?.[0]?.streaming_aggs ??
-                      false;
+                      state.resultMetaData[queryIndex]?.[0]?.streaming_aggs ?? false;
 
                     // If streaming_aggs, replace the data (aggregation query)
                     if (streaming_aggs) {
@@ -482,11 +451,8 @@ export const usePanelSQLExecutor = (ctx: {
                     // Otherwise, append/prepend based on chunking direction and order_by
                     else {
                       const orderAsc =
-                        state.resultMetaData[
-                          queryIndex
-                        ]?.order_by?.toLowerCase() === "asc";
-                      const isLTR =
-                        chunkingLeftToRight.get(queryIndex) ?? false;
+                        state.resultMetaData[queryIndex]?.order_by?.toLowerCase() === "asc";
+                      const isLTR = chunkingLeftToRight.get(queryIndex) ?? false;
                       const shouldPrepend = shouldPrependChunk(isLTR, orderAsc);
 
                       if (shouldPrepend) {
@@ -503,8 +469,7 @@ export const usePanelSQLExecutor = (ctx: {
                     }
 
                     if (state.resultMetaData[queryIndex]) {
-                      state.resultMetaData[queryIndex].hits =
-                        state.data[queryIndex];
+                      state.resultMetaData[queryIndex].hits = state.data[queryIndex];
                     }
                   }
                   state.errorDetail = { message: "", code: "" };
@@ -563,8 +528,10 @@ export const usePanelSQLExecutor = (ctx: {
             panelSchema.value.queryType,
           );
 
-          const { query: query2, metadata: metadata2 } =
-            await applyDynamicVariables(query1, panelSchema.value.queryType);
+          const { query: query2, metadata: metadata2 } = await applyDynamicVariables(
+            query1,
+            panelSchema.value.queryType,
+          );
 
           const query = query2;
 
@@ -625,9 +592,7 @@ export const usePanelSQLExecutor = (ctx: {
 
             const currentQueryIndex = state.data.length - 1;
 
-            state.data[currentQueryIndex] = markRaw(
-              searchResponse.value.hits ?? [],
-            );
+            state.data[currentQueryIndex] = markRaw(searchResponse.value.hits ?? []);
             // In Logs→Visualize path, searchResponse is a single combined chunk
             // (not streaming). Override time_offset with the user's actual
             // selected range so fillMissingValues detects direction / builds
@@ -743,9 +708,7 @@ export const usePanelSQLExecutor = (ctx: {
       state.metadata.queries.push({ panelQueryIndex: 0 });
 
       const currentQueryIndex = state.data.length - 1;
-      state.data[currentQueryIndex] = markRaw(
-        searchResponse.value.hits ?? [],
-      );
+      state.data[currentQueryIndex] = markRaw(searchResponse.value.hits ?? []);
       // Override time_offset with the user's actual selected range
       state.resultMetaData[currentQueryIndex] = [
         {
@@ -785,8 +748,8 @@ export const usePanelSQLExecutor = (ctx: {
 
       if (it.config?.time_shift && it.config?.time_shift?.length > 0) {
         // Expand time-shift query into N+1 entries (original + N shifts)
-        const timeShiftInMilliSecondsArray = it.config.time_shift.map(
-          (ts: any) => convertOffsetToSeconds(ts.offSet, endISOTimestamp),
+        const timeShiftInMilliSecondsArray = it.config.time_shift.map((ts: any) =>
+          convertOffsetToSeconds(ts.offSet, endISOTimestamp),
         );
         timeShiftInMilliSecondsArray.unshift({
           seconds: 0,
@@ -797,19 +760,15 @@ export const usePanelSQLExecutor = (ctx: {
           const timeRangeGap = timeShiftInMilliSecondsArray[i];
           const { query: query1, metadata: metadata1 } = replaceQueryValue(
             it.query,
-            adjustTimestampByTimeRangeGap(
-              startISOTimestamp,
-              timeRangeGap.seconds,
-            ),
-            adjustTimestampByTimeRangeGap(
-              endISOTimestamp,
-              timeRangeGap.seconds,
-            ),
+            adjustTimestampByTimeRangeGap(startISOTimestamp, timeRangeGap.seconds),
+            adjustTimestampByTimeRangeGap(endISOTimestamp, timeRangeGap.seconds),
             panelSchema.value.queryType,
           );
 
-          const { query: query2, metadata: metadata2 } =
-            await applyDynamicVariables(query1, panelSchema.value.queryType);
+          const { query: query2, metadata: metadata2 } = await applyDynamicVariables(
+            query1,
+            panelSchema.value.queryType,
+          );
           const query = query2;
 
           if (!checkTimestampAlias(query)) {
@@ -826,28 +785,16 @@ export const usePanelSQLExecutor = (ctx: {
 
           allSearchRequests.push({
             sql: query,
-            start_time: adjustTimestampByTimeRangeGap(
-              startISOTimestamp,
-              timeRangeGap.seconds,
-            ),
-            end_time: adjustTimestampByTimeRangeGap(
-              endISOTimestamp,
-              timeRangeGap.seconds,
-            ),
+            start_time: adjustTimestampByTimeRangeGap(startISOTimestamp, timeRangeGap.seconds),
+            end_time: adjustTimestampByTimeRangeGap(endISOTimestamp, timeRangeGap.seconds),
             query_fn: buildQueryFn(it),
           });
 
           allMetadata.push({
             originalQuery: it.query,
             query: query,
-            startTime: adjustTimestampByTimeRangeGap(
-              startISOTimestamp,
-              timeRangeGap.seconds,
-            ),
-            endTime: adjustTimestampByTimeRangeGap(
-              endISOTimestamp,
-              timeRangeGap.seconds,
-            ),
+            startTime: adjustTimestampByTimeRangeGap(startISOTimestamp, timeRangeGap.seconds),
+            endTime: adjustTimestampByTimeRangeGap(endISOTimestamp, timeRangeGap.seconds),
             queryType: panelSchema.value.queryType,
             variables: [...(metadata1 || []), ...(metadata2 || [])],
             timeRangeGap: timeRangeGap,
@@ -864,8 +811,10 @@ export const usePanelSQLExecutor = (ctx: {
           panelSchema.value.queryType,
         );
 
-        const { query: query2, metadata: metadata2 } =
-          await applyDynamicVariables(query1, panelSchema.value.queryType);
+        const { query: query2, metadata: metadata2 } = await applyDynamicVariables(
+          query1,
+          panelSchema.value.queryType,
+        );
         const query = query2;
 
         if (!checkTimestampAlias(query)) {
@@ -933,10 +882,7 @@ export const usePanelSQLExecutor = (ctx: {
     const annotationsPromise = (async () => {
       try {
         if (!shouldFetchAnnotations()) return [];
-        const annotationList = await refreshAnnotations(
-          startISOTimestamp,
-          endISOTimestamp,
-        );
+        const annotationList = await refreshAnnotations(startISOTimestamp, endISOTimestamp);
         return annotationList || [];
       } catch (annotationError) {
         console.error("Failed to fetch annotations:", annotationError);
@@ -1021,17 +967,14 @@ export const usePanelSQLExecutor = (ctx: {
         }
 
         if (response.type === "search_response_hits") {
-          const hits =
-            response?.content?.results?.hits ?? response?.content?.hits;
+          const hits = response?.content?.results?.hits ?? response?.content?.hits;
           const results = response?.content?.results;
 
-          let queryIndex =
-            results?.query_index ?? currentQueryIndexInStream;
+          let queryIndex = results?.query_index ?? currentQueryIndexInStream;
 
           if (queryIndex === undefined || queryIndex === null) {
             queryIndex = state.resultMetaData.findIndex(
-              (_meta: any, idx: number) =>
-                !state.data[idx] || state.data[idx].length === 0,
+              (_meta: any, idx: number) => !state.data[idx] || state.data[idx].length === 0,
             );
           }
 
@@ -1041,37 +984,24 @@ export const usePanelSQLExecutor = (ctx: {
             Array.isArray(hits) &&
             hits.length > 0
           ) {
-            const streaming_aggs =
-              state.resultMetaData[queryIndex]?.[0]?.streaming_aggs ??
-              false;
+            const streaming_aggs = state.resultMetaData[queryIndex]?.[0]?.streaming_aggs ?? false;
 
             if (streaming_aggs) {
               state.data[queryIndex] = markRaw([...hits]);
             } else {
-              const orderAsc =
-                state.resultMetaData[
-                  queryIndex
-                ]?.order_by?.toLowerCase() === "asc";
-              const isLTR =
-                chunkingLeftToRight.get(queryIndex) ?? false;
+              const orderAsc = state.resultMetaData[queryIndex]?.order_by?.toLowerCase() === "asc";
+              const isLTR = chunkingLeftToRight.get(queryIndex) ?? false;
               const shouldPrepend = shouldPrependChunk(isLTR, orderAsc);
 
               if (shouldPrepend) {
-                state.data[queryIndex] = markRaw([
-                  ...hits,
-                  ...toRaw(state.data[queryIndex] ?? []),
-                ]);
+                state.data[queryIndex] = markRaw([...hits, ...toRaw(state.data[queryIndex] ?? [])]);
               } else {
-                state.data[queryIndex] = markRaw([
-                  ...toRaw(state.data[queryIndex] ?? []),
-                  ...hits,
-                ]);
+                state.data[queryIndex] = markRaw([...toRaw(state.data[queryIndex] ?? []), ...hits]);
               }
             }
 
             if (state.resultMetaData[queryIndex]) {
-              state.resultMetaData[queryIndex].hits =
-                state.data[queryIndex];
+              state.resultMetaData[queryIndex].hits = state.data[queryIndex];
             }
           }
           state.errorDetail = { message: "", code: "" };

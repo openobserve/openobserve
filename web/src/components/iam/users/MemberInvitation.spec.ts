@@ -73,8 +73,7 @@ function mountComp(props: Record<string, any> = {}) {
   });
 }
 
-const getForm = (wrapper: VueWrapper<any>) =>
-  wrapper.findComponent({ name: "OForm" });
+const getForm = (wrapper: VueWrapper<any>) => wrapper.findComponent({ name: "OForm" });
 
 const setEmail = (wrapper: VueWrapper<any>, value: string) =>
   getForm(wrapper).vm.form.setFieldValue("email", value);
@@ -241,9 +240,7 @@ describe("MemberInvitation", () => {
       await submitForm(wrapper);
 
       expect(wrapper.emitted("inviteSent")).toBeTruthy();
-      expect(mockToast).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "success" }),
-      );
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
       // Row cleared after save (reset), role preserved.
       expect(getForm(wrapper).vm.form.state.values.email).toBe("");
       expect(getForm(wrapper).vm.form.state.values.role).toBe("admin");
@@ -271,9 +268,7 @@ describe("MemberInvitation", () => {
       setEmail(wrapper, "new@example.com");
       await submitForm(wrapper);
 
-      expect(mockToast).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "error" }),
-      );
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
       expect(wrapper.emitted("inviteSent")).toBeFalsy();
     });
 

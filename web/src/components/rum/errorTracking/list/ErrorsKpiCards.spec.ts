@@ -64,10 +64,7 @@ const baseKpis: ErrorKpis = {
   deployVersion: "v1.0.6",
 };
 
-function mountCards(
-  kpis: ErrorKpis = baseKpis,
-  loading = false,
-): VueWrapper {
+function mountCards(kpis: ErrorKpis = baseKpis, loading = false): VueWrapper {
   return mount(ErrorsKpiCards, {
     props: { kpis, loading },
     global: { plugins: [i18n] },
@@ -92,26 +89,14 @@ describe("ErrorsKpiCards", () => {
 
   describe("rendering", () => {
     it("renders the root section element", () => {
-      expect(wrapper.find('[data-test="rum-errors-kpi-cards"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="rum-errors-kpi-cards"]').exists()).toBe(true);
     });
 
     it("renders all four article cards", () => {
-      expect(
-        wrapper.find('[data-test="rum-errors-kpi-total-errors-card"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="rum-errors-kpi-crash-free-card"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper
-          .find('[data-test="rum-errors-kpi-users-affected-card"]')
-          .exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="rum-errors-kpi-new-issues-card"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-errors-kpi-total-errors-card"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="rum-errors-kpi-crash-free-card"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="rum-errors-kpi-users-affected-card"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="rum-errors-kpi-new-issues-card"]').exists()).toBe(true);
     });
 
     it("renders each card as an article element for semantic correctness", () => {
@@ -126,43 +111,33 @@ describe("ErrorsKpiCards", () => {
 
   describe("total errors card", () => {
     it("formats totalErrors 16300 as '16.3K'", () => {
-      expect(
-        wrapper.find('[data-test="rum-errors-kpi-total-errors-value"]').text(),
-      ).toBe("16.3K");
+      expect(wrapper.find('[data-test="rum-errors-kpi-total-errors-value"]').text()).toBe("16.3K");
     });
 
     it("renders totalErrors caption with uniqueIssues count", () => {
-      expect(
-        wrapper
-          .find('[data-test="rum-errors-kpi-total-errors-caption"]')
-          .text(),
-      ).toContain("62");
+      expect(wrapper.find('[data-test="rum-errors-kpi-total-errors-caption"]').text()).toContain(
+        "62",
+      );
     });
 
     it("renders totalErrors caption containing 'unique issues'", () => {
-      expect(
-        wrapper
-          .find('[data-test="rum-errors-kpi-total-errors-caption"]')
-          .text(),
-      ).toContain("unique issues");
+      expect(wrapper.find('[data-test="rum-errors-kpi-total-errors-caption"]').text()).toContain(
+        "unique issues",
+      );
     });
 
     it("appends '+' to uniqueIssues count when issuesTruncated is true", () => {
       const kpis = { ...baseKpis, uniqueIssues: 200, issuesTruncated: true };
       const w = mountCards(kpis);
 
-      expect(
-        w.find('[data-test="rum-errors-kpi-total-errors-caption"]').text(),
-      ).toContain("200+");
+      expect(w.find('[data-test="rum-errors-kpi-total-errors-caption"]').text()).toContain("200+");
 
       w.unmount();
     });
 
     it("does not append '+' when issuesTruncated is false", () => {
       expect(
-        wrapper
-          .find('[data-test="rum-errors-kpi-total-errors-caption"]')
-          .text(),
+        wrapper.find('[data-test="rum-errors-kpi-total-errors-caption"]').text(),
       ).not.toContain("+");
     });
 
@@ -170,9 +145,7 @@ describe("ErrorsKpiCards", () => {
       const kpis = { ...baseKpis, totalErrors: 1_000_000 };
       const w = mountCards(kpis);
 
-      expect(
-        w.find('[data-test="rum-errors-kpi-total-errors-value"]').text(),
-      ).toBe("1.0M");
+      expect(w.find('[data-test="rum-errors-kpi-total-errors-value"]').text()).toBe("1.0M");
 
       w.unmount();
     });
@@ -181,9 +154,7 @@ describe("ErrorsKpiCards", () => {
       const kpis = { ...baseKpis, totalErrors: 42 };
       const w = mountCards(kpis);
 
-      expect(
-        w.find('[data-test="rum-errors-kpi-total-errors-value"]').text(),
-      ).toBe("42");
+      expect(w.find('[data-test="rum-errors-kpi-total-errors-value"]').text()).toBe("42");
 
       w.unmount();
     });
@@ -192,9 +163,7 @@ describe("ErrorsKpiCards", () => {
       const kpis = { ...baseKpis, totalErrors: 0 };
       const w = mountCards(kpis);
 
-      expect(
-        w.find('[data-test="rum-errors-kpi-total-errors-value"]').text(),
-      ).toBe("0");
+      expect(w.find('[data-test="rum-errors-kpi-total-errors-value"]').text()).toBe("0");
 
       w.unmount();
     });
@@ -209,9 +178,7 @@ describe("ErrorsKpiCards", () => {
       const kpis = { ...baseKpis, crashFreePct: 5.1 };
       const w = mountCards(kpis);
 
-      expect(
-        w.find('[data-test="rum-errors-kpi-crash-free-value"]').text(),
-      ).toBe("5.1%");
+      expect(w.find('[data-test="rum-errors-kpi-crash-free-value"]').text()).toBe("5.1%");
 
       w.unmount();
     });
@@ -249,9 +216,7 @@ describe("ErrorsKpiCards", () => {
       const kpis = { ...baseKpis, crashFreePct: 99 };
       const w = mountCards(kpis);
 
-      expect(
-        w.find('[data-test="rum-errors-kpi-crash-free-badge"]').text(),
-      ).toBe("Good");
+      expect(w.find('[data-test="rum-errors-kpi-crash-free-badge"]').text()).toBe("Good");
 
       w.unmount();
     });
@@ -260,9 +225,7 @@ describe("ErrorsKpiCards", () => {
       const kpis = { ...baseKpis, crashFreePct: 95 };
       const w = mountCards(kpis);
 
-      expect(
-        w.find('[data-test="rum-errors-kpi-crash-free-badge"]').text(),
-      ).toBe("Fair");
+      expect(w.find('[data-test="rum-errors-kpi-crash-free-badge"]').text()).toBe("Fair");
 
       w.unmount();
     });
@@ -271,9 +234,7 @@ describe("ErrorsKpiCards", () => {
       const kpis = { ...baseKpis, crashFreePct: 94.9 };
       const w = mountCards(kpis);
 
-      expect(
-        w.find('[data-test="rum-errors-kpi-crash-free-badge"]').text(),
-      ).toBe("Poor");
+      expect(w.find('[data-test="rum-errors-kpi-crash-free-badge"]').text()).toBe("Poor");
 
       w.unmount();
     });
@@ -282,30 +243,22 @@ describe("ErrorsKpiCards", () => {
       const kpis = { ...baseKpis, crashFreePct: null };
       const w = mountCards(kpis);
 
-      expect(
-        w.find('[data-test="rum-errors-kpi-crash-free-value"]').text(),
-      ).toBe("—");
-      expect(
-        w.find('[data-test="rum-errors-kpi-crash-free-badge"]').exists(),
-      ).toBe(false);
+      expect(w.find('[data-test="rum-errors-kpi-crash-free-value"]').text()).toBe("—");
+      expect(w.find('[data-test="rum-errors-kpi-crash-free-badge"]').exists()).toBe(false);
 
       w.unmount();
     });
 
     it("renders crash-free caption with errorSessions and totalSessions", () => {
       // errorSessions 40 / totalSessions 42
-      const caption = wrapper
-        .find('[data-test="rum-errors-kpi-crash-free-caption"]')
-        .text();
+      const caption = wrapper.find('[data-test="rum-errors-kpi-crash-free-caption"]').text();
 
       expect(caption).toContain("40");
       expect(caption).toContain("42");
     });
 
     it("renders crash-free caption containing 'sessions hit an error'", () => {
-      const caption = wrapper
-        .find('[data-test="rum-errors-kpi-crash-free-caption"]')
-        .text();
+      const caption = wrapper.find('[data-test="rum-errors-kpi-crash-free-caption"]').text();
 
       expect(caption).toContain("sessions hit an error");
     });
@@ -317,38 +270,28 @@ describe("ErrorsKpiCards", () => {
 
   describe("users affected card", () => {
     it("formats usersAffected 218 with no abbreviation (< 1000)", () => {
-      expect(
-        wrapper
-          .find('[data-test="rum-errors-kpi-users-affected-value"]')
-          .text(),
-      ).toBe("218");
+      expect(wrapper.find('[data-test="rum-errors-kpi-users-affected-value"]').text()).toBe("218");
     });
 
     it("renders usersAffected caption with totalUsers and percentage", () => {
       // usersAffected=218, totalUsers=604 → 218/604 ≈ 36%
-      const caption = wrapper
-        .find('[data-test="rum-errors-kpi-users-affected-caption"]')
-        .text();
+      const caption = wrapper.find('[data-test="rum-errors-kpi-users-affected-caption"]').text();
 
       expect(caption).toContain("604");
       expect(caption).toContain("36%");
     });
 
     it("renders usersAffected caption containing 'active users'", () => {
-      expect(
-        wrapper
-          .find('[data-test="rum-errors-kpi-users-affected-caption"]')
-          .text(),
-      ).toContain("active users");
+      expect(wrapper.find('[data-test="rum-errors-kpi-users-affected-caption"]').text()).toContain(
+        "active users",
+      );
     });
 
     it("shows 0% when totalUsers is 0", () => {
       const kpis = { ...baseKpis, usersAffected: 0, totalUsers: 0 };
       const w = mountCards(kpis);
 
-      expect(
-        w.find('[data-test="rum-errors-kpi-users-affected-caption"]').text(),
-      ).toContain("0%");
+      expect(w.find('[data-test="rum-errors-kpi-users-affected-caption"]').text()).toContain("0%");
 
       w.unmount();
     });
@@ -358,9 +301,7 @@ describe("ErrorsKpiCards", () => {
       const kpis = { ...baseKpis, usersAffected: 1, totalUsers: 3 };
       const w = mountCards(kpis);
 
-      const caption = w
-        .find('[data-test="rum-errors-kpi-users-affected-caption"]')
-        .text();
+      const caption = w.find('[data-test="rum-errors-kpi-users-affected-caption"]').text();
 
       expect(caption).toContain("33%");
 
@@ -374,15 +315,11 @@ describe("ErrorsKpiCards", () => {
 
   describe("new issues card", () => {
     it("renders newIssues value as plain number string", () => {
-      expect(
-        wrapper.find('[data-test="rum-errors-kpi-new-issues-value"]').text(),
-      ).toBe("3");
+      expect(wrapper.find('[data-test="rum-errors-kpi-new-issues-value"]').text()).toBe("3");
     });
 
     it("renders 'first seen since the v1.0.6 deploy' caption when deployVersion is set", () => {
-      const caption = wrapper
-        .find('[data-test="rum-errors-kpi-new-issues-caption"]')
-        .text();
+      const caption = wrapper.find('[data-test="rum-errors-kpi-new-issues-caption"]').text();
 
       expect(caption).toContain("first seen since the v1.0.6 deploy");
     });
@@ -391,9 +328,7 @@ describe("ErrorsKpiCards", () => {
       const kpis = { ...baseKpis, deployVersion: null };
       const w = mountCards(kpis);
 
-      const caption = w
-        .find('[data-test="rum-errors-kpi-new-issues-caption"]')
-        .text();
+      const caption = w.find('[data-test="rum-errors-kpi-new-issues-caption"]').text();
 
       expect(caption).toContain("first seen in the selected window");
 
@@ -404,9 +339,7 @@ describe("ErrorsKpiCards", () => {
       const kpis = { ...baseKpis, newIssues: 0 };
       const w = mountCards(kpis);
 
-      expect(
-        w.find('[data-test="rum-errors-kpi-new-issues-value"]').text(),
-      ).toBe("0");
+      expect(w.find('[data-test="rum-errors-kpi-new-issues-value"]').text()).toBe("0");
 
       w.unmount();
     });
@@ -423,18 +356,10 @@ describe("ErrorsKpiCards", () => {
       // OSkeleton is rendered inside each card; the component renders
       // 4 cards × 1 skeleton each.
       // We verify by checking the value elements are absent.
-      expect(
-        w.find('[data-test="rum-errors-kpi-total-errors-value"]').exists(),
-      ).toBe(false);
-      expect(
-        w.find('[data-test="rum-errors-kpi-crash-free-value"]').exists(),
-      ).toBe(false);
-      expect(
-        w.find('[data-test="rum-errors-kpi-users-affected-value"]').exists(),
-      ).toBe(false);
-      expect(
-        w.find('[data-test="rum-errors-kpi-new-issues-value"]').exists(),
-      ).toBe(false);
+      expect(w.find('[data-test="rum-errors-kpi-total-errors-value"]').exists()).toBe(false);
+      expect(w.find('[data-test="rum-errors-kpi-crash-free-value"]').exists()).toBe(false);
+      expect(w.find('[data-test="rum-errors-kpi-users-affected-value"]').exists()).toBe(false);
+      expect(w.find('[data-test="rum-errors-kpi-new-issues-value"]').exists()).toBe(false);
 
       w.unmount();
     });
@@ -442,12 +367,8 @@ describe("ErrorsKpiCards", () => {
     it("hides caption elements when loading is true", () => {
       const w = mountCards(baseKpis, true);
 
-      expect(
-        w.find('[data-test="rum-errors-kpi-total-errors-caption"]').exists(),
-      ).toBe(false);
-      expect(
-        w.find('[data-test="rum-errors-kpi-crash-free-caption"]').exists(),
-      ).toBe(false);
+      expect(w.find('[data-test="rum-errors-kpi-total-errors-caption"]').exists()).toBe(false);
+      expect(w.find('[data-test="rum-errors-kpi-crash-free-caption"]').exists()).toBe(false);
 
       w.unmount();
     });
@@ -459,12 +380,8 @@ describe("ErrorsKpiCards", () => {
       await w.setProps({ loading: false });
 
       // Assert
-      expect(
-        w.find('[data-test="rum-errors-kpi-total-errors-value"]').exists(),
-      ).toBe(true);
-      expect(
-        w.find('[data-test="rum-errors-kpi-crash-free-value"]').exists(),
-      ).toBe(true);
+      expect(w.find('[data-test="rum-errors-kpi-total-errors-value"]').exists()).toBe(true);
+      expect(w.find('[data-test="rum-errors-kpi-crash-free-value"]').exists()).toBe(true);
 
       w.unmount();
     });
@@ -472,18 +389,10 @@ describe("ErrorsKpiCards", () => {
     it("still renders all four card containers while loading", () => {
       const w = mountCards(baseKpis, true);
 
-      expect(
-        w.find('[data-test="rum-errors-kpi-total-errors-card"]').exists(),
-      ).toBe(true);
-      expect(
-        w.find('[data-test="rum-errors-kpi-crash-free-card"]').exists(),
-      ).toBe(true);
-      expect(
-        w.find('[data-test="rum-errors-kpi-users-affected-card"]').exists(),
-      ).toBe(true);
-      expect(
-        w.find('[data-test="rum-errors-kpi-new-issues-card"]').exists(),
-      ).toBe(true);
+      expect(w.find('[data-test="rum-errors-kpi-total-errors-card"]').exists()).toBe(true);
+      expect(w.find('[data-test="rum-errors-kpi-crash-free-card"]').exists()).toBe(true);
+      expect(w.find('[data-test="rum-errors-kpi-users-affected-card"]').exists()).toBe(true);
+      expect(w.find('[data-test="rum-errors-kpi-new-issues-card"]').exists()).toBe(true);
 
       w.unmount();
     });
@@ -497,24 +406,18 @@ describe("ErrorsKpiCards", () => {
     it("updates total errors value when kpis.totalErrors changes", async () => {
       await wrapper.setProps({ kpis: { ...baseKpis, totalErrors: 5000 } });
 
-      expect(
-        wrapper.find('[data-test="rum-errors-kpi-total-errors-value"]').text(),
-      ).toBe("5.0K");
+      expect(wrapper.find('[data-test="rum-errors-kpi-total-errors-value"]').text()).toBe("5.0K");
     });
 
     it("updates crash-free badge from Good to Poor when crashFreePct drops below 95", async () => {
       // Starts at 99.5 = Good
-      expect(
-        wrapper.find('[data-test="rum-errors-kpi-crash-free-badge"]').text(),
-      ).toBe("Good");
+      expect(wrapper.find('[data-test="rum-errors-kpi-crash-free-badge"]').text()).toBe("Good");
 
       // Act
       await wrapper.setProps({ kpis: { ...baseKpis, crashFreePct: 80 } });
 
       // Assert
-      expect(
-        wrapper.find('[data-test="rum-errors-kpi-crash-free-badge"]').text(),
-      ).toBe("Poor");
+      expect(wrapper.find('[data-test="rum-errors-kpi-crash-free-badge"]').text()).toBe("Poor");
     });
 
     it("updates new issues caption when deployVersion changes to null", async () => {
@@ -523,9 +426,9 @@ describe("ErrorsKpiCards", () => {
         kpis: { ...baseKpis, deployVersion: null },
       });
 
-      expect(
-        wrapper.find('[data-test="rum-errors-kpi-new-issues-caption"]').text(),
-      ).toContain("first seen in the selected window");
+      expect(wrapper.find('[data-test="rum-errors-kpi-new-issues-caption"]').text()).toContain(
+        "first seen in the selected window",
+      );
     });
   });
 
@@ -558,9 +461,7 @@ describe("ErrorsKpiCards", () => {
       const kpis = { ...baseKpis, totalErrors: 2_500_000_000 };
       const w = mountCards(kpis);
 
-      expect(
-        w.find('[data-test="rum-errors-kpi-total-errors-value"]').text(),
-      ).toBe("2.5B");
+      expect(w.find('[data-test="rum-errors-kpi-total-errors-value"]').text()).toBe("2.5B");
 
       w.unmount();
     });
@@ -569,9 +470,7 @@ describe("ErrorsKpiCards", () => {
       const kpis = { ...baseKpis, uniqueIssues: 1 };
       const w = mountCards(kpis);
 
-      expect(
-        w.find('[data-test="rum-errors-kpi-total-errors-caption"]').text(),
-      ).toContain("1");
+      expect(w.find('[data-test="rum-errors-kpi-total-errors-caption"]').text()).toContain("1");
 
       w.unmount();
     });
@@ -580,12 +479,8 @@ describe("ErrorsKpiCards", () => {
       const kpis = { ...baseKpis, crashFreePct: 100 };
       const w = mountCards(kpis);
 
-      expect(
-        w.find('[data-test="rum-errors-kpi-crash-free-value"]').text(),
-      ).toBe("100.0%");
-      expect(
-        w.find('[data-test="rum-errors-kpi-crash-free-badge"]').text(),
-      ).toBe("Good");
+      expect(w.find('[data-test="rum-errors-kpi-crash-free-value"]').text()).toBe("100.0%");
+      expect(w.find('[data-test="rum-errors-kpi-crash-free-badge"]').text()).toBe("Good");
 
       w.unmount();
     });
@@ -594,12 +489,8 @@ describe("ErrorsKpiCards", () => {
       const kpis = { ...baseKpis, crashFreePct: 0 };
       const w = mountCards(kpis);
 
-      expect(
-        w.find('[data-test="rum-errors-kpi-crash-free-value"]').text(),
-      ).toBe("0.0%");
-      expect(
-        w.find('[data-test="rum-errors-kpi-crash-free-badge"]').text(),
-      ).toBe("Poor");
+      expect(w.find('[data-test="rum-errors-kpi-crash-free-value"]').text()).toBe("0.0%");
+      expect(w.find('[data-test="rum-errors-kpi-crash-free-badge"]').text()).toBe("Poor");
 
       w.unmount();
     });
@@ -608,9 +499,7 @@ describe("ErrorsKpiCards", () => {
       const kpis = { ...baseKpis, errorSessions: 1200, totalSessions: 5000 };
       const w = mountCards(kpis);
 
-      const caption = w
-        .find('[data-test="rum-errors-kpi-crash-free-caption"]')
-        .text();
+      const caption = w.find('[data-test="rum-errors-kpi-crash-free-caption"]').text();
 
       expect(caption).toContain("1,200");
       expect(caption).toContain("5,000");
@@ -626,9 +515,7 @@ describe("ErrorsKpiCards", () => {
       };
       const w = mountCards(kpis);
 
-      const caption = w
-        .find('[data-test="rum-errors-kpi-users-affected-caption"]')
-        .text();
+      const caption = w.find('[data-test="rum-errors-kpi-users-affected-caption"]').text();
 
       expect(caption).toContain("10,000");
 

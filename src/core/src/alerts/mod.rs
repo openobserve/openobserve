@@ -38,7 +38,6 @@ use search::utils::is_permissable_function_error;
 use tracing::Instrument;
 use usage_reporting::http_report_metrics;
 
-use super::promql;
 use crate::{search as SearchService, service::setup_tracing_with_trace_id};
 
 pub mod alert;
@@ -166,7 +165,7 @@ impl QueryConditionExt for QueryCondition {
                 };
                 let end = end_time;
                 let condition = self.promql_condition.as_ref().unwrap();
-                let req = promql::MetricsQueryRequest {
+                let req = promql_service::MetricsQueryRequest {
                     query: format!(
                         "({}) {} {}",
                         v,
@@ -195,15 +194,21 @@ impl QueryConditionExt for QueryCondition {
                 let is_super_cluster = o2_enterprise::enterprise::common::config::get_config()
                     .super_cluster
                     .enabled;
-                let resp =
-                    match promql::search::search(&trace_id, org_id, &req, "", 0, is_super_cluster)
-                        .await
-                    {
-                        Ok(v) => v,
-                        Err(_) => {
-                            return Ok(eval_results);
-                        }
-                    };
+                let resp = match promql_service::search::search(
+                    &trace_id,
+                    org_id,
+                    &req,
+                    "",
+                    0,
+                    is_super_cluster,
+                )
+                .await
+                {
+                    Ok(v) => v,
+                    Err(_) => {
+                        return Ok(eval_results);
+                    }
+                };
                 let config::meta::promql::value::Value::Matrix(value) = resp else {
                     log::warn!(
                         "Alert evaluate: trace_id: {trace_id}, PromQL query {v} returned unexpected response: {resp:?}"

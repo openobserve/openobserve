@@ -1,38 +1,38 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mount, flushPromises, VueWrapper } from '@vue/test-utils';
-import EnrichmentSchema from './EnrichmentSchema.vue';
-import { createStore } from 'vuex';
-import { createI18n } from 'vue-i18n';
-import { nextTick } from 'vue';
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
+import EnrichmentSchema from "./EnrichmentSchema.vue";
+import { createStore } from "vuex";
+import { createI18n } from "vue-i18n";
+import { nextTick } from "vue";
 
 // Create mock functions
 const mockGetStream = vi.fn();
 
 // Mock modules
-vi.mock('@/composables/useStreams', () => ({
+vi.mock("@/composables/useStreams", () => ({
   default: () => ({
     getStream: mockGetStream,
   }),
 }));
 
-vi.mock('@/services/segment_analytics', () => ({
+vi.mock("@/services/segment_analytics", () => ({
   default: {},
 }));
 
-vi.mock('@/aws-exports', () => ({
+vi.mock("@/aws-exports", () => ({
   default: {
-    isCloud: 'false',
+    isCloud: "false",
   },
 }));
 
-vi.mock('@/utils/zincutils', () => ({
+vi.mock("@/utils/zincutils", () => ({
   formatSizeFromMB: vi.fn((size) => `${size} MB`),
   getImageURL: vi.fn(),
   timestampToTimezoneDate: vi.fn(),
   convertDateToTimestamp: vi.fn(),
 }));
 
-vi.mock('vue-router', () => ({
+vi.mock("vue-router", () => ({
   useRouter: () => ({
     push: vi.fn(),
     replace: vi.fn(),
@@ -42,9 +42,9 @@ vi.mock('vue-router', () => ({
 // Stub for ODrawer: exposes slots and re-emits update:open so tests can drive
 // drawer open/close interactions without rendering the real overlay.
 const ODrawerStub = {
-  name: 'ODrawer',
-  props: ['open', 'width', 'showClose', 'persistent', 'size', 'title', 'subTitle'],
-  emits: ['update:open', 'click:primary', 'click:secondary', 'click:neutral'],
+  name: "ODrawer",
+  props: ["open", "width", "showClose", "persistent", "size", "title", "subTitle"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
   template: `
     <div data-test-stub="o-drawer" :data-open="open" :data-title="title" :data-size="size">
       <div data-test-stub="o-drawer-header"><slot name="header" /></div>
@@ -56,7 +56,7 @@ const ODrawerStub = {
 
 const mockStore = createStore({
   state: {
-    theme: 'light',
+    theme: "light",
     zoConfig: {
       show_stream_stats_doc_num: true,
     },
@@ -64,25 +64,25 @@ const mockStore = createStore({
 });
 
 const mockI18n = createI18n({
-  locale: 'en',
+  locale: "en",
   messages: {
     en: {
       logStream: {
-        schemaHeader: 'Schema',
-        docsCount: 'Documents',
-        storageSize: 'Storage Size',
-        compressedSize: 'Compressed Size',
-        propertyName: 'Property Name',
-        propertyType: 'Property Type',
+        schemaHeader: "Schema",
+        docsCount: "Documents",
+        storageSize: "Storage Size",
+        compressedSize: "Compressed Size",
+        propertyName: "Property Name",
+        propertyType: "Property Type",
       },
       alerts: {
-        stream_name: 'Stream Name',
+        stream_name: "Stream Name",
       },
       search: {
-        searchField: 'Search fields',
-        showing: 'Showing',
-        of: 'of',
-        recordsPerPage: 'records per page',
+        searchField: "Search fields",
+        showing: "Showing",
+        of: "of",
+        recordsPerPage: "records per page",
       },
     },
   },
@@ -91,7 +91,7 @@ const mockI18n = createI18n({
 function buildMountOptions(store: any = mockStore, props: Record<string, unknown> = {}) {
   return {
     props: {
-      selectedEnrichmentTable: 'test_table',
+      selectedEnrichmentTable: "test_table",
       open: true,
       ...props,
     },
@@ -109,13 +109,12 @@ function buildMountOptions(store: any = mockStore, props: Record<string, unknown
   };
 }
 
-
-describe('EnrichmentSchema.vue Branch Coverage', () => {
+describe("EnrichmentSchema.vue Branch Coverage", () => {
   const mockSchemaData = {
-    name: 'test_stream',
+    name: "test_stream",
     schema: [
-      { name: 'field1', type: 'string' },
-      { name: 'field2', type: 'number' },
+      { name: "field1", type: "string" },
+      { name: "field2", type: "number" },
     ],
     stats: {
       doc_num: 1000,
@@ -135,75 +134,69 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
     wrapper?.unmount();
   });
 
-  describe('ODrawer Integration', () => {
-    it('should render the ODrawer wrapper', async () => {
+  describe("ODrawer Integration", () => {
+    it("should render the ODrawer wrapper", async () => {
       wrapper = mount(EnrichmentSchema, buildMountOptions());
       await flushPromises();
       expect(wrapper.find('[data-test-stub="o-drawer"]').exists()).toBe(true);
     });
 
-    it('should pass open prop through to ODrawer', async () => {
+    it("should pass open prop through to ODrawer", async () => {
       wrapper = mount(EnrichmentSchema, buildMountOptions());
       await flushPromises();
       const drawer = wrapper.find('[data-test-stub="o-drawer"]');
-      expect(drawer.attributes('data-open')).toBe('true');
+      expect(drawer.attributes("data-open")).toBe("true");
     });
 
-    it('should set the drawer title from the i18n schemaHeader key', async () => {
+    it("should set the drawer title from the i18n schemaHeader key", async () => {
       wrapper = mount(EnrichmentSchema, buildMountOptions());
       await flushPromises();
-      expect(
-        wrapper.find('[data-test-stub="o-drawer"]').attributes('data-title'),
-      ).toBe('Schema');
+      expect(wrapper.find('[data-test-stub="o-drawer"]').attributes("data-title")).toBe("Schema");
     });
 
     it('should pass size "lg" to ODrawer', async () => {
       wrapper = mount(EnrichmentSchema, buildMountOptions());
       await flushPromises();
-      expect(
-        wrapper.find('[data-test-stub="o-drawer"]').attributes('data-size'),
-      ).toBe('lg');
+      expect(wrapper.find('[data-test-stub="o-drawer"]').attributes("data-size")).toBe("lg");
     });
 
-    it('should propagate ODrawer update:open event to parent', async () => {
+    it("should propagate ODrawer update:open event to parent", async () => {
       wrapper = mount(EnrichmentSchema, buildMountOptions());
       await flushPromises();
 
-      const drawer = wrapper.findComponent({ name: 'ODrawer' });
-      drawer.vm.$emit('update:open', false);
+      const drawer = wrapper.findComponent({ name: "ODrawer" });
+      drawer.vm.$emit("update:open", false);
       await flushPromises();
 
-      const events = wrapper.emitted('update:open');
+      const events = wrapper.emitted("update:open");
       expect(events).toBeTruthy();
       expect(events![events!.length - 1]).toEqual([false]);
     });
 
-    it('should reflect open=false when the prop is set to false', async () => {
+    it("should reflect open=false when the prop is set to false", async () => {
       wrapper = mount(EnrichmentSchema, buildMountOptions(mockStore, { open: false }));
       await flushPromises();
-      expect(
-        wrapper.find('[data-test-stub="o-drawer"]').attributes('data-open'),
-      ).toBe('false');
+      expect(wrapper.find('[data-test-stub="o-drawer"]').attributes("data-open")).toBe("false");
     });
   });
 
-  describe('Loading State Branch Coverage', () => {
-    it('should show content after loading completes', async () => {
+  describe("Loading State Branch Coverage", () => {
+    it("should show content after loading completes", async () => {
       wrapper = mount(EnrichmentSchema, buildMountOptions());
 
       await nextTick();
       await nextTick();
 
-      expect(wrapper.find('.indexDetailsContainer').exists()).toBe(true);
+      expect(wrapper.find(".indexDetailsContainer").exists()).toBe(true);
       expect(wrapper.vm).toBeDefined();
     });
   });
 
-  describe('Config-based Display Branch Coverage', () => {
-    it('should show doc count when zoConfig.show_stream_stats_doc_num is true', async () => {
+  describe("Config-based Display Branch Coverage", () => {
+    it("should show doc count when zoConfig.show_stream_stats_doc_num is true", async () => {
       const storeWithDocNum = createStore({
         state: {
-          theme: 'light',
+          theme: "light",
           zoConfig: {
             show_stream_stats_doc_num: true,
           },
@@ -216,16 +209,14 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
       await nextTick();
 
       const streamElements = wrapper.findAll('[data-test="schema-stream-title-text"]');
-      const hasDocCountElement = streamElements.some((el) =>
-        el.text().includes('Documents'),
-      );
+      const hasDocCountElement = streamElements.some((el) => el.text().includes("Documents"));
       expect(hasDocCountElement).toBe(true);
     });
 
-    it('should hide doc count when zoConfig.show_stream_stats_doc_num is false', async () => {
+    it("should hide doc count when zoConfig.show_stream_stats_doc_num is false", async () => {
       const storeWithoutDocNum = createStore({
         state: {
-          theme: 'light',
+          theme: "light",
           zoConfig: {
             show_stream_stats_doc_num: false,
           },
@@ -238,18 +229,16 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
       await nextTick();
 
       const streamElements = wrapper.findAll('[data-test="schema-stream-title-text"]');
-      const hasDocCountElement = streamElements.some((el) =>
-        el.text().includes('Documents'),
-      );
+      const hasDocCountElement = streamElements.some((el) => el.text().includes("Documents"));
       expect(hasDocCountElement).toBe(false);
     });
   });
 
-  describe('Theme-based Styling Branch Coverage', () => {
-    it('should apply light theme class when theme is light', async () => {
+  describe("Theme-based Styling Branch Coverage", () => {
+    it("should apply light theme class when theme is light", async () => {
       const lightStore = createStore({
         state: {
-          theme: 'light',
+          theme: "light",
           zoConfig: {
             show_stream_stats_doc_num: true,
           },
@@ -267,10 +256,10 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
       expect(themeTable.exists()).toBe(true);
     });
 
-    it('should apply dark theme class when theme is dark', async () => {
+    it("should apply dark theme class when theme is dark", async () => {
       const darkStore = createStore({
         state: {
-          theme: 'dark',
+          theme: "dark",
           zoConfig: {
             show_stream_stats_doc_num: true,
           },
@@ -289,64 +278,66 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
     });
   });
 
-  describe('Error Handling Branch Coverage', () => {
-    it('should handle getSchemaData error and set loading to false', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  describe("Error Handling Branch Coverage", () => {
+    it("should handle getSchemaData error and set loading to false", async () => {
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       mockGetStream.mockReset();
-      mockGetStream.mockRejectedValueOnce(new Error('API Error'));
+      mockGetStream.mockRejectedValueOnce(new Error("API Error"));
 
       wrapper = mount(EnrichmentSchema, buildMountOptions(mockStore, { open: false }));
       await wrapper.setProps({ open: true });
       await flushPromises();
 
       expect(consoleSpy).toHaveBeenCalled();
-      expect(wrapper.find('[data-test="enrichment-schema-loading-indicator"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="enrichment-schema-loading-indicator"]').exists()).toBe(
+        false,
+      );
 
       consoleSpy.mockRestore();
     });
 
-    it('should test loading state transitions', async () => {
+    it("should test loading state transitions", async () => {
       wrapper = mount(EnrichmentSchema, buildMountOptions());
 
       await nextTick();
       await nextTick();
 
-      expect(wrapper.find('.indexDetailsContainer').exists()).toBe(true);
+      expect(wrapper.find(".indexDetailsContainer").exists()).toBe(true);
       expect(wrapper.vm).toBeDefined();
     });
   });
 
-  describe('Filter Functionality Branch Coverage', () => {
-    it('should filter fields via filterField ref', async () => {
+  describe("Filter Functionality Branch Coverage", () => {
+    it("should filter fields via filterField ref", async () => {
       wrapper = mount(EnrichmentSchema, buildMountOptions());
 
       await nextTick();
 
       const vm = wrapper.vm as any;
-      expect(vm.filterField).toBe('');
+      expect(vm.filterField).toBe("");
 
-      vm.filterField = 'user';
-      expect(vm.filterField).toBe('user');
+      vm.filterField = "user";
+      expect(vm.filterField).toBe("user");
 
-      vm.filterField = '';
-      expect(vm.filterField).toBe('');
+      vm.filterField = "";
+      expect(vm.filterField).toBe("");
     });
   });
 
-  describe('Cloud Environment Simulation', () => {
-    it('should handle cloud vs non-cloud display logic', async () => {
+  describe("Cloud Environment Simulation", () => {
+    it("should handle cloud vs non-cloud display logic", async () => {
       wrapper = mount(EnrichmentSchema, buildMountOptions());
 
       await nextTick();
       await nextTick();
 
-      expect(wrapper.find('.stream_details_container').exists()).toBe(true);
+      expect(wrapper.find(".stream_details_container").exists()).toBe(true);
     });
   });
 
-  describe('Search Field Input Coverage', () => {
-    it('should render schema field search input', async () => {
+  describe("Search Field Input Coverage", () => {
+    it("should render schema field search input", async () => {
       wrapper = mount(EnrichmentSchema, buildMountOptions());
 
       await nextTick();
@@ -356,22 +347,22 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
       expect(searchInput.exists()).toBe(true);
     });
 
-    it('should update filterField when search input changes', async () => {
+    it("should update filterField when search input changes", async () => {
       wrapper = mount(EnrichmentSchema, buildMountOptions());
 
       await nextTick();
       await nextTick();
 
       const vm = wrapper.vm as any;
-      expect(vm.filterField).toBe('');
+      expect(vm.filterField).toBe("");
 
-      vm.filterField = 'test_field';
-      expect(vm.filterField).toBe('test_field');
+      vm.filterField = "test_field";
+      expect(vm.filterField).toBe("test_field");
     });
   });
 
-  describe('Result Total and Field Count Coverage', () => {
-    it('should set schemaData with correct schema length after data load', async () => {
+  describe("Result Total and Field Count Coverage", () => {
+    it("should set schemaData with correct schema length after data load", async () => {
       wrapper = mount(EnrichmentSchema, buildMountOptions(mockStore, { open: false }));
       await wrapper.setProps({ open: true });
       await flushPromises();
@@ -380,30 +371,30 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
       expect(vm.schemaData.schema).toHaveLength(2);
     });
 
-    it('should display all-fields count in the display-total-fields element', async () => {
+    it("should display all-fields count in the display-total-fields element", async () => {
       wrapper = mount(EnrichmentSchema, buildMountOptions(mockStore, { open: false }));
       await wrapper.setProps({ open: true });
       await flushPromises();
 
       const totalFields = wrapper.find('[data-test="enrichment-schema-total-fields"]');
       expect(totalFields.exists()).toBe(true);
-      expect(totalFields.text()).toContain('2');
+      expect(totalFields.text()).toContain("2");
     });
   });
 
-  describe('Pagination Coverage', () => {
-    it('should have page size options configured on OTable', async () => {
+  describe("Pagination Coverage", () => {
+    it("should have page size options configured on OTable", async () => {
       wrapper = mount(EnrichmentSchema, buildMountOptions());
 
       await nextTick();
       await nextTick();
 
       // OTable handles pagination internally with :page-size-options="[5, 10, 20, 50]"
-      const table = wrapper.findComponent({ name: 'OTable' });
+      const table = wrapper.findComponent({ name: "OTable" });
       expect(table.exists()).toBe(true);
     });
 
-    it('should mount without pagination-related errors', async () => {
+    it("should mount without pagination-related errors", async () => {
       wrapper = mount(EnrichmentSchema, buildMountOptions());
 
       await nextTick();
@@ -413,50 +404,50 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
     });
   });
 
-  describe('filterField Comprehensive Coverage', () => {
-    it('should default filterField to empty string', async () => {
+  describe("filterField Comprehensive Coverage", () => {
+    it("should default filterField to empty string", async () => {
       wrapper = mount(EnrichmentSchema, buildMountOptions());
 
       await nextTick();
 
       const vm = wrapper.vm as any;
-      expect(vm.filterField).toBe('');
+      expect(vm.filterField).toBe("");
     });
 
-    it('should update filterField value', async () => {
+    it("should update filterField value", async () => {
       wrapper = mount(EnrichmentSchema, buildMountOptions());
 
       await nextTick();
 
       const vm = wrapper.vm as any;
-      vm.filterField = 'username';
-      expect(vm.filterField).toBe('username');
+      vm.filterField = "username";
+      expect(vm.filterField).toBe("username");
     });
 
-    it('should clear filterField back to empty', async () => {
+    it("should clear filterField back to empty", async () => {
       wrapper = mount(EnrichmentSchema, buildMountOptions());
 
       await nextTick();
 
       const vm = wrapper.vm as any;
-      vm.filterField = 'xyz_not_found';
-      vm.filterField = '';
-      expect(vm.filterField).toBe('');
+      vm.filterField = "xyz_not_found";
+      vm.filterField = "";
+      expect(vm.filterField).toBe("");
     });
   });
 
-  describe('Schema Data Loading Coverage', () => {
-    it('should set schemaData correctly after successful load', async () => {
+  describe("Schema Data Loading Coverage", () => {
+    it("should set schemaData correctly after successful load", async () => {
       wrapper = mount(EnrichmentSchema, buildMountOptions(mockStore, { open: false }));
       await wrapper.setProps({ open: true });
       await flushPromises();
 
       const vm = wrapper.vm as any;
-      expect(vm.schemaData.name).toBe('test_stream');
+      expect(vm.schemaData.name).toBe("test_stream");
       expect(vm.schemaData.schema).toHaveLength(2);
     });
 
-    it('should reset loadingState to false after successful load', async () => {
+    it("should reset loadingState to false after successful load", async () => {
       wrapper = mount(EnrichmentSchema, buildMountOptions(mockStore, { open: false }));
       await wrapper.setProps({ open: true });
       await flushPromises();
@@ -465,15 +456,15 @@ describe('EnrichmentSchema.vue Branch Coverage', () => {
       expect(vm.loadingState).toBe(false);
     });
 
-    it('should call getStream with enrichment_tables type', async () => {
+    it("should call getStream with enrichment_tables type", async () => {
       wrapper = mount(
         EnrichmentSchema,
-        buildMountOptions(mockStore, { selectedEnrichmentTable: 'my_table', open: false }),
+        buildMountOptions(mockStore, { selectedEnrichmentTable: "my_table", open: false }),
       );
       await wrapper.setProps({ open: true });
       await flushPromises();
 
-      expect(mockGetStream).toHaveBeenCalledWith('my_table', 'enrichment_tables', true);
+      expect(mockGetStream).toHaveBeenCalledWith("my_table", "enrichment_tables", true);
     });
   });
 });

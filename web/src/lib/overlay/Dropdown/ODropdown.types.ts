@@ -11,10 +11,7 @@ export type {
   DropdownItemEmits,
   DropdownItemSlots,
 } from "./ODropdownItem.types";
-export type {
-  DropdownGroupProps,
-  DropdownGroupSlots,
-} from "./ODropdownGroup.types";
+export type { DropdownGroupProps, DropdownGroupSlots } from "./ODropdownGroup.types";
 export type { DropdownSeparatorSlots } from "./ODropdownSeparator.types";
 
 export type DropdownAlign = "start" | "center" | "end";

@@ -28,13 +28,11 @@ async function writeClipboard(text: string): Promise<void> {
   // focus back and clear the selection, causing Chrome to return true for an
   // empty-selection copy and the success toast to be shown incorrectly.
   const activeEl = document.activeElement as HTMLElement | null;
-  const container: HTMLElement =
-    activeEl?.closest<HTMLElement>('[role="dialog"]') ?? document.body;
+  const container: HTMLElement = activeEl?.closest<HTMLElement>('[role="dialog"]') ?? document.body;
 
   const textarea = document.createElement("textarea");
   textarea.value = text;
-  textarea.style.cssText =
-    "position:fixed;top:0;left:0;opacity:0;pointer-events:none;";
+  textarea.style.cssText = "position:fixed;top:0;left:0;opacity:0;pointer-events:none;";
   textarea.setAttribute("readonly", "");
   container.appendChild(textarea);
   textarea.focus();
@@ -55,8 +53,7 @@ export async function copyToClipboard(
   text: string,
   options: CopyToClipboardOptions = {},
 ): Promise<boolean> {
-  const { successMessage, errorMessage, timeout = 2000, silent = false } =
-    options;
+  const { successMessage, errorMessage, timeout = 2000, silent = false } = options;
 
   try {
     await writeClipboard(text);

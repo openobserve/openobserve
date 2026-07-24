@@ -20,7 +20,6 @@ import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDo
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
 vi.mock("vue-router", () => ({
@@ -127,7 +126,7 @@ const globalConfig = {
     AddFolder: AddFolderStub,
     ODrawer: ODrawerStub,
     OButton: OButtonStub,
-    "OSelect": {
+    OSelect: {
       template: `
         <div class="o-select-stub" :data-test="$attrs['data-test']" :data-disable="String(disabled)">
           <select :value="modelValue" @change="$emit('update:modelValue', $event.target.value)">
@@ -137,7 +136,7 @@ const globalConfig = {
       props: ["modelValue", "options", "label", "disabled"],
       emits: ["update:modelValue"],
     },
-    "OIcon": { template: '<i :class="name" />', props: ["name", "size"] },
+    OIcon: { template: '<i :class="name" />', props: ["name", "size"] },
   },
   mocks: { $store: store },
   provide: { store },
@@ -347,10 +346,7 @@ describe("SelectFolderDropDown.vue", () => {
     it("refreshes selectedFolder when foldersByType changes in the store", async () => {
       wrapper = createWrapper({ activeFolderId: "folder-1" });
       // Simulate store update
-      setStoreFolders("alerts", [
-        ...MOCK_FOLDERS,
-        { folderId: "folder-3", name: "Staging" },
-      ]);
+      setStoreFolders("alerts", [...MOCK_FOLDERS, { folderId: "folder-3", name: "Staging" }]);
       store.commit("setFoldersByType", store.state.organizationData.foldersByType);
       await nextTick();
       // selectedFolder should still resolve to folder-1

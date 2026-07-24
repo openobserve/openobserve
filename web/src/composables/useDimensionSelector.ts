@@ -177,10 +177,7 @@ function isSystemField(name: string): boolean {
 /**
  * Analyze field from log samples to gather statistics
  */
-function analyzeFieldFromSamples(
-  fieldName: string,
-  logSamples: any[],
-): FieldStats {
+function analyzeFieldFromSamples(fieldName: string, logSamples: any[]): FieldStats {
   const stats: FieldStats = {
     uniqueValues: new Set(),
     occurrences: 0,
@@ -220,8 +217,7 @@ function scoreField(
   // Calculate derived metrics
   const cardinality = stats.uniqueValues.size;
   const coverage = stats.occurrences / sampleCount;
-  const avgLength =
-    stats.occurrences > 0 ? stats.totalLength / stats.occurrences : 0;
+  const avgLength = stats.occurrences > 0 ? stats.totalLength / stats.occurrences : 0;
 
   // IMMEDIATE DISQUALIFIERS
 
@@ -435,10 +431,7 @@ function selectDimensionsFromSchema(
   ];
 
   const available = schemaFields
-    .filter(
-      (f) =>
-        !isSystemField(f.name) && !f.isFTS && !isHighCardinalityPattern(f.name),
-    )
+    .filter((f) => !isSystemField(f.name) && !f.isFTS && !isHighCardinalityPattern(f.name))
     .map((f) => f.name);
 
   // Try priority list first
@@ -497,9 +490,7 @@ export function selectTraceDimensions(
   ];
 
   const availableFields = new Set(schemaFields.map((f) => f.name));
-  const existing = prioritizedDimensions.filter((dim) =>
-    availableFields.has(dim),
-  );
+  const existing = prioritizedDimensions.filter((dim) => availableFields.has(dim));
 
   if (existing.length === 0) {
     return ["service_name", "span_kind", "span_status", "operation_name"];

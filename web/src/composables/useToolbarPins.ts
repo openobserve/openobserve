@@ -53,13 +53,10 @@ const readInitial = (): ToolbarPinKey[] => {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
     const pins: ToolbarPinKey[] = Array.isArray(parsed)
-      ? parsed.filter(
-          (k): k is ToolbarPinKey => typeof k === "string" && isValidKey(k),
-        )
+      ? parsed.filter((k): k is ToolbarPinKey => typeof k === "string" && isValidKey(k))
       : [];
     for (const key of DEFAULT_PINNED) {
-      const decided =
-        window.localStorage.getItem(PIN_DECIDED_KEYS[key]!) === "true";
+      const decided = window.localStorage.getItem(PIN_DECIDED_KEYS[key]!) === "true";
       if (!decided && !pins.includes(key)) pins.push(key);
     }
     return pins;
@@ -73,10 +70,7 @@ const pinnedSet = ref<Set<ToolbarPinKey>>(new Set(readInitial()));
 
 const persist = () => {
   try {
-    window.localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify(Array.from(pinnedSet.value)),
-    );
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(pinnedSet.value)));
   } catch (e) {
     // localStorage may be unavailable (private mode / quota) — pins stay in-memory.
     console.log(`Error persisting toolbar pins: ${e}`);

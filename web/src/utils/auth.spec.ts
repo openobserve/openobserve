@@ -20,9 +20,7 @@ vi.mock("@/services/users", () => ({
 
 vi.mock("@/services/organizations", () => ({
   default: {
-    get_organization_summary: vi
-      .fn()
-      .mockResolvedValue({ data: { streams: { num_streams: 5 } } }),
+    get_organization_summary: vi.fn().mockResolvedValue({ data: { streams: { num_streams: 5 } } }),
   },
 }));
 
@@ -39,9 +37,7 @@ vi.mock("@/utils/storage", () => ({
 vi.mock("@/utils/uuid", () => ({
   getUUID: vi.fn(() => "aaaabbbb-cccc-dddd-0000-111122223333"),
   getUUIDv7: vi.fn((compact?: boolean) =>
-    compact
-      ? "0123456789ab7def8123456789abcdef"
-      : "01234567-89ab-7def-8123-456789abcdef",
+    compact ? "0123456789ab7def8123456789abcdef" : "01234567-89ab-7def-8123-456789abcdef",
   ),
 }));
 
@@ -50,11 +46,7 @@ import config from "../aws-exports";
 import { useStore } from "vuex";
 import userService from "@/services/users";
 import organizationService from "@/services/organizations";
-import {
-  b64DecodeUnicode,
-  b64EncodeStandard,
-  b64DecodeStandard,
-} from "@/utils/formatters";
+import { b64DecodeUnicode, b64EncodeStandard, b64DecodeStandard } from "@/utils/formatters";
 import { useLocalUserInfo } from "@/utils/storage";
 
 import {
@@ -291,15 +283,13 @@ describe("getBasicAuth", () => {
 
 describe("getDueDays", () => {
   it("returns a positive number for a future timestamp", () => {
-    const futureMicros =
-      (Date.now() + 30 * 24 * 60 * 60 * 1000) * 1000; // 30 days ahead in microseconds
+    const futureMicros = (Date.now() + 30 * 24 * 60 * 60 * 1000) * 1000; // 30 days ahead in microseconds
     const result = getDueDays(futureMicros);
     expect(result).toBeGreaterThan(0);
   });
 
   it("returns a negative number for a past timestamp", () => {
-    const pastMicros =
-      (Date.now() - 30 * 24 * 60 * 60 * 1000) * 1000; // 30 days ago in microseconds
+    const pastMicros = (Date.now() - 30 * 24 * 60 * 60 * 1000) * 1000; // 30 days ago in microseconds
     const result = getDueDays(pastMicros);
     expect(result).toBeLessThan(0);
   });
@@ -324,11 +314,7 @@ describe("routeGuard", () => {
       mockStore = buildMockStore();
       vi.mocked(useStore).mockReturnValue(mockStore as any);
 
-      await routeGuard(
-        { name: "dashboard", path: "/dashboard" },
-        {},
-        mockNext,
-      );
+      await routeGuard({ name: "dashboard", path: "/dashboard" }, {}, mockNext);
 
       expect(mockNext).toHaveBeenCalledTimes(1);
     });
@@ -351,24 +337,18 @@ describe("routeGuard", () => {
       });
       vi.mocked(useStore).mockReturnValue(mockStore as any);
 
-      await routeGuard(
-        { name: "dashboard", path: "/dashboard" },
-        {},
-        mockNext,
-      );
+      await routeGuard({ name: "dashboard", path: "/dashboard" }, {}, mockNext);
 
-      expect(mockNext).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "plans" }),
-      );
+      expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({ name: "plans" }));
     });
   });
 
   describe("restricted_routes_on_empty_data guard", () => {
     it("redirects to /ingestion when num_streams is 0", async () => {
       (config as any).isCloud = "false";
-      vi.mocked(organizationService.get_organization_summary).mockResolvedValue(
-        { data: { streams: { num_streams: 0 } } },
-      );
+      vi.mocked(organizationService.get_organization_summary).mockResolvedValue({
+        data: { streams: { num_streams: 0 } },
+      });
       mockStore = buildMockStore({
         state: {
           organizationData: {
@@ -381,24 +361,17 @@ describe("routeGuard", () => {
       });
       vi.mocked(useStore).mockReturnValue(mockStore as any);
 
-      await routeGuard(
-        { name: "logs", path: "/logs" },
-        {},
-        mockNext,
-      );
+      await routeGuard({ name: "logs", path: "/logs" }, {}, mockNext);
 
-      expect(mockStore._mockDispatch).toHaveBeenCalledWith(
-        "setIsDataIngested",
-        false,
-      );
+      expect(mockStore._mockDispatch).toHaveBeenCalledWith("setIsDataIngested", false);
       expect(mockNext).toHaveBeenCalledWith({ path: "/ingestion" });
     });
 
     it("dispatches setIsDataIngested(true) and calls next() when num_streams > 0", async () => {
       (config as any).isCloud = "false";
-      vi.mocked(organizationService.get_organization_summary).mockResolvedValue(
-        { data: { streams: { num_streams: 5 } } },
-      );
+      vi.mocked(organizationService.get_organization_summary).mockResolvedValue({
+        data: { streams: { num_streams: 5 } },
+      });
       mockStore = buildMockStore({
         state: {
           organizationData: {
@@ -411,16 +384,9 @@ describe("routeGuard", () => {
       });
       vi.mocked(useStore).mockReturnValue(mockStore as any);
 
-      await routeGuard(
-        { name: "logs", path: "/logs" },
-        {},
-        mockNext,
-      );
+      await routeGuard({ name: "logs", path: "/logs" }, {}, mockNext);
 
-      expect(mockStore._mockDispatch).toHaveBeenCalledWith(
-        "setIsDataIngested",
-        true,
-      );
+      expect(mockStore._mockDispatch).toHaveBeenCalledWith("setIsDataIngested", true);
       expect(mockNext).toHaveBeenCalledTimes(1);
     });
 
@@ -442,17 +408,10 @@ describe("routeGuard", () => {
       });
       vi.mocked(useStore).mockReturnValue(mockStore as any);
 
-      await routeGuard(
-        { name: "logs", path: "/logs" },
-        {},
-        mockNext,
-      );
+      await routeGuard({ name: "logs", path: "/logs" }, {}, mockNext);
 
       expect(warnSpy).toHaveBeenCalled();
-      expect(mockStore._mockDispatch).toHaveBeenCalledWith(
-        "setIsDataIngested",
-        true,
-      );
+      expect(mockStore._mockDispatch).toHaveBeenCalledWith("setIsDataIngested", true);
       expect(mockNext).toHaveBeenCalledTimes(1);
       warnSpy.mockRestore();
     });
@@ -471,11 +430,7 @@ describe("routeGuard", () => {
       });
       vi.mocked(useStore).mockReturnValue(mockStore as any);
 
-      await routeGuard(
-        { name: "ingestion", path: "/ingestion" },
-        {},
-        mockNext,
-      );
+      await routeGuard({ name: "ingestion", path: "/ingestion" }, {}, mockNext);
 
       expect(organizationService.get_organization_summary).not.toHaveBeenCalled();
       expect(mockNext).toHaveBeenCalledTimes(1);
@@ -495,11 +450,7 @@ describe("routeGuard", () => {
       });
       vi.mocked(useStore).mockReturnValue(mockStore as any);
 
-      await routeGuard(
-        { name: "iam", path: "/iam" },
-        {},
-        mockNext,
-      );
+      await routeGuard({ name: "iam", path: "/iam" }, {}, mockNext);
 
       expect(organizationService.get_organization_summary).not.toHaveBeenCalled();
       expect(mockNext).toHaveBeenCalledTimes(1);
@@ -527,9 +478,9 @@ describe("routeGuard", () => {
       ["general settings, trailing slash", "general", "/settings/general/"],
     ])("calls next() directly for %s", async (_label, name, path) => {
       (config as any).isCloud = "false";
-      vi.mocked(organizationService.get_organization_summary).mockResolvedValue(
-        { data: { streams: { num_streams: 0 } } },
-      );
+      vi.mocked(organizationService.get_organization_summary).mockResolvedValue({
+        data: { streams: { num_streams: 0 } },
+      });
       mockStore = buildEmptyDataStore();
       vi.mocked(useStore).mockReturnValue(mockStore as any);
 
@@ -549,9 +500,9 @@ describe("routeGuard", () => {
       ["cipherKeys", "/settings/cipher_keys"],
     ])("still redirects %s to /ingestion", async (name, path) => {
       (config as any).isCloud = "false";
-      vi.mocked(organizationService.get_organization_summary).mockResolvedValue(
-        { data: { streams: { num_streams: 0 } } },
-      );
+      vi.mocked(organizationService.get_organization_summary).mockResolvedValue({
+        data: { streams: { num_streams: 0 } },
+      });
       mockStore = buildEmptyDataStore();
       vi.mocked(useStore).mockReturnValue(mockStore as any);
 
@@ -588,9 +539,7 @@ describe("generateTraceContext", () => {
   it("traceparent matches the format 00-<32hex>-<16hex>-01", () => {
     const result = generateTraceContext();
     // traceparent: "00-{traceId}-{spanId}-01"
-    expect(result.traceparent).toMatch(
-      /^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/i,
-    );
+    expect(result.traceparent).toMatch(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/i);
   });
 
   it("traceId has no dashes and is 32 hex chars", () => {

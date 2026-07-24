@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex items-center gap-2">
     <img class="size-6" v-if="showIcon" :src="icon" alt="icon" />
-    <span data-test="common-group-header-title" class="text-base font-bold leading-6">
+    <span data-test="common-group-header-title" class="text-base leading-6 font-bold">
       {{ title }}
     </span>
     <span class="flex-1">
@@ -25,11 +25,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </span>
   </div>
 </template>
-  
+
 <script lang="ts">
 import { getImageURL } from "@/utils/zincutils";
 import { computed, defineComponent } from "vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
   name: "GroupHeader",
@@ -39,23 +39,22 @@ export default defineComponent({
       type: String,
       default: "",
     },
-    iconPath:{
+    iconPath: {
       type: String,
       default: "",
     },
     showIcon: {
       type: Boolean,
       default: true,
-    }
+    },
   },
   setup(props) {
     const icon = computed(() => {
-      return getImageURL(props.iconPath)
-    })
+      return getImageURL(props.iconPath);
+    });
     return {
       icon,
     };
   },
 });
 </script>
-

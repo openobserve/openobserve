@@ -23,20 +23,15 @@ import AwsMarketplaceSetup from "@/views/AwsMarketplaceSetup.vue";
 import OnlineEvals from "@/enterprise/components/OnlineEvals.vue";
 import { routeGuard } from "@/utils/zincutils";
 
-const AIObservabilityShell = () =>
-  import("@/enterprise/views/AIObservability/Index.vue");
-const AILLMInsightsPage = () =>
-  import("@/enterprise/views/AIObservability/LLMInsightsPage.vue");
-const AISessionsPage = () =>
-  import("@/enterprise/views/AIObservability/SessionsPage.vue");
-const AIAgentGraphPage = () =>
-  import("@/enterprise/views/AIObservability/AgentGraphPage.vue");
+const AIObservabilityShell = () => import("@/enterprise/views/AIObservability/Index.vue");
+const AILLMInsightsPage = () => import("@/enterprise/views/AIObservability/LLMInsightsPage.vue");
+const AISessionsPage = () => import("@/enterprise/views/AIObservability/SessionsPage.vue");
+const AIAgentGraphPage = () => import("@/enterprise/views/AIObservability/AgentGraphPage.vue");
 const AIAgentBehaviorPage = () =>
   import("@/enterprise/views/AIObservability/AgentBehaviorPage.vue");
 // Reused for the AI/LLM session drill-down so it lives under /ai (keeps the
 // AI menu item active) instead of the Traces session-details route.
-const SessionDetails = () =>
-  import("@/plugins/traces/SessionDetails.vue");
+const SessionDetails = () => import("@/plugins/traces/SessionDetails.vue");
 
 const useEnvRoutes = () => {
   // Note: AWS Marketplace registration is handled by backend at POST /api/aws-marketplace/register

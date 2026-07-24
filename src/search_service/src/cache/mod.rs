@@ -1224,7 +1224,7 @@ pub async fn apply_regex_to_response(
 
     let ret = match pattern_manager.process_at_search(
         org_id,
-        StreamType::Logs,
+        stream_type,
         &mut res.hits,
         projections,
     ) {

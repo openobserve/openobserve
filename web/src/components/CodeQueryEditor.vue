@@ -15,10 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="relative w-full h-full flex flex-col" v-bind="$attrs">
+  <div class="relative flex h-full w-full flex-col" v-bind="$attrs">
     <div
       data-test="query-editor"
-      class="logs-query-editor flex-1 min-h-0 bg-card-glass-bg"
+      class="logs-query-editor bg-card-glass-bg min-h-0 flex-1"
       ref="editorRef"
       :id="editorId"
     />
@@ -27,17 +27,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="showAiIcon && !disableAi"
       variant="sidebar-toggle"
       size="icon-toolbar"
-      class="absolute! top-2 right-2 z-10 bg-card-glass-bg border border-card-glass-border transition-all duration-200 hover:bg-button-outline-hover-bg hover:border-accent"
-      :class="nlpMode ? 'bg-primary-100 border-accent' : ''"
+      class="bg-card-glass-bg border-card-glass-border hover:bg-button-outline-hover-bg hover:border-accent absolute! top-2 right-2 z-10 border transition-all duration-200"
+      :class="nlpMode ? 'bg-surface-accent-active border-accent' : ''"
       @click="toggleNlpMode"
       data-test="query-editor-ai-icon-btn"
     >
       <!-- name="" satisfies the required prop; empty name renders only the slot -->
       <OIcon name="" size="md">
-        <img :src="aiIcon" alt="AI" class="w-4.5 h-4.5" />
+        <img :src="aiIcon" alt="AI" class="h-4.5 w-4.5" />
       </OIcon>
       <OTooltip side="top" align="center">
-        <template #content>{{ disableAiReason || t(nlpMode ? 'search.nlpModeEnabled' : 'search.nlpModeLabel') }}</template>
+        <template #content>{{
+          disableAiReason || t(nlpMode ? "search.nlpModeEnabled" : "search.nlpModeLabel")
+        }}</template>
       </OTooltip>
     </OButton>
   </div>
@@ -191,13 +193,8 @@ export default defineComponent({
     // debounce. Assigned when the editor is created; see `commitModelChange`.
     let commitPendingChange: (() => void) | null = null;
     const { searchObj } = searchState();
-    const {
-      detectNaturalLanguage,
-      generateSQL,
-      transformToSQL,
-      isGenerating,
-      streamingResponse,
-    } = useNLQuery();
+    const { detectNaturalLanguage, generateSQL, transformToSQL, isGenerating, streamingResponse } =
+      useNLQuery();
 
     let provider: Ref<any | null> = ref(null);
     const currentEditorText = ref("");
@@ -222,10 +219,8 @@ export default defineComponent({
       };
 
       insertTextRules = {
-        InsertAsSnippet:
-          monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-        KeepWhitespace:
-          monaco.languages.CompletionItemInsertTextRule.KeepWhitespace,
+        InsertAsSnippet: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+        KeepWhitespace: monaco.languages.CompletionItemInsertTextRule.KeepWhitespace,
         None: monaco.languages.CompletionItemInsertTextRule.None,
       };
     };
@@ -337,18 +332,15 @@ export default defineComponent({
       {
         label: (_keyword: string) => `match_all_raw_ignore_case('${_keyword}')`,
         kind: "Text",
-        insertText: (_keyword: string) =>
-          `match_all_raw_ignore_case('${_keyword}')`,
+        insertText: (_keyword: string) => `match_all_raw_ignore_case('${_keyword}')`,
       },
       {
-        label: () =>
-          `re_match(fieldname: string, regular_expression: string)`,
+        label: () => `re_match(fieldname: string, regular_expression: string)`,
         kind: "Text",
         insertText: () => `re_match(fieldname, '')`,
       },
       {
-        label: () =>
-          `re_not_match(fieldname: string, regular_expression: string)`,
+        label: () => `re_not_match(fieldname: string, regular_expression: string)`,
         kind: "Text",
         insertText: () => `re_not_match(fieldname, '')`,
       },
@@ -358,11 +350,9 @@ export default defineComponent({
         insertText: (_keyword: string) => `str_match(fieldname, '${_keyword}')`,
       },
       {
-        label: (_keyword: string) =>
-          `str_match_ignore_case(fieldname, '${_keyword}')`,
+        label: (_keyword: string) => `str_match_ignore_case(fieldname, '${_keyword}')`,
         kind: "Text",
-        insertText: (_keyword: string) =>
-          `str_match_ignore_case(fieldname, '${_keyword}')`,
+        insertText: (_keyword: string) => `str_match_ignore_case(fieldname, '${_keyword}')`,
       },
     ];
 
@@ -370,9 +360,7 @@ export default defineComponent({
       () => isDark.value,
       () => {
         if (!monaco) return;
-        monaco.editor.setTheme(
-          isDark.value ? "myCustomDarkTheme" : "myCustomTheme",
-        );
+        monaco.editor.setTheme(isDark.value ? "myCustomDarkTheme" : "myCustomTheme");
       },
     );
 
@@ -402,7 +390,6 @@ export default defineComponent({
     const checkForNaturalLanguage = debounce((text: string) => {
       currentEditorText.value = text;
       const isNL = detectNaturalLanguage(text, props.language);
-
 
       // ONLY emit events if NOT already in NLP mode (auto-detection feature)
       // If already in NLP mode (user toggled it), don't change anything
@@ -455,12 +442,7 @@ export default defineComponent({
         const prompt = `${promptPrefix} : ${currentText}`;
 
         // Generate query from natural language
-        const generatedSQL = await generateSQL(
-          prompt,
-          orgId,
-          abortSignal,
-          sessionId,
-        );
+        const generatedSQL = await generateSQL(prompt, orgId, abortSignal, sessionId);
 
         if (!generatedSQL || generatedSQL.trim() === "") {
           // Show error notification - use streaming error message if available (e.g. Unauthorized Access)
@@ -476,9 +458,7 @@ export default defineComponent({
 
         // Check if this is a special action completion (dashboard/alert)
         if (generatedSQL.startsWith("✓ DASHBOARD_CREATED:")) {
-          const responseText = generatedSQL
-            .replace("✓ DASHBOARD_CREATED:", "")
-            .trim();
+          const responseText = generatedSQL.replace("✓ DASHBOARD_CREATED:", "").trim();
           emit("generation-success", {
             type: "dashboard",
             message: responseText,
@@ -488,29 +468,21 @@ export default defineComponent({
         }
 
         if (generatedSQL.startsWith("✓ ALERT_CREATED:")) {
-          const responseText = generatedSQL
-            .replace("✓ ALERT_CREATED:", "")
-            .trim();
+          const responseText = generatedSQL.replace("✓ ALERT_CREATED:", "").trim();
           emit("generation-success", { type: "alert", message: responseText });
           // Don't emit nlpModeDetected - keep user in current mode
           return; // Success without SQL
         }
 
         if (generatedSQL.startsWith("✓ ACTION_COMPLETED:")) {
-          const responseText = generatedSQL
-            .replace("✓ ACTION_COMPLETED:", "")
-            .trim();
+          const responseText = generatedSQL.replace("✓ ACTION_COMPLETED:", "").trim();
           emit("generation-success", { type: "action", message: responseText });
           // Don't emit nlpModeDetected - keep user in current mode
           return; // Success without SQL
         }
 
         // Normal query generation - transform and update editor with language-specific comments
-        const transformedText = transformToSQL(
-          currentText,
-          generatedSQL,
-          props.language,
-        );
+        const transformedText = transformToSQL(currentText, generatedSQL, props.language);
 
         // Update editor value
         setValue(transformedText);
@@ -524,7 +496,6 @@ export default defineComponent({
 
         // Emit SQL generation success
         emit("generation-success", { type: "sql", message: generatedSQL });
-
       } catch (error) {
         console.error("[NL2Q-UI] Exception during SQL generation:", error);
         showErrorNotification(t("search.nlQueryGenerationFailed"));
@@ -543,8 +514,7 @@ export default defineComponent({
           range: range,
         };
         if (insertTextRules[keyword["insertTextRule"]]) {
-          itemObj["insertTextRules"] =
-            insertTextRules[keyword["insertTextRule"]];
+          itemObj["insertTextRules"] = insertTextRules[keyword["insertTextRule"]];
         }
         return itemObj;
       });
@@ -572,10 +542,7 @@ export default defineComponent({
         monaco.languages.register({ id: "vrl" });
 
         // Register a tokens provider for the language
-        monaco.languages.setMonarchTokensProvider(
-          "vrl",
-          vrlLanguageDefinition as any,
-        );
+        monaco.languages.setMonarchTokensProvider("vrl", vrlLanguageDefinition as any);
       }
 
       monaco.editor.defineTheme("myCustomTheme", {
@@ -730,22 +697,14 @@ export default defineComponent({
       };
 
       editorObj.createContextKey("ctrlenter", true);
-      editorObj.addCommand(
-        monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
-        runQuery,
-        "ctrlenter",
-      );
+      editorObj.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, runQuery, "ctrlenter");
       editorObj.onDidFocusEditorWidget(() => {
         emit("focus");
 
         // added hack to handle case where ctrl+enter / cmd+enter stops working after
         // user click on the result row and open sidebase or opensidebar from schedule search
         // This is because the editor loses focus and the context key "ctrlenter" is not active anymore, so we need to re-add the command on focus
-        editorObj.addCommand(
-          monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
-          runQuery,
-          "ctrlenter",
-        );
+        editorObj.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, runQuery, "ctrlenter");
       });
 
       editorObj.onDidBlurEditorWidget(() => {
@@ -888,9 +847,7 @@ export default defineComponent({
       () => isDark.value,
       () => {
         if (!monaco) return;
-        monaco.editor.setTheme(
-          isDark.value ? "myCustomDarkTheme" : "myCustomTheme",
-        );
+        monaco.editor.setTheme(isDark.value ? "myCustomDarkTheme" : "myCustomTheme");
       },
     );
 
@@ -909,8 +866,7 @@ export default defineComponent({
         // 2. It's readonly AND values are actually different
         // 3. Compare trimmed values to avoid cursor jumps from trailing spaces
         const shouldUpdate =
-          (props.readOnly || !hasFocus) &&
-          currentValue?.trim() !== newValue?.trim();
+          (props.readOnly || !hasFocus) && currentValue?.trim() !== newValue?.trim();
 
         if (shouldUpdate) {
           editorObj.getModel()?.setValue(newValue);
@@ -929,54 +885,49 @@ export default defineComponent({
 
     const registerAutoCompleteProvider = () => {
       if (!props.showAutoComplete || !monaco) return;
-      provider.value = monaco.languages.registerCompletionItemProvider(
-        props.language,
-        {
-          provideCompletionItems: function (
-            model: MonacoEditor.editor.ITextModel,
-            position: MonacoEditor.Position,
-          ) {
-            // find out if we are completing a property in the 'dependencies' object.
-            var textUntilPosition = model.getValueInRange({
-              startLineNumber: 1,
-              startColumn: 1,
-              endLineNumber: position.lineNumber,
-              endColumn: position.column,
+      provider.value = monaco.languages.registerCompletionItemProvider(props.language, {
+        provideCompletionItems: function (
+          model: MonacoEditor.editor.ITextModel,
+          position: MonacoEditor.Position,
+        ) {
+          // find out if we are completing a property in the 'dependencies' object.
+          var textUntilPosition = model.getValueInRange({
+            startLineNumber: 1,
+            startColumn: 1,
+            endLineNumber: position.lineNumber,
+            endColumn: position.column,
+          });
+
+          var word = model.getWordUntilPosition(position);
+          var range = {
+            startLineNumber: position.lineNumber,
+            endLineNumber: position.lineNumber,
+            startColumn: word.startColumn,
+            endColumn: word.endColumn,
+          };
+
+          let arr = textUntilPosition.trim().split(" ");
+          let filteredSuggestions = [];
+          filteredSuggestions = createDependencyProposals(range);
+          filteredSuggestions = filteredSuggestions.filter((item) => {
+            return item.label.toLowerCase().includes(word.word.toLowerCase());
+          });
+
+          const lastElement = arr.pop();
+          suggestions.value.forEach((suggestion: any) => {
+            filteredSuggestions.push({
+              label: suggestion.label(lastElement),
+              kind: monaco.languages.CompletionItemKind[suggestion.kind || "Text"],
+              insertText: suggestion.insertText(lastElement),
+              range: range,
             });
+          });
 
-            var word = model.getWordUntilPosition(position);
-            var range = {
-              startLineNumber: position.lineNumber,
-              endLineNumber: position.lineNumber,
-              startColumn: word.startColumn,
-              endColumn: word.endColumn,
-            };
-
-            let arr = textUntilPosition.trim().split(" ");
-            let filteredSuggestions = [];
-            filteredSuggestions = createDependencyProposals(range);
-            filteredSuggestions = filteredSuggestions.filter((item) => {
-              return item.label.toLowerCase().includes(word.word.toLowerCase());
-            });
-
-            const lastElement = arr.pop();
-            suggestions.value.forEach((suggestion: any) => {
-              filteredSuggestions.push({
-                label: suggestion.label(lastElement),
-                kind: monaco.languages.CompletionItemKind[
-                  suggestion.kind || "Text"
-                ],
-                insertText: suggestion.insertText(lastElement),
-                range: range,
-              });
-            });
-
-            return {
-              suggestions: filteredSuggestions,
-            };
-          },
+          return {
+            suggestions: filteredSuggestions,
+          };
         },
-      );
+      });
     };
 
     const resetEditorLayout = () => {
@@ -1026,8 +977,7 @@ export default defineComponent({
 
     const getCursorIndex = () => {
       const currentPosition = editorObj.getPosition();
-      const cursorIndex =
-        editorObj?.getModel().getOffsetAt(currentPosition) - 1;
+      const cursorIndex = editorObj?.getModel().getOffsetAt(currentPosition) - 1;
       return cursorIndex || null;
     };
 
@@ -1106,8 +1056,7 @@ export default defineComponent({
         // field name). Otherwise highlight to end-of-line so a syntax-error
         // squiggle near the cursor stays visible.
         const lineContent = model?.getLineContent?.(endLine) ?? "";
-        const endCol =
-          range.endColumn ?? (lineContent.length + 1 || startCol + 1);
+        const endCol = range.endColumn ?? (lineContent.length + 1 || startCol + 1);
         return {
           severity: monaco.MarkerSeverity.Error,
           startLineNumber: startLine,

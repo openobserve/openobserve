@@ -19,7 +19,6 @@ import ColumnOrderPopUp from "./ColumnOrderPopUp.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 // Stub ODialog so tests are deterministic (no Portal/Reka teleport).
 // Exposes the same props/emits surface used by ColumnOrderPopUp.
 const ODialogStub = {
@@ -167,9 +166,7 @@ describe("ColumnOrderPopUp", () => {
       });
 
       expect(wrapper.text()).toContain("No columns ordered");
-      expect(wrapper.text()).toContain(
-        "Columns will be displayed in their default order",
-      );
+      expect(wrapper.text()).toContain("Columns will be displayed in their default order");
       expect(wrapper.findComponent({ name: "OIcon" }).exists()).toBe(true);
     });
 
@@ -179,9 +176,7 @@ describe("ColumnOrderPopUp", () => {
         availableColumns: [],
       });
 
-      expect(
-        wrapper.find('[data-test="dashboard-column-order-drag"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-column-order-drag"]').exists()).toBe(false);
     });
   });
 
@@ -194,11 +189,7 @@ describe("ColumnOrderPopUp", () => {
 
       await flushPromises();
 
-      expect(wrapper.vm.editColumnOrder).toEqual([
-        "column1",
-        "column2",
-        "column3",
-      ]);
+      expect(wrapper.vm.editColumnOrder).toEqual(["column1", "column2", "column3"]);
     });
 
     it("should initialize with availableColumns in natural order when columnOrder is empty", async () => {
@@ -220,11 +211,7 @@ describe("ColumnOrderPopUp", () => {
 
       await flushPromises();
 
-      expect(wrapper.vm.editColumnOrder).toEqual([
-        "column1",
-        "column2",
-        "column3",
-      ]);
+      expect(wrapper.vm.editColumnOrder).toEqual(["column1", "column2", "column3"]);
       expect(wrapper.vm.editColumnOrder).not.toContain("column4");
     });
 
@@ -236,11 +223,7 @@ describe("ColumnOrderPopUp", () => {
 
       await flushPromises();
 
-      expect(wrapper.vm.editColumnOrder).toEqual([
-        "column2",
-        "column1",
-        "column3",
-      ]);
+      expect(wrapper.vm.editColumnOrder).toEqual(["column2", "column1", "column3"]);
     });
   });
 
@@ -280,12 +263,8 @@ describe("ColumnOrderPopUp", () => {
 
       // Assert each indexed drag handle exists individually to avoid matching
       // child elements rendered inside OIcon which also carry the data-test value.
-      expect(
-        wrapper.find('[data-test="column-order-drag-handle-0"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="column-order-drag-handle-1"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="column-order-drag-handle-0"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="column-order-drag-handle-1"]').exists()).toBe(true);
     });
 
     it("should render move up/down buttons for each column", async () => {
@@ -417,9 +396,7 @@ describe("ColumnOrderPopUp", () => {
 
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="dashboard-column-order-drag"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-column-order-drag"]').exists()).toBe(true);
     });
 
     it("should have correct drag options", () => {
@@ -447,11 +424,7 @@ describe("ColumnOrderPopUp", () => {
       wrapper.vm.editColumnOrder = ["column3", "column1", "column2"];
       await flushPromises();
 
-      expect(wrapper.vm.editColumnOrder).toEqual([
-        "column3",
-        "column1",
-        "column2",
-      ]);
+      expect(wrapper.vm.editColumnOrder).toEqual(["column3", "column1", "column2"]);
     });
   });
 
@@ -584,11 +557,7 @@ describe("ColumnOrderPopUp", () => {
       });
       await flushPromises();
 
-      expect(wrapper.vm.editColumnOrder).toEqual([
-        "column1",
-        "column2",
-        "column3",
-      ]);
+      expect(wrapper.vm.editColumnOrder).toEqual(["column1", "column2", "column3"]);
     });
 
     it("should maintain columnOrder priority after availableColumns change", async () => {
@@ -624,10 +593,18 @@ describe("ColumnOrderPopUp", () => {
 
       const columnRow = wrapper.find('[data-test="column-order-row-0"]');
       expect(columnRow.exists()).toBe(true);
-      expect(columnRow.find('[data-test="dashboard-column-order-drag-handle"]').exists()).toBe(true);
-      expect(columnRow.find('[data-test="dashboard-column-order-column-number"]').exists()).toBe(true);
-      expect(columnRow.find('[data-test="dashboard-column-order-column-name"]').exists()).toBe(true);
-      expect(columnRow.find('[data-test="dashboard-column-order-column-actions"]').exists()).toBe(true);
+      expect(columnRow.find('[data-test="dashboard-column-order-drag-handle"]').exists()).toBe(
+        true,
+      );
+      expect(columnRow.find('[data-test="dashboard-column-order-column-number"]').exists()).toBe(
+        true,
+      );
+      expect(columnRow.find('[data-test="dashboard-column-order-column-name"]').exists()).toBe(
+        true,
+      );
+      expect(columnRow.find('[data-test="dashboard-column-order-column-actions"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should have tooltips on move buttons", async () => {
@@ -698,11 +675,7 @@ describe("ColumnOrderPopUp", () => {
 
       await flushPromises();
 
-      expect(wrapper.vm.editColumnOrder).toEqual([
-        "column3",
-        "column1",
-        "column2",
-      ]);
+      expect(wrapper.vm.editColumnOrder).toEqual(["column3", "column1", "column2"]);
     });
   });
 
@@ -716,9 +689,7 @@ describe("ColumnOrderPopUp", () => {
       await flushPromises();
 
       expect(wrapper.findComponent(ODialogStub).exists()).toBe(true);
-      expect(
-        wrapper.find('[data-test="dashboard-column-order-drag"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-column-order-drag"]').exists()).toBe(true);
     });
 
     it("should expose Save and Cancel button labels via ODialog props", () => {

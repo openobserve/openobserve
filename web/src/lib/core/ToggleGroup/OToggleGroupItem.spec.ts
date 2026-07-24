@@ -18,10 +18,7 @@ function mountItem(
 
 describe("OToggleGroupItem", () => {
   it("renders slot content", () => {
-    const wrapper = mountItem(
-      { value: "x" },
-      { default: () => h("span", "Option") },
-    );
+    const wrapper = mountItem({ value: "x" }, { default: () => h("span", "Option") });
     expect(wrapper.text()).toContain("Option");
   });
 
@@ -46,10 +43,7 @@ describe("OToggleGroupItem", () => {
   });
 
   it("applies base item classes", () => {
-    const wrapper = mountItem(
-      { value: "x" },
-      { default: () => h("span", "A") },
-    );
+    const wrapper = mountItem({ value: "x" }, { default: () => h("span", "A") });
     const btn = wrapper.find("button");
     expect(btn.classes().join(" ")).toContain("bg-toggle-item-bg");
   });

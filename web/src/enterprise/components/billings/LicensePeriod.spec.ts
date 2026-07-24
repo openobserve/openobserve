@@ -19,7 +19,6 @@ import { createStore } from "vuex";
 import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
 import i18n from "@/locales";
 
-
 // Mock vue-router
 const mockRouter = { push: vi.fn() };
 vi.mock("vue-router", () => ({
@@ -38,8 +37,7 @@ vi.mock("@/aws-exports", () => ({
 
 /** Convert a "days from now" value into the microsecond timestamp LicensePeriod expects */
 const msToMicro = (ms: number) => ms * 1000;
-const nowPlusDays = (days: number) =>
-  msToMicro(Date.now() + days * 24 * 60 * 60 * 1000);
+const nowPlusDays = (days: number) => msToMicro(Date.now() + days * 24 * 60 * 60 * 1000);
 
 const makeStore = (licenseExpiry: number | null | undefined) => ({
   state: {
@@ -53,8 +51,7 @@ const makeStore = (licenseExpiry: number | null | undefined) => ({
  * Creates a real Vuex store so that useStore() in the Composition API
  * component resolves correctly (mocks: { $store } only works for Options API).
  */
-const createTestStore = (zoConfig: Record<string, any>) =>
-  createStore({ state: { zoConfig } });
+const createTestStore = (zoConfig: Record<string, any>) => createStore({ state: { zoConfig } });
 
 const createWrapper = (storeOverride: any) => {
   const testStore = createTestStore(storeOverride.state.zoConfig);
@@ -240,9 +237,7 @@ describe("LicensePeriod.vue", () => {
       wrapper = createWrapper(makeStore(nowPlusDays(5)));
       const span = wrapper.find('[data-test="license-period-subtitle"]');
       expect(span.exists()).toBe(true);
-      expect(span.text()).toContain(
-        "Please update your license by contacting your administrator."
-      );
+      expect(span.text()).toContain("Please update your license by contacting your administrator.");
     });
 
     it("should display the expiry message text in the template", () => {
@@ -266,9 +261,7 @@ describe("LicensePeriod.vue", () => {
     });
 
     it("should not throw when mounted without zoConfig", () => {
-      expect(() =>
-        createWrapper({ state: { zoConfig: {} } })
-      ).not.toThrow();
+      expect(() => createWrapper({ state: { zoConfig: {} } })).not.toThrow();
     });
 
     it("should unmount gracefully", () => {

@@ -55,10 +55,7 @@ describe("traces/constants", () => {
   describe("SPAN_KIND_LABEL_TO_KEY", () => {
     it("should be the exact reverse of SPAN_KIND_MAP with lowercase keys", () => {
       const expected = Object.fromEntries(
-        Object.entries(SPAN_KIND_MAP).map(([key, label]) => [
-          label.toLowerCase(),
-          key,
-        ]),
+        Object.entries(SPAN_KIND_MAP).map(([key, label]) => [label.toLowerCase(), key]),
       );
       expect(SPAN_KIND_LABEL_TO_KEY).toEqual(expected);
     });
@@ -100,29 +97,21 @@ describe("traces/constants", () => {
 
   describe("parseSpanKindWhereClause", () => {
     it("should replace span_kind='Server' with the numeric key", () => {
-      expect(parseSpanKindWhereClause("span_kind='Server'")).toBe(
-        "span_kind='2'",
-      );
+      expect(parseSpanKindWhereClause("span_kind='Server'")).toBe("span_kind='2'");
     });
 
     it("should replace span_kind='server' case-insensitively", () => {
-      expect(parseSpanKindWhereClause("span_kind='server'")).toBe(
-        "span_kind='2'",
-      );
+      expect(parseSpanKindWhereClause("span_kind='server'")).toBe("span_kind='2'");
     });
 
     it("should replace span_kind!='Client' preserving the != operator", () => {
-      expect(parseSpanKindWhereClause("span_kind!='Client'")).toBe(
-        "span_kind!='3'",
-      );
+      expect(parseSpanKindWhereClause("span_kind!='Client'")).toBe("span_kind!='3'");
     });
 
     it("should replace multiple span_kind tokens in a compound clause", () => {
-      expect(
-        parseSpanKindWhereClause(
-          "(span_kind='SERVER' or span_kind='internal')",
-        ),
-      ).toBe("(span_kind='2' or span_kind='1')");
+      expect(parseSpanKindWhereClause("(span_kind='SERVER' or span_kind='internal')")).toBe(
+        "(span_kind='2' or span_kind='1')",
+      );
     });
 
     it("should leave an unknown label unchanged", () => {
@@ -136,21 +125,15 @@ describe("traces/constants", () => {
     });
 
     it("should handle spaces around the = operator", () => {
-      expect(parseSpanKindWhereClause("span_kind = 'Consumer'")).toBe(
-        "span_kind='5'",
-      );
+      expect(parseSpanKindWhereClause("span_kind = 'Consumer'")).toBe("span_kind='5'");
     });
 
     it("should handle spaces around the != operator", () => {
-      expect(parseSpanKindWhereClause("span_kind != 'Producer'")).toBe(
-        "span_kind!='4'",
-      );
+      expect(parseSpanKindWhereClause("span_kind != 'Producer'")).toBe("span_kind!='4'");
     });
 
     it("should replace span_kind='Unspecified' with '0'", () => {
-      expect(parseSpanKindWhereClause("span_kind='Unspecified'")).toBe(
-        "span_kind='0'",
-      );
+      expect(parseSpanKindWhereClause("span_kind='Unspecified'")).toBe("span_kind='0'");
     });
 
     it("should return an empty string unchanged", () => {
@@ -164,29 +147,28 @@ describe("traces/constants", () => {
     });
 
     it("should replace all labels in an IN clause with their numeric keys (regex fallback)", () => {
-      expect(
-        parseSpanKindWhereClause("span_kind IN ('Server', 'Client')"),
-      ).toBe("span_kind IN ('2', '3')");
+      expect(parseSpanKindWhereClause("span_kind IN ('Server', 'Client')")).toBe(
+        "span_kind IN ('2', '3')",
+      );
     });
 
     it("should handle mixed case labels in an IN clause (regex fallback)", () => {
-      expect(
-        parseSpanKindWhereClause("span_kind IN ('SERVER', 'internal')"),
-      ).toBe("span_kind IN ('2', '1')");
+      expect(parseSpanKindWhereClause("span_kind IN ('SERVER', 'internal')")).toBe(
+        "span_kind IN ('2', '1')",
+      );
     });
 
     it("should leave unknown labels in an IN clause unchanged (regex fallback)", () => {
-      expect(
-        parseSpanKindWhereClause("span_kind IN ('Unknown', 'Server')"),
-      ).toBe("span_kind IN ('Unknown', '2')");
+      expect(parseSpanKindWhereClause("span_kind IN ('Unknown', 'Server')")).toBe(
+        "span_kind IN ('Unknown', '2')",
+      );
     });
 
     describe("with SQL parser", () => {
       let parser: any;
 
       beforeAll(async () => {
-        const mod =
-          await import("@openobserve/node-sql-parser/build/datafusionsql");
+        const mod = await import("@openobserve/node-sql-parser/build/datafusionsql");
         parser = new mod.default.Parser();
       });
 
@@ -232,10 +214,7 @@ describe("traces/constants", () => {
       });
 
       it("should replace all labels in an IN clause with their numeric keys", () => {
-        const result = parseSpanKindWhereClause(
-          "span_kind IN ('Server', 'Client')",
-          parser,
-        );
+        const result = parseSpanKindWhereClause("span_kind IN ('Server', 'Client')", parser);
         expect(result).toBe("span_kind IN ('2', '3')");
       });
     });

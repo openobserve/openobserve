@@ -24,11 +24,9 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-
 describe.skip("Search Result", async () => {
   let wrapper: any;
   beforeEach(async () => {
-    
     wrapper = mount(QueryEditor, {
       attachTo: "#app",
       props: {

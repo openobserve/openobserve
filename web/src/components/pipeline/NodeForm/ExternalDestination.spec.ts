@@ -66,8 +66,7 @@ const DestinationPickerStub = {
   name: "DestinationPicker",
   props: ["initialName"],
   emits: ["expand"],
-  template:
-    '<div class="destination-picker-stub" @click="$emit(\'expand\', true)" />',
+  template: '<div class="destination-picker-stub" @click="$emit(\'expand\', true)" />',
   methods: {
     submit: () => Promise.resolve(pickerPayload),
   },
@@ -112,18 +111,14 @@ describe("ExternalDestination.vue (drawer chrome)", () => {
   it("mounts and renders the shared DestinationPicker as its body", () => {
     const wrapper = createWrapper();
     expect(wrapper.find(".destination-picker-stub").exists()).toBe(true);
-    expect(wrapper.find(".o-drawer-title").text()).toContain(
-      "External Destination",
-    );
+    expect(wrapper.find(".o-drawer-title").text()).toContain("External Destination");
   });
 
   it("seeds the picker with the saved destination when editing", () => {
     const wrapper = createWrapper({
       currentSelectedNodeData: { data: { destination_name: "dest2" } },
     });
-    expect(
-      wrapper.findComponent({ name: "DestinationPicker" }).props("initialName"),
-    ).toBe("dest2");
+    expect(wrapper.findComponent({ name: "DestinationPicker" }).props("initialName")).toBe("dest2");
   });
 
   // ── Save ────────────────────────────────────────────────────────────────
@@ -166,12 +161,12 @@ describe("ExternalDestination.vue (drawer chrome)", () => {
   });
 
   it("shows the delete button only when editing a node", () => {
-    expect(
-      createWrapper({ isEditNode: false }).find('[data-test="delete-btn"]').exists(),
-    ).toBe(false);
-    expect(
-      createWrapper({ isEditNode: true }).find('[data-test="delete-btn"]').exists(),
-    ).toBe(true);
+    expect(createWrapper({ isEditNode: false }).find('[data-test="delete-btn"]').exists()).toBe(
+      false,
+    );
+    expect(createWrapper({ isEditNode: true }).find('[data-test="delete-btn"]').exists()).toBe(
+      true,
+    );
   });
 
   // ── Cancel / delete ─────────────────────────────────────────────────────

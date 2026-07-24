@@ -662,7 +662,7 @@ describe("BarConverter", () => {
 
       const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
-      expect(result.series[0].data).toEqual([10, '-']);
+      expect(result.series[0].data).toEqual([10, "-"]);
     });
 
     it("should apply colors to stacked series", () => {
@@ -1134,7 +1134,7 @@ describe("BarConverter", () => {
         panelSchema,
         mockStore,
         mockExtras,
-        mockChartPanelRef
+        mockChartPanelRef,
       );
 
       expect(result).toBeDefined();

@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 <template>
-  <div class="flex-1 flex flex-col overflow-hidden min-w-0">
+  <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
     <OTable
       :data="filteredLocations"
       :columns="columns"
@@ -17,8 +17,8 @@
       @row-click="openDetail"
     >
       <template #toolbar>
-        <div class="flex items-center gap-2 flex-1 min-w-0">
-          <div class="flex-1 min-w-0">
+        <div class="flex min-w-0 flex-1 items-center gap-2">
+          <div class="min-w-0 flex-1">
             <OInput
               v-model="search"
               :placeholder="t('synthetics.privateLocations.searchPlaceholder')"
@@ -49,22 +49,18 @@
         </OBadge>
       </template>
 
-      <!-- Name + pool subtext -->
+      <!-- Label + pool subtext -->
       <template #cell-name="{ row }">
-        <div class="flex flex-col min-w-0">
-          <span class="truncate font-medium">{{ (row as any).name }}</span>
-          <span class="truncate text-xs text-text-muted">{{ (row as any).pool }}</span>
+        <div class="flex min-w-0 flex-col">
+          <span class="truncate font-medium">{{ (row as any).label }}</span>
+          <span class="text-text-muted truncate text-xs">{{ (row as any).pool }}</span>
         </div>
       </template>
 
-      <!-- Agents: live/total + version -->
+      <!-- Agents: name(s), live if any are online else the last known one.
+           Pool health (live/total) is on the detail page, not repeated here. -->
       <template #cell-agents="{ row }">
-        <div class="flex flex-col">
-          <span>{{ (row as any).live_agents }}/{{ (row as any).agents_total }}</span>
-          <span v-if="(row as any).version" class="text-xs text-text-muted">
-            v{{ (row as any).version }}
-          </span>
-        </div>
+        <span class="truncate">{{ agentSubtext(row as any) || "—" }}</span>
       </template>
 
       <!-- Capability type chips -->
@@ -85,7 +81,9 @@
 
       <!-- Last seen -->
       <template #cell-lastSeen="{ row }">
-        <span v-if="(row as any).last_seen_at">{{ formatTimeAgoUs((row as any).last_seen_at) }}</span>
+        <span v-if="(row as any).last_seen_at">{{
+          formatTimeAgoUs((row as any).last_seen_at)
+        }}</span>
         <span v-else class="text-text-muted">—</span>
       </template>
 
@@ -107,7 +105,9 @@
             :disabled="(row as any).monitors_count > 0"
             :title="
               (row as any).monitors_count > 0
-                ? t('synthetics.privateLocations.deleteBlocked', { count: (row as any).monitors_count })
+                ? t('synthetics.privateLocations.deleteBlocked', {
+                    count: (row as any).monitors_count,
+                  })
                 : t('synthetics.table.delete')
             "
             :data-test="`synthetics-private-locations-delete-btn-${(row as any).id}`"
@@ -164,7 +164,7 @@ const filteredLocations = computed(() => {
   if (!q) return props.locations;
   return props.locations.filter(
     (l) =>
-      l.name.toLowerCase().includes(q) ||
+      l.label.toLowerCase().includes(q) ||
       l.region.toLowerCase().includes(q) ||
       l.pool.toLowerCase().includes(q),
   );
@@ -172,6 +172,12 @@ const filteredLocations = computed(() => {
 
 const statusVariant = (status: string) =>
   status === "online" ? "success" : status === "offline" ? "error" : "default";
+
+/** Live agent name(s) when any are online; otherwise the last known agent's
+ *  name (still visible offline) so a dead location doesn't hide who to
+ *  recover, without opening the detail page. */
+const agentSubtext = (row: SyntheticLocation) =>
+  row.agent_names?.length ? row.agent_names.join(", ") : row.last_agent_name || null;
 
 const columns = computed<OTableColumnDef[]>(() => [
   {
@@ -185,7 +191,7 @@ const columns = computed<OTableColumnDef[]>(() => [
   {
     id: "name",
     header: t("synthetics.privateLocations.table.name"),
-    accessorKey: "name",
+    accessorKey: "label",
     size: 220,
     minSize: 140,
     sortable: true,
@@ -203,7 +209,7 @@ const columns = computed<OTableColumnDef[]>(() => [
   {
     id: "agents",
     header: t("synthetics.privateLocations.table.agents"),
-    accessorKey: "live_agents",
+    accessorKey: "last_agent_name",
     size: 100,
     minSize: 80,
     sortable: true,
@@ -221,16 +227,6 @@ const columns = computed<OTableColumnDef[]>(() => [
     id: "monitors",
     header: t("synthetics.privateLocations.table.checks"),
     accessorKey: "monitors_count",
-    size: 90,
-    minSize: 70,
-    sortable: true,
-    meta: { align: "right" },
-    hideable: true,
-  },
-  {
-    id: "checksPerMin",
-    header: t("synthetics.privateLocations.table.checksPerMin"),
-    accessorKey: "checks_per_min",
     size: 90,
     minSize: 70,
     sortable: true,
@@ -260,5 +256,4 @@ const columns = computed<OTableColumnDef[]>(() => [
 const openDetail = (row: SyntheticLocation) => {
   router.push({ name: "synthetic-private-location", params: { id: row.id } });
 };
-
 </script>

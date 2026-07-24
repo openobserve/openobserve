@@ -43,8 +43,7 @@ const NAMED_DEFAULTS: Record<string, string> = {
   alert_end_time: String(SAMPLE_TS + 600000000),
 };
 
-const typeDefault = (v: { enumValues?: string[] }) =>
-  v.enumValues?.length ? v.enumValues[0] : "";
+const typeDefault = (v: { enumValues?: string[] }) => (v.enumValues?.length ? v.enumValues[0] : "");
 
 export const buildTestSample = (): unknown[] => {
   const meta: Record<string, string> = {};
@@ -63,8 +62,7 @@ export const buildTestSample = (): unknown[] => {
 };
 
 // Pretty-printed JSON string for seeding the editor.
-export const buildTestSampleText = (): string =>
-  JSON.stringify(buildTestSample(), null, 2);
+export const buildTestSampleText = (): string => JSON.stringify(buildTestSample(), null, 2);
 
 // The FLATTENED view a Function node sees when "After Flattening" (RAF, the
 // default) is on: the `meta` block becomes `meta_<field>` string columns merged

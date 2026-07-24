@@ -178,11 +178,7 @@ describe("WorkflowView", () => {
     it("derives the VueFlow render template from node_type", () => {
       wrapper = mountView(graph);
       const nodes = vueFlow(wrapper).props("nodes");
-      expect(nodes.map((n: any) => n.type)).toEqual([
-        "input",
-        "default",
-        "output",
-      ]);
+      expect(nodes.map((n: any) => n.type)).toEqual(["input", "default", "output"]);
     });
 
     it("preserves the original node fields", () => {
@@ -291,9 +287,7 @@ describe("WorkflowView", () => {
     it("observes the container and re-fits on resize", async () => {
       wrapper = mountView(graph);
       expect(roObserve).toHaveBeenCalledTimes(1);
-      expect(roObserve.mock.calls[0][0]).toBe(
-        wrapper.find(".workflow-view-tooltip").element,
-      );
+      expect(roObserve.mock.calls[0][0]).toBe(wrapper.find(".workflow-view-tooltip").element);
 
       roCallback?.();
       await nextTick();

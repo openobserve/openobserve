@@ -8,7 +8,7 @@
 use config::{
     cluster::LOCAL_NODE,
     get_config,
-    meta::stream::{FileKey, StreamType},
+    meta::stream::{FileKey, PartitionTimeLevel, StreamType},
     metrics::{FILE_LIST_CACHE_HIT_COUNT, FILE_LIST_ID_SELECT_COUNT},
 };
 use hashbrown::HashSet;
@@ -16,6 +16,70 @@ use infra::{errors::Result, file_list as infra_file_list};
 use rayon::slice::ParallelSliceMut;
 
 use crate::inspector::{SearchInspectorFieldsBuilder, search_inspector_fields};
+
+#[tracing::instrument(
+    name = "search_service::file_list::query",
+    skip_all,
+    fields(org_id = org_id, stream_name = stream_name)
+)]
+pub async fn query(
+    trace_id: &str,
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    time_level: PartitionTimeLevel,
+    time_min: i64,
+    time_max: i64,
+) -> Result<Vec<FileKey>> {
+    let mut files = infra_file_list::query(
+        org_id,
+        stream_type,
+        stream_name,
+        time_level,
+        (time_min, time_max),
+        None,
+    )
+    .await?;
+    let dumped_files = crate::file_list_dump::query(
+        trace_id,
+        org_id,
+        stream_type,
+        stream_name,
+        (time_min, time_max),
+        &[],
+    )
+    .await?;
+
+    files.extend(dumped_files.iter().map(FileKey::from));
+    files.par_sort_unstable_by(|left, right| left.key.cmp(&right.key));
+    files.dedup_by(|left, right| left.key == right.key);
+    Ok(files)
+}
+
+/// Query merge candidates from the live file list only.
+///
+/// Dumped file-list entries have already been compacted and cannot be marked deleted, so
+/// re-compaction intentionally ignores them.
+#[tracing::instrument(
+    name = "search_service::file_list::query_for_merge",
+    skip_all,
+    fields(org_id = org_id, stream_name = stream_name)
+)]
+pub async fn query_for_merge(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    date_start: &str,
+    date_end: &str,
+) -> Result<Vec<FileKey>> {
+    infra_file_list::query_for_merge(
+        org_id,
+        stream_type,
+        stream_name,
+        (date_start.to_string(), date_end.to_string()),
+    )
+    .await
+}
 
 #[tracing::instrument(name = "search_service::file_list::query_by_ids", skip_all)]
 pub async fn query_by_ids(

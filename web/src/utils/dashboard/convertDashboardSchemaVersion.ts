@@ -345,9 +345,7 @@ export function convertDashboardSchemaVersion(data: any) {
             // Migrate the filters
             // all column which is currently string will be converted to object with streamAlias and field
             // make sure that conditions can be array based on filterType
-            queryItem.fields.filter = migrateFilterConditions(
-              queryItem.fields.filter,
-            );
+            queryItem.fields.filter = migrateFilterConditions(queryItem.fields.filter);
           });
         });
       });

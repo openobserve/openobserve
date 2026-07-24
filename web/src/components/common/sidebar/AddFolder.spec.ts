@@ -84,9 +84,7 @@ const OFormInputStub = {
 // Mock all dependencies
 vi.mock("@/utils/commons.ts", () => ({
   createFolder: vi.fn(),
-  createFolderByType: vi
-    .fn()
-    .mockResolvedValue({ folderId: "new-folder", name: "New Folder" }),
+  createFolderByType: vi.fn().mockResolvedValue({ folderId: "new-folder", name: "New Folder" }),
   updateFolder: vi.fn(),
   updateFolderByType: vi.fn().mockResolvedValue({}),
 }));
@@ -103,10 +101,8 @@ const showErrorNotification = vi.fn();
 
 vi.mock("@/composables/useNotifications.ts", () => ({
   default: vi.fn().mockReturnValue({
-    showPositiveNotification: (...args: unknown[]) =>
-      showPositiveNotification(...args),
-    showErrorNotification: (...args: unknown[]) =>
-      showErrorNotification(...args),
+    showPositiveNotification: (...args: unknown[]) => showPositiveNotification(...args),
+    showErrorNotification: (...args: unknown[]) => showErrorNotification(...args),
   }),
 }));
 
@@ -120,7 +116,11 @@ describe("AddFolder.vue", () => {
         { folderId: "folder-2", name: "Another Folder", description: "Another Description" },
       ],
       dashboards: [
-        { folderId: "dash-folder-1", name: "Dashboard Folder", description: "Dashboard Description" },
+        {
+          folderId: "dash-folder-1",
+          name: "Dashboard Folder",
+          description: "Dashboard Description",
+        },
       ],
     };
   });

@@ -21,11 +21,7 @@ export const buildConditionPreview = (node: any): string => {
   if (!node) return "";
 
   // V2 Format: Group
-  if (
-    node.filterType === "group" &&
-    node.conditions &&
-    Array.isArray(node.conditions)
-  ) {
+  if (node.filterType === "group" && node.conditions && Array.isArray(node.conditions)) {
     if (node.conditions.length === 0) return "";
 
     const parts: string[] = [];
@@ -111,9 +107,7 @@ export const buildConditionPreview = (node: any): string => {
         const column = c.column || "field";
         const operator = c.operator || "=";
         const value =
-          c.value !== undefined && c.value !== null && c.value !== ""
-            ? `'${c.value}'`
-            : "''";
+          c.value !== undefined && c.value !== null && c.value !== "" ? `'${c.value}'` : "''";
         return `${column} ${operator} ${value}`;
       })
       .join(" and ");
@@ -123,10 +117,7 @@ export const buildConditionPreview = (node: any): string => {
 };
 
 // Preview truncated to `maxLength` (default 20, matching the pipeline node card).
-export const getTruncatedConditions = (
-  conditionData: any,
-  maxLength = 20,
-): string => {
+export const getTruncatedConditions = (conditionData: any, maxLength = 20): string => {
   const text = buildConditionPreview(conditionData);
   return text.length > maxLength ? text.substring(0, maxLength) + "..." : text;
 };

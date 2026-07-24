@@ -18,7 +18,6 @@ import { mount } from "@vue/test-utils";
 import CodeQueryEditor from "./CodeQueryEditor.vue";
 import { createStore } from "vuex";
 
-
 // Stable mock editor instance so tests can reference it directly
 const mockEditorObj = {
   onDidChangeModelContent: vi.fn(),
@@ -69,30 +68,12 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
 }));
 
 // Mock dynamic imports
-vi.mock(
-  "monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js",
-  () => ({}),
-);
-vi.mock(
-  "monaco-editor/esm/vs/language/json/monaco.contribution.js",
-  () => ({}),
-);
-vi.mock(
-  "monaco-editor/esm/vs/language/html/monaco.contribution.js",
-  () => ({}),
-);
-vi.mock(
-  "monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js",
-  () => ({}),
-);
-vi.mock(
-  "monaco-editor/esm/vs/basic-languages/python/python.contribution.js",
-  () => ({}),
-);
-vi.mock(
-  "monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js",
-  () => ({}),
-);
+vi.mock("monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js", () => ({}));
+vi.mock("monaco-editor/esm/vs/language/json/monaco.contribution.js", () => ({}));
+vi.mock("monaco-editor/esm/vs/language/html/monaco.contribution.js", () => ({}));
+vi.mock("monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js", () => ({}));
+vi.mock("monaco-editor/esm/vs/basic-languages/python/python.contribution.js", () => ({}));
+vi.mock("monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js", () => ({}));
 
 // Fix: component imports default from "@/composables/useLogs/searchState"
 vi.mock("@/composables/useLogs/searchState", () => ({
@@ -226,9 +207,7 @@ describe("CodeQueryEditor", () => {
     });
 
     it("should accept keywords array prop", () => {
-      const keywords = [
-        { label: "SELECT", kind: "Keyword", insertText: "SELECT" },
-      ];
+      const keywords = [{ label: "SELECT", kind: "Keyword", insertText: "SELECT" }];
       const wrapper = createWrapper({ keywords });
       expect(wrapper.props("keywords")).toEqual(keywords);
     });
@@ -514,9 +493,7 @@ describe("CodeQueryEditor", () => {
     // async setupEditor chain (dynamic imports + loadMonaco) fully completes.
     const mountAndSetup = async (props: any = {}) => {
       const fakeEditorEl = document.createElement("div");
-      getElementByIdSpy = vi
-        .spyOn(document, "getElementById")
-        .mockReturnValue(fakeEditorEl);
+      getElementByIdSpy = vi.spyOn(document, "getElementById").mockReturnValue(fakeEditorEl);
 
       shortcutWrapper = mount(CodeQueryEditor, {
         props: {
@@ -577,9 +554,7 @@ describe("CodeQueryEditor", () => {
     // editorObj is fully initialised and the exposed setValue is wired to mockEditorObj.
     const mountAndSetup = async (props: any = {}) => {
       const fakeEditorEl = document.createElement("div");
-      getElementByIdSpy = vi
-        .spyOn(document, "getElementById")
-        .mockReturnValue(fakeEditorEl);
+      getElementByIdSpy = vi.spyOn(document, "getElementById").mockReturnValue(fakeEditorEl);
 
       shortcutWrapper = mount(CodeQueryEditor, {
         props: {
@@ -659,9 +634,7 @@ describe("CodeQueryEditor", () => {
 
       // Assert — value is forwarded as-is
       expect(mockEditorObj.setValue).toHaveBeenCalledOnce();
-      expect(mockEditorObj.setValue).toHaveBeenCalledWith(
-        "SELECT count(*) FROM logs",
-      );
+      expect(mockEditorObj.setValue).toHaveBeenCalledWith("SELECT count(*) FROM logs");
     });
 
     it("also calls layout after setValue so the editor repaints", async () => {
@@ -695,15 +668,11 @@ describe("CodeQueryEditor", () => {
     // vi.waitFor on addCommand BEFORE our component had registered its provider.
     const mountAndWait = async (props: any = {}) => {
       const monacoApi = await import("monaco-editor/esm/vs/editor/editor.api");
-      const registerFn = vi.mocked(
-        monacoApi.languages.registerCompletionItemProvider,
-      );
+      const registerFn = vi.mocked(monacoApi.languages.registerCompletionItemProvider);
       const baselineIndex = registerFn.mock.calls.length;
 
       const fakeEl = document.createElement("div");
-      getElementByIdSpy = vi
-        .spyOn(document, "getElementById")
-        .mockReturnValue(fakeEl);
+      getElementByIdSpy = vi.spyOn(document, "getElementById").mockReturnValue(fakeEl);
       mount(CodeQueryEditor, {
         props: {
           editorId: "test-editor",
@@ -724,9 +693,7 @@ describe("CodeQueryEditor", () => {
 
     const captureProvideCompletionItems = async (baselineIndex: number) => {
       const monacoApi = await import("monaco-editor/esm/vs/editor/editor.api");
-      const calls = vi.mocked(
-        monacoApi.languages.registerCompletionItemProvider,
-      ).mock.calls;
+      const calls = vi.mocked(monacoApi.languages.registerCompletionItemProvider).mock.calls;
       // Use the first call AFTER the baseline — that is unambiguously our mount.
       return calls[baselineIndex][1].provideCompletionItems as Function;
     };
@@ -745,8 +712,7 @@ describe("CodeQueryEditor", () => {
 
     const hasFunctionSuggestion = (result: any) =>
       result.suggestions.some(
-        (s: any) =>
-          typeof s.label === "string" && s.label.startsWith("match_all"),
+        (s: any) => typeof s.label === "string" && s.label.startsWith("match_all"),
       );
 
     it.skip(
@@ -764,8 +730,7 @@ describe("CodeQueryEditor", () => {
         const fn = await captureProvideCompletionItems(baselineIndex);
         const result = callProvider(fn, "SELECT");
         const found = result.suggestions.some(
-          (s: any) =>
-            typeof s.label === "string" && s.label.startsWith("custom_fn"),
+          (s: any) => typeof s.label === "string" && s.label.startsWith("custom_fn"),
         );
         expect(found).toBe(true);
       },
@@ -802,9 +767,7 @@ describe("CodeQueryEditor", () => {
     // ── double-quoted values ────────────────────────────────────────────────
 
     it('flags = "value"', () => {
-      expect(findInvalidQuotes(`WHERE http_endpoint = "test"`)).toEqual([
-        `"test"`,
-      ]);
+      expect(findInvalidQuotes(`WHERE http_endpoint = "test"`)).toEqual([`"test"`]);
     });
 
     it('flags != "value"', () => {
@@ -812,15 +775,11 @@ describe("CodeQueryEditor", () => {
     });
 
     it('flags LIKE "%value%"', () => {
-      expect(findInvalidQuotes(`WHERE msg LIKE "%error%"`)).toEqual([
-        `"%error%"`,
-      ]);
+      expect(findInvalidQuotes(`WHERE msg LIKE "%error%"`)).toEqual([`"%error%"`]);
     });
 
     it('flags NOT LIKE "value"', () => {
-      expect(findInvalidQuotes(`WHERE path NOT LIKE "%admin%"`)).toEqual([
-        `"%admin%"`,
-      ]);
+      expect(findInvalidQuotes(`WHERE path NOT LIKE "%admin%"`)).toEqual([`"%admin%"`]);
     });
 
     it('flags IN ("value")', () => {
@@ -828,15 +787,16 @@ describe("CodeQueryEditor", () => {
     });
 
     it("flags every double-quoted value across multiple conditions", () => {
-      expect(
-        findInvalidQuotes(`WHERE status = "200" AND env = "prod"`),
-      ).toEqual([`"200"`, `"prod"`]);
+      expect(findInvalidQuotes(`WHERE status = "200" AND env = "prod"`)).toEqual([
+        `"200"`,
+        `"prod"`,
+      ]);
     });
 
     it('flags double-quoted URL path: = "/api/v1/payments"', () => {
-      expect(
-        findInvalidQuotes(`WHERE http_endpoint = "/api/v1/payments"`),
-      ).toEqual([`"/api/v1/payments"`]);
+      expect(findInvalidQuotes(`WHERE http_endpoint = "/api/v1/payments"`)).toEqual([
+        `"/api/v1/payments"`,
+      ]);
     });
 
     // ── mismatched quotes ───────────────────────────────────────────────────
@@ -852,27 +812,19 @@ describe("CodeQueryEditor", () => {
     // ── valid cases — must NOT be flagged ────────────────────────────────────
 
     it("does NOT flag single-quoted values", () => {
-      expect(findInvalidQuotes(`WHERE status = 'ok' AND env = 'prod'`)).toEqual(
-        [],
-      );
+      expect(findInvalidQuotes(`WHERE status = 'ok' AND env = 'prod'`)).toEqual([]);
     });
 
     it("does NOT flag numeric values", () => {
-      expect(findInvalidQuotes(`WHERE status = 200 AND code >= 400`)).toEqual(
-        [],
-      );
+      expect(findInvalidQuotes(`WHERE status = 200 AND code >= 400`)).toEqual([]);
     });
 
     it("does NOT flag double-quoted table names in FROM clause", () => {
-      expect(
-        findInvalidQuotes(`SELECT * FROM "test_table" WHERE status = 200`),
-      ).toEqual([]);
+      expect(findInvalidQuotes(`SELECT * FROM "test_table" WHERE status = 200`)).toEqual([]);
     });
 
     it("does NOT flag a valid URL path in single quotes", () => {
-      expect(
-        findInvalidQuotes(`WHERE http_endpoint = '/api/v1/payments'`),
-      ).toEqual([]);
+      expect(findInvalidQuotes(`WHERE http_endpoint = '/api/v1/payments'`)).toEqual([]);
     });
   });
 });

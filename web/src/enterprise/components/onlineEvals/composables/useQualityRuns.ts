@@ -109,13 +109,8 @@ const normalizedScopeSql = [
   "))",
 ].join("\n");
 
-function scoreBaseWhere(
-  configId: string,
-  agentWhere: string | null,
-  scope: QualityScope,
-): string {
-  const scopeWhere =
-    scope === "all" ? null : `${normalizedScopeSql} = '${scope}'`;
+function scoreBaseWhere(configId: string, agentWhere: string | null, scope: QualityScope): string {
+  const scopeWhere = scope === "all" ? null : `${normalizedScopeSql} = '${scope}'`;
   return (
     combineWhere(
       `CAST(score_config_id AS VARCHAR) = '${escapeSqlString(configId)}'`,
@@ -140,9 +135,7 @@ export function buildQualityRunsCountSql(
     "SELECT",
     "  COUNT(*) AS all_count,",
     `  ${unhealthyCount} AS unhealthy_count`,
-    `FROM ${latestScoresFromSql(
-      scoreBaseWhere(entityId(config), agentWhere, scope),
-    )}`,
+    `FROM ${latestScoresFromSql(scoreBaseWhere(entityId(config), agentWhere, scope))}`,
   ].join("\n");
 }
 
@@ -166,10 +159,7 @@ export function buildQualityRunsSql(
         ? `(${threshold.unhealthyExpr})`
         : "1 = 0"
       : null;
-  const where = combineWhere(
-    scoreBaseWhere(entityId(config), agentWhere, scope),
-    filterWhere,
-  );
+  const where = combineWhere(scoreBaseWhere(entityId(config), agentWhere, scope), filterWhere);
   const offset = (safePage - 1) * safePageSize;
 
   return [
@@ -212,9 +202,7 @@ export function buildEvaluatorSpanLookupSql(
     `WHERE CAST(trace_id AS VARCHAR) = '${escapeSqlString(evaluatorTraceId)}'`,
     `  AND CAST(attributes_task_id AS VARCHAR) = '${escapeSqlString(taskId)}'`,
     ...(scoreId
-      ? [
-          `  AND CAST(attributes_score_id AS VARCHAR) = '${escapeSqlString(scoreId)}'`,
-        ]
+      ? [`  AND CAST(attributes_score_id AS VARCHAR) = '${escapeSqlString(scoreId)}'`]
       : []),
     "ORDER BY _timestamp DESC",
     "LIMIT 1",
@@ -239,30 +227,19 @@ function timestampToMs(value: unknown): number {
   return 0;
 }
 
-function parseTargetScope(
-  row: RawQualityScoreRow,
-): QualityRunRow["targetScope"] {
+function parseTargetScope(row: RawQualityScoreRow): QualityRunRow["targetScope"] {
   const normalized = String(row.target_scope ?? row.level ?? "").toLowerCase();
-  if (
-    normalized === "span" ||
-    normalized === "trace" ||
-    normalized === "session"
-  ) {
+  if (normalized === "span" || normalized === "trace" || normalized === "session") {
     return normalized;
   }
   return "unknown";
 }
 
-function canonicalScoreValue(
-  score: RawQualityScoreRow,
-  config: ScoreConfig,
-): ScoreValue {
+function canonicalScoreValue(score: RawQualityScoreRow, config: ScoreConfig): ScoreValue {
   const dataType = dataTypeOf(config);
   if (dataType === "numeric") return toNumber(score.value_numeric);
   if (dataType === "categorical") {
-    return score.value_categorical == null
-      ? null
-      : String(score.value_categorical);
+    return score.value_categorical == null ? null : String(score.value_categorical);
   }
   if (dataType === "boolean") {
     if (typeof score.value_boolean === "boolean") return score.value_boolean;
@@ -280,10 +257,7 @@ function formatResult(result: ScoreValue): string {
   return result;
 }
 
-export function mapQualityRunRow(
-  raw: RawQualityScoreRow,
-  config: ScoreConfig,
-): QualityRunRow {
+export function mapQualityRunRow(raw: RawQualityScoreRow, config: ScoreConfig): QualityRunRow {
   const result = canonicalScoreValue(raw, config);
   const unhealthy = isScoreUnhealthy(config, result);
   const targetScope = parseTargetScope(raw);
@@ -310,8 +284,7 @@ export function mapQualityRunRow(
     result,
     resultDisplay: formatResult(result),
     reasoning: String(raw.reasoning ?? ""),
-    health:
-      unhealthy == null ? "unclassified" : unhealthy ? "unhealthy" : "healthy",
+    health: unhealthy == null ? "unclassified" : unhealthy ? "unhealthy" : "healthy",
     isUnhealthy: unhealthy === true,
     targetScope,
     targetId,
@@ -332,10 +305,7 @@ export function mapQualityRunRow(
 function parseCounts(row: RawQualityRunCounts | undefined): QualityRunCounts {
   return {
     all: toNumber(row?.all_count) ?? 0,
-    unhealthy:
-      row?.unhealthy_count == null
-        ? null
-        : (toNumber(row.unhealthy_count) ?? 0),
+    unhealthy: row?.unhealthy_count == null ? null : (toNumber(row.unhealthy_count) ?? 0),
   };
 }
 
@@ -379,12 +349,7 @@ export function useQualityRuns(
       currentPage.value,
       pageSize.value,
     );
-    const hits = (await executeQueryOnce(
-      sql,
-      startUs,
-      endUs,
-      "logs",
-    )) as RawQualityScoreRow[];
+    const hits = (await executeQueryOnce(sql, startUs, endUs, "logs")) as RawQualityScoreRow[];
     if (generation !== refreshGeneration) return;
     runs.value = hits.map((row) => mapQualityRunRow(row, config));
   }
@@ -439,9 +404,7 @@ export function useQualityRuns(
       Math.min(MAX_PAGE_SIZE, Math.floor(pagination.size) || DEFAULT_PAGE_SIZE),
     );
     currentPage.value =
-      nextSize === pageSize.value
-        ? Math.max(1, Math.floor(pagination.page) || 1)
-        : 1;
+      nextSize === pageSize.value ? Math.max(1, Math.floor(pagination.page) || 1) : 1;
     pageSize.value = nextSize;
     await refresh();
   }
@@ -461,10 +424,7 @@ export function useQualityRuns(
       )) as RawEvaluatorSpanLookupRow[];
       return String(hits[0]?.span_id ?? "");
     } catch (caughtError) {
-      console.warn(
-        "[QualityDetail:scores] evaluator span lookup failed:",
-        caughtError,
-      );
+      console.warn("[QualityDetail:scores] evaluator span lookup failed:", caughtError);
       return "";
     }
   }

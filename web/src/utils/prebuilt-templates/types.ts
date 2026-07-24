@@ -12,11 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 /**
  * Prebuilt destination types
  */
-export type PrebuiltTypeId = 'slack' | 'discord' | 'msteams' | 'pagerduty' | 'servicenow' | 'email' | 'opsgenie';
+export type PrebuiltTypeId =
+  | "slack"
+  | "discord"
+  | "msteams"
+  | "pagerduty"
+  | "servicenow"
+  | "email"
+  | "opsgenie";
 
 /**
  * A user-facing validation message, expressed as an i18n KEY (+ optional
@@ -46,7 +52,7 @@ export type CredentialValidatorResult = true | ValidationMessage;
 export interface CredentialField {
   key: string;
   labelKey: string;
-  type: 'text' | 'password' | 'email' | 'select' | 'toggle';
+  type: "text" | "password" | "email" | "select" | "toggle";
   required: boolean;
   hint?: string;
   options?: Array<{ label: string; value: string; description?: string }>;
@@ -60,7 +66,7 @@ export interface PrebuiltConfig {
   templateName: string;
   templateBody: string;
   headers: Record<string, string>;
-  method: 'get' | 'post' | 'put';
+  method: "get" | "post" | "put";
   urlValidator: (url: string) => boolean;
   credentialFields: CredentialField[];
 }
@@ -75,7 +81,7 @@ export interface PrebuiltType {
   icon: string; // Icon name or component reference
   image?: string; // Image URL for logo
   popular?: boolean;
-  category: 'messaging' | 'incident' | 'email' | 'custom';
+  category: "messaging" | "incident" | "email" | "custom";
 }
 
 /**
@@ -112,7 +118,7 @@ export interface TestResult {
 export interface PrebuiltTemplate {
   name: string;
   body: string;
-  type: 'http' | 'email';
+  type: "http" | "email";
   isDefault: boolean;
 }
 

@@ -61,8 +61,7 @@ export function addSpacesToOperators(input: string): string {
       }
     }
 
-    const shouldProcessOperators =
-      !inSingleQuote && !inDoubleQuote && parenDepth === 0;
+    const shouldProcessOperators = !inSingleQuote && !inDoubleQuote && parenDepth === 0;
 
     if (shouldProcessOperators) {
       if (i < input.length - 1) {
@@ -79,12 +78,7 @@ export function addSpacesToOperators(input: string): string {
           continue;
         }
       }
-      if (
-        char === "!" &&
-        nextChar === " " &&
-        i + 2 < input.length &&
-        input[i + 2] === "="
-      ) {
+      if (char === "!" && nextChar === " " && i + 2 < input.length && input[i + 2] === "=") {
         if (prevChar && prevChar !== " ") {
           result += " ";
         }
@@ -117,15 +111,10 @@ export const mergeRoutes: any = (route1: any, route2: any) => {
   const mergedRoutes = [];
 
   for (const r1 of route1) {
-    const matchingRoute = route2.find(
-      (r2: any) => r2.path === r1.path && r2.name === r1.name,
-    );
+    const matchingRoute = route2.find((r2: any) => r2.path === r1.path && r2.name === r1.name);
 
     if (matchingRoute) {
-      const mergedChildren = mergeRoutes(
-        r1.children || [],
-        matchingRoute.children || [],
-      );
+      const mergedChildren = mergeRoutes(r1.children || [], matchingRoute.children || []);
       mergedRoutes.push({
         ...r1,
         children: mergedChildren.length ? mergedChildren : undefined,
@@ -151,10 +140,7 @@ const isValidKey = (key: string) => {
 export const mergeDeep = (target: any, source: any) => {
   if (isObject(target) && isObject(source)) {
     for (const key in source) {
-      if (
-        isValidKey(key) &&
-        Object.prototype.hasOwnProperty.call(source, key)
-      ) {
+      if (isValidKey(key) && Object.prototype.hasOwnProperty.call(source, key)) {
         if (isObject(source[key])) {
           if (!target[key]) target[key] = {};
           mergeDeep(target[key], source[key]);
@@ -237,21 +223,12 @@ export const deepCopy = (value: any) => {
   }
 };
 
-export const mergeAndRemoveDuplicates = (
-  arr1: string[],
-  arr2: string[],
-): string[] => {
+export const mergeAndRemoveDuplicates = (arr1: string[], arr2: string[]): string[] => {
   return [...new Set([...arr1, ...arr2])];
 };
 
-export const maxLengthCharValidation = (
-  val: string = "",
-  char_length: number = 50,
-) => {
-  return (
-    (val && val.length <= char_length) ||
-    `Maximum ${char_length} characters allowed`
-  );
+export const maxLengthCharValidation = (val: string = "", char_length: number = 50) => {
+  return (val && val.length <= char_length) || `Maximum ${char_length} characters allowed`;
 };
 
 export const validateUrl = (val: string) => {
@@ -349,10 +326,7 @@ export function isAboveMinRefreshInterval(
   return value >= minInterval;
 }
 
-export const describeCron = (
-  cronExpression: string,
-  timezone?: string,
-): string => {
+export const describeCron = (cronExpression: string, timezone?: string): string => {
   if (!cronExpression || !cronExpression.trim()) return "";
   try {
     const parts = cronExpression.trim().split(/\s+/);
@@ -454,10 +428,7 @@ export const convertMinutesToCron = (minutes: number): string => {
   return `0 */${minutes} * * * *`;
 };
 
-export const processQueryMetadataErrors = (
-  metadata: any,
-  timezone: string = "UTC",
-): string => {
+export const processQueryMetadataErrors = (metadata: any, timezone: string = "UTC"): string => {
   if (!metadata || metadata.length === 0) {
     return "";
   }
@@ -467,11 +438,7 @@ export const processQueryMetadataErrors = (
   if (Array.isArray(metadata[0])) {
     metadata.forEach((queryChunks: any[]) => {
       queryChunks.forEach((chunk: any) => {
-        if (
-          chunk?.function_error &&
-          chunk?.new_start_time &&
-          chunk?.new_end_time
-        ) {
+        if (chunk?.function_error && chunk?.new_start_time && chunk?.new_end_time) {
           const combinedMessage = getFunctionErrorMessage(
             chunk.function_error,
             chunk.new_start_time,

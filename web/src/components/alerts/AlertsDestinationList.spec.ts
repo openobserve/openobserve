@@ -34,7 +34,7 @@ vi.mock("@/composables/useActions", () => ({
 }));
 
 vi.mock("@/utils/zincutils", async (importOriginal) => {
-  const actual = await importOriginal() as any;
+  const actual = (await importOriginal()) as any;
   return {
     ...actual,
     getImageURL: vi.fn((p: string) => `mock-${p}`),
@@ -131,13 +131,15 @@ function mountComponent() {
         OBadge: { template: '<span data-test="o-badge-stub"><slot /></span>' },
         OIcon: { template: '<span data-test="o-icon-stub" />' },
         OButton: {
-          template: '<button data-test="o-button-stub" v-bind="$attrs" @click="$emit(\'click\')"><slot /></button>',
+          template:
+            '<button data-test="o-button-stub" v-bind="$attrs" @click="$emit(\'click\')"><slot /></button>',
           emits: ["click"],
         },
         OInput: {
           props: ["modelValue"],
           emits: ["update:modelValue"],
-          template: '<input data-test="o-input-stub" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+          template:
+            '<input data-test="o-input-stub" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
         },
       },
     },
@@ -207,7 +209,9 @@ describe("AlertsDestinationList", () => {
     it("renders add button", async () => {
       wrapper = mountComponent();
       await flushPromises();
-      expect(wrapper.find('[data-test="alert-destination-list-add-alert-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="alert-destination-list-add-alert-btn"]').exists()).toBe(
+        true,
+      );
     });
   });
 
@@ -440,7 +444,6 @@ describe("AlertsDestinationList", () => {
 
   // ── import action ──────────────────────────────────────────────────────────
 
-  
   describe("import action", () => {
     it("importDestination sets showImportDestination to true", async () => {
       wrapper = mountComponent();

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from "vitest";
 import {
   formatNumber,
   formatLatency,
@@ -24,52 +24,56 @@ import {
   calculateRootNodeMetrics,
   generateTracePatternTooltipContent,
   generatePatternNodeTooltipContent,
-} from './treeTooltipHelpers';
+} from "./treeTooltipHelpers";
 
-describe('treeTooltipHelpers', () => {
-  describe('formatNumber', () => {
-    it('should format millions with M suffix', () => {
-      expect(formatNumber(5500000)).toBe('5.5M');
-      expect(formatNumber(1234567)).toBe('1.2M');
+describe("treeTooltipHelpers", () => {
+  describe("formatNumber", () => {
+    it("should format millions with M suffix", () => {
+      expect(formatNumber(5500000)).toBe("5.5M");
+      expect(formatNumber(1234567)).toBe("1.2M");
     });
 
-    it('should format thousands with K suffix', () => {
-      expect(formatNumber(5500)).toBe('5.5K');
-      expect(formatNumber(1234)).toBe('1.2K');
+    it("should format thousands with K suffix", () => {
+      expect(formatNumber(5500)).toBe("5.5K");
+      expect(formatNumber(1234)).toBe("1.2K");
     });
 
-    it('should return string for numbers < 1000', () => {
-      expect(formatNumber(999)).toBe('999');
-      expect(formatNumber(42)).toBe('42');
-      expect(formatNumber(0)).toBe('0');
-    });
-  });
-
-  describe('formatLatency', () => {
-    it('should return N/A for zero or undefined', () => {
-      expect(formatLatency(0)).toBe('N/A');
-      expect(formatLatency(null as any)).toBe('N/A');
-      expect(formatLatency(undefined as any)).toBe('N/A');
-    });
-
-    it('should format nanoseconds to milliseconds', () => {
-      expect(formatLatency(4200000)).toBe('4.20ms');
-      expect(formatLatency(180000000)).toBe('180.00ms');
-    });
-
-    it('should format to seconds for large values', () => {
-      expect(formatLatency(3050000000)).toBe('3.05s');
-      expect(formatLatency(10000000000)).toBe('10.00s');
+    it("should return string for numbers < 1000", () => {
+      expect(formatNumber(999)).toBe("999");
+      expect(formatNumber(42)).toBe("42");
+      expect(formatNumber(0)).toBe("0");
     });
   });
 
-  describe('pointToBezierDistance', () => {
-    it('should calculate distance to straight line (degenerate bezier)', () => {
+  describe("formatLatency", () => {
+    it("should return N/A for zero or undefined", () => {
+      expect(formatLatency(0)).toBe("N/A");
+      expect(formatLatency(null as any)).toBe("N/A");
+      expect(formatLatency(undefined as any)).toBe("N/A");
+    });
+
+    it("should format nanoseconds to milliseconds", () => {
+      expect(formatLatency(4200000)).toBe("4.20ms");
+      expect(formatLatency(180000000)).toBe("180.00ms");
+    });
+
+    it("should format to seconds for large values", () => {
+      expect(formatLatency(3050000000)).toBe("3.05s");
+      expect(formatLatency(10000000000)).toBe("10.00s");
+    });
+  });
+
+  describe("pointToBezierDistance", () => {
+    it("should calculate distance to straight line (degenerate bezier)", () => {
       const shape = {
-        x1: 0, y1: 0,
-        cpx1: 50, cpy1: 0,
-        cpx2: 50, cpy2: 0,
-        x2: 100, y2: 0,
+        x1: 0,
+        y1: 0,
+        cpx1: 50,
+        cpy1: 0,
+        cpx2: 50,
+        cpy2: 0,
+        x2: 100,
+        y2: 0,
       };
 
       // Point on the line
@@ -80,12 +84,16 @@ describe('treeTooltipHelpers', () => {
       expect(dist).toBeCloseTo(10, 0);
     });
 
-    it('should calculate distance to curved bezier', () => {
+    it("should calculate distance to curved bezier", () => {
       const shape = {
-        x1: 0, y1: 0,
-        cpx1: 50, cpy1: 0,
-        cpx2: 50, cpy2: 100,
-        x2: 100, y2: 100,
+        x1: 0,
+        y1: 0,
+        cpx1: 50,
+        cpy1: 0,
+        cpx2: 50,
+        cpy2: 100,
+        x2: 100,
+        y2: 100,
       };
 
       // Point far from curve
@@ -96,12 +104,16 @@ describe('treeTooltipHelpers', () => {
       expect(midDist).toBeLessThan(30);
     });
 
-    it('should handle zero-length bezier', () => {
+    it("should handle zero-length bezier", () => {
       const shape = {
-        x1: 50, y1: 50,
-        cpx1: 50, cpy1: 50,
-        cpx2: 50, cpy2: 50,
-        x2: 50, y2: 50,
+        x1: 50,
+        y1: 50,
+        cpx1: 50,
+        cpy1: 50,
+        cpx2: 50,
+        cpy2: 50,
+        x2: 50,
+        y2: 50,
       };
 
       const dist = pointToBezierDistance(60, 60, shape);
@@ -109,216 +121,202 @@ describe('treeTooltipHelpers', () => {
     });
   });
 
-  describe('generateNodeTooltipContent', () => {
-    it('should generate correct HTML for node tooltip', () => {
-      const html = generateNodeTooltipContent('user-service', 5500000, 387200, 7.07);
+  describe("generateNodeTooltipContent", () => {
+    it("should generate correct HTML for node tooltip", () => {
+      const html = generateNodeTooltipContent("user-service", 5500000, 387200, 7.07);
 
-      expect(html).toContain('<strong>user-service</strong>');
-      expect(html).toContain('Requests: 5.5M');
-      expect(html).toContain('Errors: 387.2K');
-      expect(html).toContain('Error Rate: 7.07%');
+      expect(html).toContain("<strong>user-service</strong>");
+      expect(html).toContain("Requests: 5.5M");
+      expect(html).toContain("Errors: 387.2K");
+      expect(html).toContain("Error Rate: 7.07%");
     });
 
-    it('should handle zero errors', () => {
-      const html = generateNodeTooltipContent('db-service', 1000000, 0, 0);
+    it("should handle zero errors", () => {
+      const html = generateNodeTooltipContent("db-service", 1000000, 0, 0);
 
-      expect(html).toContain('Errors: 0');
-      expect(html).toContain('Error Rate: 0.00%');
+      expect(html).toContain("Errors: 0");
+      expect(html).toContain("Error Rate: 0.00%");
     });
 
-    it('should handle small numbers', () => {
-      const html = generateNodeTooltipContent('test', 42, 3, 7.14);
+    it("should handle small numbers", () => {
+      const html = generateNodeTooltipContent("test", 42, 3, 7.14);
 
-      expect(html).toContain('Requests: 42');
-      expect(html).toContain('Errors: 3');
+      expect(html).toContain("Requests: 42");
+      expect(html).toContain("Errors: 3");
     });
   });
 
-  describe('generateEdgeTooltipContent', () => {
-    it('should generate correct HTML for edge tooltip with latencies', () => {
-      const html = generateEdgeTooltipContent(
-        3100000,
-        12000,
-        0.39,
-        4200000,
-        18000000,
-        45000000
-      );
+  describe("generateEdgeTooltipContent", () => {
+    it("should generate correct HTML for edge tooltip with latencies", () => {
+      const html = generateEdgeTooltipContent(3100000, 12000, 0.39, 4200000, 18000000, 45000000);
 
-      expect(html).toContain('<strong>Requests:</strong> 3.1M');
-      expect(html).toContain('<strong>Errors:</strong> 12000 (0.39%)');
-      expect(html).toContain('<strong>P50:</strong> 4.20ms');
-      expect(html).toContain('<strong>P95:</strong> 18.00ms');
-      expect(html).toContain('<strong>P99:</strong> 45.00ms');
+      expect(html).toContain("<strong>Requests:</strong> 3.1M");
+      expect(html).toContain("<strong>Errors:</strong> 12000 (0.39%)");
+      expect(html).toContain("<strong>P50:</strong> 4.20ms");
+      expect(html).toContain("<strong>P95:</strong> 18.00ms");
+      expect(html).toContain("<strong>P99:</strong> 45.00ms");
     });
 
-    it('should handle N/A latencies', () => {
+    it("should handle N/A latencies", () => {
       const html = generateEdgeTooltipContent(1000, 10, 1.0, 0, 0, 0);
 
-      expect(html).toContain('<strong>P50:</strong> N/A');
-      expect(html).toContain('<strong>P95:</strong> N/A');
-      expect(html).toContain('<strong>P99:</strong> N/A');
+      expect(html).toContain("<strong>P50:</strong> N/A");
+      expect(html).toContain("<strong>P95:</strong> N/A");
+      expect(html).toContain("<strong>P99:</strong> N/A");
     });
 
-    it('should format latencies in seconds for large values', () => {
-      const html = generateEdgeTooltipContent(
-        1000,
-        0,
-        0,
-        3050000000,
-        5000000000,
-        10000000000
-      );
+    it("should format latencies in seconds for large values", () => {
+      const html = generateEdgeTooltipContent(1000, 0, 0, 3050000000, 5000000000, 10000000000);
 
-      expect(html).toContain('<strong>P50:</strong> 3.05s');
-      expect(html).toContain('<strong>P95:</strong> 5.00s');
-      expect(html).toContain('<strong>P99:</strong> 10.00s');
+      expect(html).toContain("<strong>P50:</strong> 3.05s");
+      expect(html).toContain("<strong>P95:</strong> 5.00s");
+      expect(html).toContain("<strong>P99:</strong> 10.00s");
     });
   });
 
-  describe('findIncomingEdgeForNode', () => {
+  describe("findIncomingEdgeForNode", () => {
     const edges = [
-      { from: 'api-gateway', to: 'user-service', total_requests: 5500000 },
-      { from: 'user-service', to: 'database', total_requests: 2700000 },
-      { from: null, to: 'api-gateway', total_requests: 8800000 },
+      { from: "api-gateway", to: "user-service", total_requests: 5500000 },
+      { from: "user-service", to: "database", total_requests: 2700000 },
+      { from: null, to: "api-gateway", total_requests: 8800000 },
     ];
 
-    it('should find edge by exact parent and child match', () => {
-      const edge = findIncomingEdgeForNode('user-service', 'api-gateway', edges);
+    it("should find edge by exact parent and child match", () => {
+      const edge = findIncomingEdgeForNode("user-service", "api-gateway", edges);
 
       expect(edge).toBeTruthy();
       expect(edge.total_requests).toBe(5500000);
     });
 
-    it('should find edge for entry-point service with null parent', () => {
-      const edge = findIncomingEdgeForNode('api-gateway', '', edges);
+    it("should find edge for entry-point service with null parent", () => {
+      const edge = findIncomingEdgeForNode("api-gateway", "", edges);
 
       expect(edge).toBeTruthy();
       expect(edge.total_requests).toBe(8800000);
     });
 
-    it('should return fallback edge when no parent provided', () => {
-      const edge = findIncomingEdgeForNode('user-service', undefined, edges);
+    it("should return fallback edge when no parent provided", () => {
+      const edge = findIncomingEdgeForNode("user-service", undefined, edges);
 
       // Falls back to any edge to the node
       expect(edge).toBeTruthy();
-      expect(edge.to).toBe('user-service');
+      expect(edge.to).toBe("user-service");
     });
 
-    it('should fallback to any edge to node if exact match fails', () => {
-      const edge = findIncomingEdgeForNode('database', 'different-parent', edges);
+    it("should fallback to any edge to node if exact match fails", () => {
+      const edge = findIncomingEdgeForNode("database", "different-parent", edges);
 
       // Should find the edge from user-service as fallback
       expect(edge).toBeTruthy();
-      expect(edge.from).toBe('user-service');
+      expect(edge.from).toBe("user-service");
     });
 
-    it('should return null when node has no incoming edges', () => {
-      const edge = findIncomingEdgeForNode('non-existent', 'any-parent', edges);
+    it("should return null when node has no incoming edges", () => {
+      const edge = findIncomingEdgeForNode("non-existent", "any-parent", edges);
 
       expect(edge).toBeNull();
     });
   });
 
-  describe('calculateRootNodeMetrics', () => {
+  describe("calculateRootNodeMetrics", () => {
     const edges = [
-      { from: 'api-gateway', to: 'user-service', total_requests: 5500000, failed_requests: 387200 },
-      { from: 'api-gateway', to: 'order-service', total_requests: 3100000, failed_requests: 12000 },
-      { from: 'user-service', to: 'database', total_requests: 2700000, failed_requests: 61000 },
+      { from: "api-gateway", to: "user-service", total_requests: 5500000, failed_requests: 387200 },
+      { from: "api-gateway", to: "order-service", total_requests: 3100000, failed_requests: 12000 },
+      { from: "user-service", to: "database", total_requests: 2700000, failed_requests: 61000 },
     ];
 
-    it('should sum outgoing edges for root node', () => {
-      const metrics = calculateRootNodeMetrics('api-gateway', edges);
+    it("should sum outgoing edges for root node", () => {
+      const metrics = calculateRootNodeMetrics("api-gateway", edges);
 
       expect(metrics.requests).toBe(8600000); // 5.5M + 3.1M
       expect(metrics.errors).toBe(399200); // 387.2K + 12K
       expect(metrics.errorRate).toBeCloseTo(4.64, 1);
     });
 
-    it('should return zero metrics for node with no outgoing edges', () => {
-      const metrics = calculateRootNodeMetrics('database', edges);
+    it("should return zero metrics for node with no outgoing edges", () => {
+      const metrics = calculateRootNodeMetrics("database", edges);
 
       expect(metrics.requests).toBe(0);
       expect(metrics.errors).toBe(0);
       expect(metrics.errorRate).toBe(0);
     });
 
-    it('should handle single outgoing edge', () => {
-      const metrics = calculateRootNodeMetrics('user-service', edges);
+    it("should handle single outgoing edge", () => {
+      const metrics = calculateRootNodeMetrics("user-service", edges);
 
       expect(metrics.requests).toBe(2700000);
       expect(metrics.errors).toBe(61000);
       expect(metrics.errorRate).toBeCloseTo(2.26, 1);
     });
 
-    it('should handle edges with missing metrics', () => {
+    it("should handle edges with missing metrics", () => {
       const sparseEdges = [
-        { from: 'root', to: 'child1', total_requests: 1000 },
-        { from: 'root', to: 'child2' }, // missing metrics
+        { from: "root", to: "child1", total_requests: 1000 },
+        { from: "root", to: "child2" }, // missing metrics
       ];
 
-      const metrics = calculateRootNodeMetrics('root', sparseEdges);
+      const metrics = calculateRootNodeMetrics("root", sparseEdges);
 
       expect(metrics.requests).toBe(1000);
       expect(metrics.errors).toBe(0);
     });
 
-    it('should calculate correct error rate when total is zero', () => {
-      const edges = [{ from: 'node', to: 'child', total_requests: 0, failed_requests: 0 }];
-      const metrics = calculateRootNodeMetrics('node', edges);
+    it("should calculate correct error rate when total is zero", () => {
+      const edges = [{ from: "node", to: "child", total_requests: 0, failed_requests: 0 }];
+      const metrics = calculateRootNodeMetrics("node", edges);
 
       expect(metrics.errorRate).toBe(0);
     });
   });
 
-  describe('generatePatternNodeTooltipContent', () => {
-    it('should show the full service name as the tooltip header', () => {
+  describe("generatePatternNodeTooltipContent", () => {
+    it("should show the full service name as the tooltip header", () => {
       const result = generatePatternNodeTooltipContent({
-        serviceName: 'oteldemo.RecommendationService',
+        serviceName: "oteldemo.RecommendationService",
         count: 3,
         avg: 39.49,
         traceTimePercent: 27.9,
         errorCount: 0,
       });
 
-      expect(result).toContain('oteldemo.RecommendationService');
-      expect(result).toContain('Spans:');
-      expect(result).toContain('Average:');
+      expect(result).toContain("oteldemo.RecommendationService");
+      expect(result).toContain("Spans:");
+      expect(result).toContain("Average:");
     });
 
-    it('should fall back to the path signature when service name is missing', () => {
+    it("should fall back to the path signature when service name is missing", () => {
       const result = generatePatternNodeTooltipContent({
-        pathSignature: 'frontend→recommendation',
+        pathSignature: "frontend→recommendation",
         count: 1,
         avg: 1.5,
         traceTimePercent: 10,
       });
 
-      expect(result).toContain('frontend→recommendation');
+      expect(result).toContain("frontend→recommendation");
     });
 
-    it('should escape HTML in the service name', () => {
+    it("should escape HTML in the service name", () => {
       const result = generatePatternNodeTooltipContent({
-        serviceName: '<img src=x onerror=alert(1)>',
+        serviceName: "<img src=x onerror=alert(1)>",
         count: 1,
         avg: 0,
         traceTimePercent: 0,
       });
 
-      expect(result).not.toContain('<img');
-      expect(result).toContain('&lt;img');
+      expect(result).not.toContain("<img");
+      expect(result).toContain("&lt;img");
     });
 
-    it('should return empty string when metadata is missing', () => {
-      expect(generatePatternNodeTooltipContent(null)).toBe('');
-      expect(generatePatternNodeTooltipContent(undefined)).toBe('');
+    it("should return empty string when metadata is missing", () => {
+      expect(generatePatternNodeTooltipContent(null)).toBe("");
+      expect(generatePatternNodeTooltipContent(undefined)).toBe("");
     });
   });
 
-  describe('generateTracePatternTooltipContent', () => {
-    it('should generate tooltip HTML with all duration metrics', () => {
+  describe("generateTracePatternTooltipContent", () => {
+    it("should generate tooltip HTML with all duration metrics", () => {
       const mockMetadata = {
-        pathSignature: 'frontend → recommendation',
+        pathSignature: "frontend → recommendation",
         count: 3,
         avg: 45.5,
         min: 20.1,
@@ -332,38 +330,38 @@ describe('treeTooltipHelpers', () => {
       const result = generateTracePatternTooltipContent(mockMetadata);
 
       // Values are wrapped in <span> tags — check for label + value separately
-      expect(result).toContain('frontend → recommendation');
-      expect(result).toContain('>3</span>');
-      expect(result).toContain('>45.5ms</span>');
-      expect(result).toContain('>20.1ms</span>');
-      expect(result).toContain('>89.3ms</span>');
-      expect(result).toContain('>67.2ms</span>');
-      expect(result).toContain('>85.6ms</span>');
-      expect(result).toContain('>88.4ms</span>');
-      expect(result).toContain('>12.5%</span>');
+      expect(result).toContain("frontend → recommendation");
+      expect(result).toContain(">3</span>");
+      expect(result).toContain(">45.5ms</span>");
+      expect(result).toContain(">20.1ms</span>");
+      expect(result).toContain(">89.3ms</span>");
+      expect(result).toContain(">67.2ms</span>");
+      expect(result).toContain(">85.6ms</span>");
+      expect(result).toContain(">88.4ms</span>");
+      expect(result).toContain(">12.5%</span>");
     });
 
-    it('should handle missing or invalid metadata gracefully', () => {
+    it("should handle missing or invalid metadata gracefully", () => {
       const result = generateTracePatternTooltipContent({});
 
-      expect(result).toContain('Unknown Pattern');
-      expect(result).toContain('Calls:');
-      expect(result).toContain('>1</span>');
-      expect(result).toContain('Average:');
-      expect(result).toContain('Error Rate:');
+      expect(result).toContain("Unknown Pattern");
+      expect(result).toContain("Calls:");
+      expect(result).toContain(">1</span>");
+      expect(result).toContain("Average:");
+      expect(result).toContain("Error Rate:");
     });
 
-    it('should handle null or undefined metadata', () => {
+    it("should handle null or undefined metadata", () => {
       const resultNull = generateTracePatternTooltipContent(null);
       const resultUndefined = generateTracePatternTooltipContent(undefined);
 
-      expect(resultNull).toContain('Unknown Pattern');
-      expect(resultUndefined).toContain('Unknown Pattern');
+      expect(resultNull).toContain("Unknown Pattern");
+      expect(resultUndefined).toContain("Unknown Pattern");
     });
 
-    it('should format percentile values with single decimal place', () => {
+    it("should format percentile values with single decimal place", () => {
       const mockMetadata = {
-        pathSignature: 'service-a → service-b',
+        pathSignature: "service-a → service-b",
         count: 100,
         avg: 123.456,
         min: 10.123,
@@ -377,18 +375,18 @@ describe('treeTooltipHelpers', () => {
       const result = generateTracePatternTooltipContent(mockMetadata);
 
       // Values are wrapped in <span> tags — check for formatted values
-      expect(result).toContain('>123.5ms</span>');
-      expect(result).toContain('>10.1ms</span>');
-      expect(result).toContain('>1000.0ms</span>');
-      expect(result).toContain('>456.8ms</span>');
-      expect(result).toContain('>789.1ms</span>');
-      expect(result).toContain('>999.9ms</span>');
-      expect(result).toContain('>5.6%</span>');
+      expect(result).toContain(">123.5ms</span>");
+      expect(result).toContain(">10.1ms</span>");
+      expect(result).toContain(">1000.0ms</span>");
+      expect(result).toContain(">456.8ms</span>");
+      expect(result).toContain(">789.1ms</span>");
+      expect(result).toContain(">999.9ms</span>");
+      expect(result).toContain(">5.6%</span>");
     });
 
-    it('should handle zero values for all metrics', () => {
+    it("should handle zero values for all metrics", () => {
       const mockMetadata = {
-        pathSignature: 'zero-pattern',
+        pathSignature: "zero-pattern",
         count: 0,
         avg: 0,
         min: 0,
@@ -401,16 +399,16 @@ describe('treeTooltipHelpers', () => {
 
       const result = generateTracePatternTooltipContent(mockMetadata);
 
-      expect(result).toContain('zero-pattern');
-      expect(result).toContain('Calls:');
-      expect(result).toContain('>0</span>');
-      expect(result).toContain('>0.0ms</span>');
-      expect(result).toContain('>0.0%</span>');
+      expect(result).toContain("zero-pattern");
+      expect(result).toContain("Calls:");
+      expect(result).toContain(">0</span>");
+      expect(result).toContain(">0.0ms</span>");
+      expect(result).toContain(">0.0%</span>");
     });
 
-    it('should include HTML structure with inline styles', () => {
+    it("should include HTML structure with inline styles", () => {
       const mockMetadata = {
-        pathSignature: 'test',
+        pathSignature: "test",
         count: 1,
         avg: 10,
         min: 5,
@@ -425,75 +423,75 @@ describe('treeTooltipHelpers', () => {
 
       // generateTracePatternTooltipContent uses inline styles, not CSS classes
       expect(result).toContain("font-family: var(--font-sans)");
-      expect(result).toContain('font-weight: 600');
-      expect(result).toContain('border-bottom: 1px solid');
-      expect(result).toContain('Calls:');
-      expect(result).toContain(
-        '<span style="font-family: var(--font-mono);">1</span>',
-      );
+      expect(result).toContain("font-weight: 600");
+      expect(result).toContain("border-bottom: 1px solid");
+      expect(result).toContain("Calls:");
+      expect(result).toContain('<span style="font-family: var(--font-mono);">1</span>');
     });
   });
 
-  describe('Edge cases', () => {
-    it('should handle formatNumber with decimal values', () => {
-      expect(formatNumber(1234.56)).toBe('1.2K');
-      expect(formatNumber(1234567.89)).toBe('1.2M');
+  describe("Edge cases", () => {
+    it("should handle formatNumber with decimal values", () => {
+      expect(formatNumber(1234.56)).toBe("1.2K");
+      expect(formatNumber(1234567.89)).toBe("1.2M");
     });
 
-    it('should handle formatLatency with very small values', () => {
-      expect(formatLatency(100)).toBe('0.00ms');
-      expect(formatLatency(1000)).toBe('0.00ms');
+    it("should handle formatLatency with very small values", () => {
+      expect(formatLatency(100)).toBe("0.00ms");
+      expect(formatLatency(1000)).toBe("0.00ms");
     });
 
-    it('should handle formatLatency with exact second boundaries', () => {
-      expect(formatLatency(1000000000)).toBe('1.00s');
-      expect(formatLatency(999999999)).toBe('1000.00ms');
+    it("should handle formatLatency with exact second boundaries", () => {
+      expect(formatLatency(1000000000)).toBe("1.00s");
+      expect(formatLatency(999999999)).toBe("1000.00ms");
     });
 
-    it('should find edges with null from field', () => {
-      const edges = [
-        { from: null, to: 'entry', total_requests: 1000 },
-      ];
-      const edge = findIncomingEdgeForNode('entry', '', edges);
+    it("should find edges with null from field", () => {
+      const edges = [{ from: null, to: "entry", total_requests: 1000 }];
+      const edge = findIncomingEdgeForNode("entry", "", edges);
       expect(edge).toBeTruthy();
       expect(edge.from).toBeNull();
     });
 
-    it('should generate tooltip content with high error rates', () => {
-      const html = generateNodeTooltipContent('failing-service', 1000, 950, 95.0);
-      expect(html).toContain('Error Rate: 95.00%');
+    it("should generate tooltip content with high error rates", () => {
+      const html = generateNodeTooltipContent("failing-service", 1000, 950, 95.0);
+      expect(html).toContain("Error Rate: 95.00%");
     });
 
-    it('should generate edge tooltip with zero error rate', () => {
+    it("should generate edge tooltip with zero error rate", () => {
       const html = generateEdgeTooltipContent(5000, 0, 0, 1000000, 2000000, 3000000);
-      expect(html).toContain('(0.00%)');
+      expect(html).toContain("(0.00%)");
     });
 
-    it('should handle formatNumber with exactly 1000', () => {
-      expect(formatNumber(1000)).toBe('1.0K');
+    it("should handle formatNumber with exactly 1000", () => {
+      expect(formatNumber(1000)).toBe("1.0K");
     });
 
-    it('should handle formatNumber with exactly 1000000', () => {
-      expect(formatNumber(1000000)).toBe('1.0M');
+    it("should handle formatNumber with exactly 1000000", () => {
+      expect(formatNumber(1000000)).toBe("1.0M");
     });
 
-    it('should calculate zero distance when point is on bezier endpoint', () => {
+    it("should calculate zero distance when point is on bezier endpoint", () => {
       const shape = {
-        x1: 0, y1: 0,
-        cpx1: 25, cpy1: 0,
-        cpx2: 75, cpy2: 100,
-        x2: 100, y2: 100,
+        x1: 0,
+        y1: 0,
+        cpx1: 25,
+        cpy1: 0,
+        cpx2: 75,
+        cpy2: 100,
+        x2: 100,
+        y2: 100,
       };
       // Point exactly at endpoint
       expect(pointToBezierDistance(100, 100, shape)).toBeLessThan(0.1);
     });
 
-    it('should find correct edge when multiple edges exist to same node', () => {
+    it("should find correct edge when multiple edges exist to same node", () => {
       const edges = [
-        { from: 'service-a', to: 'database', total_requests: 1000 },
-        { from: 'service-b', to: 'database', total_requests: 2000 },
+        { from: "service-a", to: "database", total_requests: 1000 },
+        { from: "service-b", to: "database", total_requests: 2000 },
       ];
-      const edge = findIncomingEdgeForNode('database', 'service-b', edges);
+      const edge = findIncomingEdgeForNode("database", "service-b", edges);
       expect(edge.total_requests).toBe(2000);
     });
   });

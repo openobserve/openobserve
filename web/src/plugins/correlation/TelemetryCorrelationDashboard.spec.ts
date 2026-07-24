@@ -78,20 +78,14 @@ vi.mock("@/utils/metrics/metricGrouping", async (importOriginal) => {
 
 vi.mock("@/services/stream", () => ({
   default: {
-    nameList: vi.fn(() =>
-      Promise.resolve({ data: { list: [] } })
-    ),
+    nameList: vi.fn(() => Promise.resolve({ data: { list: [] } })),
   },
 }));
 
 vi.mock("@/services/search", () => ({
   default: {
-    search: vi.fn(() =>
-      Promise.resolve({ data: { hits: [], total: 0, took: 0 } })
-    ),
-    get_traces: vi.fn(() =>
-      Promise.resolve({ data: { hits: [], total: 0 } })
-    ),
+    search: vi.fn(() => Promise.resolve({ data: { hits: [], total: 0, took: 0 } })),
+    get_traces: vi.fn(() => Promise.resolve({ data: { hits: [], total: 0 } })),
   },
 }));
 
@@ -264,7 +258,6 @@ const mockMetricStreams = [
   { stream_name: "disk_io", stream_type: "metrics", filters: { service: "api" } },
 ];
 
-
 describe("TelemetryCorrelationDashboard.vue", () => {
   let wrapper: any;
 
@@ -290,10 +283,7 @@ describe("TelemetryCorrelationDashboard.vue", () => {
         ...props,
       },
       global: {
-        plugins: [
-          i18n,
-          store,
-        ],
+        plugins: [i18n, store],
         stubs: {
           TraceDetails: true,
           TracesSearchResultList: true,
@@ -517,7 +507,9 @@ describe("TelemetryCorrelationDashboard.vue", () => {
       wrapper.vm.toggleMetricStream(stream);
       await nextTick();
 
-      expect(wrapper.vm.selectedMetricStreams.some((s: any) => s.stream_name === "new_metric")).toBe(true);
+      expect(
+        wrapper.vm.selectedMetricStreams.some((s: any) => s.stream_name === "new_metric"),
+      ).toBe(true);
     });
 
     it("should remove stream when already selected", async () => {
@@ -529,7 +521,9 @@ describe("TelemetryCorrelationDashboard.vue", () => {
       wrapper.vm.toggleMetricStream(mockMetricStreams[0]);
       await nextTick();
 
-      expect(wrapper.vm.selectedMetricStreams.some((s: any) => s.stream_name === streamName)).toBe(false);
+      expect(wrapper.vm.selectedMetricStreams.some((s: any) => s.stream_name === streamName)).toBe(
+        false,
+      );
     });
   });
 
@@ -723,7 +717,9 @@ describe("TelemetryCorrelationDashboard.vue", () => {
       });
 
       wrapper = createWrapper({
-        traceStreams: [{ stream_name: "traces", stream_type: "traces", filters: { service: "api" } }],
+        traceStreams: [
+          { stream_name: "traces", stream_type: "traces", filters: { service: "api" } },
+        ],
       });
 
       await wrapper.vm.fetchTracesByDimensions();
@@ -742,7 +738,13 @@ describe("TelemetryCorrelationDashboard.vue", () => {
       });
 
       wrapper = createWrapper({
-        traceStreams: [{ stream_name: "traces", stream_type: "traces", filters: { service: "api", env: "prod" } }],
+        traceStreams: [
+          {
+            stream_name: "traces",
+            stream_type: "traces",
+            filters: { service: "api", env: "prod" },
+          },
+        ],
       });
 
       await wrapper.vm.fetchTracesByDimensions();

@@ -41,7 +41,7 @@ function makeAlerts(count = 3, overrides: Record<string, any> = {}) {
       alert_name: `Alert ${i + 1}`,
       created_at: 1700000000000000 + i,
       ...overrides,
-    })
+    }),
   );
 }
 
@@ -135,7 +135,9 @@ describe("IncidentAlertTriggersTable", () => {
     it("shows empty message when triggers is empty", () => {
       wrapper = mountComp({ triggers: [] });
       expect(wrapper.find('[data-test="no-triggers-message"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="no-triggers-message"]').text()).toContain("No triggers loaded");
+      expect(wrapper.find('[data-test="no-triggers-message"]').text()).toContain(
+        "No triggers loaded",
+      );
     });
 
     it("does not show empty message when triggers are present", () => {
@@ -187,17 +189,23 @@ describe("IncidentAlertTriggersTable", () => {
   describe("correlation reason badge", () => {
     it("shows Service Discovery label for service_discovery reason", () => {
       wrapper = mountComp({ triggers: [makeAlert({ correlation_reason: "service_discovery" })] });
-      expect(wrapper.find('[data-test="correlation-reason-badge"]').text()).toBe("Service Discovery");
+      expect(wrapper.find('[data-test="correlation-reason-badge"]').text()).toBe(
+        "Service Discovery",
+      );
     });
 
     it("shows Primary Match label for primary_match reason", () => {
       wrapper = mountComp({ triggers: [makeAlert({ correlation_reason: "primary_match" })] });
-      expect(wrapper.find('[data-test="correlation-reason-badge"]').text()).toContain("Primary Match");
+      expect(wrapper.find('[data-test="correlation-reason-badge"]').text()).toContain(
+        "Primary Match",
+      );
     });
 
     it("shows Secondary Match label for secondary_match reason", () => {
       wrapper = mountComp({ triggers: [makeAlert({ correlation_reason: "secondary_match" })] });
-      expect(wrapper.find('[data-test="correlation-reason-badge"]').text()).toContain("Secondary Match");
+      expect(wrapper.find('[data-test="correlation-reason-badge"]').text()).toContain(
+        "Secondary Match",
+      );
     });
 
     it("shows Alert ID label for alert_id reason", () => {

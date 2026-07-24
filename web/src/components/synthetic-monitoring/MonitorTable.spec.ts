@@ -73,7 +73,7 @@ const OButtonStub = {
   inheritAttrs: false,
   methods: {
     onClick(e: MouseEvent) {
-      (this as any).$emit('click', e);
+      (this as any).$emit("click", e);
     },
   },
 };
@@ -208,9 +208,7 @@ describe("MonitorTable", () => {
 
     it("should render loading state indicator when loading is true", () => {
       wrapper = mountMonitorTable({ loading: true });
-      expect(
-        wrapper.find('[data-test="otable-loading-state"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="otable-loading-state"]').exists()).toBe(true);
     });
 
     it("should render correct columns for all mode", () => {
@@ -318,30 +316,22 @@ describe("MonitorTable", () => {
       expect(pauseBtn.exists()).toBe(true);
       await pauseBtn.trigger("click");
       expect(wrapper.emitted("toggle-enabled")).toHaveLength(1);
-      expect(wrapper.emitted("toggle-enabled")![0]).toEqual([
-        mockMonitorList[0],
-      ]);
+      expect(wrapper.emitted("toggle-enabled")![0]).toEqual([mockMonitorList[0]]);
     });
 
     it("should emit toggle-enabled with row data when enable button is clicked for disabled row", async () => {
       wrapper = mountMonitorTable();
       // Fourth row is mockMonitorDisabled which has enabled: false
-      const enableBtns = wrapper.findAll(
-        '[data-test="monitor-table-enable-btn"]',
-      );
+      const enableBtns = wrapper.findAll('[data-test="monitor-table-enable-btn"]');
       expect(enableBtns.length).toBeGreaterThan(0);
       await enableBtns[enableBtns.length - 1].trigger("click");
       expect(wrapper.emitted("toggle-enabled")).toHaveLength(1);
-      expect(wrapper.emitted("toggle-enabled")![0]).toEqual([
-        mockMonitorList[3],
-      ]);
+      expect(wrapper.emitted("toggle-enabled")![0]).toEqual([mockMonitorList[3]]);
     });
 
     it("should emit duplicate with row data when duplicate button is clicked", async () => {
       wrapper = mountMonitorTable();
-      const duplicateBtn = wrapper.find(
-        '[data-test="monitor-table-duplicate-btn"]',
-      );
+      const duplicateBtn = wrapper.find('[data-test="monitor-table-duplicate-btn"]');
       expect(duplicateBtn.exists()).toBe(true);
       await duplicateBtn.trigger("click");
       expect(wrapper.emitted("duplicate")).toHaveLength(1);
@@ -368,6 +358,15 @@ describe("MonitorTable", () => {
       await deleteItem.trigger("click");
       expect(wrapper.emitted("delete")).toHaveLength(1);
       expect(wrapper.emitted("delete")![0]).toEqual([mockMonitorList[0]]);
+    });
+
+    it("should emit move with row data when move menu item is clicked", async () => {
+      wrapper = mountMonitorTable();
+      const moveItem = wrapper.find('[data-test="monitor-table-move-item"]');
+      expect(moveItem.exists()).toBe(true);
+      await moveItem.trigger("click");
+      expect(wrapper.emitted("move")).toHaveLength(1);
+      expect(wrapper.emitted("move")![0]).toEqual([mockMonitorList[0]]);
     });
 
     it("should render per-row action buttons for each data row", () => {
@@ -398,9 +397,7 @@ describe("MonitorTable", () => {
       const otable = wrapper.findComponent({ name: "OTableStub" });
       await otable.vm.$emit("update:selectedIds", ["mon-http-1", "mon-tcp-1"]);
       expect(wrapper.emitted("update:selectedIds")).toHaveLength(1);
-      expect(wrapper.emitted("update:selectedIds")![0]).toEqual([
-        ["mon-http-1", "mon-tcp-1"],
-      ]);
+      expect(wrapper.emitted("update:selectedIds")![0]).toEqual([["mon-http-1", "mon-tcp-1"]]);
     });
   });
 
@@ -409,24 +406,18 @@ describe("MonitorTable", () => {
   describe("empty state", () => {
     it("should show empty state region when data is empty", () => {
       wrapper = mountMonitorTable({ data: [] });
-      expect(
-        wrapper.find('[data-test="otable-empty-region"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="otable-empty-region"]').exists()).toBe(true);
     });
 
     it("should render OEmptyState when data is empty", () => {
       wrapper = mountMonitorTable({ data: [] });
-      const emptyState = wrapper.find(
-        '[data-test="monitor-table-empty-state"]',
-      );
+      const emptyState = wrapper.find('[data-test="monitor-table-empty-state"]');
       expect(emptyState.exists()).toBe(true);
     });
 
     it("should not render empty state region when data is present", () => {
       wrapper = mountMonitorTable({ data: mockMonitorList });
-      expect(
-        wrapper.find('[data-test="otable-empty-region"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="otable-empty-region"]').exists()).toBe(false);
     });
 
     it("should emit empty-action when OEmptyState action is triggered", async () => {
@@ -465,44 +456,24 @@ describe("MonitorTable", () => {
       wrapper = mountMonitorTable({
         selectedIds: ["mon-http-1", "mon-tcp-1"],
       });
-      expect(
-        wrapper.find('[data-test="monitor-table-pause-selected-btn"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="monitor-table-enable-selected-btn"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find(
-          '[data-test="monitor-table-trigger-selected-btn"]',
-        ).exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="monitor-table-move-selected-btn"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find(
-          '[data-test="monitor-table-delete-selected-btn"]',
-        ).exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="monitor-table-pause-selected-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="monitor-table-enable-selected-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="monitor-table-trigger-selected-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="monitor-table-move-selected-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="monitor-table-delete-selected-btn"]').exists()).toBe(true);
     });
 
     it("should not show bulk action buttons when no rows are selected", () => {
       wrapper = mountMonitorTable({ selectedIds: [] });
-      expect(
-        wrapper.find('[data-test="monitor-table-pause-selected-btn"]').exists(),
-      ).toBe(false);
-      expect(
-        wrapper.find('[data-test="monitor-table-delete-selected-btn"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="monitor-table-pause-selected-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="monitor-table-delete-selected-btn"]').exists()).toBe(false);
     });
 
     it("should emit pause-selected when pause selected button is clicked", async () => {
       wrapper = mountMonitorTable({
         selectedIds: ["mon-http-1"],
       });
-      const btn = wrapper.find(
-        '[data-test="monitor-table-pause-selected-btn"]',
-      );
+      const btn = wrapper.find('[data-test="monitor-table-pause-selected-btn"]');
       expect(btn.exists()).toBe(true);
       await btn.trigger("click");
       expect(wrapper.emitted("pause-selected")).toHaveLength(1);
@@ -512,9 +483,7 @@ describe("MonitorTable", () => {
       wrapper = mountMonitorTable({
         selectedIds: ["mon-http-1"],
       });
-      const btn = wrapper.find(
-        '[data-test="monitor-table-enable-selected-btn"]',
-      );
+      const btn = wrapper.find('[data-test="monitor-table-enable-selected-btn"]');
       expect(btn.exists()).toBe(true);
       await btn.trigger("click");
       expect(wrapper.emitted("enable-selected")).toHaveLength(1);
@@ -524,9 +493,7 @@ describe("MonitorTable", () => {
       wrapper = mountMonitorTable({
         selectedIds: ["mon-http-1"],
       });
-      const btn = wrapper.find(
-        '[data-test="monitor-table-trigger-selected-btn"]',
-      );
+      const btn = wrapper.find('[data-test="monitor-table-trigger-selected-btn"]');
       expect(btn.exists()).toBe(true);
       await btn.trigger("click");
       expect(wrapper.emitted("trigger-selected")).toHaveLength(1);
@@ -536,9 +503,7 @@ describe("MonitorTable", () => {
       wrapper = mountMonitorTable({
         selectedIds: ["mon-http-1"],
       });
-      const btn = wrapper.find(
-        '[data-test="monitor-table-move-selected-btn"]',
-      );
+      const btn = wrapper.find('[data-test="monitor-table-move-selected-btn"]');
       expect(btn.exists()).toBe(true);
       await btn.trigger("click");
       expect(wrapper.emitted("move-selected")).toHaveLength(1);
@@ -548,9 +513,7 @@ describe("MonitorTable", () => {
       wrapper = mountMonitorTable({
         selectedIds: ["mon-http-1"],
       });
-      const btn = wrapper.find(
-        '[data-test="monitor-table-delete-selected-btn"]',
-      );
+      const btn = wrapper.find('[data-test="monitor-table-delete-selected-btn"]');
       expect(btn.exists()).toBe(true);
       await btn.trigger("click");
       expect(wrapper.emitted("delete-selected")).toHaveLength(1);
@@ -561,17 +524,11 @@ describe("MonitorTable", () => {
         selectedIds: ["mon-http-1"],
         bulkActionLoading: true,
       });
-      const pauseBtn = wrapper.find(
-        '[data-test="monitor-table-pause-selected-btn"]',
-      );
+      const pauseBtn = wrapper.find('[data-test="monitor-table-pause-selected-btn"]');
       expect(pauseBtn.attributes("disabled")).toBeDefined();
-      const enableBtn = wrapper.find(
-        '[data-test="monitor-table-enable-selected-btn"]',
-      );
+      const enableBtn = wrapper.find('[data-test="monitor-table-enable-selected-btn"]');
       expect(enableBtn.attributes("disabled")).toBeDefined();
-      const triggerBtn = wrapper.find(
-        '[data-test="monitor-table-trigger-selected-btn"]',
-      );
+      const triggerBtn = wrapper.find('[data-test="monitor-table-trigger-selected-btn"]');
       expect(triggerBtn.attributes("disabled")).toBeDefined();
     });
   });
@@ -625,17 +582,13 @@ describe("MonitorTable", () => {
       wrapper = mountMonitorTable({
         toggleLoadingMap: { "mon-http-1": true },
       });
-      const spinner = wrapper.find(
-        '[data-test="monitor-table-toggle-spinner"]',
-      );
+      const spinner = wrapper.find('[data-test="monitor-table-toggle-spinner"]');
       expect(spinner.exists()).toBe(true);
     });
 
     it("should not show toggle spinner when toggleLoadingMap is empty", () => {
       wrapper = mountMonitorTable();
-      const spinner = wrapper.find(
-        '[data-test="monitor-table-toggle-spinner"]',
-      );
+      const spinner = wrapper.find('[data-test="monitor-table-toggle-spinner"]');
       expect(spinner.exists()).toBe(false);
     });
 
@@ -643,17 +596,13 @@ describe("MonitorTable", () => {
       wrapper = mountMonitorTable({
         triggerLoadingMap: { "mon-http-1": true },
       });
-      const spinner = wrapper.find(
-        '[data-test="monitor-table-trigger-spinner"]',
-      );
+      const spinner = wrapper.find('[data-test="monitor-table-trigger-spinner"]');
       expect(spinner.exists()).toBe(true);
     });
 
     it("should not show trigger spinner when triggerLoadingMap is empty", () => {
       wrapper = mountMonitorTable();
-      const spinner = wrapper.find(
-        '[data-test="monitor-table-trigger-spinner"]',
-      );
+      const spinner = wrapper.find('[data-test="monitor-table-trigger-spinner"]');
       expect(spinner.exists()).toBe(false);
     });
   });
@@ -677,9 +626,7 @@ describe("MonitorTable", () => {
       wrapper = mountMonitorTable();
       const editBtn = wrapper.find('[data-test="monitor-table-edit-btn"]');
       expect(editBtn.exists()).toBe(true);
-      const duplicateBtn = wrapper.find(
-        '[data-test="monitor-table-duplicate-btn"]',
-      );
+      const duplicateBtn = wrapper.find('[data-test="monitor-table-duplicate-btn"]');
       expect(duplicateBtn.exists()).toBe(true);
       const moreBtn = wrapper.find('[data-test="monitor-table-more-btn"]');
       expect(moreBtn.exists()).toBe(true);

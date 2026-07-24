@@ -111,18 +111,14 @@ describe("MetricSelector", () => {
     it("renders the metric selector root element", () => {
       wrapper = createWrapper();
 
-      expect(
-        wrapper.find('[data-test="promql-metric-selector"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="promql-metric-selector"]').exists()).toBe(true);
     });
 
     it("displays the 'Metric' layout label", () => {
       wrapper = createWrapper();
 
       // i18n resolves 'panel.metric' to 'Metric' in the en locale
-      expect(
-        wrapper.find('[data-test="promql-metric-selector-label"]').text(),
-      ).toBe("Metric");
+      expect(wrapper.find('[data-test="promql-metric-selector-label"]').text()).toBe("Metric");
     });
 
     it("renders the OSelect component", () => {
@@ -147,9 +143,7 @@ describe("MetricSelector", () => {
     it("passes 'Metric Name' label to OSelect", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.find('[data-test="o-select-label"]').text()).toBe(
-        "Metric Name",
-      );
+      expect(wrapper.find('[data-test="o-select-label"]').text()).toBe("Metric Name");
     });
   });
 
@@ -196,9 +190,7 @@ describe("MetricSelector", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="o-select-options-count"]').text(),
-      ).toBe("5");
+      expect(wrapper.find('[data-test="o-select-options-count"]').text()).toBe("5");
     });
 
     it("passes empty options list when API returns empty list", async () => {
@@ -219,9 +211,7 @@ describe("MetricSelector", () => {
 
       // The #empty slot is forwarded to the stub root; the stub root is
       // rendered with the forwarded data-test="metric-selector" attribute.
-      expect(wrapper.find('[data-test="metric-selector"]').text()).toContain(
-        "No metrics found",
-      );
+      expect(wrapper.find('[data-test="metric-selector"]').text()).toContain("No metrics found");
     });
 
     it("shows 'Loading metrics...' in empty slot while request is in flight", async () => {
@@ -237,9 +227,7 @@ describe("MetricSelector", () => {
       // Do NOT flush — request is still pending
       await Promise.resolve(); // let onMounted microtask run
 
-      expect(wrapper.find('[data-test="metric-selector"]').text()).toContain(
-        "Loading metrics...",
-      );
+      expect(wrapper.find('[data-test="metric-selector"]').text()).toContain("Loading metrics...");
 
       // Cleanup: resolve so no leaked promise
       resolveNameList({ data: { list: [] } });
@@ -257,9 +245,7 @@ describe("MetricSelector", () => {
     });
 
     it("handles API error: options remain empty and loading clears", async () => {
-      const consoleSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       mockStreamService.nameList.mockRejectedValue(new Error("API Error"));
 
       wrapper = createWrapper();
@@ -268,13 +254,8 @@ describe("MetricSelector", () => {
       const oSelect = wrapper.findComponent({ name: "OSelect" });
       expect(oSelect.props("options")).toEqual([]);
       // Loading cleared — 'No metrics found' visible, not the loading text
-      expect(wrapper.find('[data-test="metric-selector"]').text()).toContain(
-        "No metrics found",
-      );
-      expect(consoleSpy).toHaveBeenCalledWith(
-        "Error loading metrics:",
-        expect.any(Error),
-      );
+      expect(wrapper.find('[data-test="metric-selector"]').text()).toContain("No metrics found");
+      expect(consoleSpy).toHaveBeenCalledWith("Error loading metrics:", expect.any(Error));
 
       consoleSpy.mockRestore();
     });
@@ -305,9 +286,7 @@ describe("MetricSelector", () => {
       await wrapper.find('[data-test="o-select-trigger"]').trigger("click");
 
       expect(wrapper.emitted("update:metric")).toBeTruthy();
-      expect(wrapper.emitted("update:metric")![0]).toEqual([
-        "http_requests_total",
-      ]);
+      expect(wrapper.emitted("update:metric")![0]).toEqual(["http_requests_total"]);
     });
 
     it("updates OSelect modelValue after a selection", async () => {

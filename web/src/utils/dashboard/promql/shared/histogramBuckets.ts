@@ -73,8 +73,7 @@ export function parseLe(raw: string): number {
   if (trimmed === "") return NaN;
 
   const negative = trimmed.startsWith("-");
-  const magnitude =
-    negative || trimmed.startsWith("+") ? trimmed.slice(1) : trimmed;
+  const magnitude = negative || trimmed.startsWith("+") ? trimmed.slice(1) : trimmed;
 
   if (INFINITY_SPELLINGS.has(magnitude.toLowerCase())) {
     return negative ? -Infinity : Infinity;
@@ -169,9 +168,7 @@ export function deaccumulateHistogramSeries(
       timestampSet.add(ts);
     }
   }
-  const timestamps = Array.from(timestampSet).sort(
-    (a, b) => Number(a) - Number(b),
-  );
+  const timestamps = Array.from(timestampSet).sort((a, b) => Number(a) - Number(b));
 
   const output: HistogramSeriesOutput[] = buckets.map((bucket) => ({
     le: bucket.le,

@@ -1,8 +1,4 @@
-import type {
-  Provider,
-  ScoreConfig,
-  ScorerType,
-} from "@/services/online-evals.service";
+import type { Provider, ScoreConfig, ScorerType } from "@/services/online-evals.service";
 
 const VALID_SCORER_TYPES: ScorerType[] = ["llm_judge", "remote"];
 
@@ -88,8 +84,7 @@ export function normalizeScorerInput(raw: unknown): NormalizedScorerInput | null
   const scName = src.producesScoreConfigName ?? src.produces_score_config_name;
   if (typeof scName === "string" && scName) scorer.producesScoreConfigName = scName;
 
-  const scVer =
-    src.producesScoreConfigVersion ?? src.produces_score_config_version;
+  const scVer = src.producesScoreConfigVersion ?? src.produces_score_config_version;
   if (scVer !== undefined) scorer.producesScoreConfigVersion = scVer;
 
   if (typeof src.template === "string") scorer.template = src.template;
@@ -125,12 +120,7 @@ function scoreConfigEntityId(row: ScoreConfig): string {
 }
 
 function findScoreConfigById(rows: ReadonlyArray<ScoreConfig>, id: string) {
-  return (
-    rows.find(
-      (r) =>
-        scoreConfigEntityId(r) === id || String(r.id) === id,
-    ) ?? null
-  );
+  return rows.find((r) => scoreConfigEntityId(r) === id || String(r.id) === id) ?? null;
 }
 
 function findScoreConfigByName(rows: ReadonlyArray<ScoreConfig>, name: string) {
@@ -176,7 +166,9 @@ function resolveProviderRef(
   const byId = params.provider_id ? findProviderById(ctx.providers, params.provider_id) : null;
   if (byId) return { id: byId.id };
 
-  const byName = params.providerName ? findProviderByName(ctx.providers, params.providerName) : null;
+  const byName = params.providerName
+    ? findProviderByName(ctx.providers, params.providerName)
+    : null;
   if (byName) return { id: byName.id };
 
   if (!params.provider_id && !params.providerName) {

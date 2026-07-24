@@ -109,7 +109,6 @@ const ConfirmDialogStub = {
   emits: ["update:ok", "update:cancel"],
 };
 
-
 describe("QueryTypeSelector", () => {
   let wrapper: VueWrapper;
 
@@ -188,16 +187,10 @@ describe("QueryTypeSelector", () => {
 
     it("should render all buttons", () => {
       wrapper = createWrapper();
-      const builderButton = wrapper.find(
-        '[data-test="dashboard-builder-query-type"]',
-      );
+      const builderButton = wrapper.find('[data-test="dashboard-builder-query-type"]');
       // promql button is only rendered for metrics stream type (uses v-if)
-      const sqlButton = wrapper.find(
-        '[data-test="dashboard-sql-query-type"]',
-      );
-      const customButton = wrapper.find(
-        '[data-test="dashboard-custom-query-type"]',
-      );
+      const sqlButton = wrapper.find('[data-test="dashboard-sql-query-type"]');
+      const customButton = wrapper.find('[data-test="dashboard-custom-query-type"]');
 
       expect(builderButton.exists()).toBeTruthy();
       expect(sqlButton.exists()).toBeTruthy();
@@ -206,13 +199,9 @@ describe("QueryTypeSelector", () => {
 
     it("should show correct button labels", () => {
       wrapper = createWrapper();
-      const builderButton = wrapper.find(
-        '[data-test="dashboard-builder-query-type"]',
-      );
+      const builderButton = wrapper.find('[data-test="dashboard-builder-query-type"]');
       const sqlButton = wrapper.find('[data-test="dashboard-sql-query-type"]');
-      const customButton = wrapper.find(
-        '[data-test="dashboard-custom-query-type"]',
-      );
+      const customButton = wrapper.find('[data-test="dashboard-custom-query-type"]');
 
       expect(builderButton.text()).toBe("panel.builder");
       expect(sqlButton.text()).toBe("panel.SQL");
@@ -225,9 +214,7 @@ describe("QueryTypeSelector", () => {
       wrapper = createWrapper();
       // reka-ui manages data-state in a real browser; in jsdom we verify the
       // reactive model-value prop on the builder-mode OToggleGroup instead.
-      const builderButton = wrapper.find(
-        '[data-test="dashboard-builder-query-type"]',
-      );
+      const builderButton = wrapper.find('[data-test="dashboard-builder-query-type"]');
       expect(builderButton.exists()).toBe(true);
       expect(wrapper.vm.selectedButtonType).toBe("builder");
     });
@@ -285,36 +272,28 @@ describe("QueryTypeSelector", () => {
     it("should show builder button for non-custom chart types", () => {
       mockDashboardPanelData.data.type = "line";
       wrapper = createWrapper();
-      const builderButton = wrapper.find(
-        '[data-test="dashboard-builder-query-type"]',
-      );
+      const builderButton = wrapper.find('[data-test="dashboard-builder-query-type"]');
       expect(builderButton.exists()).toBeTruthy();
     });
 
     it("should hide builder button for custom_chart type", () => {
       mockDashboardPanelData.data.type = "custom_chart";
       wrapper = createWrapper();
-      const builderButton = wrapper.find(
-        '[data-test="dashboard-builder-query-type"]',
-      );
+      const builderButton = wrapper.find('[data-test="dashboard-builder-query-type"]');
       expect(builderButton.exists()).toBeFalsy();
     });
 
     it("should show promql button for metrics stream type", () => {
       mockDashboardPanelData.data.queries[0].fields.stream_type = "metrics";
       wrapper = createWrapper();
-      const promqlButton = wrapper.find(
-        '[data-test="dashboard-promql-query-type"]',
-      );
+      const promqlButton = wrapper.find('[data-test="dashboard-promql-query-type"]');
       expect(promqlButton.isVisible()).toBeTruthy();
     });
 
     it("should hide promql button for non-metrics stream type", () => {
       mockDashboardPanelData.data.queries[0].fields.stream_type = "logs";
       wrapper = createWrapper();
-      const promqlButton = wrapper.find(
-        '[data-test="dashboard-promql-query-type"]',
-      );
+      const promqlButton = wrapper.find('[data-test="dashboard-promql-query-type"]');
       // OToggleGroupItem uses v-if so the element won't exist for non-metrics
       expect(promqlButton.exists()).toBeFalsy();
     });
@@ -327,9 +306,7 @@ describe("QueryTypeSelector", () => {
 
     it("should always show Custom button", () => {
       wrapper = createWrapper();
-      const customButton = wrapper.find(
-        '[data-test="dashboard-custom-query-type"]',
-      );
+      const customButton = wrapper.find('[data-test="dashboard-custom-query-type"]');
       expect(customButton.exists()).toBeTruthy();
     });
   });
@@ -337,9 +314,7 @@ describe("QueryTypeSelector", () => {
   describe("Button Interactions", () => {
     it("should handle builder button click", async () => {
       wrapper = createWrapper();
-      const builderButton = wrapper.find(
-        '[data-test="dashboard-builder-query-type"]',
-      );
+      const builderButton = wrapper.find('[data-test="dashboard-builder-query-type"]');
       await builderButton.trigger("click");
 
       expect(wrapper.vm.selectedButtonType).toBe("builder");
@@ -370,9 +345,7 @@ describe("QueryTypeSelector", () => {
 
       // OToggleGroup uses reka-ui — emit update:model-value on the query type
       // toggle group (first OToggleGroup) to simulate a user selecting "promql".
-      const queryTypeToggleGroup = wrapper
-        .findAllComponents({ name: "OToggleGroup" })
-        .at(0);
+      const queryTypeToggleGroup = wrapper.findAllComponents({ name: "OToggleGroup" }).at(0);
       await queryTypeToggleGroup!.vm.$emit("update:modelValue", "promql");
       await wrapper.vm.$nextTick();
 
@@ -389,9 +362,7 @@ describe("QueryTypeSelector", () => {
       wrapper.vm.selectedButtonQueryType = "promql";
       await wrapper.vm.$nextTick();
 
-      const queryTypeToggleGroup = wrapper
-        .findAllComponents({ name: "OToggleGroup" })
-        .at(0);
+      const queryTypeToggleGroup = wrapper.findAllComponents({ name: "OToggleGroup" }).at(0);
       await queryTypeToggleGroup!.vm.$emit("update:modelValue", "sql");
       await wrapper.vm.$nextTick();
 
@@ -410,9 +381,7 @@ describe("QueryTypeSelector", () => {
 
     it("should not change selection when clicking same button", async () => {
       wrapper = createWrapper();
-      const builderButton = wrapper.find(
-        '[data-test="dashboard-builder-query-type"]',
-      );
+      const builderButton = wrapper.find('[data-test="dashboard-builder-query-type"]');
       const initialType = wrapper.vm.selectedButtonType;
 
       await builderButton.trigger("click");
@@ -439,9 +408,7 @@ describe("QueryTypeSelector", () => {
       mockDashboardPanelData.data.queries[0].query = "";
       wrapper = createWrapper();
 
-      const customButton = wrapper.find(
-        '[data-test="dashboard-custom-query-type"]',
-      );
+      const customButton = wrapper.find('[data-test="dashboard-custom-query-type"]');
       await customButton.trigger("click");
 
       expect(wrapper.vm.confirmQueryModeChangeDialog).toBeFalsy();
@@ -699,21 +666,17 @@ describe("QueryTypeSelector", () => {
 
     it("should not apply selected class to inactive buttons", () => {
       wrapper = createWrapper();
-      const customButton = wrapper.find(
-        '[data-test="dashboard-custom-query-type"]',
-      );
+      const customButton = wrapper.find('[data-test="dashboard-custom-query-type"]');
       // OToggleGroupItem uses reka-ui data-state="off" for inactive state
       expect(customButton.attributes("data-state")).not.toBe("on");
     });
 
     it("should have proper button classes", () => {
       wrapper = createWrapper();
-      const builderButton = wrapper.find(
-        '[data-test="dashboard-builder-query-type"]',
-      );
+      const builderButton = wrapper.find('[data-test="dashboard-builder-query-type"]');
       // OToggleGroupItem renders with Tailwind classes (inline-flex, items-center, etc.)
       expect(builderButton.exists()).toBeTruthy();
-      expect(builderButton.classes().some(c => c.startsWith(""))).toBe(true);
+      expect(builderButton.classes().some((c) => c.startsWith(""))).toBe(true);
     });
 
     it("should have button-group container class", () => {
@@ -866,9 +829,7 @@ describe("QueryTypeSelector", () => {
       await settle();
 
       expect(mockDashboardPanelData.data.queryType).toBe("sql");
-      expect(mockDashboardPanelData.data.queries[0].query).toBe(
-        "SELECT count(*) FROM logs",
-      );
+      expect(mockDashboardPanelData.data.queries[0].query).toBe("SELECT count(*) FROM logs");
     });
 
     it("does NOT convert a SAVED panel when its stream type flips to metrics", async () => {

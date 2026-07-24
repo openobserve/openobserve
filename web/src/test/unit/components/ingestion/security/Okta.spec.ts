@@ -22,7 +22,8 @@ import Okta from "@/components/ingestion/security/Okta.vue";
 vi.mock("@/composables/useIngestion", () => ({
   default: vi.fn(() => ({
     endpoint: "https://api.example.com/ingest",
-    securityContent: "curl -X POST https://api.example.com/ingest -d '{\"stream\": \"[STREAM_NAME]\"}' ",
+    securityContent:
+      'curl -X POST https://api.example.com/ingest -d \'{"stream": "[STREAM_NAME]"}\' ',
     securityDocURLs: {
       okta: "https://docs.example.com/okta",
       falco: "https://docs.example.com/falco",
@@ -34,7 +35,6 @@ vi.mock("@/composables/useIngestion", () => ({
     },
   })),
 }));
-
 
 describe("Okta.vue", () => {
   let store: any;

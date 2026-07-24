@@ -149,7 +149,7 @@ describe("LoadingProgress", () => {
 
   it("should validate percentage is between 0 and 100", () => {
     const validator = LoadingProgress.props.loadingProgressPercentage.validator;
-    
+
     expect(validator(0)).toBe(true);
     expect(validator(50)).toBe(true);
     expect(validator(100)).toBe(true);
@@ -294,6 +294,6 @@ describe("LoadingProgress", () => {
 
     const container = wrapper.find(".absolute");
     expect(container.classes()).toContain("top-0");
-    expect(container.classes()).toContain("z-[999]");
+    expect(container.classes()).toContain("z-999");
   });
 });

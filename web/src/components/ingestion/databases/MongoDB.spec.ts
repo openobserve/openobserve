@@ -22,13 +22,32 @@ import MongoDB from "./MongoDB.vue";
 import mongodbCard from "@/components/ingestion/setupCard/content/mongodb";
 import { getDataSourceCard } from "@/components/ingestion/setupCard/registry";
 
-const mockEndpoint = ref({ url: "https://test.openobserve.ai", host: "h", port: 443, protocol: "https", tls: true });
-vi.mock("@/composables/useIngestion", () => ({ default: vi.fn(() => ({ endpoint: mockEndpoint })) }));
+const mockEndpoint = ref({
+  url: "https://test.openobserve.ai",
+  host: "h",
+  port: 443,
+  protocol: "https",
+  tls: true,
+});
+vi.mock("@/composables/useIngestion", () => ({
+  default: vi.fn(() => ({ endpoint: mockEndpoint })),
+}));
 vi.mock("@/components/ingestion/setupCard/SetupCardRenderer.vue", () => ({
-  default: { name: "SetupCardRenderer", props: ["content", "subs", "logoUrl", "logoUrlDark"], template: '<div data-test="rich-card-stub" />' },
+  default: {
+    name: "SetupCardRenderer",
+    props: ["content", "subs", "logoUrl", "logoUrlDark"],
+    template: '<div data-test="rich-card-stub" />',
+  },
 }));
 
-const mockStore = createStore({ state: { selectedOrganization: { identifier: "test-org" }, userInfo: { email: "test@example.com" }, organizationData: { organizationPasscode: "pc" }, theme: "light" } });
+const mockStore = createStore({
+  state: {
+    selectedOrganization: { identifier: "test-org" },
+    userInfo: { email: "test@example.com" },
+    organizationData: { organizationPasscode: "pc" },
+    theme: "light",
+  },
+});
 const mockI18n = createI18n({ locale: "en", messages: { en: {} } });
 const SUBS = { url: "https://test.openobserve.ai", org: "test-org", token: "dGVzdEB0b2tlbg==" };
 
@@ -36,8 +55,18 @@ describe("mongodbCard builder", () => {
   it("builds metadata + step flow", () => {
     const card = mongodbCard(SUBS);
     expect(card.provider.name).toBe("MongoDB");
-    expect(card.detect).toMatchObject({ streamType: "metrics", match: "keyword", streamName: "mongodb" });
-    expect(card.steps.map((s) => s.id)).toEqual(["prepare", "install", "configure", "run", "verify"]);
+    expect(card.detect).toMatchObject({
+      streamType: "metrics",
+      match: "keyword",
+      streamName: "mongodb",
+    });
+    expect(card.steps.map((s) => s.id)).toEqual([
+      "prepare",
+      "install",
+      "configure",
+      "run",
+      "verify",
+    ]);
   });
 
   it("offers mongosh / docker / Compass tabs to create the user", () => {
@@ -62,7 +91,9 @@ describe("mongodbCard builder", () => {
 
 describe("MongoDB.vue", () => {
   let wrapper: VueWrapper<any>;
-  afterEach(() => { if (wrapper) wrapper.unmount(); });
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
   it("renders the shared card for the mongoDB slug", () => {
     expect(getDataSourceCard("mongoDB", SUBS)?.provider.name).toBe("MongoDB");
     wrapper = mount(MongoDB, { global: { plugins: [mockStore, mockI18n] } });

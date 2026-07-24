@@ -32,7 +32,6 @@ vi.mock("@/composables/useStreams", () => ({
   }),
 }));
 
-
 const mockActionScripts = [
   {
     id: "test-action-1",
@@ -109,13 +108,7 @@ describe("ActionScripts", () => {
           },
           QTablePagination: {
             template: '<div data-test="table-pagination">Pagination</div>',
-            props: [
-              "scope",
-              "pageTitle",
-              "position",
-              "resultTotal",
-              "perPageOptions",
-            ],
+            props: ["scope", "pageTitle", "position", "resultTotal", "perPageOptions"],
             emits: ["update:changeRecordPerPage"],
           },
           OTable: {
@@ -178,12 +171,7 @@ describe("ActionScripts", () => {
               "secondaryButtonLoading",
               "neutralButtonLoading",
             ],
-            emits: [
-              "update:open",
-              "click:primary",
-              "click:secondary",
-              "click:neutral",
-            ],
+            emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
           },
         },
       },
@@ -202,9 +190,7 @@ describe("ActionScripts", () => {
 
   it("should mount ActionScripts component", () => {
     expect(wrapper.exists()).toBe(true);
-    expect(
-      wrapper.find('[data-test="action-scripts-list-page"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="action-scripts-list-page"]').exists()).toBe(true);
   });
 
   describe("Header section", () => {
@@ -215,9 +201,7 @@ describe("ActionScripts", () => {
     });
 
     it("should display search input", () => {
-      const searchInput = wrapper.find(
-        '[data-test="action-list-search-input"]',
-      );
+      const searchInput = wrapper.find('[data-test="action-list-search-input"]');
       expect(searchInput.exists()).toBe(true);
     });
 
@@ -228,9 +212,7 @@ describe("ActionScripts", () => {
     });
 
     it("should handle search input changes", async () => {
-      const searchInput = wrapper.find(
-        '[data-test="action-list-search-input"]',
-      );
+      const searchInput = wrapper.find('[data-test="action-list-search-input"]');
       if (searchInput.exists()) {
         const input = searchInput.find("input");
         if (input.exists()) {
@@ -296,12 +278,8 @@ describe("ActionScripts", () => {
       ];
       await wrapper.vm.$nextTick();
 
-      const editBtn = wrapper.find(
-        '[data-test="alert-list-Test Action 1-update-alert"]',
-      );
-      const deleteBtn = wrapper.find(
-        '[data-test="alert-list-Test Action 1-delete-alert"]',
-      );
+      const editBtn = wrapper.find('[data-test="alert-list-Test Action 1-update-alert"]');
+      const deleteBtn = wrapper.find('[data-test="alert-list-Test Action 1-delete-alert"]');
 
       expect(editBtn.exists()).toBe(true);
       expect(deleteBtn.exists()).toBe(true);
@@ -325,9 +303,7 @@ describe("ActionScripts", () => {
       wrapper.vm.alertStateLoadingMap = { "uuid-1": true };
       await wrapper.vm.$nextTick();
 
-      const loadingSpinner = wrapper.find(
-        '[data-test="action-scripts-loading"]',
-      );
+      const loadingSpinner = wrapper.find('[data-test="action-scripts-loading"]');
       expect(loadingSpinner.exists()).toBe(true);
     });
   });
@@ -405,19 +381,14 @@ describe("ActionScripts", () => {
       wrapper.vm.selectedDelete = mockAlert;
 
       // Suppress console errors during this test
-      const consoleSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       // Mock the actions service delete method to return error with non-200 code
       globalThis.server.use(
         http.delete(
           `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/actions/test-action-1`,
           () => {
-            return HttpResponse.json(
-              { error: "Error deleting action script" },
-              { status: 500 },
-            );
+            return HttpResponse.json({ error: "Error deleting action script" }, { status: 500 });
           },
         ),
       );
@@ -439,9 +410,7 @@ describe("ActionScripts", () => {
       const mockAlert = { id: "test-action-1", name: "Test Action 1" };
       wrapper.vm.selectedDelete = mockAlert;
 
-      const consoleSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       // Mock the actions service delete method to return HTTP 403 status
       globalThis.server.use(
         http.delete(
@@ -686,12 +655,15 @@ describe("ActionScripts", () => {
       wrapper.vm.confirmBulkDelete = true;
 
       globalThis.server.use(
-        http.delete(`${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/actions`, () => {
-          return HttpResponse.json({
-            successful: ["test-action-1", "test-action-2"],
-            unsuccessful: [],
-          });
-        }),
+        http.delete(
+          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/actions`,
+          () => {
+            return HttpResponse.json({
+              successful: ["test-action-1", "test-action-2"],
+              unsuccessful: [],
+            });
+          },
+        ),
       );
 
       await wrapper.vm.bulkDeleteActionScripts();
@@ -709,12 +681,15 @@ describe("ActionScripts", () => {
       wrapper.vm.confirmBulkDelete = true;
 
       globalThis.server.use(
-        http.delete(`${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/actions`, () => {
-          return HttpResponse.json({
-            successful: ["test-action-1"],
-            unsuccessful: ["test-action-2"],
-          });
-        }),
+        http.delete(
+          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/actions`,
+          () => {
+            return HttpResponse.json({
+              successful: ["test-action-1"],
+              unsuccessful: ["test-action-2"],
+            });
+          },
+        ),
       );
 
       await wrapper.vm.bulkDeleteActionScripts();
@@ -724,18 +699,19 @@ describe("ActionScripts", () => {
     });
 
     it("should handle bulk delete with all failures", async () => {
-      wrapper.vm.selectedActionScripts = [
-        { id: "test-action-1", name: "Test Action 1" },
-      ];
+      wrapper.vm.selectedActionScripts = [{ id: "test-action-1", name: "Test Action 1" }];
       wrapper.vm.confirmBulkDelete = true;
 
       globalThis.server.use(
-        http.delete(`${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/actions`, () => {
-          return HttpResponse.json({
-            successful: [],
-            unsuccessful: ["test-action-1"],
-          });
-        }),
+        http.delete(
+          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/actions`,
+          () => {
+            return HttpResponse.json({
+              successful: [],
+              unsuccessful: ["test-action-1"],
+            });
+          },
+        ),
       );
 
       await wrapper.vm.bulkDeleteActionScripts();
@@ -745,15 +721,16 @@ describe("ActionScripts", () => {
     });
 
     it("should handle bulk delete with HTTP error", async () => {
-      wrapper.vm.selectedActionScripts = [
-        { id: "test-action-1", name: "Test Action 1" },
-      ];
+      wrapper.vm.selectedActionScripts = [{ id: "test-action-1", name: "Test Action 1" }];
       wrapper.vm.confirmBulkDelete = true;
 
       globalThis.server.use(
-        http.delete(`${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/actions`, () => {
-          return HttpResponse.json({ message: "Internal Server Error" }, { status: 500 });
-        }),
+        http.delete(
+          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/actions`,
+          () => {
+            return HttpResponse.json({ message: "Internal Server Error" }, { status: 500 });
+          },
+        ),
       );
 
       await wrapper.vm.bulkDeleteActionScripts();
@@ -764,15 +741,16 @@ describe("ActionScripts", () => {
     });
 
     it("should handle bulk delete with 403 error silently", async () => {
-      wrapper.vm.selectedActionScripts = [
-        { id: "test-action-1", name: "Test Action 1" },
-      ];
+      wrapper.vm.selectedActionScripts = [{ id: "test-action-1", name: "Test Action 1" }];
       wrapper.vm.confirmBulkDelete = true;
 
       globalThis.server.use(
-        http.delete(`${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/actions`, () => {
-          return HttpResponse.json({ message: "Forbidden" }, { status: 403 });
-        }),
+        http.delete(
+          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/actions`,
+          () => {
+            return HttpResponse.json({ message: "Forbidden" }, { status: 403 });
+          },
+        ),
       );
 
       await wrapper.vm.bulkDeleteActionScripts();
@@ -783,17 +761,18 @@ describe("ActionScripts", () => {
     });
 
     it("should clear selected action scripts after bulk delete", async () => {
-      wrapper.vm.selectedActionScripts = [
-        { id: "test-action-1", name: "Test Action 1" },
-      ];
+      wrapper.vm.selectedActionScripts = [{ id: "test-action-1", name: "Test Action 1" }];
 
       globalThis.server.use(
-        http.delete(`${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/actions`, () => {
-          return HttpResponse.json({
-            successful: ["test-action-1"],
-            unsuccessful: [],
-          });
-        }),
+        http.delete(
+          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/actions`,
+          () => {
+            return HttpResponse.json({
+              successful: ["test-action-1"],
+              unsuccessful: [],
+            });
+          },
+        ),
       );
 
       await wrapper.vm.bulkDeleteActionScripts();
@@ -1035,11 +1014,7 @@ describe("ActionScripts", () => {
       const dialog = findODialog();
       const emitsOption = (dialog.vm.$options as any).emits;
       expect(emitsOption).toEqual(
-        expect.arrayContaining([
-          "update:open",
-          "click:primary",
-          "click:secondary",
-        ]),
+        expect.arrayContaining(["update:open", "click:primary", "click:secondary"]),
       );
     });
 
@@ -1076,15 +1051,9 @@ describe("ActionScripts", () => {
     });
 
     it("should render clone form fields inside the ODialog default slot", () => {
-      expect(
-        wrapper.find('[data-test="to-be-clone-action-name"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="to-be-clone-stream-type"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="to-be-clone-stream-name"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="to-be-clone-action-name"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="to-be-clone-stream-type"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="to-be-clone-stream-name"]').exists()).toBe(true);
     });
   });
 

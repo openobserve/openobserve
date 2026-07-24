@@ -106,6 +106,13 @@ export class MetricsPage {
         this.panelSidebarExpandedHeader = page.locator('[data-test="panel-sidebar-header-expanded"]').first();
         // Sentinel: any config-panel control. Used to gate the async ConfigPanel mount.
         this.anyDashboardConfigControl = page.locator('[data-test^="dashboard-config-"]').first();
+        // Expand/collapse-all button in the config sidebar. Config sections start
+        // collapsed after the config-panel redesign; the second locator is the
+        // same button narrowed to the all-expanded state for deterministic waits.
+        this.configToggleAllSectionsBtn = page.locator('[data-test="dashboard-config-toggle-all-sections-btn"]');
+        this.configToggleAllSectionsBtnExpanded = page.locator(
+            '[data-test="dashboard-config-toggle-all-sections-btn"][data-test-all-expanded="true"]'
+        );
         // All config-panel controls (used by getConfigSectionKeys to enumerate).
         this.allDashboardConfigControls = page.locator('[data-test^="dashboard-config-"]');
         // Metrics page does not yet surface a chart-type picker; this defensive
@@ -1119,6 +1126,39 @@ export class MetricsPage {
         if (await btn.isVisible({ timeout: 3000 }).catch(() => false)) {
             await btn.click();
         }
+        await this.expandAllConfigSections();
+    }
+
+    /**
+     * Config sections start collapsed after the config-panel redesign. Expand
+     * them all so section controls (table mode, column order, unit, etc.)
+     * render. Idempotent: skips when already expanded; tolerates the button
+     * being absent (e.g. custom-chart config has no sections).
+     */
+    async expandAllConfigSections() {
+        const btn = this.configToggleAllSectionsBtn;
+        // ConfigPanel is async-imported — wait for the button to actually mount
+        // (isVisible() would return the instantaneous state and skip too early).
+        const appeared = await btn
+            .waitFor({ state: 'visible', timeout: 8000 })
+            .then(() => true)
+            .catch(() => false);
+        if (!appeared) return;
+        const expanded = await btn.getAttribute('data-test-all-expanded');
+        if (expanded === 'true') return;
+        await btn.click();
+        await this.configToggleAllSectionsBtnExpanded
+            .waitFor({ state: 'visible', timeout: 5000 })
+            .catch(() => {});
+        // Wait for the sections' open (height) animations to finish — clicking
+        // an OSelect while sections are still animating dismisses the dropdown.
+        await this.page
+            .waitForFunction(() =>
+                Array.from(
+                    document.querySelectorAll('[data-test="o-collapsible-content"]')
+                ).every((el) => el.getAnimations().length === 0)
+            )
+            .catch(() => {});
     }
 
     /**
@@ -1132,6 +1172,7 @@ export class MetricsPage {
         if (await expandedHeader.isVisible({ timeout: 500 }).catch(() => false)) {
             // already open — still wait for async ConfigPanel to mount
             await anyConfig.waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
+            await this.expandAllConfigSections();
             return;
         }
         const btn = this.dashboardSidebarButton;
@@ -1140,6 +1181,7 @@ export class MetricsPage {
         await expandedHeader.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         // ConfigPanel is async-imported; wait for any dashboard-config-* node to mount.
         await anyConfig.waitFor({ state: 'attached', timeout: 8000 }).catch(() => {});
+        await this.expandAllConfigSections();
     }
 
     /**

@@ -84,11 +84,7 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
   { titleKey: "shortcuts.modules.metrics", pages: ["shortcuts.pages.metrics"] },
   {
     titleKey: "shortcuts.modules.traces",
-    pages: [
-      "shortcuts.pages.traces",
-      "shortcuts.pages.traceDetail",
-      "shortcuts.pages.sessions",
-    ],
+    pages: ["shortcuts.pages.traces", "shortcuts.pages.traceDetail", "shortcuts.pages.sessions"],
   },
   {
     titleKey: "shortcuts.modules.alerts",
@@ -102,17 +98,11 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
   { titleKey: "shortcuts.modules.streams", pages: ["shortcuts.pages.streams"] },
   {
     titleKey: "shortcuts.modules.pipelines",
-    pages: [
-      "shortcuts.pages.pipelines",
-      "shortcuts.pages.pipelineDestinations",
-    ],
+    pages: ["shortcuts.pages.pipelines", "shortcuts.pages.pipelineDestinations"],
   },
   {
     titleKey: "shortcuts.modules.functions",
-    pages: [
-      "shortcuts.pages.functions",
-      "shortcuts.pages.enrichmentTables",
-    ],
+    pages: ["shortcuts.pages.functions", "shortcuts.pages.enrichmentTables"],
   },
   { titleKey: "shortcuts.modules.reports", pages: ["shortcuts.pages.reports"] },
   {
@@ -171,9 +161,14 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.global",
     shortcuts: [
-      { id: "openCheatsheet", key: "shift+?",                        descriptionKey: "shortcuts.actions.openCheatsheet" },
-      { id: "closeDialog",    key: "escape",                         descriptionKey: "shortcuts.actions.closeDialog" },
-      { id: "aiChatToggle",   keyForWindows: "ctrl+b", keyForMac: "meta+b", descriptionKey: "shortcuts.actions.aiChatToggle" },
+      { id: "openCheatsheet", key: "shift+?", descriptionKey: "shortcuts.actions.openCheatsheet" },
+      { id: "closeDialog", key: "escape", descriptionKey: "shortcuts.actions.closeDialog" },
+      {
+        id: "aiChatToggle",
+        keyForWindows: "ctrl+b",
+        keyForMac: "meta+b",
+        descriptionKey: "shortcuts.actions.aiChatToggle",
+      },
     ],
   },
 
@@ -182,14 +177,38 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.logs",
     scope: "logs",
     shortcuts: [
-      { id: "logsRunQuery",        keyForWindows: "ctrl+enter",   keyForMac: "meta+enter",   descriptionKey: "shortcuts.actions.logsRunQuery" },
-      { id: "logsRefresh",         key: "r",                                                 descriptionKey: "shortcuts.actions.logsRefresh" },
-      { id: "logsToggleHistogram", key: "h",                                                 descriptionKey: "shortcuts.actions.logsToggleHistogram" },
-      { id: "logsToggleSidebar",   keyForWindows: "ctrl+/",       keyForMac: "meta+/",       descriptionKey: "shortcuts.actions.logsToggleSidebar" },
-      { id: "logsSearchHistory",   keyForWindows: "ctrl+h",       keyForMac: "meta+h",       descriptionKey: "shortcuts.actions.logsSearchHistory" },
-      { id: "logsFocusQuery",      key: "/",                                                 descriptionKey: "shortcuts.actions.focusQuery" },
-      { id: "logsSaveView",        key: "s",                                                 descriptionKey: "shortcuts.actions.logsSaveView" },
-      { id: "logsExport",          keyForWindows: "ctrl+shift+d", keyForMac: "meta+shift+d", descriptionKey: "shortcuts.actions.logsExport" },
+      {
+        id: "logsRunQuery",
+        keyForWindows: "ctrl+enter",
+        keyForMac: "meta+enter",
+        descriptionKey: "shortcuts.actions.logsRunQuery",
+      },
+      { id: "logsRefresh", key: "r", descriptionKey: "shortcuts.actions.logsRefresh" },
+      {
+        id: "logsToggleHistogram",
+        key: "h",
+        descriptionKey: "shortcuts.actions.logsToggleHistogram",
+      },
+      {
+        id: "logsToggleSidebar",
+        keyForWindows: "ctrl+/",
+        keyForMac: "meta+/",
+        descriptionKey: "shortcuts.actions.logsToggleSidebar",
+      },
+      {
+        id: "logsSearchHistory",
+        keyForWindows: "ctrl+h",
+        keyForMac: "meta+h",
+        descriptionKey: "shortcuts.actions.logsSearchHistory",
+      },
+      { id: "logsFocusQuery", key: "/", descriptionKey: "shortcuts.actions.focusQuery" },
+      { id: "logsSaveView", key: "s", descriptionKey: "shortcuts.actions.logsSaveView" },
+      {
+        id: "logsExport",
+        keyForWindows: "ctrl+shift+d",
+        keyForMac: "meta+shift+d",
+        descriptionKey: "shortcuts.actions.logsExport",
+      },
     ],
   },
 
@@ -198,12 +217,32 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.dashboardsList",
     scope: "dashboards-list",
     shortcuts: [
-      { id: "dashboardsListAdd",     key: "n", descriptionKey: "shortcuts.actions.dashboardsListAdd" },
-      { id: "dashboardsListImport",  key: "i", descriptionKey: "shortcuts.actions.dashboardsListImport" },
-      { id: "dashboardsListRefresh", key: "r", descriptionKey: "shortcuts.actions.dashboardsListRefresh" },
-      { id: "dashboardsListFocusSearch", key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
-      { id: "dashboardsListRowDuplicate", display: "d",        descriptionKey: "shortcuts.actions.tableRowDuplicate" },
-      { id: "dashboardsListRowDelete",    display: "del / ⌫", descriptionKey: "shortcuts.actions.tableRowDelete" },
+      { id: "dashboardsListAdd", key: "n", descriptionKey: "shortcuts.actions.dashboardsListAdd" },
+      {
+        id: "dashboardsListImport",
+        key: "i",
+        descriptionKey: "shortcuts.actions.dashboardsListImport",
+      },
+      {
+        id: "dashboardsListRefresh",
+        key: "r",
+        descriptionKey: "shortcuts.actions.dashboardsListRefresh",
+      },
+      {
+        id: "dashboardsListFocusSearch",
+        key: "/",
+        descriptionKey: "shortcuts.actions.focusSearch",
+      },
+      {
+        id: "dashboardsListRowDuplicate",
+        display: "d",
+        descriptionKey: "shortcuts.actions.tableRowDuplicate",
+      },
+      {
+        id: "dashboardsListRowDelete",
+        display: "del / ⌫",
+        descriptionKey: "shortcuts.actions.tableRowDelete",
+      },
     ],
   },
 
@@ -212,11 +251,20 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.dashboards",
     scope: "dashboard",
     shortcuts: [
-      { id: "dashboardAddPanel",   key: "n",                                          descriptionKey: "shortcuts.actions.dashboardAddPanel" },
-      { id: "dashboardRefresh",    key: "r",                                          descriptionKey: "shortcuts.actions.dashboardRefresh" },
-      { id: "dashboardSave",       keyForWindows: "ctrl+s", keyForMac: "meta+s",      descriptionKey: "shortcuts.actions.dashboardSave" },
-      { id: "dashboardFullscreen", key: "f",                                          descriptionKey: "shortcuts.actions.dashboardFullscreen" },
-      { id: "dashboardExport",     key: "x",                                          descriptionKey: "shortcuts.actions.dashboardExport" },
+      { id: "dashboardAddPanel", key: "n", descriptionKey: "shortcuts.actions.dashboardAddPanel" },
+      { id: "dashboardRefresh", key: "r", descriptionKey: "shortcuts.actions.dashboardRefresh" },
+      {
+        id: "dashboardSave",
+        keyForWindows: "ctrl+s",
+        keyForMac: "meta+s",
+        descriptionKey: "shortcuts.actions.dashboardSave",
+      },
+      {
+        id: "dashboardFullscreen",
+        key: "f",
+        descriptionKey: "shortcuts.actions.dashboardFullscreen",
+      },
+      { id: "dashboardExport", key: "x", descriptionKey: "shortcuts.actions.dashboardExport" },
     ],
   },
 
@@ -224,11 +272,15 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.dashboardsPanel",
     shortcuts: [
-      { id: "panelView",            display: "v",        descriptionKey: "shortcuts.actions.panelView" },
-      { id: "panelQueryInspector",  display: "i",        descriptionKey: "shortcuts.actions.panelQueryInspector" },
-      { id: "panelEdit",            display: "e",        descriptionKey: "shortcuts.actions.panelEdit" },
-      { id: "panelDuplicate",       display: "d",        descriptionKey: "shortcuts.actions.panelDuplicate" },
-      { id: "panelDelete",          display: "del / ⌫", descriptionKey: "shortcuts.actions.panelDelete" },
+      { id: "panelView", display: "v", descriptionKey: "shortcuts.actions.panelView" },
+      {
+        id: "panelQueryInspector",
+        display: "i",
+        descriptionKey: "shortcuts.actions.panelQueryInspector",
+      },
+      { id: "panelEdit", display: "e", descriptionKey: "shortcuts.actions.panelEdit" },
+      { id: "panelDuplicate", display: "d", descriptionKey: "shortcuts.actions.panelDuplicate" },
+      { id: "panelDelete", display: "del / ⌫", descriptionKey: "shortcuts.actions.panelDelete" },
     ],
   },
 
@@ -237,10 +289,28 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.panelEditor",
     scope: "panel-editor",
     shortcuts: [
-      { id: "panelEditorRun",            keyForWindows: "ctrl+enter", keyForMac: "meta+enter", descriptionKey: "shortcuts.actions.panelEditorRun" },
-      { id: "panelEditorSave",           keyForWindows: "ctrl+s",     keyForMac: "meta+s",     descriptionKey: "shortcuts.actions.panelEditorSave" },
-      { id: "panelEditorBack",           key: "alt+left",                                      descriptionKey: "shortcuts.actions.panelEditorBack" },
-      { id: "panelEditorQueryInspector", key: "i",                                             descriptionKey: "shortcuts.actions.panelEditorQueryInspector" },
+      {
+        id: "panelEditorRun",
+        keyForWindows: "ctrl+enter",
+        keyForMac: "meta+enter",
+        descriptionKey: "shortcuts.actions.panelEditorRun",
+      },
+      {
+        id: "panelEditorSave",
+        keyForWindows: "ctrl+s",
+        keyForMac: "meta+s",
+        descriptionKey: "shortcuts.actions.panelEditorSave",
+      },
+      {
+        id: "panelEditorBack",
+        key: "alt+left",
+        descriptionKey: "shortcuts.actions.panelEditorBack",
+      },
+      {
+        id: "panelEditorQueryInspector",
+        key: "i",
+        descriptionKey: "shortcuts.actions.panelEditorQueryInspector",
+      },
     ],
   },
 
@@ -249,8 +319,20 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.metrics",
     scope: "metrics",
     shortcuts: [
-      { id: "metricsRunQuery", keyForWindows: "ctrl+enter", keyForMac: "meta+enter", descriptionKey: "shortcuts.actions.metricsRunQuery" },
-      { id: "metricsRefresh",  key: "r",                                              descriptionKey: "shortcuts.actions.metricsRefresh" },
+      {
+        id: "metricsRunQuery",
+        keyForWindows: "ctrl+enter",
+        keyForMac: "meta+enter",
+        descriptionKey: "shortcuts.actions.metricsRunQuery",
+      },
+      { id: "metricsRefresh", key: "r", descriptionKey: "shortcuts.actions.metricsRefresh" },
+      { id: "metricsFocusQuery", key: "/", descriptionKey: "shortcuts.actions.focusQuery" },
+      {
+        id: "metricsAddToDashboard",
+        key: "d",
+        descriptionKey: "shortcuts.actions.metricsAddToDashboard",
+      },
+      { id: "metricsCopyUrl", key: "c", descriptionKey: "shortcuts.actions.metricsCopyUrl" },
     ],
   },
 
@@ -259,10 +341,20 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.traces",
     scope: "traces",
     shortcuts: [
-      { id: "tracesSearch",     keyForWindows: "ctrl+enter",   keyForMac: "meta+enter",   descriptionKey: "shortcuts.actions.tracesSearch" },
-      { id: "tracesRefresh",    key: "r",                                                 descriptionKey: "shortcuts.actions.tracesRefresh" },
-      { id: "tracesFocusQuery", key: "/",                                                 descriptionKey: "shortcuts.actions.focusQuery" },
-      { id: "tracesCopyUrl",    keyForWindows: "ctrl+shift+c", keyForMac: "meta+shift+c", descriptionKey: "shortcuts.actions.tracesCopyUrl" },
+      {
+        id: "tracesSearch",
+        keyForWindows: "ctrl+enter",
+        keyForMac: "meta+enter",
+        descriptionKey: "shortcuts.actions.tracesSearch",
+      },
+      { id: "tracesRefresh", key: "r", descriptionKey: "shortcuts.actions.tracesRefresh" },
+      { id: "tracesFocusQuery", key: "/", descriptionKey: "shortcuts.actions.focusQuery" },
+      {
+        id: "tracesCopyUrl",
+        keyForWindows: "ctrl+shift+c",
+        keyForMac: "meta+shift+c",
+        descriptionKey: "shortcuts.actions.tracesCopyUrl",
+      },
     ],
   },
 
@@ -271,8 +363,18 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.traceDetail",
     scope: "trace-detail",
     shortcuts: [
-      { id: "traceNextSpan", keys: ["j", "down"], display: "J / ↓", descriptionKey: "shortcuts.actions.traceNextSpan" },
-      { id: "tracePrevSpan", keys: ["k", "up"],   display: "K / ↑", descriptionKey: "shortcuts.actions.tracePrevSpan" },
+      {
+        id: "traceNextSpan",
+        keys: ["j", "down"],
+        display: "J / ↓",
+        descriptionKey: "shortcuts.actions.traceNextSpan",
+      },
+      {
+        id: "tracePrevSpan",
+        keys: ["k", "up"],
+        display: "K / ↑",
+        descriptionKey: "shortcuts.actions.tracePrevSpan",
+      },
     ],
   },
 
@@ -281,15 +383,23 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.alerts",
     scope: "alerts",
     shortcuts: [
-      { id: "alertsCreate",      key: "n", descriptionKey: "shortcuts.actions.alertsCreate" },
-      { id: "alertsImport",      key: "i", descriptionKey: "shortcuts.actions.alertsImport" },
-      { id: "alertsRefresh",     key: "r", descriptionKey: "shortcuts.actions.alertsRefresh" },
+      { id: "alertsCreate", key: "n", descriptionKey: "shortcuts.actions.alertsCreate" },
+      { id: "alertsImport", key: "i", descriptionKey: "shortcuts.actions.alertsImport" },
+      { id: "alertsRefresh", key: "r", descriptionKey: "shortcuts.actions.alertsRefresh" },
       { id: "alertsFocusSearch", key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
-      { id: "alertsRowEdit",      display: "e",        descriptionKey: "shortcuts.actions.tableRowEdit" },
-      { id: "alertsRowDuplicate", display: "d",        descriptionKey: "shortcuts.actions.tableRowDuplicate" },
-      { id: "alertsRowPause",     display: "p",        descriptionKey: "shortcuts.actions.tableRowPause" },
-      { id: "alertsRowExport",    display: "x",        descriptionKey: "shortcuts.actions.tableRowExport" },
-      { id: "alertsRowDelete",    display: "del / ⌫", descriptionKey: "shortcuts.actions.tableRowDelete" },
+      { id: "alertsRowEdit", display: "e", descriptionKey: "shortcuts.actions.tableRowEdit" },
+      {
+        id: "alertsRowDuplicate",
+        display: "d",
+        descriptionKey: "shortcuts.actions.tableRowDuplicate",
+      },
+      { id: "alertsRowPause", display: "p", descriptionKey: "shortcuts.actions.tableRowPause" },
+      { id: "alertsRowExport", display: "x", descriptionKey: "shortcuts.actions.tableRowExport" },
+      {
+        id: "alertsRowDelete",
+        display: "del / ⌫",
+        descriptionKey: "shortcuts.actions.tableRowDelete",
+      },
     ],
   },
 
@@ -298,12 +408,36 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.alertDestinations",
     scope: "alert-destinations",
     shortcuts: [
-      { id: "alertDestinationsAdd",         key: "n", descriptionKey: "shortcuts.actions.alertDestinationsAdd" },
-      { id: "alertDestinationsRefresh",     key: "r", descriptionKey: "shortcuts.actions.alertDestinationsRefresh" },
-      { id: "alertDestinationsFocusSearch", key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
-      { id: "alertDestinationsRowEdit",   display: "e",        descriptionKey: "shortcuts.actions.tableRowEdit" },
-      { id: "alertDestinationsRowExport", display: "x",        descriptionKey: "shortcuts.actions.tableRowExport" },
-      { id: "alertDestinationsRowDelete", display: "del / ⌫", descriptionKey: "shortcuts.actions.tableRowDelete" },
+      {
+        id: "alertDestinationsAdd",
+        key: "n",
+        descriptionKey: "shortcuts.actions.alertDestinationsAdd",
+      },
+      {
+        id: "alertDestinationsRefresh",
+        key: "r",
+        descriptionKey: "shortcuts.actions.alertDestinationsRefresh",
+      },
+      {
+        id: "alertDestinationsFocusSearch",
+        key: "/",
+        descriptionKey: "shortcuts.actions.focusSearch",
+      },
+      {
+        id: "alertDestinationsRowEdit",
+        display: "e",
+        descriptionKey: "shortcuts.actions.tableRowEdit",
+      },
+      {
+        id: "alertDestinationsRowExport",
+        display: "x",
+        descriptionKey: "shortcuts.actions.tableRowExport",
+      },
+      {
+        id: "alertDestinationsRowDelete",
+        display: "del / ⌫",
+        descriptionKey: "shortcuts.actions.tableRowDelete",
+      },
     ],
   },
 
@@ -312,12 +446,32 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.alertTemplates",
     scope: "alert-templates",
     shortcuts: [
-      { id: "alertTemplatesAdd",         key: "n", descriptionKey: "shortcuts.actions.alertTemplatesAdd" },
-      { id: "alertTemplatesRefresh",     key: "r", descriptionKey: "shortcuts.actions.alertTemplatesRefresh" },
-      { id: "alertTemplatesFocusSearch", key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
-      { id: "alertTemplatesRowEdit",   display: "e",        descriptionKey: "shortcuts.actions.tableRowEdit" },
-      { id: "alertTemplatesRowExport", display: "x",        descriptionKey: "shortcuts.actions.tableRowExport" },
-      { id: "alertTemplatesRowDelete", display: "del / ⌫", descriptionKey: "shortcuts.actions.tableRowDelete" },
+      { id: "alertTemplatesAdd", key: "n", descriptionKey: "shortcuts.actions.alertTemplatesAdd" },
+      {
+        id: "alertTemplatesRefresh",
+        key: "r",
+        descriptionKey: "shortcuts.actions.alertTemplatesRefresh",
+      },
+      {
+        id: "alertTemplatesFocusSearch",
+        key: "/",
+        descriptionKey: "shortcuts.actions.focusSearch",
+      },
+      {
+        id: "alertTemplatesRowEdit",
+        display: "e",
+        descriptionKey: "shortcuts.actions.tableRowEdit",
+      },
+      {
+        id: "alertTemplatesRowExport",
+        display: "x",
+        descriptionKey: "shortcuts.actions.tableRowExport",
+      },
+      {
+        id: "alertTemplatesRowDelete",
+        display: "del / ⌫",
+        descriptionKey: "shortcuts.actions.tableRowDelete",
+      },
     ],
   },
 
@@ -326,10 +480,14 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.streams",
     scope: "streams",
     shortcuts: [
-      { id: "streamsAdd",         key: "n", descriptionKey: "shortcuts.actions.streamsAdd" },
-      { id: "streamsRefresh",     key: "r", descriptionKey: "shortcuts.actions.streamsRefresh" },
+      { id: "streamsAdd", key: "n", descriptionKey: "shortcuts.actions.streamsAdd" },
+      { id: "streamsRefresh", key: "r", descriptionKey: "shortcuts.actions.streamsRefresh" },
       { id: "streamsFocusSearch", key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
-      { id: "streamsRowDelete", display: "del / ⌫", descriptionKey: "shortcuts.actions.tableRowDelete" },
+      {
+        id: "streamsRowDelete",
+        display: "del / ⌫",
+        descriptionKey: "shortcuts.actions.tableRowDelete",
+      },
     ],
   },
 
@@ -338,14 +496,22 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.pipelines",
     scope: "pipelines",
     shortcuts: [
-      { id: "pipelinesAdd",         key: "n", descriptionKey: "shortcuts.actions.pipelinesAdd" },
-      { id: "pipelinesImport",      key: "i", descriptionKey: "shortcuts.actions.pipelinesImport" },
-      { id: "pipelinesRefresh",     key: "r", descriptionKey: "shortcuts.actions.pipelinesRefresh" },
+      { id: "pipelinesAdd", key: "n", descriptionKey: "shortcuts.actions.pipelinesAdd" },
+      { id: "pipelinesImport", key: "i", descriptionKey: "shortcuts.actions.pipelinesImport" },
+      { id: "pipelinesRefresh", key: "r", descriptionKey: "shortcuts.actions.pipelinesRefresh" },
       { id: "pipelinesFocusSearch", key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
-      { id: "pipelinesRowEdit",   display: "e",        descriptionKey: "shortcuts.actions.tableRowEdit" },
-      { id: "pipelinesRowPause",  display: "p",        descriptionKey: "shortcuts.actions.tableRowPause" },
-      { id: "pipelinesRowExport", display: "x",        descriptionKey: "shortcuts.actions.tableRowExport" },
-      { id: "pipelinesRowDelete", display: "del / ⌫", descriptionKey: "shortcuts.actions.tableRowDelete" },
+      { id: "pipelinesRowEdit", display: "e", descriptionKey: "shortcuts.actions.tableRowEdit" },
+      { id: "pipelinesRowPause", display: "p", descriptionKey: "shortcuts.actions.tableRowPause" },
+      {
+        id: "pipelinesRowExport",
+        display: "x",
+        descriptionKey: "shortcuts.actions.tableRowExport",
+      },
+      {
+        id: "pipelinesRowDelete",
+        display: "del / ⌫",
+        descriptionKey: "shortcuts.actions.tableRowDelete",
+      },
     ],
   },
 
@@ -354,11 +520,15 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.functions",
     scope: "functions",
     shortcuts: [
-      { id: "functionsAdd",         key: "n", descriptionKey: "shortcuts.actions.functionsAdd" },
-      { id: "functionsRefresh",     key: "r", descriptionKey: "shortcuts.actions.functionsRefresh" },
+      { id: "functionsAdd", key: "n", descriptionKey: "shortcuts.actions.functionsAdd" },
+      { id: "functionsRefresh", key: "r", descriptionKey: "shortcuts.actions.functionsRefresh" },
       { id: "functionsFocusSearch", key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
-      { id: "functionsRowEdit",   display: "e",        descriptionKey: "shortcuts.actions.tableRowEdit" },
-      { id: "functionsRowDelete", display: "del / ⌫", descriptionKey: "shortcuts.actions.tableRowDelete" },
+      { id: "functionsRowEdit", display: "e", descriptionKey: "shortcuts.actions.tableRowEdit" },
+      {
+        id: "functionsRowDelete",
+        display: "del / ⌫",
+        descriptionKey: "shortcuts.actions.tableRowDelete",
+      },
     ],
   },
 
@@ -367,11 +537,15 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.reports",
     scope: "reports",
     shortcuts: [
-      { id: "reportsAdd",         key: "n", descriptionKey: "shortcuts.actions.reportsAdd" },
-      { id: "reportsRefresh",     key: "r", descriptionKey: "shortcuts.actions.reportsRefresh" },
+      { id: "reportsAdd", key: "n", descriptionKey: "shortcuts.actions.reportsAdd" },
+      { id: "reportsRefresh", key: "r", descriptionKey: "shortcuts.actions.reportsRefresh" },
       { id: "reportsFocusSearch", key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
-      { id: "reportsRowEdit",   display: "e",        descriptionKey: "shortcuts.actions.tableRowEdit" },
-      { id: "reportsRowDelete", display: "del / ⌫", descriptionKey: "shortcuts.actions.tableRowDelete" },
+      { id: "reportsRowEdit", display: "e", descriptionKey: "shortcuts.actions.tableRowEdit" },
+      {
+        id: "reportsRowDelete",
+        display: "del / ⌫",
+        descriptionKey: "shortcuts.actions.tableRowDelete",
+      },
     ],
   },
 
@@ -380,11 +554,15 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.iamUsers",
     scope: "iam-users",
     shortcuts: [
-      { id: "iamUsersAdd",         key: "n", descriptionKey: "shortcuts.actions.iamUsersAdd" },
-      { id: "iamUsersRefresh",     key: "r", descriptionKey: "shortcuts.actions.iamUsersRefresh" },
+      { id: "iamUsersAdd", key: "n", descriptionKey: "shortcuts.actions.iamUsersAdd" },
+      { id: "iamUsersRefresh", key: "r", descriptionKey: "shortcuts.actions.iamUsersRefresh" },
       { id: "iamUsersFocusSearch", key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
-      { id: "iamUsersRowEdit",   display: "e",        descriptionKey: "shortcuts.actions.tableRowEdit" },
-      { id: "iamUsersRowDelete", display: "del / ⌫", descriptionKey: "shortcuts.actions.tableRowDelete" },
+      { id: "iamUsersRowEdit", display: "e", descriptionKey: "shortcuts.actions.tableRowEdit" },
+      {
+        id: "iamUsersRowDelete",
+        display: "del / ⌫",
+        descriptionKey: "shortcuts.actions.tableRowDelete",
+      },
     ],
   },
 
@@ -393,11 +571,15 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.iamRoles",
     scope: "iam-roles",
     shortcuts: [
-      { id: "iamRolesAdd",         key: "n", descriptionKey: "shortcuts.actions.iamRolesAdd" },
-      { id: "iamRolesRefresh",     key: "r", descriptionKey: "shortcuts.actions.iamRolesRefresh" },
+      { id: "iamRolesAdd", key: "n", descriptionKey: "shortcuts.actions.iamRolesAdd" },
+      { id: "iamRolesRefresh", key: "r", descriptionKey: "shortcuts.actions.iamRolesRefresh" },
       { id: "iamRolesFocusSearch", key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
-      { id: "iamRolesRowEdit",   display: "e",        descriptionKey: "shortcuts.actions.tableRowEdit" },
-      { id: "iamRolesRowDelete", display: "del / ⌫", descriptionKey: "shortcuts.actions.tableRowDelete" },
+      { id: "iamRolesRowEdit", display: "e", descriptionKey: "shortcuts.actions.tableRowEdit" },
+      {
+        id: "iamRolesRowDelete",
+        display: "del / ⌫",
+        descriptionKey: "shortcuts.actions.tableRowDelete",
+      },
     ],
   },
 
@@ -406,11 +588,15 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.iamGroups",
     scope: "iam-groups",
     shortcuts: [
-      { id: "iamGroupsAdd",         key: "n", descriptionKey: "shortcuts.actions.iamGroupsAdd" },
-      { id: "iamGroupsRefresh",     key: "r", descriptionKey: "shortcuts.actions.iamGroupsRefresh" },
+      { id: "iamGroupsAdd", key: "n", descriptionKey: "shortcuts.actions.iamGroupsAdd" },
+      { id: "iamGroupsRefresh", key: "r", descriptionKey: "shortcuts.actions.iamGroupsRefresh" },
       { id: "iamGroupsFocusSearch", key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
-      { id: "iamGroupsRowEdit",   display: "e",        descriptionKey: "shortcuts.actions.tableRowEdit" },
-      { id: "iamGroupsRowDelete", display: "del / ⌫", descriptionKey: "shortcuts.actions.tableRowDelete" },
+      { id: "iamGroupsRowEdit", display: "e", descriptionKey: "shortcuts.actions.tableRowEdit" },
+      {
+        id: "iamGroupsRowDelete",
+        display: "del / ⌫",
+        descriptionKey: "shortcuts.actions.tableRowDelete",
+      },
     ],
   },
 
@@ -419,11 +605,31 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.iamServiceAccounts",
     scope: "iam-service-accounts",
     shortcuts: [
-      { id: "iamServiceAccountsAdd",         key: "n", descriptionKey: "shortcuts.actions.iamServiceAccountsAdd" },
-      { id: "iamServiceAccountsRefresh",     key: "r", descriptionKey: "shortcuts.actions.iamServiceAccountsRefresh" },
-      { id: "iamServiceAccountsFocusSearch", key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
-      { id: "iamServiceAccountsRowEdit",   display: "e",        descriptionKey: "shortcuts.actions.tableRowEdit" },
-      { id: "iamServiceAccountsRowDelete", display: "del / ⌫", descriptionKey: "shortcuts.actions.tableRowDelete" },
+      {
+        id: "iamServiceAccountsAdd",
+        key: "n",
+        descriptionKey: "shortcuts.actions.iamServiceAccountsAdd",
+      },
+      {
+        id: "iamServiceAccountsRefresh",
+        key: "r",
+        descriptionKey: "shortcuts.actions.iamServiceAccountsRefresh",
+      },
+      {
+        id: "iamServiceAccountsFocusSearch",
+        key: "/",
+        descriptionKey: "shortcuts.actions.focusSearch",
+      },
+      {
+        id: "iamServiceAccountsRowEdit",
+        display: "e",
+        descriptionKey: "shortcuts.actions.tableRowEdit",
+      },
+      {
+        id: "iamServiceAccountsRowDelete",
+        display: "del / ⌫",
+        descriptionKey: "shortcuts.actions.tableRowDelete",
+      },
     ],
   },
 
@@ -432,9 +638,21 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.ingestionTokens",
     scope: "ingestion-tokens",
     shortcuts: [
-      { id: "ingestionTokensAdd",         key: "n", descriptionKey: "shortcuts.actions.ingestionTokensAdd" },
-      { id: "ingestionTokensRefresh",     key: "r", descriptionKey: "shortcuts.actions.ingestionTokensRefresh" },
-      { id: "ingestionTokensFocusSearch", key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
+      {
+        id: "ingestionTokensAdd",
+        key: "n",
+        descriptionKey: "shortcuts.actions.ingestionTokensAdd",
+      },
+      {
+        id: "ingestionTokensRefresh",
+        key: "r",
+        descriptionKey: "shortcuts.actions.ingestionTokensRefresh",
+      },
+      {
+        id: "ingestionTokensFocusSearch",
+        key: "/",
+        descriptionKey: "shortcuts.actions.focusSearch",
+      },
     ],
   },
 
@@ -443,8 +661,16 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.runningQueries",
     scope: "running-queries",
     shortcuts: [
-      { id: "runningQueriesRefresh",     key: "r", descriptionKey: "shortcuts.actions.runningQueriesRefresh" },
-      { id: "runningQueriesFocusSearch", key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
+      {
+        id: "runningQueriesRefresh",
+        key: "r",
+        descriptionKey: "shortcuts.actions.runningQueriesRefresh",
+      },
+      {
+        id: "runningQueriesFocusSearch",
+        key: "/",
+        descriptionKey: "shortcuts.actions.focusSearch",
+      },
     ],
   },
 
@@ -453,7 +679,11 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.alertIncidents",
     scope: "alert-incidents",
     shortcuts: [
-      { id: "alertIncidentsRefresh", key: "r", descriptionKey: "shortcuts.actions.alertIncidentsRefresh" },
+      {
+        id: "alertIncidentsRefresh",
+        key: "r",
+        descriptionKey: "shortcuts.actions.alertIncidentsRefresh",
+      },
     ],
   },
 
@@ -462,7 +692,11 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.pipelineDestinations",
     scope: "pipeline-destinations",
     shortcuts: [
-      { id: "pipelineDestinationsRefresh", key: "r", descriptionKey: "shortcuts.actions.pipelineDestinationsRefresh" },
+      {
+        id: "pipelineDestinationsRefresh",
+        key: "r",
+        descriptionKey: "shortcuts.actions.pipelineDestinationsRefresh",
+      },
     ],
   },
 
@@ -471,7 +705,11 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.enrichmentTables",
     scope: "enrichment-tables",
     shortcuts: [
-      { id: "enrichmentTablesRefresh", key: "r", descriptionKey: "shortcuts.actions.enrichmentTablesRefresh" },
+      {
+        id: "enrichmentTablesRefresh",
+        key: "r",
+        descriptionKey: "shortcuts.actions.enrichmentTablesRefresh",
+      },
     ],
   },
 
@@ -480,7 +718,11 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.iamInvitations",
     scope: "iam-invitations",
     shortcuts: [
-      { id: "iamInvitationsRefresh", key: "r", descriptionKey: "shortcuts.actions.iamInvitationsRefresh" },
+      {
+        id: "iamInvitationsRefresh",
+        key: "r",
+        descriptionKey: "shortcuts.actions.iamInvitationsRefresh",
+      },
     ],
   },
 
@@ -489,7 +731,11 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.iamOrganizations",
     scope: "iam-organizations",
     shortcuts: [
-      { id: "iamOrganizationsRefresh", key: "r", descriptionKey: "shortcuts.actions.iamOrganizationsRefresh" },
+      {
+        id: "iamOrganizationsRefresh",
+        key: "r",
+        descriptionKey: "shortcuts.actions.iamOrganizationsRefresh",
+      },
     ],
   },
 
@@ -498,7 +744,11 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.regexPatterns",
     scope: "regex-patterns",
     shortcuts: [
-      { id: "regexPatternsRefresh", key: "r", descriptionKey: "shortcuts.actions.regexPatternsRefresh" },
+      {
+        id: "regexPatternsRefresh",
+        key: "r",
+        descriptionKey: "shortcuts.actions.regexPatternsRefresh",
+      },
     ],
   },
 
@@ -515,9 +765,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.nodes",
     scope: "nodes",
-    shortcuts: [
-      { id: "nodesRefresh", key: "r", descriptionKey: "shortcuts.actions.nodesRefresh" },
-    ],
+    shortcuts: [{ id: "nodesRefresh", key: "r", descriptionKey: "shortcuts.actions.nodesRefresh" }],
   },
 
   // ── Model Pricing ───────────────────────────────────────────────────────
@@ -525,7 +773,11 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.modelPricing",
     scope: "model-pricing",
     shortcuts: [
-      { id: "modelPricingRefresh", key: "r", descriptionKey: "shortcuts.actions.modelPricingRefresh" },
+      {
+        id: "modelPricingRefresh",
+        key: "r",
+        descriptionKey: "shortcuts.actions.modelPricingRefresh",
+      },
     ],
   },
 
@@ -534,7 +786,11 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.searchSchedulers",
     scope: "search-schedulers",
     shortcuts: [
-      { id: "searchSchedulersRefresh", key: "r", descriptionKey: "shortcuts.actions.searchSchedulersRefresh" },
+      {
+        id: "searchSchedulersRefresh",
+        key: "r",
+        descriptionKey: "shortcuts.actions.searchSchedulersRefresh",
+      },
     ],
   },
 
@@ -543,7 +799,11 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.searchHistory",
     scope: "search-history",
     shortcuts: [
-      { id: "searchHistoryRefresh", key: "r", descriptionKey: "shortcuts.actions.searchHistoryRefresh" },
+      {
+        id: "searchHistoryRefresh",
+        key: "r",
+        descriptionKey: "shortcuts.actions.searchHistoryRefresh",
+      },
     ],
   },
 
@@ -561,7 +821,11 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.evalTemplates",
     scope: "eval-templates",
     shortcuts: [
-      { id: "evalTemplatesRefresh", key: "r", descriptionKey: "shortcuts.actions.evalTemplatesRefresh" },
+      {
+        id: "evalTemplatesRefresh",
+        key: "r",
+        descriptionKey: "shortcuts.actions.evalTemplatesRefresh",
+      },
     ],
   },
 
@@ -588,7 +852,11 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.scoreConfigs",
     scope: "score-configs",
     shortcuts: [
-      { id: "scoreConfigsRefresh", key: "r", descriptionKey: "shortcuts.actions.scoreConfigsRefresh" },
+      {
+        id: "scoreConfigsRefresh",
+        key: "r",
+        descriptionKey: "shortcuts.actions.scoreConfigsRefresh",
+      },
     ],
   },
 
@@ -606,7 +874,11 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.llmProviders",
     scope: "llm-providers",
     shortcuts: [
-      { id: "llmProvidersRefresh", key: "r", descriptionKey: "shortcuts.actions.llmProvidersRefresh" },
+      {
+        id: "llmProvidersRefresh",
+        key: "r",
+        descriptionKey: "shortcuts.actions.llmProvidersRefresh",
+      },
     ],
   },
 
@@ -624,7 +896,11 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.orgManagement",
     scope: "organization-management",
     shortcuts: [
-      { id: "orgManagementRefresh", key: "r", descriptionKey: "shortcuts.actions.orgManagementRefresh" },
+      {
+        id: "orgManagementRefresh",
+        key: "r",
+        descriptionKey: "shortcuts.actions.orgManagementRefresh",
+      },
     ],
   },
 
@@ -642,7 +918,11 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.rumSessions",
     scope: "rum-sessions",
     shortcuts: [
-      { id: "rumSessionsRefresh", key: "r", descriptionKey: "shortcuts.actions.rumSessionsRefresh" },
+      {
+        id: "rumSessionsRefresh",
+        key: "r",
+        descriptionKey: "shortcuts.actions.rumSessionsRefresh",
+      },
     ],
   },
 
@@ -654,7 +934,6 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { id: "sourceMapsRefresh", key: "r", descriptionKey: "shortcuts.actions.sourceMapsRefresh" },
     ],
   },
-
 ];
 
 // ---------------------------------------------------------------------------
@@ -724,9 +1003,7 @@ const ENTRIES: Map<string, ShortcutEntry> = (() => {
  * (OShortcut renders `ctrl`→`⌘` on Mac), the bare key, the list of bindings, or
  * the leading token of a multi-binding label (e.g. "del / ⌫" → "del").
  */
-export function getShortcutDisplay(
-  id: string,
-): string | string[] | undefined {
+export function getShortcutDisplay(id: string): string | string[] | undefined {
   const e = ENTRIES.get(id);
   if (!e) return undefined;
   if (e.keyForWindows) return e.keyForWindows;

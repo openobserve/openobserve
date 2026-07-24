@@ -14,7 +14,6 @@
   /* Separator */
   --spacing-separator: var(--spacing-px);
   --color-separator: var(--color-border-default);
-  --color-separator-strong: var(--color-border-strong);
 
   /* Form field label (dark overrides in dark.css) */
   --color-input-label-text: var(--color-grey-800);
@@ -58,6 +57,11 @@
   --color-button-ghost-primary-active-bg: var(--color-surface-accent-active);
   --color-button-ghost-primary-focus-ring: var(--color-primary-400);
 
+  /* Button — on-dark-primary (primary-colored text on a WHITE button that sits on
+     a dark gradient panel). Fixed at primary-600 in BOTH themes — must NOT flip to
+     the lighter accent (primary-400) or it washes out against the white button. */
+  --color-button-on-dark-primary-text: var(--color-primary-600);
+
   /* Button — ghost-destructive (flat + destructive color text) */
   --color-button-ghost-destructive-text: var(--color-error-600);
   --color-button-ghost-destructive-hover-bg: var(--color-error-50);
@@ -85,16 +89,40 @@
 
   /* Button — ghost-warning (yellow-600 text for contrast on white, faint yellow tint on hover) */
   --color-button-ghost-warning-text: var(--color-warning-600);
-  --color-button-ghost-warning-hover-bg: color-mix(in srgb, var(--color-warning-400) 12%, transparent);
-  --color-button-ghost-warning-active-bg: color-mix(in srgb, var(--color-warning-400) 22%, transparent);
-  --color-button-ghost-warning-focus-ring: color-mix(in srgb, var(--color-warning-400) 50%, transparent);
+  --color-button-ghost-warning-hover-bg: color-mix(
+    in srgb,
+    var(--color-warning-400) 12%,
+    transparent
+  );
+  --color-button-ghost-warning-active-bg: color-mix(
+    in srgb,
+    var(--color-warning-400) 22%,
+    transparent
+  );
+  --color-button-ghost-warning-focus-ring: color-mix(
+    in srgb,
+    var(--color-warning-400) 50%,
+    transparent
+  );
 
   /* Button — outline-warning (transparent bg, yellow-600 border + text) */
   --color-button-outline-warning-text: var(--color-warning-600);
   --color-button-outline-warning-border: var(--color-warning-600);
-  --color-button-outline-warning-hover-bg: color-mix(in srgb, var(--color-warning-400) 12%, transparent);
-  --color-button-outline-warning-active-bg: color-mix(in srgb, var(--color-warning-400) 22%, transparent);
-  --color-button-outline-warning-focus-ring: color-mix(in srgb, var(--color-warning-400) 50%, transparent);
+  --color-button-outline-warning-hover-bg: color-mix(
+    in srgb,
+    var(--color-warning-400) 12%,
+    transparent
+  );
+  --color-button-outline-warning-active-bg: color-mix(
+    in srgb,
+    var(--color-warning-400) 22%,
+    transparent
+  );
+  --color-button-outline-warning-focus-ring: color-mix(
+    in srgb,
+    var(--color-warning-400) 50%,
+    transparent
+  );
 
   /* Button — warning (bright yellow-400 bg, yellow-500 hover — never goes brown) */
   --color-button-warning: var(--color-warning-400);
@@ -189,18 +217,22 @@
   --color-collapsible-trigger-hover-bg: var(--color-primary-100);
   --color-collapsible-trigger-active-bg: var(--color-surface-accent-active);
   --color-collapsible-trigger-focus-ring: var(--color-primary-400);
+  /* Open-state accent (sidebar variant): highlighted header when expanded */
+  --color-collapsible-trigger-open-bg: var(--color-primary-50);
+  --color-collapsible-open-accent: var(--color-primary-600);
+  --color-collapsible-icon-open: var(--color-primary-600);
 
   /* OFieldList / OFieldRow / OFieldLabel */
-  --color-field-list-row-hover-bg:     var(--color-primary-100);
-  --color-field-list-group-text:       var(--color-text-secondary);
-  --color-field-list-label-text:       var(--color-text-heading);
-  --color-field-list-label-icon:       var(--color-text-secondary);
-  --color-field-list-drag-icon:        var(--color-text-secondary);
-  --color-field-list-expand-icon:      var(--color-text-secondary);
-  --color-field-list-empty-text:       var(--color-text-muted);
-  --color-field-list-actions-bg:       var(--color-primary-100);
-  --color-field-list-actions-border:   var(--color-border-default);
-  --color-field-list-expansion-bg:     var(--color-surface-subtle);
+  --color-field-list-row-hover-bg: var(--color-primary-100);
+  --color-field-list-group-text: var(--color-text-secondary);
+  --color-field-list-label-text: var(--color-text-heading);
+  --color-field-list-label-icon: var(--color-text-secondary);
+  --color-field-list-drag-icon: var(--color-text-secondary);
+  --color-field-list-expand-icon: var(--color-text-secondary);
+  --color-field-list-empty-text: var(--color-text-muted);
+  --color-field-list-actions-bg: var(--color-primary-100);
+  --color-field-list-actions-border: var(--color-border-default);
+  --color-field-list-expansion-bg: var(--color-surface-subtle);
   --color-field-list-expansion-border: var(--color-border-default);
 
   /* Stepper */
@@ -224,27 +256,27 @@
   --color-dialog-overlay: var(--color-overlay-scrim);
 
   /* Panel */
-  --color-dialog-bg:            var(--color-surface-overlay);
-  --color-dialog-border:        var(--color-border-default);
-  --shadow-dialog:              var(--shadow-lg);
+  --color-dialog-bg: var(--color-surface-overlay);
+  --color-dialog-border: var(--color-border-default);
+  --shadow-dialog: var(--shadow-lg);
 
   /* Header */
-  --color-dialog-header-bg:     var(--color-surface-panel);
-  --color-dialog-header-text:   var(--color-text-heading);
+  --color-dialog-header-bg: var(--color-surface-panel);
+  --color-dialog-header-text: var(--color-text-heading);
   --color-dialog-header-border: var(--color-border-default);
 
   /* Content */
-  --color-dialog-content-text:  var(--color-text-heading);
+  --color-dialog-content-text: var(--color-text-heading);
 
   /* Footer */
-  --color-dialog-footer-bg:     var(--color-surface-panel);
+  --color-dialog-footer-bg: var(--color-surface-panel);
   --color-dialog-footer-border: var(--color-border-default);
 
   /* Close button */
-  --color-dialog-close-text:      var(--color-text-secondary);
-  --color-dialog-close-hover-bg:  var(--color-surface-subtle);
+  --color-dialog-close-text: var(--color-text-secondary);
+  --color-dialog-close-hover-bg: var(--color-surface-subtle);
   --color-dialog-close-active-bg: var(--color-surface-subtle-hover);
-  --color-dialog-focus-ring:      var(--color-primary-400);
+  --color-dialog-focus-ring: var(--color-primary-400);
 
   /* Page edge inset — THE single horizontal grid line of the app.
      Everything that sits at the edge of a page derives from this one knob: the
@@ -295,6 +327,18 @@
   --color-badge-primary-soft-bg: var(--color-primary-100);
   --color-badge-primary-soft-text: var(--color-primary-700);
 
+  /* Count badge — small numeric overlay badge (e.g. OTableColumnToggle hidden-column
+     count). Solid brand dot, fixed primary-600 in both themes + white text. */
+  --color-count-badge-bg: var(--color-primary-600);
+
+  /* Avatar tint stack — decorative placeholder silhouette avatars
+     (CommunitySlackInvite). A 4-step brand gradient, each step fixed in both themes
+     (dark enough behind the white person glyph). Not real members. */
+  --color-avatar-tint-1: var(--color-primary-700);
+  --color-avatar-tint-2: var(--color-primary-600);
+  --color-avatar-tint-3: var(--color-primary-500);
+  --color-avatar-tint-4: var(--color-primary-400);
+
   /* Keyboard-shortcut cheatsheet — soft primary highlight (light tint; reversed in dark) */
   --color-shortcut-highlight-bg: var(--color-primary-100);
 
@@ -329,11 +373,11 @@
 
   /* Badge — info (blue, for logs stream type) */
   --color-badge-info-ol-border: var(--color-blue-700);
-  --color-badge-info-ol-text:   var(--color-blue-700);
+  --color-badge-info-ol-text: var(--color-blue-700);
 
   /* Badge — purple (for metrics stream type) */
   --color-badge-purple-ol-border: var(--color-purple-600);
-  --color-badge-purple-ol-text:   var(--color-purple-700);
+  --color-badge-purple-ol-text: var(--color-purple-700);
 
   /* Badge — teal */
   --color-badge-teal-solid-bg: var(--color-teal-600);
@@ -402,38 +446,38 @@
 
   /* ── Toast ─────────────────────────────────────────────── */
   /* success */
-  --color-toast-success-bg:     var(--color-success-50);
+  --color-toast-success-bg: var(--color-success-50);
   --color-toast-success-border: var(--color-success-500);
-  --color-toast-success-icon:   var(--color-success-700);
+  --color-toast-success-icon: var(--color-success-700);
 
   /* error */
-  --color-toast-error-bg:       var(--color-error-50);
-  --color-toast-error-border:   var(--color-error-400);
-  --color-toast-error-icon:     var(--color-error-600);
+  --color-toast-error-bg: var(--color-error-50);
+  --color-toast-error-border: var(--color-error-400);
+  --color-toast-error-icon: var(--color-error-600);
 
   /* warning */
-  --color-toast-warning-bg:     var(--color-warning-50);
+  --color-toast-warning-bg: var(--color-warning-50);
   --color-toast-warning-border: var(--color-warning-400);
-  --color-toast-warning-icon:   var(--color-warning-600);
+  --color-toast-warning-icon: var(--color-warning-600);
 
   /* info */
-  --color-toast-info-bg:        var(--color-primary-50);
-  --color-toast-info-border:    var(--color-primary-300);
-  --color-toast-info-icon:      var(--color-primary-600);
+  --color-toast-info-bg: var(--color-primary-50);
+  --color-toast-info-border: var(--color-primary-300);
+  --color-toast-info-icon: var(--color-primary-600);
 
   /* loading / default */
-  --color-toast-loading-bg:     var(--color-surface-overlay);
+  --color-toast-loading-bg: var(--color-surface-overlay);
   --color-toast-loading-border: var(--color-border-default);
-  --color-toast-loading-icon:   var(--color-primary-600);
-  --color-toast-default-bg:     var(--color-surface-overlay);
+  --color-toast-loading-icon: var(--color-primary-600);
+  --color-toast-default-bg: var(--color-surface-overlay);
   --color-toast-default-border: var(--color-border-default);
 
   /* shared foreground */
-  --color-toast-fg:             var(--color-text-heading);
-  --color-toast-fg-secondary:   var(--color-text-secondary);
-  --color-toast-action-text:    var(--color-primary-600);
-  --color-toast-action-hover:   var(--color-primary-700);
-  --shadow-toast:               var(--shadow-lg);
+  --color-toast-fg: var(--color-text-heading);
+  --color-toast-fg-secondary: var(--color-text-secondary);
+  --color-toast-action-text: var(--color-primary-600);
+  --color-toast-action-hover: var(--color-primary-700);
+  --shadow-toast: var(--shadow-lg);
 
   /* Spinner */
   --color-spinner: var(--color-primary-600);
@@ -546,6 +590,9 @@
   --color-switch-border-off: var(--color-primary-500);
   --color-switch-thumb-off: var(--color-primary-500);
   --color-switch-thumb-on: var(--color-primary-500);
+  --color-switch-track-on: var(
+    --color-primary-500
+  ); /* ON-track fill — solid primary-500, fixed both themes (matches switch-border) */
   --color-switch-disabled-border: var(--color-grey-300);
   --color-switch-disabled-thumb: var(--color-grey-300);
 
@@ -691,72 +738,87 @@
   /* Subtle amber wash for warning/flagged rows (theme-aware). */
   --color-warning-surface: color-mix(in srgb, var(--color-warning-400) 10%, transparent);
   /* Row height tokens: change these to resize all OTable rows globally. */
-  --table-row-height-dense: 2.375rem;  /* 38px */
-  --table-row-height-normal: 2.75rem;  /* 44px */
+  --table-row-height-dense: 2.375rem; /* 38px */
+  --table-row-height-normal: 2.75rem; /* 44px */
 
   /* ── Banner (OBanner) ──────────────────────────────────── */
   /* default */
-  --color-banner-default-bg:      var(--color-grey-100);
-  --color-banner-default-text:    var(--color-grey-800);
+  --color-banner-default-bg: var(--color-grey-100);
+  --color-banner-default-text: var(--color-grey-800);
 
   /* info */
-  --color-banner-info-bg:         var(--color-blue-100);
-  --color-banner-info-border:     var(--color-blue-200);
-  --color-banner-info-text:       var(--color-blue-900);
+  --color-banner-info-bg: var(--color-blue-100);
+  --color-banner-info-border: var(--color-blue-200);
+  --color-banner-info-text: var(--color-blue-900);
 
   /* success */
-  --color-banner-success-bg:      var(--color-success-50);
-  --color-banner-success-border:  var(--color-success-200);
-  --color-banner-success-text:    var(--color-success-900);
+  --color-banner-success-bg: var(--color-success-50);
+  --color-banner-success-border: var(--color-success-200);
+  --color-banner-success-text: var(--color-success-900);
 
   /* warning */
-  --color-banner-warning-bg:      var(--color-warning-50);
-  --color-banner-warning-border:  var(--color-warning-300);
-  --color-banner-warning-text:    var(--color-warning-900);
+  --color-banner-warning-bg: var(--color-warning-50);
+  --color-banner-warning-border: var(--color-warning-300);
+  --color-banner-warning-text: var(--color-warning-900);
 
   /* error */
-  --color-banner-error-bg:        var(--color-error-600);
-  --color-banner-error-text:      var(--color-grey-0);
+  --color-banner-error-bg: var(--color-error-600);
+  --color-banner-error-text: var(--color-grey-0);
 
   /* error-soft: tinted error banner for hints/insights; the solid `error`
      variant stays reserved for hard failures. */
-  --color-banner-error-soft-bg:     var(--color-error-50);
+  --color-banner-error-soft-bg: var(--color-error-50);
   --color-banner-error-soft-border: var(--color-error-300);
-  --color-banner-error-soft-text:   var(--color-error-700);
+  --color-banner-error-soft-text: var(--color-error-700);
 
   /* usage-report severity banners (enterprise billings) — right-fade gradient bg +
      border. Light values here / dark overrides in dark.css, so the token carries
      the theme automatically (no dark: variant needed at the call site). */
-  --color-usage-banner-success-bg: linear-gradient(to right, transparent 60%, #f7f7ff 70%, #cdf7e4 100%);
-  --color-usage-banner-error-border:   #f87171;
-  --color-usage-banner-error-bg:       linear-gradient(to right, transparent 60%, #fff5f5 70%, #fecdd3 100%);
+  --color-usage-banner-success-bg: linear-gradient(
+    to right,
+    transparent 60%,
+    #f7f7ff 70%,
+    #cdf7e4 100%
+  );
+  --color-usage-banner-error-border: #f87171;
+  --color-usage-banner-error-bg: linear-gradient(
+    to right,
+    transparent 60%,
+    #fff5f5 70%,
+    #fecdd3 100%
+  );
   --color-usage-banner-warning-border: #f0c674;
-  --color-usage-banner-warning-bg:     linear-gradient(to right, transparent 60%, #fffbf0 70%, #fff3cd 100%);
+  --color-usage-banner-warning-bg: linear-gradient(
+    to right,
+    transparent 60%,
+    #fffbf0 70%,
+    #fff3cd 100%
+  );
 
   /* ── Note Container (pipeline guideline cards) ─────────── */
 
   /* OText typography colours (one per variant) */
-  --color-typography-page-title:  var(--color-text-heading);
-  --color-typography-section:     var(--color-text-secondary);
+  --color-typography-page-title: var(--color-text-heading);
+  --color-typography-section: var(--color-text-secondary);
   --color-typography-panel-title: var(--color-text-heading);
   /* Body typography routes through the body token (not the heading alias) */
-  --color-typography-body:        var(--color-text-body);
-  --color-typography-label:       var(--color-text-heading);
-  --color-typography-meta:        var(--color-text-secondary);
-  --color-typography-mono:        var(--color-text-heading);
+  --color-typography-body: var(--color-text-body);
+  --color-typography-label: var(--color-text-heading);
+  --color-typography-meta: var(--color-text-secondary);
+  --color-typography-mono: var(--color-text-heading);
 
   /* OCode (inline chip + block) */
-  --color-code-text:              var(--color-text-heading);
-  --color-code-bg:                var(--color-surface-subtle);
-  --color-code-border:            var(--color-border-default);
-  --color-code-block-text:        var(--color-text-heading);
-  --color-code-block-bg:          var(--color-surface-panel);
-  --color-code-copy-icon:         var(--color-text-secondary);
-  --color-code-copy-hover-icon:   var(--color-text-heading);
-  --color-code-copy-hover-bg:     var(--color-surface-subtle-hover);
+  --color-code-text: var(--color-text-heading);
+  --color-code-bg: var(--color-surface-subtle);
+  --color-code-border: var(--color-border-default);
+  --color-code-block-text: var(--color-text-heading);
+  --color-code-block-bg: var(--color-surface-panel);
+  --color-code-copy-icon: var(--color-text-secondary);
+  --color-code-copy-hover-icon: var(--color-text-heading);
+  --color-code-copy-hover-bg: var(--color-surface-subtle-hover);
 
   /* Skeleton shimmer + datepicker inner border */
-  --color-skeleton-shimmer:        rgba(255, 255, 255, 0.8);
+  --color-skeleton-shimmer: rgba(255, 255, 255, 0.8);
   --color-datepicker-inner-border: var(--color-grey-100);
 
   /* Shared hover + surface accent — real formula owned by semantic.css
@@ -783,7 +845,6 @@
   /* Separator */
   --spacing-separator: var(--spacing-separator);
   --color-separator: var(--color-separator);
-  --color-separator-strong: var(--color-separator-strong);
 
   /* Button — primary */
   --color-button-primary: var(--color-button-primary);
@@ -821,6 +882,9 @@
   --color-button-ghost-primary-hover-bg: var(--color-button-ghost-primary-hover-bg);
   --color-button-ghost-primary-active-bg: var(--color-button-ghost-primary-active-bg);
   --color-button-ghost-primary-focus-ring: var(--color-button-ghost-primary-focus-ring);
+
+  /* Button — on-dark-primary */
+  --color-button-on-dark-primary-text: var(--color-button-on-dark-primary-text);
 
   /* Button — ghost-destructive */
   --color-button-ghost-destructive-text: var(--color-button-ghost-destructive-text);
@@ -994,6 +1058,7 @@
   --color-switch-border-off: var(--color-switch-border-off);
   --color-switch-thumb-off: var(--color-switch-thumb-off);
   --color-switch-thumb-on: var(--color-switch-thumb-on);
+  --color-switch-track-on: var(--color-switch-track-on);
   --color-switch-disabled-border: var(--color-switch-disabled-border);
   --color-switch-disabled-thumb: var(--color-switch-disabled-thumb);
 
@@ -1121,18 +1186,21 @@
   --color-collapsible-trigger-hover-bg: var(--color-collapsible-trigger-hover-bg);
   --color-collapsible-trigger-active-bg: var(--color-collapsible-trigger-active-bg);
   --color-collapsible-trigger-focus-ring: var(--color-collapsible-trigger-focus-ring);
+  --color-collapsible-trigger-open-bg: var(--color-collapsible-trigger-open-bg);
+  --color-collapsible-open-accent: var(--color-collapsible-open-accent);
+  --color-collapsible-icon-open: var(--color-collapsible-icon-open);
 
   /* OFieldList / OFieldRow / OFieldLabel */
-  --color-field-list-row-hover-bg:     var(--color-field-list-row-hover-bg);
-  --color-field-list-group-text:       var(--color-field-list-group-text);
-  --color-field-list-label-text:       var(--color-text-heading);
-  --color-field-list-label-icon:       var(--color-field-list-label-icon);
-  --color-field-list-drag-icon:        var(--color-field-list-drag-icon);
-  --color-field-list-expand-icon:      var(--color-field-list-expand-icon);
-  --color-field-list-empty-text:       var(--color-field-list-empty-text);
-  --color-field-list-actions-bg:       var(--color-field-list-actions-bg);
-  --color-field-list-actions-border:   var(--color-field-list-actions-border);
-  --color-field-list-expansion-bg:     var(--color-field-list-expansion-bg);
+  --color-field-list-row-hover-bg: var(--color-field-list-row-hover-bg);
+  --color-field-list-group-text: var(--color-field-list-group-text);
+  --color-field-list-label-text: var(--color-text-heading);
+  --color-field-list-label-icon: var(--color-field-list-label-icon);
+  --color-field-list-drag-icon: var(--color-field-list-drag-icon);
+  --color-field-list-expand-icon: var(--color-field-list-expand-icon);
+  --color-field-list-empty-text: var(--color-field-list-empty-text);
+  --color-field-list-actions-bg: var(--color-field-list-actions-bg);
+  --color-field-list-actions-border: var(--color-field-list-actions-border);
+  --color-field-list-expansion-bg: var(--color-field-list-expansion-bg);
   --color-field-list-expansion-border: var(--color-field-list-expansion-border);
 
   /* Dialog */
@@ -1175,6 +1243,15 @@
   --color-badge-primary-soft-bg: var(--color-badge-primary-soft-bg);
   --color-badge-primary-soft-text: var(--color-badge-primary-soft-text);
 
+  /* Count badge */
+  --color-count-badge-bg: var(--color-count-badge-bg);
+
+  /* Avatar tint stack (decorative) */
+  --color-avatar-tint-1: var(--color-avatar-tint-1);
+  --color-avatar-tint-2: var(--color-avatar-tint-2);
+  --color-avatar-tint-3: var(--color-avatar-tint-3);
+  --color-avatar-tint-4: var(--color-avatar-tint-4);
+
   /* Keyboard-shortcut cheatsheet */
   --color-shortcut-highlight-bg: var(--color-shortcut-highlight-bg);
 
@@ -1209,11 +1286,11 @@
 
   /* Badge — info (blue) */
   --color-badge-info-ol-border: var(--color-badge-info-ol-border);
-  --color-badge-info-ol-text:   var(--color-badge-info-ol-text);
+  --color-badge-info-ol-text: var(--color-badge-info-ol-text);
 
   /* Badge — purple */
   --color-badge-purple-ol-border: var(--color-badge-purple-ol-border);
-  --color-badge-purple-ol-text:   var(--color-badge-purple-ol-text);
+  --color-badge-purple-ol-text: var(--color-badge-purple-ol-text);
 
   /* Badge — teal */
   --color-badge-teal-solid-bg: var(--color-badge-teal-solid-bg);
@@ -1333,23 +1410,23 @@
   --color-skeleton-shimmer: var(--color-skeleton-shimmer);
 
   /* OText typography colours (so text-typography-* utilities generate) */
-  --color-typography-page-title:  var(--color-typography-page-title);
-  --color-typography-section:     var(--color-typography-section);
+  --color-typography-page-title: var(--color-typography-page-title);
+  --color-typography-section: var(--color-typography-section);
   --color-typography-panel-title: var(--color-typography-panel-title);
-  --color-typography-body:        var(--color-typography-body);
-  --color-typography-label:       var(--color-typography-label);
-  --color-typography-meta:        var(--color-typography-meta);
-  --color-typography-mono:        var(--color-typography-mono);
+  --color-typography-body: var(--color-typography-body);
+  --color-typography-label: var(--color-typography-label);
+  --color-typography-meta: var(--color-typography-meta);
+  --color-typography-mono: var(--color-typography-mono);
 
   /* OCode colours */
-  --color-code-text:              var(--color-code-text);
-  --color-code-bg:                var(--color-code-bg);
-  --color-code-border:            var(--color-code-border);
-  --color-code-block-text:        var(--color-code-block-text);
-  --color-code-block-bg:          var(--color-code-block-bg);
-  --color-code-copy-icon:         var(--color-code-copy-icon);
-  --color-code-copy-hover-icon:   var(--color-code-copy-hover-icon);
-  --color-code-copy-hover-bg:     var(--color-code-copy-hover-bg);
+  --color-code-text: var(--color-code-text);
+  --color-code-bg: var(--color-code-bg);
+  --color-code-border: var(--color-code-border);
+  --color-code-block-text: var(--color-code-block-text);
+  --color-code-block-bg: var(--color-code-block-bg);
+  --color-code-copy-icon: var(--color-code-copy-icon);
+  --color-code-copy-hover-icon: var(--color-code-copy-hover-icon);
+  --color-code-copy-hover-bg: var(--color-code-copy-hover-bg);
 
   /* Datepicker inner border */
   --color-datepicker-inner-border: var(--color-datepicker-inner-border);
@@ -1409,31 +1486,31 @@
 
 /* ── sdr-fields ── */
 @theme inline {
-  --color-label-chip-ip-bg:        var(--color-label-chip-ip-bg);
-  --color-label-chip-ip-text:      var(--color-label-chip-ip-text);
-  --color-label-chip-method-bg:    var(--color-label-chip-method-bg);
-  --color-label-chip-method-text:  var(--color-label-chip-method-text);
-  --color-label-chip-url-bg:       var(--color-label-chip-url-bg);
-  --color-label-chip-url-text:     var(--color-label-chip-url-text);
-  --color-label-chip-num-bg:       var(--color-label-chip-num-bg);
-  --color-label-chip-num-text:     var(--color-label-chip-num-text);
-  --color-pattern-var-bg:          var(--color-pattern-var-bg);
-  --color-pattern-var-text:        var(--color-pattern-var-text);
-  --color-label-chip-float-bg:     var(--color-label-chip-float-bg);
-  --color-label-chip-float-text:   var(--color-label-chip-float-text);
-  --color-label-chip-hex-bg:       var(--color-label-chip-hex-bg);
-  --color-label-chip-hex-text:     var(--color-label-chip-hex-text);
-  --color-label-chip-ts-bg:        var(--color-label-chip-ts-bg);
-  --color-label-chip-ts-text:      var(--color-label-chip-ts-text);
-  --color-label-chip-id-bg:        var(--color-label-chip-id-bg);
-  --color-label-chip-id-text:      var(--color-label-chip-id-text);
-  --color-label-chip-email-bg:     var(--color-label-chip-email-bg);
-  --color-label-chip-email-text:   var(--color-label-chip-email-text);
-  --color-label-chip-str-bg:       var(--color-label-chip-str-bg);
-  --color-label-chip-str-text:     var(--color-label-chip-str-text);
-  --color-label-chip-default-bg:   var(--color-label-chip-default-bg);
+  --color-label-chip-ip-bg: var(--color-label-chip-ip-bg);
+  --color-label-chip-ip-text: var(--color-label-chip-ip-text);
+  --color-label-chip-method-bg: var(--color-label-chip-method-bg);
+  --color-label-chip-method-text: var(--color-label-chip-method-text);
+  --color-label-chip-url-bg: var(--color-label-chip-url-bg);
+  --color-label-chip-url-text: var(--color-label-chip-url-text);
+  --color-label-chip-num-bg: var(--color-label-chip-num-bg);
+  --color-label-chip-num-text: var(--color-label-chip-num-text);
+  --color-pattern-var-bg: var(--color-pattern-var-bg);
+  --color-pattern-var-text: var(--color-pattern-var-text);
+  --color-label-chip-float-bg: var(--color-label-chip-float-bg);
+  --color-label-chip-float-text: var(--color-label-chip-float-text);
+  --color-label-chip-hex-bg: var(--color-label-chip-hex-bg);
+  --color-label-chip-hex-text: var(--color-label-chip-hex-text);
+  --color-label-chip-ts-bg: var(--color-label-chip-ts-bg);
+  --color-label-chip-ts-text: var(--color-label-chip-ts-text);
+  --color-label-chip-id-bg: var(--color-label-chip-id-bg);
+  --color-label-chip-id-text: var(--color-label-chip-id-text);
+  --color-label-chip-email-bg: var(--color-label-chip-email-bg);
+  --color-label-chip-email-text: var(--color-label-chip-email-text);
+  --color-label-chip-str-bg: var(--color-label-chip-str-bg);
+  --color-label-chip-str-text: var(--color-label-chip-str-text);
+  --color-label-chip-default-bg: var(--color-label-chip-default-bg);
   --color-label-chip-default-text: var(--color-label-chip-default-text);
-  --color-label-chip-pattern-bg:   var(--color-label-chip-pattern-bg);
+  --color-label-chip-pattern-bg: var(--color-label-chip-pattern-bg);
   --color-label-chip-pattern-text: var(--color-label-chip-pattern-text);
 }
 

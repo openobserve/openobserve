@@ -49,7 +49,7 @@ import PrivateLocations from "./PrivateLocations.vue";
 function makeLocation(overrides: Partial<SyntheticLocation> = {}): SyntheticLocation {
   return {
     id: "loc-1",
-    name: "US East",
+    label: "US East",
     region: "us-east-1",
     provider: "aws",
     kind: "private",
@@ -110,7 +110,7 @@ const OTableStub = {
 };
 
 const OButtonStub = {
-  template: '<button @click="$emit(\'click\')"><slot /></button>',
+  template: "<button @click=\"$emit('click')\"><slot /></button>",
   props: ["variant", "size", "iconLeft", "loading", "title"],
   emits: ["click"],
 };
@@ -174,33 +174,27 @@ describe("PrivateLocations", () => {
     it("renders the table with the correct data-test attribute", () => {
       wrapper = makeWrapper({ locations: [makeLocation()] });
 
-      expect(
-        wrapper.find('[data-test="synthetics-private-locations-table"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-private-locations-table"]').exists()).toBe(true);
     });
 
     it("renders the search input in the toolbar", () => {
       wrapper = makeWrapper({ locations: [makeLocation()] });
 
-      const input = wrapper.find(
-        '[data-test="synthetics-private-locations-search-input"]',
-      );
+      const input = wrapper.find('[data-test="synthetics-private-locations-search-input"]');
       expect(input.exists()).toBe(true);
     });
 
     it("renders the refresh button in the toolbar-trailing", () => {
       wrapper = makeWrapper({ locations: [makeLocation()] });
 
-      const refreshBtn = wrapper.find(
-        '[data-test="synthetics-private-locations-refresh-btn"]',
-      );
+      const refreshBtn = wrapper.find('[data-test="synthetics-private-locations-refresh-btn"]');
       expect(refreshBtn.exists()).toBe(true);
     });
 
     it("renders location rows in the table", () => {
       const locations = [
-        makeLocation({ id: "loc-1", name: "US East" }),
-        makeLocation({ id: "loc-2", name: "EU West" }),
+        makeLocation({ id: "loc-1", label: "US East" }),
+        makeLocation({ id: "loc-2", label: "EU West" }),
       ];
       wrapper = makeWrapper({ locations });
 
@@ -210,7 +204,7 @@ describe("PrivateLocations", () => {
 
     it("renders the location name and pool in the name cell", () => {
       wrapper = makeWrapper({
-        locations: [makeLocation({ name: "US East", pool: "prod" })],
+        locations: [makeLocation({ label: "US East", pool: "prod" })],
       });
 
       const nameCell = wrapper.find(".otable-cell-name");
@@ -218,14 +212,40 @@ describe("PrivateLocations", () => {
       expect(nameCell.text()).toContain("prod");
     });
 
-    it("renders agents count and version in the agents cell", () => {
+    it("renders live agent names in the agents cell", () => {
       wrapper = makeWrapper({
-        locations: [makeLocation({ live_agents: 3, agents_total: 5, version: "2.0.0" })],
+        locations: [makeLocation({ agent_names: ["agent-a", "agent-b"] })],
       });
 
       const agentsCell = wrapper.find(".otable-cell-agents");
-      expect(agentsCell.text()).toContain("3/5");
-      expect(agentsCell.text()).toContain("v2.0.0");
+      expect(agentsCell.text()).toContain("agent-a, agent-b");
+    });
+
+    it("falls back to the last known agent's name when none are live", () => {
+      wrapper = makeWrapper({
+        locations: [
+          makeLocation({ live_agents: 0, agent_names: [], last_agent_name: "agent-dead" }),
+        ],
+      });
+
+      const agentsCell = wrapper.find(".otable-cell-agents");
+      expect(agentsCell.text()).toContain("agent-dead");
+    });
+
+    it("shows a dash when no agent has ever registered", () => {
+      wrapper = makeWrapper({
+        locations: [
+          makeLocation({
+            live_agents: 0,
+            agents_total: 0,
+            agent_names: [],
+            last_agent_name: undefined,
+          }),
+        ],
+      });
+
+      const agentsCell = wrapper.find(".otable-cell-agents");
+      expect(agentsCell.text()).toContain("—");
     });
 
     it("renders type chips for each type", () => {
@@ -266,10 +286,7 @@ describe("PrivateLocations", () => {
 
     it("renders copy and delete action buttons for each row", () => {
       wrapper = makeWrapper({
-        locations: [
-          makeLocation({ id: "loc-a" }),
-          makeLocation({ id: "loc-b" }),
-        ],
+        locations: [makeLocation({ id: "loc-a" }), makeLocation({ id: "loc-b" })],
       });
 
       expect(
@@ -301,27 +318,25 @@ describe("PrivateLocations", () => {
       wrapper = makeWrapper({ loading: true, locations: [] });
       // The OTable stub is rendered; verify the empty slot doesn't
       // show OEmptyState when loading is true (v-if="!loading")
-      expect(
-        wrapper.find('[data-test="synthetics-private-locations-empty-state"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="synthetics-private-locations-empty-state"]').exists()).toBe(
+        false,
+      );
     });
 
     it("passes loading false to OTable", () => {
       wrapper = makeWrapper({ loading: false });
       // With loading false and no data, the empty state should appear
       // This is tested in the empty state section
-      expect(
-        wrapper.find('[data-test="synthetics-private-locations-table"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-private-locations-table"]').exists()).toBe(true);
     });
   });
 
   describe("search/filter", () => {
     it("shows all locations when search is empty", () => {
       const locations = [
-        makeLocation({ id: "loc-1", name: "US East" }),
-        makeLocation({ id: "loc-2", name: "EU West" }),
-        makeLocation({ id: "loc-3", name: "Asia Pacific" }),
+        makeLocation({ id: "loc-1", label: "US East" }),
+        makeLocation({ id: "loc-2", label: "EU West" }),
+        makeLocation({ id: "loc-3", label: "Asia Pacific" }),
       ];
       wrapper = makeWrapper({ locations });
 
@@ -332,9 +347,9 @@ describe("PrivateLocations", () => {
     it("filters locations by name (case-insensitive)", async () => {
       // Use regions that don't contain "east" so only name matches drive the result.
       const locations = [
-        makeLocation({ id: "loc-1", name: "US East", region: "r-1", pool: "p-1" }),
-        makeLocation({ id: "loc-2", name: "EU West", region: "r-2", pool: "p-2" }),
-        makeLocation({ id: "loc-3", name: "Asia Pacific", region: "r-3", pool: "p-3" }),
+        makeLocation({ id: "loc-1", label: "US East", region: "r-1", pool: "p-1" }),
+        makeLocation({ id: "loc-2", label: "EU West", region: "r-2", pool: "p-2" }),
+        makeLocation({ id: "loc-3", label: "Asia Pacific", region: "r-3", pool: "p-3" }),
       ];
       wrapper = makeWrapper({ locations });
 
@@ -349,8 +364,8 @@ describe("PrivateLocations", () => {
 
     it("filters locations by region (case-insensitive)", async () => {
       const locations = [
-        makeLocation({ id: "loc-1", name: "Prod", region: "us-east-1" }),
-        makeLocation({ id: "loc-2", name: "Staging", region: "eu-west-1" }),
+        makeLocation({ id: "loc-1", label: "Prod", region: "us-east-1" }),
+        makeLocation({ id: "loc-2", label: "Staging", region: "eu-west-1" }),
       ];
       wrapper = makeWrapper({ locations });
 
@@ -365,9 +380,9 @@ describe("PrivateLocations", () => {
 
     it("filters locations by pool (case-insensitive)", async () => {
       const locations = [
-        makeLocation({ id: "loc-1", name: "A", pool: "alpha" }),
-        makeLocation({ id: "loc-2", name: "B", pool: "beta" }),
-        makeLocation({ id: "loc-3", name: "C", pool: "alpha-backup" }),
+        makeLocation({ id: "loc-1", label: "A", pool: "alpha" }),
+        makeLocation({ id: "loc-2", label: "B", pool: "beta" }),
+        makeLocation({ id: "loc-3", label: "C", pool: "alpha-backup" }),
       ];
       wrapper = makeWrapper({ locations });
 
@@ -379,9 +394,7 @@ describe("PrivateLocations", () => {
     });
 
     it("shows no rows when search matches nothing", async () => {
-      const locations = [
-        makeLocation({ id: "loc-1", name: "US East" }),
-      ];
+      const locations = [makeLocation({ id: "loc-1", label: "US East" })];
       wrapper = makeWrapper({ locations });
 
       const input = wrapper.find("input");
@@ -394,8 +407,8 @@ describe("PrivateLocations", () => {
     it("restores all rows when search is cleared", async () => {
       // Use unique regions/pools so "east" only matches the name field.
       const locations = [
-        makeLocation({ id: "loc-1", name: "US East", region: "r-a", pool: "p-a" }),
-        makeLocation({ id: "loc-2", name: "EU West", region: "r-b", pool: "p-b" }),
+        makeLocation({ id: "loc-1", label: "US East", region: "r-a", pool: "p-a" }),
+        makeLocation({ id: "loc-2", label: "EU West", region: "r-b", pool: "p-b" }),
       ];
       wrapper = makeWrapper({ locations });
 
@@ -412,9 +425,7 @@ describe("PrivateLocations", () => {
     it('emits "refresh" when refresh button is clicked', async () => {
       wrapper = makeWrapper({ locations: [makeLocation()] });
 
-      const refreshBtn = wrapper.find(
-        '[data-test="synthetics-private-locations-refresh-btn"]',
-      );
+      const refreshBtn = wrapper.find('[data-test="synthetics-private-locations-refresh-btn"]');
       await refreshBtn.trigger("click");
 
       expect(wrapper.emitted("refresh")).toBeTruthy();
@@ -422,12 +433,10 @@ describe("PrivateLocations", () => {
     });
 
     it('emits "copy-setup" with row data when copy button is clicked', async () => {
-      const loc = makeLocation({ id: "loc-abc", name: "Test Location" });
+      const loc = makeLocation({ id: "loc-abc", label: "Test Location" });
       wrapper = makeWrapper({ locations: [loc] });
 
-      const copyBtn = wrapper.find(
-        '[data-test="synthetics-private-locations-copy-btn-loc-abc"]',
-      );
+      const copyBtn = wrapper.find('[data-test="synthetics-private-locations-copy-btn-loc-abc"]');
       await copyBtn.trigger("click");
 
       expect(wrapper.emitted("copy-setup")).toBeTruthy();
@@ -491,27 +500,21 @@ describe("PrivateLocations", () => {
     it("shows OEmptyState when locations is empty and not loading", () => {
       wrapper = makeWrapper({ locations: [], loading: false });
 
-      const emptyState = wrapper.find(
-        '[data-test="synthetics-private-locations-empty-state"]',
-      );
+      const emptyState = wrapper.find('[data-test="synthetics-private-locations-empty-state"]');
       expect(emptyState.exists()).toBe(true);
     });
 
     it("does not show OEmptyState when loading is true (even with empty locations)", () => {
       wrapper = makeWrapper({ locations: [], loading: true });
 
-      const emptyState = wrapper.find(
-        '[data-test="synthetics-private-locations-empty-state"]',
-      );
+      const emptyState = wrapper.find('[data-test="synthetics-private-locations-empty-state"]');
       expect(emptyState.exists()).toBe(false);
     });
 
     it("does not show OEmptyState when locations has items", () => {
       wrapper = makeWrapper({ locations: [makeLocation()], loading: false });
 
-      const emptyState = wrapper.find(
-        '[data-test="synthetics-private-locations-empty-state"]',
-      );
+      const emptyState = wrapper.find('[data-test="synthetics-private-locations-empty-state"]');
       expect(emptyState.exists()).toBe(false);
     });
   });
@@ -579,9 +582,7 @@ describe("PrivateLocations", () => {
       const buttons = trailing.findAll("button");
       // Only the refresh button should exist in toolbar-trailing
       expect(buttons).toHaveLength(1);
-      expect(
-        buttons[0]?.attributes("data-test"),
-      ).toBe("synthetics-private-locations-refresh-btn");
+      expect(buttons[0]?.attributes("data-test")).toBe("synthetics-private-locations-refresh-btn");
     });
   });
 });

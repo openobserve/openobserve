@@ -91,7 +91,6 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-
 const mockSeriesOptions = [
   { name: "Series 1", value: "series1" },
   { name: "Series 2", value: "series2" },
@@ -136,9 +135,7 @@ describe("ColorBySeriesPopUp", () => {
   });
 
   it("renders the popup content inside the dialog", () => {
-    expect(
-      wrapper.find("[data-test='dashboard-color-by-series-popup']").exists(),
-    ).toBe(true);
+    expect(wrapper.find("[data-test='dashboard-color-by-series-popup']").exists()).toBe(true);
   });
 
   it("forwards the title to ODialog", () => {
@@ -246,9 +243,7 @@ describe("ColorBySeriesPopUp", () => {
 
     // Delete the MIDDLE (non-last) row via its delete button.
     await wrapper
-      .find(
-        "[data-test='dashboard-addpanel-config-color-by-series-delete-btn-1']",
-      )
+      .find("[data-test='dashboard-addpanel-config-color-by-series-delete-btn-1']")
       .trigger("click");
     await flushPromises();
     await wrapper.vm.$nextTick();
@@ -256,10 +251,7 @@ describe("ColorBySeriesPopUp", () => {
     // The surviving rows must render in order (B gone, C shifted up) — proving the
     // inputs track the data and are not left blank/shifted.
     expect(renderedRowValues()).toEqual(["Series A", "Series C"]);
-    expect(wrapper.vm.editColorBySeries.map((r: any) => r.value)).toEqual([
-      "Series A",
-      "Series C",
-    ]);
+    expect(wrapper.vm.editColorBySeries.map((r: any) => r.value)).toEqual(["Series A", "Series C"]);
   });
 
   it("sets color when setColorByIndex is invoked", async () => {
@@ -284,11 +276,7 @@ describe("ColorBySeriesPopUp", () => {
   it("filters out series options with undefined name", async () => {
     wrapper.unmount();
     wrapper = buildWrapper({
-      seriesOptions: [
-        { name: "Valid" },
-        { name: undefined },
-        { name: "Another" },
-      ],
+      seriesOptions: [{ name: "Valid" }, { name: undefined }, { name: "Another" }],
     });
     await flushPromises();
     const items = wrapper.vm.seriesDataItems;
@@ -403,9 +391,7 @@ describe("ColorBySeriesPopUp", () => {
   });
 
   it("returns value, label, or raw item from selectColorBySeriesOption", () => {
-    expect(
-      wrapper.vm.selectColorBySeriesOption({ value: "v", label: "l" }),
-    ).toBe("v");
+    expect(wrapper.vm.selectColorBySeriesOption({ value: "v", label: "l" })).toBe("v");
     expect(wrapper.vm.selectColorBySeriesOption({ label: "l" })).toBe("l");
     expect(wrapper.vm.selectColorBySeriesOption("raw")).toBe("raw");
   });

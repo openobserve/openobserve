@@ -1,11 +1,11 @@
 <template>
   <div>
     <div class="p-2 pt-1">
-      <div class="text-base font-medium font-bold">OTLP HTTP</div>
+      <div class="text-base font-bold font-medium">OTLP HTTP</div>
       <ContentCopy class="mt-2" :content="getOtelHttpConfig" />
     </div>
     <div class="p-3" v-if="config.isCloud == 'false'">
-      <div class="text-base font-medium font-bold">OTLP gRPC</div>
+      <div class="text-base font-bold font-medium">OTLP gRPC</div>
       <ContentCopy :content="getOtelGrpcConfig" />
     </div>
   </div>

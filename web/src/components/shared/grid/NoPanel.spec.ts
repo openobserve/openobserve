@@ -19,7 +19,6 @@ import { createI18n } from "vue-i18n";
 
 import NoPanel from "./NoPanel.vue";
 
-
 const i18n = createI18n({
   legacy: false,
   locale: "en",
@@ -90,29 +89,19 @@ describe("NoPanel", () => {
   describe("add panel button visibility", () => {
     it("should show the add panel button when viewOnly is false", () => {
       wrapper = mountNoPanel({ viewOnly: false });
-      expect(
-        wrapper
-          .find('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-if-no-panel-add-panel-btn"]').exists()).toBe(true);
     });
 
     it("should show the add panel button when viewOnly prop is not provided", () => {
       wrapper = mountNoPanel();
-      expect(
-        wrapper
-          .find('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-if-no-panel-add-panel-btn"]').exists()).toBe(true);
     });
 
     it("should hide the add panel button when viewOnly is true", () => {
       wrapper = mountNoPanel({ viewOnly: true });
-      expect(
-        wrapper
-          .find('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-if-no-panel-add-panel-btn"]').exists()).toBe(
+        false,
+      );
     });
   });
 
@@ -122,9 +111,7 @@ describe("NoPanel", () => {
     });
 
     it("should display the label for the first quick-start card", () => {
-      const btn = wrapper.find(
-        '[data-test="dashboard-if-no-panel-add-panel-btn"]',
-      );
+      const btn = wrapper.find('[data-test="dashboard-if-no-panel-add-panel-btn"]');
       expect(btn.exists()).toBe(true);
     });
   });
@@ -135,9 +122,7 @@ describe("NoPanel", () => {
     });
 
     it("should emit update:Panel when the add button is clicked", async () => {
-      const btn = wrapper.find(
-        '[data-test="dashboard-if-no-panel-add-panel-btn"]',
-      );
+      const btn = wrapper.find('[data-test="dashboard-if-no-panel-add-panel-btn"]');
       expect(btn.exists()).toBe(true);
       await btn.trigger("click");
       expect(wrapper.emitted("update:Panel")).toBeTruthy();
@@ -145,9 +130,7 @@ describe("NoPanel", () => {
     });
 
     it("should emit update:Panel on every click", async () => {
-      const btn = wrapper.find(
-        '[data-test="dashboard-if-no-panel-add-panel-btn"]',
-      );
+      const btn = wrapper.find('[data-test="dashboard-if-no-panel-add-panel-btn"]');
       await btn.trigger("click");
       await btn.trigger("click");
       expect(wrapper.emitted("update:Panel")).toHaveLength(2);

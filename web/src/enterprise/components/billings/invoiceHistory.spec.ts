@@ -22,12 +22,11 @@ import store from "@/test/unit/helpers/store";
 vi.mock("@/enterprise/components/billings/invoiceTable.vue", () => ({
   default: {
     name: "InvoiceTable",
-    template: '<div data-testid="mock-invoice-table">Mock Invoice Table</div>'
-  }
+    template: '<div data-testid="mock-invoice-table">Mock Invoice Table</div>',
+  },
 }));
 
 import InvoiceHistory from "@/enterprise/components/billings/invoiceHistory.vue";
-
 
 describe("InvoiceHistory", () => {
   let wrapper: any;
@@ -37,9 +36,9 @@ describe("InvoiceHistory", () => {
       global: {
         plugins: [i18n],
         provide: {
-          store: store
+          store: store,
         },
-      }
+      },
     });
   });
 
@@ -111,8 +110,8 @@ describe("InvoiceHistory", () => {
         props: propsData,
         global: {
           plugins: [i18n],
-          provide: { store }
-        }
+          provide: { store },
+        },
       });
       expect(wrapperWithProps.exists()).toBe(true);
     });
@@ -122,8 +121,8 @@ describe("InvoiceHistory", () => {
         props: { unknownProp: "test" },
         global: {
           plugins: [i18n],
-          provide: { store }
-        }
+          provide: { store },
+        },
       });
       expect(wrapperWithUnknownProps.exists()).toBe(true);
     });
@@ -157,12 +156,11 @@ describe("InvoiceHistory", () => {
     });
   });
 
-
   describe("Internationalization (i18n)", () => {
     it("should handle missing translation keys gracefully", () => {
       // Test that translation function exists and works
       expect(typeof wrapper.vm.t).toBe("function");
-      
+
       // Test with a known translation key
       const result = wrapper.vm.t("billing.invoiceHistory");
       expect(typeof result).toBe("string");
@@ -231,9 +229,8 @@ describe("InvoiceHistory", () => {
           global: {
             plugins: [i18n],
             provide: { store },
-            stubs: {
-                          }
-          }
+            stubs: {},
+          },
         });
       }).not.toThrow();
     });
@@ -244,9 +241,9 @@ describe("InvoiceHistory", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            InvoiceTable: true
-          }
-        }
+            InvoiceTable: true,
+          },
+        },
       });
       expect(minimalWrapper.exists()).toBe(true);
     });
@@ -257,7 +254,7 @@ describe("InvoiceHistory", () => {
           global: {
             plugins: [i18n],
             // Completely omit store from provide to test actual missing store scenario
-          }
+          },
         });
       }).not.toThrow();
     });
@@ -267,8 +264,8 @@ describe("InvoiceHistory", () => {
         props: null,
         global: {
           plugins: [i18n],
-          provide: { store }
-        }
+          provide: { store },
+        },
       });
       expect(wrapperWithNullProps.exists()).toBe(true);
     });
@@ -278,7 +275,7 @@ describe("InvoiceHistory", () => {
     it("should maintain component stability", () => {
       // Test that component maintains its structure after updates
       wrapper.vm.$forceUpdate();
-      
+
       // Verify component still exists and has expected elements
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.find('[data-test="invoice-history-container"]').exists()).toBe(true);

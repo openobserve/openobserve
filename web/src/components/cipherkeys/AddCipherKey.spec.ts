@@ -103,25 +103,15 @@ describe("AddCipherKey.vue", () => {
 
     it("shows the create (not update) title in create mode", async () => {
       wrapper = await createWrapper();
-      expect(
-        wrapper.find('[data-test="add-template-title"]').text(),
-      ).not.toContain("Update");
+      expect(wrapper.find('[data-test="add-template-title"]').text()).not.toContain("Update");
     });
 
     it("renders the name input, type select, and action buttons", async () => {
       wrapper = await createWrapper();
-      expect(
-        wrapper.find('[data-test="add-cipher-key-name-input"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="add-cipher-key-type-input"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="add-cipher-key-cancel-btn"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="add-cipher-key-save-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-cipher-key-name-input"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-cipher-key-type-input"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-cipher-key-cancel-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-cipher-key-save-btn"]').exists()).toBe(true);
     });
 
     it("starts at step 1", async () => {
@@ -148,9 +138,9 @@ describe("AddCipherKey.vue", () => {
       await flush();
 
       expect(CipherKeysService.create).not.toHaveBeenCalled();
-      expect(
-        wrapper.find('[data-test="add-cipher-key-name-input-error"]').text(),
-      ).toBe("Name is required");
+      expect(wrapper.find('[data-test="add-cipher-key-name-input-error"]').text()).toBe(
+        "Name is required",
+      );
     });
   });
 
@@ -203,9 +193,7 @@ describe("AddCipherKey.vue", () => {
       expect(CipherKeysService.create).toHaveBeenCalledTimes(1);
       const [, payload] = (CipherKeysService.create as any).mock.calls[0];
       expect(payload.key.store.type).toBe("akeyless");
-      expect(payload.key.store.akeyless.base_url).toBe(
-        "https://api.akeyless.io",
-      );
+      expect(payload.key.store.akeyless.base_url).toBe("https://api.akeyless.io");
     });
 
     it("does NOT create an akeyless key with an invalid base URL", async () => {
@@ -248,9 +236,7 @@ describe("AddCipherKey.vue", () => {
       await nextTick();
       expect(wrapper.vm.step).toBe(2);
 
-      await wrapper
-        .find('[data-test="add-cipher-key-step2-back-btn"]')
-        .trigger("click");
+      await wrapper.find('[data-test="add-cipher-key-step2-back-btn"]').trigger("click");
       expect(wrapper.vm.step).toBe(1);
     });
 
@@ -258,18 +244,16 @@ describe("AddCipherKey.vue", () => {
       wrapper = await createWrapper();
       setField(wrapper, "key.store.type", "akeyless");
       await nextTick();
-      expect(
-        wrapper.find('[data-test="add-cipher-key-akeyless-baseurl-input"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-cipher-key-akeyless-baseurl-input"]').exists()).toBe(
+        true,
+      );
     });
 
     it("renders the openobserve secret child when store.type is local", async () => {
       wrapper = await createWrapper();
-      expect(
-        wrapper.find('[data-test="add-cipher-key-openobserve-secret-input"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-cipher-key-openobserve-secret-input"]').exists()).toBe(
+        true,
+      );
     });
   });
 
@@ -290,21 +274,15 @@ describe("AddCipherKey.vue", () => {
       wrapper = await createWrapper({ action: "edit", name: "existing-key" });
       await flush();
       expect(wrapper.vm.isUpdatingCipherKey).toBe(true);
-      expect(wrapper.find('[data-test="add-template-title"]').text()).toContain(
-        "Update",
-      );
+      expect(wrapper.find('[data-test="add-template-title"]').text()).toContain("Update");
       expect(wrapper.vm.form.state.values.name).toBe("existing-key");
-      expect(wrapper.vm.form.state.values.key.store.local).toBe(
-        "loaded-secret",
-      );
+      expect(wrapper.vm.form.state.values.key.store.local).toBe("loaded-secret");
     });
 
     it("makes the name input readonly AND disabled in update mode", async () => {
       wrapper = await createWrapper({ action: "edit", name: "existing-key" });
       await flush();
-      const nameInput = wrapper.find(
-        '[data-test="add-cipher-key-name-input"] input',
-      );
+      const nameInput = wrapper.find('[data-test="add-cipher-key-name-input"] input');
       // Pre-migration the name field carried BOTH readonly + disable in edit
       // mode: readonly blocks typing, disabled gives the greyed "locked" look.
       expect(nameInput.attributes("readonly")).toBeDefined();
@@ -325,8 +303,7 @@ describe("AddCipherKey.vue", () => {
       setField(wrapper, "key.store.local", "changed-secret");
       await submit(wrapper);
       expect(CipherKeysService.update).toHaveBeenCalledTimes(1);
-      const [org, payload, name] = (CipherKeysService.update as any).mock
-        .calls[0];
+      const [org, payload, name] = (CipherKeysService.update as any).mock.calls[0];
       expect(org).toBe("test-org");
       expect(payload.key.store.local).toBe("changed-secret");
       // Payload parity: `isUpdate` flag merged into the body (true on update).
@@ -338,9 +315,7 @@ describe("AddCipherKey.vue", () => {
   describe("cancel", () => {
     it("emits cancel:hideform directly when there are no changes", async () => {
       wrapper = await createWrapper();
-      await wrapper
-        .find('[data-test="add-cipher-key-cancel-btn"]')
-        .trigger("click");
+      await wrapper.find('[data-test="add-cipher-key-cancel-btn"]').trigger("click");
       expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
       expect(wrapper.vm.dialog.show).toBe(false);
     });
@@ -349,9 +324,7 @@ describe("AddCipherKey.vue", () => {
       wrapper = await createWrapper();
       setField(wrapper, "name", "dirty-name");
       await nextTick();
-      await wrapper
-        .find('[data-test="add-cipher-key-cancel-btn"]')
-        .trigger("click");
+      await wrapper.find('[data-test="add-cipher-key-cancel-btn"]').trigger("click");
       expect(wrapper.vm.dialog.show).toBe(true);
       expect(wrapper.vm.dialog.title).toBe("Discard Changes");
     });

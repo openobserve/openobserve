@@ -45,6 +45,7 @@ use config::{
 };
 use db;
 use infra::schema::{SchemaCache, get_partition_time_level};
+use ingestion_common::IngestUser;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
     collector::metrics::v1::{
@@ -53,6 +54,7 @@ use opentelemetry_proto::tonic::{
     metrics::v1::{metric::Data, *},
 };
 use prost::Message;
+use schema::{check_for_schema, stream_schema_exists};
 
 use crate::{
     alerts::alert::AlertExt,
@@ -64,13 +66,12 @@ use crate::{
     },
     metrics::get_exclude_labels,
     pipeline::batch_execution::ExecutablePipeline,
-    schema::{check_for_schema, stream_schema_exists},
 };
 
 pub async fn otlp_proto(
     org_id: &str,
     body: Bytes,
-    user: crate::ingestion_types::IngestUser,
+    user: IngestUser,
 ) -> Result<HttpResponse, std::io::Error> {
     let request = match ExportMetricsServiceRequest::decode(body) {
         Ok(v) => v,
@@ -98,7 +99,7 @@ pub async fn otlp_proto(
 pub async fn otlp_json(
     org_id: &str,
     body: Bytes,
-    user: crate::ingestion_types::IngestUser,
+    user: IngestUser,
 ) -> Result<HttpResponse, std::io::Error> {
     let mut body_json = match serde_json::from_slice::<json::Value>(body.as_ref()) {
         Ok(v) => v,
@@ -133,7 +134,7 @@ pub async fn handle_otlp_request(
     org_id: &str,
     request: ExportMetricsServiceRequest,
     req_type: OtlpRequestType,
-    user: crate::ingestion_types::IngestUser,
+    user: IngestUser,
 ) -> Result<HttpResponse, anyhow::Error> {
     // check system resource
     if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None).await {
@@ -179,6 +180,10 @@ pub async fn handle_otlp_request(
     // records buffer
     let mut json_data_by_stream: HashMap<String, Vec<_>> = HashMap::new();
 
+    // check if stream is deleting from cache
+    let mut stream_delete_status: HashMap<String, bool> = HashMap::new();
+    let mut skipped_records: u32 = 0;
+
     for resource_metric in &request.resource_metrics {
         if resource_metric.scope_metrics.is_empty() {
             continue;
@@ -186,6 +191,26 @@ pub async fn handle_otlp_request(
         for scope_metric in &resource_metric.scope_metrics {
             for metric in &scope_metric.metrics {
                 let metric_name = format_stream_name(metric.name.to_string());
+
+                // check stream if it is deleting
+                let is_deleting = match stream_delete_status.get(&metric_name) {
+                    Some(v) => *v,
+                    None => {
+                        let flag = db::compact::retention::is_deleting_stream(
+                            org_id,
+                            StreamType::Metrics,
+                            &metric_name,
+                            None,
+                        );
+                        stream_delete_status.insert(metric_name.clone(), flag);
+                        flag
+                    }
+                };
+
+                if is_deleting {
+                    skipped_records += 1;
+                    continue;
+                }
 
                 let mut rec = json::json!({});
                 if let Some(res) = &resource_metric.resource {
@@ -401,6 +426,11 @@ pub async fn handle_otlp_request(
                 }
             }
         }
+    }
+
+    // warn if any records were skipped due to streams being deleted
+    if skipped_records > 0 {
+        log::warn!("[METRICS:OTLP] Skipped {skipped_records} records due to streams being deleted");
     }
 
     // process records buffered for pipeline processing

@@ -20,11 +20,7 @@
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
-import {
-  collectorInstallStep,
-  writeConfigVariants,
-  sharedToolIcons,
-} from "./otelShared";
+import { collectorInstallStep, writeConfigVariants, sharedToolIcons } from "./otelShared";
 
 // Step 1 — the monitoring role. Literal name/password here and in the config (the
 // config reads the password from $POSTGRESQL_PASSWORD set at run time) — edit
@@ -75,9 +71,7 @@ service:
       processors: [memory_limiter, batch]
       exporters: [otlphttp/openobserve]`;
 
-export default function postgresCard(
-  subs: CardSubstitutions,
-): RichCardContent {
+export default function postgresCard(subs: CardSubstitutions): RichCardContent {
   const tool = sharedToolIcons();
   return {
     provider: {
@@ -92,8 +86,7 @@ export default function postgresCard(
       {
         id: "prepare",
         title: "Prepare PostgreSQL",
-        description:
-          "Create the monitoring role — run it in a SQL client, **not** your shell.",
+        description: "Create the monitoring role — run it in a SQL client, **not** your shell.",
         chip: { kind: "terminal", label: "Terminal" },
         completeOn: "copy",
         variants: [
@@ -167,18 +160,11 @@ export default function postgresCard(
       {
         id: "verify",
         title: "Verify Data in OpenObserve",
-        description:
-          "Hit Test below, or check Streams for the `postgresql_*` metrics.",
+        description: "Hit Test below, or check Streams for the `postgresql_*` metrics.",
         chip: { kind: "traces", label: "Metrics" },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: [
-          "Active Backends",
-          "Commits",
-          "Rollbacks",
-          "Database Size",
-          "Blocks Read",
-        ],
+        pills: ["Active Backends", "Commits", "Rollbacks", "Database Size", "Blocks Read"],
       },
     ],
     detect: {

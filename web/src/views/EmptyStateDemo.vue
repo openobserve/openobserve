@@ -6,18 +6,17 @@
 -->
 <template>
   <div :class="['es-demo-page', { dark: localDark, '[color-scheme:dark]': localDark }]">
-    <div class="p-8 flex flex-col gap-8 bg-surface-base min-h-screen">
-      <div class="flex items-start justify-between gap-4 flex-wrap">
+    <div class="bg-surface-base flex min-h-screen flex-col gap-8 p-8">
+      <div class="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 class="text-2xl font-semibold text-text-heading">
+          <h1 class="text-text-heading text-2xl font-semibold">
             Empty states — full set for review
           </h1>
-          <p class="text-sm text-text-secondary mt-1 max-w-2xl">
+          <p class="text-text-secondary mt-1 max-w-2xl text-sm">
             Every preset below is a real
-            <code class="text-text-body">&lt;OEmptyState&gt;</code> with its
-            production copy, illustration, and action. Each detailed scene has its
-            own character micro-animation and pauses under OS "reduce motion".
-            Nothing is wired into real pages yet.
+            <code class="text-text-body">&lt;OEmptyState&gt;</code> with its production copy,
+            illustration, and action. Each detailed scene has its own character micro-animation and
+            pauses under OS "reduce motion". Nothing is wired into real pages yet.
           </p>
         </div>
         <div class="flex items-center gap-2">
@@ -29,21 +28,26 @@
           >
             {{ filteredPreview ? "First-run state" : "Filtered state" }}
           </OButton>
-          <OButton variant="outline" size="sm" icon-left="dark-mode" @click="localDark = !localDark">
+          <OButton
+            variant="outline"
+            size="sm"
+            icon-left="dark-mode"
+            @click="localDark = !localDark"
+          >
             {{ localDark ? "Light preview" : "Dark preview" }}
           </OButton>
         </div>
       </div>
 
-      <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <section v-for="p in presets" :key="p.preset" class="flex flex-col gap-2">
           <div class="flex items-baseline gap-2">
-            <span class="text-xs font-semibold uppercase tracking-wider text-text-secondary">
+            <span class="text-text-secondary text-xs font-semibold tracking-wider uppercase">
               {{ p.label }}
             </span>
             <code class="text-2xs text-text-disabled">preset="{{ p.preset }}"</code>
           </div>
-          <div class="rounded-default border border-border-default h-110 overflow-hidden">
+          <div class="rounded-default border-border-default h-110 overflow-hidden border">
             <OEmptyState
               :preset="p.preset"
               size="hero"
@@ -56,15 +60,15 @@
       </div>
 
       <div>
-        <h2 class="text-lg font-semibold text-text-heading mb-1">
+        <h2 class="text-text-heading mb-1 text-lg font-semibold">
           Character — optional, only where it adds value
         </h2>
-        <p class="text-sm text-text-secondary mb-3 max-w-2xl">
-          The illustration is just a named choice, so a scene can opt into a
-          character (e.g. a prominent first-run hero) while everything else stays
-          object-only. Same component, <code class="text-text-body">illustration="explorer"</code>.
+        <p class="text-text-secondary mb-3 max-w-2xl text-sm">
+          The illustration is just a named choice, so a scene can opt into a character (e.g. a
+          prominent first-run hero) while everything else stays object-only. Same component,
+          <code class="text-text-body">illustration="explorer"</code>.
         </p>
-        <div class="rounded-default border border-border-default h-110 overflow-hidden">
+        <div class="rounded-default border-border-default h-110 overflow-hidden border">
           <OEmptyState
             size="hero"
             variant="create"
@@ -79,23 +83,23 @@
       </div>
 
       <div>
-        <h2 class="text-lg font-semibold text-text-heading mb-3">
+        <h2 class="text-text-heading mb-3 text-lg font-semibold">
           Sizes — the same system at block &amp; inline scale
         </h2>
-        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
           <section class="flex flex-col gap-2">
-            <span class="text-xs font-semibold uppercase tracking-wider text-text-secondary">
+            <span class="text-text-secondary text-xs font-semibold tracking-wider uppercase">
               size="block" (inside a card / dashboard panel)
             </span>
-            <div class="rounded-default border border-border-default overflow-hidden">
+            <div class="rounded-default border-border-default overflow-hidden border">
               <OEmptyState preset="no-search-results" size="block" @action="onAction('block')" />
             </div>
           </section>
           <section class="flex flex-col gap-2">
-            <span class="text-xs font-semibold uppercase tracking-wider text-text-secondary">
+            <span class="text-text-secondary text-xs font-semibold tracking-wider uppercase">
               size="inline" (table body / dropdown)
             </span>
-            <div class="rounded-default border border-border-default overflow-hidden">
+            <div class="rounded-default border-border-default overflow-hidden border">
               <OEmptyState preset="no-search-results" size="inline" @action="onAction('inline')" />
             </div>
           </section>

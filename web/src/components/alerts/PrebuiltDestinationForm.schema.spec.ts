@@ -43,9 +43,7 @@ describe("prebuilt credential schema - required + per-type validators", () => {
     });
     expect(res.success).toBe(false);
     if (!res.success) {
-      expect(res.error.issues.some((i) => i.path[0] === "webhookUrl")).toBe(
-        true,
-      );
+      expect(res.error.issues.some((i) => i.path[0] === "webhookUrl")).toBe(true);
     }
   });
 
@@ -82,10 +80,9 @@ describe("prebuilt credential schema - required + per-type validators", () => {
   });
 
   it("email: requires recipients", () => {
-    expect(
-      makePrebuiltDestinationSchema(t, "email").safeParse({ recipients: "" })
-        .success,
-    ).toBe(false);
+    expect(makePrebuiltDestinationSchema(t, "email").safeParse({ recipients: "" }).success).toBe(
+      false,
+    );
     expect(
       makePrebuiltDestinationSchema(t, "email").safeParse({
         recipients: "user@example.com",

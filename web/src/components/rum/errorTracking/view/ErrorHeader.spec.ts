@@ -164,7 +164,7 @@ describe("ErrorHeader", () => {
       // Assert
       expect(mockCopyToClipboard).toHaveBeenCalledWith(
         "error-abc123",
-        expect.objectContaining({ successMessage: "Copied to clipboard" })
+        expect.objectContaining({ successMessage: "Copied to clipboard" }),
       );
     });
 
@@ -180,7 +180,7 @@ describe("ErrorHeader", () => {
       // Assert
       expect(mockCopyToClipboard).toHaveBeenCalledWith(
         "different-id",
-        expect.objectContaining({ successMessage: "Copied to clipboard" })
+        expect.objectContaining({ successMessage: "Copied to clipboard" }),
       );
     });
   });

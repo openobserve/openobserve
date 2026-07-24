@@ -1,9 +1,4 @@
-import type {
-  Provider,
-  ScoreConfig,
-  Scorer,
-  ScorerType,
-} from "@/services/online-evals.service";
+import type { Provider, ScoreConfig, Scorer, ScorerType } from "@/services/online-evals.service";
 
 // Canonical export shape. Embeds BOTH the ID (for same-org re-import speed) and
 // the name (for cross-org portability). The importer resolves IDs first, then
@@ -37,16 +32,11 @@ function findScoreConfigFor(
   rawId: string,
 ): ScoreConfig | null {
   return (
-    scoreConfigs.find(
-      (c) => scoreConfigEntityId(c) === rawId || String(c.id) === rawId,
-    ) ?? null
+    scoreConfigs.find((c) => scoreConfigEntityId(c) === rawId || String(c.id) === rawId) ?? null
   );
 }
 
-function findProviderById(
-  providers: ReadonlyArray<Provider>,
-  rawId: string,
-): Provider | null {
+function findProviderById(providers: ReadonlyArray<Provider>, rawId: string): Provider | null {
   return providers.find((p) => String(p.id) === rawId) ?? null;
 }
 

@@ -22,9 +22,7 @@ const props = defineProps<FormToggleGroupProps>();
 const form = inject(FORM_CONTEXT_KEY, null);
 
 if (import.meta.env.DEV && !form) {
-  console.warn(
-    "[OFormToggleGroup] must be rendered inside <OForm>. No form context found.",
-  );
+  console.warn("[OFormToggleGroup] must be rendered inside <OForm>. No form context found.");
 }
 </script>
 
@@ -53,10 +51,7 @@ if (import.meta.env.DEV && !form) {
           </template>
           <slot />
         </OToggleGroup>
-        <div
-          v-if="field.state.meta.errors.length > 0"
-          class="text-xs text-input-error-text"
-        >
+        <div v-if="field.state.meta.errors.length > 0" class="text-input-error-text text-xs">
           {{ firstFieldError(field.state.meta.errors) }}
         </div>
       </div>

@@ -13,10 +13,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="dashboard-color-palette-root">
-    <div
-      data-test="dashboard-color-palette-flex-container"
-      class="flex items-center"
-    >
+    <div data-test="dashboard-color-palette-flex-container" class="flex items-center">
       <!-- dropdown to select color palette type/mode -->
       <OSelect
         data-test="dashboard-color-palette-select"
@@ -27,22 +24,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :dropdownStyle="{ width: '240px' }"
       >
         <template #trigger>
-          <div class="flex items-center gap-1.5 min-w-0 flex-1">
+          <div class="flex min-w-0 flex-1 items-center gap-1.5">
             <span
               v-if="selectedOptionPalette.length"
-              class="inline-flex items-center gap-[0.1875rem] flex-shrink-0"
+              class="inline-flex flex-shrink-0 items-center gap-[0.1875rem]"
               aria-hidden="true"
             >
               <span
                 v-for="(color, i) in selectedOptionPalette.slice(0, 3)"
                 :key="i"
-                class="w-2 h-2 rounded-full flex-shrink-0"
+                class="h-2 w-2 flex-shrink-0 rounded-full"
                 :style="{ background: color }"
               />
             </span>
             <span
-              class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm text-text-body"
-            >{{ selectedOptionLabel }}</span
+              class="text-text-body min-w-0 flex-1 overflow-hidden text-sm text-ellipsis whitespace-nowrap"
+              >{{ selectedOptionLabel }}</span
             >
           </div>
         </template>
@@ -55,23 +52,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :value="opt.value"
             :label="opt.label"
           >
-            <div class="flex items-center gap-1.5 w-full min-w-0">
+            <div class="flex w-full min-w-0 items-center gap-1.5">
               <span
                 v-if="opt.colorPalette?.length"
-                class="inline-flex items-center gap-[0.1875rem] flex-shrink-0"
+                class="inline-flex flex-shrink-0 items-center gap-[0.1875rem]"
                 aria-hidden="true"
               >
                 <span
                   v-for="(c, i) in opt.colorPalette.slice(0, 5)"
                   :key="i"
-                  class="w-2 h-2 rounded-full flex-shrink-0"
+                  class="h-2 w-2 flex-shrink-0 rounded-full"
                   :style="{ background: c }"
                 />
               </span>
-              <span
-                class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
-              >{{ opt.label }}</span
-              >
+              <span class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{
+                opt.label
+              }}</span>
             </div>
           </OSelectItem>
 
@@ -87,17 +83,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :value="opt.value"
             :label="opt.label"
           >
-            <div class="flex items-center gap-1.5 w-full min-w-0">
+            <div class="flex w-full min-w-0 items-center gap-1.5">
               <span
                 v-if="opt.colorPalette?.length"
-                class="block w-10 h-2 rounded-default flex-shrink-0"
+                class="rounded-default block h-2 w-10 flex-shrink-0"
                 aria-hidden="true"
                 :style="{ background: `linear-gradient(to right, ${opt.colorPalette.join(', ')})` }"
               />
-              <span
-                class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
-              >{{ opt.label }}</span
-              >
+              <span class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{
+                opt.label
+              }}</span>
             </div>
           </OSelectItem>
         </OSelectGroup>
@@ -106,12 +101,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- color picker for fixed and shades typed color mode -->
       <div
         v-if="['fixed', 'shades'].includes(dashboardPanelData.data.config.color.mode)"
-        class="inline-flex items-center flex-shrink-0 mt-7.5 ml-1.5 relative"
+        class="relative mt-7.5 ml-1.5 inline-flex flex-shrink-0 items-center"
         data-test="dashboard-color-palette-color-input-wrapper"
       >
         <button
           type="button"
-          class="w-8 h-8 rounded-full cursor-pointer flex-shrink-0 transition-[box-shadow,border-color] duration-200 ease border-2 border-solid border-border-default hover:border-button-primary hover:ring-2 hover:ring-button-primary-focus-ring focus-visible:outline-2 focus-visible:outline-button-primary-focus-ring focus-visible:outline-offset-2"
+          class="ease border-border-default hover:border-button-primary hover:ring-button-primary-focus-ring focus-visible:outline-button-primary-focus-ring h-8 w-8 flex-shrink-0 cursor-pointer rounded-full border-2 border-solid transition-[box-shadow,border-color] duration-200 hover:ring-2 focus-visible:outline-2 focus-visible:outline-offset-2"
           :aria-label="`Panel color: ${dashboardPanelData.data.config.color.fixedColor[0]}`"
           :style="{ background: dashboardPanelData.data.config.color.fixedColor[0] }"
           data-test="dashboard-color-palette-swatch-btn"
@@ -120,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <input
           ref="colorInput"
           type="color"
-          class="absolute w-0 h-0 opacity-0 pointer-events-none"
+          class="pointer-events-none absolute h-0 w-0 opacity-0"
           v-model="dashboardPanelData.data.config.color.fixedColor[0]"
           data-test="dashboard-color-palette-color-input"
           tabindex="-1"
@@ -130,10 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- color by button group -->
-    <div
-      class="pt-3"
-      v-if="dashboardPanelData.data.config.color.mode.startsWith('continuous')"
-    >
+    <div class="pt-3" v-if="dashboardPanelData.data.config.color.mode.startsWith('continuous')">
       {{ t("dashboard.colorSeriesBy") }}
       <div>
         <OToggleGroup v-model="dashboardPanelData.data.config.color.seriesBy">
@@ -174,13 +166,8 @@ export default defineComponent({
   setup() {
     const { t } = useI18n();
 
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
-    const { dashboardPanelData, promqlMode } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+    const { dashboardPanelData, promqlMode } = useDashboardPanelData(dashboardPanelDataPageKey);
     onBeforeMount(() => {
       // on before mount need to check whether color object is there or not else use palette-classic-by-series as a default
       if (!dashboardPanelData?.data?.config?.color) {
@@ -274,18 +261,19 @@ export default defineComponent({
       const selectedOption = colorOptions.find(
         (option) =>
           option.value ===
-          (dashboardPanelData?.data?.config?.color?.mode ??
-            "palette-classic-by-series"),
+          (dashboardPanelData?.data?.config?.color?.mode ?? "palette-classic-by-series"),
       );
-      return selectedOption
-        ? selectedOption.label
-        : t("dashboard.colorPaletteClassicBySeries");
+      return selectedOption ? selectedOption.label : t("dashboard.colorPaletteClassicBySeries");
     });
 
     const colorOptionsByGroup = computed(() => ({
       bySeries: colorOptions.filter(
         (o): o is SelectableColorOption =>
-          !o.header && !!o.value && !o.value.startsWith("continuous") && o.value !== "fixed" && o.value !== "shades",
+          !o.header &&
+          !!o.value &&
+          !o.value.startsWith("continuous") &&
+          o.value !== "fixed" &&
+          o.value !== "shades",
       ),
       byValue: colorOptions.filter(
         (o): o is SelectableColorOption => !!o.value && o.value.startsWith("continuous"),
@@ -310,9 +298,7 @@ export default defineComponent({
       if (["fixed", "shades"].includes(value)) {
         dashboardPanelData.data.config.color.fixedColor = ["#53ca53"];
         dashboardPanelData.data.config.color.seriesBy = "last";
-      } else if (
-        ["palette-classic-by-series", "palette-classic"].includes(value)
-      ) {
+      } else if (["palette-classic-by-series", "palette-classic"].includes(value)) {
         // do not store fixedcolor in config for palette-classic-by-series and palette-classic
         dashboardPanelData.data.config.color.fixedColor = [];
       } else {

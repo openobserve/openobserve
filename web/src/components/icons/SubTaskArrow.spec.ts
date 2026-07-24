@@ -1,9 +1,8 @@
-import { describe, it, expect, afterEach, vi } from 'vitest';
-import { mount, VueWrapper } from '@vue/test-utils';
-import SubTaskArrow from '@/components/icons/SubTaskArrow.vue';
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { mount, VueWrapper } from "@vue/test-utils";
+import SubTaskArrow from "@/components/icons/SubTaskArrow.vue";
 
-
-describe('SubTaskArrow.vue', () => {
+describe("SubTaskArrow.vue", () => {
   let wrapper: VueWrapper;
 
   afterEach(() => {
@@ -12,101 +11,105 @@ describe('SubTaskArrow.vue', () => {
 
   const createWrapper = () => mount(SubTaskArrow, { global: { plugins: [] } });
 
-  describe('Component Rendering', () => {
-    it('renders the component correctly', () => {
+  describe("Component Rendering", () => {
+    it("renders the component correctly", () => {
       wrapper = createWrapper();
       expect(wrapper.exists()).toBe(true);
     });
 
-    it('has correct component name', () => {
+    it("has correct component name", () => {
       wrapper = createWrapper();
-      expect(wrapper.vm.$options.name).toBe('SubTaskArrow');
+      expect(wrapper.vm.$options.name).toBe("SubTaskArrow");
     });
 
-    it('renders an SVG element', () => {
+    it("renders an SVG element", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('svg').exists()).toBe(true);
+      expect(wrapper.find("svg").exists()).toBe(true);
     });
 
-    it('has correct SVG display dimensions (12x12)', () => {
+    it("has correct SVG display dimensions (12x12)", () => {
       wrapper = createWrapper();
-      const svg = wrapper.find('svg');
-      expect(svg.attributes('width')).toBe('12');
-      expect(svg.attributes('height')).toBe('12');
+      const svg = wrapper.find("svg");
+      expect(svg.attributes("width")).toBe("12");
+      expect(svg.attributes("height")).toBe("12");
     });
 
-    it('has correct viewBox (0 0 24 24)', () => {
+    it("has correct viewBox (0 0 24 24)", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('svg').attributes('viewBox')).toBe('0 0 24 24');
+      expect(wrapper.find("svg").attributes("viewBox")).toBe("0 0 24 24");
     });
 
-    it('has stroke set for drawing lines', () => {
+    it("has stroke set for drawing lines", () => {
       wrapper = createWrapper();
-      const svg = wrapper.find('svg');
-      expect(svg.attributes('stroke')).toBeTruthy();
+      const svg = wrapper.find("svg");
+      expect(svg.attributes("stroke")).toBeTruthy();
     });
 
-    it('contains path elements for the arrow', () => {
+    it("contains path elements for the arrow", () => {
       wrapper = createWrapper();
-      expect(wrapper.findAll('path').length).toBeGreaterThanOrEqual(2);
+      expect(wrapper.findAll("path").length).toBeGreaterThanOrEqual(2);
     });
 
-    it('has stroke-linecap set to round', () => {
+    it("has stroke-linecap set to round", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('svg').attributes('stroke-linecap')).toBe('round');
+      expect(wrapper.find("svg").attributes("stroke-linecap")).toBe("round");
     });
 
-    it('has stroke-linejoin set to round', () => {
+    it("has stroke-linejoin set to round", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('svg').attributes('stroke-linejoin')).toBe('round');
+      expect(wrapper.find("svg").attributes("stroke-linejoin")).toBe("round");
     });
   });
 
-  describe('Vue 3 Integration', () => {
-    it('uses defineComponent correctly', () => {
+  describe("Vue 3 Integration", () => {
+    it("uses defineComponent correctly", () => {
       wrapper = createWrapper();
       expect(wrapper.vm).toBeTruthy();
     });
 
-    it('has no reactive state', () => {
+    it("has no reactive state", () => {
       wrapper = createWrapper();
       expect(wrapper.vm.$data).toEqual({});
     });
 
-    it('mounts without errors', () => {
-      expect(() => { wrapper = createWrapper(); }).not.toThrow();
+    it("mounts without errors", () => {
+      expect(() => {
+        wrapper = createWrapper();
+      }).not.toThrow();
     });
 
-    it('unmounts cleanly', () => {
+    it("unmounts cleanly", () => {
       wrapper = createWrapper();
-      expect(() => { wrapper.unmount(); }).not.toThrow();
+      expect(() => {
+        wrapper.unmount();
+      }).not.toThrow();
     });
 
-    it('has no side effects on mount', () => {
-      const spy = vi.spyOn(console, 'warn');
+    it("has no side effects on mount", () => {
+      const spy = vi.spyOn(console, "warn");
       wrapper = createWrapper();
       expect(spy).not.toHaveBeenCalled();
       spy.mockRestore();
     });
   });
 
-  describe('Icon Specifics', () => {
-    it('renders at the SVG root level', () => {
+  describe("Icon Specifics", () => {
+    it("renders at the SVG root level", () => {
       wrapper = createWrapper();
-      expect(wrapper.element.tagName).toBe('svg');
+      expect(wrapper.element.tagName).toBe("svg");
     });
 
-    it('has curved path for the arrow line', () => {
+    it("has curved path for the arrow line", () => {
       wrapper = createWrapper();
-      const paths = wrapper.findAll('path');
-      const curvedPath = paths.find((p) => p.attributes('d')?.includes('C'));
+      const paths = wrapper.findAll("path");
+      const curvedPath = paths.find((p) => p.attributes("d")?.includes("C"));
       expect(curvedPath).toBeTruthy();
     });
 
-    it('has an arrowhead path', () => {
+    it("has an arrowhead path", () => {
       wrapper = createWrapper();
-      const paths = wrapper.findAll('path');
-      const arrowheadPath = paths.find((p) => p.attributes('d')?.includes('L20 15'));
+      const paths = wrapper.findAll("path");
+      const arrowheadPath = paths.find((p) => p.attributes("d")?.includes("L20 15"));
       expect(arrowheadPath).toBeTruthy();
     });
   });

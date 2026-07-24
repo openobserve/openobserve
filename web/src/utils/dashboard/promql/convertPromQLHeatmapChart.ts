@@ -13,17 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import {
-  PromQLChartConverter,
-  ProcessedPromQLData,
-  TOOLTIP_SCROLL_STYLE,
-} from "./shared/types";
+import { PromQLChartConverter, ProcessedPromQLData, TOOLTIP_SCROLL_STYLE } from "./shared/types";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
 import { chartColor } from "@/utils/chartTheme";
-import {
-  deaccumulateHistogramSeries,
-  HistogramSeriesInput,
-} from "./shared/histogramBuckets";
+import { deaccumulateHistogramSeries, HistogramSeriesInput } from "./shared/histogramBuckets";
 import {
   HEATMAP_SPLIT_AREA,
   HEATMAP_VISUAL_MAP_COLORS,
@@ -46,9 +39,7 @@ export const PROMETHEUS_HISTOGRAM_MODE = "prometheus_histogram";
  * different grids, later samples get looked up against query 0's timestamps and
  * read as 0. The union degrades to the truth instead of to blankness.
  */
-function buildTimeAxis(
-  processedData: ProcessedPromQLData[],
-): Array<[any, any]> {
+function buildTimeAxis(processedData: ProcessedPromQLData[]): Array<[any, any]> {
   const byTs = new Map<string, [any, any]>();
 
   for (const queryData of processedData ?? []) {
@@ -60,9 +51,7 @@ function buildTimeAxis(
     }
   }
 
-  return [...byTs.values()].sort(
-    (a, b) => Number(a[0]) - Number(b[0]),
-  );
+  return [...byTs.values()].sort((a, b) => Number(a[0]) - Number(b[0]));
 }
 
 /**
@@ -76,10 +65,7 @@ function buildTimeAxis(
  * same colour. Both paths ask this one question so neither can answer it wrongly
  * on its own.
  */
-function visualMapRangeOf(
-  minValue: number,
-  maxValue: number,
-): { min: number; max: number } {
+function visualMapRangeOf(minValue: number, maxValue: number): { min: number; max: number } {
   return {
     min: Number.isFinite(minValue) ? Math.min(0, minValue) : 0,
     max: Number.isFinite(maxValue) ? maxValue : 0,
@@ -147,12 +133,7 @@ function formatBucketLabel(le: string, leValue: number, config: any): string {
 
   try {
     const formatted = formatUnitValue(
-      getUnitValue(
-        leValue,
-        config?.bucket_unit,
-        config?.bucket_unit_custom,
-        config?.decimals,
-      ),
+      getUnitValue(leValue, config?.bucket_unit, config?.bucket_unit_custom, config?.decimals),
     );
     return formatted || le;
   } catch (error) {
@@ -223,12 +204,7 @@ function applyCompactPreview(options: any): any {
 export class HeatmapConverter implements PromQLChartConverter {
   supportedTypes = ["heatmap"];
 
-  convert(
-    processedData: ProcessedPromQLData[],
-    panelSchema: any,
-    store: any,
-    extras: any,
-  ) {
+  convert(processedData: ProcessedPromQLData[], panelSchema: any, store: any, extras: any) {
     const config = panelSchema.config || {};
 
     // Opt-in only: Prometheus classic-histogram mode. Generic heatmaps keep
@@ -250,9 +226,7 @@ export class HeatmapConverter implements PromQLChartConverter {
     // Shared across every query, so a cell's column is its INSTANT — not its
     // offset within whichever query happened to report it.
     const timeAxis = buildTimeAxis(processedData);
-    const columnOfTs = new Map(
-      timeAxis.map(([ts], index) => [String(ts), index]),
-    );
+    const columnOfTs = new Map(timeAxis.map(([ts], index) => [String(ts), index]));
 
     processedData.forEach((queryData) => {
       queryData.series.forEach((seriesData) => {
@@ -360,8 +334,7 @@ export class HeatmapConverter implements PromQLChartConverter {
         extraCssText: TOOLTIP_SCROLL_STYLE,
         formatter: (params: any) => {
           try {
-            const seriesName =
-              seriesNames[params?.value[1]] || params?.seriesName;
+            const seriesName = seriesNames[params?.value[1]] || params?.seriesName;
             const value =
               formatUnitValue(
                 getUnitValue(
@@ -407,12 +380,10 @@ export class HeatmapConverter implements PromQLChartConverter {
     // interleave two histograms' buckets. Each query is its own cumulative
     // histogram.
     const buckets = processedData.flatMap((queryData) => {
-      const inputs: HistogramSeriesInput[] = (queryData.series ?? []).map(
-        (seriesData) => ({
-          le: extractLeLabel(seriesData),
-          data: seriesData.data ?? {},
-        }),
-      );
+      const inputs: HistogramSeriesInput[] = (queryData.series ?? []).map((seriesData) => ({
+        le: extractLeLabel(seriesData),
+        data: seriesData.data ?? {},
+      }));
       return deaccumulateHistogramSeries(inputs);
     });
 
@@ -523,8 +494,7 @@ export class HeatmapConverter implements PromQLChartConverter {
         extraCssText: TOOLTIP_SCROLL_STYLE,
         formatter: (params: any) => {
           try {
-            const bucketLabel =
-              bucketLabels[params?.value?.[1]] ?? params?.seriesName;
+            const bucketLabel = bucketLabels[params?.value?.[1]] ?? params?.seriesName;
             // config.unit remains the CELL INTENSITY unit (e.g. count/s).
             const value =
               formatUnitValue(

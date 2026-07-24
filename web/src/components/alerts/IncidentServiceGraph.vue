@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="incident-service-graph relative h-[calc(100vh-12.625rem)] min-h-100 flex flex-col m-3 p-5 rounded-default overflow-hidden transition-all duration-200 bg-[linear-gradient(135deg,#f9fafb_0%,#ffffff_100%)] border border-border-default shadow-[0_1px_3px_0_rgba(0,0,0,0.08),0_1px_2px_0_rgba(0,0,0,0.04),inset_0_0_0_1px_rgba(255,255,255,0.5)] hover:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1),0_2px_4px_-1px_rgba(0,0,0,0.06),inset_0_0_0_1px_rgba(255,255,255,0.5)] dark:bg-[linear-gradient(135deg,var(--color-grey-800)_0%,var(--color-grey-900)_100%)] dark:border-grey-700 dark:shadow-[0_1px_3px_0_color-mix(in_srgb,var(--color-black)_30%,transparent),0_1px_2px_0_color-mix(in_srgb,var(--color-black)_20%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--color-grey-700)_30%,transparent)] dark:hover:shadow-[0_4px_6px_-1px_color-mix(in_srgb,var(--color-black)_40%,transparent),0_2px_4px_-1px_color-mix(in_srgb,var(--color-black)_30%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--color-grey-700)_30%,transparent)]"
+    class="incident-service-graph rounded-default border-border-default relative m-3 flex h-[calc(100vh-12.625rem)] min-h-100 flex-col overflow-hidden border bg-[linear-gradient(135deg,#f9fafb_0%,#ffffff_100%)] p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.08),0_1px_2px_0_rgba(0,0,0,0.04),inset_0_0_0_1px_rgba(255,255,255,0.5)] transition-all duration-200 hover:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1),0_2px_4px_-1px_rgba(0,0,0,0.06),inset_0_0_0_1px_rgba(255,255,255,0.5)] dark:bg-[linear-gradient(135deg,var(--color-grey-800)_0%,var(--color-grey-900)_100%)] dark:shadow-[0_1px_3px_0_color-mix(in_srgb,var(--color-black)_30%,transparent),0_1px_2px_0_color-mix(in_srgb,var(--color-black)_20%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--color-grey-700)_30%,transparent)] dark:hover:shadow-[0_4px_6px_-1px_color-mix(in_srgb,var(--color-black)_40%,transparent),0_2px_4px_-1px_color-mix(in_srgb,var(--color-black)_30%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--color-grey-700)_30%,transparent)]"
   >
     <!-- Info Icon → Graph Legend popover (hover to show) -->
     <span
@@ -27,51 +27,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="info-outline" size="sm" />
       </OButton>
       <div
-        class="graph-legend absolute top-[calc(100%+8px)] right-0 min-w-60 py-3.5 px-4 text-compact leading-normal text-text-body bg-surface-overlay border border-border-default rounded-default shadow-[0_10px_20px_rgba(0,0,0,0.12),0_3px_6px_rgba(0,0,0,0.06)] opacity-0 invisible -translate-y-1 transition-all duration-150 pointer-events-none whitespace-nowrap group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:pointer-events-auto dark:text-grey-200 dark:bg-grey-800 dark:border-[color-mix(in_srgb,var(--color-white)_12%,transparent)] dark:shadow-[0_10px_20px_color-mix(in_srgb,var(--color-black)_60%,transparent),0_3px_6px_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
+        class="graph-legend text-compact text-text-body bg-surface-overlay border-border-default rounded-default pointer-events-none invisible absolute top-[calc(100%+8px)] right-0 min-w-60 -translate-y-1 border px-4 py-3.5 leading-normal whitespace-nowrap opacity-0 shadow-[0_10px_20px_rgba(0,0,0,0.12),0_3px_6px_rgba(0,0,0,0.06)] transition-all duration-150 group-focus-within:pointer-events-auto group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 dark:border-[color-mix(in_srgb,var(--color-white)_12%,transparent)] dark:shadow-[0_10px_20px_color-mix(in_srgb,var(--color-black)_60%,transparent),0_3px_6px_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
         role="tooltip"
       >
-        <div class="font-semibold text-sm mb-2.5">Graph Legend</div>
+        <div class="mb-2.5 text-sm font-semibold">Graph Legend</div>
         <div class="graph-legend__row flex items-center gap-2 py-1">
-          <span class="graph-legend__dot text-sm leading-none w-3.5 text-center shrink-0 text-status-negative">●</span>
+          <span
+            class="graph-legend__dot text-status-negative w-3.5 shrink-0 text-center text-sm leading-none"
+            >●</span
+          >
           Red = Potential Root Cause
         </div>
         <div class="graph-legend__row flex items-center gap-2 py-1">
-          <span class="graph-legend__dot text-sm leading-none w-3.5 text-center shrink-0 text-status-warning-text">●</span>
+          <span
+            class="graph-legend__dot text-status-warning-text w-3.5 shrink-0 text-center text-sm leading-none"
+            >●</span
+          >
           Orange = High Frequency
         </div>
         <div class="graph-legend__row flex items-center gap-2 py-1">
-          <span class="graph-legend__dot text-sm leading-none w-3.5 text-center shrink-0 text-text-link">●</span>
+          <span
+            class="graph-legend__dot text-text-link w-3.5 shrink-0 text-center text-sm leading-none"
+            >●</span
+          >
           Blue = Normal
         </div>
-        <div class="graph-legend__divider h-px bg-border-default my-2 dark:bg-[color-mix(in_srgb,var(--color-white)_15%,transparent)]" />
+        <div
+          class="graph-legend__divider bg-border-default my-2 h-px dark:bg-[color-mix(in_srgb,var(--color-white)_15%,transparent)]"
+        />
         <div class="graph-legend__row flex items-center gap-2 py-1">
-          <span class="graph-legend__dot text-sm leading-none w-3.5 text-center shrink-0 text-badge-purple-ol-text">→</span>
+          <span
+            class="graph-legend__dot text-badge-purple-ol-text w-3.5 shrink-0 text-center text-sm leading-none"
+            >→</span
+          >
           Purple arrows show temporal flow
         </div>
       </div>
     </span>
 
     <!-- Loading State -->
-    <div
-      v-if="loading"
-      class="flex items-center justify-center h-full bg-surface-base/50"
-    >
+    <div v-if="loading" class="bg-surface-base/50 flex h-full items-center justify-center">
       <OSpinner size="md" />
     </div>
 
     <!-- Empty State -->
     <div
       v-else-if="!graphData || !graphData.nodes || graphData.nodes.length === 0"
-      class="flex flex-col items-center justify-center gap-3 h-full"
+      class="flex h-full flex-col items-center justify-center gap-3"
     >
       <!-- size-12! (48px) exceeds OIcon's largest `size` prop (xl = 40px); the `!`
            is required because OIcon's own `size-6` default sits in the same layer. -->
       <OIcon name="hub" class="text-text-muted size-12!" />
       <div class="text-center">
-        <div class="text-sm font-medium text-text-secondary">
-          Service Graph Unavailable
-        </div>
-        <div class="text-xs mt-1 text-text-secondary">
+        <div class="text-text-secondary text-sm font-medium">Service Graph Unavailable</div>
+        <div class="text-text-secondary mt-1 text-xs">
           No topology data available for this incident.
         </div>
       </div>
@@ -80,13 +89,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Graph Canvas using ECharts -->
     <div
       v-if="!loading && graphData && graphData.nodes && graphData.nodes.length > 0"
-      class="w-full h-full"
+      class="h-full w-full"
     >
-      <ChartRenderer
-        ref="chartRendererRef"
-        :data="chartData"
-        :key="chartKey"
-      />
+      <ChartRenderer ref="chartRendererRef" :data="chartData" :key="chartKey" />
     </div>
   </div>
 </template>
@@ -95,7 +100,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, computed, watch } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import { forceSimulation, forceManyBody, forceLink, forceCenter, forceCollide, forceX, forceY } from "d3-force";
+import {
+  forceSimulation,
+  forceManyBody,
+  forceLink,
+  forceCenter,
+  forceCollide,
+  forceX,
+  forceY,
+} from "d3-force";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import { AlertNode } from "@/services/incidents";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -109,7 +122,7 @@ export default defineComponent({
     OButton,
     OSpinner,
     OIcon,
-},
+  },
   props: {
     topologyContext: {
       type: Object as () => { nodes: AlertNode[]; edges: any[] } | null,
@@ -132,8 +145,8 @@ export default defineComponent({
 
     // D3-Force simulation to compute stable node positions with left-to-right layout
     const computeForceLayout = (nodes: any[], edges: any[], width = 800, height = 600) => {
-      const nodesCopy = nodes.map(n => ({ ...n }));
-      const edgesCopy = edges.map(e => ({
+      const nodesCopy = nodes.map((n) => ({ ...n }));
+      const edgesCopy = edges.map((e) => ({
         source: e.source,
         target: e.target,
         ...e,
@@ -141,18 +154,20 @@ export default defineComponent({
 
       // Calculate depth/level for each node (for left-to-right positioning)
       const nodeDepth = new Map<string, number>();
-      nodesCopy.forEach(n => nodeDepth.set(n.id, 0));
+      nodesCopy.forEach((n) => nodeDepth.set(n.id, 0));
 
       // Build adjacency list from temporal edges to determine hierarchy
-      const temporalEdges = edgesCopy.filter(e => e.originalEdge?.edge_type === 'temporal');
+      const temporalEdges = edgesCopy.filter((e) => e.originalEdge?.edge_type === "temporal");
       const visited = new Set<string>();
 
       // BFS to calculate depth
       const queue: Array<{ id: string; depth: number }> = [];
 
       // Find root nodes (nodes with no incoming temporal edges)
-      const hasIncoming = new Set(temporalEdges.map(e => typeof e.target === 'string' ? e.target : e.target.id));
-      nodesCopy.forEach(n => {
+      const hasIncoming = new Set(
+        temporalEdges.map((e) => (typeof e.target === "string" ? e.target : e.target.id)),
+      );
+      nodesCopy.forEach((n) => {
         if (!hasIncoming.has(n.id)) {
           queue.push({ id: n.id, depth: 0 });
         }
@@ -165,9 +180,9 @@ export default defineComponent({
         nodeDepth.set(id, depth);
 
         // Find outgoing temporal edges
-        temporalEdges.forEach(edge => {
-          const sourceId = typeof edge.source === 'string' ? edge.source : edge.source.id;
-          const targetId = typeof edge.target === 'string' ? edge.target : edge.target.id;
+        temporalEdges.forEach((edge) => {
+          const sourceId = typeof edge.source === "string" ? edge.source : edge.source.id;
+          const targetId = typeof edge.target === "string" ? edge.target : edge.target.id;
           if (sourceId === id) {
             queue.push({ id: targetId, depth: depth + 1 });
           }
@@ -175,34 +190,44 @@ export default defineComponent({
       }
 
       const simulation = forceSimulation(nodesCopy)
-        .force('charge', forceManyBody().strength(-400).distanceMax(1200))
-        .force('link', forceLink(edgesCopy)
-          .id((d: any) => d.id)
-          .distance(180)
-          .strength(0.5)
-          .iterations(2)
+        .force("charge", forceManyBody().strength(-400).distanceMax(1200))
+        .force(
+          "link",
+          forceLink(edgesCopy)
+            .id((d: any) => d.id)
+            .distance(180)
+            .strength(0.5)
+            .iterations(2),
         )
-        .force('x', forceX((d: any) => {
-          // Position nodes left-to-right based on their temporal-edge depth.
-          const depth = nodeDepth.get(d.id) || 0;
-          const maxDepth = Math.max(...Array.from(nodeDepth.values()));
-          const leftMargin = 80; // Left margin to prevent nodes from touching the edge
-          const rightMargin = 80; // Right margin
-          const availableWidth = width - leftMargin - rightMargin;
-          const spacing = maxDepth > 0 ? availableWidth / maxDepth : 0;
-          return leftMargin + spacing * depth;
-        }).strength(1.5)) // Strong horizontal positioning
-        .force('y', forceY(() => {
-          return height / 2;
-        }).strength((d: any) => {
-          // Stronger centering for root nodes (depth 0).
-          const depth = nodeDepth.get(d.id) || 0;
-          return depth === 0 ? 0.8 : 0.1;
-        }))
-        .force('collision', forceCollide()
-          .radius((d: any) => (d.symbolSize || 60) / 2 + 50)
-          .strength(1.0)
-          .iterations(3)
+        .force(
+          "x",
+          forceX((d: any) => {
+            // Position nodes left-to-right based on their temporal-edge depth.
+            const depth = nodeDepth.get(d.id) || 0;
+            const maxDepth = Math.max(...Array.from(nodeDepth.values()));
+            const leftMargin = 80; // Left margin to prevent nodes from touching the edge
+            const rightMargin = 80; // Right margin
+            const availableWidth = width - leftMargin - rightMargin;
+            const spacing = maxDepth > 0 ? availableWidth / maxDepth : 0;
+            return leftMargin + spacing * depth;
+          }).strength(1.5),
+        ) // Strong horizontal positioning
+        .force(
+          "y",
+          forceY(() => {
+            return height / 2;
+          }).strength((d: any) => {
+            // Stronger centering for root nodes (depth 0).
+            const depth = nodeDepth.get(d.id) || 0;
+            return depth === 0 ? 0.8 : 0.1;
+          }),
+        )
+        .force(
+          "collision",
+          forceCollide()
+            .radius((d: any) => (d.symbolSize || 60) / 2 + 50)
+            .strength(1.0)
+            .iterations(3),
         )
         .velocityDecay(0.4)
         .stop();
@@ -212,7 +237,7 @@ export default defineComponent({
         simulation.tick();
       }
 
-      return simulation.nodes().map(n => ({ ...n }));
+      return simulation.nodes().map((n) => ({ ...n }));
     };
 
     // Data comes from props.
@@ -235,7 +260,7 @@ export default defineComponent({
     const getNodeSize = (node: AlertNode, nodes: AlertNode[], maxSize = 120): number => {
       // Scale node size based on alert_count relative to the max count in the dataset
       const minSize = 30;
-      const maxCount = Math.max(...nodes.map(n => n.alert_count || 0), 1);
+      const maxCount = Math.max(...nodes.map((n) => n.alert_count || 0), 1);
       if (maxCount === 0) return minSize;
       const ratio = (node.alert_count || 0) / maxCount;
       return Math.round(minSize + ratio * (maxSize - minSize));
@@ -249,12 +274,12 @@ export default defineComponent({
     // Bucket-unit ladder in microseconds (backend timestamps are microseconds).
     const US = 1000; // microseconds per millisecond
     const BUCKET_UNITS_US = [
-      60 * US * 1000,            // 1 minute
-      5 * 60 * US * 1000,        // 5 minutes
-      15 * 60 * US * 1000,       // 15 minutes
-      60 * 60 * US * 1000,       // 1 hour
-      6 * 60 * 60 * US * 1000,   // 6 hours
-      24 * 60 * 60 * US * 1000,  // 1 day
+      60 * US * 1000, // 1 minute
+      5 * 60 * US * 1000, // 5 minutes
+      15 * 60 * US * 1000, // 15 minutes
+      60 * 60 * US * 1000, // 1 hour
+      6 * 60 * 60 * US * 1000, // 6 hours
+      24 * 60 * 60 * US * 1000, // 1 day
       7 * 24 * 60 * 60 * US * 1000, // 7 days
     ];
 
@@ -292,16 +317,19 @@ export default defineComponent({
         BUCKET_UNITS_US.find((u) => Math.ceil(span / u) <= BUCKET_TARGET_MAX) ??
         Math.ceil(span / BUCKET_TARGET_MAX);
 
-      const buckets = new Map<string, {
-        alert_id: string;
-        alert_name: string;
-        service_name: string;
-        alert_count: number;
-        first_fired_at: number;
-        last_fired_at: number;
-        windowStart: number;
-        serviceCounts: Map<string, number>;
-      }>();
+      const buckets = new Map<
+        string,
+        {
+          alert_id: string;
+          alert_name: string;
+          service_name: string;
+          alert_count: number;
+          first_fired_at: number;
+          last_fired_at: number;
+          windowStart: number;
+          serviceCounts: Map<string, number>;
+        }
+      >();
 
       // Track which bucket key each raw node index falls into, for edge rebuild.
       const rawIdxToKey = new Map<number, string>();
@@ -433,11 +461,11 @@ export default defineComponent({
       // Compute force-directed layout positions using D3 with left-to-right layout
       // Only compute if we don't have cached positions for these nodes
       let positionedNodes;
-      const hasAllPositions = preparedNodes.every(n => nodePositions.value.has(n.id));
+      const hasAllPositions = preparedNodes.every((n) => nodePositions.value.has(n.id));
 
       if (hasAllPositions) {
         // Use cached positions
-        positionedNodes = preparedNodes.map(n => ({
+        positionedNodes = preparedNodes.map((n) => ({
           ...n,
           x: nodePositions.value.get(n.id)!.x,
           y: nodePositions.value.get(n.id)!.y,
@@ -480,7 +508,9 @@ export default defineComponent({
             fontWeight: 500,
             color: isDarkMode.value ? "#e5e7eb" : "#374151",
             formatter: `{b}`,
-            backgroundColor: isDarkMode.value ? "rgba(31, 41, 55, 0.85)" : "rgba(255, 255, 255, 0.9)",
+            backgroundColor: isDarkMode.value
+              ? "rgba(31, 41, 55, 0.85)"
+              : "rgba(255, 255, 255, 0.9)",
             borderRadius: 4,
             padding: [3, 7],
             borderColor: isDarkMode.value ? "#4b5563" : "#e5e7eb",
@@ -495,7 +525,9 @@ export default defineComponent({
               fontWeight: 600,
               color: isDarkMode.value ? "#e5e7eb" : "#374151",
               formatter: `{b}`,
-              backgroundColor: isDarkMode.value ? "rgba(31, 41, 55, 0.95)" : "rgba(255, 255, 255, 1)",
+              backgroundColor: isDarkMode.value
+                ? "rgba(31, 41, 55, 0.95)"
+                : "rgba(255, 255, 255, 1)",
               borderRadius: 4,
               padding: [3, 7],
               borderColor: isDarkMode.value ? "#6b7280" : "#d1d5db",
@@ -505,7 +537,10 @@ export default defineComponent({
           tooltip: {
             formatter: () => {
               const firstTime = new Date(originalNode.first_fired_at / 1000).toLocaleString();
-              const lastTime = originalNode.alert_count > 1 ? new Date(originalNode.last_fired_at / 1000).toLocaleString() : null;
+              const lastTime =
+                originalNode.alert_count > 1
+                  ? new Date(originalNode.last_fired_at / 1000).toLocaleString()
+                  : null;
 
               let html = `<div style="padding: 0.5rem; font-size: var(--text-xs);">`;
               html += `<strong style="font-size: var(--text-sm);">${originalNode.alert_name}</strong><br/>`;
@@ -533,9 +568,14 @@ export default defineComponent({
           source: edge.from_node_index.toString(),
           target: edge.to_node_index.toString(),
           lineStyle: {
-            color: edge.edge_type === "temporal"
-              ? (isDarkMode.value ? "#a78bfa" : "#8b5cf6") // purple for temporal
-              : (isDarkMode.value ? "#6b7280" : "#9ca3af"), // gray for service dependency
+            color:
+              edge.edge_type === "temporal"
+                ? isDarkMode.value
+                  ? "#a78bfa"
+                  : "#8b5cf6" // purple for temporal
+                : isDarkMode.value
+                  ? "#6b7280"
+                  : "#9ca3af", // gray for service dependency
             width: edge.edge_type === "temporal" ? 3 : 2,
             curveness: 0.2,
             type: "solid",
@@ -629,7 +669,7 @@ export default defineComponent({
         nodePositions.value.clear();
         loadGraph();
       },
-      { deep: true }
+      { deep: true },
     );
 
     return {

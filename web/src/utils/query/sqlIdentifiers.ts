@@ -81,9 +81,7 @@ export const buildColumnIdentifierAst = (identifier: string) => {
 
   if (rawIdentifier === "*") return "*";
 
-  const type = needsSqlIdentifierQuoting(rawIdentifier)
-    ? "double_quote_string"
-    : "default";
+  const type = needsSqlIdentifierQuoting(rawIdentifier) ? "double_quote_string" : "default";
 
   return { expr: { type, value: rawIdentifier } };
 };

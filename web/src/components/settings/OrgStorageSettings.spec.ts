@@ -20,7 +20,6 @@ import i18n from "@/locales";
 import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
 
-
 const { mockGetStorage } = vi.hoisted(() => ({
   mockGetStorage: vi.fn(),
 }));
@@ -99,7 +98,9 @@ describe("OrgStorageSettings", () => {
   it("shows loading spinner initially", () => {
     mockGetStorage.mockReturnValue(new Promise(() => {}));
     const wrapper = createWrapper();
-    expect(wrapper.find('[data-test="org-storage-settings-loading-indicator"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="org-storage-settings-loading-indicator"]').exists()).toBe(
+      true,
+    );
   });
 
   it("shows empty state when not configured", async () => {
@@ -108,9 +109,7 @@ describe("OrgStorageSettings", () => {
     await nextTick();
 
     expect(wrapper.text()).toContain("No bucket configured");
-    expect(
-      wrapper.find('[data-test="org-storage-settings-empty-state"]').exists()
-    ).toBe(true);
+    expect(wrapper.find('[data-test="org-storage-settings-empty-state"]').exists()).toBe(true);
   });
 
   it("shows editor when configure is clicked", async () => {
@@ -118,9 +117,7 @@ describe("OrgStorageSettings", () => {
     await nextTick();
     await nextTick();
 
-    await wrapper
-      .find('[data-test="org-storage-settings-empty-state"] button')
-      .trigger("click");
+    await wrapper.find('[data-test="org-storage-settings-empty-state"] button').trigger("click");
     await nextTick();
 
     const editor = wrapper.findComponent({ name: "OrgStorageEditor" });
@@ -153,9 +150,7 @@ describe("OrgStorageSettings", () => {
     expect(wrapper.text()).toContain("us-west-1");
     expect(wrapper.text()).toContain("AKI123456789");
     expect(wrapper.text()).toContain("secret123");
-    expect(
-      wrapper.find('[data-test="storage-settings-update-btn"]').exists()
-    ).toBe(true);
+    expect(wrapper.find('[data-test="storage-settings-update-btn"]').exists()).toBe(true);
   });
 
   it("shows editor in edit mode when update is clicked", async () => {
@@ -176,9 +171,7 @@ describe("OrgStorageSettings", () => {
     await nextTick();
     await nextTick();
 
-    await wrapper
-      .find('[data-test="storage-settings-update-btn"]')
-      .trigger("click");
+    await wrapper.find('[data-test="storage-settings-update-btn"]').trigger("click");
     await nextTick();
 
     const editor = wrapper.findComponent({ name: "OrgStorageEditor" });

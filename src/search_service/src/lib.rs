@@ -75,6 +75,8 @@ pub mod grpc_search;
 pub mod grpc_server;
 pub mod partition;
 pub mod query_range;
+#[cfg(feature = "enterprise")]
+pub mod search_jobs;
 pub mod searcher;
 pub mod streaming;
 #[cfg(feature = "enterprise")]

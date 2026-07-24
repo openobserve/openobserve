@@ -23,10 +23,8 @@ use axum::{
 };
 use config::utils::json;
 use flate2::read::ZlibDecoder;
-use openobserve_core::{
-    auth::UserEmail,
-    ingestion_types::{IngestUser, IngestionRequest},
-};
+use ingestion_common::{IngestUser, IngestionRequest};
+use openobserve_core::auth::UserEmail;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 

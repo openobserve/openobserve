@@ -33,14 +33,11 @@ headers = {
 records = [{"source": "databricks", "message": "hello from databricks"}]
 requests.post(url, headers=headers, json=records)`;
 
-export default function databricksCard(
-  subs: CardSubstitutions,
-): RichCardContent {
+export default function databricksCard(subs: CardSubstitutions): RichCardContent {
   return {
     provider: {
       name: "Databricks",
-      tagline:
-        "Ship Databricks notebook logs to OpenObserve over the logs API.",
+      tagline: "Ship Databricks notebook logs to OpenObserve over the logs API.",
       logo: getImageURL("images/ingestion/databricks.svg"),
       tone: "#FF3621",
       metaBadges: ["Logs"],
@@ -63,8 +60,7 @@ export default function databricksCard(
       {
         id: "verify",
         title: "Verify Data in OpenObserve",
-        description:
-          "Hit Test below, or open Logs and search `source:databricks`.",
+        description: "Hit Test below, or open Logs and search `source:databricks`.",
         chip: { kind: "traces", label: "Logs" },
         completeOn: "detect",
         detectionAnchor: true,

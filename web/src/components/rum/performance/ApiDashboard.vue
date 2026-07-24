@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :key="store.state.selectedOrganization.identifier"
   >
     <div
-      class="h-full min-h-0! max-h-[calc(100vh-196px)] overflow-y-auto"
+      class="h-full max-h-[calc(100vh-196px)] min-h-0! overflow-y-auto"
       :class="isLoading.length ? 'invisible' : 'visible'"
     >
       <div class="performance-dashboard">
@@ -40,11 +40,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-show="isLoading.length"
-      class="pb-4 flex items-center justify-center text-center absolute w-full h-[calc(100vh-15.625rem)] top-0"
+      class="absolute top-0 flex h-[calc(100vh-15.625rem)] w-full items-center justify-center pb-4 text-center"
     >
       <div>
         <OSpinner size="md" class="mx-auto block" />
-        <div class="text-center w-full">Loading Dashboard</div>
+        <div class="w-full text-center">Loading Dashboard</div>
       </div>
     </div>
   </div>
@@ -52,15 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import {
-  defineComponent,
-  ref,
-  watch,
-  onMounted,
-  onActivated,
-  nextTick,
-  type Ref,
-} from "vue";
+import { defineComponent, ref, watch, onMounted, onActivated, nextTick, type Ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { reactive } from "vue";
@@ -261,10 +253,7 @@ export default defineComponent({
 
       // if variables data is null, set it to empty list
       if (
-        !(
-          currentDashboardData.data?.variables &&
-          currentDashboardData.data?.variables?.list.length
-        )
+        !(currentDashboardData.data?.variables && currentDashboardData.data?.variables?.list.length)
       ) {
         if (variablesData.value) {
           variablesData.value.isVariablesLoading = false;
@@ -315,4 +304,3 @@ export default defineComponent({
   },
 });
 </script>
-

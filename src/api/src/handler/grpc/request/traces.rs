@@ -14,12 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{meta::otlp::OtlpRequestType, metrics};
+use ingestion_common::IngestUser;
 use opentelemetry_proto::tonic::collector::trace::v1::{
     ExportTraceServiceRequest, ExportTraceServiceResponse, trace_service_server::TraceService,
 };
 use tonic::{Response, Status};
 
-use crate::service::{ingestion_types::IngestUser, traces::handle_otlp_request};
+use crate::service::traces::handle_otlp_request;
 
 #[derive(Default)]
 pub struct TraceServer;

@@ -1146,14 +1146,19 @@ test.describe("Logs Regression Bugs", () => {
   });
 
   /**
-   * Bug #9724: Log detail sidebar should open with JSON tab selected by default
+   * Log detail sidebar default tab (originally Bug #9724).
    * https://github.com/openobserve/openobserve/issues/9724
-   * PR #9703 fixed the sidebar consistency issue by adding initialTab prop
+   *
+   * Bug #9724 / PR #9703 originally made the sidebar open on the JSON tab.
+   * PR #13368 ("logs sidebar table will be default view and draggable tabs")
+   * intentionally changed the default to the Table tab. This test now verifies
+   * the current intended behavior — Table is the default view — while still
+   * confirming both tabs render and JSON remains reachable by switching tabs.
    */
-  test("Log detail sidebar opens with JSON tab by default (Bug #9724)", {
+  test("Log detail sidebar opens with Table tab by default (#13368)", {
     tag: ['@regressionBugs', '@logDetail', '@sidebar', '@bug9724', '@P1', '@logs']
   }, async ({ page }) => {
-    testLogger.info('Test: Log detail sidebar default tab verification (Bug #9724)');
+    testLogger.info('Test: Log detail sidebar default tab verification (#13368)');
 
     // Navigate to logs page
     await pm.logsPage.clickMenuLinkLogsItem();
@@ -1177,9 +1182,11 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info('Step 2: Verifying sidebar is visible');
     await pm.logsPage.expectLogDetailSidebarVisible();
 
-    // Step 3: Verify JSON tab is selected by default (Bug #9724 core verification)
-    testLogger.info('Step 3: Verifying JSON tab is selected by default');
-    await pm.logsPage.verifyJsonTabSelectedByDefault();
+    // Step 3: Verify Table tab is selected by default (#13368 core verification)
+    testLogger.info('Step 3: Verifying Table tab is selected by default');
+    await pm.logsPage.verifyTableTabSelectedByDefault();
+    // Wrap toggle is only rendered on the Table tab, so it must be visible on open
+    await pm.logsPage.verifyWrapToggleVisibleInTableTab();
 
     // Step 4: Verify both tabs are visible
     testLogger.info('Step 4: Verifying both JSON and Table tabs are visible');
@@ -1189,30 +1196,29 @@ test.describe("Logs Regression Bugs", () => {
     testLogger.info('Step 5: Verifying navigation buttons are visible');
     await pm.logsPage.verifyNavigationButtonsVisible();
 
-    // Step 6: Click on Table tab and verify switch
-    testLogger.info('Step 6: Switching to Table tab');
-    await pm.logsPage.clickLogDetailTableTab();
-    await pm.logsPage.verifyTableTabSelected();
-    await pm.logsPage.verifyWrapToggleVisibleInTableTab();
-
-    // Step 7: Click back to JSON tab and verify switch
-    testLogger.info('Step 7: Switching back to JSON tab');
+    // Step 6: Click on JSON tab and verify switch
+    testLogger.info('Step 6: Switching to JSON tab');
     await pm.logsPage.clickLogDetailJsonTab();
     await pm.logsPage.verifyJsonTabSelected();
 
-    // Step 8: Close sidebar and reopen - verify JSON tab is still default
+    // Step 7: Click back to Table tab and verify switch
+    testLogger.info('Step 7: Switching back to Table tab');
+    await pm.logsPage.clickLogDetailTableTab();
+    await pm.logsPage.verifyTableTabSelected();
+
+    // Step 8: Close sidebar and reopen - verify Table tab is still default
     testLogger.info('Step 8: Close and reopen sidebar to verify default state persists');
     await pm.logsPage.closeLogDetailSidebar();
     await pm.logsPage.expectLogDetailSidebarNotVisible();
 
     // Reopen sidebar
     await pm.logsPage.openLogDetailSidebar();
-    await pm.logsPage.verifyJsonTabSelectedByDefault();
+    await pm.logsPage.verifyTableTabSelectedByDefault();
 
     // Close sidebar
     await pm.logsPage.closeLogDetailSidebar();
 
-    testLogger.info('✓ Bug #9724 verification complete: Log detail sidebar opens with JSON tab by default');
+    testLogger.info('✓ #13368 verification complete: Log detail sidebar opens with Table tab by default');
   });
 
   // ============================================================================

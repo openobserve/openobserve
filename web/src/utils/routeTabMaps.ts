@@ -159,7 +159,7 @@ export function resolveTab(
   fallback: string,
 ): string {
   const map = ROUTE_TAB_MAPS[section];
-  return (map && routeName && map[routeName]) ? map[routeName] : fallback;
+  return map && routeName && map[routeName] ? map[routeName] : fallback;
 }
 
 /** Expose the raw maps for consumers that need to iterate over valid tab names. */

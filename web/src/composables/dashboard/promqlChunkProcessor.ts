@@ -87,11 +87,11 @@ export function createPromQLChunkProcessor(options: PromQLChunkProcessorOptions)
     if (enableLogging) {
       if (metricsCount > maxSeries) {
         console.log(
-          `[PromQL Chunk] ⚠️ First chunk limited from ${metricsCount} to ${limitedResult.length} metrics`
+          `[PromQL Chunk] ⚠️ First chunk limited from ${metricsCount} to ${limitedResult.length} metrics`,
         );
       }
       console.log(
-        `[PromQL Chunk] Built index for ${limitedResult.length} metrics in ${(performance.now() - startTime).toFixed(1)}ms`
+        `[PromQL Chunk] Built index for ${limitedResult.length} metrics in ${(performance.now() - startTime).toFixed(1)}ms`,
       );
     }
 
@@ -132,10 +132,7 @@ export function createPromQLChunkProcessor(options: PromQLChunkProcessorOptions)
 
       if (existingIndex !== undefined && existingIndex < mergedResult.length) {
         // Existing metric - append values
-        if (
-          Array.isArray(mergedResult[existingIndex].values) &&
-          Array.isArray(newMetric.values)
-        ) {
+        if (Array.isArray(mergedResult[existingIndex].values) && Array.isArray(newMetric.values)) {
           mergedResult[existingIndex].values.push(...newMetric.values);
           valuesAppended += newMetric.values.length;
         }
@@ -155,7 +152,7 @@ export function createPromQLChunkProcessor(options: PromQLChunkProcessorOptions)
     if (enableLogging) {
       console.log(
         `[PromQL Chunk] Merged in ${(performance.now() - mergeStart).toFixed(1)}ms ` +
-          `(${newMetricsAdded} new metrics, ${valuesAppended} values appended)`
+          `(${newMetricsAdded} new metrics, ${valuesAppended} values appended)`,
       );
     }
 
@@ -175,18 +172,14 @@ export function createPromQLChunkProcessor(options: PromQLChunkProcessorOptions)
     const metricsCount = newData?.result?.length || 0;
 
     if (enableLogging) {
-      console.log(
-        `[PromQL Chunk] Chunk ${stats.chunkCount} received: ${metricsCount} metrics`
-      );
+      console.log(`[PromQL Chunk] Chunk ${stats.chunkCount} received: ${metricsCount} metrics`);
     }
 
-    const result = !currentResult
-      ? processFirstChunk(newData)
-      : mergeChunk(currentResult, newData);
+    const result = !currentResult ? processFirstChunk(newData) : mergeChunk(currentResult, newData);
 
     if (enableLogging) {
       console.log(
-        `[PromQL Chunk] Total chunk processing: ${(performance.now() - chunkStartTime).toFixed(1)}ms`
+        `[PromQL Chunk] Total chunk processing: ${(performance.now() - chunkStartTime).toFixed(1)}ms`,
       );
     }
 
@@ -211,10 +204,10 @@ export function createPromQLChunkProcessor(options: PromQLChunkProcessorOptions)
 
     if (enableLogging) {
       console.log(
-        `[PromQL Chunk] ✅ Processing complete! Total time: ${finalStats.totalTime.toFixed(0)}ms (${stats.chunkCount} chunks)`
+        `[PromQL Chunk] ✅ Processing complete! Total time: ${finalStats.totalTime.toFixed(0)}ms (${stats.chunkCount} chunks)`,
       );
       console.log(
-        `[PromQL Chunk] Final metrics: ${stats.metricsStored} stored (${stats.totalMetricsReceived} received, ${stats.valuesAppended} values appended)`
+        `[PromQL Chunk] Final metrics: ${stats.metricsStored} stored (${stats.totalMetricsReceived} received, ${stats.valuesAppended} values appended)`,
       );
     }
   }

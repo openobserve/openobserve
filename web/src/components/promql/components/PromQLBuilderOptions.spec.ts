@@ -19,7 +19,6 @@ import PromQLBuilderOptions from "./PromQLBuilderOptions.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 describe("PromQLBuilderOptions", () => {
   let wrapper: any;
 
@@ -99,25 +98,19 @@ describe("PromQLBuilderOptions", () => {
 
     it("should render legend field", () => {
       wrapper = createWrapper();
-      const legend = wrapper.find(
-        '[data-test="dashboard-promql-builder-legend"]'
-      );
+      const legend = wrapper.find('[data-test="dashboard-promql-builder-legend"]');
       expect(legend.exists()).toBe(true);
     });
 
     it("should render step value field", () => {
       wrapper = createWrapper();
-      const stepValue = wrapper.find(
-        '[data-test="dashboard-promql-builder-step-value"]'
-      );
+      const stepValue = wrapper.find('[data-test="dashboard-promql-builder-step-value"]');
       expect(stepValue.exists()).toBe(true);
     });
 
     it("should render query type field", () => {
       wrapper = createWrapper();
-      const queryType = wrapper.find(
-        '[data-test="dashboard-promql-builder-query-type"]'
-      );
+      const queryType = wrapper.find('[data-test="dashboard-promql-builder-query-type"]');
       expect(queryType.exists()).toBe(true);
     });
 
@@ -143,21 +136,16 @@ describe("PromQLBuilderOptions", () => {
   describe("Legend Field", () => {
     it("should bind to promql_legend in query config", () => {
       wrapper = createWrapper();
-      expect(
-        wrapper.vm.dashboardPanelData.data.queries[0].config.promql_legend
-      ).toBe("");
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].config.promql_legend).toBe("");
     });
 
     it("should update promql_legend when changed", async () => {
       wrapper = createWrapper();
 
-      wrapper.vm.dashboardPanelData.data.queries[0].config.promql_legend =
-        "{{method}}";
+      wrapper.vm.dashboardPanelData.data.queries[0].config.promql_legend = "{{method}}";
       await wrapper.vm.$nextTick();
 
-      expect(
-        wrapper.vm.dashboardPanelData.data.queries[0].config.promql_legend
-      ).toBe("{{method}}");
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].config.promql_legend).toBe("{{method}}");
     });
 
     it("should show legend info tooltip", () => {
@@ -176,9 +164,7 @@ describe("PromQLBuilderOptions", () => {
 
     it("should have correct width for legend input", () => {
       wrapper = createWrapper();
-      const legend = wrapper.find(
-        '[data-test="dashboard-promql-builder-legend"]'
-      );
+      const legend = wrapper.find('[data-test="dashboard-promql-builder-legend"]');
       expect(legend.attributes("style")).toContain("width: 260px");
     });
   });
@@ -198,9 +184,7 @@ describe("PromQLBuilderOptions", () => {
       };
 
       wrapper = createWrapper(dataWithoutQueryType);
-      expect(
-        wrapper.vm.dashboardPanelData.data.queries[0].config.query_type
-      ).toBe("range");
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].config.query_type).toBe("range");
     });
 
     it("should bind to query_type in query config", () => {
@@ -221,9 +205,7 @@ describe("PromQLBuilderOptions", () => {
       };
 
       wrapper = createWrapper(dataWithQueryType);
-      expect(
-        wrapper.vm.dashboardPanelData.data.queries[0].config.query_type
-      ).toBe("instant");
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].config.query_type).toBe("instant");
     });
 
     it("should have query type options", () => {
@@ -242,13 +224,10 @@ describe("PromQLBuilderOptions", () => {
     it("should update query_type when changed", async () => {
       wrapper = createWrapper();
 
-      wrapper.vm.dashboardPanelData.data.queries[0].config.query_type =
-        "instant";
+      wrapper.vm.dashboardPanelData.data.queries[0].config.query_type = "instant";
       await wrapper.vm.$nextTick();
 
-      expect(
-        wrapper.vm.dashboardPanelData.data.queries[0].config.query_type
-      ).toBe("instant");
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].config.query_type).toBe("instant");
     });
 
     it("should render query type select", () => {
@@ -259,9 +238,7 @@ describe("PromQLBuilderOptions", () => {
 
     it("should have correct width for query type select", () => {
       wrapper = createWrapper();
-      const queryType = wrapper.find(
-        '[data-test="dashboard-promql-builder-query-type"]'
-      );
+      const queryType = wrapper.find('[data-test="dashboard-promql-builder-query-type"]');
       expect(queryType.exists()).toBe(true);
       const style = queryType.attributes("style");
       if (style) {
@@ -279,9 +256,7 @@ describe("PromQLBuilderOptions", () => {
   describe("Step Value Field", () => {
     it("should bind to step_value in query config", () => {
       wrapper = createWrapper();
-      expect(
-        wrapper.vm.dashboardPanelData.data.queries[0].config.step_value
-      ).toBe("");
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].config.step_value).toBe("");
     });
 
     it("should update step_value when changed", async () => {
@@ -290,9 +265,7 @@ describe("PromQLBuilderOptions", () => {
       wrapper.vm.dashboardPanelData.data.queries[0].config.step_value = "30s";
       await wrapper.vm.$nextTick();
 
-      expect(
-        wrapper.vm.dashboardPanelData.data.queries[0].config.step_value
-      ).toBe("30s");
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].config.step_value).toBe("30s");
     });
 
     it("should have placeholder text", () => {
@@ -315,9 +288,7 @@ describe("PromQLBuilderOptions", () => {
 
     it("should have correct width for step value input", () => {
       wrapper = createWrapper();
-      const stepValue = wrapper.find(
-        '[data-test="dashboard-promql-builder-step-value"]'
-      );
+      const stepValue = wrapper.find('[data-test="dashboard-promql-builder-step-value"]');
       expect(stepValue.exists()).toBe(true);
     });
 
@@ -404,8 +375,7 @@ describe("PromQLBuilderOptions", () => {
   describe("PromQL Name Option Selection", () => {
     it("should add braces and field name when no braces present", () => {
       wrapper = createWrapper();
-      wrapper.vm.dashboardPanelData.data.queries[0].config.promql_legend =
-        "test";
+      wrapper.vm.dashboardPanelData.data.queries[0].config.promql_legend = "test";
 
       const result = wrapper.vm.selectPromQlNameOption("method");
       expect(result).toBe("{method}");
@@ -413,8 +383,7 @@ describe("PromQLBuilderOptions", () => {
 
     it("should replace content after opening brace", () => {
       wrapper = createWrapper();
-      wrapper.vm.dashboardPanelData.data.queries[0].config.promql_legend =
-        "prefix{old}";
+      wrapper.vm.dashboardPanelData.data.queries[0].config.promql_legend = "prefix{old}";
 
       const result = wrapper.vm.selectPromQlNameOption("method");
       expect(result).toBe("prefix{method}");
@@ -422,8 +391,7 @@ describe("PromQLBuilderOptions", () => {
 
     it("should handle legend with multiple braces", () => {
       wrapper = createWrapper();
-      wrapper.vm.dashboardPanelData.data.queries[0].config.promql_legend =
-        "{first}{second{";
+      wrapper.vm.dashboardPanelData.data.queries[0].config.promql_legend = "{first}{second{";
 
       const result = wrapper.vm.selectPromQlNameOption("method");
       expect(result).toBe("{first}{second{method}");
@@ -469,12 +437,8 @@ describe("PromQLBuilderOptions", () => {
 
       wrapper = createWrapper(dataWithMultipleQueries);
 
-      expect(
-        wrapper.vm.dashboardPanelData.data.queries[1].config.promql_legend
-      ).toBe("query2");
-      expect(
-        wrapper.vm.dashboardPanelData.data.queries[1].config.step_value
-      ).toBe("1m");
+      expect(wrapper.vm.dashboardPanelData.data.queries[1].config.promql_legend).toBe("query2");
+      expect(wrapper.vm.dashboardPanelData.data.queries[1].config.step_value).toBe("1m");
     });
 
     it("should update correct query when currentQueryIndex changes", async () => {
@@ -499,33 +463,20 @@ describe("PromQLBuilderOptions", () => {
 
       wrapper = createWrapper(dataWithMultipleQueries);
 
-      wrapper.vm.dashboardPanelData.data.queries[0].config.promql_legend =
-        "first";
+      wrapper.vm.dashboardPanelData.data.queries[0].config.promql_legend = "first";
       await wrapper.vm.$nextTick();
 
-      expect(
-        wrapper.vm.dashboardPanelData.data.queries[0].config.promql_legend
-      ).toBe("first");
-      expect(
-        wrapper.vm.dashboardPanelData.data.queries[1].config.promql_legend
-      ).toBe("");
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].config.promql_legend).toBe("first");
+      expect(wrapper.vm.dashboardPanelData.data.queries[1].config.promql_legend).toBe("");
     });
   });
 
   describe("Accessibility", () => {
     it("should have data-test attributes", () => {
       wrapper = createWrapper();
-      expect(
-        wrapper.find('[data-test="dashboard-promql-builder-legend"]').exists()
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="dashboard-promql-builder-step-value"]')
-          .exists()
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="dashboard-promql-builder-query-type"]')
-          .exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-promql-builder-legend"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-promql-builder-step-value"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-promql-builder-query-type"]').exists()).toBe(true);
     });
 
     it("should have tooltips for user guidance", () => {
@@ -550,7 +501,9 @@ describe("PromQLBuilderOptions", () => {
 
     it("should have axis container", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('[data-test="promql-builder-options-axis-container"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="promql-builder-options-axis-container"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should have field labels", () => {
@@ -561,7 +514,9 @@ describe("PromQLBuilderOptions", () => {
 
     it("should have field input wrappers", () => {
       wrapper = createWrapper();
-      const inputWrappers = wrapper.findAll('[data-test="promql-builder-options-field-input-wrapper"]');
+      const inputWrappers = wrapper.findAll(
+        '[data-test="promql-builder-options-field-input-wrapper"]',
+      );
       expect(inputWrappers.length).toBeGreaterThan(0);
     });
   });

@@ -31,8 +31,7 @@ import { hasMetricsEditorParams } from "@/utils/metrics/metricsEditorParams";
 const Search = () => import("@/plugins/logs/Index.vue");
 const SearchJobInspector = () => import("@/plugins/logs/SearchJobInspector.vue");
 const AppMetrics = () => import("@/plugins/metrics/Index.vue");
-const AppMetricsExplorer = () =>
-  import("@/plugins/metrics/explorer/MetricsExplorer.vue");
+const AppMetricsExplorer = () => import("@/plugins/metrics/explorer/MetricsExplorer.vue");
 const AppTraces = () => import("@/plugins/traces/Index.vue");
 const PromQLQueryBuilder = () => import("@/views/PromQL/QueryBuilder.vue");
 
@@ -48,8 +47,7 @@ const AlertList = () => import("@/components/alerts/AlertList.vue");
 
 const Functions = () => import("@/views/Functions.vue");
 const FunctionList = () => import("@/components/functions/FunctionList.vue");
-const EnrichmentTableList = () =>
-  import("@/components/functions/EnrichmentTableList.vue");
+const EnrichmentTableList = () => import("@/components/functions/EnrichmentTableList.vue");
 const RealUserMonitoring = () => import("@/views/RUM/RealUserMonitoring.vue");
 const SessionViewer = () => import("@/views/RUM/SessionViewer.vue");
 const ErrorViewer = () => import("@/views/RUM/ErrorViewer.vue");
@@ -62,14 +60,10 @@ const UploadSourceMaps = () => import("@/views/RUM/UploadSourceMaps.vue");
 const ReportList = () => import("@/components/reports/ReportList.vue");
 const CreateReport = () => import("@/components/reports/CreateReport.vue");
 
-const PerformanceSummary = () =>
-  import("@/components/rum/performance/PerformanceSummary.vue");
-const WebVitalsDashboard = () =>
-  import("@/components/rum/performance/WebVitalsDashboard.vue");
-const ErrorsDashboard = () =>
-  import("@/components/rum/performance/ErrorsDashboard.vue");
-const ApiDashboard = () =>
-  import("@/components/rum/performance/ApiDashboard.vue");
+const PerformanceSummary = () => import("@/components/rum/performance/PerformanceSummary.vue");
+const WebVitalsDashboard = () => import("@/components/rum/performance/WebVitalsDashboard.vue");
+const ErrorsDashboard = () => import("@/components/rum/performance/ErrorsDashboard.vue");
+const ApiDashboard = () => import("@/components/rum/performance/ApiDashboard.vue");
 const PipelineEditor = () => import("@/components/pipeline/PipelineEditor.vue");
 const PipelinesList = () => import("@/components/pipeline/PipelinesList.vue");
 
@@ -405,8 +399,7 @@ const useRoutes = () => {
             {
               path: "history",
               name: "pipelineHistory",
-              component: () =>
-                import("@/components/pipelines/PipelineHistory.vue"),
+              component: () => import("@/components/pipelines/PipelineHistory.vue"),
               meta: {
                 title: "Pipeline History",
               },
@@ -417,8 +410,7 @@ const useRoutes = () => {
             {
               path: "backfill",
               name: "pipelineBackfill",
-              component: () =>
-                import("@/components/pipelines/BackfillJobsList.vue"),
+              component: () => import("@/components/pipelines/BackfillJobsList.vue"),
               meta: {
                 title: "Pipeline Backfill Jobs",
               },

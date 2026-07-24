@@ -49,7 +49,12 @@ describe("unwrapList — three response shapes", () => {
 
   it("unwraps under a custom key (versions endpoint uses 'versions')", async () => {
     mockGet.mockResolvedValue({
-      data: { versions: [{ id: "v1", version: 2 }, { id: "v1", version: 1 }] },
+      data: {
+        versions: [
+          { id: "v1", version: 2 },
+          { id: "v1", version: 1 },
+        ],
+      },
     });
     const result = await onlineEvalsService.scoreConfigs.versions("org-1", "sc1");
     expect(result).toEqual([

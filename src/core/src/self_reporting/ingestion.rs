@@ -31,10 +31,9 @@ use config::{
     utils::json,
 };
 use hashbrown::{HashMap, hash_map::Entry};
+use ingestion_common::{self as ingestion, IngestUser, SystemJobType};
 use proto::cluster_rpc;
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
-
-use crate::ingestion_types::{self as ingestion, IngestUser, SystemJobType};
 
 pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
     if curr_usages.is_empty() {

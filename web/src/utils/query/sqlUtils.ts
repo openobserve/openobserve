@@ -65,12 +65,7 @@ export const addLabelsToSQlQuery = async (originalQuery: any, labels: any) => {
 
   for (let i = 0; i < labels.length; i++) {
     const label = labels[i];
-    dummyQuery = await addLabelToSQlQuery(
-      dummyQuery,
-      label.name,
-      label.value,
-      label.operator,
-    );
+    dummyQuery = await addLabelToSQlQuery(dummyQuery, label.name, label.value, label.operator);
   }
 
   try {
@@ -199,10 +194,7 @@ export const addLabelToSQlQuery = async (
       case ">=":
         // If value starts and ends with quote, remove it
         value =
-          value &&
-          value.length > 1 &&
-          value.startsWith("'") &&
-          value.endsWith("'")
+          value && value.length > 1 && value.startsWith("'") && value.endsWith("'")
             ? value.substring(1, value.length - 1)
             : value;
         // escape single quotes by doubling them
@@ -234,10 +226,7 @@ export const addLabelToSQlQuery = async (
               column: label,
             },
             right: {
-              type:
-                operator === "IN" || operator === "NOT IN"
-                  ? "expr_list"
-                  : "string",
+              type: operator === "IN" || operator === "NOT IN" ? "expr_list" : "string",
               value: value,
             },
           };
@@ -298,10 +287,7 @@ export const getStreamFromQuery = async (query: any) => {
 // returns 'ASC' or 'DESC' if exist
 // return null if not exist
 
-export const isGivenFieldInOrderBy = async (
-  sqlQuery: string,
-  fieldAlias: string,
-) => {
+export const isGivenFieldInOrderBy = async (sqlQuery: string, fieldAlias: string) => {
   try {
     await importSqlParser();
     const ast: any = parser.astify(sqlQuery);
@@ -375,10 +361,8 @@ export function extractFields(parsedAst: any, timeField: string, sqlParser?: any
       field.streamAlias = column?.expr?.args?.expr?.table || null;
     } else if (column.expr.type === "function") {
       // histogram field
-      field.column =
-        column?.expr?.args?.value[0]?.column?.expr?.value ?? timeField;
-      field.aggregationFunction =
-        column?.expr?.name?.name[0]?.value?.toLowerCase() ?? "histogram";
+      field.column = column?.expr?.args?.value[0]?.column?.expr?.value ?? timeField;
+      field.aggregationFunction = column?.expr?.name?.name[0]?.value?.toLowerCase() ?? "histogram";
       // Extract table/streamAlias from function argument
       field.streamAlias = column?.expr?.args?.value?.[0]?.table || null;
     } else if (column.expr.type === "case" && sqlParser) {
@@ -565,9 +549,7 @@ function parseCondition(condition: any) {
       } else if (condition.operator == "NOT IN") {
         // create values array based on right side of condition
         // quote the values
-        const values =
-          condition?.right?.value?.map((value: any) => `'${value?.value}'`) ??
-          [];
+        const values = condition?.right?.value?.map((value: any) => `'${value?.value}'`) ?? [];
         const columnObj = {
           field: condition?.left?.column?.expr?.value ?? "",
           streamAlias: condition?.left?.table || null,
@@ -584,9 +566,7 @@ function parseCondition(condition: any) {
         };
       } else if (condition.operator == "IN") {
         // create values array based on right side of condition
-        const values = condition.right.value.map(
-          (value: any) => `${value?.value}`,
-        );
+        const values = condition.right.value.map((value: any) => `${value?.value}`);
         const columnObj = {
           field: condition?.left?.column?.expr?.value ?? "",
           streamAlias: condition?.left?.table || null,
@@ -690,9 +670,7 @@ function parseCondition(condition: any) {
       } else if (condition?.operator == "NOT LIKE") {
         // right value may have % at the beginning or end or both
         // so we need to remove it
-        const value = condition?.right?.value
-          ?.replace(/^%/, "")
-          .replace(/%$/, "");
+        const value = condition?.right?.value?.replace(/^%/, "").replace(/%$/, "");
         const columnObj = {
           field: condition?.left?.column?.expr?.value,
           streamAlias: condition?.left?.table || null,
@@ -804,10 +782,7 @@ function extractTableName(parsedAst: any) {
   return parsedAst.from[0].table ?? null;
 }
 
-export const getFieldsFromQuery = async (
-  query: any,
-  timeField: string = "_timestamp",
-) => {
+export const getFieldsFromQuery = async (query: any, timeField: string = "_timestamp") => {
   try {
     await importSqlParser();
 
@@ -862,11 +837,7 @@ export const getFieldsFromQuery = async (
   }
 };
 
-export const buildSqlQuery = (
-  tableName: string,
-  fields: any,
-  whereClause: string,
-) => {
+export const buildSqlQuery = (tableName: string, fields: any, whereClause: string) => {
   let query = "SELECT ";
 
   // If the fields array is empty, use *, otherwise join the fields with commas
@@ -887,10 +858,7 @@ export const buildSqlQuery = (
   // Return the constructed query
   return query;
 };
-export const changeHistogramInterval = async (
-  query: any,
-  histogramInterval: any,
-) => {
+export const changeHistogramInterval = async (query: any, histogramInterval: any) => {
   try {
     // if histogramInterval is null or query is null or query is empty, return query
     if (query === null || query === "") {
@@ -982,9 +950,7 @@ export const getStreamNameFromQuery = async (query: any) => {
             const extractTablesFromNode = (node: any, depth: number = 0) => {
               if (!node || depth > MAX_RECURSION_DEPTH) {
                 if (depth > MAX_RECURSION_DEPTH) {
-                  console.warn(
-                    "Maximum recursion depth reached while parsing SQL query",
-                  );
+                  console.warn("Maximum recursion depth reached while parsing SQL query");
                 }
                 return;
               }
@@ -1154,10 +1120,7 @@ function createBinaryExpr(condition: any) {
 }
 
 // Main function to build SQL query using AST
-export async function buildSQLQueryWithParser(
-  fields: any,
-  joins: any[],
-): Promise<string> {
+export async function buildSQLQueryWithParser(fields: any, joins: any[]): Promise<string> {
   // Import parser
   await importSqlParser();
 
@@ -1223,8 +1186,7 @@ export async function buildSQLQueryWithParser(
         groupByFields.push({
           type: "column_ref",
           table: null,
-          column:
-            breakdownField.alias || breakdownField.column || "unknown_column",
+          column: breakdownField.alias || breakdownField.column || "unknown_column",
         });
 
         // Handle ORDER BY for Breakdown
@@ -1233,13 +1195,9 @@ export async function buildSQLQueryWithParser(
             expr: {
               type: "column_ref",
               table: null,
-              column:
-                breakdownField.alias ||
-                breakdownField.column ||
-                "unknown_column",
+              column: breakdownField.alias || breakdownField.column || "unknown_column",
             },
-            type:
-              breakdownField.sortBy.toLowerCase() === "desc" ? "DESC" : "ASC",
+            type: breakdownField.sortBy.toLowerCase() === "desc" ? "DESC" : "ASC",
           });
         }
       }
@@ -1310,9 +1268,7 @@ export const parseWhereClauseToFilter = async (
 
   try {
     await importSqlParser();
-    const ast: any = parser.astify(
-      `SELECT * FROM "dummy" WHERE ${whereClauseText}`,
-    );
+    const ast: any = parser.astify(`SELECT * FROM "dummy" WHERE ${whereClauseText}`);
     if (!ast?.where) return defaultFilter;
 
     const filters = convertWhereToFilter(ast.where);
@@ -1342,9 +1298,7 @@ export const parseWhereClauseToFilter = async (
  * Returns just the condition text without the WHERE keyword, or empty string
  * if the query has no WHERE clause.
  */
-export const extractWhereClause = async (
-  sql: string,
-): Promise<string> => {
+export const extractWhereClause = async (sql: string): Promise<string> => {
   if (!sql?.trim()) return "";
 
   try {
@@ -1375,10 +1329,4 @@ export const extractWhereClause = async (
 };
 
 // Export internal functions for testing
-export {
-  formatValue,
-  parseCondition,
-  convertWhereToFilter,
-  extractFilters,
-  extractTableName,
-};
+export { formatValue, parseCondition, convertWhereToFilter, extractFilters, extractTableName };

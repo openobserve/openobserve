@@ -76,10 +76,8 @@ function mountComp() {
 }
 
 const getForm = (w: any) => w.findComponent({ name: "OForm" });
-const getNameInput = (w: any) =>
-  w.find('[data-test="ingestion-token-name-input"] input');
-const getDescInput = (w: any) =>
-  w.find('[data-test="ingestion-token-description-input"] input');
+const getNameInput = (w: any) => w.find('[data-test="ingestion-token-name-input"] input');
+const getDescInput = (w: any) => w.find('[data-test="ingestion-token-description-input"] input');
 const submitForm = async (w: any) => {
   await getForm(w).vm.form.handleSubmit();
   await flushPromises();
@@ -110,9 +108,9 @@ describe("IngestionTokens — Create Token form", () => {
       expect(getForm(wrapper).exists()).toBe(true);
       expect(getNameInput(wrapper).exists()).toBe(true);
       expect(getDescInput(wrapper).exists()).toBe(true);
-      expect(
-        wrapper.find('[data-test-stub="o-dialog"]').attributes("data-form-id"),
-      ).toBe("create-token-form");
+      expect(wrapper.find('[data-test-stub="o-dialog"]').attributes("data-form-id")).toBe(
+        "create-token-form",
+      );
     });
 
     it("returns the schema from setup() (Options-API wiring)", () => {
@@ -195,9 +193,7 @@ describe("IngestionTokens — Create Token form", () => {
       expect(wrapper.vm.revealedToken).toEqual({ name: "my-token", token: "tok_abc" });
       expect(wrapper.vm.showCreateForm).toBe(false);
       expect(wrapper.vm.showRevealedDialog).toBe(true);
-      expect(mockToast).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "success" }),
-      );
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
     });
 
     it("shows an error toast and keeps the dialog open on failure", async () => {

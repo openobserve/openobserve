@@ -86,7 +86,6 @@ import PromQLTableChart from "@/components/dashboards/panels/PromQLTableChart.vu
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 const mockTableData = {
   columns: [
     {
@@ -560,7 +559,10 @@ describe("PromQLTableChart", () => {
       wrapper = createWrapper();
 
       const mockCSVFn = vi.fn();
-      (wrapper.vm as any).innerTableRef = { downloadTableAsCSV: mockCSVFn, downloadTableAsJSON: vi.fn() };
+      (wrapper.vm as any).innerTableRef = {
+        downloadTableAsCSV: mockCSVFn,
+        downloadTableAsJSON: vi.fn(),
+      };
 
       wrapper.vm.downloadTableAsCSV("test-title");
 
@@ -572,7 +574,10 @@ describe("PromQLTableChart", () => {
       wrapper = createWrapper();
 
       const mockJSONFn = vi.fn();
-      (wrapper.vm as any).innerTableRef = { downloadTableAsCSV: vi.fn(), downloadTableAsJSON: mockJSONFn };
+      (wrapper.vm as any).innerTableRef = {
+        downloadTableAsCSV: vi.fn(),
+        downloadTableAsJSON: mockJSONFn,
+      };
 
       wrapper.vm.downloadTableAsJSON("test-title");
 
@@ -594,7 +599,10 @@ describe("PromQLTableChart", () => {
       wrapper = createWrapper();
 
       const mockCSVFn = vi.fn();
-      (wrapper.vm as any).innerTableRef = { downloadTableAsCSV: mockCSVFn, downloadTableAsJSON: vi.fn() };
+      (wrapper.vm as any).innerTableRef = {
+        downloadTableAsCSV: mockCSVFn,
+        downloadTableAsJSON: vi.fn(),
+      };
 
       wrapper.vm.downloadTableAsCSV();
 

@@ -80,20 +80,12 @@ describe("postgresCard builder", () => {
 
   it("offers psql / docker / GUI tabs to create the monitoring role", () => {
     const prepare = postgresCard(SUBS).steps.find((s) => s.id === "prepare")!;
-    expect(prepare.variants?.map((v) => v.id)).toEqual([
-      "psql",
-      "docker",
-      "sql-client",
-    ]);
+    expect(prepare.variants?.map((v) => v.id)).toEqual(["psql", "docker", "sql-client"]);
     const psql = prepare.variants!.find((v) => v.id === "psql")!.code;
     expect(psql.raw).toContain("psql");
     expect(psql.raw).toContain("CREATE ROLE myuser");
-    expect(prepare.variants!.find((v) => v.id === "docker")!.code.raw).toContain(
-      "docker exec",
-    );
-    expect(prepare.variants!.find((v) => v.id === "sql-client")!.code.lang).toBe(
-      "sql",
-    );
+    expect(prepare.variants!.find((v) => v.id === "docker")!.code.raw).toContain("docker exec");
+    expect(prepare.variants!.find((v) => v.id === "sql-client")!.code.lang).toBe("sql");
     expect(prepare.variants!.every((v) => !!v.icon)).toBe(true);
   });
 

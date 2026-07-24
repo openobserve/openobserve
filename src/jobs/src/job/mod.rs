@@ -65,6 +65,20 @@ mod service_graph;
 mod session_cleanup;
 mod stats;
 
+struct CompactionStreamDataCleanup;
+
+#[async_trait::async_trait]
+impl openobserve_core::org_cleanup::StreamDataCleanup for CompactionStreamDataCleanup {
+    async fn delete_stream_data(
+        &self,
+        org_id: &str,
+        stream_type: config::meta::stream::StreamType,
+        stream_name: &str,
+    ) -> Result<(), anyhow::Error> {
+        compaction::retention::delete_all(org_id, stream_type, stream_name).await
+    }
+}
+
 #[cfg(feature = "enterprise")]
 async fn patch_sre_readonly_alerts_incidents() {
     use bytes::Bytes;
@@ -185,14 +199,9 @@ async fn enforce_usage_stream_retention() {
         && s.data_retention < 32
     {
         s.data_retention = 32;
-        openobserve_core::stream::save_stream_settings(
-            META_ORG_ID,
-            USAGE_STREAM,
-            StreamType::Logs,
-            s,
-        )
-        .await
-        .unwrap(); //unwrap is intentional, we should panic if this fails
+        stream::save_stream_settings(META_ORG_ID, USAGE_STREAM, StreamType::Logs, s)
+            .await
+            .unwrap(); //unwrap is intentional, we should panic if this fails
     }
 }
 
@@ -357,7 +366,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // This ensures the stale job recovery task starts even if this ingester
     // never receives a URL enrichment event. Critical for distributed deployments.
     if LOCAL_NODE.is_ingester() {
-        openobserve_core::enrichment_table::init_url_processor();
+        enrichment_data::enrichment_table::init_url_processor();
     }
 
     db::user::cache().await.expect("user cache failed");
@@ -527,7 +536,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         tokio::task::spawn(db::session::watch());
     }
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
-        tokio::task::spawn(openobserve_core::enrichment_table::runtime::watch());
+        tokio::task::spawn(enrichment_data::enrichment_table::runtime::watch());
     }
 
     tokio::task::yield_now().await;
@@ -1051,12 +1060,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
         // to fetch tasks and a per-task CAS guards execution; the promotion sweep uses
         // an atomic status CAS — so multiple compactors remain safe, just less
         // contended. (The org_status cache watch loop stays on every node — see below.)
-        tokio::task::spawn(openobserve_core::org_cleanup::run());
+        tokio::task::spawn(openobserve_core::org_cleanup::run(std::sync::Arc::new(
+            CompactionStreamDataCleanup,
+        )));
         tokio::task::spawn(openobserve_core::org_cleanup::run_promotion_scheduler());
     }
 
     // load metrics disk cache
-    tokio::task::spawn(openobserve_core::promql::search::init());
+    tokio::task::spawn(promql_service::search::init());
 
     // start pipeline data retention
     #[cfg(feature = "enterprise")]
@@ -1145,7 +1156,7 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
         .await
         .expect("Failed to clean up old JSON format enrichment tables");
 
-    openobserve_core::enrichment_table::cache::cache_enrichment_tables()
+    enrichment_data::enrichment_table::cache::cache_enrichment_tables()
         .await
         .expect("EnrichmentTables cache failed");
     // pipelines can potentially depend on enrichment tables, so cached afterwards

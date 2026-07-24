@@ -25,11 +25,6 @@ export function systemProvidedVariablesForScope(
   return [];
 }
 
-export function isSystemProvidedVariable(
-  targetScope: EvalTargetScope,
-  variable: string,
-): boolean {
-  return systemProvidedVariablesForScope(targetScope).some(
-    ({ name }) => name === variable.trim(),
-  );
+export function isSystemProvidedVariable(targetScope: EvalTargetScope, variable: string): boolean {
+  return systemProvidedVariablesForScope(targetScope).some(({ name }) => name === variable.trim());
 }

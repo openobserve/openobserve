@@ -12,8 +12,7 @@
 export function isMacOS(): boolean {
   if (typeof navigator === "undefined") return false;
   const source =
-    (navigator as { userAgentData?: { platform?: string } }).userAgentData
-      ?.platform ||
+    (navigator as { userAgentData?: { platform?: string } }).userAgentData?.platform ||
     navigator.platform ||
     navigator.userAgent ||
     "";
@@ -62,9 +61,7 @@ export function focusSearchInput(dataTest: string): void {
     ) ??
     (() => {
       const el = document.querySelector<HTMLElement>(`[data-test="${dataTest}"]`);
-      return el && el.matches("input, textarea, .cm-editor, [contenteditable]")
-        ? el
-        : null;
+      return el && el.matches("input, textarea, .cm-editor, [contenteditable]") ? el : null;
     })();
   target?.focus();
 }

@@ -77,9 +77,7 @@ setBadgeTranslator((key: string) => i18n.global.t(key as never));
 
 type LocaleMessageSchema = Parameters<typeof i18n.global.setLocaleMessage>[1];
 
-const localeLoaders = import.meta.glob<{ default: LocaleMessageSchema }>(
-  "./languages/*.json",
-);
+const localeLoaders = import.meta.glob<{ default: LocaleMessageSchema }>("./languages/*.json");
 
 /**
  * Loads and registers the messages for a locale on demand. No-op when the

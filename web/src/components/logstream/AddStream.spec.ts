@@ -27,13 +27,12 @@ import { qLayoutInjections } from "@/test/unit/helpers/layout-injections";
 import { createStore } from "vuex";
 import i18n from "@/locales";
 
-const { mockGetStream, mockAddStream, mockCreateStream, mockSchemaStream } =
-  vi.hoisted(() => ({
-    mockGetStream: vi.fn(),
-    mockAddStream: vi.fn(),
-    mockCreateStream: vi.fn(),
-    mockSchemaStream: vi.fn(),
-  }));
+const { mockGetStream, mockAddStream, mockCreateStream, mockSchemaStream } = vi.hoisted(() => ({
+  mockGetStream: vi.fn(),
+  mockAddStream: vi.fn(),
+  mockCreateStream: vi.fn(),
+  mockSchemaStream: vi.fn(),
+}));
 
 const mockToast = vi.hoisted(() => vi.fn());
 
@@ -200,26 +199,20 @@ describe("AddStream", () => {
     it("should render the stream name input", async () => {
       const wrapper = mountComp();
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="add-stream-name-input"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-stream-name-input"]').exists()).toBe(true);
     });
 
     it("should render the stream type select", async () => {
       const wrapper = mountComp();
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="add-stream-type-input"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-stream-type-input"]').exists()).toBe(true);
     });
 
     it("should render the data retention input when data_retention_days is set", async () => {
       const customStore = makeStore({ data_retention_days: 30 });
       const wrapper = mountComp(customStore);
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="add-stream-data-retention-input"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-stream-data-retention-input"]').exists()).toBe(true);
     });
 
     it("should render inline form without ODialog when isInPipeline is true", async () => {
@@ -227,21 +220,13 @@ describe("AddStream", () => {
       await flushPromises();
 
       expect(wrapper.findComponent(ODialogStub).exists()).toBe(false);
-      expect(
-        wrapper.find('[data-test="add-stream-name-input"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="add-stream-type-input"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-stream-name-input"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-stream-type-input"]').exists()).toBe(true);
       // Pipeline mode renders NO inline Cancel/Save — the parent <ODrawer>
       // (Stream.vue) owns the built-in footer buttons, and its Save submits this
       // form via `form-id` (see the id assertion below).
-      expect(
-        wrapper.find('[data-test="add-stream-cancel-btn"]').exists(),
-      ).toBe(false);
-      expect(
-        wrapper.find('[data-test="add-stream-save-btn"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="add-stream-cancel-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="add-stream-save-btn"]').exists()).toBe(false);
     });
 
     it("inline form exposes id=add-stream-node-form so the drawer footer Save can submit it", async () => {
@@ -257,9 +242,7 @@ describe("AddStream", () => {
       const customStore = makeStore({ data_retention_days: 30 });
       const wrapper = mountComp(customStore, { isInPipeline: true });
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="add-stream-data-retention-input"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-stream-data-retention-input"]').exists()).toBe(true);
     });
   });
 
@@ -504,9 +487,7 @@ describe("AddStream", () => {
       await submit(wrapper);
 
       expect(mockCreateStream).not.toHaveBeenCalled();
-      expect(mockToast).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "warning" }),
-      );
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
     });
 
     it("emits streamAdded and close after successful creation", async () => {
@@ -551,9 +532,7 @@ describe("AddStream", () => {
     it("should return all three stream types", async () => {
       const wrapper = mountComp();
       await flushPromises();
-      const types = (wrapper.vm as any).filteredStreamTypes.map(
-        (t: any) => t.value,
-      );
+      const types = (wrapper.vm as any).filteredStreamTypes.map((t: any) => t.value);
       expect(types).toContain("logs");
       expect(types).toContain("metrics");
       expect(types).toContain("traces");
@@ -605,11 +584,7 @@ describe("AddStream", () => {
         { uuid: "c", name: "row_three", type: "Float64", index_type: [] },
       ]);
       await flushPromises();
-      expect(renderedRowNames(wrapper)).toEqual([
-        "row_one",
-        "row_two",
-        "row_three",
-      ]);
+      expect(renderedRowNames(wrapper)).toEqual(["row_one", "row_two", "row_three"]);
       expect(renderedRowTypes(wrapper)).toEqual(["Utf8", "Int64", "Float64"]);
 
       // Delete the MIDDLE row.
@@ -621,14 +596,8 @@ describe("AddStream", () => {
       expect(renderedRowNames(wrapper)).toEqual(["row_one", "row_three"]);
       expect(renderedRowTypes(wrapper)).toEqual(["Utf8", "Float64"]);
       // …and the form data agrees.
-      expect(values(wrapper).fields.map((r: any) => r.name)).toEqual([
-        "row_one",
-        "row_three",
-      ]);
-      expect(values(wrapper).fields.map((r: any) => r.type)).toEqual([
-        "Utf8",
-        "Float64",
-      ]);
+      expect(values(wrapper).fields.map((r: any) => r.name)).toEqual(["row_one", "row_three"]);
+      expect(values(wrapper).fields.map((r: any) => r.type)).toEqual(["Utf8", "Float64"]);
     }, 20000);
   });
 

@@ -137,10 +137,7 @@ export function computePrefixAssignment(
   opts: PrefixGroupOptions = {},
 ): { groups: PrefixGroup[]; groupOf: Map<string, string> } {
   const maxDepth = Math.max(1, Math.floor(opts.maxDepth ?? DEFAULT_MAX_DEPTH));
-  const minGroupSize = Math.max(
-    1,
-    Math.floor(opts.minGroupSize ?? DEFAULT_MIN_GROUP_SIZE),
-  );
+  const minGroupSize = Math.max(1, Math.floor(opts.minGroupSize ?? DEFAULT_MIN_GROUP_SIZE));
 
   const names = normalizeNames(metricNames);
   if (names.length === 0) return { groups: [], groupOf: new Map() };
@@ -154,10 +151,7 @@ export function computePrefixAssignment(
     candidatesByName.set(name, candidates);
 
     for (const candidate of candidates) {
-      candidateCoverage.set(
-        candidate,
-        (candidateCoverage.get(candidate) ?? 0) + 1,
-      );
+      candidateCoverage.set(candidate, (candidateCoverage.get(candidate) ?? 0) + 1);
     }
   }
 
@@ -292,5 +286,3 @@ export function matchesSearch(
 
   return terms.every((term) => haystack.includes(term));
 }
-
-

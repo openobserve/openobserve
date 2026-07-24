@@ -16,13 +16,7 @@
 import http from "./http";
 
 const users = {
-  list: (
-    page_num: number,
-    page_size: number,
-    sort_by: string,
-    desc: boolean,
-    name: string,
-  ) => {
+  list: (page_num: number, page_size: number, sort_by: string, desc: boolean, name: string) => {
     return http().get(
       `/api/users?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`,
     );
@@ -33,11 +27,7 @@ const users = {
   update: (data: any, org_identifier: string, user_email: string) => {
     return http().put(`/api/${org_identifier}/users/${user_email}`, data);
   },
-  updateexistinguser: (
-    data: any,
-    org_identifier: string,
-    user_email: string,
-  ) => {
+  updateexistinguser: (data: any, org_identifier: string, user_email: string) => {
     return http().post(`/api/${org_identifier}/users/${user_email}`, data);
   },
   delete: (org_identifier: string, user_email: string) => {

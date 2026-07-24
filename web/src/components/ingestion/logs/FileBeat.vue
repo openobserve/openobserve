@@ -47,7 +47,7 @@ export default defineComponent({
       protocol: "",
       tls: "",
     });
-    
+
     const ingestionURL = getIngestionURL();
     endpoint.value = getEndPoint(ingestionURL);
     const content = `setup.ilm.enabled: false

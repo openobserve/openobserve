@@ -3,7 +3,7 @@
  * Extracted from AddAlert.vue to reduce file complexity
  */
 
-import { buildConditionsString } from './conditionsFormatter';
+import { buildConditionsString } from "./conditionsFormatter";
 
 export interface StreamFieldsMap {
   [key: string]: {
@@ -37,11 +37,7 @@ export interface AlertFormData {
   query_condition: QueryCondition;
 }
 
-export const getFormattedCondition = (
-  column: string,
-  operator: string,
-  value: number | string,
-) => {
+export const getFormattedCondition = (column: string, operator: string, value: number | string) => {
   let condition = "";
   switch (operator) {
     case "=":
@@ -76,10 +72,7 @@ export const getFormattedCondition = (
   return condition;
 };
 
-export const generateWhereClause = (
-  group: any,
-  streamFieldsMap: StreamFieldsMap,
-) => {
+export const generateWhereClause = (group: any, streamFieldsMap: StreamFieldsMap) => {
   // V2 FORMAT: Uses filterType, logicalOperator, and conditions array
   // Uses shared buildConditionsString utility for consistency with UI preview
   return buildConditionsString(group, {
@@ -102,10 +95,7 @@ export const generateSqlQuery = (
   // SELECT histgoram(_timestamp, '1 minute') AS zo_sql_key, avg(action_error_count) as zo_sql_val,
   // geo_info_city FROM _rundata WHERE geo_info_country='india' GROUP BY zo_sql_key,geo_info_city ORDER BY zo_sql_key ASC;
   let query = `SELECT histogram(${timestampColumn}) AS zo_sql_key,`;
-  const whereClause = generateWhereClause(
-    formData.query_condition.conditions,
-    streamFieldsMap,
-  );
+  const whereClause = generateWhereClause(formData.query_condition.conditions, streamFieldsMap);
 
   if (!isAggregationEnabled) {
     query +=

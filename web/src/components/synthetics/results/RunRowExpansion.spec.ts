@@ -25,7 +25,9 @@ vi.mock("@/composables/synthetics/syntheticResultsSchema", () => ({
 
 vi.mock("@/services/synthetics", () => ({
   default: {
-    artifactUrl: vi.fn((org: string, key: string) => `/api/${org}/artifact?key=${encodeURIComponent(key)}`),
+    artifactUrl: vi.fn(
+      (org: string, key: string) => `/api/${org}/artifact?key=${encodeURIComponent(key)}`,
+    ),
   },
 }));
 
@@ -160,9 +162,7 @@ describe("RunRowExpansion", () => {
     });
 
     it("should suppress ignorable stream-not-found errors", async () => {
-      mockExecuteQuery.mockRejectedValueOnce(
-        new Error("stream synthetics_results not found"),
-      );
+      mockExecuteQuery.mockRejectedValueOnce(new Error("stream synthetics_results not found"));
 
       wrapper = mountComponent();
       await flushPromises();

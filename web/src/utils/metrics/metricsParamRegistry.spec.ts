@@ -14,11 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import {
-  sanitizeChartType,
-  defaultMetricsQuery,
-  METRICS_PARAMS,
-} from "./metricsParamRegistry";
+import { sanitizeChartType, defaultMetricsQuery, METRICS_PARAMS } from "./metricsParamRegistry";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import type { ParamDescriptor } from "@/utils/url/deepLinkParams";
 import {
@@ -26,8 +22,7 @@ import {
   hasMetricsEditorParams,
 } from "@/utils/metrics/metricsEditorParams";
 
-const byKey = (key: string) =>
-  METRICS_PARAMS.find((d) => d.key === key) as ParamDescriptor;
+const byKey = (key: string) => METRICS_PARAMS.find((d) => d.key === key) as ParamDescriptor;
 
 describe("metricsParamRegistry · sanitizeChartType", () => {
   it.each(["line", "bar", "area", "scatter", "table", "gauge", "h-bar"])(
@@ -146,10 +141,7 @@ describe("metricsEditorParams stays in sync with the registry", () => {
     // store into the router's module graph), so it uses a standalone key list.
     // If a param is added to the registry and not to that list, a deep link
     // carrying it would land on the explorer instead of the editor.
-    const registryKeys = METRICS_PARAMS.flatMap((p: any) => [
-      p.key,
-      ...(p.aliases ?? []),
-    ]);
+    const registryKeys = METRICS_PARAMS.flatMap((p: any) => [p.key, ...(p.aliases ?? [])]);
 
     for (const key of registryKeys) {
       expect(METRICS_EDITOR_PARAM_KEYS).toContain(key);
@@ -162,9 +154,7 @@ describe("metricsEditorParams stays in sync with the registry", () => {
     // perQuery params are indexed; a multi-query shared link must still be
     // recognized as an editor deep link.
     expect(hasMetricsEditorParams({ "query.1": "x" })).toBe(true);
-    expect(hasMetricsEditorParams({ org_identifier: "o", period: "15m" })).toBe(
-      false,
-    );
+    expect(hasMetricsEditorParams({ org_identifier: "o", period: "15m" })).toBe(false);
     expect(hasMetricsEditorParams({})).toBe(false);
     expect(hasMetricsEditorParams(undefined)).toBe(false);
   });

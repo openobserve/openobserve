@@ -41,9 +41,7 @@ export interface PreparedScoreConfigImport {
 
 // Accepts both camelCase and snake_case keys. Strips unknown fields so users
 // can paste an API response that includes id/version/createdAt/etc.
-export function normalizeScoreConfigInput(
-  raw: unknown,
-): Partial<ScoreConfigPayload> | null {
+export function normalizeScoreConfigInput(raw: unknown): Partial<ScoreConfigPayload> | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const r = raw as Record<string, any>;
 

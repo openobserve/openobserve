@@ -59,9 +59,7 @@ describe("useWildcardHover", () => {
       } as any);
       vi.advanceTimersByTime(350); // wait for SHOW_DELAY_MS
 
-      expect(hoveredToken.value!.displayValues).toEqual([
-        { value: "10.0.0.1", count: 42 },
-      ]);
+      expect(hoveredToken.value!.displayValues).toEqual([{ value: "10.0.0.1", count: 42 }]);
     });
 
     it("should cancel any pending hide timeout", () => {
@@ -101,8 +99,7 @@ describe("useWildcardHover", () => {
 
   describe("onPopoverEnter", () => {
     it("should cancel the pending hide timeout", () => {
-      const { onMouseEnter, onMouseLeave, onPopoverEnter, hoveredToken } =
-        useWildcardHover();
+      const { onMouseEnter, onMouseLeave, onPopoverEnter, hoveredToken } = useWildcardHover();
       const el = document.createElement("span");
 
       onMouseEnter("<*>", [], { currentTarget: el } as any);

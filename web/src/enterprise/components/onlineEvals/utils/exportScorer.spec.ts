@@ -1,9 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  bulkExportFileName,
-  exportScorerFileName,
-  stripScorerForExport,
-} from "./exportScorer";
+import { bulkExportFileName, exportScorerFileName, stripScorerForExport } from "./exportScorer";
 import { normalizeScorerInput, prepareScorerImport } from "./importScorer";
 import type { Provider, ScoreConfig, Scorer } from "@/services/online-evals.service";
 
@@ -60,10 +56,10 @@ describe("stripScorerForExport", () => {
   });
 
   it("does not embed score config name when ID does not resolve", () => {
-    const out = stripScorerForExport(
-      scorer({ producesScoreConfigId: "stale-id" }),
-      { scoreConfigs: [sc()], providers: [prov()] },
-    );
+    const out = stripScorerForExport(scorer({ producesScoreConfigId: "stale-id" }), {
+      scoreConfigs: [sc()],
+      providers: [prov()],
+    });
     expect(out.scorer.producesScoreConfigId).toBe("stale-id");
     expect(out.scorer.producesScoreConfigName).toBeUndefined();
   });
@@ -129,7 +125,9 @@ describe("stripScorerForExport", () => {
     expect(normalized?.name).toBe(exported.name);
     expect(normalized?.scorer?.type).toBe(exported.scorer.type);
     expect(normalized?.scorer?.producesScoreConfigId).toBe(exported.scorer.producesScoreConfigId);
-    expect(normalized?.scorer?.producesScoreConfigName).toBe(exported.scorer.producesScoreConfigName);
+    expect(normalized?.scorer?.producesScoreConfigName).toBe(
+      exported.scorer.producesScoreConfigName,
+    );
     expect(normalized?.scorer?.params?.provider_id).toBe(exported.scorer.params.provider_id);
     expect(normalized?.scorer?.params?.providerName).toBe(exported.scorer.params.providerName);
   });
