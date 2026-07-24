@@ -107,10 +107,16 @@ async function fetchLocations() {
   try {
     const org = store.state.selectedOrganization.identifier
     const res = await syntheticsService.getLocations(org)
-    // Protocol checks run from public locations and private agents alike;
-    // disabled locations are hidden.
+    // Protocol checks run from public locations and protocol-capable private
+    // agents. Hide disabled locations, and hide private locations whose live
+    // agents are browser-only (a browser agent can't run an HTTP/TCP/… check) —
+    // `types` reflects live agents' capabilities, so a private location shows
+    // only when it currently has an agent advertising a non-browser type.
+    // Mirror of the browser page, which requires `types` to include 'browser'.
     locations.value = (((res.data ?? {}).locations ?? []) as SyntheticsLocation[]).filter(
-      (l) => l.enabled !== false,
+      (l) =>
+        l.enabled !== false &&
+        (l.kind !== 'private' || (l.types ?? []).some((t) => t !== 'browser')),
     )
   } catch {
     locations.value = []
