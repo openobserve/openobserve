@@ -88,8 +88,7 @@ import PrivateLocationDetail from "./PrivateLocationDetail.vue";
 // ── Stubs ────────────────────────────────────────────────────────────────
 const baseStubs = {
   OTable: {
-    template:
-      '<div :data-test="$attrs[\'data-test\']"><slot /></div>',
+    template: "<div :data-test=\"$attrs['data-test']\"><slot /></div>",
     props: [
       "data",
       "columns",
@@ -102,8 +101,7 @@ const baseStubs = {
     inheritAttrs: true,
   },
   OButton: {
-    template:
-      '<button :data-test="$attrs[\'data-test\']" :disabled="disabled"><slot /></button>',
+    template: '<button :data-test="$attrs[\'data-test\']" :disabled="disabled"><slot /></button>',
     props: ["variant", "size", "iconLeft", "disabled", "loading", "title"],
     inheritAttrs: true,
   },
@@ -244,9 +242,9 @@ describe("PrivateLocationDetail", () => {
       wrapper = mountPage();
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="synthetics-private-location-detail-empty"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-private-location-detail-empty"]').exists()).toBe(
+        true,
+      );
     });
   });
 
