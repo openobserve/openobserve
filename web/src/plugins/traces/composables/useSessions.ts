@@ -589,7 +589,7 @@ export function useSessions() {
     const sql = compactSql(`
       SELECT
         span_id, trace_id, operation_name, gen_ai_operation_name,
-        tool_name, gen_ai_tool_name, tool_args,
+        gen_ai_tool_name,
         duration, start_time, end_time,
         span_status, status_message,
         gen_ai_request_model, gen_ai_response_model,
