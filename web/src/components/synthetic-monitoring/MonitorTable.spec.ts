@@ -121,7 +121,8 @@ const ODropdownSeparatorStub = {
 
 const OTooltipStub = {
   name: "OTooltipStub",
-  template: '<div class="otooltip-stub" :data-content="content" :data-content-class="contentClass"><slot /></div>',
+  template:
+    '<div class="otooltip-stub" :data-content="content" :data-content-class="contentClass"><slot /></div>',
   props: ["content", "side", "contentClass", "delay"],
 };
 
@@ -790,9 +791,7 @@ describe("MonitorTable", () => {
         // Row 2 has ["us-east-1", "eu-west-1", "ap-southeast-1"]
         // Only us-east-1 is mapped; eu-west-1 and ap-southeast-1 fall back to raw IDs
         const row2LocTooltip = tooltips[16];
-        expect(row2LocTooltip.props("content")).toBe(
-          "US East\neu-west-1\nap-southeast-1",
-        );
+        expect(row2LocTooltip.props("content")).toBe("US East\neu-west-1\nap-southeast-1");
       });
     });
   });
