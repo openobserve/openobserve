@@ -37,9 +37,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="$emit('update:modelValue', $event)"
   >
     <template #header>
-      <div class="flex items-center gap-2 min-w-0">
+      <div class="flex min-w-0 items-center gap-2">
         <span
-          class="font-mono text-sm font-semibold truncate"
+          class="truncate font-mono text-sm font-semibold"
           :title="card.name"
           data-test="metrics-fn-metric"
           >{{ card.name }}</span
@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="shrink-0"
           data-test="metrics-fn-badge"
         />
-        <span class="truncate text-xs text-text-secondary">
+        <span class="text-text-secondary truncate text-xs">
           {{ t("metrics.explorer.fn.subtitle") }}
         </span>
       </div>
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          defensive branch for one that is somehow opened anyway. -->
     <div
       v-if="!variants.length"
-      class="flex flex-col items-center gap-2 py-8 text-xs text-text-secondary"
+      class="text-text-secondary flex flex-col items-center gap-2 py-8 text-xs"
       data-test="metrics-fn-empty"
     >
       <OIcon name="settings" size="md" />
@@ -79,10 +79,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="variant in variants"
         :key="variant.id"
-        class="flex grow basis-[17.5rem] max-w-full min-w-0 cursor-pointer flex-col gap-1 rounded-default border p-2"
+        class="rounded-default flex max-w-full min-w-0 grow basis-[17.5rem] cursor-pointer flex-col gap-1 border p-2"
         :class="
           variant.id === selectedId
-            ? 'border-accent ring-1 ring-accent'
+            ? 'border-accent ring-accent ring-1'
             : 'border-border-default hover:border-border-default'
         "
         :data-test="`metrics-fn-variant-${variant.id}`"
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <div
-          class="truncate font-mono text-3xs text-text-secondary"
+          class="text-3xs text-text-secondary truncate font-mono"
           :title="exprOf(variant)"
           :data-test="`metrics-fn-expr-${variant.id}`"
         >
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="relative h-30">
           <div
             v-if="previewOf(variant).status === 'error'"
-            class="flex h-full flex-col items-center justify-center gap-1 text-xs text-text-secondary"
+            class="text-text-secondary flex h-full flex-col items-center justify-center gap-1 text-xs"
             :title="previewOf(variant).error"
             :data-test="`metrics-fn-error-${variant.id}`"
           >
@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div
             v-else-if="previewOf(variant).status === 'unavailable'"
-            class="flex h-full items-center justify-center text-xs text-text-secondary"
+            class="text-text-secondary flex h-full items-center justify-center text-xs"
             :data-test="`metrics-fn-nopreview-${variant.id}`"
           >
             {{ t("metrics.explorer.fn.noPreview") }}
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div
             v-else-if="previewOf(variant).status === 'done' && isEmpty(variant)"
-            class="flex h-full items-center justify-center rounded-default text-xs text-text-secondary"
+            class="rounded-default text-text-secondary flex h-full items-center justify-center text-xs"
             :data-test="`metrics-fn-nodata-${variant.id}`"
           >
             {{ t("metrics.explorer.noData") }}
@@ -187,22 +187,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template #footer>
       <div class="flex items-center justify-between gap-2">
-        <OButton
-          variant="ghost"
-          size="sm-action"
-          data-test="metrics-fn-restore"
-          @click="onRestore"
-        >
+        <OButton variant="ghost" size="sm-action" data-test="metrics-fn-restore" @click="onRestore">
           {{ t("metrics.explorer.fn.resetToDefault") }}
         </OButton>
 
         <div class="flex items-center gap-2">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            data-test="metrics-fn-cancel"
-            @click="close"
-          >
+          <OButton variant="outline" size="sm-action" data-test="metrics-fn-cancel" @click="close">
             {{ t("metrics.explorer.fn.cancel") }}
           </OButton>
           <OButton
@@ -236,10 +226,7 @@ import { toO2Unit } from "@/utils/metrics/metricDefaults";
 import { isCancelled } from "@/composables/metrics/useMetricsPreviewQueue";
 import { parseSearchError } from "@/utils/query/searchError";
 import type { MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
-import {
-  hasSamples,
-  type FnOverride,
-} from "@/composables/metrics/useMetricsExplorerGrid";
+import { hasSamples, type FnOverride } from "@/composables/metrics/useMetricsExplorerGrid";
 
 type TileStatus = "idle" | "loading" | "done" | "error" | "unavailable";
 
@@ -254,8 +241,7 @@ const IDLE: TilePreview = { status: "idle", results: [], error: "" };
 /** The legend a percentile query carries, e.g. `p99`. */
 const PERCENTILE_LEGEND = /^p(\d+)$/;
 
-const sortedNumbers = (values: any[]): number[] =>
-  [...values].map(Number).sort((a, b) => a - b);
+const sortedNumbers = (values: any[]): number[] => [...values].map(Number).sort((a, b) => a - b);
 
 const sameNumbers = (a: number[] | null, b: number[] | null) => {
   if (!a || !b) return a === b;
@@ -301,8 +287,7 @@ export default defineComponent({
     const { t } = useI18n();
 
     const variants = computed<any[]>(() => props.defaults?.variants ?? []);
-    const variantById = (id: string) =>
-      variants.value.find((v) => v.id === id) ?? null;
+    const variantById = (id: string) => variants.value.find((v) => v.id === id) ?? null;
 
     /* ----------------------------------------------------------- selection */
 
@@ -314,9 +299,7 @@ export default defineComponent({
     const baselinePercentilesOf = (variant: any): number[] | null => {
       if (!variant?.options?.percentiles) return null;
       const fromOverride =
-        props.override?.variantId === variant.id
-          ? props.override?.options?.percentiles
-          : null;
+        props.override?.variantId === variant.id ? props.override?.options?.percentiles : null;
       const picked =
         Array.isArray(fromOverride) && fromOverride.length
           ? fromOverride
@@ -344,11 +327,9 @@ export default defineComponent({
 
     /* --------------------------------------------------------- percentiles */
 
-    const checkedOf = (variant: any): number[] =>
-      percentiles.value[variant.id] ?? [];
+    const checkedOf = (variant: any): number[] => percentiles.value[variant.id] ?? [];
 
-    const isChecked = (variant: any, p: number) =>
-      checkedOf(variant).includes(Number(p));
+    const isChecked = (variant: any, p: number) => checkedOf(variant).includes(Number(p));
 
     /** The last remaining checkbox is disabled — the set may never go empty. */
     const isOnlyChecked = (variant: any, p: number) => {
@@ -397,20 +378,17 @@ export default defineComponent({
         .map((query: any) => query.expr)
         .join("  |  ");
 
-    const unitOf = (variant: any) =>
-      toO2Unit(variant?.unit ?? props.defaults?.unit);
+    const unitOf = (variant: any) => toO2Unit(variant?.unit ?? props.defaults?.unit);
 
     const bucketUnitOf = (variant: any) =>
-      (variant?.chartType ?? props.defaults?.chartType) === "heatmap" &&
-      props.defaults?.bucketUnit
+      (variant?.chartType ?? props.defaults?.chartType) === "heatmap" && props.defaults?.bucketUnit
         ? toO2Unit(props.defaults.bucketUnit)
         : { unit: null, unitCustom: null };
 
     /* ------------------------------------------------------------ previews */
 
     const previews = ref<Record<string, TilePreview>>({});
-    const previewOf = (variant: any): TilePreview =>
-      previews.value[variant.id] ?? IDLE;
+    const previewOf = (variant: any): TilePreview => previews.value[variant.id] ?? IDLE;
 
     /**
      * Resolutions from a previous open — or from a tile whose percentile set has
@@ -541,10 +519,7 @@ export default defineComponent({
 
       const variant = variantById(selectedId.value);
       if (!variant?.options?.percentiles) return false;
-      return !sameNumbers(
-        sortedNumbers(checkedOf(variant)),
-        baselinePercentilesOf(variant),
-      );
+      return !sameNumbers(sortedNumbers(checkedOf(variant)), baselinePercentilesOf(variant));
     });
 
     const close = () => emit("update:modelValue", false);
@@ -552,9 +527,7 @@ export default defineComponent({
     const onApply = () => {
       const variant = variantById(selectedId.value);
       if (!variant) return;
-      const picked = variant.options?.percentiles
-        ? sortedNumbers(checkedOf(variant))
-        : null;
+      const picked = variant.options?.percentiles ? sortedNumbers(checkedOf(variant)) : null;
       emit("apply", {
         variantId: variant.id,
         ...(picked?.length ? { options: { percentiles: picked } } : {}),

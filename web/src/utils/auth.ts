@@ -4,11 +4,7 @@ import config from "../aws-exports";
 import { useStore } from "vuex";
 import userService from "@/services/users";
 import organizationService from "@/services/organizations";
-import {
-  b64DecodeUnicode,
-  b64EncodeStandard,
-  b64DecodeStandard,
-} from "@/utils/formatters";
+import { b64DecodeUnicode, b64EncodeStandard, b64DecodeStandard } from "@/utils/formatters";
 import { useLocalUserInfo } from "@/utils/storage";
 import { getUUID, getUUIDv7 } from "@/utils/uuid";
 
@@ -26,12 +22,7 @@ export const emptyDataAllowedPaths = ["/settings", "/settings/general"];
 const normalizePath = (path: string) =>
   path !== "/" && path.endsWith("/") ? path.slice(0, -1) : path;
 
-export const trialPeriodAllowedPath = [
-  "iam",
-  "users",
-  "organizations",
-  "invitations",
-];
+export const trialPeriodAllowedPath = ["iam", "users", "organizations", "invitations"];
 
 export const getUserInfo = (loginString: string) => {
   try {
@@ -48,9 +39,7 @@ export const getUserInfo = (loginString: string) => {
             if (!payload || typeof payload !== "object") return null;
             payload["family_name"] = payload["name"] || "";
             payload["given_name"] = payload["given_name"] || "";
-            const encodedSessionData: any = b64EncodeStandard(
-              JSON.stringify(payload),
-            );
+            const encodedSessionData: any = b64EncodeStandard(JSON.stringify(payload));
             useLocalUserInfo(encodedSessionData);
             decToken = payload;
           } catch (error) {
@@ -59,9 +48,7 @@ export const getUserInfo = (loginString: string) => {
           }
         } else {
           decToken = getDecodedAccessToken(propArr[1]);
-          const encodedSessionData: any = b64EncodeStandard(
-            JSON.stringify(decToken),
-          );
+          const encodedSessionData: any = b64EncodeStandard(JSON.stringify(decToken));
           useLocalUserInfo(encodedSessionData);
         }
       }
@@ -122,10 +109,7 @@ export const getDueDays = (microTimestamp: number): number => {
 export const routeGuard = async (to: any, from: any, next: any) => {
   const store = useStore();
   if (config.isCloud) {
-    if (
-      store.state.organizationData?.organizationSettings?.free_trial_expiry !==
-      ""
-    ) {
+    if (store.state.organizationData?.organizationSettings?.free_trial_expiry !== "") {
       const trialDueDays = getDueDays(
         store.state.organizationData?.organizationSettings?.free_trial_expiry,
       );
@@ -147,10 +131,7 @@ export const routeGuard = async (to: any, from: any, next: any) => {
     to.name !== "iam" &&
     emptyDataAllowedPaths.indexOf(normalizePath(to.path)) === -1 &&
     trialPeriodAllowedPath.indexOf(to.name) === -1 &&
-    Object.prototype.hasOwnProperty.call(
-      store.state.zoConfig,
-      "restricted_routes_on_empty_data"
-    ) &&
+    Object.prototype.hasOwnProperty.call(store.state.zoConfig, "restricted_routes_on_empty_data") &&
     store.state.zoConfig.restricted_routes_on_empty_data === true &&
     store.state.organizationData.isDataIngested === false
   ) {
@@ -160,9 +141,7 @@ export const routeGuard = async (to: any, from: any, next: any) => {
         next();
         return;
       }
-      const response = await organizationService.get_organization_summary(
-        orgIdentifier,
-      );
+      const response = await organizationService.get_organization_summary(orgIdentifier);
       if (!response.data?.streams?.num_streams) {
         store.dispatch("setIsDataIngested", false);
         next({ path: "/ingestion" });

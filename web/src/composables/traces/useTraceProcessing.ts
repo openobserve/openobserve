@@ -11,10 +11,7 @@ import {
   SpanKind,
   SpanStatus,
 } from "@/ts/interfaces/traces/span.types";
-import {
-  type TraceMetadata,
-  type ServiceBreakdown,
-} from "@/ts/interfaces/traces/trace.types";
+import { type TraceMetadata, type ServiceBreakdown } from "@/ts/interfaces/traces/trace.types";
 import type { ServiceDetectionConfig } from "@/ts/interfaces/traces/serviceDetection.types";
 import { useSpanServiceDetection } from "@/utils/traces/useSpanServiceDetection";
 import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
@@ -36,17 +33,12 @@ export function useTraceProcessing(
    * Convert old tree format to EnrichedSpan format and flatten
    * Handles tree nodes with 'spans' property (children) and 'depth' or calculates depth
    */
-  const flattenOldTreeFormat = (
-    treeNodes: any[],
-    currentDepth = 0,
-  ): EnrichedSpan[] => {
+  const flattenOldTreeFormat = (treeNodes: any[], currentDepth = 0): EnrichedSpan[] => {
     const result: EnrichedSpan[] = [];
 
     // Get trace start time from the root node (old format stores it as lowestStartTime)
     const traceStartTimeUs =
-      treeNodes.length > 0 && treeNodes[0].lowestStartTime
-        ? treeNodes[0].lowestStartTime
-        : 0;
+      treeNodes.length > 0 && treeNodes[0].lowestStartTime ? treeNodes[0].lowestStartTime : 0;
 
     const traverse = (node: any, depth: number) => {
       // Calculate startOffsetMs as offset from trace start
@@ -86,8 +78,7 @@ export function useTraceProcessing(
         operationName: node.operationName || "unknown",
         statusIcon: getStatusIcon(node.spanStatus),
         kindIcon: getKindIcon(node.spanKind),
-        hasError:
-          node.spanStatus === SpanStatus.ERROR || node.spanStatus === "ERROR",
+        hasError: node.spanStatus === SpanStatus.ERROR || node.spanStatus === "ERROR",
       };
 
       result.push(enrichedSpan);
@@ -107,9 +98,7 @@ export function useTraceProcessing(
    */
   const isOldTreeFormat = (data: any[]): boolean => {
     return (
-      data.length > 0 &&
-      ("spanId" in data[0] || "spans" in data[0]) &&
-      !("children" in data[0])
+      data.length > 0 && ("spanId" in data[0] || "spans" in data[0]) && !("children" in data[0])
     );
   };
 
@@ -226,10 +215,7 @@ export function useTraceProcessing(
   /**
    * Calculate trace metadata
    */
-  const calculateMetadata = (
-    traceId: string,
-    spanTree: EnrichedSpan[],
-  ): TraceMetadata => {
+  const calculateMetadata = (traceId: string, spanTree: EnrichedSpan[]): TraceMetadata => {
     const allSpans = flattenSpanTree(spanTree);
 
     if (allSpans.length === 0) {
@@ -251,10 +237,7 @@ export function useTraceProcessing(
 
     allSpans.forEach((span) => {
       services.add(span.service_name);
-      serviceSpans.set(
-        span.service_name,
-        (serviceSpans.get(span.service_name) || 0) + 1,
-      );
+      serviceSpans.set(span.service_name, (serviceSpans.get(span.service_name) || 0) + 1);
       serviceDurations.set(
         span.service_name,
         (serviceDurations.get(span.service_name) || 0) + span.durationMs,
@@ -317,9 +300,7 @@ export function useTraceProcessing(
   /**
    * Calculate service breakdown
    */
-  const calculateServiceBreakdown = (
-    metadata: TraceMetadata,
-  ): ServiceBreakdown[] => {
+  const calculateServiceBreakdown = (metadata: TraceMetadata): ServiceBreakdown[] => {
     const breakdown: ServiceBreakdown[] = [];
 
     metadata.services.forEach((serviceName) => {
@@ -346,36 +327,25 @@ export function useTraceProcessing(
   /**
    * Filter spans based on criteria
    */
-  const filterSpans = (
-    spanList: EnrichedSpan[],
-    filter: SpanFilter,
-  ): EnrichedSpan[] => {
+  const filterSpans = (spanList: EnrichedSpan[], filter: SpanFilter): EnrichedSpan[] => {
     return spanList.filter((span) => {
       if (filter.services && filter.services.length > 0) {
         if (!filter.services.includes(span.service_name)) return false;
       }
 
       if (filter.statuses && filter.statuses.length > 0) {
-        if (!filter.statuses.includes(span.span_status || SpanStatus.UNSET))
-          return false;
+        if (!filter.statuses.includes(span.span_status || SpanStatus.UNSET)) return false;
       }
 
       if (filter.kinds && filter.kinds.length > 0) {
-        if (!filter.kinds.includes(span.span_kind || SpanKind.UNSPECIFIED))
-          return false;
+        if (!filter.kinds.includes(span.span_kind || SpanKind.UNSPECIFIED)) return false;
       }
 
-      if (
-        filter.minDuration !== undefined &&
-        span.durationMs < filter.minDuration
-      ) {
+      if (filter.minDuration !== undefined && span.durationMs < filter.minDuration) {
         return false;
       }
 
-      if (
-        filter.maxDuration !== undefined &&
-        span.durationMs > filter.maxDuration
-      ) {
+      if (filter.maxDuration !== undefined && span.durationMs > filter.maxDuration) {
         return false;
       }
 
@@ -396,10 +366,7 @@ export function useTraceProcessing(
         if (!matchesSearch) return false;
       }
 
-      if (
-        filter.attributeFilters &&
-        Object.keys(filter.attributeFilters).length > 0
-      ) {
+      if (filter.attributeFilters && Object.keys(filter.attributeFilters).length > 0) {
         for (const [key, value] of Object.entries(filter.attributeFilters)) {
           if (span.attributes?.[key] !== value) return false;
         }
@@ -513,11 +480,7 @@ export function formatTimestamp(
   const timestampMs = timestamp / 1000000;
 
   // Format: "16 Feb 11:40:40.049" in the selected timezone
-  const formattedDate = timestampToTimezoneDate(
-    timestampMs,
-    timezone,
-    "dd MMM HH:mm:ss.SSS",
-  );
+  const formattedDate = timestampToTimezoneDate(timestampMs, timezone, "dd MMM HH:mm:ss.SSS");
 
   // Calculate relative time
   const now = Date.now();

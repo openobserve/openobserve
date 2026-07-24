@@ -8,9 +8,7 @@ defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
 // Forward consumer's `data-test` so individual buttons can be addressed via
 // `${parent}-prev` / `${parent}-next` / `${parent}-page-{n}` selectors.
-const parentDataTest = computed(
-  () => $attrs["data-test"] as string | undefined,
-);
+const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 
 const props = withDefaults(defineProps<PaginationProps>(), {
   disable: false,
@@ -20,8 +18,7 @@ const props = withDefaults(defineProps<PaginationProps>(), {
 const emit = defineEmits<PaginationEmits>();
 
 /** Clamp a value between min and max (inclusive). */
-const clamp = (val: number, min: number, max: number) =>
-  Math.min(Math.max(val, min), max);
+const clamp = (val: number, min: number, max: number) => Math.min(Math.max(val, min), max);
 
 /** Visible page-number window, centred around the current page. */
 const pages = computed<number[]>(() => {
@@ -65,7 +62,7 @@ const navigate = (page: number) => {
     <!-- Previous page -->
     <button
       type="button"
-      class="o-pagination__btn flex size-7 items-center justify-center rounded-default transition-colors"
+      class="o-pagination__btn rounded-default flex size-7 items-center justify-center transition-colors"
       :class="[
         isFirst || disable
           ? 'text-pagination-nav-disabled-text cursor-not-allowed opacity-50'
@@ -84,7 +81,7 @@ const navigate = (page: number) => {
       v-for="page in pages"
       :key="page"
       type="button"
-      class="o-pagination__btn flex size-7 items-center justify-center rounded-default text-sm font-medium transition-colors"
+      class="o-pagination__btn rounded-default flex size-7 items-center justify-center text-sm font-medium transition-colors"
       :class="[
         page === modelValue
           ? 'bg-pagination-item-active-bg text-pagination-item-active-text cursor-default'
@@ -106,7 +103,7 @@ const navigate = (page: number) => {
     <!-- Next page -->
     <button
       type="button"
-      class="o-pagination__btn flex size-7 items-center justify-center rounded-default transition-colors"
+      class="o-pagination__btn rounded-default flex size-7 items-center justify-center transition-colors"
       :class="[
         isLast || disable
           ? 'text-pagination-nav-disabled-text cursor-not-allowed opacity-50'
@@ -119,6 +116,5 @@ const navigate = (page: number) => {
     >
       <OIcon name="fast-forward" size="sm" />
     </button>
-
   </div>
 </template>

@@ -20,6 +20,7 @@ enterprise = [
     "openobserve-api-management/enterprise",
     "openobserve-api-query/enterprise",
     "openobserve-core/enterprise",
+    "openobserve-sourcemaps/enterprise",
     "promql-service/enterprise",
     "search_service/enterprise",
     "enrichment-data/enterprise",
@@ -57,6 +58,8 @@ common.workspace = true
 audit.workspace = true
 db.workspace = true
 openobserve-core.workspace = true
+openobserve-builtins.workspace = true
+openobserve-sourcemaps.workspace = true
 ingestion-common.workspace = true
 stream.workspace = true
 enrichment-data.workspace = true

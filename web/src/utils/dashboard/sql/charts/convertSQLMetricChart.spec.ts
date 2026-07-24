@@ -60,7 +60,15 @@ function makeMockContext(overrides: Partial<any> = {}): any {
 
   return {
     options: {
-      xAxis: [{ data: ["Jan", "Feb", "Mar"], axisLabel: { rotate: 0, width: 120, margin: 5 }, axisTick: {}, nameGap: 25, name: "" }],
+      xAxis: [
+        {
+          data: ["Jan", "Feb", "Mar"],
+          axisLabel: { rotate: 0, width: 120, margin: 5 },
+          axisTick: {},
+          nameGap: 25,
+          name: "",
+        },
+      ],
       yAxis: [{ data: [], axisLabel: { width: 80 }, name: "" }],
       series: [],
       tooltip: { axisPointer: {}, textStyle: {} },
@@ -135,9 +143,7 @@ describe("applyMetricChart", () => {
     it("floors the metric font size at the readable minimum", () => {
       vi.mocked(calculateOptimalFontSize).mockReturnValueOnce(3);
       // narrow-but-tall cell: width fit says 3px, floor lifts it to 12px
-      expect(calculateMetricFontSize("311688.00", 74, 267)).toBe(
-        METRIC_MIN_FONT_PX,
-      );
+      expect(calculateMetricFontSize("311688.00", 74, 267)).toBe(METRIC_MIN_FONT_PX);
     });
 
     it("does not floor beyond what the cell height allows", () => {
@@ -149,9 +155,7 @@ describe("applyMetricChart", () => {
     it("does not floor beyond what the full cell width fits (no clipped digits)", () => {
       // slot-reserved fit says 3px; the full-width fit only allows 9px, so
       // the 12px floor is capped at 9px instead of clipping the value
-      vi.mocked(calculateOptimalFontSize)
-        .mockReturnValueOnce(3)
-        .mockReturnValueOnce(9);
+      vi.mocked(calculateOptimalFontSize).mockReturnValueOnce(3).mockReturnValueOnce(9);
       expect(calculateMetricFontSize("311688.00", 60, 267)).toBe(9);
     });
 

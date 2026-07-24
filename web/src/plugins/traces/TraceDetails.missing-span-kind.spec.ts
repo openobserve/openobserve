@@ -33,8 +33,6 @@ vi.mock("@/composables/useNotifications", () => ({
   }),
 }));
 
-
-
 /**
  * Test Suite: TraceDetails Component - Missing span_kind Field
  *
@@ -279,12 +277,7 @@ describe("TraceDetails - Missing span_kind Field", () => {
               "searchQuery",
               "spanList",
             ],
-            emits: [
-              "toggle-collapse",
-              "select-span",
-              "update-current-index",
-              "search-result",
-            ],
+            emits: ["toggle-collapse", "select-span", "update-current-index", "search-result"],
             methods: {
               nextMatch: vi.fn(),
               prevMatch: vi.fn(),
@@ -410,9 +403,7 @@ describe("TraceDetails - Missing span_kind Field", () => {
     });
 
     it("should render operation name correctly", () => {
-      const operationName = wrapper.find(
-        '[data-test="trace-details-operation-name"]',
-      );
+      const operationName = wrapper.find('[data-test="trace-details-operation-name"]');
       if (operationName.exists()) {
         expect(operationName.text()).toBeTruthy();
       }
@@ -465,9 +456,7 @@ describe("TraceDetails - Missing span_kind Field", () => {
     });
 
     it("should toggle timeline without errors", async () => {
-      const toggleBtn = wrapper.find(
-        '[data-test="trace-details-toggle-timeline-btn"]',
-      );
+      const toggleBtn = wrapper.find('[data-test="trace-details-toggle-timeline-btn"]');
       if (toggleBtn.exists()) {
         await toggleBtn.trigger("click");
         expect(wrapper.vm.isTimelineExpanded).toBe(true);
@@ -508,18 +497,14 @@ describe("TraceDetails - Missing span_kind Field", () => {
 
     it("should process all spans regardless of span_kind presence", () => {
       const processedSpanIds = Object.keys(wrapper.vm.spanMap);
-      const originalSpanIds = mockSpansWithoutSpanKind.hits.map(
-        (s) => s.span_id,
-      );
+      const originalSpanIds = mockSpansWithoutSpanKind.hits.map((s) => s.span_id);
       expect(processedSpanIds.length).toBe(originalSpanIds.length);
     });
   });
 
   describe("Critical: Navigation and actions with missing span_kind", () => {
     it("should navigate to logs without errors", async () => {
-      const viewLogsBtn = wrapper.find(
-        '[data-test="trace-details-view-logs-btn"]',
-      );
+      const viewLogsBtn = wrapper.find('[data-test="trace-details-view-logs-btn"]');
       if (viewLogsBtn.exists()) {
         const routerPushSpy = vi.spyOn(router, "push");
         await viewLogsBtn.trigger("click");
@@ -528,9 +513,7 @@ describe("TraceDetails - Missing span_kind Field", () => {
     });
 
     it("should copy trace ID without errors", async () => {
-      const copyBtn = wrapper.find(
-        '[data-test="trace-details-copy-trace-id-btn"]',
-      );
+      const copyBtn = wrapper.find('[data-test="trace-details-copy-trace-id-btn"]');
       if (copyBtn.exists()) {
         await copyBtn.trigger("click");
         expect(navigator.clipboard.writeText).toHaveBeenCalled();

@@ -21,10 +21,7 @@ describe("ORadioGroup", () => {
     wrapper = mount(ORadioGroup, {
       props: { modelValue: "" },
       slots: {
-        default: [
-          '<ORadio value="a" label="A" />',
-          '<ORadio value="b" label="B" />',
-        ],
+        default: ['<ORadio value="a" label="A" />', '<ORadio value="b" label="B" />'],
       },
       global: { components: { ORadio } },
     });

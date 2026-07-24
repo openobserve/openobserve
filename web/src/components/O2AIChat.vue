@@ -1,23 +1,17 @@
 ﻿<template>
   <div
-    class="chat-container w-full h-full flex flex-col overflow-hidden rounded-default text-text-body bg-card-glass-solid [box-shadow:0_0_5px_1px_var(--color-hover-shadow)]"
-    :class="[
-      { 'chat-open': isOpen },    ]"
+    class="chat-container rounded-default text-text-body bg-card-glass-solid flex h-full w-full flex-col overflow-hidden [box-shadow:0_0_5px_1px_var(--color-hover-shadow)]"
+    :class="[{ 'chat-open': isOpen }]"
   >
-    <div
-      v-if="isOpen"
-      class="chat-content-wrapper flex flex-col h-full bg-transparent"
-    >
+    <div v-if="isOpen" class="chat-content-wrapper flex h-full flex-col bg-transparent">
       <div
-        class="chat-header flex justify-between items-end shrink-0 z-2 px-3 pt-0 pb-1 border-b border-separator bg-surface-base"
+        class="chat-header border-separator bg-surface-base z-2 flex shrink-0 items-end justify-between border-b px-3 pt-0 pb-1"
         :style="{ height: headerHeight ? headerHeight + 'px' : '' }"
       >
-        <div
-          class="chat-title flex justify-between items-center w-full font-bold"
-        >
+        <div class="chat-title flex w-full items-center justify-between font-bold">
           <div class="flex items-center gap-2">
-            <div class="inline-flex w-6 h-6 rounded-full overflow-hidden">
-              <img :src="o2AiTitleLogo" class="w-full h-full object-cover" />
+            <div class="inline-flex h-6 w-6 overflow-hidden rounded-full">
+              <img :src="o2AiTitleLogo" class="h-full w-full object-cover" />
             </div>
 
             <ODropdown @update:open="(v) => v && loadHistory()">
@@ -25,11 +19,11 @@
                 <OButton
                   variant="ghost"
                   size="sm"
-                  class="chat-title-dropdown flex items-center overflow-hidden max-w-52.5 h-8 min-h-8 px-3 py-1.5 rounded-default transition-colors duration-200 hover:bg-interactive-hover-bg"
+                  class="chat-title-dropdown rounded-default hover:bg-interactive-hover-bg flex h-8 min-h-8 max-w-52.5 items-center overflow-hidden px-3 py-1.5 transition-colors duration-200"
                 >
-                  <div class="flex items-center gap-2 max-w-55">
+                  <div class="flex max-w-55 items-center gap-2">
                     <span
-                      class="chat-title-text text-sm font-medium truncate block max-w-45 text-text-body"
+                      class="chat-title-text text-text-body block max-w-45 truncate text-sm font-medium"
                     >
                       {{ displayedTitle || "New Chat" }}
                       <OTooltip
@@ -40,17 +34,15 @@
                         :content="displayedTitle"
                       />
                     </span>
-                    <OIcon
-                      name="arrow-drop-down"
-                      size="md"
-                      class="flex-shrink-0"
-                    />
+                    <OIcon name="arrow-drop-down" size="md" class="flex-shrink-0" />
                   </div>
                 </OButton>
               </template>
               <!-- History menu with search -->
-              <div class="history-menu-container relative max-h-112.5 flex flex-col w-75">
-                <div class="search-history-bar-sticky sticky top-0 z-2 bg-surface-base p-2 border-b border-separator shrink-0">
+              <div class="history-menu-container relative flex max-h-112.5 w-75 flex-col">
+                <div
+                  class="search-history-bar-sticky bg-surface-base border-separator sticky top-0 z-2 shrink-0 border-b p-2"
+                >
                   <OSearchInput
                     v-model="historySearchTerm"
                     placeholder="Search chat history"
@@ -58,17 +50,15 @@
                   />
                 </div>
                 <div
-                  class="history-list-container flex-1 overflow-y-auto overflow-x-hidden max-h-87.5 min-w-50 w-75 max-w-75 border border-border-default"
+                  class="history-list-container border-border-default max-h-87.5 w-75 max-w-75 min-w-50 flex-1 overflow-x-hidden overflow-y-auto border"
                 >
                   <ODropdownItem
                     v-for="chat in filteredChatHistory"
                     :key="chat.id"
-                    class="history-item relative group"
+                    class="history-item group relative"
                     @select="loadChat(chat.id)"
                   >
-                    <div
-                      class="flex items-center justify-between w-full"
-                    >
+                    <div class="flex w-full items-center justify-between">
                       <div class="flex-1 overflow-hidden">
                         <div class="text-compact truncate">
                           {{ chat.title }}
@@ -90,7 +80,7 @@
                   </ODropdownItem>
                   <div
                     v-if="filteredChatHistory.length === 0"
-                    class="text-center text-text-muted p-2"
+                    class="text-text-muted p-2 text-center"
                   >
                     No matching chats found
                   </div>
@@ -99,12 +89,12 @@
                 <!-- Clear all conversations button -->
                 <div
                   v-if="filteredChatHistory.length > 0"
-                  class="clear-all-container bg-surface-base p-2 border-t border-separator shrink-0"
+                  class="clear-all-container bg-surface-base border-separator shrink-0 border-t p-2"
                 >
                   <ODropdownSeparator />
                   <OButton
                     variant="ghost"
-                    class="clear-all-btn w-full text-[var(--color-status-negative)] text-compact hover:bg-[color-mix(in_srgb,var(--color-status-negative)_10%,transparent)]"
+                    class="clear-all-btn text-compact w-full text-[var(--color-status-negative)] hover:bg-[color-mix(in_srgb,var(--color-status-negative)_10%,transparent)]"
                     @click.stop="clearAllConversations"
                   >
                     <template #icon-left>
@@ -117,7 +107,7 @@
             </ODropdown>
           </div>
 
-          <div class="flex items-center gap-1 chat-header-actions">
+          <div class="chat-header-actions flex items-center gap-1">
             <!-- Edit title button -->
             <OButton
               v-if="currentChatId"
@@ -138,11 +128,7 @@
               @click="toggleExpand"
             >
               <OIcon
-                :name="
-                  store.state.isAiChatExpanded
-                    ? 'close-fullscreen'
-                    : 'open-in-full'
-                "
+                :name="store.state.isAiChatExpanded ? 'close-fullscreen' : 'open-in-full'"
                 size="sm"
               />
               <OTooltip
@@ -158,22 +144,26 @@
       <OSeparator class="bg-separator" />
 
       <!-- History Panel -->
-      <ODrawer data-test="o2-ai-chat-history-drawer" bleed v-model:open="showHistory" size="sm" title="Chat History">
-        <ul class="flex flex-col divide-y divide-border">
+      <ODrawer
+        data-test="o2-ai-chat-history-drawer"
+        bleed
+        v-model:open="showHistory"
+        size="sm"
+        title="Chat History"
+      >
+        <ul class="divide-border flex flex-col divide-y">
           <li
             v-for="chat in chatHistory"
             :key="chat.id"
             :data-test="`o2-ai-chat-history-item-${chat.id}`"
-            class="flex flex-col px-3 py-2 cursor-pointer hover:bg-muted/50"
+            class="hover:bg-muted/50 flex cursor-pointer flex-col px-3 py-2"
             @click="loadChat(chat.id)"
           >
             <span class="text-sm">{{ chat.title }}</span>
-            <span class="block text-xs text-muted-foreground">
+            <span class="text-muted-foreground block text-xs">
               {{ new Date(chat.timestamp).toLocaleString() }}
             </span>
-            <span class="block text-xs text-muted-foreground">
-              Model: {{ chat.model }}
-            </span>
+            <span class="text-muted-foreground block text-xs"> Model: {{ chat.model }} </span>
           </li>
         </ul>
       </ODrawer>
@@ -226,49 +216,38 @@
         <div class="flex justify-center">
           <img
             v-if="previewImage"
-            :src="
-              'data:' + previewImage.mimeType + ';base64,' + previewImage.data
-            "
+            :src="'data:' + previewImage.mimeType + ';base64,' + previewImage.data"
             :alt="previewImage.filename"
-            class="max-w-full max-h-[80vh] object-contain"
+            class="max-h-[80vh] max-w-full object-contain"
           />
         </div>
       </ODialog>
 
       <div
-        class="chat-content relative flex flex-col flex-1 min-h-0 overflow-hidden bg-transparent"
+        class="chat-content relative flex min-h-0 flex-1 flex-col overflow-hidden bg-transparent"
       >
         <div
-          class="messages-container flex flex-col flex-1 min-h-0 overflow-y-auto gap-4 p-2 w-full max-w-225 mx-auto bg-transparent"
+          class="messages-container mx-auto flex min-h-0 w-full max-w-225 flex-1 flex-col gap-4 overflow-y-auto bg-transparent p-2"
           ref="messagesContainer"
           @scroll="checkIfShouldAutoScroll"
         >
           <div
             v-if="chatMessages.length === 0"
-            class="welcome-section flex flex-1 items-center justify-center rounded-default"
+            class="welcome-section rounded-default flex flex-1 items-center justify-center"
             :class="
               centeredStart
-                ? 'p-0 mb-0 bg-transparent'
-                : 'p-6 mb-6 [background:linear-gradient(to_right,color-mix(in_srgb,var(--color-theme-accent)_5%,transparent),color-mix(in_srgb,var(--color-theme-accent)_10%,transparent))]'
+                ? 'mb-0 bg-transparent p-0'
+                : 'mb-6 p-6 [background:linear-gradient(to_right,color-mix(in_srgb,var(--color-theme-accent)_5%,transparent),color-mix(in_srgb,var(--color-theme-accent)_10%,transparent))]'
             "
           >
             <!-- Home tab: rich V2 welcome -->
-            <O2AIHomeWelcome
-              v-if="centeredStart"
-              @select-prompt="selectWelcomePrompt"
-            />
+            <O2AIHomeWelcome v-if="centeredStart" @select-prompt="selectWelcomePrompt" />
             <!-- Sidepanel: minimal logo + title -->
-            <div
-              v-else
-              class="flex flex-col items-center justify-center h-full w-full"
-            >
+            <div v-else class="flex h-full w-full flex-col items-center justify-center">
               <div class="flex flex-col items-center">
                 <img :src="o2AiTitleLogo" />
                 <div class="relative inline-block">
-                  <span
-                    class="text-sm font-[600] ml-7.5 text-center"
-                    >O2 Assistant</span
-                  >
+                  <span class="ml-7.5 text-center text-sm font-[600]">O2 Assistant</span>
                   <!-- Same shared Beta tag as the Workflows screens. -->
                   <BetaBadge class="ml-2" />
                 </div>
@@ -278,31 +257,35 @@
           <div
             v-for="(message, index) in processedMessages"
             :key="index"
-            class="message p-3 rounded-default border border-border-default [box-shadow:0_1px_2px_color-mix(in_srgb,var(--color-text-heading)_10%,transparent)]"
+            class="message rounded-default border-border-default border p-3 [box-shadow:0_1px_2px_color-mix(in_srgb,var(--color-text-heading)_10%,transparent)]"
             :class="[
               message.role,
               message.role === 'user'
-                ? 'ml-10 w-[calc(100%-2.5rem)] [background:var(--color-chat-bubble-ai)] text-text-body dark:text-text-secondary'
-                : 'ml-0 w-full bg-surface-base text-text-body dark:text-text-secondary',
+                ? 'text-text-body dark:text-text-secondary ml-10 w-[calc(100%-2.5rem)] [background:var(--color-chat-bubble-ai)]'
+                : 'bg-surface-base text-text-body dark:text-text-secondary ml-0 w-full',
               { 'error-message': message.content.startsWith('Error:') },
             ]"
           >
-            <div class="message-content flex items-start gap-1.5 w-full">
+            <div class="message-content flex w-full items-start gap-1.5">
               <div
                 v-if="message.role === 'user'"
-                class="inline-flex items-center justify-center w-6 h-6 rounded-full text-text-inverse [background:var(--color-gradient-ai)] shrink-0"
+                class="text-text-inverse inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full [background:var(--color-gradient-ai)]"
               >
-                <OIcon
-                  size="sm"
-                  name="person"
-                  class='text-text-inverse'
-                />
+                <OIcon size="sm" name="person" class="text-text-inverse" />
               </div>
               <div
-                class="message-blocks flex flex-col flex-1 gap-0 min-w-0 max-w-full overflow-x-auto [word-wrap:break-word] wrap-break-word bg-transparent"
+                class="message-blocks flex max-w-full min-w-0 flex-1 flex-col gap-0 overflow-x-auto bg-transparent wrap-break-word [word-wrap:break-word]"
               >
                 <!-- Loading indicator inside message box for empty assistant messages -->
-                <div v-if="message.role === 'assistant' && (!message.contentBlocks || message.contentBlocks.length === 0) && (!message.content || message.content.trim() === '') && isLoading" class="inline-loading flex items-center gap-2.5 py-2 text-text-secondary text-sm">
+                <div
+                  v-if="
+                    message.role === 'assistant' &&
+                    (!message.contentBlocks || message.contentBlocks.length === 0) &&
+                    (!message.content || message.content.trim() === '') &&
+                    isLoading
+                  "
+                  class="inline-loading text-text-secondary flex items-center gap-2.5 py-2 text-sm"
+                >
                   <OSpinner variant="dots" size="sm" />
                   <span>{{ currentAnalyzingMessage }}</span>
                 </div>
@@ -314,22 +297,19 @@
                   <!-- Tool call block - expandable -->
                   <div
                     v-if="block.type === 'tool_call'"
-                    class="tool-call-item flex flex-col px-3 py-2 rounded-default text-compact mb-2 min-w-0 max-w-full"
+                    class="tool-call-item rounded-default text-compact mb-2 flex max-w-full min-w-0 flex-col px-3 py-2"
                     :class="[
                       { 'has-details': hasToolCallDetails(block) },
                       {
-                        error:
-                          block.success === false && !block.pendingConfirmation,
+                        error: block.success === false && !block.pendingConfirmation,
                       },
                       {
                         'pending-confirmation':
-                          block.pendingConfirmation &&
-                          block.tool !== 'navigation_action',
+                          block.pendingConfirmation && block.tool !== 'navigation_action',
                       },
                       {
                         'pending-navigation':
-                          block.pendingConfirmation &&
-                          block.tool === 'navigation_action',
+                          block.pendingConfirmation && block.tool === 'navigation_action',
                       },
                     ]"
                     @click="
@@ -360,36 +340,27 @@
                               : 'text-status-positive'
                         "
                       />
-                      <span class="tool-call-name font-medium flex-1">
+                      <span class="tool-call-name flex-1 font-medium">
                         {{ formatToolCallMessage(block).text
-                        }}<strong
-                          v-if="formatToolCallMessage(block).highlight"
-                          >{{ formatToolCallMessage(block).highlight }}</strong
+                        }}<strong v-if="formatToolCallMessage(block).highlight">{{
+                          formatToolCallMessage(block).highlight
+                        }}</strong
                         >{{ formatToolCallMessage(block).suffix }}
                       </span>
                       <!-- Navigation icon -->
                       <OIcon
-                        v-if="
-                          block.navigationAction && !block.pendingConfirmation
-                        "
+                        v-if="block.navigationAction && !block.pendingConfirmation"
                         name="open-in-new"
                         size="xs"
-                        class="navigation-icon cursor-pointer ml-auto opacity-70 transition-opacity duration-200 hover:opacity-100"
-                        @click.stop="
-                          handleNavigationAction(block.navigationAction)
-                        "
+                        class="navigation-icon ml-auto cursor-pointer opacity-70 transition-opacity duration-200 hover:opacity-100"
+                        @click.stop="handleNavigationAction(block.navigationAction)"
                       >
                         <OTooltip :content="block.navigationAction.label" />
                       </OIcon>
                       <OIcon
-                        v-if="
-                          hasToolCallDetails(block) &&
-                          !block.pendingConfirmation
-                        "
+                        v-if="hasToolCallDetails(block) && !block.pendingConfirmation"
                         :name="
-                          isToolCallExpanded(index, blockIndex)
-                            ? 'expand-less'
-                            : 'expand-more'
+                          isToolCallExpanded(index, blockIndex) ? 'expand-less' : 'expand-more'
                         "
                         size="sm"
                         class="expand-icon opacity-60 transition-transform duration-200"
@@ -398,28 +369,37 @@
                     <!-- Expandable details -->
                     <div
                       v-if="isToolCallExpanded(index, blockIndex)"
-                      class="tool-call-details mt-2.5 pt-2.5 border-t border-border-default flex flex-col gap-2 min-w-0"
+                      class="tool-call-details border-border-default mt-2.5 flex min-w-0 flex-col gap-2 border-t pt-2.5"
                       @click.stop
                     >
                       <!-- Error details for failed tool calls -->
                       <template v-if="block.success === false">
                         <div v-if="block.resultMessage" class="detail-item flex flex-col gap-1">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Error</span>
-                          <span class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere] text-status-negative">{{
-                            block.resultMessage
-                          }}</span>
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60"
+                            >Error</span
+                          >
+                          <span
+                            class="detail-value text-status-negative max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                            >{{ block.resultMessage }}</span
+                          >
                         </div>
                         <div v-if="block.errorType" class="detail-item flex flex-col gap-1">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Type</span>
-                          <code class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]">{{
-                            block.errorType
-                          }}</code>
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60"
+                            >Type</span
+                          >
+                          <code
+                            class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                            >{{ block.errorType }}</code
+                          >
                         </div>
                         <div v-if="block.suggestion" class="detail-item flex flex-col gap-1">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Suggestion</span>
-                          <span class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere] italic opacity-85">{{
-                            block.suggestion
-                          }}</span>
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60"
+                            >Suggestion</span
+                          >
+                          <span
+                            class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words italic opacity-85 select-text"
+                            >{{ block.suggestion }}</span
+                          >
                         </div>
                       </template>
                       <!-- Summary details for successful tool calls with summary -->
@@ -428,8 +408,11 @@
                           v-if="block.summary.count !== undefined"
                           class="detail-item flex flex-col gap-1"
                         >
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Results</span>
-                          <span class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]"
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60"
+                            >Results</span
+                          >
+                          <span
+                            class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
                             >{{ block.summary.count }} records</span
                           >
                         </div>
@@ -437,8 +420,11 @@
                           v-if="block.summary.took !== undefined"
                           class="detail-item flex flex-col gap-1"
                         >
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Duration</span>
-                          <span class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]"
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60"
+                            >Duration</span
+                          >
+                          <span
+                            class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
                             >{{ block.summary.took }}ms</span
                           >
                         </div>
@@ -447,17 +433,23 @@
                           v-if="block.summary.return_code !== undefined"
                           class="detail-item flex flex-col gap-1"
                         >
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Exit code</span>
-                          <code class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]">{{
-                            block.summary.return_code
-                          }}</code>
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60"
+                            >Exit code</span
+                          >
+                          <code
+                            class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                            >{{ block.summary.return_code }}</code
+                          >
                         </div>
                         <div
                           v-if="block.summary.stdout_lines !== undefined"
                           class="detail-item flex flex-col gap-1"
                         >
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Stdout</span>
-                          <span class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]"
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60"
+                            >Stdout</span
+                          >
+                          <span
+                            class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
                             >{{ block.summary.stdout_lines }} lines</span
                           >
                         </div>
@@ -465,14 +457,22 @@
                           v-if="block.summary.stderr_lines"
                           class="detail-item flex flex-col gap-1"
                         >
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Stderr</span>
-                          <span class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]"
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60"
+                            >Stderr</span
+                          >
+                          <span
+                            class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
                             >{{ block.summary.stderr_lines }} lines</span
                           >
                         </div>
                         <div v-if="block.summary.truncated" class="detail-item flex flex-col gap-1">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Output</span>
-                          <span class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]">truncated</span>
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60"
+                            >Output</span
+                          >
+                          <span
+                            class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                            >truncated</span
+                          >
                         </div>
                       </template>
                       <!-- Existing context details -->
@@ -481,222 +481,238 @@
                         class="detail-item flex flex-col gap-1"
                       >
                         <div class="detail-header flex items-center justify-between">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Query</span>
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60"
+                            >Query</span
+                          >
                           <OButton
                             variant="ghost"
                             size="icon-xs-circle"
                             class="copy-btn opacity-60 hover:opacity-100"
                             @click.stop="
-                              copyToClipboard(
-                                getToolCallDisplayData(block.context)?.query,
-                              )
+                              copyToClipboard(getToolCallDisplayData(block.context)?.query)
                             "
                           >
                             <OIcon name="content-copy" size="sm" />
                             <OTooltip content="Copy query" />
                           </OButton>
                         </div>
-                        <code class="detail-value query-value text-xs select-text font-mono p-2 rounded-default whitespace-pre-wrap break-all cursor-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">{{
-                          getToolCallDisplayData(block.context)?.query
-                        }}</code>
+                        <code
+                          class="detail-value query-value rounded-default cursor-text p-2 font-mono text-xs break-all whitespace-pre-wrap select-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
+                          >{{ getToolCallDisplayData(block.context)?.query }}</code
+                        >
                       </div>
                       <div
                         v-if="getToolCallDisplayData(block.context)?.stream"
                         class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">Stream</span>
-                        <code class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]">{{
-                          getToolCallDisplayData(block.context)?.stream
-                        }}</code>
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60"
+                          >Stream</span
+                        >
+                        <code
+                          class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                          >{{ getToolCallDisplayData(block.context)?.stream }}</code
+                        >
                       </div>
                       <div
                         v-if="getToolCallDisplayData(block.context)?.type"
                         class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">Type</span>
-                        <code class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]">{{
-                          getToolCallDisplayData(block.context)?.type
-                        }}</code>
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60"
+                          >Type</span
+                        >
+                        <code
+                          class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                          >{{ getToolCallDisplayData(block.context)?.type }}</code
+                        >
                       </div>
                       <div
                         v-if="getToolCallDisplayData(block.context)?.start_time"
                         class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">Start</span>
-                        <span class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]">{{
-                          formatTimestamp(
-                            getToolCallDisplayData(block.context)?.start_time,
-                          )
-                        }}</span>
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60"
+                          >Start</span
+                        >
+                        <span
+                          class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                          >{{
+                            formatTimestamp(getToolCallDisplayData(block.context)?.start_time)
+                          }}</span
+                        >
                       </div>
                       <div
                         v-if="getToolCallDisplayData(block.context)?.end_time"
                         class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">End</span>
-                        <span class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]">{{
-                          formatTimestamp(
-                            getToolCallDisplayData(block.context)?.end_time,
-                          )
-                        }}</span>
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60"
+                          >End</span
+                        >
+                        <span
+                          class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                          >{{
+                            formatTimestamp(getToolCallDisplayData(block.context)?.end_time)
+                          }}</span
+                        >
                       </div>
                       <div
-                        v-if="
-                          getToolCallDisplayData(block.context)?.from !==
-                          undefined
-                        "
+                        v-if="getToolCallDisplayData(block.context)?.from !== undefined"
                         class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">From</span>
-                        <span class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]">{{
-                          getToolCallDisplayData(block.context)?.from
-                        }}</span>
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60"
+                          >From</span
+                        >
+                        <span
+                          class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                          >{{ getToolCallDisplayData(block.context)?.from }}</span
+                        >
                       </div>
                       <div
-                        v-if="
-                          getToolCallDisplayData(block.context)?.size !==
-                          undefined
-                        "
+                        v-if="getToolCallDisplayData(block.context)?.size !== undefined"
                         class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">Size</span>
-                        <span class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]">{{
-                          getToolCallDisplayData(block.context)?.size
-                        }}</span>
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60"
+                          >Size</span
+                        >
+                        <span
+                          class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                          >{{ getToolCallDisplayData(block.context)?.size }}</span
+                        >
                       </div>
                       <div
                         v-if="getToolCallDisplayData(block.context)?.query_type"
                         class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">Query Type</span>
-                        <code class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]">{{
-                          getToolCallDisplayData(block.context)?.query_type
-                        }}</code>
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60"
+                          >Query Type</span
+                        >
+                        <code
+                          class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                          >{{ getToolCallDisplayData(block.context)?.query_type }}</code
+                        >
                       </div>
                       <div
                         v-if="getToolCallDisplayData(block.context)?.vrl"
                         class="detail-item flex flex-col gap-1"
                       >
                         <div class="detail-header flex items-center justify-between">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">VRL</span>
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60"
+                            >VRL</span
+                          >
                           <OButton
                             variant="ghost"
                             size="icon-xs-circle"
                             class="copy-btn opacity-60 hover:opacity-100"
                             @click.stop="
-                              copyToClipboard(
-                                getToolCallDisplayData(block.context)?.vrl,
-                              )
+                              copyToClipboard(getToolCallDisplayData(block.context)?.vrl)
                             "
                           >
                             <OIcon name="content-copy" size="sm" />
                             <OTooltip content="Copy VRL" />
                           </OButton>
                         </div>
-                        <code class="detail-value query-value text-xs select-text font-mono p-2 rounded-default whitespace-pre-wrap break-all cursor-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">{{
-                          getToolCallDisplayData(block.context)?.vrl
-                        }}</code>
+                        <code
+                          class="detail-value query-value rounded-default cursor-text p-2 font-mono text-xs break-all whitespace-pre-wrap select-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
+                          >{{ getToolCallDisplayData(block.context)?.vrl }}</code
+                        >
                       </div>
                       <div
                         v-if="getToolCallDisplayData(block.context)?.command"
                         class="detail-item flex flex-col gap-1"
                       >
                         <div class="detail-header flex items-center justify-between">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Command</span>
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60"
+                            >Command</span
+                          >
                           <OButton
                             variant="ghost"
                             size="icon-xs-circle"
                             class="copy-btn opacity-60 hover:opacity-100"
                             @click.stop="
-                              copyToClipboard(
-                                getToolCallDisplayData(block.context)?.command,
-                              )
+                              copyToClipboard(getToolCallDisplayData(block.context)?.command)
                             "
                           >
                             <OIcon name="content-copy" size="sm" />
                             <OTooltip content="Copy command" />
                           </OButton>
                         </div>
-                        <code class="detail-value query-value text-xs select-text font-mono p-2 rounded-default whitespace-pre-wrap break-all cursor-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">{{
-                          getToolCallDisplayData(block.context)?.command
-                        }}</code>
+                        <code
+                          class="detail-value query-value rounded-default cursor-text p-2 font-mono text-xs break-all whitespace-pre-wrap select-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
+                          >{{ getToolCallDisplayData(block.context)?.command }}</code
+                        >
                       </div>
                       <!-- Tool response: SearchSQL hits -->
                       <template v-if="block.response && block.response.hits">
                         <div class="detail-item flex flex-col gap-1">
                           <div class="detail-header flex items-center justify-between">
-                            <span class="detail-label text-2xs font-semibold uppercase opacity-60">Results</span>
+                            <span class="detail-label text-2xs font-semibold uppercase opacity-60"
+                              >Results</span
+                            >
                             <OButton
                               variant="ghost"
                               size="icon-xs-circle"
                               class="copy-btn opacity-60 hover:opacity-100"
                               @click.stop="
-                                copyToClipboard(
-                                  JSON.stringify(block.response.hits, null, 2),
-                                )
+                                copyToClipboard(JSON.stringify(block.response.hits, null, 2))
                               "
                             >
                               <OIcon name="content-copy" size="sm" />
                               <OTooltip content="Copy results" />
                             </OButton>
                           </div>
-                          <div class="tool-response-hits flex flex-col gap-1 text-xs font-mono px-2 py-1.5 rounded-default max-h-50 overflow-y-auto [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">
+                          <div
+                            class="tool-response-hits rounded-default flex max-h-50 flex-col gap-1 overflow-y-auto px-2 py-1.5 font-mono text-xs [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
+                          >
                             <div
                               v-for="(hit, hIdx) in block.response.hits"
                               :key="hIdx"
-                              class="tool-response-hit flex flex-wrap gap-x-3 gap-y-1 py-0.5 [&:not(:last-child)]:border-b [&:not(:last-child)]:border-border-default [&:not(:last-child)]:pb-1"
+                              class="tool-response-hit [&:not(:last-child)]:border-border-default flex flex-wrap gap-x-3 gap-y-1 py-0.5 [&:not(:last-child)]:border-b [&:not(:last-child)]:pb-1"
                             >
                               <span
                                 v-for="(val, key) in hit"
                                 :key="key"
-                                class="hit-field break-all select-text cursor-text"
+                                class="hit-field cursor-text break-all select-text"
                               >
-                                <span class="hit-key opacity-60 font-semibold">{{ key }}:</span>
+                                <span class="hit-key font-semibold opacity-60">{{ key }}:</span>
                                 {{ val }}
                               </span>
                             </div>
                           </div>
                         </div>
-                        <div class="tool-response-meta flex flex-wrap gap-1.5 mt-1">
-                          <span
-                            v-if="block.response.total !== undefined"
-                            class="context-tag"
+                        <div class="tool-response-meta mt-1 flex flex-wrap gap-1.5">
+                          <span v-if="block.response.total !== undefined" class="context-tag"
                             >Total: {{ block.response.total }}</span
                           >
-                          <span
-                            v-if="block.response.took !== undefined"
-                            class="context-tag"
+                          <span v-if="block.response.took !== undefined" class="context-tag"
                             >Took: {{ block.response.took }}ms</span
                           >
-                          <span
-                            v-if="block.response.hits_truncated"
-                            class="context-tag"
-                            >Showing first
-                            {{ block.response.hits.length }}</span
+                          <span v-if="block.response.hits_truncated" class="context-tag"
+                            >Showing first {{ block.response.hits.length }}</span
                           >
                         </div>
                       </template>
                       <!-- Tool response: testFunction input/output -->
                       <template
                         v-else-if="
-                          block.response &&
-                          (block.response.input || block.response.output)
+                          block.response && (block.response.input || block.response.output)
                         "
                       >
                         <div v-if="block.response.input" class="detail-item flex flex-col gap-1">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Input Events</span>
-                          <div class="tool-response-hits flex flex-col gap-1 text-xs font-mono px-2 py-1.5 rounded-default max-h-50 overflow-y-auto [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60"
+                            >Input Events</span
+                          >
+                          <div
+                            class="tool-response-hits rounded-default flex max-h-50 flex-col gap-1 overflow-y-auto px-2 py-1.5 font-mono text-xs [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
+                          >
                             <div
                               v-for="(evt, eIdx) in block.response.input"
                               :key="eIdx"
-                              class="tool-response-hit flex flex-wrap gap-x-3 gap-y-1 py-0.5 [&:not(:last-child)]:border-b [&:not(:last-child)]:border-border-default [&:not(:last-child)]:pb-1"
+                              class="tool-response-hit [&:not(:last-child)]:border-border-default flex flex-wrap gap-x-3 gap-y-1 py-0.5 [&:not(:last-child)]:border-b [&:not(:last-child)]:pb-1"
                             >
                               <span
                                 v-for="(val, key) in evt"
                                 :key="key"
-                                class="hit-field break-all select-text cursor-text"
+                                class="hit-field cursor-text break-all select-text"
                               >
-                                <span class="hit-key opacity-60 font-semibold">{{ key }}:</span>
+                                <span class="hit-key font-semibold opacity-60">{{ key }}:</span>
                                 {{
                                   typeof val === "string" && val.length > 120
                                     ? val.substring(0, 120) + "..."
@@ -707,20 +723,24 @@
                           </div>
                         </div>
                         <div v-if="block.response.output" class="detail-item flex flex-col gap-1">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Output</span>
-                          <div class="tool-response-hits flex flex-col gap-1 text-xs font-mono px-2 py-1.5 rounded-default max-h-50 overflow-y-auto [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60"
+                            >Output</span
+                          >
+                          <div
+                            class="tool-response-hits rounded-default flex max-h-50 flex-col gap-1 overflow-y-auto px-2 py-1.5 font-mono text-xs [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
+                          >
                             <div
                               v-for="(res, rIdx) in block.response.output"
                               :key="rIdx"
-                              class="tool-response-hit flex flex-wrap gap-x-3 gap-y-1 py-0.5 [&:not(:last-child)]:border-b [&:not(:last-child)]:border-border-default [&:not(:last-child)]:pb-1"
+                              class="tool-response-hit [&:not(:last-child)]:border-border-default flex flex-wrap gap-x-3 gap-y-1 py-0.5 [&:not(:last-child)]:border-b [&:not(:last-child)]:pb-1"
                             >
                               <template v-if="res.event">
                                 <span
                                   v-for="(val, key) in res.event"
                                   :key="key"
-                                  class="hit-field break-all select-text cursor-text"
+                                  class="hit-field cursor-text break-all select-text"
                                 >
-                                  <span class="hit-key opacity-60 font-semibold">{{ key }}:</span>
+                                  <span class="hit-key font-semibold opacity-60">{{ key }}:</span>
                                   {{
                                     typeof val === "string" && val.length > 120
                                       ? val.substring(0, 120) + "..."
@@ -730,9 +750,9 @@
                               </template>
                               <span
                                 v-if="res.message"
-                                class="hit-field break-all select-text cursor-text text-status-negative"
+                                class="hit-field text-status-negative cursor-text break-all select-text"
                               >
-                                <span class="hit-key opacity-60 font-semibold">error:</span>
+                                <span class="hit-key font-semibold opacity-60">error:</span>
                                 {{ res.message }}
                               </span>
                             </div>
@@ -752,38 +772,36 @@
                           class="detail-item flex flex-col gap-1"
                         >
                           <div class="detail-header flex items-center justify-between">
-                            <span class="detail-label text-2xs font-semibold uppercase opacity-60">Items</span>
+                            <span class="detail-label text-2xs font-semibold uppercase opacity-60"
+                              >Items</span
+                            >
                             <OButton
                               variant="ghost"
                               size="icon-xs-circle"
                               class="copy-btn opacity-60 hover:opacity-100"
                               @click.stop="
-                                copyToClipboard(
-                                  JSON.stringify(block.response.items, null, 2),
-                                )
+                                copyToClipboard(JSON.stringify(block.response.items, null, 2))
                               "
                             >
                               <OIcon name="content-copy" size="sm" />
                               <OTooltip content="Copy items" />
                             </OButton>
                           </div>
-                          <div class="tool-response-hits flex flex-col gap-1 text-xs font-mono px-2 py-1.5 rounded-default max-h-50 overflow-y-auto [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">
+                          <div
+                            class="tool-response-hits rounded-default flex max-h-50 flex-col gap-1 overflow-y-auto px-2 py-1.5 font-mono text-xs [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
+                          >
                             <div
                               v-for="(item, iIdx) in block.response.items"
                               :key="iIdx"
-                              class="tool-response-list-item flex flex-col gap-0.5 py-1 [&:not(:last-child)]:border-b [&:not(:last-child)]:border-border-default [&:not(:last-child)]:pb-1.5"
+                              class="tool-response-list-item [&:not(:last-child)]:border-border-default flex flex-col gap-0.5 py-1 [&:not(:last-child)]:border-b [&:not(:last-child)]:pb-1.5"
                             >
                               <div
                                 v-for="(val, key) in item"
                                 :key="key"
-                                class="hit-field break-all select-text cursor-text"
+                                class="hit-field cursor-text break-all select-text"
                               >
-                                <span class="hit-key opacity-60 font-semibold">{{ key }}:</span>
-                                {{
-                                  typeof val === "object"
-                                    ? JSON.stringify(val)
-                                    : val
-                                }}
+                                <span class="hit-key font-semibold opacity-60">{{ key }}:</span>
+                                {{ typeof val === "object" ? JSON.stringify(val) : val }}
                               </div>
                             </div>
                           </div>
@@ -792,7 +810,9 @@
                       <!-- Tool response: generic fallback (string or other) -->
                       <div v-else-if="block.response" class="detail-item flex flex-col gap-1">
                         <div class="detail-header flex items-center justify-between">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Response</span>
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60"
+                            >Response</span
+                          >
                           <OButton
                             variant="ghost"
                             size="icon-xs-circle"
@@ -809,32 +829,33 @@
                             <OTooltip content="Copy response" />
                           </OButton>
                         </div>
-                        <code class="detail-value query-value text-xs select-text font-mono p-2 rounded-default whitespace-pre-wrap break-all cursor-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">{{
-                          typeof block.response === "string"
-                            ? block.response
-                            : JSON.stringify(block.response, null, 2)
-                        }}</code>
+                        <code
+                          class="detail-value query-value rounded-default cursor-text p-2 font-mono text-xs break-all whitespace-pre-wrap select-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
+                          >{{
+                            typeof block.response === "string"
+                              ? block.response
+                              : JSON.stringify(block.response, null, 2)
+                          }}</code
+                        >
                       </div>
                     </div>
                   </div>
                   <!-- Log Entry block - expandable -->
                   <div
                     v-else-if="block.type === 'log_entry'"
-                    class="log-entry-item flex flex-col px-2.5 py-1.5 rounded-default text-xs mb-1 cursor-pointer text-text-secondary [background:color-mix(in_srgb,var(--color-info)_8%,transparent)] hover:[background:color-mix(in_srgb,var(--color-info)_12%,transparent)] dark:bg-surface-panel dark:border dark:border-border-default dark:hover:bg-surface-panel dark:hover:border-text-secondary"
+                    class="log-entry-item rounded-default text-text-secondary dark:bg-surface-panel dark:border-border-default dark:hover:bg-surface-panel dark:hover:border-text-secondary mb-1 flex cursor-pointer flex-col px-2.5 py-1.5 text-xs [background:color-mix(in_srgb,var(--color-info)_8%,transparent)] hover:[background:color-mix(in_srgb,var(--color-info)_12%,transparent)] dark:border"
                     @click="toggleLogEntryExpanded(index, blockIndex)"
                   >
                     <div class="log-entry-header flex items-center gap-1.5">
                       <OIcon name="description" size="xs" />
                       <span
-                        class="log-entry-info flex-1 font-medium text-xs overflow-hidden text-ellipsis whitespace-nowrap"
+                        class="log-entry-info flex-1 overflow-hidden text-xs font-medium text-ellipsis whitespace-nowrap"
                       >
                         {{ block.preview }}
                       </span>
                       <OIcon
                         :name="
-                          isLogEntryExpanded(index, blockIndex)
-                            ? 'expand-less'
-                            : 'expand-more'
+                          isLogEntryExpanded(index, blockIndex) ? 'expand-less' : 'expand-more'
                         "
                         size="sm"
                         class="expand-icon opacity-60 transition-transform duration-200"
@@ -847,19 +868,19 @@
                       @click.stop
                     >
                       <div
-                        class="log-entry-content relative rounded-default border overflow-hidden bg-surface-base border-border-default [box-shadow:0_2px_8px_color-mix(in_srgb,var(--color-black)_8%,transparent)] dark:bg-surface-panel dark:[box-shadow:0_2px_8px_color-mix(in_srgb,var(--color-black)_20%,transparent)]"
+                        class="log-entry-content rounded-default bg-surface-base border-border-default dark:bg-surface-panel relative overflow-hidden border [box-shadow:0_2px_8px_color-mix(in_srgb,var(--color-black)_8%,transparent)] dark:[box-shadow:0_2px_8px_color-mix(in_srgb,var(--color-black)_20%,transparent)]"
                       >
                         <OButton
                           variant="ghost"
                           size="icon-xs-circle"
-                          class="copy-btn opacity-60 hover:opacity-100 absolute top-2 right-2 z-1 rounded-default px-2 py-1 [background:color-mix(in_srgb,var(--color-text-heading)_10%,transparent)] hover:[background:color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] dark:hover:[background:color-mix(in_srgb,var(--color-text-heading)_15%,transparent)]"
+                          class="copy-btn rounded-default absolute top-2 right-2 z-1 px-2 py-1 opacity-60 [background:color-mix(in_srgb,var(--color-text-heading)_10%,transparent)] hover:opacity-100 hover:[background:color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] dark:hover:[background:color-mix(in_srgb,var(--color-text-heading)_15%,transparent)]"
                           @click.stop="copyToClipboard(block.content)"
                         >
                           <OIcon name="content-copy" size="sm" />
                           <OTooltip content="Copy content" />
                         </OButton>
                         <code
-                          class="log-entry-code block font-mono text-2xs leading-relaxed p-3 pr-10 whitespace-pre-wrap [word-wrap:break-word] select-text cursor-text max-h-75 overflow-y-auto bg-surface-base text-text-body dark:[background:var(--color-syntax-bg)] dark:text-text-secondary"
+                          class="log-entry-code text-2xs bg-surface-base text-text-body dark:text-text-secondary block max-h-75 cursor-text overflow-y-auto p-3 pr-10 font-mono leading-relaxed whitespace-pre-wrap select-text [word-wrap:break-word] dark:[background:var(--color-syntax-bg)]"
                           v-html="formatLogEntryContent(block.content)"
                         ></code>
                       </div>
@@ -868,32 +889,30 @@
                   <!-- Stream-level error block -->
                   <div
                     v-else-if="block.type === 'error'"
-                    class="stream-error-block flex flex-col px-3 py-2.5 rounded-default border-l-3 border-border-default mb-2 text-compact text-text-secondary [background:color-mix(in_srgb,var(--color-status-negative)_6%,transparent)] dark:[background:color-mix(in_srgb,var(--color-status-negative)_10%,transparent)]"
+                    class="stream-error-block rounded-default border-border-default text-compact text-text-secondary mb-2 flex flex-col border-l-3 px-3 py-2.5 [background:color-mix(in_srgb,var(--color-status-negative)_6%,transparent)] dark:[background:color-mix(in_srgb,var(--color-status-negative)_10%,transparent)]"
                   >
                     <div class="stream-error-header flex items-center gap-2">
                       <OIcon name="warning" size="sm" />
-                      <span class="stream-error-message font-medium text-status-negative">{{
+                      <span class="stream-error-message text-status-negative font-medium">{{
                         block.message
                       }}</span>
                     </div>
                     <div
                       v-if="block.suggestion"
-                      class="stream-error-suggestion mt-1.5 pl-6 italic text-xs opacity-85"
+                      class="stream-error-suggestion mt-1.5 pl-6 text-xs italic opacity-85"
                     >
                       {{ block.suggestion }}
                     </div>
                     <div
                       v-if="block.recoverable"
-                      class="stream-error-recoverable mt-1 pl-6 text-2xs opacity-70"
+                      class="stream-error-recoverable text-2xs mt-1 pl-6 opacity-70"
                     >
                       This error may be temporary. You can try again.
                     </div>
                   </div>
                   <!-- Navigation block - standalone navigation button -->
                   <div
-                    v-else-if="
-                      block.type === 'navigation' && block.navigationAction
-                    "
+                    v-else-if="block.type === 'navigation' && block.navigationAction"
                     class="navigation-block my-1 [background:color-mix(in_srgb,var(--color-info)_8%,transparent)] dark:[background:color-mix(in_srgb,var(--color-info)_12%,transparent)]"
                   >
                     <OButton
@@ -902,18 +921,14 @@
                       class="navigation-block-btn text-compact"
                       @click="handleNavigationAction(block.navigationAction)"
                     >
-                      <template #icon-left
-                        ><OIcon :name="'open-in-new'" size="sm"
-                      /></template>
+                      <template #icon-left><OIcon :name="'open-in-new'" size="sm" /></template>
                       {{ block.navigationAction.label }}
                     </OButton>
                   </div>
                   <!-- Text block - render with markdown processing -->
                   <template v-else-if="block.type === 'text' && block.text">
                     <template
-                      v-for="(textBlock, tbIndex) in processTextBlock(
-                        block.text,
-                      )"
+                      v-for="(textBlock, tbIndex) in processTextBlock(block.text)"
                       :key="'tb-' + blockIndex + '-' + tbIndex"
                     >
                       <div
@@ -921,11 +936,11 @@
                         class="code-block rounded-default m-0 overflow-hidden"
                       >
                         <div
-                          class="code-block-header flex items-center justify-between px-2 py-1 bg-surface-subtle"
+                          class="code-block-header bg-surface-subtle flex items-center justify-between px-2 py-1"
                         >
                           <span
                             v-if="textBlock.language"
-                            class="code-type-label text-xs font-semibold px-1.5 py-0.5 rounded-default text-theme-accent dark:text-text-secondary [background:color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)]"
+                            class="code-type-label rounded-default text-theme-accent dark:text-text-secondary px-1.5 py-0.5 text-xs font-semibold [background:color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)]"
                           >
                             {{ getLanguageDisplay(textBlock.language) }}
                           </span>
@@ -946,7 +961,7 @@
                           ></code>
                         </span>
                         <div
-                          class="code-block-footer flex items-center justify-between w-full px-2 py-1"
+                          class="code-block-footer flex w-full items-center justify-between px-2 py-1"
                         >
                           <OButton
                             variant="ghost"
@@ -968,19 +983,11 @@
                   </template>
                 </template>
                 <!-- Fallback for messages without contentBlocks (user messages or old assistant messages) -->
-                <template
-                  v-if="
-                    !message.contentBlocks || message.contentBlocks.length === 0
-                  "
-                >
+                <template v-if="!message.contentBlocks || message.contentBlocks.length === 0">
                   <!-- Display images for user messages -->
                   <div
-                    v-if="
-                      message.role === 'user' &&
-                      message.images &&
-                      message.images.length > 0
-                    "
-                    class="message-images flex flex-wrap gap-2 mb-2"
+                    v-if="message.role === 'user' && message.images && message.images.length > 0"
+                    class="message-images mb-2 flex flex-wrap gap-2"
                   >
                     <div
                       v-for="(img, imgIndex) in message.images"
@@ -990,26 +997,23 @@
                       <img
                         :src="'data:' + img.mimeType + ';base64,' + img.data"
                         :alt="img.filename"
-                        class="max-w-50 max-h-37.5 object-contain rounded-default border border-border-default cursor-pointer [transition:transform_0.2s_ease,box-shadow_0.2s_ease] hover:scale-102 hover:shadow-[0_4px_12px_color-mix(in_srgb,var(--color-black)_15%,transparent)]"
+                        class="rounded-default border-border-default max-h-37.5 max-w-50 cursor-pointer border object-contain [transition:transform_0.2s_ease,box-shadow_0.2s_ease] hover:scale-102 hover:shadow-[0_4px_12px_color-mix(in_srgb,var(--color-black)_15%,transparent)]"
                         @click="openImagePreview(img)"
                       />
                       <OTooltip :content="img.filename" />
                     </div>
                   </div>
-                  <template
-                    v-for="(block, blockIndex) in message.blocks"
-                    :key="'fb-' + blockIndex"
-                  >
+                  <template v-for="(block, blockIndex) in message.blocks" :key="'fb-' + blockIndex">
                     <div
                       v-if="block.type === 'code'"
                       class="code-block rounded-default m-0 overflow-hidden"
                     >
                       <div
-                        class="code-block-header flex items-center justify-between px-2 py-1 bg-surface-subtle"
+                        class="code-block-header bg-surface-subtle flex items-center justify-between px-2 py-1"
                       >
                         <span
                           v-if="block.language"
-                          class="code-type-label text-xs font-semibold px-1.5 py-0.5 rounded-default text-theme-accent dark:text-text-secondary [background:color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)]"
+                          class="code-type-label rounded-default text-theme-accent dark:text-text-secondary px-1.5 py-0.5 text-xs font-semibold [background:color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)]"
                         >
                           {{ getLanguageDisplay(block.language) }}
                         </span>
@@ -1040,22 +1044,16 @@
                 <!-- Feedback buttons for assistant messages -->
                 <div
                   v-if="
-                    message.role === 'assistant' &&
-                    message.content &&
-                    message.content.trim() !== ''
+                    message.role === 'assistant' && message.content && message.content.trim() !== ''
                   "
-                  class="feedback-buttons flex items-center gap-0.5 mt-1 *:transition-opacity *:duration-200 [&>*:hover]:opacity-100"
+                  class="feedback-buttons mt-1 flex items-center gap-0.5 *:transition-opacity *:duration-200 [&>*:hover]:opacity-100"
                   :class="message.feedback ? '*:opacity-100' : '*:opacity-50'"
                 >
                   <OButton
                     variant="ghost"
                     size="icon-xs-circle"
                     :disabled="message.feedback === 'thumbs_up'"
-                    :class="
-                      message.feedback === 'thumbs_up'
-                        ? 'text-accent opacity-100!'
-                        : ''
-                    "
+                    :class="message.feedback === 'thumbs_up' ? 'text-accent opacity-100!' : ''"
                     data-test="o2-ai-chat-thumbs-up-btn"
                     @click="likeCodeBlock(index)"
                   >
@@ -1066,11 +1064,7 @@
                     variant="ghost"
                     size="icon-xs-circle"
                     :disabled="message.feedback === 'thumbs_down'"
-                    :class="
-                      message.feedback === 'thumbs_down'
-                        ? 'text-accent opacity-100!'
-                        : ''
-                    "
+                    :class="message.feedback === 'thumbs_down' ? 'text-accent opacity-100!' : ''"
                     data-test="o2-ai-chat-thumbs-down-btn"
                     @click="dislikeCodeBlock(index)"
                   >
@@ -1088,16 +1082,13 @@
             v-for="(block, pIdx) in pendingToolCalls"
             v-show="block.type === 'tool_call'"
             :key="'pending-tc-' + pIdx"
-            class="tool-call-indicator flex items-center rounded-default border border-border-default [background:var(--color-chat-bubble-user)] px-4 py-2 my-1"
+            class="tool-call-indicator rounded-default border-border-default my-1 flex items-center border px-4 py-2 [background:var(--color-chat-bubble-user)]"
           >
-            <div class="tool-call-content flex items-center gap-3 w-full">
-              <OIcon
-                :name="block.success === false ? 'error' : 'check-circle'"
-                size="sm"
-              />
-              <div class="tool-call-info flex flex-col flex-1 min-w-0 gap-1.5">
+            <div class="tool-call-content flex w-full items-center gap-3">
+              <OIcon :name="block.success === false ? 'error' : 'check-circle'" size="sm" />
+              <div class="tool-call-info flex min-w-0 flex-1 flex-col gap-1.5">
                 <span
-                  class="tool-call-message text-sm font-medium opacity-85 text-text-secondary"
+                  class="tool-call-message text-text-secondary text-sm font-medium opacity-85"
                   >{{ block.message }}</span
                 >
               </div>
@@ -1106,12 +1097,12 @@
           <!-- Tool call indicator - shows outside message box -->
           <div
             v-if="activeToolCall"
-            class="tool-call-indicator flex items-center rounded-default border border-border-default [background:var(--color-chat-bubble-user)] px-4 py-3 my-2"
+            class="tool-call-indicator rounded-default border-border-default my-2 flex items-center border px-4 py-3 [background:var(--color-chat-bubble-user)]"
           >
-            <div class="tool-call-content flex items-center gap-3 w-full">
+            <div class="tool-call-content flex w-full items-center gap-3">
               <OSpinner variant="dots" size="xs" />
-              <div class="tool-call-info flex flex-col flex-1 min-w-0 gap-1.5">
-                <span class="tool-call-message text-sm font-semibold text-text-secondary">{{
+              <div class="tool-call-info flex min-w-0 flex-1 flex-col gap-1.5">
+                <span class="tool-call-message text-text-secondary text-sm font-semibold">{{
                   activeToolCall.message
                 }}</span>
                 <div
@@ -1123,11 +1114,9 @@
                     class="context-item w-full"
                   >
                     <code
-                      class="context-query block font-mono text-xs px-3 py-2 rounded-default whitespace-pre-wrap break-all max-w-full overflow-hidden bg-surface-base border border-border-default text-text-body dark:text-text-secondary"
+                      class="context-query rounded-default bg-surface-base border-border-default text-text-body dark:text-text-secondary block max-w-full overflow-hidden border px-3 py-2 font-mono text-xs break-all whitespace-pre-wrap"
                       >{{
-                        truncateQuery(
-                          getToolCallDisplayData(activeToolCall.context)?.query,
-                        )
+                        truncateQuery(getToolCallDisplayData(activeToolCall.context)?.query)
                       }}</code
                     >
                   </div>
@@ -1139,33 +1128,25 @@
                     class="context-item w-full"
                   >
                     <code
-                      class="context-query block font-mono text-xs px-3 py-2 rounded-default whitespace-pre-wrap break-all max-w-full overflow-hidden bg-surface-base border border-border-default text-text-body dark:text-text-secondary"
+                      class="context-query rounded-default bg-surface-base border-border-default text-text-body dark:text-text-secondary block max-w-full overflow-hidden border px-3 py-2 font-mono text-xs break-all whitespace-pre-wrap"
                       >{{
-                        truncateQuery(
-                          getToolCallDisplayData(activeToolCall.context)?.vrl,
-                        )
+                        truncateQuery(getToolCallDisplayData(activeToolCall.context)?.vrl)
                       }}</code
                     >
                   </div>
                   <span
-                    v-if="
-                      getToolCallDisplayData(activeToolCall.context)?.stream
-                    "
-                    class="context-tag inline-flex items-center text-2xs px-2 py-1 rounded-default font-medium text-ai-accent dark:text-text-secondary [background:color-mix(in_srgb,var(--color-ai-accent)_10%,transparent)] dark:[background:color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)]"
+                    v-if="getToolCallDisplayData(activeToolCall.context)?.stream"
+                    class="context-tag text-2xs rounded-default text-ai-accent dark:text-text-secondary inline-flex items-center px-2 py-1 font-medium [background:color-mix(in_srgb,var(--color-ai-accent)_10%,transparent)] dark:[background:color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)]"
                   >
                     Stream:
                     {{ getToolCallDisplayData(activeToolCall.context)?.stream }}
                   </span>
                   <span
-                    v-if="
-                      getToolCallDisplayData(activeToolCall.context)?.query_type
-                    "
-                    class="context-tag inline-flex items-center text-2xs px-2 py-1 rounded-default font-medium text-ai-accent dark:text-text-secondary [background:color-mix(in_srgb,var(--color-ai-accent)_10%,transparent)] dark:[background:color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)]"
+                    v-if="getToolCallDisplayData(activeToolCall.context)?.query_type"
+                    class="context-tag text-2xs rounded-default text-ai-accent dark:text-text-secondary inline-flex items-center px-2 py-1 font-medium [background:color-mix(in_srgb,var(--color-ai-accent)_10%,transparent)] dark:[background:color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)]"
                   >
                     Type:
-                    {{
-                      getToolCallDisplayData(activeToolCall.context)?.query_type
-                    }}
+                    {{ getToolCallDisplayData(activeToolCall.context)?.query_type }}
                   </span>
                 </div>
               </div>
@@ -1174,11 +1155,11 @@
           <!-- Standalone loading indicator - only shown when loading with no tool calls -->
           <div
             v-if="isLoading && !activeToolCall"
-            class="tool-call-indicator flex items-center rounded-default border border-border-default [background:var(--color-chat-bubble-user)] px-4 py-3 my-2"
+            class="tool-call-indicator rounded-default border-border-default my-2 flex items-center border px-4 py-3 [background:var(--color-chat-bubble-user)]"
           >
-            <div class="tool-call-content flex items-center gap-3 w-full">
+            <div class="tool-call-content flex w-full items-center gap-3">
               <OSpinner variant="dots" size="xs" />
-              <span class="tool-call-message text-sm font-semibold text-text-secondary">{{
+              <span class="tool-call-message text-text-secondary text-sm font-semibold">{{
                 currentAnalyzingMessage
               }}</span>
             </div>
@@ -1186,11 +1167,14 @@
         </div>
 
         <!-- Scroll to bottom button -->
-        <div v-show="showScrollToBottom" class="scroll-to-bottom-container absolute bottom-2.5 left-1/2 -translate-x-1/2 z-1000 pointer-events-none [transition:all_0.3s_ease]">
+        <div
+          v-show="showScrollToBottom"
+          class="scroll-to-bottom-container pointer-events-none absolute bottom-2.5 left-1/2 z-1000 -translate-x-1/2 [transition:all_0.3s_ease]"
+        >
           <OButton
             variant="ghost"
             size="icon-sm"
-            class="scroll-to-bottom-btn transition-all duration-300 pointer-events-auto [backdrop-filter:blur(0.5rem)] shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_20%,transparent)] border-2! border-text-link! text-text-link! bg-surface-base! dark:border-ai-accent! dark:text-ai-accent! dark:bg-surface-base! hover:scale-110 hover:shadow-[0_4px_12px_color-mix(in_srgb,var(--color-black)_30%,transparent)] hover:border-text-link! hover:text-text-link! hover:bg-surface-base! dark:hover:border-ai-accent! dark:hover:text-ai-accent! dark:hover:bg-surface-base! active:scale-100"
+            class="scroll-to-bottom-btn border-text-link! text-text-link! bg-surface-base! dark:border-ai-accent! dark:text-ai-accent! dark:bg-surface-base! hover:border-text-link! hover:text-text-link! hover:bg-surface-base! dark:hover:border-ai-accent! dark:hover:text-ai-accent! dark:hover:bg-surface-base! pointer-events-auto border-2! shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_20%,transparent)] [backdrop-filter:blur(0.5rem)] transition-all duration-300 hover:scale-110 hover:shadow-[0_4px_12px_color-mix(in_srgb,var(--color-black)_30%,transparent)] active:scale-100"
             @click="scrollToBottomSmooth"
           >
             <OIcon name="arrow-downward" size="sm" />
@@ -1202,31 +1186,31 @@
       <!-- Fixed loading indicator above input - only shown when scrolled up -->
       <div
         v-if="(isLoading || activeToolCall) && showScrollToBottom"
-        class="fixed-analyzing-indicator flex items-center justify-center px-4 py-3 mx-4 mb-2 rounded-default border border-border-default [background:var(--color-chat-bubble-user)] [box-shadow:0_2px_8px_color-mix(in_srgb,var(--color-black)_8%,transparent)]"
+        class="fixed-analyzing-indicator rounded-default border-border-default mx-4 mb-2 flex items-center justify-center border px-4 py-3 [box-shadow:0_2px_8px_color-mix(in_srgb,var(--color-black)_8%,transparent)] [background:var(--color-chat-bubble-user)]"
       >
         <!-- Show tool call if active -->
         <div
           v-if="activeToolCall"
-          class="analyzing-content flex items-center gap-3 w-full max-w-225"
+          class="analyzing-content flex w-full max-w-225 items-center gap-3"
         >
           <OSpinner variant="dots" size="xs" />
-          <span class="analyzing-message text-sm font-medium text-theme-accent">{{
+          <span class="analyzing-message text-theme-accent text-sm font-medium">{{
             activeToolCall.message
           }}</span>
         </div>
         <!-- Show analyzing message if loading but no active tool call -->
         <div
           v-else-if="isLoading"
-          class="analyzing-content flex items-center gap-3 w-full max-w-225"
+          class="analyzing-content flex w-full max-w-225 items-center gap-3"
         >
           <OSpinner variant="dots" size="xs" />
-          <span class="analyzing-message text-sm font-medium text-theme-accent">{{
+          <span class="analyzing-message text-theme-accent text-sm font-medium">{{
             currentAnalyzingMessage
           }}</span>
         </div>
       </div>
 
-      <div class="chat-input-container relative shrink-0 w-full max-w-225 mx-auto my-2 px-2">
+      <div class="chat-input-container relative mx-auto my-2 w-full max-w-225 shrink-0 px-2">
         <!-- Confirmation dialog -->
         <O2AIConfirmDialog
           :visible="pendingConfirmation !== null"
@@ -1248,13 +1232,16 @@
 
         <div
           v-if="!pendingConfirmation"
-          class="unified-input-box flex flex-col gap-3 px-2 py-1 rounded-default transition-all duration-200 bg-surface-base border border-border-default focus-within:border-transparent focus-within:[box-shadow:0_0_0_2px_var(--color-accent)]"
+          class="unified-input-box rounded-default bg-surface-base border-border-default flex flex-col gap-3 border px-2 py-1 transition-all duration-200 focus-within:border-transparent focus-within:[box-shadow:0_0_0_2px_var(--color-accent)]"
           @dragover="handleDragOver"
           @drop="handleDrop"
           @paste="handlePaste"
         >
           <!-- Image preview strip -->
-          <div v-if="pendingImages.length > 0" class="image-preview-strip flex flex-wrap gap-2 py-2 mb-2">
+          <div
+            v-if="pendingImages.length > 0"
+            class="image-preview-strip mb-2 flex flex-wrap gap-2 py-2"
+          >
             <div
               v-for="(img, index) in pendingImages"
               :key="index"
@@ -1263,19 +1250,17 @@
               <img
                 :src="'data:' + img.mimeType + ';base64,' + img.data"
                 :alt="img.filename"
-                class="preview-image w-16 h-16 object-cover rounded-default border border-border-default [transition:transform_0.2s_ease] hover:scale-105"
+                class="preview-image rounded-default border-border-default h-16 w-16 border object-cover [transition:transform_0.2s_ease] hover:scale-105"
               />
               <OButton
                 variant="ghost"
                 size="icon-xs-circle"
-                class="image-remove-btn absolute! -top-1.5! -right-1.5! w-5! h-5! min-w-5! min-h-5! p-0! bg-status-negative! z-10 hover:bg-status-negative!"
+                class="image-remove-btn bg-status-negative! hover:bg-status-negative! absolute! -top-1.5! -right-1.5! z-10 h-5! min-h-5! w-5! min-w-5! p-0!"
                 @click.stop="removeImage(index)"
               >
                 <OIcon name="close" size="xs" />
               </OButton>
-              <OTooltip
-                :content="`${img.filename} (${(img.size / 1024).toFixed(0)}KB)`"
-              />
+              <OTooltip :content="`${img.filename} (${(img.size / 1024).toFixed(0)}KB)`" />
             </div>
           </div>
 
@@ -1303,11 +1288,7 @@
                 size="icon-sm"
                 class="image-upload-btn opacity-70 transition-opacity duration-200 hover:opacity-100"
               >
-                <OIcon
-                  name="image"
-                  size="sm"
-                  class="text-icon-color"
-                />
+                <OIcon name="image" size="sm" class="text-icon-color" />
                 <OTooltip :content="t('aiAssistant.attachImageTooltip')" />
               </OButton>
               <div v-else class="w-8"></div>
@@ -1318,30 +1299,20 @@
                 @click.stop="isAutoNavigationEnabled = !isAutoNavigationEnabled"
                 variant="ghost"
                 size="sm"
-                class="auto-nav-toggle-btn flex items-center gap-1.5 px-2 py-1 rounded-default transition-all duration-200 hover:bg-surface-subtle"
+                class="auto-nav-toggle-btn rounded-default hover:bg-surface-subtle flex items-center gap-1.5 px-2 py-1 transition-all duration-200"
               >
                 <OIcon
-                  :name="
-                    isAutoNavigationEnabled
-                      ? 'check-circle'
-                      : 'radio-button-unchecked'
-                  "
+                  :name="isAutoNavigationEnabled ? 'check-circle' : 'radio-button-unchecked'"
                   size="sm"
                   :class="[
                     'auto-nav-icon',
-                    isAutoNavigationEnabled
-                      ? 'text-theme-accent!'
-                      : 'text-icon-color'
+                    isAutoNavigationEnabled ? 'text-theme-accent!' : 'text-icon-color',
                   ]"
                 />
                 <span
                   class="auto-nav-label ml-1 text-xs font-medium"
-                  :class="
-                    isAutoNavigationEnabled
-                      ? 'text-theme-accent'
-                      : 'text-text-secondary'
-                  "
-                  >{{ t('aiAssistant.autoNavigation.label') }}</span
+                  :class="isAutoNavigationEnabled ? 'text-theme-accent' : 'text-text-secondary'"
+                  >{{ t("aiAssistant.autoNavigation.label") }}</span
                 >
                 <OTooltip
                   :content="
@@ -1361,7 +1332,7 @@
                 @click="sendMessage"
                 variant="ai-gradient"
                 size="icon-xs-circle"
-                class="send-button bg-(image:--color-gradient-ai)! [transition:all_0.3s_ease]! shadow-[0_4px_15px_0_color-mix(in_srgb,var(--color-ai-accent)_30%,transparent)]!"
+                class="send-button bg-(image:--color-gradient-ai)! shadow-[0_4px_15px_0_color-mix(in_srgb,var(--color-ai-accent)_30%,transparent)]! [transition:all_0.3s_ease]!"
               >
                 <OIcon name="send" size="sm" />
               </OButton>
@@ -1372,7 +1343,7 @@
                 @click="cancelCurrentRequest"
                 variant="ghost"
                 size="icon-xs-circle"
-                class="stop-button bg-(image:--color-gradient-danger)! [transition:all_0.3s_ease]! shadow-[0_4px_15px_0_color-mix(in_srgb,var(--color-status-negative)_30%,transparent)]! hover:bg-(image:--color-gradient-danger-hover)! hover:shadow-[0_6px_20px_0_color-mix(in_srgb,var(--color-status-negative)_40%,transparent)]! hover:-translate-y-px! active:translate-y-0! active:shadow-[0_2px_10px_0_color-mix(in_srgb,var(--color-status-negative)_30%,transparent)]!"
+                class="stop-button bg-(image:--color-gradient-danger)! shadow-[0_4px_15px_0_color-mix(in_srgb,var(--color-status-negative)_30%,transparent)]! [transition:all_0.3s_ease]! hover:-translate-y-px! hover:bg-(image:--color-gradient-danger-hover)! hover:shadow-[0_6px_20px_0_color-mix(in_srgb,var(--color-status-negative)_40%,transparent)]! active:translate-y-0! active:shadow-[0_2px_10px_0_color-mix(in_srgb,var(--color-status-negative)_30%,transparent)]!"
               >
                 <OIcon name="stop" size="sm" />
               </OButton>
@@ -1425,10 +1396,7 @@ import O2AIConfirmDialog from "@/components/O2AIConfirmDialog.vue";
 import O2AIHomeWelcome from "@/components/ai-assistant/welcome/O2AIHomeWelcome.vue";
 import { useChatHistory } from "@/composables/useChatHistory";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
-import {
-  useAiDashboardEvents,
-  getDashboardEventType,
-} from "@/composables/useAiDashboardEvents";
+import { useAiDashboardEvents, getDashboardEventType } from "@/composables/useAiDashboardEvents";
 import OButton from "@/lib/core/Button/OButton.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -1443,7 +1411,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { UNAUTHORIZED_MESSAGE, isAuthError } from "@/utils/authErrors";
 
 const { fetchAiChat, submitFeedback } = useAiChat();
@@ -1583,9 +1551,7 @@ export default defineComponent({
   setup(props) {
     const router = useRouter();
     const route = useRoute();
-    const inputMessage = ref(
-      props.aiChatInputContext ? props.aiChatInputContext : "",
-    );
+    const inputMessage = ref(props.aiChatInputContext ? props.aiChatInputContext : "");
     const chatMessages = ref<ChatMessage[]>([]);
     const isLoading = ref(false);
     const messagesContainer = ref<HTMLElement | null>(null);
@@ -1614,16 +1580,13 @@ export default defineComponent({
     const typewriterEnabled = computed(
       () => !!props.centeredStart && chatMessages.value.length === 0,
     );
-    const { placeholder: typewriterPlaceholder } = useTypewriterPlaceholder(
-      typewriterPrompts,
-      {
-        enabled: typewriterEnabled,
-        typeSpeedMs: 85,
-        eraseSpeedMs: 45,
-        holdMs: 2800,
-        initialDelayMs: 500,
-      },
-    );
+    const { placeholder: typewriterPlaceholder } = useTypewriterPlaceholder(typewriterPrompts, {
+      enabled: typewriterEnabled,
+      typeSpeedMs: 85,
+      eraseSpeedMs: 45,
+      holdMs: 2800,
+      initialDelayMs: 500,
+    });
     const inputPlaceholder = computed(() =>
       props.centeredStart && chatMessages.value.length === 0
         ? typewriterPlaceholder.value || "Write your prompt"
@@ -1782,14 +1745,10 @@ export default defineComponent({
      */
     const startAnalyzingRotation = () => {
       currentAnalyzingMessage.value =
-        ANALYZING_MESSAGES[
-          Math.floor(Math.random() * ANALYZING_MESSAGES.length)
-        ];
+        ANALYZING_MESSAGES[Math.floor(Math.random() * ANALYZING_MESSAGES.length)];
       analyzingRotationInterval.value = setInterval(() => {
         currentAnalyzingMessage.value =
-          ANALYZING_MESSAGES[
-            Math.floor(Math.random() * ANALYZING_MESSAGES.length)
-          ];
+          ANALYZING_MESSAGES[Math.floor(Math.random() * ANALYZING_MESSAGES.length)];
       }, 5000);
     };
 
@@ -1901,10 +1860,7 @@ export default defineComponent({
         const codeBlockEnd = remaining.indexOf("```", codeBlockStart[0].length);
         if (codeBlockEnd !== -1) {
           const endPos = codeBlockEnd + 3;
-          displayedStreamingContent.value = target.slice(
-            0,
-            current.length + endPos,
-          );
+          displayedStreamingContent.value = target.slice(0, current.length + endPos);
         } else {
           // Code block not complete yet, reveal opening and wait
           displayedStreamingContent.value = target.slice(
@@ -1921,10 +1877,7 @@ export default defineComponent({
         // ends and the remaining backlog is force-flushed.
         const backlog = remaining.length;
         const revealCount = backlog > 200 ? Math.ceil(backlog / 20) : 1;
-        displayedStreamingContent.value = target.slice(
-          0,
-          current.length + revealCount,
-        );
+        displayedStreamingContent.value = target.slice(0, current.length + revealCount);
       }
 
       // Schedule next frame
@@ -1985,8 +1938,7 @@ export default defineComponent({
     const scrollToBottom = async () => {
       await nextTick();
       if (messagesContainer.value && shouldAutoScroll.value) {
-        messagesContainer.value.scrollTop =
-          messagesContainer.value.scrollHeight;
+        messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
       }
     };
 
@@ -2052,10 +2004,7 @@ export default defineComponent({
             } else if (currentStreamingMessage.value) {
               // Update final text in contentBlocks to show all buffered content
               if (lastMessage.contentBlocks) {
-                const lastBlock =
-                  lastMessage.contentBlocks[
-                    lastMessage.contentBlocks.length - 1
-                  ];
+                const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
                 if (lastBlock && lastBlock.type === "text") {
                   lastBlock.text = currentTextSegment.value;
                 }
@@ -2073,8 +2022,7 @@ export default defineComponent({
         // message cleanup above so the empty-assistant-message pop can't drop
         // the message we attach them to.
         if (pendingToolCalls.value.length) {
-          const lastMessage =
-            chatMessages.value[chatMessages.value.length - 1];
+          const lastMessage = chatMessages.value[chatMessages.value.length - 1];
           if (lastMessage && lastMessage.role === "assistant") {
             if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
             // Tools ran before any text, so place them ahead of it.
@@ -2084,10 +2032,7 @@ export default defineComponent({
             chatMessages.value.push({
               role: "assistant",
               content: stoppedNote,
-              contentBlocks: [
-                ...pendingToolCalls.value,
-                { type: "text", text: stoppedNote },
-              ],
+              contentBlocks: [...pendingToolCalls.value, { type: "text", text: stoppedNote }],
             });
           }
           pendingToolCalls.value = [];
@@ -2110,10 +2055,7 @@ export default defineComponent({
     const processPendingChips = () => {
       if (pendingChips.value.length > 0) {
         nextTick(() => {
-          if (
-            chatInput.value &&
-            typeof chatInput.value.insertChip === "function"
-          ) {
+          if (chatInput.value && typeof chatInput.value.insertChip === "function") {
             // Focus input first to ensure cursor is positioned correctly
             focusInput();
 
@@ -2123,8 +2065,7 @@ export default defineComponent({
             const editableDiv =
               inputElement?.querySelector(".rich-text-input") ||
               inputElement?.querySelector("[contenteditable]");
-            const hasExistingChips =
-              editableDiv?.querySelector(".reference-chip") !== null;
+            const hasExistingChips = editableDiv?.querySelector(".reference-chip") !== null;
             const hasExistingText = editableDiv?.textContent?.trim().length > 0;
 
             // Only clear if:
@@ -2132,10 +2073,7 @@ export default defineComponent({
             // 2. AND there are no existing chips
             // 3. AND there is no existing text
             if (!props.appendMode && !hasExistingChips && !hasExistingText) {
-              if (
-                chatInput.value &&
-                typeof chatInput.value.clear === "function"
-              ) {
+              if (chatInput.value && typeof chatInput.value.clear === "function") {
                 chatInput.value.clear();
               }
               inputMessage.value = "";
@@ -2168,8 +2106,7 @@ export default defineComponent({
               .map((k) => {
                 const val = parsed[k];
                 if (typeof val === "string") {
-                  const truncatedVal =
-                    val.length > 8 ? val.substring(0, 8) + "..." : val;
+                  const truncatedVal = val.length > 8 ? val.substring(0, 8) + "..." : val;
                   return k + ': "' + truncatedVal + '"';
                 }
                 return k + ": " + String(val).substring(0, 8);
@@ -2297,9 +2234,7 @@ export default defineComponent({
       return null;
     };
 
-    const processStream = async (
-      reader: ReadableStreamDefaultReader<Uint8Array>,
-    ) => {
+    const processStream = async (reader: ReadableStreamDefaultReader<Uint8Array>) => {
       const decoder = new TextDecoder();
       let buffer = "";
       let messageComplete = false;
@@ -2333,25 +2268,15 @@ export default defineComponent({
           ctxSessionId = getUUIDv7();
           if (isActive()) currentSessionId.value = ctxSessionId;
         }
-        const title = isActive()
-          ? aiGeneratedTitle.value || undefined
-          : ctxTitle;
+        const title = isActive() ? aiGeneratedTitle.value || undefined : ctxTitle;
         const chatId = isActive() ? currentChatId.value : ctxChatId;
-        const resultId = await dbSaveToHistory(
-          msgs,
-          ctxSessionId,
-          title,
-          chatId,
-        );
+        const resultId = await dbSaveToHistory(msgs, ctxSessionId, title, chatId);
         if (!chatId && resultId) {
           if (isActive()) {
             currentChatId.value = resultId;
             // Carry the new-chat preference onto the chat id. Persist the actual
             // value (ON by default) so an explicit user disable is honored.
-            autoNavigationPreferences.value.set(
-              resultId,
-              pendingAutoNavigation.value,
-            );
+            autoNavigationPreferences.value.set(resultId, pendingAutoNavigation.value);
             saveAutoNavigationPreferences();
           } else {
             ctxChatId = resultId;
@@ -2434,8 +2359,7 @@ export default defineComponent({
                     // When detached, auto-deny confirmations to unblock the stream
                     if (!isActive()) {
                       try {
-                        const orgId =
-                          store.state.selectedOrganization.identifier;
+                        const orgId = store.state.selectedOrganization.identifier;
                         await fetch(
                           `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${ctxSessionId}`,
                           {
@@ -2455,14 +2379,10 @@ export default defineComponent({
                     }
 
                     // Check if this is a navigation action and auto navigation is enabled
-                    if (
-                      data.tool === "navigation_action" &&
-                      isAutoNavigationEnabled.value
-                    ) {
+                    if (data.tool === "navigation_action" && isAutoNavigationEnabled.value) {
                       // Auto-approve navigation without showing confirmation
                       try {
-                        const orgId =
-                          store.state.selectedOrganization.identifier;
+                        const orgId = store.state.selectedOrganization.identifier;
                         await fetch(
                           `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${ctxSessionId}`,
                           {
@@ -2473,10 +2393,7 @@ export default defineComponent({
                           },
                         );
                       } catch (error) {
-                        console.error(
-                          "Error auto-confirming navigation:",
-                          error,
-                        );
+                        console.error("Error auto-confirming navigation:", error);
                       }
                       continue;
                     }
@@ -2489,10 +2406,7 @@ export default defineComponent({
                       tool: data.tool,
                       message: activeToolCall.value?.message || data.message,
                       context: activeToolCall.value?.context || {},
-                      call_id:
-                        data.call_id ||
-                        activeToolCall.value?.call_id ||
-                        undefined,
+                      call_id: data.call_id || activeToolCall.value?.call_id || undefined,
                       pendingConfirmation: true,
                       confirmationMessage: data.message,
                       confirmationArgs: data.args || {},
@@ -2501,25 +2415,20 @@ export default defineComponent({
 
                     let lastMessage = msgs[msgs.length - 1];
                     if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks)
-                        lastMessage.contentBlocks = [];
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(confirmBlock);
                     } else {
                       msgs.push({
                         role: "assistant",
                         content: "",
-                        contentBlocks: [
-                          ...pendingToolCalls.value,
-                          confirmBlock,
-                        ],
+                        contentBlocks: [...pendingToolCalls.value, confirmBlock],
                       });
                       pendingToolCalls.value = [];
                     }
                     pendingConfirmation.value = {
                       tool: data.tool,
                       args: data.args || {},
-                      message:
-                        data.message || `Confirm execution of ${data.tool}?`,
+                      message: data.message || `Confirm execution of ${data.tool}?`,
                     };
                     await scrollToBottom();
                     continue;
@@ -2538,8 +2447,7 @@ export default defineComponent({
                       };
                       let lastMessage = msgs[msgs.length - 1];
                       if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks)
-                          lastMessage.contentBlocks = [];
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                         lastMessage.contentBlocks.push(completedToolBlock);
                       } else {
                         pendingToolCalls.value.push(completedToolBlock);
@@ -2574,8 +2482,7 @@ export default defineComponent({
                         call_id: activeToolCall.value.call_id,
                       };
                       if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks)
-                          lastMessage.contentBlocks = [];
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                         lastMessage.contentBlocks.push(completedToolBlock);
                       } else {
                         pendingToolCalls.value.push(completedToolBlock);
@@ -2585,20 +2492,13 @@ export default defineComponent({
 
                     // Format error message with suggestion if available
                     // Handle case where error/message might be an object instead of string
-                    const rawError =
-                      data.error ??
-                      data.message ??
-                      "An unexpected error occurred";
+                    const rawError = data.error ?? data.message ?? "An unexpected error occurred";
                     const errorText =
-                      typeof rawError === "string"
-                        ? rawError
-                        : JSON.stringify(rawError, null, 2);
+                      typeof rawError === "string" ? rawError : JSON.stringify(rawError, null, 2);
 
                     // Check if this is an authorization/access error
                     const authErr = isAuthError(errorText, data.error_type);
-                    let errorMessage = authErr
-                      ? UNAUTHORIZED_MESSAGE
-                      : `Error: ${errorText}`;
+                    let errorMessage = authErr ? UNAUTHORIZED_MESSAGE : `Error: ${errorText}`;
                     if (data.suggestion && !authErr) {
                       errorMessage += `\n\n${data.suggestion}`;
                     }
@@ -2661,8 +2561,7 @@ export default defineComponent({
                       };
                       let lastMessage = msgs[msgs.length - 1];
                       if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks)
-                          lastMessage.contentBlocks = [];
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                         lastMessage.contentBlocks.push(completedToolBlock);
                       } else {
                         pendingToolCalls.value.push(completedToolBlock);
@@ -2678,11 +2577,8 @@ export default defineComponent({
                     if (pendingToolCalls.value.length) {
                       let lastMessage = msgs[msgs.length - 1];
                       if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks)
-                          lastMessage.contentBlocks = [];
-                        lastMessage.contentBlocks.push(
-                          ...pendingToolCalls.value,
-                        );
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                        lastMessage.contentBlocks.push(...pendingToolCalls.value);
                       } else {
                         msgs.push({
                           role: "assistant",
@@ -2721,12 +2617,9 @@ export default defineComponent({
                     // Emit dashboard event only when stream is active (foreground)
                     if (data.success !== false && isActive()) {
                       const resolvedToolName =
-                        data.tool && data.tool !== "tools_call"
-                          ? data.tool
-                          : "";
+                        data.tool && data.tool !== "tools_call" ? data.tool : "";
                       const callArgs = data.call_args || {};
-                      const dashboardEventType =
-                        getDashboardEventType(resolvedToolName);
+                      const dashboardEventType = getDashboardEventType(resolvedToolName);
                       if (dashboardEventType) {
                         const dashboardId =
                           callArgs.dashboard_id ||
@@ -2754,10 +2647,8 @@ export default defineComponent({
                     // Match by call_id if available, fall back to tool name
                     const matchesActiveToolCall =
                       activeToolCall.value &&
-                      ((data.call_id &&
-                        activeToolCall.value.call_id === data.call_id) ||
-                        (!data.call_id &&
-                          activeToolCall.value.tool === data.tool));
+                      ((data.call_id && activeToolCall.value.call_id === data.call_id) ||
+                        (!data.call_id && activeToolCall.value.tool === data.tool));
 
                     // If active tool call matches, complete it with result data
                     if (matchesActiveToolCall) {
@@ -2772,8 +2663,7 @@ export default defineComponent({
                       };
                       let lastMessage = msgs[msgs.length - 1];
                       if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks)
-                          lastMessage.contentBlocks = [];
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                         lastMessage.contentBlocks.push(completedToolBlock);
                       } else {
                         pendingToolCalls.value.push(completedToolBlock);
@@ -2783,11 +2673,7 @@ export default defineComponent({
                       // Tool was already completed — retroactively enrich the matching block
                       const lastMessage = msgs[msgs.length - 1];
                       if (lastMessage && lastMessage.contentBlocks) {
-                        for (
-                          let i = lastMessage.contentBlocks.length - 1;
-                          i >= 0;
-                          i--
-                        ) {
+                        for (let i = lastMessage.contentBlocks.length - 1; i >= 0; i--) {
                           const block = lastMessage.contentBlocks[i];
                           const blockMatches = data.call_id
                             ? block.call_id === data.call_id
@@ -2804,11 +2690,7 @@ export default defineComponent({
                         }
                       }
                       // Also check pending tool calls
-                      for (
-                        let i = pendingToolCalls.value.length - 1;
-                        i >= 0;
-                        i--
-                      ) {
+                      for (let i = pendingToolCalls.value.length - 1; i >= 0; i--) {
                         const block = pendingToolCalls.value[i];
                         const blockMatches = data.call_id
                           ? block.call_id === data.call_id
@@ -2860,17 +2742,13 @@ export default defineComponent({
 
                       let lastMessage = msgs[msgs.length - 1];
                       if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks)
-                          lastMessage.contentBlocks = [];
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                         lastMessage.contentBlocks.push(confirmBlock);
                       } else {
                         msgs.push({
                           role: "assistant",
                           content: "",
-                          contentBlocks: [
-                            ...pendingToolCalls.value,
-                            confirmBlock,
-                          ],
+                          contentBlocks: [...pendingToolCalls.value, confirmBlock],
                         });
                         pendingToolCalls.value = [];
                       }
@@ -2907,8 +2785,7 @@ export default defineComponent({
                       };
                       let lastMessage = msgs[msgs.length - 1];
                       if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks)
-                          lastMessage.contentBlocks = [];
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                         lastMessage.contentBlocks.push(failedToolBlock);
                       } else {
                         pendingToolCalls.value.push(failedToolBlock);
@@ -2917,29 +2794,18 @@ export default defineComponent({
                     }
 
                     // Add inline error block
-                    const rawErrorMessage =
-                      data.message || data.error || "An error occurred";
-                    const authErr = isAuthError(
-                      rawErrorMessage,
-                      data.error_type,
-                    );
+                    const rawErrorMessage = data.message || data.error || "An error occurred";
+                    const authErr = isAuthError(rawErrorMessage, data.error_type);
                     const errorBlock: ContentBlock = {
                       type: "error",
-                      message: authErr
-                        ? UNAUTHORIZED_MESSAGE
-                        : rawErrorMessage,
+                      message: authErr ? UNAUTHORIZED_MESSAGE : rawErrorMessage,
                       errorType: data.error_type || undefined,
-                      suggestion: authErr
-                        ? undefined
-                        : data.suggestion || undefined,
-                      recoverable: authErr
-                        ? false
-                        : data.recoverable ?? undefined,
+                      suggestion: authErr ? undefined : data.suggestion || undefined,
+                      recoverable: authErr ? false : (data.recoverable ?? undefined),
                     };
                     let lastMessage = msgs[msgs.length - 1];
                     if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks)
-                        lastMessage.contentBlocks = [];
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(errorBlock);
                     } else {
                       msgs.push({
@@ -2970,8 +2836,7 @@ export default defineComponent({
                       };
                       let lastMessage = msgs[msgs.length - 1];
                       if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks)
-                          lastMessage.contentBlocks = [];
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                         lastMessage.contentBlocks.push(completedToolBlock);
                       } else {
                         pendingToolCalls.value.push(completedToolBlock);
@@ -2984,17 +2849,13 @@ export default defineComponent({
                     // any content arriving via a non-`content` fallback field is
                     // also an incremental delta.
                     const isMessageDelta =
-                      data.type === "message_delta" ||
-                      typeof data.content !== "string";
+                      data.type === "message_delta" || typeof data.content !== "string";
 
                     // Format code blocks with proper line breaks for full/legacy
                     // messages. Deltas must be appended exactly as received.
                     let content = streamText;
                     if (!isMessageDelta) {
-                      content = content.replace(
-                        /```(\w*)\s*([^`])/g,
-                        "```$1\n$2",
-                      );
+                      content = content.replace(/```(\w*)\s*([^`])/g, "```$1\n$2");
                       content = content.replace(/([^`])\s*```/g, "$1\n```");
                     }
 
@@ -3050,9 +2911,7 @@ export default defineComponent({
 
                       // Find the last text block and update it, or create new one
                       const lastBlock =
-                        lastMessage.contentBlocks[
-                          lastMessage.contentBlocks.length - 1
-                        ];
+                        lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
                       if (lastBlock && lastBlock.type === "text") {
                         // Append to existing text block (same segment)
                         lastBlock.text = textSegment;
@@ -3070,12 +2929,7 @@ export default defineComponent({
                     if (isActive()) await scrollToBottom();
                   }
                 } catch (jsonError) {
-                  console.debug(
-                    "JSON parse error:",
-                    jsonError,
-                    "for line:",
-                    jsonStr,
-                  );
+                  console.debug("JSON parse error:", jsonError, "for line:", jsonStr);
                   continue;
                 }
               } catch (e) {
@@ -3119,8 +2973,7 @@ export default defineComponent({
                     };
                     let lastMessage = msgs[msgs.length - 1];
                     if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks)
-                        lastMessage.contentBlocks = [];
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(completedToolBlock);
                     } else {
                       pendingToolCalls.value.push(completedToolBlock);
@@ -3152,8 +3005,7 @@ export default defineComponent({
                       call_id: activeToolCall.value.call_id,
                     };
                     if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks)
-                        lastMessage.contentBlocks = [];
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(completedToolBlock);
                     } else {
                       pendingToolCalls.value.push(completedToolBlock);
@@ -3161,20 +3013,13 @@ export default defineComponent({
                     if (isActive()) activeToolCall.value = null;
                   }
 
-                  const rawError =
-                    data.error ??
-                    data.message ??
-                    "An unexpected error occurred";
+                  const rawError = data.error ?? data.message ?? "An unexpected error occurred";
                   const errorText =
-                    typeof rawError === "string"
-                      ? rawError
-                      : JSON.stringify(rawError, null, 2);
+                    typeof rawError === "string" ? rawError : JSON.stringify(rawError, null, 2);
 
                   // Check if this is an authorization/access error
                   const authErr = isAuthError(errorText, data.error_type);
-                  let errorMessage = authErr
-                    ? UNAUTHORIZED_MESSAGE
-                    : `Error: ${errorText}`;
+                  let errorMessage = authErr ? UNAUTHORIZED_MESSAGE : `Error: ${errorText}`;
                   if (data.suggestion && !authErr) {
                     errorMessage += `\n\n${data.suggestion}`;
                   }
@@ -3229,8 +3074,7 @@ export default defineComponent({
                     };
                     let lastMessage = msgs[msgs.length - 1];
                     if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks)
-                        lastMessage.contentBlocks = [];
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(completedToolBlock);
                     } else {
                       pendingToolCalls.value.push(completedToolBlock);
@@ -3254,10 +3098,8 @@ export default defineComponent({
 
                   const matchesActive =
                     activeToolCall.value &&
-                    ((data.call_id &&
-                      activeToolCall.value.call_id === data.call_id) ||
-                      (!data.call_id &&
-                        activeToolCall.value.tool === data.tool));
+                    ((data.call_id && activeToolCall.value.call_id === data.call_id) ||
+                      (!data.call_id && activeToolCall.value.tool === data.tool));
 
                   if (matchesActive) {
                     const completedToolBlock: ContentBlock = {
@@ -3270,8 +3112,7 @@ export default defineComponent({
                     };
                     let lastMessage = msgs[msgs.length - 1];
                     if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks)
-                        lastMessage.contentBlocks = [];
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(completedToolBlock);
                     } else {
                       pendingToolCalls.value.push(completedToolBlock);
@@ -3280,11 +3121,7 @@ export default defineComponent({
                   } else {
                     const lastMessage = msgs[msgs.length - 1];
                     if (lastMessage && lastMessage.contentBlocks) {
-                      for (
-                        let i = lastMessage.contentBlocks.length - 1;
-                        i >= 0;
-                        i--
-                      ) {
+                      for (let i = lastMessage.contentBlocks.length - 1; i >= 0; i--) {
                         const block = lastMessage.contentBlocks[i];
                         const blockMatches = data.call_id
                           ? block.call_id === data.call_id
@@ -3297,11 +3134,7 @@ export default defineComponent({
                         }
                       }
                     }
-                    for (
-                      let i = pendingToolCalls.value.length - 1;
-                      i >= 0;
-                      i--
-                    ) {
+                    for (let i = pendingToolCalls.value.length - 1; i >= 0; i--) {
                       const block = pendingToolCalls.value[i];
                       const blockMatches = data.call_id
                         ? block.call_id === data.call_id
@@ -3333,8 +3166,7 @@ export default defineComponent({
                     };
                     let lastMessage = msgs[msgs.length - 1];
                     if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks)
-                        lastMessage.contentBlocks = [];
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(failedToolBlock);
                     } else {
                       pendingToolCalls.value.push(failedToolBlock);
@@ -3342,29 +3174,18 @@ export default defineComponent({
                     if (isActive()) activeToolCall.value = null;
                   }
 
-                  const rawErrorMessage =
-                    data.message || data.error || "An error occurred";
-                  const authErr = isAuthError(
-                    rawErrorMessage,
-                    data.error_type,
-                  );
+                  const rawErrorMessage = data.message || data.error || "An error occurred";
+                  const authErr = isAuthError(rawErrorMessage, data.error_type);
                   const errorBlock: ContentBlock = {
                     type: "error",
-                    message: authErr
-                      ? UNAUTHORIZED_MESSAGE
-                      : rawErrorMessage,
+                    message: authErr ? UNAUTHORIZED_MESSAGE : rawErrorMessage,
                     errorType: data.error_type || undefined,
-                    suggestion: authErr
-                      ? undefined
-                      : data.suggestion || undefined,
-                    recoverable: authErr
-                      ? false
-                      : data.recoverable ?? undefined,
+                    suggestion: authErr ? undefined : data.suggestion || undefined,
+                    recoverable: authErr ? false : (data.recoverable ?? undefined),
                   };
                   let lastMessage = msgs[msgs.length - 1];
                   if (lastMessage && lastMessage.role === "assistant") {
-                    if (!lastMessage.contentBlocks)
-                      lastMessage.contentBlocks = [];
+                    if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                     lastMessage.contentBlocks.push(errorBlock);
                   } else {
                     msgs.push({
@@ -3392,8 +3213,7 @@ export default defineComponent({
                     };
                     let lastMessage = msgs[msgs.length - 1];
                     if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks)
-                        lastMessage.contentBlocks = [];
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(completedToolBlock);
                     } else {
                       pendingToolCalls.value.push(completedToolBlock);
@@ -3402,8 +3222,7 @@ export default defineComponent({
                   }
 
                   const isMessageDelta =
-                    data.type === "message_delta" ||
-                    typeof data.content !== "string";
+                    data.type === "message_delta" || typeof data.content !== "string";
 
                   let content = streamText;
                   if (!isMessageDelta) {
@@ -3451,9 +3270,7 @@ export default defineComponent({
                       lastMessage.contentBlocks = [];
                     }
                     const lastBlock =
-                      lastMessage.contentBlocks[
-                        lastMessage.contentBlocks.length - 1
-                      ];
+                      lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
                     if (lastBlock && lastBlock.type === "text") {
                       lastBlock.text = textSegment;
                     } else {
@@ -3486,13 +3303,8 @@ export default defineComponent({
           }
           // Update final text in contentBlocks
           const lastMessage = msgs[msgs.length - 1];
-          if (
-            lastMessage &&
-            lastMessage.role === "assistant" &&
-            lastMessage.contentBlocks
-          ) {
-            const lastBlock =
-              lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
+          if (lastMessage && lastMessage.role === "assistant" && lastMessage.contentBlocks) {
+            const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
             if (lastBlock && lastBlock.type === "text") {
               lastBlock.text = textSegment;
             }
@@ -3545,10 +3357,7 @@ export default defineComponent({
 
           // Apply pending auto navigation preference to the new chat. Persist the
           // actual value (ON by default) so an explicit user disable is honored.
-          autoNavigationPreferences.value.set(
-            chatId,
-            pendingAutoNavigation.value,
-          );
+          autoNavigationPreferences.value.set(chatId, pendingAutoNavigation.value);
           saveAutoNavigationPreferences();
         }
       } catch (error) {
@@ -3645,24 +3454,24 @@ export default defineComponent({
 
     useShortcuts([
       {
-        id: 'aiChatClose',
-        key: 'escape',
-        description: 'Close AI chat',
+        id: "aiChatClose",
+        key: "escape",
+        description: "Close AI chat",
         // Escape must close the chat even while typing a message in its input.
         allowInInput: true,
         handler: () => {
           if (store.state.isAiChatEnabled) {
-            store.dispatch('setIsAiChatEnabled', false);
-            store.dispatch('setIsAiChatExpanded', false);
-            window.dispatchEvent(new Event('resize'));
+            store.dispatch("setIsAiChatEnabled", false);
+            store.dispatch("setIsAiChatExpanded", false);
+            window.dispatchEvent(new Event("resize"));
           }
         },
       },
       {
-        id: 'aiChatExpand',
-        key: 'ctrl+b',
-        keyForMac: 'meta+b',
-        description: 'Expand/collapse AI chat',
+        id: "aiChatExpand",
+        key: "ctrl+b",
+        keyForMac: "meta+b",
+        description: "Expand/collapse AI chat",
         handler: toggleExpand,
       },
     ]);
@@ -3703,10 +3512,7 @@ export default defineComponent({
 
       try {
         // Update title using the composable
-        const success = await dbUpdateChatTitle(
-          currentChatId.value,
-          editingTitle.value.trim(),
-        );
+        const success = await dbUpdateChatTitle(currentChatId.value, editingTitle.value.trim());
 
         if (success) {
           // Update the displayed title
@@ -3907,9 +3713,7 @@ export default defineComponent({
         }
 
         const vrlFunction =
-          query.functionContent ||
-          requestBody.function ||
-          requestBody.functionContent;
+          query.functionContent || requestBody.function || requestBody.functionContent;
 
         // Don't generate navigation if time range is missing
         if (query.start_time === undefined || query.end_time === undefined) {
@@ -3943,9 +3747,7 @@ export default defineComponent({
 
       // Pattern 2: Create/Get tools (has ID) → navigate_direct
       // Extract resource type from tool name (CreateAlert → alert, GetDashboard → dashboard, createPipeline → pipeline)
-      const resourceTypeMatch = toolName.match(
-        /^(create|get|update|delete)(.+)$/i,
-      );
+      const resourceTypeMatch = toolName.match(/^(create|get|update|delete)(.+)$/i);
       if (!resourceTypeMatch) return null;
 
       const resourceType = resourceTypeMatch[2].toLowerCase(); // Alert → alert, Dashboard → dashboard, Pipeline → pipeline
@@ -3986,8 +3788,7 @@ export default defineComponent({
             const textContent = responseBody.content[0].text;
             const parsed = JSON.parse(textContent);
             // Extract from versioned response (v8, v7, etc.)
-            parsedResponse =
-              parsed.v8 || parsed.v7 || parsed.v6 || parsed.v5 || parsed;
+            parsedResponse = parsed.v8 || parsed.v7 || parsed.v6 || parsed.v5 || parsed;
           } catch (e) {
             console.warn("[Navigation] Failed to parse content text:", e);
           }
@@ -4056,8 +3857,7 @@ export default defineComponent({
       detachCurrentStream();
 
       // Helper to encode strings for URL (same as search history)
-      const encodeForUrl = (str: string) =>
-        btoa(unescape(encodeURIComponent(str)));
+      const encodeForUrl = (str: string) => btoa(unescape(encodeURIComponent(str)));
 
       // Extract page name for success message
       let pageName = action.label || "";
@@ -4065,8 +3865,7 @@ export default defineComponent({
         // Fallback: use target name or resource type
         pageName =
           action.target.name ||
-          action.resource_type.charAt(0).toUpperCase() +
-            action.resource_type.slice(1);
+          action.resource_type.charAt(0).toUpperCase() + action.resource_type.slice(1);
       }
 
       // Perform navigation FIRST
@@ -4103,9 +3902,7 @@ export default defineComponent({
         // Add base64 encoded query
         if (target.query) {
           queryParams.query = encodeForUrl(
-            typeof target.query === "string"
-              ? target.query
-              : JSON.stringify(target.query),
+            typeof target.query === "string" ? target.query : JSON.stringify(target.query),
           );
         }
 
@@ -4126,9 +3923,7 @@ export default defineComponent({
         // Direct navigation - build proper URLs based on resource type
         let path = action.target.path || `/${action.resource_type}`;
         // navigate_direct always carries the record form of `query`
-        const targetQuery = action.target.query as
-          | Record<string, any>
-          | undefined;
+        const targetQuery = action.target.query as Record<string, any> | undefined;
         const queryParams: Record<string, string> = {
           org_identifier: store.state.selectedOrganization.identifier,
           ...targetQuery,
@@ -4144,17 +3939,13 @@ export default defineComponent({
             queryParams.alert_id = alertId;
             queryParams.name = action.target.name || targetQuery?.name;
           }
-          queryParams.folder =
-            action.target.folder || targetQuery?.folder || "default";
+          queryParams.folder = action.target.folder || targetQuery?.folder || "default";
         } else if (action.resource_type === "dashboard") {
           // Dashboards use /dashboards/view path
           path = "/dashboards/view";
           queryParams.dashboard =
-            action.target.dashboard_id ||
-            action.target.dashboardId ||
-            targetQuery?.dashboardId;
-          queryParams.folder =
-            action.target.folder || targetQuery?.folder || "default";
+            action.target.dashboard_id || action.target.dashboardId || targetQuery?.dashboardId;
+          queryParams.folder = action.target.folder || targetQuery?.folder || "default";
           queryParams.tab = action.target.tab || "tab-1";
           queryParams.refresh = "Off";
           queryParams.period = "15m";
@@ -4162,8 +3953,7 @@ export default defineComponent({
         } else if (action.resource_type === "pipeline") {
           // Pipelines use /pipeline/pipelines/edit path
           path = "/pipeline/pipelines/edit";
-          queryParams.id =
-            action.target.pipeline_id || action.target.id || targetQuery?.id;
+          queryParams.id = action.target.pipeline_id || action.target.id || targetQuery?.id;
           queryParams.name = action.target.name || targetQuery?.name;
         }
 
@@ -4246,9 +4036,7 @@ export default defineComponent({
           // If so, re-attach by using the LIVE array that processStream is writing to
           // instead of the stale IndexedDB snapshot. Setting chatMessages.value to the
           // same array makes processStream's isActive() true again, so UI updates resume.
-          const bgCtx = chat.sessionId
-            ? backgroundStreamMap.get(chat.sessionId)
-            : null;
+          const bgCtx = chat.sessionId ? backgroundStreamMap.get(chat.sessionId) : null;
 
           if (bgCtx) {
             // Re-attach: use the live streaming array
@@ -4273,8 +4061,7 @@ export default defineComponent({
             // existing text instantly, then let the ongoing stream continue.
             const lastMsg = chatMessages.value[chatMessages.value.length - 1];
             if (lastMsg?.role === "assistant" && lastMsg.contentBlocks?.length) {
-              const lastBlock =
-                lastMsg.contentBlocks[lastMsg.contentBlocks.length - 1];
+              const lastBlock = lastMsg.contentBlocks[lastMsg.contentBlocks.length - 1];
               if (lastBlock?.type === "text" && lastBlock.text) {
                 currentStreamingMessage.value = lastMsg.content || lastBlock.text;
                 currentTextSegment.value = lastBlock.text;
@@ -4287,9 +4074,7 @@ export default defineComponent({
             const formattedMessages = chat.messages.map((msg: any) => ({
               role: msg.role,
               content: msg.content,
-              ...(msg.contentBlocks
-                ? { contentBlocks: msg.contentBlocks }
-                : {}),
+              ...(msg.contentBlocks ? { contentBlocks: msg.contentBlocks } : {}),
               ...(msg.images ? { images: msg.images } : {}),
               ...(msg.feedback ? { feedback: msg.feedback } : {}),
             }));
@@ -4334,10 +4119,7 @@ export default defineComponent({
 
       // Get the message for backend (with unwrapped chips)
       let backendMessage = inputMessage.value;
-      if (
-        chatInput.value &&
-        typeof chatInput.value.getMessageForBackend === "function"
-      ) {
+      if (chatInput.value && typeof chatInput.value.getMessageForBackend === "function") {
         backendMessage = chatInput.value.getMessageForBackend();
       }
 
@@ -4424,9 +4206,7 @@ export default defineComponent({
           } catch (_) {
             // body may not be JSON
           }
-          const err: any = new Error(
-            errorBody?.message || `Server error (${response.status})`,
-          );
+          const err: any = new Error(errorBody?.message || `Server error (${response.status})`);
           err.status = response.status;
           err.errorBody = errorBody;
           throw err;
@@ -4460,21 +4240,18 @@ export default defineComponent({
         //this will impact in the case of error showing empty message above the error message in the chat
         if (
           chatMessages.value.length > 0 &&
-          chatMessages.value[chatMessages.value.length - 1].role ===
-            "assistant" &&
+          chatMessages.value[chatMessages.value.length - 1].role === "assistant" &&
           !chatMessages.value[chatMessages.value.length - 1].content
         ) {
           chatMessages.value.pop();
         }
         let errorMessage: string;
         if (error.status === 403) {
-          errorMessage =
-            UNAUTHORIZED_MESSAGE;
+          errorMessage = UNAUTHORIZED_MESSAGE;
         } else if (error.message && error.message !== "No response body") {
           errorMessage = error.message;
         } else {
-          errorMessage =
-            "Error: Unable to get response from the server. Please try again later.";
+          errorMessage = "Error: Unable to get response from the server. Please try again later.";
         }
         chatMessages.value.push({
           role: "assistant",
@@ -4534,29 +4311,17 @@ export default defineComponent({
           let imageRefSpan: Element | null = null;
 
           // Case 1: Cursor is in a text node at position 0, check previous sibling
-          if (
-            cursorNode.nodeType === Node.TEXT_NODE &&
-            range.startOffset === 0
-          ) {
+          if (cursorNode.nodeType === Node.TEXT_NODE && range.startOffset === 0) {
             const prevSibling = cursorNode.previousSibling;
-            if (
-              prevSibling &&
-              (prevSibling as Element).classList?.contains("image-reference")
-            ) {
+            if (prevSibling && (prevSibling as Element).classList?.contains("image-reference")) {
               imageRefSpan = prevSibling as Element;
             }
           }
           // Case 2: Cursor is in an element node, check the child before cursor
-          else if (
-            cursorNode.nodeType === Node.ELEMENT_NODE &&
-            range.startOffset > 0
-          ) {
+          else if (cursorNode.nodeType === Node.ELEMENT_NODE && range.startOffset > 0) {
             const element = cursorNode as Element;
             const prevChild = element.childNodes[range.startOffset - 1];
-            if (
-              prevChild &&
-              (prevChild as Element).classList?.contains("image-reference")
-            ) {
+            if (prevChild && (prevChild as Element).classList?.contains("image-reference")) {
               imageRefSpan = prevChild as Element;
             }
           }
@@ -4573,9 +4338,7 @@ export default defineComponent({
               const filename = match[1];
 
               // Remove the associated image from pendingImages
-              const imageIndex = pendingImages.value.findIndex(
-                (img) => img.filename === filename,
-              );
+              const imageIndex = pendingImages.value.findIndex((img) => img.filename === filename);
               if (imageIndex !== -1) {
                 pendingImages.value.splice(imageIndex, 1);
               }
@@ -4586,9 +4349,7 @@ export default defineComponent({
 
             // Trigger input event to update model
             if (contenteditable) {
-              contenteditable.dispatchEvent(
-                new Event("input", { bubbles: true }),
-              );
+              contenteditable.dispatchEvent(new Event("input", { bubbles: true }));
             }
           }
         } else {
@@ -4607,13 +4368,10 @@ export default defineComponent({
             const refStart = cursorPos - match[0].length;
 
             // Remove the entire @[filename] reference from text
-            inputMessage.value =
-              text.substring(0, refStart) + text.substring(cursorPos);
+            inputMessage.value = text.substring(0, refStart) + text.substring(cursorPos);
 
             // Remove the associated image from pendingImages
-            const imageIndex = pendingImages.value.findIndex(
-              (img) => img.filename === filename,
-            );
+            const imageIndex = pendingImages.value.findIndex((img) => img.filename === filename);
             if (imageIndex !== -1) {
               pendingImages.value.splice(imageIndex, 1);
             }
@@ -4626,10 +4384,7 @@ export default defineComponent({
         }
       } else if (e.key === "ArrowUp") {
         const target = e.target as HTMLElement;
-        const textarea =
-          target.tagName === "TEXTAREA"
-            ? (target as HTMLTextAreaElement)
-            : null;
+        const textarea = target.tagName === "TEXTAREA" ? (target as HTMLTextAreaElement) : null;
         if (textarea && isOnFirstLine(textarea)) {
           e.preventDefault();
           navigateHistory("up");
@@ -4748,17 +4503,13 @@ export default defineComponent({
           if (contenteditable) {
             // RichTextInput - insert at cursor position in contenteditable
             const selection = window.getSelection();
-            const range =
-              selection && selection.rangeCount > 0
-                ? selection.getRangeAt(0)
-                : null;
+            const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
 
             // Create a non-editable span for the image reference
             const imageRefSpan = document.createElement("span");
             imageRefSpan.contentEditable = "false";
             imageRefSpan.className = "image-reference";
-            imageRefSpan.style.cssText =
-              `display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; margin: 0 2px; background: ${chartColor("--color-status-success-bg")}; border: 1px solid ${chartColor("--color-success-200")}; border-radius: 4px; font-size: var(--text-compact); color: ${chartColor("--color-status-success-text")}; user-select: none;`;
+            imageRefSpan.style.cssText = `display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; margin: 0 2px; background: ${chartColor("--color-status-success-bg")}; border: 1px solid ${chartColor("--color-success-200")}; border-radius: 4px; font-size: var(--text-compact); color: ${chartColor("--color-status-success-text")}; user-select: none;`;
 
             // Add image icon
             const imageIcon = document.createElement("span");
@@ -4772,8 +4523,7 @@ export default defineComponent({
             // Add remove button
             const removeBtn = document.createElement("button");
             removeBtn.textContent = "×";
-            removeBtn.style.cssText =
-              `display: flex; align-items: center; justify-content: center; width: 14px; height: 14px; padding: 0; margin-left: 2px; background: transparent; border: none; border-radius: 3px; font-size: var(--text-base); line-height: 1; cursor: pointer; color: ${chartColor("--color-status-success-text")}; transition: all 0.15s ease;`;
+            removeBtn.style.cssText = `display: flex; align-items: center; justify-content: center; width: 14px; height: 14px; padding: 0; margin-left: 2px; background: transparent; border: none; border-radius: 3px; font-size: var(--text-base); line-height: 1; cursor: pointer; color: ${chartColor("--color-status-success-text")}; transition: all 0.15s ease;`;
             removeBtn.onmouseover = () => {
               removeBtn.style.background = chartColor("--color-status-negative");
               removeBtn.style.color = chartColor("--color-white");
@@ -4787,9 +4537,7 @@ export default defineComponent({
               e.stopPropagation();
 
               // Find and remove the image from pendingImages
-              const imageIndex = pendingImages.value.findIndex(
-                (img) => img.filename === file.name,
-              );
+              const imageIndex = pendingImages.value.findIndex((img) => img.filename === file.name);
               if (imageIndex !== -1) {
                 pendingImages.value.splice(imageIndex, 1);
               }
@@ -4798,9 +4546,7 @@ export default defineComponent({
               imageRefSpan.remove();
 
               // Trigger input event
-              contenteditable.dispatchEvent(
-                new Event("input", { bubbles: true }),
-              );
+              contenteditable.dispatchEvent(new Event("input", { bubbles: true }));
             };
 
             imageRefSpan.appendChild(imageIcon);
@@ -4855,9 +4601,7 @@ export default defineComponent({
             }
 
             // Trigger input event to update model
-            contenteditable.dispatchEvent(
-              new Event("input", { bubbles: true }),
-            );
+            contenteditable.dispatchEvent(new Event("input", { bubbles: true }));
             focusInput();
           } else {
             // Legacy textarea fallback
@@ -4873,18 +4617,12 @@ export default defineComponent({
 
               // Add space before if needed
               const needsSpaceBefore =
-                before.length > 0 &&
-                !before.endsWith(" ") &&
-                !before.endsWith("\n");
+                before.length > 0 && !before.endsWith(" ") && !before.endsWith("\n");
               const needsSpaceAfter =
-                after.length > 0 &&
-                !after.startsWith(" ") &&
-                !after.startsWith("\n");
+                after.length > 0 && !after.startsWith(" ") && !after.startsWith("\n");
 
               const insertion =
-                (needsSpaceBefore ? " " : "") +
-                imageRef +
-                (needsSpaceAfter ? " " : "");
+                (needsSpaceBefore ? " " : "") + imageRef + (needsSpaceAfter ? " " : "");
               inputMessage.value = before + insertion + after;
 
               // Set cursor position after the inserted reference
@@ -4897,11 +4635,7 @@ export default defineComponent({
               // Final fallback: append to end
               const currentText = inputMessage.value;
               const separator =
-                currentText &&
-                !currentText.endsWith(" ") &&
-                !currentText.endsWith("\n")
-                  ? " "
-                  : "";
+                currentText && !currentText.endsWith(" ") && !currentText.endsWith("\n") ? " " : "";
               inputMessage.value = currentText + separator + imageRef + " ";
             }
           }
@@ -4932,8 +4666,7 @@ export default defineComponent({
 
         if (contenteditable) {
           // Find and remove all image reference spans with this filename
-          const imageRefSpans =
-            contenteditable.querySelectorAll(".image-reference");
+          const imageRefSpans = contenteditable.querySelectorAll(".image-reference");
           imageRefSpans.forEach((span: Element) => {
             if (span.textContent === imageRef) {
               span.remove();
@@ -5007,7 +4740,6 @@ export default defineComponent({
       showImagePreview.value = false;
       previewImage.value = null;
     };
-
 
     // Load query history from localStorage
     const loadQueryHistory = () => {
@@ -5140,10 +4872,7 @@ export default defineComponent({
     // closure and can't reset our isLoading), watch the shared streaming
     // registry and clear our own streaming UI once that session finishes.
     watch(
-      () =>
-        currentSessionId.value
-          ? sessionStreamingState[currentSessionId.value]
-          : undefined,
+      () => (currentSessionId.value ? sessionStreamingState[currentSessionId.value] : undefined),
       (isStreaming) => {
         // React to the session going false, not to a true->false transition: an
         // instance that re-attached mid-stream never observed the `true`, so it
@@ -5309,13 +5038,8 @@ export default defineComponent({
       }
 
       const lastMessage = chatMessages.value[chatMessages.value.length - 1];
-      if (
-        lastMessage &&
-        lastMessage.role === "assistant" &&
-        lastMessage.contentBlocks
-      ) {
-        const lastBlock =
-          lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
+      if (lastMessage && lastMessage.role === "assistant" && lastMessage.contentBlocks) {
+        const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
         if (lastBlock && lastBlock.type === "text") {
           // Additive-only: the stream handler writes the FULL accumulated
           // textSegment into this block as it arrives; the typewriter only
@@ -5357,7 +5081,6 @@ export default defineComponent({
       }
     });
 
-
     // Filter markdown headers - convert # and ## to smaller formatting
     // This should only process actual markdown headers, not code block comments
     const filterMarkdownHeaders = (content: string): string => {
@@ -5375,12 +5098,9 @@ export default defineComponent({
       filtered = filtered.replace(/^# (.+)$/gm, "**$1:**");
 
       // Restore code blocks
-      filtered = filtered.replace(
-        /___CODE_BLOCK_(\d+)___/g,
-        (_match, index) => {
-          return codeBlocks[parseInt(index)];
-        },
-      );
+      filtered = filtered.replace(/___CODE_BLOCK_(\d+)___/g, (_match, index) => {
+        return codeBlocks[parseInt(index)];
+      });
 
       return filtered;
     };
@@ -5405,9 +5125,7 @@ export default defineComponent({
 
           const highlightedContent =
             token.lang && hljs.getLanguage(token.lang)
-              ? DOMPurify.sanitize(
-                  hljs.highlight(codeText, { language: token.lang }).value,
-                )
+              ? DOMPurify.sanitize(hljs.highlight(codeText, { language: token.lang }).value)
               : DOMPurify.sanitize(hljs.highlightAuto(codeText).value);
 
           blocks.push({
@@ -5447,9 +5165,7 @@ export default defineComponent({
 
           const highlightedContent =
             token.lang && hljs.getLanguage(token.lang)
-              ? DOMPurify.sanitize(
-                  hljs.highlight(codeText, { language: token.lang }).value,
-                )
+              ? DOMPurify.sanitize(hljs.highlight(codeText, { language: token.lang }).value)
               : DOMPurify.sanitize(hljs.highlightAuto(codeText).value);
 
           blocks.push({
@@ -5510,8 +5226,7 @@ export default defineComponent({
 
     // Parse log entries from message content and maintain order
     const parseLogEntries = (content: string) => {
-      const logEntryPattern =
-        /--- (.+?) (?:\(lines (\d+)-(\d+)\) )?---\n([\s\S]*?)\n--- end ---/g;
+      const logEntryPattern = /--- (.+?) (?:\(lines (\d+)-(\d+)\) )?---\n([\s\S]*?)\n--- end ---/g;
       const orderedBlocks: any[] = [];
       let lastIndex = 0;
       let match;
@@ -5575,10 +5290,7 @@ export default defineComponent({
 
           return {
             ...message,
-            blocks:
-              orderedBlocks.length > 0
-                ? []
-                : processMessageContent(message.content),
+            blocks: orderedBlocks.length > 0 ? [] : processMessageContent(message.content),
             contentBlocks: combinedContentBlocks,
           };
         }
@@ -5596,9 +5308,7 @@ export default defineComponent({
       if (!message || message.role !== "assistant") return;
 
       // Find the index of this assistant message
-      const messageIndex = chatMessages.value.findIndex(
-        (m) => m.content === message.content,
-      );
+      const messageIndex = chatMessages.value.findIndex((m) => m.content === message.content);
       if (messageIndex === -1) return;
 
       // Find the corresponding user message that came before this assistant message
@@ -5679,10 +5389,7 @@ export default defineComponent({
     };
 
     // Tool call expansion helpers
-    const toggleToolCallExpanded = (
-      messageIndex: number,
-      blockIndex: number,
-    ) => {
+    const toggleToolCallExpanded = (messageIndex: number, blockIndex: number) => {
       const key = `${messageIndex}-${blockIndex}`;
       if (expandedToolCalls.value.has(key)) {
         expandedToolCalls.value.delete(key);
@@ -5696,10 +5403,7 @@ export default defineComponent({
     };
 
     // Log entry expansion helpers
-    const toggleLogEntryExpanded = (
-      messageIndex: number,
-      blockIndex: number,
-    ) => {
+    const toggleLogEntryExpanded = (messageIndex: number, blockIndex: number) => {
       const key = `${messageIndex}-${blockIndex}`;
       if (expandedLogEntries.value.has(key)) {
         expandedLogEntries.value.delete(key);
@@ -5732,8 +5436,7 @@ export default defineComponent({
 
       // Handle testFunction context (VRL validation)
       if (context.vrl) data.vrl = context.vrl;
-      if (context.request_body?.function)
-        data.vrl = context.request_body.function;
+      if (context.request_body?.function) data.vrl = context.request_body.function;
 
       // Handle flat SQL from SearchSQL enriched context
       if (context.sql) data.query = context.sql;
@@ -5750,9 +5453,7 @@ export default defineComponent({
 
     // `response` is stamped onto blocks by the stream handler but is not part
     // of the shared ContentBlock interface.
-    const hasToolCallDetails = (
-      block: ContentBlock & { response?: Record<string, any> },
-    ) => {
+    const hasToolCallDetails = (block: ContentBlock & { response?: Record<string, any> }) => {
       // Show details for failed tools, successful tools with summary, tools with context data, or tools with response
       if (block.success === false) return true;
       if (block.summary) return true;
@@ -5760,9 +5461,7 @@ export default defineComponent({
       return getToolCallDisplayData(block.context) !== null;
     };
 
-    const formatToolCallMessage = (
-      block: ContentBlock & { response?: Record<string, any> },
-    ) => {
+    const formatToolCallMessage = (block: ContentBlock & { response?: Record<string, any> }) => {
       // Show error message for failed tools
       // Tool-specific messages (both success and error)
       if (block.tool === "testFunction") {
@@ -5909,9 +5608,7 @@ export default defineComponent({
         return chatHistory.value;
       }
       const searchTerm = historySearchTerm.value.toLowerCase();
-      return chatHistory.value.filter((chat) =>
-        chat.title.toLowerCase().includes(searchTerm),
-      );
+      return chatHistory.value.filter((chat) => chat.title.toLowerCase().includes(searchTerm));
     });
 
     return {
@@ -6161,14 +5858,12 @@ export default defineComponent({
    ============================================================ */
 .send-button:hover:not(.disabled):not([disabled]):not(:disabled) {
   background: var(--color-gradient-ai) !important;
-  box-shadow: 0 0.375rem 1.25rem 0
-    color-mix(in srgb, var(--color-ai-accent) 40%, transparent) !important;
+  box-shadow: 0 0.375rem 1.25rem 0 color-mix(in srgb, var(--color-ai-accent) 40%, transparent) !important;
   transform: translateY(-0.0625rem) !important;
 }
 .send-button:active:not(.disabled):not([disabled]):not(:disabled) {
   transform: translateY(0) !important;
-  box-shadow: 0 0.125rem 0.625rem 0
-    color-mix(in srgb, var(--color-ai-accent) 30%, transparent) !important;
+  box-shadow: 0 0.125rem 0.625rem 0 color-mix(in srgb, var(--color-ai-accent) 30%, transparent) !important;
 }
 
 /* ============================================================

@@ -7,7 +7,7 @@ defineSlots<ContextMenuLabelSlots>();
 
 <template>
   <ContextMenuLabel
-    class="px-3 py-1.5 text-xs font-medium text-dropdown-label select-none truncate"
+    class="text-dropdown-label truncate px-3 py-1.5 text-xs font-medium select-none"
   >
     <slot />
   </ContextMenuLabel>

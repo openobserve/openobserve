@@ -149,11 +149,7 @@ describe("useStickyColumns", () => {
     });
 
     it("should add __colIndex to each column", async () => {
-      mockProps.columns = [
-        { name: "col1" },
-        { name: "col2" },
-        { name: "col3" },
-      ];
+      mockProps.columns = [{ name: "col1" }, { name: "col2" }, { name: "col3" }];
 
       composable = useStickyColumns(mockProps, mockStore);
       await nextTick();

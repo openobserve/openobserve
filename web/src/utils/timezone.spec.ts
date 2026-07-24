@@ -76,11 +76,7 @@ describe("timestampToTimezoneDate", () => {
   });
 
   it("respects a custom format string", () => {
-    const result = timestampToTimezoneDate(
-      1_700_000_000_000,
-      "UTC",
-      "yyyy-MM-dd",
-    );
+    const result = timestampToTimezoneDate(1_700_000_000_000, "UTC", "yyyy-MM-dd");
     expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
@@ -340,12 +336,7 @@ describe("getFunctionErrorMessage", () => {
     const startMs = 1_700_000_000_000_000; // microseconds
     const endMs = 1_700_003_600_000_000;
 
-    const result = getFunctionErrorMessage(
-      "Error occurred",
-      startMs,
-      endMs,
-      "UTC",
-    );
+    const result = getFunctionErrorMessage("Error occurred", startMs, endMs, "UTC");
 
     expect(result).toContain("Error occurred");
     expect(result).toContain("Data returned for:");

@@ -68,7 +68,6 @@ export const BG_SWATCHES = [
   "#ffffff",
 ];
 
-
 export const emptyColumnOverride = (field = ""): ColumnOverrideUI => ({
   field,
   fieldType: "auto",
@@ -129,9 +128,7 @@ export const loadAllFromRaw = (raw: any[] | undefined): ColumnOverrideUI[] => {
 };
 
 /** Serialize a UI row to a persisted entry, or null if it has no formatting. */
-export const serializeColumnOverride = (
-  c: ColumnOverrideUI,
-): any | null => {
+export const serializeColumnOverride = (c: ColumnOverrideUI): any | null => {
   if (!c.field) return null;
   const config: any[] = [];
 
@@ -142,10 +139,8 @@ export const serializeColumnOverride = (
       type: OVERRIDE_CONFIG_TYPES.UNIT,
       value: { unit: c.unit, customUnit: c.customUnit },
     });
-  if (c.alignment)
-    config.push({ type: OVERRIDE_CONFIG_TYPES.ALIGNMENT, value: c.alignment });
-  if (c.textColor)
-    config.push({ type: OVERRIDE_CONFIG_TYPES.TEXT_COLOR, value: c.textColor });
+  if (c.alignment) config.push({ type: OVERRIDE_CONFIG_TYPES.ALIGNMENT, value: c.alignment });
+  if (c.textColor) config.push({ type: OVERRIDE_CONFIG_TYPES.TEXT_COLOR, value: c.textColor });
   if (c.bgColor)
     config.push({
       type: OVERRIDE_CONFIG_TYPES.BACKGROUND_COLOR,
@@ -158,10 +153,7 @@ export const serializeColumnOverride = (
     });
 
   const validConditions = c.conditions.filter(
-    (r) =>
-      r.operator &&
-      r.threshold !== "" &&
-      !Number.isNaN(parseFloat(r.threshold)),
+    (r) => r.operator && r.threshold !== "" && !Number.isNaN(parseFloat(r.threshold)),
   );
   if (validConditions.length) {
     config.push({

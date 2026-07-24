@@ -55,7 +55,7 @@ export function getStatusDisplayLabel(status: string): string {
  * Generate SQL CASE statement to map backend statuses to UI labels
  * Usage: SELECT ${getStatusMappingSQL('status')} as display_status FROM triggers
  */
-export function getStatusMappingSQL(columnName: string = 'status'): string {
+export function getStatusMappingSQL(columnName: string = "status"): string {
   return `CASE
     WHEN ${columnName} = '${TriggerDataStatus.Completed}' THEN '${TriggerStatusLabel.Firing}'
     WHEN ${columnName} = '${TriggerDataStatus.Failed}' THEN '${TriggerStatusLabel.Errored}'

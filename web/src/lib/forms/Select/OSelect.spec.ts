@@ -45,18 +45,14 @@ describe("OSelect", () => {
         options: [{ label: "Option A", value: "a" }],
       },
     });
-    expect(wrapper.find('button[aria-label="Clear selection"]').exists()).toBe(
-      true,
-    );
+    expect(wrapper.find('button[aria-label="Clear selection"]').exists()).toBe(true);
   });
 
   it("does not show clear button when value is undefined", () => {
     wrapper = mount(OSelect, {
       props: { clearable: true, modelValue: undefined },
     });
-    expect(wrapper.find('button[aria-label="Clear selection"]').exists()).toBe(
-      false,
-    );
+    expect(wrapper.find('button[aria-label="Clear selection"]').exists()).toBe(false);
   });
 
   it("emits clear event when clear button is clicked", async () => {
@@ -159,9 +155,7 @@ describe("OSelect", () => {
     expect(input).not.toBeNull();
     input!.value = "brand-new-term";
     input!.dispatchEvent(new Event("input", { bubbles: true }));
-    input!.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
-    );
+    input!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     await flushPromises();
     expect(wrapper.emitted("create")).toBeFalsy();
   });
@@ -214,9 +208,7 @@ describe("OSelect", () => {
       });
       await wrapper.find("button").trigger("keydown", { key: "s", ctrlKey: true });
       await flushPromises();
-      expect(
-        document.body.querySelector('input[placeholder="Search..."]'),
-      ).toBeNull();
+      expect(document.body.querySelector('input[placeholder="Search..."]')).toBeNull();
     });
 
     it("should stop propagation of printable keys so page-level shortcuts never fire", async () => {

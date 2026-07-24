@@ -25,22 +25,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   buttons toast until then.
 -->
 <template>
-  <div
-    data-test="workflow-editor-page"
-    class="flex flex-col h-full min-h-0"
-  >
+  <div data-test="workflow-editor-page" class="flex h-full min-h-0 flex-col">
     <!-- Toolbar — the shared OPageHeader (same as the pipeline editor): a
          back chevron in the module-icon slot, the workflow name input inline
          after the title, and the Test / Cancel / Save actions right-aligned. -->
     <OPageHeader
       :title="headerTitle"
       :back="{ label: t('workflow.header'), onClick: goBack, dataTest: 'workflow-editor-back' }"
-      class="px-4 border-b border-border-default"
+      class="border-border-default border-b px-4"
     >
       <!-- Beta tag inside the title line (see WorkflowsList: #title-trail sits
            after the title+subtitle column, stranding it far from the title). -->
       <template #title>
-        <span class="inline-flex items-center gap-2 min-w-0">
+        <span class="inline-flex min-w-0 items-center gap-2">
           <span class="truncate">{{ headerTitle }}</span>
           <BetaBadge />
         </span>
@@ -116,10 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- workspace: docked palette + canvas (+ drawer region for node forms). The
          history drawer portals in here (below the toolbar) so it can sit
          side-by-side with the canvas. -->
-    <div
-      id="workflow-workspace"
-      class="flex-1 flex min-h-0 relative"
-    >
+    <div id="workflow-workspace" class="relative flex min-h-0 flex-1">
       <!-- Docked node palette — same shared component as Pipelines, so the two
            palettes can never drift apart. Workflows add click-to-append. -->
       <NodePalette
@@ -135,9 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            the canvas falls through to the page background rather than sitting
            on the lighter `surface-subtle` slab, which is what made the two
            editors read as different shades. -->
-      <div
-        class="flex-1 relative min-w-0 overflow-hidden bg-surface-subtle dark:bg-transparent"
-      >
+      <div class="bg-surface-subtle relative min-w-0 flex-1 overflow-hidden dark:bg-transparent">
         <WorkflowCanvas />
       </div>
     </div>
@@ -279,12 +271,8 @@ const paletteCard = (nt: string) => {
   };
 };
 const paletteItems = computed(() => {
-  const transforms = ADDABLE_NODE_TYPES.filter(
-    (nt) => nodeMeta(nt)?.ioType !== "output",
-  );
-  const destinations = ADDABLE_NODE_TYPES.filter(
-    (nt) => nodeMeta(nt)?.ioType === "output",
-  );
+  const transforms = ADDABLE_NODE_TYPES.filter((nt) => nodeMeta(nt)?.ioType !== "output");
+  const destinations = ADDABLE_NODE_TYPES.filter((nt) => nodeMeta(nt)?.ioType === "output");
   return [
     { label: t("workflow.node.sectionTransform"), isSectionHeader: true },
     ...transforms.map(paletteCard),
@@ -297,33 +285,29 @@ const paletteClick = (item: any) => addNodeToEnd(item.subtype);
 
 // In "trigger" mode the picker is the workflow's FIRST node, so it offers the
 // trigger types; otherwise it offers the addable step types.
-const isTriggerStep = computed(
-  () => workflowObj.stepPicker.mode === "trigger",
-);
+const isTriggerStep = computed(() => workflowObj.stepPicker.mode === "trigger");
 
 // Items for the shared step picker.
 const stepItems = computed(() =>
-  (isTriggerStep.value ? TRIGGER_NODE_TYPES : ADDABLE_NODE_TYPES).map(
-    (nt: string) => {
-      const m = nodeMeta(nt);
-      const img = m?.image;
-      return {
-        key: nt,
-        title: t(m?.titleKey || nt),
-        description: t(m?.descKey || ""),
-        icon: img ? `img:${img}` : m?.icon || "help",
-        iconTint:
-          m?.category === "action"
-            ? "bg-badge-success-soft-bg text-badge-success-soft-text"
-            : m?.category === "trigger"
-              ? "bg-badge-blue-soft-bg text-badge-blue-soft-text"
-              : "bg-badge-warning-soft-bg text-badge-warning-soft-text",
-        // v1 has one trigger kind; when more land they become their own
-        // TRIGGER_NODE_TYPES entries carrying their own kind.
-        trigger_kind: "alert_fired",
-      };
-    },
-  ),
+  (isTriggerStep.value ? TRIGGER_NODE_TYPES : ADDABLE_NODE_TYPES).map((nt: string) => {
+    const m = nodeMeta(nt);
+    const img = m?.image;
+    return {
+      key: nt,
+      title: t(m?.titleKey || nt),
+      description: t(m?.descKey || ""),
+      icon: img ? `img:${img}` : m?.icon || "help",
+      iconTint:
+        m?.category === "action"
+          ? "bg-badge-success-soft-bg text-badge-success-soft-text"
+          : m?.category === "trigger"
+            ? "bg-badge-blue-soft-bg text-badge-blue-soft-text"
+            : "bg-badge-warning-soft-bg text-badge-warning-soft-text",
+      // v1 has one trigger kind; when more land they become their own
+      // TRIGGER_NODE_TYPES entries carrying their own kind.
+      trigger_kind: "alert_fired",
+    };
+  }),
 );
 
 const onStepPick = (item: any) => {
@@ -387,9 +371,7 @@ const validate = (): boolean => {
   workflowObj.nameError = false;
 
   const nodes = wf.nodes || [];
-  const trigger = nodes.find(
-    (n: any) => n.data?.node_type === "workflow_trigger",
-  );
+  const trigger = nodes.find((n: any) => n.data?.node_type === "workflow_trigger");
   if (!trigger) {
     toast({ message: t("workflow.triggerRequired"), variant: "warning" });
     return false;
@@ -401,9 +383,7 @@ const validate = (): boolean => {
 
   // Every non-trigger node must have an incoming edge.
   const targets = new Set((wf.edges || []).map((e: any) => e.target));
-  const orphan = nodes.find(
-    (n: any) => n.id !== trigger.id && !targets.has(n.id),
-  );
+  const orphan = nodes.find((n: any) => n.id !== trigger.id && !targets.has(n.id));
   if (orphan) {
     toast({ message: t("workflow.connectAllNodes"), variant: "warning" });
     return false;

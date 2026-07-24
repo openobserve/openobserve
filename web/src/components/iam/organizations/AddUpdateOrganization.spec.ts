@@ -65,14 +65,7 @@ vi.mock("@/services/reodotdev_analytics", () => ({
 // ODialog stub: keeps slot content queryable + exposes form-id and open state.
 const ODialogStub = {
   name: "ODialog",
-  props: [
-    "open",
-    "size",
-    "title",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "formId",
-  ],
+  props: ["open", "size", "title", "primaryButtonLabel", "secondaryButtonLabel", "formId"],
   emits: ["update:open", "click:primary", "click:secondary"],
   template: `
     <div data-test-stub="o-dialog" :data-open="open" :data-title="title" :data-form-id="formId">
@@ -101,10 +94,8 @@ const mountComp = (props: Record<string, any> = {}): VueWrapper<any> =>
     props: { open: true, modelValue: { id: "", name: "" }, ...props },
   });
 
-const getForm = (wrapper: VueWrapper<any>) =>
-  wrapper.findComponent({ name: "OForm" });
-const getNameInput = (wrapper: VueWrapper<any>) =>
-  wrapper.find('[data-test="org-name"] input');
+const getForm = (wrapper: VueWrapper<any>) => wrapper.findComponent({ name: "OForm" });
+const getNameInput = (wrapper: VueWrapper<any>) => wrapper.find('[data-test="org-name"] input');
 const submitForm = async (wrapper: VueWrapper<any>) => {
   await getForm(wrapper).vm.form.handleSubmit();
   await flushPromises();
@@ -119,25 +110,25 @@ describe("AddUpdateOrganization", () => {
   describe("rendering", () => {
     it("renders create title when not updating", () => {
       const wrapper = mountComp();
-      expect(
-        wrapper.find('[data-test-stub="o-dialog"]').attributes("data-title"),
-      ).toBe("New organization");
+      expect(wrapper.find('[data-test-stub="o-dialog"]').attributes("data-title")).toBe(
+        "New organization",
+      );
     });
 
     it("renders update title + the read-only id field when beingUpdated", () => {
       const wrapper = mountComp({ modelValue: { id: "123", name: "Acme" } });
-      expect(
-        wrapper.find('[data-test-stub="o-dialog"]').attributes("data-title"),
-      ).toBe("Update organization");
+      expect(wrapper.find('[data-test-stub="o-dialog"]').attributes("data-title")).toBe(
+        "Update organization",
+      );
       expect(wrapper.vm.beingUpdated).toBe(true);
     });
 
     it("wires the OForm to the dialog via form-id", () => {
       const wrapper = mountComp();
       expect(getForm(wrapper).exists()).toBe(true);
-      expect(
-        wrapper.find('[data-test-stub="o-dialog"]').attributes("data-form-id"),
-      ).toBe("add-update-organization-form");
+      expect(wrapper.find('[data-test-stub="o-dialog"]').attributes("data-form-id")).toBe(
+        "add-update-organization-form",
+      );
     });
 
     it("returns the schema + prefilled defaults from setup()", () => {
@@ -174,9 +165,7 @@ describe("AddUpdateOrganization", () => {
 
       expect(getForm(wrapper).vm.form.state.isValid).toBe(false);
       expect(orgService.create).not.toHaveBeenCalled();
-      expect(wrapper.text()).toContain(
-        "Use alphanumeric characters, space and underscore only.",
-      );
+      expect(wrapper.text()).toContain("Use alphanumeric characters, space and underscore only.");
     });
 
     it("blocks submit when the name exceeds 100 characters (max rule)", async () => {
@@ -234,9 +223,7 @@ describe("AddUpdateOrganization", () => {
       await getNameInput(wrapper).setValue("Err Org");
       await submitForm(wrapper);
 
-      expect(toast).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "error" }),
-      );
+      expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
     });
 
     it("renames the organization in update mode", async () => {
@@ -244,10 +231,7 @@ describe("AddUpdateOrganization", () => {
       await getNameInput(wrapper).setValue("Acme Renamed");
       await submitForm(wrapper);
 
-      expect(orgService.rename_organization).toHaveBeenCalledWith(
-        "123",
-        "Acme Renamed",
-      );
+      expect(orgService.rename_organization).toHaveBeenCalledWith("123", "Acme Renamed");
     });
 
     it("completeSubscriptionProcess navigates to billing plans with newOrgIdentifier", async () => {
@@ -256,9 +240,7 @@ describe("AddUpdateOrganization", () => {
       const pushSpy = vi.spyOn(router, "push");
 
       wrapper.vm.completeSubscriptionProcess();
-      expect(pushSpy).toHaveBeenCalledWith(
-        "/billings/plans?org_identifier=org-123",
-      );
+      expect(pushSpy).toHaveBeenCalledWith("/billings/plans?org_identifier=org-123");
     });
   });
 

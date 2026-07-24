@@ -2,10 +2,9 @@
   <div class="flex flex-col gap-2.5">
     <div class="flex flex-col gap-0.5">
       <div class="flex flex-wrap items-center gap-1">
-        <span
-          class="text-compact leading-tight font-medium text-input-label-text"
-          >{{ t("onlineEvals.job.inputMapping.title") }}</span
-        >
+        <span class="text-compact text-input-label-text leading-tight font-medium">{{
+          t("onlineEvals.job.inputMapping.title")
+        }}</span>
         <OButton
           v-if="systemProvidedVariables.length"
           data-test="job-input-mapping-system-variables-learn-more"
@@ -19,7 +18,7 @@
           <span>{{ t("alerts.alertSettings.helpLearnMore") }}</span>
         </OButton>
       </div>
-      <span class="text-xs text-input-help-text leading-none">{{
+      <span class="text-input-help-text text-xs leading-none">{{
         t(`onlineEvals.job.inputMapping.hint.${targetScope}`)
       }}</span>
     </div>
@@ -36,10 +35,8 @@
         <!-- `bleed` drops ODrawer's body inset so the table runs edge to edge.
              The vertical rhythm and the prose inset are re-applied with the
              same tokens the drawer would have used, so only the table bleeds. -->
-        <div class="flex flex-col gap-3 py-dialog-content-py">
-          <span
-            class="px-dialog-content-px text-xs leading-relaxed text-text-secondary"
-          >
+        <div class="py-dialog-content-py flex flex-col gap-3">
+          <span class="px-dialog-content-px text-text-secondary text-xs leading-relaxed">
             {{ systemProvidedDescriptionText }}
           </span>
 
@@ -61,7 +58,7 @@
           >
             <template #cell-variable="{ row }">
               <code
-                class="w-fit max-w-full rounded-default bg-surface-subtle px-1.5 py-0.5"
+                class="rounded-default bg-surface-subtle w-fit max-w-full px-1.5 py-0.5"
                 :data-test="`job-input-mapping-system-variable-${row.name}`"
                 >{{ formatTemplateVariable(row.name) }}</code
               >
@@ -72,16 +69,8 @@
                 <OTag variant="primary-soft" size="xs">
                   {{ t("onlineEvals.job.inputMapping.systemProvided.badge") }}
                 </OTag>
-                <OTag
-                  v-if="row.name === 'spans'"
-                  variant="warning-soft"
-                  size="xs"
-                >
-                  {{
-                    t(
-                      "onlineEvals.job.inputMapping.systemProvided.selectorRequired",
-                    )
-                  }}
+                <OTag v-if="row.name === 'spans'" variant="warning-soft" size="xs">
+                  {{ t("onlineEvals.job.inputMapping.systemProvided.selectorRequired") }}
                 </OTag>
               </div>
             </template>
@@ -91,7 +80,7 @@
     </template>
     <div
       v-if="selectedScorers.length === 0"
-      class="py-2.5 px-3 border border-dashed border-dialog-header-border rounded-default text-text-secondary text-xs text-center"
+      class="border-dialog-header-border rounded-default text-text-secondary border border-dashed px-3 py-2.5 text-center text-xs"
     >
       {{ t("onlineEvals.job.inputMapping.selectScorers") }}
     </div>
@@ -99,16 +88,15 @@
       <article
         v-for="scorer in selectedScorers"
         :key="entityId(scorer)"
-        class="border border-dialog-header-border rounded-default bg-card-bg overflow-hidden"
+        class="border-dialog-header-border rounded-default bg-card-bg overflow-hidden border"
       >
         <div
-          class="flex items-center justify-between gap-3 py-2.5 px-3 border-b border-dialog-header-border"
+          class="border-dialog-header-border flex items-center justify-between gap-3 border-b px-3 py-2.5"
         >
-          <div class="flex flex-col gap-px min-w-0">
-            <strong
-              class="truncate text-compact font-semibold text-text-heading"
-              >{{ scorer.name }}</strong
-            >
+          <div class="flex min-w-0 flex-col gap-px">
+            <strong class="text-compact text-text-heading truncate font-semibold">{{
+              scorer.name
+            }}</strong>
             <small class="text-2xs text-text-secondary">{{
               t("onlineEvals.job.scorerPicker.meta", {
                 type: scorerTypeOf(scorer).replace("_", " "),
@@ -116,9 +104,7 @@
               })
             }}</small>
           </div>
-          <span
-            class="shrink-0 text-2xs font-semibold text-text-secondary"
-          >
+          <span class="text-2xs text-text-secondary shrink-0 font-semibold">
             {{
               t("onlineEvals.job.inputMapping.variableCount", {
                 count: variablesFor(scorer).length,
@@ -133,11 +119,11 @@
              so activation could be blocked with no way to satisfy it. -->
         <div
           v-if="targetScope === 'trace'"
-          class="flex flex-col gap-1 border-b border-dialog-header-border py-2 px-3"
+          class="border-dialog-header-border flex flex-col gap-1 border-b px-3 py-2"
           :data-test="`job-input-mapping-span-selector-${entityId(scorer)}`"
         >
           <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span class="text-2xs font-semibold text-text-secondary">
+            <span class="text-2xs text-text-secondary font-semibold">
               {{ t("onlineEvals.job.spanSelector.editorTitle") }}
               <span aria-hidden="true">*</span>
             </span>
@@ -147,29 +133,24 @@
               :binding="spanSelectorBindings[entityId(scorer)]"
               :stream-fields="streamFields"
               @update:selectors="emit('update:spanSelectors', $event)"
-              @update:binding="
-                updateSpanSelectorBinding(entityId(scorer), $event)
-              "
+              @update:binding="updateSpanSelectorBinding(entityId(scorer), $event)"
             />
           </div>
           <!-- Required with no explanation is why this read as arbitrary: say
                what a selector does and why a trace needs one. -->
-          <span class="text-2xs leading-[1.4] text-text-secondary">
+          <span class="text-2xs text-text-secondary leading-[1.4]">
             {{ t("onlineEvals.job.spanSelector.bindingHelp") }}
           </span>
         </div>
 
-        <div
-          v-if="variablesFor(scorer).length"
-          class="grid gap-1.5 py-2.5 px-3"
-        >
+        <div v-if="variablesFor(scorer).length" class="grid gap-1.5 px-3 py-2.5">
           <div
             v-for="variable in variablesFor(scorer)"
             :key="`${entityId(scorer)}-${variable}`"
             class="grid grid-cols-[minmax(8.125rem,0.35fr)_minmax(0,1fr)] items-start gap-2.5"
           >
             <code
-              class="mt-0.5 truncate overflow-hidden rounded-default bg-surface-subtle px-2 py-1.25"
+              class="rounded-default bg-surface-subtle mt-0.5 truncate overflow-hidden px-2 py-1.25"
               >{{ formatTemplateVariable(variable) }}</code
             >
             <div
@@ -182,8 +163,8 @@
                    is true of most rows, which is what made the list read as
                    noise rather than as a list. `spans` reads the same way — the
                    selector that fills it is bound once per scorer above. -->
-              <OIcon name="bolt" size="xs" class="shrink-0 text-text-tertiary" />
-              <span class="text-2xs leading-[1.4] text-text-secondary">
+              <OIcon name="bolt" size="xs" class="text-text-tertiary shrink-0" />
+              <span class="text-2xs text-text-secondary leading-[1.4]">
                 {{ systemProvidedDescription(variable) }}
               </span>
             </div>
@@ -194,9 +175,7 @@
               :model-value="inputMappings[entityId(scorer)]?.[variable] || ''"
               :placeholder="defaultJobMappingValue(variable)"
               :data-test="`job-input-mapping-input-${entityId(scorer)}-${variable}`"
-              @update:model-value="
-                updateMapping(entityId(scorer), variable, String($event ?? ''))
-              "
+              @update:model-value="updateMapping(entityId(scorer), variable, String($event ?? ''))"
             >
               <template #icon-right>
                 <OButton
@@ -204,7 +183,7 @@
                   variant="ghost-muted"
                   size="icon-chip"
                   icon-left="content-copy"
-                  class="pointer-events-none opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
+                  class="pointer-events-none opacity-0 transition-opacity group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
                   :aria-label="t('common.copy')"
                   :title="t('common.copy')"
                   :data-test="`job-input-mapping-copy-${entityId(scorer)}-${variable}`"
@@ -216,7 +195,7 @@
         </div>
         <div
           v-else
-          class="py-2.5 px-3 border border-dashed border-dialog-header-border rounded-default text-text-secondary text-xs text-center"
+          class="border-dialog-header-border rounded-default text-text-secondary border border-dashed px-3 py-2.5 text-center text-xs"
         >
           {{ t("onlineEvals.job.inputMapping.noVariables") }}
         </div>
@@ -235,18 +214,11 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import type {
-  EvalTargetScope,
-  Scorer,
-  SpanSelector,
-} from "@/services/online-evals.service";
+import type { EvalTargetScope, Scorer, SpanSelector } from "@/services/online-evals.service";
 import { copyToClipboard } from "@/utils/clipboard";
 import { entityId, scorerTypeOf } from "../../utils/evalEntity";
 import { formatTemplateVariable } from "../../utils/evalFormat";
-import {
-  defaultJobMappingValue,
-  jobMappingVariablesForScorer,
-} from "../../utils/jobMappings";
+import { defaultJobMappingValue, jobMappingVariablesForScorer } from "../../utils/jobMappings";
 import {
   isSystemProvidedVariable,
   systemProvidedVariablesForScope,
@@ -271,19 +243,14 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
-  (
-    e: "update:inputMappings",
-    value: Record<string, Record<string, string>>,
-  ): void;
+  (e: "update:inputMappings", value: Record<string, Record<string, string>>): void;
   (e: "update:spanSelectors", value: SpanSelector[]): void;
   (e: "update:spanSelectorBindings", value: Record<string, string>): void;
 }>();
 
 const { t } = useI18n();
 const systemVariablesDrawerOpen = ref(false);
-const targetScopeName = computed(() =>
-  t(`onlineEvals.job.targetScopes.${props.targetScope}`),
-);
+const targetScopeName = computed(() => t(`onlineEvals.job.targetScopes.${props.targetScope}`));
 const systemProvidedTitle = computed(() =>
   t("onlineEvals.job.inputMapping.systemProvided.title", {
     scope: targetScopeName.value,
@@ -296,12 +263,8 @@ const systemProvidedDescriptionText = computed(() =>
     scope: targetScopeName.value.toLowerCase(),
   }),
 );
-const systemProvidedVariables = computed(() =>
-  systemProvidedVariablesForScope(props.targetScope),
-);
-const systemProvidedColumns = computed<
-  OTableColumnDef<SystemProvidedVariable>[]
->(() => [
+const systemProvidedVariables = computed(() => systemProvidedVariablesForScope(props.targetScope));
+const systemProvidedColumns = computed<OTableColumnDef<SystemProvidedVariable>[]>(() => [
   {
     id: "variable",
     header: t("onlineEvals.job.inputMapping.systemProvided.columns.variable"),
@@ -320,13 +283,9 @@ const systemProvidedColumns = computed<
   },
   {
     id: "description",
-    header: t(
-      "onlineEvals.job.inputMapping.systemProvided.columns.description",
-    ),
+    header: t("onlineEvals.job.inputMapping.systemProvided.columns.description"),
     accessorFn: (row) =>
-      t(
-        `onlineEvals.job.inputMapping.systemProvided.variables.${row.name}.${props.targetScope}`,
-      ),
+      t(`onlineEvals.job.inputMapping.systemProvided.variables.${row.name}.${props.targetScope}`),
     size: 360,
     minSize: 240,
     meta: { align: "left", autoWidth: true },
@@ -344,16 +303,11 @@ function systemProvidedDescription(variable: string) {
 }
 
 function variablesFor(scorer: Scorer) {
-  return jobMappingVariablesForScorer(
-    scorer,
-    props.inputMappings[entityId(scorer)],
-  );
+  return jobMappingVariablesForScorer(scorer, props.inputMappings[entityId(scorer)]);
 }
 
 function copyMapping(scorerId: string, variable: string) {
-  const value =
-    props.inputMappings[scorerId]?.[variable] ||
-    defaultJobMappingValue(variable);
+  const value = props.inputMappings[scorerId]?.[variable] || defaultJobMappingValue(variable);
   void copyToClipboard(value, {
     successMessage: t("common.copySuccess"),
   });

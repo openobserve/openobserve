@@ -80,11 +80,7 @@ export const useSearchStreamRefactored = () => {
    */
   const handleSearchComplete = (payload: any) => {
     // Process histogram if needed
-    if (
-      payload.type === "search" &&
-      !payload.isPagination &&
-      searchObj.meta.refreshInterval == 0
-    ) {
+    if (payload.type === "search" && !payload.isPagination && searchObj.meta.refreshInterval == 0) {
       histogramHandler.processHistogramRequest(
         payload.queryReq,
         connectionManager.buildWebSocketPayload,

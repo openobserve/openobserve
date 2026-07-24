@@ -763,17 +763,20 @@ pub async fn update_stream_settings(
     save_stream_settings(org_id, stream_name, stream_type, settings).await
 }
 
-#[tracing::instrument(skip(cleanup_related_resources))]
-pub async fn delete_stream_with_cleanup<F, Fut>(
+#[tracing::instrument(skip(cleanup_related_resources, cleanup_enrichment_table_resources))]
+pub async fn delete_stream_with_cleanup<F, Fut, E, EFut>(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
     del_related_feature_resources: bool,
     cleanup_related_resources: F,
+    cleanup_enrichment_table_resources: E,
 ) -> Result<HttpResponse, Error>
 where
     F: FnOnce(String, String, StreamType) -> Fut,
     Fut: Future<Output = Result<(), HttpResponse>>,
+    E: FnOnce(String, String, StreamType) -> EFut,
+    EFut: Future<Output = ()>,
 {
     // Reserved self-reporting streams (usage/stats/triggers/errors/...) are
     // managed internally by Cloud and must not be user-deleted — retention/
@@ -874,12 +877,10 @@ where
             .into_response());
     }
 
-    // enrichment table cleanup
-
     if stream_type == StreamType::EnrichmentTables {
-        enrichment_data::enrichment_table::cleanup_enrichment_table_resources(
-            org_id,
-            stream_name,
+        cleanup_enrichment_table_resources(
+            org_id.to_string(),
+            stream_name.to_string(),
             stream_type,
         )
         .await;

@@ -1,18 +1,16 @@
 <template>
   <section
-    class="overflow-hidden rounded-default border border-border-default bg-surface-base"
+    class="rounded-default border-border-default bg-surface-base overflow-hidden border"
     data-test="quality-runs-section"
   >
     <header
-      class="flex flex-wrap items-start justify-between gap-3 border-b border-border-default px-3.5 py-3"
+      class="border-border-default flex flex-wrap items-start justify-between gap-3 border-b px-3.5 py-3"
     >
       <div class="min-w-0">
-        <h4 class="m-0 text-compact font-semibold text-text-heading">
+        <h4 class="text-compact text-text-heading m-0 font-semibold">
           {{ t("onlineEvals.quality.runs.title") }}
         </h4>
-        <p
-          class="m-0 mt-0.5 max-w-[48rem] text-2xs leading-relaxed text-text-secondary"
-        >
+        <p class="text-2xs text-text-secondary m-0 mt-0.5 max-w-[48rem] leading-relaxed">
           {{ t("onlineEvals.quality.runs.hint") }}
         </p>
       </div>
@@ -34,7 +32,7 @@
         >
           <span>{{ option.label }}</span>
           <span
-            class="ml-1 rounded-full bg-surface-subtle px-1.5 py-0.5 text-3xs leading-none text-text-secondary [font-variant-numeric:tabular-nums]"
+            class="bg-surface-subtle text-3xs text-text-secondary ml-1 rounded-full px-1.5 py-0.5 leading-none [font-variant-numeric:tabular-nums]"
           >
             {{ option.count }}
           </span>
@@ -44,7 +42,7 @@
 
     <div
       v-if="!hasThreshold"
-      class="flex items-center gap-2 border-b border-border-default bg-surface-subtle px-3.5 py-2 text-2xs text-text-secondary"
+      class="border-border-default bg-surface-subtle text-2xs text-text-secondary flex items-center gap-2 border-b px-3.5 py-2"
       data-test="quality-runs-no-threshold"
     >
       <OIcon name="info" size="xs" class="shrink-0" />
@@ -53,7 +51,7 @@
 
     <div
       v-if="error"
-      class="flex items-center gap-2 border-b border-border-default bg-status-error-bg px-3.5 py-2 text-2xs text-status-error-text"
+      class="border-border-default bg-status-error-bg text-2xs text-status-error-text flex items-center gap-2 border-b px-3.5 py-2"
       data-test="quality-runs-query-error"
     >
       <OIcon name="error" size="xs" class="shrink-0" />
@@ -87,7 +85,7 @@
     >
       <template #cell-timestampMs="{ row }">
         <span
-          class="whitespace-nowrap text-2xs text-text-secondary [font-variant-numeric:tabular-nums]"
+          class="text-2xs text-text-secondary whitespace-nowrap [font-variant-numeric:tabular-nums]"
           >{{ formatTimestamp(row.timestampMs) }}</span
         >
       </template>
@@ -96,20 +94,14 @@
         <div class="flex flex-col items-start gap-0.5 leading-tight">
           <span
             class="font-semibold [font-variant-numeric:tabular-nums]"
-            :class="
-              row.isUnhealthy ? 'text-status-error-text' : 'text-text-heading'
-            "
+            :class="row.isUnhealthy ? 'text-status-error-text' : 'text-text-heading'"
           >
             {{ row.resultDisplay }}
           </span>
           <span
             v-if="row.health !== 'unclassified'"
             class="text-3xs"
-            :class="
-              row.isUnhealthy
-                ? 'text-status-error-text'
-                : 'text-status-success-text'
-            "
+            :class="row.isUnhealthy ? 'text-status-error-text' : 'text-status-success-text'"
           >
             {{ t(`onlineEvals.quality.runs.health.${row.health}`) }}
           </span>
@@ -118,7 +110,7 @@
 
       <template #cell-reasoning="{ row }">
         <span
-          class="block max-w-full truncate text-2xs text-text-secondary"
+          class="text-2xs text-text-secondary block max-w-full truncate"
           :title="reasoningFor(row)"
         >
           {{ reasoningFor(row) }}
@@ -127,13 +119,11 @@
 
       <template #cell-targetId="{ row }">
         <div class="flex min-w-0 flex-col items-start gap-0.5 leading-tight">
-          <span
-            class="text-3xs font-medium uppercase tracking-wide text-text-tertiary"
-          >
+          <span class="text-3xs text-text-tertiary font-medium tracking-wide uppercase">
             {{ scopeLabel(row.targetScope) }}
           </span>
           <span
-            class="max-w-full truncate font-mono text-3xs text-text-heading"
+            class="text-3xs text-text-heading max-w-full truncate font-mono"
             :title="targetIdentity(row)"
           >
             {{ shortId(targetIdentity(row)) }}
@@ -143,15 +133,12 @@
 
       <template #cell-agentName="{ row }">
         <div class="flex min-w-0 flex-col items-start gap-0.5 leading-tight">
-          <span
-            class="max-w-full truncate text-2xs text-text-heading"
-            :title="agentLabel(row)"
-          >
+          <span class="text-2xs text-text-heading max-w-full truncate" :title="agentLabel(row)">
             {{ agentLabel(row) }}
           </span>
           <span
             v-if="row.agentName && row.agentId"
-            class="max-w-full truncate font-mono text-3xs text-text-tertiary"
+            class="text-3xs text-text-tertiary max-w-full truncate font-mono"
             :title="row.agentId"
           >
             {{ shortId(row.agentId) }}
@@ -198,9 +185,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 
-const hasThreshold = computed(
-  () => thresholdForConfig(props.config).unhealthyExpr != null,
-);
+const hasThreshold = computed(() => thresholdForConfig(props.config).unhealthyExpr != null);
 
 const filterOptions = computed(() => [
   {
@@ -302,9 +287,7 @@ function reasoningFor(row: QualityRunRow): string {
 }
 
 function agentLabel(row: QualityRunRow): string {
-  return (
-    row.agentName || row.agentId || t("onlineEvals.quality.runs.unknownAgent")
-  );
+  return row.agentName || row.agentId || t("onlineEvals.quality.runs.unknownAgent");
 }
 
 function scopeLabel(scope: QualityRunRow["targetScope"]): string {

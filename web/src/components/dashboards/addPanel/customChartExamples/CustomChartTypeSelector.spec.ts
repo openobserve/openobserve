@@ -54,7 +54,6 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-
 const mountComponent = () =>
   mount(CustomChartTypeSelector, {
     global: {
@@ -151,7 +150,7 @@ describe("CustomChartTypeSelector", () => {
 
     const emitted = wrapper.emitted("select");
     expect(emitted).toBeTruthy();
-    expect((emitted![0][0] as any)).toEqual({ chart, replaceQuery: true });
+    expect(emitted![0][0] as any).toEqual({ chart, replaceQuery: true });
   });
 
   it("defaults replaceQuery to false when no options passed", async () => {

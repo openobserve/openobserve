@@ -72,19 +72,13 @@ describe("WorkflowCondition", () => {
   describe("props passed to the shared ConditionBuilder", () => {
     it("renders the body and the shared builder", () => {
       const wrapper = createWrapper();
-      expect(
-        wrapper.find('[data-test="workflow-condition-body"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.findComponent({ name: "ConditionBuilder" }).exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="workflow-condition-body"]').exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "ConditionBuilder" }).exists()).toBe(true);
     });
 
     it("passes the fired-alert payload fields (ALERT_PAYLOAD_FIELDS) as `fields`", () => {
       const wrapper = createWrapper();
-      const fields = wrapper
-        .findComponent({ name: "ConditionBuilder" })
-        .props("fields");
+      const fields = wrapper.findComponent({ name: "ConditionBuilder" }).props("fields");
       expect(fields).toEqual(ALERT_PAYLOAD_FIELDS);
       // sanity: these are the flattened `meta_*` columns, not stream fields
       expect(fields.map((f: any) => f.value)).toContain("meta_alert_name");
@@ -93,9 +87,7 @@ describe("WorkflowCondition", () => {
     it("passes null initial-conditions when there is no selected node data", () => {
       const wrapper = createWrapper();
       expect(
-        wrapper
-          .findComponent({ name: "ConditionBuilder" })
-          .props("initialConditions"),
+        wrapper.findComponent({ name: "ConditionBuilder" }).props("initialConditions"),
       ).toBeNull();
     });
 
@@ -106,9 +98,7 @@ describe("WorkflowCondition", () => {
       } as any;
       const wrapper = createWrapper();
       expect(
-        wrapper
-          .findComponent({ name: "ConditionBuilder" })
-          .props("initialConditions"),
+        wrapper.findComponent({ name: "ConditionBuilder" }).props("initialConditions"),
       ).toBeNull();
     });
 
@@ -131,9 +121,7 @@ describe("WorkflowCondition", () => {
       } as any;
       const wrapper = createWrapper();
       expect(
-        wrapper
-          .findComponent({ name: "ConditionBuilder" })
-          .props("initialConditions"),
+        wrapper.findComponent({ name: "ConditionBuilder" }).props("initialConditions"),
       ).toEqual(saved);
     });
   });

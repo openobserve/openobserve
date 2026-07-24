@@ -48,7 +48,7 @@ use vrl::compiler::runtime::Runtime;
 
 use super::{
     db::alerts::alert,
-    pipeline::{batch_execution::ExecutablePipeline, store as pipeline},
+    pipeline::{batch_execution::ExecutablePipeline, db as pipeline},
     self_reporting::publish_triggers_usage,
 };
 use crate::{

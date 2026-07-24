@@ -13,21 +13,16 @@ default = []
 enterprise = [
     "db/enterprise",
     "audit/enterprise",
-    "dep:aws-config",
-    "dep:aws-credential-types",
     "dep:o2_dex",
     "dep:o2_enterprise",
     "dep:o2_openfga",
     "common/enterprise",
     "config/enterprise",
-    "tantivy_utils/enterprise",
     "promql/enterprise",
     "promql-service/enterprise",
     "search/enterprise",
     "search_service/enterprise",
-    "compaction/enterprise",
     "stream/enterprise",
-    "enrichment-data/enterprise",
     "usage_reporting/enterprise",
 ]
 cloud = [
@@ -60,37 +55,29 @@ search.workspace = true
 search_service.workspace = true
 ingestion-common.workspace = true
 schema.workspace = true
-compaction.workspace = true
 stream.workspace = true
-enrichment-data.workspace = true
 usage_reporting.workspace = true
 axum.workspace = true
 http.workspace = true
 http-body-util.workspace = true
 anyhow.workspace = true
 async-trait.workspace = true
-aws-config = { workspace = true, optional = true }
-aws-credential-types = { workspace = true, optional = true }
 aws-sdk-sns.workspace = true
 base64.workspace = true
 bytes.workspace = true
 chrono.workspace = true
 cron.workspace = true
-csv.workspace = true
 dashmap.workspace = true
 datafusion.workspace = true
 arrow.workspace = true
 arrow-json.workspace = true
 arrow-schema.workspace = true
-parquet.workspace = true
-object_store.workspace = true
 flate2.workspace = true
 futures.workspace = true
 hashbrown.workspace = true
 itertools.workspace = true
 jsonwebtoken.workspace = true
 log.workspace = true
-maxminddb.workspace = true
 md5.workspace = true
 o2_dex = { workspace = true, optional = true }
 o2_enterprise = { workspace = true, optional = true, default-features = false }
@@ -104,7 +91,6 @@ prost.workspace = true
 prost-wkt-types.workspace = true
 proto.workspace = true
 rand.workspace = true
-rayon.workspace = true
 regex.workspace = true
 reqwest.workspace = true
 rustls.workspace = true
@@ -129,14 +115,9 @@ x509-parser.workspace = true
 config.workspace = true
 infra.workspace = true
 ingester.workspace = true
-wal.workspace = true
 chromiumoxide.workspace = true
 lettre.workspace = true
-tantivy.workspace = true
-tantivy_utils.workspace = true
-zip.workspace = true
 futures-util.workspace = true
-sourcemap.workspace = true
 
 [dev-dependencies]
 multer.workspace = true

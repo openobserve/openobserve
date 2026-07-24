@@ -61,8 +61,7 @@ function mountDescendant(dedupDefaults: Record<string, any> = {}) {
   return mount(makeDescendantHost(dedupDefaults), globalCfg);
 }
 
-const hostForm = (host: any) =>
-  (host.findComponent({ name: "OForm" }).vm as any).form;
+const hostForm = (host: any) => (host.findComponent({ name: "OForm" }).vm as any).form;
 
 /** flushDedup runs on a microtask after field.handleChange — settle both. */
 const settle = async () => {
@@ -80,12 +79,8 @@ describe("Deduplication — descendant (binds into ancestor OForm) mode", () => 
 
   it("preserves data-tests", () => {
     const host = mountDescendant();
-    expect(
-      host.find('[data-test="alert-dedup-fingerprint-fields"]').exists(),
-    ).toBe(true);
-    expect(host.find('[data-test="alert-dedup-time-window"]').exists()).toBe(
-      true,
-    );
+    expect(host.find('[data-test="alert-dedup-fingerprint-fields"]').exists()).toBe(true);
+    expect(host.find('[data-test="alert-dedup-time-window"]').exists()).toBe(true);
   });
 
   it("selecting fields writes fingerprint_fields + derived enabled into the PARENT form", async () => {
@@ -97,14 +92,10 @@ describe("Deduplication — descendant (binds into ancestor OForm) mode", () => 
       .vm.$emit("update:model-value", ["field1"]);
     await settle();
 
-    expect(parentForm.state.values.deduplication.fingerprint_fields).toEqual([
-      "field1",
-    ]);
+    expect(parentForm.state.values.deduplication.fingerprint_fields).toEqual(["field1"]);
     expect(parentForm.state.values.deduplication.enabled).toBe(true);
     // descendant mode is form-owned → no emit
-    expect(
-      host.findComponent(Deduplication).emitted("update:deduplication"),
-    ).toBeFalsy();
+    expect(host.findComponent(Deduplication).emitted("update:deduplication")).toBeFalsy();
   });
 
   it("clearing all fields derives enabled=false in the PARENT form", async () => {
@@ -119,9 +110,7 @@ describe("Deduplication — descendant (binds into ancestor OForm) mode", () => 
       .vm.$emit("update:model-value", []);
     await settle();
 
-    expect(parentForm.state.values.deduplication.fingerprint_fields).toEqual(
-      [],
-    );
+    expect(parentForm.state.values.deduplication.fingerprint_fields).toEqual([]);
     expect(parentForm.state.values.deduplication.enabled).toBe(false);
   });
 
@@ -134,9 +123,7 @@ describe("Deduplication — descendant (binds into ancestor OForm) mode", () => 
       .vm.$emit("create", "customField");
     await settle();
 
-    expect(parentForm.state.values.deduplication.fingerprint_fields).toEqual([
-      "customField",
-    ]);
+    expect(parentForm.state.values.deduplication.fingerprint_fields).toEqual(["customField"]);
     expect(parentForm.state.values.deduplication.enabled).toBe(true);
 
     // duplicate create is ignored
@@ -144,38 +131,28 @@ describe("Deduplication — descendant (binds into ancestor OForm) mode", () => 
       .findComponent('[data-test="alert-dedup-fingerprint-fields"]')
       .vm.$emit("create", "customField");
     await settle();
-    expect(parentForm.state.values.deduplication.fingerprint_fields).toEqual([
-      "customField",
-    ]);
+    expect(parentForm.state.values.deduplication.fingerprint_fields).toEqual(["customField"]);
   });
 
   it("time_window is sanitized to a number in the PARENT form (payload parity)", async () => {
     const host = mountDescendant();
     const parentForm = hostForm(host);
 
-    await host
-      .find('[data-test="alert-dedup-time-window"] input')
-      .setValue("20");
+    await host.find('[data-test="alert-dedup-time-window"] input').setValue("20");
     // sanitize runs on a microtask after field.handleChange
     await settle();
 
     expect(parentForm.state.values.deduplication.time_window_minutes).toBe(20);
-    expect(
-      typeof parentForm.state.values.deduplication.time_window_minutes,
-    ).toBe("number");
+    expect(typeof parentForm.state.values.deduplication.time_window_minutes).toBe("number");
   });
 
   it("an empty time_window is sanitized to undefined in the PARENT form", async () => {
     const host = mountDescendant({ time_window_minutes: 10 });
     const parentForm = hostForm(host);
 
-    await host
-      .find('[data-test="alert-dedup-time-window"] input')
-      .setValue("");
+    await host.find('[data-test="alert-dedup-time-window"] input').setValue("");
     await settle();
 
-    expect(
-      parentForm.state.values.deduplication.time_window_minutes,
-    ).toBeUndefined();
+    expect(parentForm.state.values.deduplication.time_window_minutes).toBeUndefined();
   });
 });

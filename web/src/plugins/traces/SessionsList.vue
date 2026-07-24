@@ -15,14 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="sessions-list h-full! flex flex-col bg-card-glass-bg"
-  >
+  <div class="sessions-list bg-card-glass-bg flex h-full! flex-col">
     <!-- No LLM streams exist in the org at all — nothing to select, so show
          the rich first-run empty state on its own (no table chrome). -->
     <div
       v-if="streamsLoaded && availableStreams.length === 0"
-      class="flex-1 min-h-0 flex items-center justify-center"
+      class="flex min-h-0 flex-1 items-center justify-center"
       data-test="sessions-empty-no-streams"
     >
       <OEmptyState size="hero" preset="no-llm-sessions" @action="onEmptyAction" />
@@ -34,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          rather than inside the OTable toolbar. -->
     <div
       v-if="!(streamsLoaded && availableStreams.length === 0)"
-      class="flex items-center gap-3 px-page-edge py-2 border-b border-border-default"
+      class="px-page-edge border-border-default flex items-center gap-3 border-b py-2"
     >
       <OToggleGroup
         :model-value="filterMode"
@@ -42,8 +40,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="sessions-list-filter-mode"
         @update:model-value="onFilterModeChange"
       >
-        <OToggleGroupItem value="agent" size="sm">{{ t('traces.sessionsList.agent') }}</OToggleGroupItem>
-        <OToggleGroupItem value="stream" size="sm">{{ t('traces.sessionsList.stream') }}</OToggleGroupItem>
+        <OToggleGroupItem value="agent" size="sm">{{
+          t("traces.sessionsList.agent")
+        }}</OToggleGroupItem>
+        <OToggleGroupItem value="stream" size="sm">{{
+          t("traces.sessionsList.stream")
+        }}</OToggleGroupItem>
       </OToggleGroup>
 
       <div
@@ -51,34 +53,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="sessions-list-stream-selector"
         class="w-56 flex-shrink-0"
       >
-        <OSkeleton type="text" v-if="!streamsLoaded" class="w-full h-8.5" />
         <OSelect
-          v-else
-          v-model="activeStream"
+          :model-value="streamsLoaded ? activeStream : ''"
           :label="t('traces.sessionsList.streamLabel')"
           label-position="inside"
           :options="availableStreams.map((s) => ({ label: s, value: s }))"
           labelKey="label"
           valueKey="value"
-          class="w-full rounded-default"
+          :loading="!streamsLoaded"
+          :placeholder="streamsLoaded ? undefined : t('traces.sessionsList.loadingStreams')"
+          class="rounded-default w-full"
           @update:model-value="onStreamChange"
         />
       </div>
-      <div
-        v-else
-        data-test="sessions-list-agent-selector"
-        class="w-56 flex-shrink-0"
-      >
-        <OSkeleton type="text" v-if="!agentsLoaded" class="w-full h-8.5" />
+      <div v-else data-test="sessions-list-agent-selector" class="w-56 flex-shrink-0">
         <OSelect
-          v-else
-          v-model="activeAgent"
+          :model-value="agentsLoaded ? activeAgent : ''"
           :label="t('traces.sessionsList.agent')"
           label-position="inside"
           :options="agentSelectOptions"
           labelKey="label"
           valueKey="value"
-          class="w-full rounded-default"
+          :loading="!agentsLoaded"
+          :placeholder="agentsLoaded ? undefined : t('traces.sessionsList.loadingAgents')"
+          class="rounded-default w-full"
           @update:model-value="onAgentChange"
         />
       </div>
@@ -110,12 +108,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :show-global-filter="false"
       :frame="false"
       width="100%"
-      class="w-full h-full"
+      class="h-full w-full"
       data-test="sessions-list-table"
+      :get-row-style="sessionRowStyle"
+      :row-class="sessionRowClass"
       @row-click="(row: any) => handleRowClick(row)"
       @pagination-change="onPaginationChange"
     >
-
       <!-- Empty / error body — rendered inside the frame so the toolbar (and
            thus the stream selector) stays visible. -->
       <template #empty>
@@ -141,84 +140,87 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :action-label="t('traces.sessionsList.viewByStream')"
           @action="onFilterModeChange('stream')"
         />
-        <div
-          v-else
-          class="flex items-center justify-center py-12"
-          data-test="sessions-empty"
-        >
+        <div v-else class="flex items-center justify-center py-12" data-test="sessions-empty">
           <OEmptyState size="hero" preset="no-llm-sessions" @action="onEmptyAction" />
         </div>
       </template>
-        <!-- Timestamp -->
-        <template #cell-firstSeenNanos="{ row }">
-          <span class="text-xs tabular-nums">
-            {{ formatTimestamp(row.firstSeenNanos) }}
-          </span>
-        </template>
+      <!-- Timestamp — relative recency ("5 min ago"), full datetime on hover. -->
+      <template #cell-firstSeenNanos="{ row }">
+        <OTimeCell :value="row.firstSeenNanos" unit="ns" mode="relative" empty-label="—" />
+      </template>
 
-        <!-- Session ID -->
-        <template #cell-sessionId="{ row }">
-          <div class="text-xs truncate w-full">
-            {{ row.sessionId }}
-            <OTooltip :content="row.sessionId" />
-          </div>
-        </template>
+      <!-- Session ID -->
+      <template #cell-sessionId="{ row }">
+        <div class="w-full truncate text-xs">
+          {{ row.sessionId }}
+          <OTooltip :content="row.sessionId" />
+        </div>
+      </template>
 
-        <!-- User -->
-        <template #cell-userId="{ row }">
-          <OUserCell
-            :value="row.userId"
-            :empty-label="t('traces.sessionsList.unknownUser')"
+      <!-- User -->
+      <template #cell-userId="{ row }">
+        <OUserCell :value="row.userId" :empty-label="t('traces.sessionsList.unknownUser')" />
+      </template>
+
+      <!-- First user message -->
+      <template #cell-firstUserMessage="{ row }">
+        <div v-if="row.firstUserMessage" class="text-text-secondary w-full truncate text-xs">
+          {{ row.firstUserMessage }}
+          <OTooltip :content="row.firstUserMessage" />
+        </div>
+        <span v-else class="text-text-muted text-xs">—</span>
+      </template>
+
+      <!-- Turns -->
+      <template #cell-turns="{ row }">
+        <span class="text-xs">{{ row.turns }}</span>
+      </template>
+
+      <!-- Duration -->
+      <template #cell-durationNanos="{ row }">
+        <span class="text-xs">
+          {{ formatDuration(row.durationNanos) }}
+          <OTooltip
+            :content="`${row.durationNanos.toLocaleString()} ${t('traces.sessionsList.durationNs')}`"
           />
-        </template>
+        </span>
+      </template>
 
-        <!-- First user message -->
-        <template #cell-firstUserMessage="{ row }">
-          <div
-            v-if="row.firstUserMessage"
-            class="text-xs text-text-secondary truncate w-full"
-          >
-            {{ row.firstUserMessage }}
-            <OTooltip :content="row.firstUserMessage" />
-          </div>
-          <span v-else class="text-xs text-text-muted">—</span>
-        </template>
-
-        <!-- Turns -->
-        <template #cell-turns="{ row }">
-          <span class="text-xs">{{ row.turns }}</span>
-        </template>
-
-        <!-- Duration -->
-        <template #cell-durationNanos="{ row }">
-          <span class="text-xs">
-            {{ formatDuration(row.durationNanos) }}
-            <OTooltip :content="`${row.durationNanos.toLocaleString()} ${t('traces.sessionsList.durationNs')}`" />
-          </span>
-        </template>
-
-        <!-- Tokens -->
-        <template #cell-tokens="{ row }">
-          <span class="text-xs tabular-nums">
-            {{ formatTokens(row.inputTokens) }} → {{ formatTokens(row.outputTokens) }} = {{ formatTokens(row.tokens) }}
-            <OTooltip :content="t('traces.sessionsList.tokenTooltip', { input: row.inputTokens.toLocaleString(), output: row.outputTokens.toLocaleString(), total: row.tokens.toLocaleString() })" />
-          </span>
-        </template>
-
-        <!-- Cost -->
-        <template #cell-cost="{ row }">
-          <span class="text-xs">${{ row.cost.toFixed(4) }}</span>
-        </template>
-
-        <!-- Status (derived from error_count) -->
-        <template #cell-status="{ row }">
-          <OTag
-            type="sessionStatus"
-            :value="row.status"
-            :data-test="`sessions-list-status-${row.sessionId}`"
+      <!-- Tokens -->
+      <template #cell-tokens="{ row }">
+        <span class="text-xs tabular-nums">
+          {{ formatTokens(row.inputTokens) }} → {{ formatTokens(row.outputTokens) }} =
+          {{ formatTokens(row.tokens) }}
+          <OTooltip
+            :content="
+              t('traces.sessionsList.tokenTooltip', {
+                input: row.inputTokens.toLocaleString(),
+                output: row.outputTokens.toLocaleString(),
+                total: row.tokens.toLocaleString(),
+              })
+            "
           />
-        </template>
-      </OTable>
+        </span>
+      </template>
+
+      <!-- Cost -->
+      <template #cell-cost="{ row }">
+        <span class="text-xs">${{ row.cost.toFixed(4) }}</span>
+      </template>
+
+      <!-- Status (derived from error_count) — the error count rides INSIDE the
+             chip as a trailing segment (hidden when 0), so the count is the
+             primary signal without a second element beside the pill. -->
+      <template #cell-status="{ row }">
+        <OTag
+          type="sessionStatus"
+          :value="row.status"
+          :count="row.errorCount"
+          hide-zero-count
+          :data-test="`sessions-list-status-${row.sessionId}`"
+        />
+      </template>
+    </OTable>
   </div>
 </template>
 
@@ -226,11 +228,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { formatDate } from "@/utils/date";
 import { useI18n } from "vue-i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import useStreams from "@/composables/useStreams";
 import { useSessions, type SessionRow } from "./composables/useSessions";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -238,22 +240,14 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import type { AcceptableValue } from "reka-ui";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import genAiAgentMappingService, {
   type GenAiAgentListItem,
 } from "@/services/gen-ai-agent-mapping.service";
-import {
-  ALL_AGENTS_VALUE,
-  agentOptionKey,
-  buildAgentSessionFilter,
-} from "./llmAgentFilter";
-import {
-  splitNumberWithUnit,
-  splitDuration,
-} from "./llmInsightsDashboard.utils";
+import { ALL_AGENTS_VALUE, agentOptionKey, buildAgentSessionFilter } from "./llmAgentFilter";
+import { splitNumberWithUnit, splitDuration } from "./llmInsightsDashboard.utils";
 
 interface Props {
   streamName: string;
@@ -343,9 +337,7 @@ const selectedAgent = computed<GenAiAgentListItem | null>(() => {
 });
 
 const effectiveStream = computed(() =>
-  filterMode.value === "agent"
-    ? (selectedAgent.value?.source_stream ?? "")
-    : activeStream.value,
+  filterMode.value === "agent" ? (selectedAgent.value?.source_stream ?? "") : activeStream.value,
 );
 const effectiveAgent = computed<GenAiAgentListItem | null>(() =>
   filterMode.value === "agent" ? selectedAgent.value : null,
@@ -381,106 +373,115 @@ watch(total, () => {
 // `sessionId` stays mandatory (it's the row identity). `firstUserMessage` is
 // the flex column — it fills leftover width on load and freezes on first
 // resize. All widths are user-resizable + persisted via `table-id`.
-const tableColumns = computed(() => [
-  {
-    id: "firstSeenNanos",
-    header: t('traces.sessionsList.columns.timestamp'),
-    accessorKey: "firstSeenNanos",
-    size: 170,
-    sortable: false,
-    hideable: true,
-    meta: { align: "left" },
-  },
-  {
-    id: "sessionId",
-    header: t('traces.sessionsList.columns.sessionId'),
-    accessorKey: "sessionId",
-    size: 250,
-    sortable: false,
-    meta: { align: "left" },
-  },
-  {
-    id: "userId",
-    header: t('traces.sessionsList.columns.user'),
-    accessorKey: "userId",
-    size: 110,
-    sortable: false,
-    hideable: true,
-    meta: { align: "left" },
-  },
-  {
-    id: "firstUserMessage",
-    header: t('traces.sessionsList.columns.firstMessage'),
-    accessorKey: "firstUserMessage",
-    size: 360,
-    // Flex columns collapse to `minSize` when the table overflows horizontally;
-    // pin a floor so the message stays readable instead of clipping to "Han…".
-    // The user drives how much they want to see via resize, capped by maxSize.
-    minSize: 200,
-    maxSize: 600,
-    sortable: false,
-    hideable: true,
-    meta: { align: "left", flex: true },
-  },
-  {
-    id: "turns",
-    header: t('traces.sessionsList.columns.turns'),
-    accessorKey: "turns",
-    size: 50,
-    sortable: false,
-    hideable: true,
-    meta: { align: "right" },
-  },
-  {
-    id: "durationNanos",
-    header: t('traces.sessionsList.columns.duration'),
-    accessorKey: "durationNanos",
-    size: 90,
-    sortable: false,
-    hideable: true,
-    meta: { align: "left" },
-  },
-  {
-    id: "tokens",
-    header: t('traces.sessionsList.columns.tokens'),
-    accessorKey: "tokens",
-    size: 150,
-    minSize: 150,
-    sortable: false,
-    hideable: true,
-    meta: { align: "right" },
-  },
-  {
-    id: "cost",
-    header: t('traces.sessionsList.columns.cost'),
-    accessorKey: "cost",
-    size: 100,
-    sortable: false,
-    hideable: true,
-    meta: { align: "right" },
-  },
-  {
-    id: "status",
-    header: t('traces.sessionsList.columns.status'),
-    accessorKey: "status",
-    size: 100,
-    sortable: false,
-    hideable: true,
-    meta: { align: "left", disableCellAction: true },
-  },
-].map((c: any) => ({
-  ...c,
-  // Offer every column except the session id (row identity) in OTable's
-  // "Manage columns" chooser.
-  hideable: c.id !== "sessionId",
-})));
+const tableColumns = computed(() =>
+  [
+    {
+      id: "firstSeenNanos",
+      header: t("traces.sessionsList.columns.timestamp"),
+      accessorKey: "firstSeenNanos",
+      size: 170,
+      sortable: false,
+      hideable: true,
+      meta: { align: "left" },
+    },
+    {
+      id: "sessionId",
+      header: t("traces.sessionsList.columns.sessionId"),
+      accessorKey: "sessionId",
+      size: 250,
+      sortable: false,
+      meta: { align: "left" },
+    },
+    {
+      id: "userId",
+      header: t("traces.sessionsList.columns.user"),
+      accessorKey: "userId",
+      size: 110,
+      sortable: false,
+      hideable: true,
+      meta: { align: "left" },
+    },
+    {
+      id: "firstUserMessage",
+      header: t("traces.sessionsList.columns.firstMessage"),
+      accessorKey: "firstUserMessage",
+      size: 360,
+      // Flex columns collapse to `minSize` when the table overflows horizontally;
+      // pin a floor so the message stays readable instead of clipping to "Han…".
+      // The user drives how much they want to see via resize, capped by maxSize.
+      minSize: 200,
+      maxSize: 600,
+      sortable: false,
+      hideable: true,
+      meta: { align: "left", flex: true },
+    },
+    {
+      id: "turns",
+      header: t("traces.sessionsList.columns.turns"),
+      accessorKey: "turns",
+      size: 50,
+      sortable: false,
+      hideable: true,
+      meta: { align: "right" },
+    },
+    {
+      id: "durationNanos",
+      header: t("traces.sessionsList.columns.duration"),
+      accessorKey: "durationNanos",
+      size: 90,
+      sortable: false,
+      hideable: true,
+      meta: { align: "left" },
+    },
+    {
+      id: "tokens",
+      header: t("traces.sessionsList.columns.tokens"),
+      accessorKey: "tokens",
+      size: 150,
+      minSize: 150,
+      sortable: false,
+      hideable: true,
+      meta: { align: "right" },
+    },
+    {
+      id: "cost",
+      header: t("traces.sessionsList.columns.cost"),
+      accessorKey: "cost",
+      size: 100,
+      sortable: false,
+      hideable: true,
+      meta: { align: "right" },
+    },
+    {
+      id: "status",
+      header: t("traces.sessionsList.columns.status"),
+      accessorKey: "status",
+      size: 100,
+      sortable: false,
+      hideable: true,
+      meta: { align: "left", disableCellAction: true },
+    },
+  ].map((c: any) => ({
+    ...c,
+    // Offer every column except the session id (row identity) in OTable's
+    // "Manage columns" chooser.
+    hideable: c.id !== "sessionId",
+  })),
+);
 
-function formatTimestamp(nanos: number): string {
-  if (!nanos) return "—";
-  // Backend ships timestamps as nanoseconds — formatDate wants ms.
-  return formatDate(Math.floor(nanos / 1_000_000), "YYYY-MM-DD HH:mm:ss");
+// Exception-only rail: paint the extreme-left edge red on sessions that errored
+// (errorCount > 0), leaving clean sessions unmarked — so a failed session pops
+// out of a long list at a glance. Mirrors the Alerts / Incidents row rail.
+function sessionRowStyle(row: SessionRow): Record<string, string> {
+  if (!row || (row.errorCount ?? 0) <= 0) return {};
+  return { boxShadow: "inset 0.25rem 0 0 0 var(--color-error-500)" };
 }
 
+// Light exception wash on the whole row for errored sessions (matches the Alerts
+// list) — clean sessions stay unwashed, so attention goes to the failures.
+function sessionRowClass(row: SessionRow): string {
+  return row && (row.errorCount ?? 0) > 0 ? "!bg-status-error-bg" : "";
+}
 
 function formatDuration(nanos: number): string {
   if (!nanos) return "—";
@@ -494,7 +495,6 @@ function formatTokens(n: number): string {
   const t = splitNumberWithUnit(n);
   return `${t.value}${t.unit}`;
 }
-
 
 // Load the trace-stream list at most once per mount. Both the initial mount
 // and the (parent-driven) session load await the SAME promise, so a load can
@@ -510,9 +510,7 @@ async function loadTraceStreams() {
   try {
     const res: any = await getStreams("traces", false, false);
     const list = res?.list || [];
-    const llmStreams = list.filter(
-      (stream: any) => stream?.settings?.is_llm_stream !== false,
-    );
+    const llmStreams = list.filter((stream: any) => stream?.settings?.is_llm_stream !== false);
     availableStreams.value = llmStreams.map((stream: any) => stream.name);
     if (!availableStreams.value.includes(activeStream.value)) {
       activeStream.value = availableStreams.value[0] || "";
@@ -569,11 +567,7 @@ function clearSessionRows() {
   total.value = 0;
 }
 
-async function loadSessions(
-  startTime?: number,
-  endTime?: number,
-  force = false,
-) {
+async function loadSessions(startTime?: number, endTime?: number, force = false) {
   const start = startTime ?? props.startTime;
   const end = endTime ?? props.endTime;
   if (!start || !end) return;
@@ -637,14 +631,13 @@ async function loadSessions(
 
 // Filter / pagination changes are deliberate user actions — force a re-fetch
 // so they bypass the "already loaded" cache guard.
-function onStreamChange() {
+function onStreamChange(val?: AcceptableValue | AcceptableValue[] | boolean) {
+  activeStream.value = typeof val === "string" ? val : "";
   currentPage.value = 1;
   loadSessions(undefined, undefined, true);
 }
 
-function onFilterModeChange(
-  mode?: AcceptableValue | AcceptableValue[] | boolean,
-) {
+function onFilterModeChange(mode?: AcceptableValue | AcceptableValue[] | boolean) {
   const next = mode === "agent" ? "agent" : "stream";
   if (next === filterMode.value) return;
   filterMode.value = next;
@@ -653,7 +646,8 @@ function onFilterModeChange(
   loadSessions(undefined, undefined, true);
 }
 
-function onAgentChange() {
+function onAgentChange(val?: AcceptableValue | AcceptableValue[] | boolean) {
+  activeAgent.value = typeof val === "string" ? val : ALL_AGENTS_VALUE;
   currentPage.value = 1;
   loadSessions(undefined, undefined, true);
 }
@@ -710,6 +704,11 @@ onUnmounted(() => {
 });
 
 useShortcuts([
-  { id: "sessionsRefresh", handler: () => { if (!isInputFocused()) refresh(); } },
+  {
+    id: "sessionsRefresh",
+    handler: () => {
+      if (!isInputFocused()) refresh();
+    },
+  },
 ]);
 </script>

@@ -116,7 +116,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import SessionDetails from "./SessionDetails.vue";
 
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -178,30 +177,27 @@ function makeSpan(overrides: Record<string, any> = {}) {
     start_time: 1700000001000000000,
     duration: 500000000,
     gen_ai_operation_name: "chat",
-    gen_ai_input_messages: JSON.stringify([
-      { role: "user", content: "Hello" },
-    ]),
-    gen_ai_output_messages: JSON.stringify([
-      { role: "assistant", content: "Hi there" },
-    ]),
+    gen_ai_input_messages: JSON.stringify([{ role: "user", content: "Hello" }]),
+    gen_ai_output_messages: JSON.stringify([{ role: "assistant", content: "Hi there" }]),
     gen_ai_response_model: "gpt-4",
     ...overrides,
   };
 }
 
-const turnRowSelector = (traceId = "trace-xyz") =>
-  `[data-test="session-turn-row-${traceId}"]`;
+const turnRowSelector = (traceId = "trace-xyz") => `[data-test="session-turn-row-${traceId}"]`;
 const turnHeaderSelector = (traceId = "trace-xyz") =>
   `[data-test="session-turn-header-${traceId}"]`;
-const turnBodySelector = (traceId = "trace-xyz") =>
-  `[data-test="session-turn-body-${traceId}"]`;
+const turnBodySelector = (traceId = "trace-xyz") => `[data-test="session-turn-body-${traceId}"]`;
 
 const globalStubs = {
   OIcon: {
     template: '<span :data-name="name"><slot /></span>',
     props: ["name", "size"],
   },
-  OTooltip: { template: '<div><slot /><span><slot name="content" /></span></div>', props: ["content", "maxWidth"] },
+  OTooltip: {
+    template: '<div><slot /><span><slot name="content" /></span></div>',
+    props: ["content", "maxWidth"],
+  },
   OSkeleton: {
     template: '<div class="o-skeleton-stub" />',
     props: ["type", "width", "height"],
@@ -315,9 +311,7 @@ describe("SessionDetails — error state", () => {
     const wrapper = await mountComponent();
     // There are multiple .o-button elements (back button + retry); find the retry one
     const buttons = wrapper.findAll(".o-button");
-    const retryBtn = buttons.find((b) =>
-      b.text().includes("traces.sessionDetail.retry"),
-    );
+    const retryBtn = buttons.find((b) => b.text().includes("traces.sessionDetail.retry"));
     expect(retryBtn).toBeTruthy();
     expect(retryBtn!.text()).toContain("traces.sessionDetail.retry");
   });
@@ -334,9 +328,7 @@ describe("SessionDetails — error state", () => {
     expect(wrapper.text()).toContain("traces.sessionDetail.failedToLoad");
 
     const buttons = wrapper.findAll(".o-button");
-    const retryBtn = buttons.find((b) =>
-      b.text().includes("traces.sessionDetail.retry"),
-    );
+    const retryBtn = buttons.find((b) => b.text().includes("traces.sessionDetail.retry"));
     expect(retryBtn).toBeTruthy();
     await retryBtn!.trigger("click");
     await flushPromises();
@@ -459,10 +451,7 @@ describe("SessionDetails — turn rows", () => {
   it("renders a turn row for each trace", async () => {
     mockFetchSession.mockResolvedValue({
       detail: makeDetail(),
-      traces: [
-        makeTrace({ traceId: "t1" }),
-        makeTrace({ traceId: "t2" }),
-      ],
+      traces: [makeTrace({ traceId: "t1" }), makeTrace({ traceId: "t2" })],
     });
 
     const wrapper = await mountComponent();
@@ -520,9 +509,9 @@ describe("SessionDetails — turn rows", () => {
     const wrapper = await mountComponent();
     const header = wrapper.find(turnHeaderSelector());
     // Look for the status badge span within the header
-    const badgeSpan = header.findAll("span").find(
-      (s) => s.classes().join("").includes("text-error-500"),
-    );
+    const badgeSpan = header
+      .findAll("span")
+      .find((s) => s.classes().join("").includes("text-error-500"));
     expect(badgeSpan).toBeTruthy();
   });
 
@@ -534,10 +523,9 @@ describe("SessionDetails — turn rows", () => {
 
     const wrapper = await mountComponent();
     const header = wrapper.find(turnHeaderSelector());
-    const badgeSpan = header.findAll("span").find(
-      (s) =>
-        s.classes().join("").includes("text-text-secondary"),
-    );
+    const badgeSpan = header
+      .findAll("span")
+      .find((s) => s.classes().join("").includes("text-text-secondary"));
     expect(badgeSpan).toBeTruthy();
   });
 

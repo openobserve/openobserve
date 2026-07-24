@@ -18,7 +18,8 @@
   <ODrawer
     :open="open"
     side="right"
-    :width="55"
+    size="xl"
+    bleed
     :title="title"
     data-test="agent-signal-detail-panel"
     @update:open="(v: boolean) => emit('update:open', v)"
@@ -26,62 +27,41 @@
     <!-- Signal-type icon in the drawer header, so the drawer's subject reads at
          a glance (⟳ loop / ⚠ failure / $ cost). -->
     <template #header-left>
-      <div
-        class="flex items-center justify-center h-7 w-7 rounded-default"
-        :class="signalIconWrap"
-      >
+      <div class="rounded-default flex h-7 w-7 items-center justify-center" :class="signalIconWrap">
         <OIcon :name="signalIcon" size="sm" />
       </div>
     </template>
 
-    <section
-      class="flex flex-col gap-3 px-5 pt-4 pb-6 min-h-full overflow-auto"
-      data-test="agent-signal-detail-body"
-    >
+    <div class="flex min-h-full flex-col" data-test="agent-signal-detail-body">
       <!-- Headline: the finding, stated plainly -->
       <div
-        class="flex items-start gap-2"
+        class="px-page-edge flex items-start gap-2 pt-4 pb-3"
         data-test="agent-signal-detail-headline"
       >
-        <OIcon
-          :name="signalIcon"
-          size="sm"
-          class="mt-0.5 shrink-0"
-          :class="signalIconColor"
-        />
+        <OIcon :name="signalIcon" size="sm" class="mt-0.5 shrink-0" :class="signalIconColor" />
         <div class="flex flex-col gap-1">
-          <p class="m-0 text-compact leading-normal text-text-heading">
+          <p class="text-compact text-text-heading m-0 leading-normal">
             {{ headline }}
           </p>
-          <p
-            class="m-0 text-2xs leading-normal text-text-secondary"
-          >
+          <p class="text-2xs text-text-secondary m-0 leading-normal">
             {{ explanation }}
           </p>
         </div>
       </div>
 
-      <!-- FAILURE: the real error messages (the "read it, know the fix" section) -->
-      <section
-        v-if="signalType === 'failure'"
-        class="card-container py-3 px-3.5 pb-3.5 bg-surface-base border border-border-default rounded-surface"
-      >
-        <header class="mb-1.5 flex items-center gap-1.5">
-          <OIcon
-            name="error-outline"
-            size="xs"
-            class="text-badge-error-soft-text"
-          />
-          <h4 class="m-0 text-compact font-semibold text-text-heading">
-            {{ t("aiObservability.behavior.detail.errorsTitle") }}
-          </h4>
-        </header>
+      <!-- FAILURE: the real error messages behind the class -->
+      <template v-if="signalType === 'failure'">
+        <PanelSectionHeader :title="t('aiObservability.behavior.detail.errorsTitle')" />
         <OTable
           data-test="agent-signal-detail-errors"
           :data="errorRows"
           :columns="errorColumns"
           :default-columns="false"
           :frame="false"
+          :show-global-filter="false"
+          :loading="loading"
+          :footer-title="t('aiObservability.behavior.detail.footerErrors')"
+          :empty-message="t('aiObservability.behavior.detail.noErrors')"
           wrap
         >
           <!-- Show the condensed one-liner; reveal the full raw error on demand
@@ -89,7 +69,7 @@
           <template #cell-message="{ row }">
             <div class="flex flex-col gap-1 py-0.5">
               <span
-                class="text-xs leading-normal text-text-heading whitespace-pre-wrap break-words"
+                class="text-text-heading text-xs leading-normal break-words whitespace-pre-wrap"
               >
                 {{ expandedErrors.has(row.full) ? row.full : row.message }}
               </span>
@@ -110,54 +90,41 @@
             </div>
           </template>
         </OTable>
-        <OEmptyState
-          v-if="!loading && errorRows.length === 0"
-          preset="no-data"
-          :title="t('aiObservability.behavior.detail.noErrors')"
-        />
-      </section>
+      </template>
 
-      <!-- LOOP / COST: the worst traces, ranked by what makes them bad -->
-      <section
-        class="card-container py-3 px-3.5 pb-3.5 bg-surface-base border border-border-default rounded-surface"
+      <!-- Worst traces first, ranked by what makes them bad -->
+      <PanelSectionHeader
+        :title="tracesTitle"
+        :hint="t('aiObservability.behavior.detail.tracesHint')"
+      />
+      <OTable
+        data-test="agent-signal-detail-traces"
+        :data="traceRows"
+        :columns="traceColumns"
+        :default-columns="false"
+        :frame="false"
+        :show-global-filter="false"
+        :loading="loading"
+        :footer-title="t('aiObservability.behavior.detail.footerTraces')"
+        :empty-message="t('aiObservability.behavior.detail.noTraces')"
+        pagination="client"
+        :page-size="10"
+        :page-size-options="[10, 20, 50]"
+        @row-click="openTrace"
       >
-        <header class="mb-1.5 flex items-center justify-between gap-2">
-          <h4 class="m-0 text-compact font-semibold text-text-heading">
-            {{ tracesTitle }}
-          </h4>
-          <span class="text-2xs text-text-secondary">
-            {{ t("aiObservability.behavior.detail.tracesHint") }}
-          </span>
-        </header>
-        <OTable
-          data-test="agent-signal-detail-traces"
-          :data="traceRows"
-          :columns="traceColumns"
-          :default-columns="false"
-          :frame="false"
-          pagination="client"
-          :page-size="10"
-          @row-click="openTrace"
-        >
-          <!-- Trace id renders with an "open in new tab" icon so it's clear the
+        <!-- Trace id renders with an "open in new tab" icon so it's clear the
                row opens the trace in a new browser tab, not in place. -->
-          <template #cell-trace_id="{ row }">
-            <span
-              class="inline-flex items-center gap-1 text-text-link hover:underline"
-              :title="t('aiObservability.behavior.detail.openInNewTab')"
-            >
-              <OIcon name="open-in-new" size="xs" class="opacity-70" />
-              <span class="font-mono truncate">{{ row.trace_id }}</span>
-            </span>
-          </template>
-        </OTable>
-        <OEmptyState
-          v-if="!loading && traceRows.length === 0"
-          preset="no-data"
-          :title="t('aiObservability.behavior.detail.noTraces')"
-        />
-      </section>
-    </section>
+        <template #cell-trace_id="{ row }">
+          <span
+            class="text-text-link inline-flex items-center gap-1 hover:underline"
+            :title="t('aiObservability.behavior.detail.openInNewTab')"
+          >
+            <span class="truncate font-mono">{{ row.trace_id }}</span>
+            <OIcon name="open-in-new" size="xs" class="shrink-0 opacity-70" />
+          </span>
+        </template>
+      </OTable>
+    </div>
   </ODrawer>
 </template>
 
@@ -169,9 +136,9 @@ import { useRouter } from "vue-router";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import PanelSectionHeader from "./PanelSectionHeader.vue";
 import searchService from "@/services/search";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
 
@@ -225,17 +192,17 @@ const toggleError = (key: string) => {
   expandedErrors.value = next;
 };
 
-const orgId = computed(
-  () => store.state.selectedOrganization?.identifier as string,
-);
+const orgId = computed(() => store.state.selectedOrganization?.identifier as string);
 const signalType = computed(() => props.row?.signalType);
 
 // Signal-type iconography — a distinct icon + accent per drawer so the subject
 // (looping / failing / costly) reads at a glance.
+// Same glyph the Looping-patterns / Failures summary tiles and table headers use,
+// so the drawer visibly belongs to the row/section it opened from.
 const signalIcon = computed(() => {
-  if (signalType.value === "loop") return "autorenew";
+  if (signalType.value === "loop") return "restart-alt";
   if (signalType.value === "cost") return "attach-money";
-  return "warning"; // failure
+  return "error-outline"; // failure
 });
 const signalIconColor = computed(() => {
   if (signalType.value === "loop") return "text-badge-warning-soft-text";
@@ -243,10 +210,8 @@ const signalIconColor = computed(() => {
   return "text-badge-error-soft-text";
 });
 const signalIconWrap = computed(() => {
-  if (signalType.value === "loop")
-    return "bg-badge-warning-soft-bg text-badge-warning-soft-text";
-  if (signalType.value === "cost")
-    return "bg-badge-primary-soft-bg text-badge-primary-soft-text";
+  if (signalType.value === "loop") return "bg-badge-warning-soft-bg text-badge-warning-soft-text";
+  if (signalType.value === "cost") return "bg-badge-primary-soft-bg text-badge-primary-soft-text";
   return "bg-badge-error-soft-bg text-badge-error-soft-text";
 });
 
@@ -291,19 +256,15 @@ const headline = computed(() => {
 const explanation = computed(() => {
   const r = props.row;
   if (!r) return "";
-  if (r.signalType === "loop")
-    return t("aiObservability.behavior.detail.loopExplain");
-  if (r.signalType === "failure")
-    return t("aiObservability.behavior.detail.failExplain");
+  if (r.signalType === "loop") return t("aiObservability.behavior.detail.loopExplain");
+  if (r.signalType === "failure") return t("aiObservability.behavior.detail.failExplain");
   return t("aiObservability.behavior.detail.costExplain");
 });
 
 const tracesTitle = computed(() => {
   const r = props.row;
-  if (r?.signalType === "loop")
-    return t("aiObservability.behavior.detail.worstLoopTraces");
-  if (r?.signalType === "cost")
-    return t("aiObservability.behavior.detail.topCostTraces");
+  if (r?.signalType === "loop") return t("aiObservability.behavior.detail.worstLoopTraces");
+  if (r?.signalType === "cost") return t("aiObservability.behavior.detail.topCostTraces");
   return t("aiObservability.behavior.detail.tracesTitle");
 });
 
@@ -401,8 +362,7 @@ const AGENT_INHERIT_DEPTH = 4;
  *  falling back to service_name. Mirrors sql.rs::agent_coalesce. */
 const callerExpr = () => {
   const parts = ["c.gen_ai_agent_name"];
-  for (let k = 1; k <= AGENT_INHERIT_DEPTH; k++)
-    parts.push(`p${k}.gen_ai_agent_name`);
+  for (let k = 1; k <= AGENT_INHERIT_DEPTH; k++) parts.push(`p${k}.gen_ai_agent_name`);
   parts.push("c.service_name");
   return `COALESCE(${parts.join(", ")})`;
 };
@@ -438,7 +398,10 @@ const condenseError = (raw: string): string => {
   const m = s.match(/"message"\s*:\s*"([^"]{3,})"/);
   if (m) {
     // Keep the leading error class (before the first "{") + the inner message.
-    const prefix = s.split("{")[0].replace(/[-:\s]+$/, "").trim();
+    const prefix = s
+      .split("{")[0]
+      .replace(/[-:\s]+$/, "")
+      .trim();
     s = prefix ? `${prefix} — ${m[1]}` : m[1];
   }
   if (s.length > MAX_ERR_LEN) s = s.slice(0, MAX_ERR_LEN).trimEnd() + "…";
@@ -485,8 +448,7 @@ const fetchDetails = async () => {
   // The error detail can live in status_message OR error_message depending on
   // the framework — COALESCE so the message shows wherever it was populated
   // (mirrors the rollup's configurable error-detail-field coalescing).
-  const detail =
-    "COALESCE(NULLIF(c.status_message, ''), NULLIF(c.error_message, ''))";
+  const detail = "COALESCE(NULLIF(c.status_message, ''), NULLIF(c.error_message, ''))";
   try {
     if (r.signalType === "failure") {
       // The real, grouped error messages behind this class — the actionable content.

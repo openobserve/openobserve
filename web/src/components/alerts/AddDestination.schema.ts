@@ -67,8 +67,7 @@ export const makeAddDestinationSchema = (
     })
     .superRefine((val, ctx) => {
       const trimmed = (s: unknown) => String(s ?? "").trim();
-      const isPrebuilt =
-        isAlerts && !!val.destination_type && val.destination_type !== "custom";
+      const isPrebuilt = isAlerts && !!val.destination_type && val.destination_type !== "custom";
 
       // name: required + resource-name check. Scoped to NON-prebuilt paths.
       if (!isPrebuilt) {
@@ -151,10 +150,9 @@ export const makeAddDestinationSchema = (
       // issue lands on its OFormInput (name=`credentials.<key>`). This is what
       // makes the single-form Save/Enter gate on the credential rules.
       if (isPrebuilt) {
-        const credResult = makePrebuiltDestinationSchema(
-          t,
-          String(val.destination_type),
-        ).safeParse((val.credentials ?? {}) as Record<string, unknown>);
+        const credResult = makePrebuiltDestinationSchema(t, String(val.destination_type)).safeParse(
+          (val.credentials ?? {}) as Record<string, unknown>,
+        );
         if (!credResult.success) {
           for (const issue of credResult.error.issues) {
             ctx.addIssue({
@@ -167,9 +165,7 @@ export const makeAddDestinationSchema = (
       }
     });
 
-export type AddDestinationForm = z.infer<
-  ReturnType<typeof makeAddDestinationSchema>
->;
+export type AddDestinationForm = z.infer<ReturnType<typeof makeAddDestinationSchema>>;
 
 // Static (create-only) defaults. Edit prefill is applied at runtime via
 // setFieldValue in setupDestinationData (see AddDestination.vue), not here.

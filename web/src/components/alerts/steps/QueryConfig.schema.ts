@@ -51,9 +51,7 @@ export const conditionGroupNodeSchema = z.looseObject({
   groupId: z.string().optional(),
   logicalOperator: z.string().optional(),
   get conditions() {
-    return z
-      .array(z.union([conditionGroupNodeSchema, conditionNodeSchema]))
-      .optional();
+    return z.array(z.union([conditionGroupNodeSchema, conditionNodeSchema])).optional();
   },
 });
 export type ConditionGroupNode = z.infer<typeof conditionGroupNodeSchema>;
@@ -205,8 +203,7 @@ export interface QueryConfigMeta {
 
 /** True when the RAW input value is empty (unset). Shared by the number checks
  *  so "" / null / undefined always count as "not provided". */
-const isBlank = (v: unknown): boolean =>
-  v === undefined || v === null || v === "";
+const isBlank = (v: unknown): boolean => v === undefined || v === null || v === "";
 
 /** A number field that must be present AND ≥ 1. Empty OR NaN OR < 1 → invalid.
  *  Operates on the raw (possibly string) value so 0 fails but "" is caught as
@@ -226,236 +223,233 @@ const isBelowOne = (v: unknown): boolean => {
 export const makeQueryConfigSchema = (t: Translator) =>
   z
     .looseObject({
-    trigger_condition: z
-      .looseObject({
-        operator: z.string().optional(),
-        threshold: z.unknown().optional(),
-        frequency: z.unknown().optional(),
-      })
-      .optional(),
-    query_condition: z
-      .looseObject({
-        conditions: conditionGroupNodeSchema.optional(),
-        aggregation: z
-          .looseObject({
-            group_by: z.array(z.string()).optional(),
-            function: z.string().optional(),
-            having: z
-              .looseObject({
-                column: z.string().optional(),
-                operator: z.string().optional(),
-                value: z.unknown().optional(),
-              })
-              .optional(),
-          })
-          .nullable()
-          .optional(),
-        promql_condition: z
-          .looseObject({
-            operator: z.string().optional(),
-            value: z.unknown().optional(),
-          })
-          .nullable()
-          .optional(),
-      })
-      .optional(),
-    /** Logs/traces group-by lives on its own field (metrics group-by lives on
-     *  query_condition.aggregation.group_by). */
-    logGroupBy: z.array(z.string()).optional(),
-    /** DISPLAY-ONLY form state — never sent to the backend (stripped by
-     *  getAlertPayload alongside `_meta`/`logGroupBy`). `checkEvery` holds the
-     *  number the user actually sees in the "Check every" input: a HOURS-count
-     *  in hours mode, a MINUTES-count otherwise. The stored
-     *  `trigger_condition.frequency` is ALWAYS minutes — QueryConfig's
-     *  onCheckEveryChange bridges display → minutes. Both frequency rules live
-     *  on this path because it is the one bound to the visible input. */
-    _ui: z
-      .looseObject({
-        checkEvery: z.unknown().optional(),
-      })
-      .optional(),
-    _meta: z.looseObject({
-      tab: z.string(),
-      isRealTime: z.string(),
-      isEventBased: z.boolean(),
-      selectedFunction: z.string(),
-      frequencyMode: z.string(),
-      hasConditions: z.boolean(),
-      hasGroupBy: z.boolean(),
-      aggregationEnabled: z.boolean(),
-      minAutoRefreshInterval: z.number().optional(),
-    }),
-  })
-  .superRefine((val, ctx) => {
-    const meta = val._meta as QueryConfigMeta;
-    const scheduled = meta.isRealTime === "false";
-    const isCustom = meta.tab === "custom";
-    const isSql = meta.tab === "sql";
-    const isPromql = meta.tab === "promql";
-    const isMeasure = meta.selectedFunction !== "total_events";
+      trigger_condition: z
+        .looseObject({
+          operator: z.string().optional(),
+          threshold: z.unknown().optional(),
+          frequency: z.unknown().optional(),
+        })
+        .optional(),
+      query_condition: z
+        .looseObject({
+          conditions: conditionGroupNodeSchema.optional(),
+          aggregation: z
+            .looseObject({
+              group_by: z.array(z.string()).optional(),
+              function: z.string().optional(),
+              having: z
+                .looseObject({
+                  column: z.string().optional(),
+                  operator: z.string().optional(),
+                  value: z.unknown().optional(),
+                })
+                .optional(),
+            })
+            .nullable()
+            .optional(),
+          promql_condition: z
+            .looseObject({
+              operator: z.string().optional(),
+              value: z.unknown().optional(),
+            })
+            .nullable()
+            .optional(),
+        })
+        .optional(),
+      /** Logs/traces group-by lives on its own field (metrics group-by lives on
+       *  query_condition.aggregation.group_by). */
+      logGroupBy: z.array(z.string()).optional(),
+      /** DISPLAY-ONLY form state — never sent to the backend (stripped by
+       *  getAlertPayload alongside `_meta`/`logGroupBy`). `checkEvery` holds the
+       *  number the user actually sees in the "Check every" input: a HOURS-count
+       *  in hours mode, a MINUTES-count otherwise. The stored
+       *  `trigger_condition.frequency` is ALWAYS minutes — QueryConfig's
+       *  onCheckEveryChange bridges display → minutes. Both frequency rules live
+       *  on this path because it is the one bound to the visible input. */
+      _ui: z
+        .looseObject({
+          checkEvery: z.unknown().optional(),
+        })
+        .optional(),
+      _meta: z.looseObject({
+        tab: z.string(),
+        isRealTime: z.string(),
+        isEventBased: z.boolean(),
+        selectedFunction: z.string(),
+        frequencyMode: z.string(),
+        hasConditions: z.boolean(),
+        hasGroupBy: z.boolean(),
+        aggregationEnabled: z.boolean(),
+        minAutoRefreshInterval: z.number().optional(),
+      }),
+    })
+    .superRefine((val, ctx) => {
+      const meta = val._meta as QueryConfigMeta;
+      const scheduled = meta.isRealTime === "false";
+      const isCustom = meta.tab === "custom";
+      const isSql = meta.tab === "sql";
+      const isPromql = meta.tab === "promql";
+      const isMeasure = meta.selectedFunction !== "total_events";
 
-    const tc = (val.trigger_condition ?? {}) as Record<string, unknown>;
-    const qc = (val.query_condition ?? {}) as Record<string, any>;
+      const tc = (val.trigger_condition ?? {}) as Record<string, unknown>;
+      const qc = (val.query_condition ?? {}) as Record<string, any>;
 
-    // ── Conditions tree (custom mode, realtime + scheduled) ──────────────────
-    // Blocks save on partially-filled rows.
-    if (isCustom && qc.conditions) {
-      refineConditionsTree(
-        qc.conditions,
-        ctx,
-        ["query_condition", "conditions"],
-        t("alerts.validation.fieldRequired"),
-      );
-    }
+      // ── Conditions tree (custom mode, realtime + scheduled) ──────────────────
+      // Blocks save on partially-filled rows.
+      if (isCustom && qc.conditions) {
+        refineConditionsTree(
+          qc.conditions,
+          ctx,
+          ["query_condition", "conditions"],
+          t("alerts.validation.fieldRequired"),
+        );
+      }
 
-    // Everything below is SCHEDULED-only (realtime alerts show filters only —
-    // no threshold sentence / "Check every").
-    if (!scheduled) return;
+      // Everything below is SCHEDULED-only (realtime alerts show filters only —
+      // no threshold sentence / "Check every").
+      if (!scheduled) return;
 
-    // ── Threshold ≥ 1 ────────────────────────────────────────────────────────
-    // Shown+required in every scheduled branch: custom (count OR the measure
-    // "having groups" — forced to 1 when no group-by, so ≥1 always holds), SQL
-    // ("no. of events"), PromQL ("having series"). One rule covers them all.
-    if (isBelowOne(tc.threshold)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["trigger_condition", "threshold"],
-        message: t("alerts.validation.thresholdPositive"),
-      });
-    }
-
-    // ── Frequency ≥ 1 ────────────────────────────────────────────────────────
-    // Only when NOT in cron mode (cron is validated separately — the component
-    // renders `cronError`, useAlertForm.runImperativeQueryChecks gates save).
-    // Keyed on the DISPLAY value (`_ui.checkEvery`) because that is the path the
-    // visible "Check every" input binds, so the message renders inline. Display
-    // ≥ 1 ⇔ stored ≥ 1 in both modes (hours multiplies by 60).
-    const ui = (val._ui ?? {}) as Record<string, unknown>;
-    const display = ui.checkEvery;
-    if (meta.frequencyMode !== "cron") {
-      if (isBelowOne(display)) {
+      // ── Threshold ≥ 1 ────────────────────────────────────────────────────────
+      // Shown+required in every scheduled branch: custom (count OR the measure
+      // "having groups" — forced to 1 when no group-by, so ≥1 always holds), SQL
+      // ("no. of events"), PromQL ("having series"). One rule covers them all.
+      if (isBelowOne(tc.threshold)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ["_ui", "checkEvery"],
-          message: t("alerts.validation.frequencyPositive"),
+          path: ["trigger_condition", "threshold"],
+          message: t("alerts.validation.thresholdPositive"),
         });
-      } else {
-        // ── Org min-frequency floor ─────────────────────────────────────────
-        // Compare the frequency in MINUTES against ceil(min_auto_refresh_interval
-        // / 60): convert the display value the same way onCheckEveryChange does.
-        // Skipped entirely when the org sets no floor.
-        const floorSecs = Number(meta.minAutoRefreshInterval) || 0;
-        if (floorSecs > 0) {
-          const freqMins =
-            meta.frequencyMode === "hours"
-              ? Number(display) * 60
-              : Number(display);
-          const floorMins = Math.ceil(floorSecs / 60);
-          if (freqMins < floorMins) {
+      }
+
+      // ── Frequency ≥ 1 ────────────────────────────────────────────────────────
+      // Only when NOT in cron mode (cron is validated separately — the component
+      // renders `cronError`, useAlertForm.runImperativeQueryChecks gates save).
+      // Keyed on the DISPLAY value (`_ui.checkEvery`) because that is the path the
+      // visible "Check every" input binds, so the message renders inline. Display
+      // ≥ 1 ⇔ stored ≥ 1 in both modes (hours multiplies by 60).
+      const ui = (val._ui ?? {}) as Record<string, unknown>;
+      const display = ui.checkEvery;
+      if (meta.frequencyMode !== "cron") {
+        if (isBelowOne(display)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["_ui", "checkEvery"],
+            message: t("alerts.validation.frequencyPositive"),
+          });
+        } else {
+          // ── Org min-frequency floor ─────────────────────────────────────────
+          // Compare the frequency in MINUTES against ceil(min_auto_refresh_interval
+          // / 60): convert the display value the same way onCheckEveryChange does.
+          // Skipped entirely when the org sets no floor.
+          const floorSecs = Number(meta.minAutoRefreshInterval) || 0;
+          if (floorSecs > 0) {
+            const freqMins =
+              meta.frequencyMode === "hours" ? Number(display) * 60 : Number(display);
+            const floorMins = Math.ceil(floorSecs / 60);
+            if (freqMins < floorMins) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["_ui", "checkEvery"],
+                message: t("alerts.validation.minimumFrequency", {
+                  minutes: floorMins,
+                }),
+              });
+            }
+          }
+        }
+      }
+
+      // ── PromQL branch ────────────────────────────────────────────────────────
+      if (isPromql) {
+        const pc = (qc.promql_condition ?? {}) as Record<string, unknown>;
+        if (!pc.operator) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["query_condition", "promql_condition", "operator"],
+            message: t("alerts.validation.fieldRequired"),
+          });
+        }
+        // ZERO-SAFE: 0 is a valid PromQL threshold; only unset fails.
+        if (isBlank(pc.value)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["query_condition", "promql_condition", "value"],
+            message: t("alerts.validation.fieldRequired"),
+          });
+        }
+      }
+
+      // ── Custom + measure aggregation ─────────────────────────────────────────
+      if (isCustom && isMeasure) {
+        const having = (qc.aggregation?.having ?? {}) as Record<string, unknown>;
+
+        // ── Measure column — required ───────────────────────────────────────────
+        // Must live in form state, not an imperative gate: the two selects are
+        // name-bound <OFormSelect>, which derives `:error` from
+        // `field.state.meta.errors` and OMITS a parent-passed `:error`. Form state
+        // is the ONLY thing that can paint the field.
+        //
+        // ONE path covers BOTH branches — the logs select and the metrics select
+        // bind the same `query_condition.aggregation.having.column` name.
+        //
+        // Predicate: aggregation ON + an aggregation object carrying a non-count
+        // function.
+        const aggregation = qc.aggregation;
+        const fn = aggregation?.function;
+        if (meta.aggregationEnabled && aggregation && fn && fn !== "total_events") {
+          // Trim-aware — a whitespace-only column is not a column.
+          const column = having.column;
+          if (column == null || String(column).trim() === "") {
             ctx.addIssue({
               code: z.ZodIssueCode.custom,
-              path: ["_ui", "checkEvery"],
-              message: t("alerts.validation.minimumFrequency", {
-                minutes: floorMins,
-              }),
+              path: ["query_condition", "aggregation", "having", "column"],
+              message: t("alerts.validation.aggregationColumnRequired"),
+            });
+          }
+        }
+
+        // "value is" field — required (non-empty).
+        if (isBlank(having.value)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["query_condition", "aggregation", "having", "value"],
+            message: t("alerts.validation.fieldRequired"),
+          });
+        }
+        // Group-by rows — PARITY with pre-migration AlertSettings.validate()
+        // (HEAD ~828-837): "if any are added, they must not be empty".
+        //   • EMPTY group_by array  → VALID. A measure alert with NO group-by
+        //     saves, exactly as before. alertPayload.ts (~:88-96) is purpose-built
+        //     for that state: it forces threshold=1 / operator=">=" because the
+        //     "Having groups" row is hidden. Requiring a group-by here would make
+        //     that pre-existing branch dead code.
+        //   • A BLANK row          → INVALID (the old loop rejected any empty
+        //     entry). The issue is attached to THAT row's index so the row's own
+        //     <OFormSelect> (name="…group_by[i]" / "logGroupBy[i]") surfaces it,
+        //     matching the old "show inline error only" behavior.
+        // Predicate `!g` mirrors the old `!field || field === ""` exactly.
+        if (meta.aggregationEnabled) {
+          const groupByPath = meta.isEventBased
+            ? ["logGroupBy"]
+            : ["query_condition", "aggregation", "group_by"];
+          const groupBy =
+            (meta.isEventBased
+              ? (val.logGroupBy as unknown[])
+              : (qc.aggregation?.group_by as unknown[])) ?? [];
+          if (Array.isArray(groupBy)) {
+            groupBy.forEach((g, i) => {
+              if (!g) {
+                ctx.addIssue({
+                  code: z.ZodIssueCode.custom,
+                  path: [...groupByPath, i],
+                  message: t("alerts.validation.fieldRequired"),
+                });
+              }
             });
           }
         }
       }
-    }
-
-    // ── PromQL branch ────────────────────────────────────────────────────────
-    if (isPromql) {
-      const pc = (qc.promql_condition ?? {}) as Record<string, unknown>;
-      if (!pc.operator) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["query_condition", "promql_condition", "operator"],
-          message: t("alerts.validation.fieldRequired"),
-        });
-      }
-      // ZERO-SAFE: 0 is a valid PromQL threshold; only unset fails.
-      if (isBlank(pc.value)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["query_condition", "promql_condition", "value"],
-          message: t("alerts.validation.fieldRequired"),
-        });
-      }
-    }
-
-    // ── Custom + measure aggregation ─────────────────────────────────────────
-    if (isCustom && isMeasure) {
-      const having = (qc.aggregation?.having ?? {}) as Record<string, unknown>;
-
-      // ── Measure column — required ───────────────────────────────────────────
-      // Must live in form state, not an imperative gate: the two selects are
-      // name-bound <OFormSelect>, which derives `:error` from
-      // `field.state.meta.errors` and OMITS a parent-passed `:error`. Form state
-      // is the ONLY thing that can paint the field.
-      //
-      // ONE path covers BOTH branches — the logs select and the metrics select
-      // bind the same `query_condition.aggregation.having.column` name.
-      //
-      // Predicate: aggregation ON + an aggregation object carrying a non-count
-      // function.
-      const aggregation = qc.aggregation;
-      const fn = aggregation?.function;
-      if (meta.aggregationEnabled && aggregation && fn && fn !== "total_events") {
-        // Trim-aware — a whitespace-only column is not a column.
-        const column = having.column;
-        if (column == null || String(column).trim() === "") {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["query_condition", "aggregation", "having", "column"],
-            message: t("alerts.validation.aggregationColumnRequired"),
-          });
-        }
-      }
-
-      // "value is" field — required (non-empty).
-      if (isBlank(having.value)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["query_condition", "aggregation", "having", "value"],
-          message: t("alerts.validation.fieldRequired"),
-        });
-      }
-      // Group-by rows — PARITY with pre-migration AlertSettings.validate()
-      // (HEAD ~828-837): "if any are added, they must not be empty".
-      //   • EMPTY group_by array  → VALID. A measure alert with NO group-by
-      //     saves, exactly as before. alertPayload.ts (~:88-96) is purpose-built
-      //     for that state: it forces threshold=1 / operator=">=" because the
-      //     "Having groups" row is hidden. Requiring a group-by here would make
-      //     that pre-existing branch dead code.
-      //   • A BLANK row          → INVALID (the old loop rejected any empty
-      //     entry). The issue is attached to THAT row's index so the row's own
-      //     <OFormSelect> (name="…group_by[i]" / "logGroupBy[i]") surfaces it,
-      //     matching the old "show inline error only" behavior.
-      // Predicate `!g` mirrors the old `!field || field === ""` exactly.
-      if (meta.aggregationEnabled) {
-        const groupByPath = meta.isEventBased
-          ? ["logGroupBy"]
-          : ["query_condition", "aggregation", "group_by"];
-        const groupBy = (
-          meta.isEventBased
-            ? (val.logGroupBy as unknown[])
-            : (qc.aggregation?.group_by as unknown[])
-        ) ?? [];
-        if (Array.isArray(groupBy)) {
-          groupBy.forEach((g, i) => {
-            if (!g) {
-              ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                path: [...groupByPath, i],
-                message: t("alerts.validation.fieldRequired"),
-              });
-            }
-          });
-        }
-      }
-    }
-  });
+    });
 
 export type QueryConfigForm = z.infer<ReturnType<typeof makeQueryConfigSchema>>;
 

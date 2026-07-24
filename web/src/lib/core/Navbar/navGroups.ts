@@ -13,12 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type {
-  NavItem,
-  RailEntry,
-  SubnavChild,
-  NavGateContext,
-} from "./ONavbar.types";
+import type { NavItem, RailEntry, SubnavChild, NavGateContext } from "./ONavbar.types";
 
 /**
  * Visibility gates — each predicate mirrors the EXACT `visible` condition the
@@ -30,10 +25,7 @@ import type {
  * enterprise only — hence the separate `isEnterprise`/`isCloud` flags rather
  * than one combined flag.
  */
-export const GATE_PREDICATES: Record<
-  string,
-  (c: NavGateContext) => boolean
-> = {
+export const GATE_PREDICATES: Record<string, (c: NavGateContext) => boolean> = {
   // Settings (isEnt = enterprise only)
   enterprise: (c) => c.isEnterprise,
   enterpriseMeta: (c) => c.isEnterprise && c.isMeta,
@@ -108,10 +100,26 @@ export const NAV_GROUPS: NavGroupDef[] = [
     children: [
       { titleKey: "menu.index", icon: "window", name: "logstreams", requires: "streams" },
       // Pipeline expands into its own tabbed sub-pages (same visibility rules).
-      { titleKey: "function.streamPipeline", icon: "lan", name: "pipelines", requires: "pipeline", gate: "streamPipelines" },
+      {
+        titleKey: "function.streamPipeline",
+        icon: "lan",
+        name: "pipelines",
+        requires: "pipeline",
+        gate: "streamPipelines",
+      },
       { titleKey: "function.header", icon: "function", name: "functionList", requires: "pipeline" },
-      { titleKey: "function.enrichmentTables", icon: "dataset", name: "enrichmentTables", requires: "pipeline" },
-      { titleKey: "menu.ingestion", icon: "data-plus-line", name: "ingestion", requires: "ingestion" },
+      {
+        titleKey: "function.enrichmentTables",
+        icon: "dataset",
+        name: "enrichmentTables",
+        requires: "pipeline",
+      },
+      {
+        titleKey: "menu.ingestion",
+        icon: "data-plus-line",
+        name: "ingestion",
+        requires: "ingestion",
+      },
     ],
   },
   {
@@ -156,9 +164,7 @@ export function groupNavLinks(
   const groupChildren = new Map<string, SubnavChild[]>();
   const absorbedToGroup = new Map<string, NavGroupDef>();
   for (const def of NAV_GROUPS) {
-    const children = def.children.filter(
-      (c) => !c.requires || presentNames.has(c.requires),
-    );
+    const children = def.children.filter((c) => !c.requires || presentNames.has(c.requires));
     const hasAbsorbed = def.absorbs.some((n) => presentNames.has(n));
     // A single-child "group" is pointless (the flyout would duplicate the tile),
     // so only collapse into a group when ≥2 children remain after filtering.
@@ -210,8 +216,7 @@ export function groupNavLinks(
     if (group) {
       // Absorbed item — drop it. Emit the group here only when it has no
       // (present) `placeAfter` anchor (default first-absorbed placement).
-      const usesPlaceAfter =
-        group.placeAfter && presentNames.has(group.placeAfter);
+      const usesPlaceAfter = group.placeAfter && presentNames.has(group.placeAfter);
       if (!usesPlaceAfter) emitGroup(group);
       continue;
     }

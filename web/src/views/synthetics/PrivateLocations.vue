@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 <template>
-  <div class="flex-1 flex flex-col overflow-hidden min-w-0">
+  <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
     <OTable
       :data="filteredLocations"
       :columns="columns"
@@ -17,8 +17,8 @@
       @row-click="openDetail"
     >
       <template #toolbar>
-        <div class="flex items-center gap-2 flex-1 min-w-0">
-          <div class="flex-1 min-w-0">
+        <div class="flex min-w-0 flex-1 items-center gap-2">
+          <div class="min-w-0 flex-1">
             <OInput
               v-model="search"
               :placeholder="t('synthetics.privateLocations.searchPlaceholder')"
@@ -51,9 +51,9 @@
 
       <!-- Label + pool subtext -->
       <template #cell-name="{ row }">
-        <div class="flex flex-col min-w-0">
+        <div class="flex min-w-0 flex-col">
           <span class="truncate font-medium">{{ (row as any).label }}</span>
-          <span class="truncate text-xs text-text-muted">{{ (row as any).pool }}</span>
+          <span class="text-text-muted truncate text-xs">{{ (row as any).pool }}</span>
         </div>
       </template>
 
@@ -81,7 +81,9 @@
 
       <!-- Last seen -->
       <template #cell-lastSeen="{ row }">
-        <span v-if="(row as any).last_seen_at">{{ formatTimeAgoUs((row as any).last_seen_at) }}</span>
+        <span v-if="(row as any).last_seen_at">{{
+          formatTimeAgoUs((row as any).last_seen_at)
+        }}</span>
         <span v-else class="text-text-muted">—</span>
       </template>
 
@@ -103,7 +105,9 @@
             :disabled="(row as any).monitors_count > 0"
             :title="
               (row as any).monitors_count > 0
-                ? t('synthetics.privateLocations.deleteBlocked', { count: (row as any).monitors_count })
+                ? t('synthetics.privateLocations.deleteBlocked', {
+                    count: (row as any).monitors_count,
+                  })
                 : t('synthetics.table.delete')
             "
             :data-test="`synthetics-private-locations-delete-btn-${(row as any).id}`"
@@ -252,5 +256,4 @@ const columns = computed<OTableColumnDef[]>(() => [
 const openDetail = (row: SyntheticLocation) => {
   router.push({ name: "synthetic-private-location", params: { id: row.id } });
 };
-
 </script>

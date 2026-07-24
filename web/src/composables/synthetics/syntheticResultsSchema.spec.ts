@@ -25,6 +25,8 @@ import {
   buildLastRunSql,
   buildRunsSql,
   buildRunsWithStepsSql,
+  deviceIconName,
+  deviceLabel,
   mapHistogram,
   mapKpi,
   mapRun,
@@ -35,18 +37,10 @@ describe("syntheticResultsSchema query builders", () => {
     const sql = buildKpiSql("mon-1");
     expect(sql).toContain(`FROM "${SYNTHETIC_RESULTS_STREAM}"`);
     expect(sql).toContain(`${SYNTHETIC_FIELDS.monitorId} = 'mon-1'`);
-    expect(sql).toContain(
-      `FILTER (WHERE ${SYNTHETIC_FIELDS.status} = '${STATUS_VALUES.passed}')`,
-    );
-    expect(sql).toContain(
-      `FILTER (WHERE ${SYNTHETIC_FIELDS.status} = '${STATUS_VALUES.warning}')`,
-    );
-    expect(sql).toContain(
-      `FILTER (WHERE ${SYNTHETIC_FIELDS.status} = '${STATUS_VALUES.failed}')`,
-    );
-    expect(sql).toContain(
-      `FILTER (WHERE ${SYNTHETIC_FIELDS.status} = '${STATUS_VALUES.error}')`,
-    );
+    expect(sql).toContain(`FILTER (WHERE ${SYNTHETIC_FIELDS.status} = '${STATUS_VALUES.passed}')`);
+    expect(sql).toContain(`FILTER (WHERE ${SYNTHETIC_FIELDS.status} = '${STATUS_VALUES.warning}')`);
+    expect(sql).toContain(`FILTER (WHERE ${SYNTHETIC_FIELDS.status} = '${STATUS_VALUES.failed}')`);
+    expect(sql).toContain(`FILTER (WHERE ${SYNTHETIC_FIELDS.status} = '${STATUS_VALUES.error}')`);
     expect(sql).toContain(`approx_percentile_cont(${SYNTHETIC_FIELDS.duration}, 0.95)`);
   });
 
@@ -87,7 +81,11 @@ describe("syntheticResultsSchema query builders", () => {
     // The schema only contains fields some ingested row has carried
     // (device/engine are browser-only, error appears after a first failure);
     // naming an absent field makes the search API reject the whole query.
-    const sql = buildRunsSql("mon-1", 50, new Set(["_timestamp", "status", "response_time_ms", "location"]));
+    const sql = buildRunsSql(
+      "mon-1",
+      50,
+      new Set(["_timestamp", "status", "response_time_ms", "location"]),
+    );
     expect(sql).toContain(`${SYNTHETIC_FIELDS.timestamp} as ts`);
     expect(sql).toContain("status as status");
     expect(sql).toContain(`${SYNTHETIC_FIELDS.location} as location`);
@@ -251,7 +249,7 @@ describe("aggregateStepStats", () => {
       ts: 1_700_000_000_500_000,
       engine: "chromium",
       location: "us-east-1",
-      device: "laptop_large",
+      device: "desktop",
       error: "",
       run_id: "run-1",
       execution_id: "exec-1",
@@ -262,7 +260,12 @@ describe("aggregateStepStats", () => {
       ]),
       last_attempt_steps: JSON.stringify([
         { step_id: "step-1", status: "ok", duration_ms: 200, error: "" },
-        { step_id: "step-2", status: "fail", duration_ms: 5000, error: "Timeout waiting for selector" },
+        {
+          step_id: "step-2",
+          status: "fail",
+          duration_ms: 5000,
+          error: "Timeout waiting for selector",
+        },
       ]),
       retry_history: "[]",
       ...overrides,
@@ -344,7 +347,12 @@ describe("aggregateStepStats", () => {
 
   it("should break down failures by browser and location", () => {
     const chrome = makeHit({ engine: "chromium", location: "us-east-1" });
-    const firefox = makeHit({ engine: "firefox", location: "eu-west-1", run_id: "run-2", execution_id: "exec-2" });
+    const firefox = makeHit({
+      engine: "firefox",
+      location: "eu-west-1",
+      run_id: "run-2",
+      execution_id: "exec-2",
+    });
 
     const result = aggregateStepStats([chrome, firefox], start, end);
     const login = result.stepGroups.find((g) => g.name === "Click login");
@@ -403,7 +411,12 @@ describe("aggregateStepStats", () => {
         { step_id: "step-2", status: "ok", duration_ms: 800, error: "" },
       ]),
       retry_history: JSON.stringify([
-        { attempt: 1, status: "failed", durationMs: 5200, steps: [{ step_id: "step-2", status: "fail", duration_ms: 5000, error: "Timeout" }] },
+        {
+          attempt: 1,
+          status: "failed",
+          durationMs: 5200,
+          steps: [{ step_id: "step-2", status: "fail", duration_ms: 5000, error: "Timeout" }],
+        },
       ]),
     });
 
@@ -419,5 +432,49 @@ describe("aggregateStepStats", () => {
     const loginBuckets = result.trendBuckets.filter((b) => b.stepName === "Click login");
     expect(loginBuckets.length).toBeGreaterThan(0);
     expect(loginBuckets[0].avgDurationMs).toBeGreaterThan(0);
+  });
+});
+
+describe("deviceIconName", () => {
+  it("should return the correct icon for desktop", () => {
+    expect(deviceIconName("desktop")).toBe("computer");
+  });
+
+  it("should return the correct icon for tablet", () => {
+    expect(deviceIconName("tablet")).toBe("tablet");
+  });
+
+  it("should return the correct icon for mobile", () => {
+    expect(deviceIconName("mobile")).toBe("smartphone");
+  });
+
+  it("should fall back to 'devices' icon for an unknown device ID", () => {
+    expect(deviceIconName("unknown_device")).toBe("devices");
+  });
+
+  it("should fall back to 'devices' icon for an empty string", () => {
+    expect(deviceIconName("")).toBe("devices");
+  });
+});
+
+describe("deviceLabel", () => {
+  it("should return the correct label for desktop", () => {
+    expect(deviceLabel("desktop")).toBe("Desktop");
+  });
+
+  it("should return the correct label for tablet", () => {
+    expect(deviceLabel("tablet")).toBe("Tablet");
+  });
+
+  it("should return the correct label for mobile", () => {
+    expect(deviceLabel("mobile")).toBe("Mobile");
+  });
+
+  it("should fall back to the raw device ID for an unknown device", () => {
+    expect(deviceLabel("some_custom_device")).toBe("some_custom_device");
+  });
+
+  it("should fall back to the raw ID for an empty string", () => {
+    expect(deviceLabel("")).toBe("");
   });
 });

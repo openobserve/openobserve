@@ -64,9 +64,7 @@ describe("workflows service", () => {
       const error = new Error("Network Error");
       mockHttpInstance.get.mockRejectedValue(error);
 
-      await expect(workflows.listWorkflows("default")).rejects.toThrow(
-        "Network Error",
-      );
+      await expect(workflows.listWorkflows("default")).rejects.toThrow("Network Error");
     });
 
     it("interpolates an org identifier containing hyphens and underscores", async () => {
@@ -74,9 +72,7 @@ describe("workflows service", () => {
 
       await workflows.listWorkflows("my-org_2");
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        "/api/my-org_2/workflows",
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith("/api/my-org_2/workflows");
     });
 
     it("does not encode the org identifier (raw interpolation)", async () => {
@@ -84,9 +80,7 @@ describe("workflows service", () => {
 
       await workflows.listWorkflows("org with space");
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        "/api/org with space/workflows",
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith("/api/org with space/workflows");
     });
 
     it("handles an empty org identifier", async () => {
@@ -105,10 +99,7 @@ describe("workflows service", () => {
 
       await workflows.createWorkflow({ org_identifier: "org123", data });
 
-      expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        "/api/org123/workflows",
-        data,
-      );
+      expect(mockHttpInstance.post).toHaveBeenCalledWith("/api/org123/workflows", data);
     });
 
     it("passes the body object through by reference (no transformation)", async () => {
@@ -132,9 +123,9 @@ describe("workflows service", () => {
       const error = { response: { status: 400, data: { message: "invalid" } } };
       mockHttpInstance.post.mockRejectedValue(error);
 
-      await expect(
-        workflows.createWorkflow({ org_identifier: "o", data: {} }),
-      ).rejects.toEqual(error);
+      await expect(workflows.createWorkflow({ org_identifier: "o", data: {} })).rejects.toEqual(
+        error,
+      );
     });
   });
 
@@ -149,10 +140,7 @@ describe("workflows service", () => {
         data,
       });
 
-      expect(mockHttpInstance.put).toHaveBeenCalledWith(
-        "/api/org123/workflows/w1",
-        data,
-      );
+      expect(mockHttpInstance.put).toHaveBeenCalledWith("/api/org123/workflows/w1", data);
     });
 
     it("interpolates a uuid workflow id", async () => {
@@ -161,10 +149,7 @@ describe("workflows service", () => {
 
       await workflows.updateWorkflow({ org_identifier: "o", id, data: {} });
 
-      expect(mockHttpInstance.put).toHaveBeenCalledWith(
-        `/api/o/workflows/${id}`,
-        {},
-      );
+      expect(mockHttpInstance.put).toHaveBeenCalledWith(`/api/o/workflows/${id}`, {});
     });
 
     it("does not encode a workflow id containing a slash (raw interpolation)", async () => {
@@ -176,10 +161,7 @@ describe("workflows service", () => {
         data: {},
       });
 
-      expect(mockHttpInstance.put).toHaveBeenCalledWith(
-        "/api/o/workflows/a/b",
-        {},
-      );
+      expect(mockHttpInstance.put).toHaveBeenCalledWith("/api/o/workflows/a/b", {});
     });
 
     it("propagates an update failure", async () => {
@@ -197,9 +179,7 @@ describe("workflows service", () => {
 
       await workflows.deleteWorkflow({ org_identifier: "org123", id: "w1" });
 
-      expect(mockHttpInstance.delete).toHaveBeenCalledWith(
-        "/api/org123/workflows/w1",
-      );
+      expect(mockHttpInstance.delete).toHaveBeenCalledWith("/api/org123/workflows/w1");
       expect(mockHttpInstance.delete.mock.calls[0]).toHaveLength(1);
     });
 
@@ -262,10 +242,10 @@ describe("workflows service", () => {
         inputs,
       });
 
-      expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        "/api/org123/workflows/w1/test",
-        { inputs, from_node: undefined },
-      );
+      expect(mockHttpInstance.post).toHaveBeenCalledWith("/api/org123/workflows/w1/test", {
+        inputs,
+        from_node: undefined,
+      });
     });
 
     it("includes from_node when replaying from a specific node", async () => {
@@ -279,10 +259,10 @@ describe("workflows service", () => {
         from_node: "node-3",
       });
 
-      expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        "/api/o/workflows/w1/test",
-        { inputs, from_node: "node-3" },
-      );
+      expect(mockHttpInstance.post).toHaveBeenCalledWith("/api/o/workflows/w1/test", {
+        inputs,
+        from_node: "node-3",
+      });
     });
 
     it("sends an empty inputs array through untouched", async () => {
@@ -290,10 +270,10 @@ describe("workflows service", () => {
 
       await workflows.testWorkflow({ org_identifier: "o", id: "w1", inputs: [] });
 
-      expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        "/api/o/workflows/w1/test",
-        { inputs: [], from_node: undefined },
-      );
+      expect(mockHttpInstance.post).toHaveBeenCalledWith("/api/o/workflows/w1/test", {
+        inputs: [],
+        from_node: undefined,
+      });
     });
 
     it("always sends the from_node key (undefined when omitted)", async () => {
@@ -320,9 +300,7 @@ describe("workflows service", () => {
 
       await workflows.getWorkflowHistory({ org_identifier: "org123", id: "w1" });
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        "/api/org123/workflows/w1/history",
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith("/api/org123/workflows/w1/history");
     });
 
     it("appends both bounds as microsecond query params", async () => {
@@ -363,9 +341,7 @@ describe("workflows service", () => {
         end_time: 456,
       });
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        "/api/o/workflows/w1/history?end_time=456",
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith("/api/o/workflows/w1/history?end_time=456");
     });
 
     it("treats an explicit undefined bound as omitted", async () => {
@@ -378,9 +354,7 @@ describe("workflows service", () => {
         end_time: undefined,
       });
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        "/api/o/workflows/w1/history",
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith("/api/o/workflows/w1/history");
     });
 
     it("treats a null bound as omitted (loose != null check)", async () => {
@@ -393,9 +367,7 @@ describe("workflows service", () => {
         end_time: null as any,
       });
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        "/api/o/workflows/w1/history",
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith("/api/o/workflows/w1/history");
     });
 
     it("keeps a 0 bound (0 is a valid timestamp, not 'omitted')", async () => {
@@ -445,9 +417,9 @@ describe("workflows service", () => {
     it("propagates a history failure", async () => {
       mockHttpInstance.get.mockRejectedValue(new Error("boom"));
 
-      await expect(
-        workflows.getWorkflowHistory({ org_identifier: "o", id: "w1" }),
-      ).rejects.toThrow("boom");
+      await expect(workflows.getWorkflowHistory({ org_identifier: "o", id: "w1" })).rejects.toThrow(
+        "boom",
+      );
     });
   });
 
@@ -461,9 +433,7 @@ describe("workflows service", () => {
         run_id: "r1",
       });
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        "/api/org123/workflows/w1/errors/r1",
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith("/api/org123/workflows/w1/errors/r1");
     });
 
     it("interpolates a uuid run id", async () => {
@@ -472,9 +442,7 @@ describe("workflows service", () => {
 
       await workflows.getWorkflowRun({ org_identifier: "o", id: "w1", run_id });
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/o/workflows/w1/errors/${run_id}`,
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(`/api/o/workflows/w1/errors/${run_id}`);
     });
 
     it("propagates a run-detail failure", async () => {
@@ -496,10 +464,10 @@ describe("workflows service", () => {
         run_id: "r1",
       });
 
-      expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        "/api/org123/workflows/w1/retry",
-        { run_id: "r1", from_node: undefined },
-      );
+      expect(mockHttpInstance.post).toHaveBeenCalledWith("/api/org123/workflows/w1/retry", {
+        run_id: "r1",
+        from_node: undefined,
+      });
     });
 
     it("includes from_node when retrying from a specific node", async () => {
@@ -512,10 +480,10 @@ describe("workflows service", () => {
         from_node: "node-2",
       });
 
-      expect(mockHttpInstance.post).toHaveBeenCalledWith(
-        "/api/o/workflows/w1/retry",
-        { run_id: "r1", from_node: "node-2" },
-      );
+      expect(mockHttpInstance.post).toHaveBeenCalledWith("/api/o/workflows/w1/retry", {
+        run_id: "r1",
+        from_node: "node-2",
+      });
     });
 
     it("always sends the from_node key (undefined when omitted)", async () => {

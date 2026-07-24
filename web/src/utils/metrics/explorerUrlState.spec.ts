@@ -91,12 +91,8 @@ describe("explorerUrlState", () => {
     // Explore is the landing default, so it serializes to nothing (bare URL);
     // only Visualize writes `?mode=visualize`.
     expect(explorerFiltersToQuery(defaults()).mode).toBeUndefined();
-    expect(
-      explorerFiltersToQuery({ ...defaults(), mode: "visualize" }).mode,
-    ).toBe("visualize");
-    expect(queryToExplorerFilters({ mode: "visualize" }).mode).toBe(
-      "visualize",
-    );
+    expect(explorerFiltersToQuery({ ...defaults(), mode: "visualize" }).mode).toBe("visualize");
+    expect(queryToExplorerFilters({ mode: "visualize" }).mode).toBe("visualize");
     // An unknown/absent mode leaves it undefined (caller keeps the default).
     expect(queryToExplorerFilters({}).mode).toBeUndefined();
     expect(queryToExplorerFilters({ mode: "bogus" }).mode).toBeUndefined();
@@ -127,25 +123,19 @@ describe("explorerUrlState", () => {
 
   it("parses a single labels param the router did not wrap in an array", () => {
     const out = queryToExplorerFilters({ labels: "code!=503" });
-    expect(out.labelFilters).toEqual([
-      { label: "code", operator: "!=", value: "503" },
-    ]);
+    expect(out.labelFilters).toEqual([{ label: "code", operator: "!=", value: "503" }]);
   });
 
   it("takes the FIRST operator, so a value containing one survives", () => {
     const out = queryToExplorerFilters({ labels: "query=a=b" });
-    expect(out.labelFilters).toEqual([
-      { label: "query", operator: "=", value: "a=b" },
-    ]);
+    expect(out.labelFilters).toEqual([{ label: "query", operator: "=", value: "a=b" }]);
   });
 
   it("drops malformed matchers, keeping the valid ones", () => {
     const out = queryToExplorerFilters({
       labels: ["no operator", "1starts_with_digit=x", "pod=api"],
     });
-    expect(out.labelFilters).toEqual([
-      { label: "pod", operator: "=", value: "api" },
-    ]);
+    expect(out.labelFilters).toEqual([{ label: "pod", operator: "=", value: "api" }]);
   });
 
   it("ignores non-literal boolean and enum values", () => {

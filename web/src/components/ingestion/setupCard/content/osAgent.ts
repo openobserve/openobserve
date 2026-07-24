@@ -24,8 +24,7 @@ import type { CardSubstitutions, RichCardDetect, RichCardExtras } from "../types
 import { applySubs, applySubsMasked } from "../subs";
 
 /** Base of the agent install scripts, e.g. `${AGENTS_REPO}/linux/install.sh`. */
-export const AGENTS_REPO =
-  "https://raw.githubusercontent.com/openobserve/agents/main";
+export const AGENTS_REPO = "https://raw.githubusercontent.com/openobserve/agents/main";
 
 /** Environment the agent is installed onto — drives the script path. */
 export type AgentEnv = "generic" | "ec2";
@@ -97,9 +96,7 @@ export type AgentOs = "linux" | "mac" | "windows";
  * The command takes no arguments, so unlike the install step there is no token to
  * substitute or mask.
  */
-export function agentUninstall(
-  os: AgentOs,
-): NonNullable<RichCardExtras["uninstall"]> {
+export function agentUninstall(os: AgentOs): NonNullable<RichCardExtras["uninstall"]> {
   return {
     label: "Uninstall the Agent",
     description: UNINSTALL_DESC[os],

@@ -13,8 +13,7 @@ import { z } from "zod";
 
 export const orgSettingsFieldNameRegex = /^[a-zA-Z0-9+=,.@_-]+$/;
 
-const FIELD_FORMAT_MESSAGE =
-  "Use alphanumeric and '+=,.@-_' characters only, without spaces.";
+const FIELD_FORMAT_MESSAGE = "Use alphanumeric and '+=,.@-_' characters only, without spaces.";
 
 export const makeOrganizationSettingsSchema = (t: (_key: string) => string) =>
   z.object({
@@ -37,6 +36,4 @@ export const makeOrganizationSettingsSchema = (t: (_key: string) => string) =>
     crossLinks: z.array(z.any()).optional(),
   });
 
-export type OrganizationSettingsForm = z.infer<
-  ReturnType<typeof makeOrganizationSettingsSchema>
->;
+export type OrganizationSettingsForm = z.infer<ReturnType<typeof makeOrganizationSettingsSchema>>;

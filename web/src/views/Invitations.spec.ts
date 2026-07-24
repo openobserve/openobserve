@@ -21,7 +21,6 @@ import { createStore } from "vuex";
 import InvitationList from "@/components/iam/users/InvitationList.vue";
 import i18n from "@/locales";
 
-
 describe("Invitations", () => {
   let store: any;
   let router: any;

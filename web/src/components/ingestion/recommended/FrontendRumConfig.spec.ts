@@ -54,16 +54,13 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
 
 // Stub SetupCardRenderer so we can inspect the props it receives without
 // rendering its (heavy) internals.
-vi.mock(
-  "@/components/ingestion/setupCard/SetupCardRenderer.vue",
-  () => ({
-    default: {
-      name: "SetupCardRenderer",
-      props: ["content", "subs"],
-      template: '<div data-test="rum-web-setup-card" />',
-    },
-  }),
-);
+vi.mock("@/components/ingestion/setupCard/SetupCardRenderer.vue", () => ({
+  default: {
+    name: "SetupCardRenderer",
+    props: ["content", "subs"],
+    template: '<div data-test="rum-web-setup-card" />',
+  },
+}));
 
 import FrontendRumConfig from "./FrontendRumConfig.vue";
 import { getIngestionURL, maskText } from "@/utils/zincutils";
@@ -75,16 +72,14 @@ const HTTP_ENDPOINT = "http://ingest.example.com";
 const ORG_ID = "my-org";
 const RUM_TOKEN = "rum-secret-token-xyz";
 
-function makeStore(overrides: {
-  rumToken?: string;
-  org?: string;
-  apiEndpoint?: string;
-} = {}) {
-  const {
-    rumToken = RUM_TOKEN,
-    org = ORG_ID,
-    apiEndpoint = HTTPS_ENDPOINT,
-  } = overrides;
+function makeStore(
+  overrides: {
+    rumToken?: string;
+    org?: string;
+    apiEndpoint?: string;
+  } = {},
+) {
+  const { rumToken = RUM_TOKEN, org = ORG_ID, apiEndpoint = HTTPS_ENDPOINT } = overrides;
 
   return createStore({
     state: {
@@ -111,8 +106,7 @@ const i18n = createI18n({
   messages: {
     en: {
       ingestion: {
-        generateRUMTokenMessage:
-          "Generate RUM Token to enable RUM for your organization.",
+        generateRUMTokenMessage: "Generate RUM Token to enable RUM for your organization.",
       },
     },
   },
@@ -147,15 +141,11 @@ describe("FrontendRumConfig", () => {
     });
 
     it("renders SetupCardRenderer when rumToken is non-empty", () => {
-      expect(
-        wrapper.find('[data-test="rum-web-setup-card"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-web-setup-card"]').exists()).toBe(true);
     });
 
     it("does NOT render the no-token message when token is present", () => {
-      expect(
-        wrapper.find('[data-test="rum-web-no-token-message"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="rum-web-no-token-message"]').exists()).toBe(false);
     });
 
     it("passes content with 3 steps to SetupCardRenderer", () => {
@@ -196,9 +186,7 @@ describe("FrontendRumConfig", () => {
 
     it("passes the rum token into content init variant raw code", () => {
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const initStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "init");
+      const initStep = card.props("content").steps.find((s: any) => s.id === "init");
       const npmVariant = initStep.variants.find((v: any) => v.id === "npm");
       expect(npmVariant.code.raw).toContain(RUM_TOKEN);
     });
@@ -206,9 +194,7 @@ describe("FrontendRumConfig", () => {
     it("content's masked code does NOT equal the raw when maskText produces a different string", () => {
       // With the real maskText (identity), raw === masked; but the structure must exist
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const initStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "init");
+      const initStep = card.props("content").steps.find((s: any) => s.id === "init");
       const npmVariant = initStep.variants.find((v: any) => v.id === "npm");
       // Both raw and masked must be strings
       expect(typeof npmVariant.code.raw).toBe("string");
@@ -251,18 +237,14 @@ describe("FrontendRumConfig", () => {
 
       const msg = wrapper.find('[data-test="rum-web-no-token-message"]');
       expect(msg.exists()).toBe(true);
-      expect(msg.text()).toContain(
-        "Generate RUM Token to enable RUM for your organization.",
-      );
+      expect(msg.text()).toContain("Generate RUM Token to enable RUM for your organization.");
     });
 
     it("does NOT render SetupCardRenderer when rumToken is empty string", () => {
       vi.mocked(getIngestionURL).mockReturnValue(HTTPS_ENDPOINT);
       ({ wrapper } = mountComponent({ rumToken: "" }));
 
-      expect(
-        wrapper.find('[data-test="rum-web-setup-card"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="rum-web-setup-card"]').exists()).toBe(false);
     });
 
     it("renders the no-token message when organizationData has no rumToken property", () => {
@@ -280,12 +262,8 @@ describe("FrontendRumConfig", () => {
         global: { plugins: [store, i18n] },
       });
 
-      expect(
-        wrapper.find('[data-test="rum-web-no-token-message"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="rum-web-setup-card"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="rum-web-no-token-message"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="rum-web-setup-card"]').exists()).toBe(false);
     });
   });
 
@@ -297,9 +275,7 @@ describe("FrontendRumConfig", () => {
       ({ wrapper } = mountComponent({ apiEndpoint: "https://api.example.com" }));
 
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const initStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "init");
+      const initStep = card.props("content").steps.find((s: any) => s.id === "init");
       const npmVariant = initStep.variants.find((v: any) => v.id === "npm");
       expect(npmVariant.code.raw).toContain("insecureHTTP: false");
     });
@@ -309,9 +285,7 @@ describe("FrontendRumConfig", () => {
       ({ wrapper } = mountComponent({ apiEndpoint: "http://api.example.com" }));
 
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const initStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "init");
+      const initStep = card.props("content").steps.find((s: any) => s.id === "init");
       const npmVariant = initStep.variants.find((v: any) => v.id === "npm");
       expect(npmVariant.code.raw).toContain("insecureHTTP: true");
     });
@@ -321,9 +295,7 @@ describe("FrontendRumConfig", () => {
       ({ wrapper } = mountComponent({ apiEndpoint: "" }));
 
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const initStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "init");
+      const initStep = card.props("content").steps.find((s: any) => s.id === "init");
       const npmVariant = initStep.variants.find((v: any) => v.id === "npm");
       expect(npmVariant.code.raw).toContain("insecureHTTP: true");
     });
@@ -337,9 +309,7 @@ describe("FrontendRumConfig", () => {
       ({ wrapper } = mountComponent());
 
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const initStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "init");
+      const initStep = card.props("content").steps.find((s: any) => s.id === "init");
       const npmVariant = initStep.variants.find((v: any) => v.id === "npm");
       expect(npmVariant.code.raw).toContain("site: 'ingest.openobserve.ai'");
     });
@@ -349,9 +319,7 @@ describe("FrontendRumConfig", () => {
       ({ wrapper } = mountComponent({ apiEndpoint: "http://ingest.openobserve.ai" }));
 
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const initStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "init");
+      const initStep = card.props("content").steps.find((s: any) => s.id === "init");
       const npmVariant = initStep.variants.find((v: any) => v.id === "npm");
       expect(npmVariant.code.raw).toContain("site: 'ingest.openobserve.ai'");
     });
@@ -365,9 +333,7 @@ describe("FrontendRumConfig", () => {
       ({ wrapper } = mountComponent({ org: "acme-corp" }));
 
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const initStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "init");
+      const initStep = card.props("content").steps.find((s: any) => s.id === "init");
       const npmVariant = initStep.variants.find((v: any) => v.id === "npm");
       expect(npmVariant.code.raw).toContain("organizationIdentifier: 'acme-corp'");
     });
@@ -388,9 +354,7 @@ describe("FrontendRumConfig", () => {
       });
 
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const initStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "init");
+      const initStep = card.props("content").steps.find((s: any) => s.id === "init");
       const npmVariant = initStep.variants.find((v: any) => v.id === "npm");
       expect(npmVariant.code.raw).toContain("organizationIdentifier: ''");
     });
@@ -431,9 +395,7 @@ describe("FrontendRumConfig", () => {
       ({ wrapper } = mountComponent());
 
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const initStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "init");
+      const initStep = card.props("content").steps.find((s: any) => s.id === "init");
       const npmVariant = initStep.variants.find((v: any) => v.id === "npm");
       expect(npmVariant.code).toHaveProperty("masked");
     });
@@ -443,9 +405,7 @@ describe("FrontendRumConfig", () => {
       ({ wrapper } = mountComponent());
 
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const initStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "init");
+      const initStep = card.props("content").steps.find((s: any) => s.id === "init");
       const cdnVariant = initStep.variants.find((v: any) => v.id === "cdn");
       expect(cdnVariant.code).toHaveProperty("masked");
     });
@@ -463,9 +423,7 @@ describe("FrontendRumConfig", () => {
       ({ wrapper } = mountComponent());
 
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const initStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "init");
+      const initStep = card.props("content").steps.find((s: any) => s.id === "init");
       const npmVariant = initStep.variants.find((v: any) => v.id === "npm");
       // masked should use the maskText return value
       expect(npmVariant.code.masked).toContain("****masked****");
@@ -484,9 +442,7 @@ describe("FrontendRumConfig", () => {
 
     it("CDN install code contains preconnect link for browsersdk.openobserve.ai", () => {
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const installStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "install");
+      const installStep = card.props("content").steps.find((s: any) => s.id === "install");
       const cdnVariant = installStep.variants.find((v: any) => v.id === "cdn");
       expect(cdnVariant.code.raw).toContain(
         'rel="preconnect" href="https://browsersdk.openobserve.ai"',
@@ -495,9 +451,7 @@ describe("FrontendRumConfig", () => {
 
     it("CDN install code contains dns-prefetch for browsersdk.openobserve.ai", () => {
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const installStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "install");
+      const installStep = card.props("content").steps.find((s: any) => s.id === "install");
       const cdnVariant = installStep.variants.find((v: any) => v.id === "cdn");
       expect(cdnVariant.code.raw).toContain(
         'rel="dns-prefetch" href="https://browsersdk.openobserve.ai"',
@@ -506,29 +460,21 @@ describe("FrontendRumConfig", () => {
 
     it("CDN install code contains preconnect link for the ingestion endpoint", () => {
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const installStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "install");
+      const installStep = card.props("content").steps.find((s: any) => s.id === "install");
       const cdnVariant = installStep.variants.find((v: any) => v.id === "cdn");
-      expect(cdnVariant.code.raw).toContain(
-        `href="${HTTPS_ENDPOINT}"`,
-      );
+      expect(cdnVariant.code.raw).toContain(`href="${HTTPS_ENDPOINT}"`);
     });
 
     it("CDN install code contains OO_RUM async loader global", () => {
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const installStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "install");
+      const installStep = card.props("content").steps.find((s: any) => s.id === "install");
       const cdnVariant = installStep.variants.find((v: any) => v.id === "cdn");
       expect(cdnVariant.code.raw).toContain("OO_RUM");
     });
 
     it("CDN install code contains OO_LOGS async loader global", () => {
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const installStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "install");
+      const installStep = card.props("content").steps.find((s: any) => s.id === "install");
       const cdnVariant = installStep.variants.find((v: any) => v.id === "cdn");
       expect(cdnVariant.code.raw).toContain("OO_LOGS");
     });
@@ -544,13 +490,9 @@ describe("FrontendRumConfig", () => {
 
     it("NPM install code is the exact install command", () => {
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
-      const installStep = card
-        .props("content")
-        .steps.find((s: any) => s.id === "install");
+      const installStep = card.props("content").steps.find((s: any) => s.id === "install");
       const npmVariant = installStep.variants.find((v: any) => v.id === "npm");
-      expect(npmVariant.code.raw).toBe(
-        "npm i @openobserve/browser-rum @openobserve/browser-logs",
-      );
+      expect(npmVariant.code.raw).toBe("npm i @openobserve/browser-rum @openobserve/browser-logs");
     });
   });
 });

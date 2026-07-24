@@ -19,25 +19,23 @@ const variantDefaultAs: Record<NonNullable<TextProps["variant"]>, string> = {
   // Consumers that need an <h1> pass `as="h1"` explicitly.
   "page-title": "span",
   // <h2> for section group labels ("Web Vitals", "Key Fields").
-  "section": "h2",
+  section: "h2",
   // <h3> for card and panel titles.
   "panel-title": "h3",
   // <p> for block-level body paragraphs.
-  "body": "p",
+  body: "p",
   // <strong> carries semantic emphasis for screen readers.
   "body-strong": "strong",
   // <span> — labels are not standalone headings.
-  "label": "span",
+  label: "span",
   // <span> — inline metadata.
-  "meta": "span",
+  meta: "span",
   // <span> — inline monospace (not <code>, which implies executable syntax).
   // Use OCode for actual code/query content.
-  "mono": "span",
+  mono: "span",
 };
 
-const resolvedAs = computed(
-  () => props.as ?? variantDefaultAs[props.variant ?? "body"],
-);
+const resolvedAs = computed(() => props.as ?? variantDefaultAs[props.variant ?? "body"]);
 
 // All classes reference design tokens via  prefix.
 // Color tokens (--color-typography-*) are defined in component.css and
@@ -47,58 +45,32 @@ const variantClasses: Record<NonNullable<TextProps["variant"]>, string> = {
   // Page title: compact, authoritative. Designed for the page header rail.
   // Deliberately restrained: a dense observability UI wants the page title to
   // orient you, not to shout over the data it sits above.
-  "page-title": [
-    "text-sm font-medium",
-    "text-typography-page-title",
-    "leading-tight",
-  ].join(" "),
+  "page-title": ["text-sm font-medium", "text-typography-page-title", "leading-tight"].join(" "),
 
   // Section group label (gray eyebrow). Recedes via color + size, not weight.
-  "section": [
-    "text-2xs font-medium",
-    "text-typography-section",
-    "leading-none",
-  ].join(" "),
+  section: ["text-2xs font-medium", "text-typography-section", "leading-none"].join(" "),
 
   // Panel / card title: mixed-case, slightly heavier than body, primary color.
   // For collapsible triggers, sidebar group headings, widget card headers.
-  "panel-title": [
-    "text-xs font-medium",
-    "text-typography-panel-title",
-    "leading-tight",
-  ].join(" "),
+  "panel-title": ["text-xs font-medium", "text-typography-panel-title", "leading-tight"].join(" "),
 
   // Default body text. Most table cells, descriptions, and paragraphs.
-  "body": [
-    "text-sm font-normal",
-    "text-typography-body",
-  ].join(" "),
+  body: ["text-sm font-normal", "text-typography-body"].join(" "),
 
   // Emphasized body: same size as body but medium. Names, totals, values.
-  "body-strong": [
-    "text-sm font-medium",
-    "text-typography-body",
-  ].join(" "),
+  "body-strong": ["text-sm font-medium", "text-typography-body"].join(" "),
 
   // Compact label: 12px medium. Filter labels, column sub-labels, pill text.
-  "label": [
-    "text-xs font-medium",
-    "text-typography-label",
-    "leading-none",
-  ].join(" "),
+  label: ["text-xs font-medium", "text-typography-label", "leading-none"].join(" "),
 
   // Metadata: timestamps, record counts, helper text, last-updated info.
   // Visually recessive — secondary color, no emphasis.
-  "meta": [
-    "text-xs font-normal",
-    "text-typography-meta",
-    "leading-none",
-  ].join(" "),
+  meta: ["text-xs font-normal", "text-typography-meta", "leading-none"].join(" "),
 
   // Monospace: cron expressions, stream names (non-linked), field paths, IDs.
   // Uses Geist Mono via the --font-mono CSS custom property.
   // For actual executable code / query content, prefer OCode instead.
-  "mono": [
+  mono: [
     "text-xs font-mono",
     // tabular figures + tight tracking for IDs/counts/timestamps.
     "[font-feature-settings:'tnum'] tracking-[-0.2px]",

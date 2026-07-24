@@ -2666,7 +2666,7 @@ mod tests {
         // Save pipeline directly to DB (bypassing API validation) to simulate a pipeline
         // with an invalid query that was saved before validation was added, or to test
         // what happens at evaluation time when the stream does not exist.
-        openobserve_core::pipeline::store::set(&pipeline_data)
+        openobserve_core::pipeline::db::set(&pipeline_data)
             .await
             .expect("Failed to set pipeline in DB");
         // Create the scheduler trigger directly with needs_validated=false so the
@@ -2719,7 +2719,7 @@ mod tests {
         assert!(trigger.retries > 0);
 
         // Clean up the invalid pipeline
-        let _ = openobserve_core::pipeline::store::delete(&pipeline.id).await;
+        let _ = openobserve_core::pipeline::db::delete(&pipeline.id).await;
     }
 
     // Test to handle case where pipeline triggers for invalid timerange where start time
@@ -2869,7 +2869,7 @@ mod tests {
         );
 
         // Clean up
-        let _ = openobserve_core::pipeline::store::delete(&pipeline.id).await;
+        let _ = openobserve_core::pipeline::db::delete(&pipeline.id).await;
         // Also delete the trigger job from scheduled jobs table
         let _ = db::scheduler::delete(
             "e2e",
@@ -3050,7 +3050,7 @@ mod tests {
         );
 
         // Clean up
-        let _ = openobserve_core::pipeline::store::delete(&pipeline.id).await;
+        let _ = openobserve_core::pipeline::db::delete(&pipeline.id).await;
         // Also delete the trigger job from scheduled jobs table
         let _ = db::scheduler::delete(
             "e2e",
@@ -3078,7 +3078,7 @@ mod tests {
         let pipeline = pipeline.unwrap();
 
         // Clean up test pipelines
-        let _ = openobserve_core::pipeline::store::delete(&pipeline.id).await;
+        let _ = openobserve_core::pipeline::db::delete(&pipeline.id).await;
     }
 
     async fn get_pipeline_from_api(pipeline_name: &str) -> http::models::pipelines::Pipeline {

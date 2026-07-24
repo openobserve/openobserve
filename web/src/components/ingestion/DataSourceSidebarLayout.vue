@@ -31,17 +31,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   #tabs slot — it receives { tabs, filter } so you can render/filter yourself.
 -->
 <template>
-  <OSplitter
-    v-model="splitterWidthModel"
-    unit="px"
-    :horizontal="false"
-    class="h-full"
-  >
+  <OSplitter v-model="splitterWidthModel" unit="px" :horizontal="false" class="h-full">
     <template #before>
-      <div class="w-full h-full">
-        <div class="h-full bg-surface-panel border-r border-border-default">
+      <div class="h-full w-full">
+        <div class="bg-surface-panel border-border-default h-full border-r">
           <div
-            :class="['overflow-hidden h-full', { 'pt-1.5': !searchable }]"
+            :class="['h-full overflow-hidden', { 'pt-1.5': !searchable }]"
             :data-test="panelDataTest || undefined"
           >
             <div v-if="searchable" class="p-2">
@@ -49,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="filter"
                 :data-test="searchDataTest || undefined"
                 clearable
-                class="w-full indexlist-search-input"
+                class="indexlist-search-input w-full"
                 :placeholder="searchPlaceholder || t('common.search')"
               />
             </div>
@@ -70,7 +65,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :to="tab.to"
                   :icon="tab.icon"
                   :label="tab.label"
-                  :data-test="tab.dataTest || (tabDataTestPrefix ? tabDataTestPrefix + tab.name : undefined)"
+                  :data-test="
+                    tab.dataTest || (tabDataTestPrefix ? tabDataTestPrefix + tab.name : undefined)
+                  "
                 />
               </slot>
             </OTabs>

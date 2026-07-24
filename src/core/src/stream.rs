@@ -15,7 +15,7 @@
 
 //! Temporary orchestration for deleting resources owned by other core services.
 
-use std::io::Error;
+use std::{future::Future, io::Error};
 
 use axum::{
     Json, http,
@@ -24,19 +24,25 @@ use axum::{
 use common::meta::http::{ERROR_HEADER, HttpResponse as MetaHttpResponse};
 use config::meta::stream::{StreamParams, StreamType};
 
-#[tracing::instrument]
-pub async fn delete_stream(
+#[tracing::instrument(skip(cleanup_enrichment_table_resources))]
+pub async fn delete_stream<E, EFut>(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
     del_related_feature_resources: bool,
-) -> Result<Response, Error> {
+    cleanup_enrichment_table_resources: E,
+) -> Result<Response, Error>
+where
+    E: FnOnce(String, String, StreamType) -> EFut,
+    EFut: Future<Output = ()>,
+{
     ::stream::delete_stream_with_cleanup(
         org_id,
         stream_name,
         stream_type,
         del_related_feature_resources,
         cleanup_related_resources,
+        cleanup_enrichment_table_resources,
     )
     .await
 }
@@ -46,14 +52,11 @@ async fn cleanup_related_resources(
     stream_name: String,
     stream_type: StreamType,
 ) -> Result<(), Response> {
-    for pipeline in crate::pipeline::store::get_by_stream(&StreamParams::new(
-        &org_id,
-        &stream_name,
-        stream_type,
-    ))
-    .await
+    for pipeline in
+        crate::pipeline::db::get_by_stream(&StreamParams::new(&org_id, &stream_name, stream_type))
+            .await
     {
-        if let Err(e) = crate::pipeline::store::delete(&pipeline.id).await {
+        if let Err(e) = crate::pipeline::db::delete(&pipeline.id).await {
             return Err((
                 http::StatusCode::INTERNAL_SERVER_ERROR,
                 [(ERROR_HEADER, format!("failed to delete stream: {e}"))],

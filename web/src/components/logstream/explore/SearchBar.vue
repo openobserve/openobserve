@@ -17,28 +17,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="logstream-explore-search-bar-container"
-    class="pb-px h-full overflow-hidden"
+    class="h-full overflow-hidden pb-px"
     id="searchBarComponent"
   >
-    <div class="flex flex justify-end">
+    <div class="flex justify-end">
       <div class="my-1">
         <OButton
           class="mr-2"
           variant="ghost"
           size="sm"
           :disabled="
-            queryData.queryResults.hasOwnProperty('hits') &&
-            !queryData.queryResults.hits.length
+            queryData.queryResults.hasOwnProperty('hits') && !queryData.queryResults.hits.length
           "
           :title="t('search.exportLogs')"
           @click="downloadLogs"
           icon-left="download"
         />
-        <div
-          class="float-left"
-          v-show="queryData.streamType !== 'enrichment_tables'"
-        >
-          <date-time
+        <div class="float-left" v-show="queryData.streamType !== 'enrichment_tables'">
+          <DateTime
             data-test="logs-search-bar-date-time-dropdown"
             auto-apply
             :default-type="searchObj.data.datetime.type"
@@ -50,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @on:date-change="updateDateTime"
           />
         </div>
-        <div class="pl-2 float-left mr-2">
+        <div class="float-left mr-2 pl-2">
           <OButton
             data-test="logs-search-bar-refresh-btn"
             data-cy="search-bar-refresh-button"
@@ -64,15 +60,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div class="flex h-[calc(100%-40px)]!">
-      <div class="flex flex-col border-t border-border-default h-25">
+      <div class="border-border-default flex h-25 flex-col border-t">
         <b>Query Editor:</b>
-        <code-query-editor
+        <CodeQueryEditor
           editor-id="logsStreamQueryEditor"
           ref="queryEditorRef"
           v-model:query="query"
           @update:query="updateQueryValue"
           @run-query="searchData"
-        ></code-query-editor>
+        ></CodeQueryEditor>
       </div>
     </div>
   </div>
@@ -85,7 +81,7 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import DateTime from "@/components/DateTime.vue";
-import OButton from '@/lib/core/Button/OButton.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
 import useLogs from "@/composables/useLogs";
 import type { IDateTime } from "@/ts/interfaces";
 
@@ -106,9 +102,7 @@ export default defineComponent({
   components: {
     DateTime,
     OButton,
-    CodeQueryEditor: defineAsyncComponent(
-      () => import("@/components/CodeQueryEditor.vue"),
-    ),
+    CodeQueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
   },
   emits: ["searchdata", "update-query", "change:date-time"],
   methods: {
@@ -152,8 +146,7 @@ export default defineComponent({
 
     const updateQuery = () => {
       // alert(searchObj.data.query);
-      if (queryEditorRef.value?.setValue)
-        queryEditorRef.value.setValue(props.queryData.query);
+      if (queryEditorRef.value?.setValue) queryEditorRef.value.setValue(props.queryData.query);
     };
 
     const jsonToCsv = (jsonData) => {

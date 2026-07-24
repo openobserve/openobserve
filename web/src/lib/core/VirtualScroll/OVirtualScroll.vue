@@ -28,7 +28,7 @@ const props = withDefaults(defineProps<OVirtualScrollProps<T>>(), {
   overscan: 5,
   scrollTarget: null,
   height: "100%",
-  dynamicRowHeight: false
+  dynamicRowHeight: false,
 });
 
 const emit = defineEmits<OVirtualScrollEmits>();
@@ -46,27 +46,39 @@ const itemsRef = computed(() => props.items);
 
 const dynamicRowHeightRef = computed(() => props.dynamicRowHeight);
 
-const { virtualItems, totalSize, scrollMargin, visibleRange, scrollToIndex, scrollToTop, measure, measureElement } =
-  useVirtualScroll({
-    items: itemsRef,
-    parentRef,
-    scrollTarget: scrollTargetRef,
-    estimateSize: props.estimateSize,
-    overscan: props.overscan,
-    dynamicRowHeight: dynamicRowHeightRef,
-  });
+const {
+  virtualItems,
+  totalSize,
+  scrollMargin,
+  visibleRange,
+  scrollToIndex,
+  scrollToTop,
+  measure,
+  measureElement,
+} = useVirtualScroll({
+  items: itemsRef,
+  parentRef,
+  scrollTarget: scrollTargetRef,
+  estimateSize: props.estimateSize,
+  overscan: props.overscan,
+  dynamicRowHeight: dynamicRowHeightRef,
+});
 
 // Emit virtual-scroll event on mount and whenever the rendered range changes.
-watch(virtualItems, (items) => {
-  if (!items.length) return;
-  const range = visibleRange.value;
-  emit("virtual-scroll", {
-    startIndex: items[0].index,
-    endIndex: items[items.length - 1].index,
-    visibleStartIndex: range?.startIndex ?? items[0].index,
-    visibleEndIndex: range?.endIndex ?? items[items.length - 1].index,
-  });
-}, { immediate: true });
+watch(
+  virtualItems,
+  (items) => {
+    if (!items.length) return;
+    const range = visibleRange.value;
+    emit("virtual-scroll", {
+      startIndex: items[0].index,
+      endIndex: items[items.length - 1].index,
+      visibleStartIndex: range?.startIndex ?? items[0].index,
+      visibleEndIndex: range?.endIndex ?? items[items.length - 1].index,
+    });
+  },
+  { immediate: true },
+);
 
 // Whether we own the scroll container (no external scrollTarget).
 const ownsScroll = computed(() => !props.scrollTarget);
@@ -83,7 +95,6 @@ const containerStyle = computed(() => {
     height: props.height,
   };
 });
-
 
 // Expose scroll helpers for parent components.
 defineExpose({
@@ -124,7 +135,7 @@ defineExpose({
         }"
         :ref="(node) => dynamicRowHeight && vItem && measureElement(node)"
       >
-        <slot :item="(items[vItem.index] as T)" :index="vItem.index" />
+        <slot :item="items[vItem.index] as T" :index="vItem.index" />
       </div>
     </div>
   </div>

@@ -88,10 +88,7 @@ export const useAnnotationsData = (
   // Watch for annotation mode to show notification
   watch(isAddAnnotationMode, () => {
     if (isAddAnnotationMode.value) {
-      showInfoNotification(
-        "Click on the chart data or select a range to add an annotation",
-        {},
-      );
+      showInfoNotification("Click on the chart data or select a range to add an annotation", {});
     }
   });
 

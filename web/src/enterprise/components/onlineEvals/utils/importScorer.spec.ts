@@ -1,9 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  normalizeScorerInput,
-  prepareScorerImport,
-  validateScorer,
-} from "./importScorer";
+import { normalizeScorerInput, prepareScorerImport, validateScorer } from "./importScorer";
 import type { Provider, ScoreConfig } from "@/services/online-evals.service";
 
 const sc = (over: Partial<ScoreConfig> = {}): ScoreConfig =>
@@ -197,7 +193,10 @@ describe("validateScorer — score config resolution", () => {
 
   it("flags fixable error when neither ref is provided", () => {
     const res = validateScorer(
-      { name: "j", scorer: { type: "llm_judge", template: "t", params: { provider_id: "prov-id" } } },
+      {
+        name: "j",
+        scorer: { type: "llm_judge", template: "t", params: { provider_id: "prov-id" } },
+      },
       { ...baseCtx, scoreConfigs: [sc()], providers: [prov()] },
     );
     expect(res.errors.find((e) => e.field === "scoreConfigRef")).toBeDefined();
@@ -379,13 +378,11 @@ describe("prepareScorerImport", () => {
   });
 
   it("aggregates errors across multiple items", () => {
-    const result = prepareScorerImport(
-      [
-        { scorer: { type: "llm_judge" } },
-        { name: "x" },
-      ],
-      { existingScorerNames: [], scoreConfigs: [sc()], providers: [prov()] },
-    );
+    const result = prepareScorerImport([{ scorer: { type: "llm_judge" } }, { name: "x" }], {
+      existingScorerNames: [],
+      scoreConfigs: [sc()],
+      providers: [prov()],
+    });
     expect(result.hasErrors).toBe(true);
     expect(result.errors.length).toBeGreaterThan(1);
   });

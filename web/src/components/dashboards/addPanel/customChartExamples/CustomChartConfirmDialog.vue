@@ -15,7 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog data-test="custom-chart-confirm-dialog"
+  <ODialog
+    data-test="custom-chart-confirm-dialog"
     v-model:open="open"
     :size="warningMessage?.length ? 'md' : 'sm'"
     :title="title"
@@ -35,10 +36,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('dashboard.customChartConfirmDialog.alsoReplaceQuery')"
           data-test="replace-query-checkbox"
         />
-        <div
-          class="text-xs mt-1 ml-7 text-text-secondary"
-        >
-          {{ t('dashboard.customChartConfirmDialog.exampleQueryInserted') }}
+        <div class="text-text-secondary mt-1 ml-7 text-xs">
+          {{ t("dashboard.customChartConfirmDialog.exampleQueryInserted") }}
         </div>
       </div>
     </div>

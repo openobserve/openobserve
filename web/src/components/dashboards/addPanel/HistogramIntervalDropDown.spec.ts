@@ -18,12 +18,11 @@ import { mount } from "@vue/test-utils";
 import HistogramIntervalDropDown from "@/components/dashboards/addPanel/HistogramIntervalDropDown.vue";
 import i18n from "@/locales";
 
-
 describe("HistogramIntervalDropDown", () => {
   let wrapper: any;
 
   const defaultProps = {
-    modelValue: null // Auto is the default when modelValue is null
+    modelValue: null, // Auto is the default when modelValue is null
   };
 
   beforeEach(() => {
@@ -40,14 +39,14 @@ describe("HistogramIntervalDropDown", () => {
     return mount(HistogramIntervalDropDown, {
       props: {
         ...defaultProps,
-        ...props
+        ...props,
       },
       global: {
         plugins: [i18n],
         mocks: {
-          $t: (key: string) => key
-        }
-      }
+          $t: (key: string) => key,
+        },
+      },
     });
   };
 
@@ -82,19 +81,19 @@ describe("HistogramIntervalDropDown", () => {
     it("should accept and display 1 minute interval", () => {
       wrapper = createWrapper({ modelValue: "1 minute" });
 
-      expect(wrapper.vm.histogramIntervalModel).toBe('1 minute');
+      expect(wrapper.vm.histogramIntervalModel).toBe("1 minute");
     });
 
     it("should accept and display 5 minutes interval", () => {
       wrapper = createWrapper({ modelValue: "5 minutes" });
 
-      expect(wrapper.vm.histogramIntervalModel).toBe('5 minutes');
+      expect(wrapper.vm.histogramIntervalModel).toBe("5 minutes");
     });
 
     it("should accept and display 1 hour interval", () => {
       wrapper = createWrapper({ modelValue: "1 hour" });
 
-      expect(wrapper.vm.histogramIntervalModel).toBe('1 hour');
+      expect(wrapper.vm.histogramIntervalModel).toBe("1 hour");
     });
 
     it("should react to model value changes from null to specific interval", async () => {
@@ -104,17 +103,17 @@ describe("HistogramIntervalDropDown", () => {
 
       await wrapper.setProps({ modelValue: "5 minutes" });
 
-      expect(wrapper.vm.histogramIntervalModel).toBe('5 minutes');
+      expect(wrapper.vm.histogramIntervalModel).toBe("5 minutes");
     });
 
     it("should react to model value changes between intervals", async () => {
       wrapper = createWrapper({ modelValue: "1 minute" });
 
-      expect(wrapper.vm.histogramIntervalModel).toBe('1 minute');
+      expect(wrapper.vm.histogramIntervalModel).toBe("1 minute");
 
       await wrapper.setProps({ modelValue: "1 hour" });
 
-      expect(wrapper.vm.histogramIntervalModel).toBe('1 hour');
+      expect(wrapper.vm.histogramIntervalModel).toBe("1 hour");
     });
 
     it("should handle null model value", () => {
@@ -151,7 +150,7 @@ describe("HistogramIntervalDropDown", () => {
         { label: "3 days", value: "3 days" },
         { label: "5 days", value: "5 days" },
         { label: "7 days", value: "7 days" },
-        { label: "30 days", value: "30 days" }
+        { label: "30 days", value: "30 days" },
       ];
 
       expect(wrapper.vm.histogramIntervalOptions).toEqual(expectedOptions);
@@ -185,11 +184,11 @@ describe("HistogramIntervalDropDown", () => {
       wrapper = createWrapper({ modelValue: null });
 
       // Trigger update:modelValue directly via the component's emit
-      wrapper.vm.$emit('update:modelValue', '1 hour');
+      wrapper.vm.$emit("update:modelValue", "1 hour");
 
       const emitted = wrapper.emitted("update:modelValue");
       expect(emitted).toBeDefined();
-      expect(emitted![0][0]).toBe('1 hour');
+      expect(emitted![0][0]).toBe("1 hour");
     });
 
     it("should emit update:modelValue with correct value when changing from Auto to specific interval", async () => {
@@ -197,17 +196,17 @@ describe("HistogramIntervalDropDown", () => {
 
       expect(wrapper.vm.histogramIntervalModel).toBe(null);
 
-      wrapper.vm.$emit('update:modelValue', '1 minute');
+      wrapper.vm.$emit("update:modelValue", "1 minute");
 
       const emitted = wrapper.emitted("update:modelValue");
       expect(emitted).toBeDefined();
-      expect(emitted![0][0]).toBe('1 minute');
+      expect(emitted![0][0]).toBe("1 minute");
     });
 
     it("should emit update:modelValue with null when changing to Auto", async () => {
       wrapper = createWrapper({ modelValue: "1 hour" });
 
-      wrapper.vm.$emit('update:modelValue', null);
+      wrapper.vm.$emit("update:modelValue", null);
 
       const emitted = wrapper.emitted("update:modelValue");
       expect(emitted).toBeDefined();
@@ -227,7 +226,7 @@ describe("HistogramIntervalDropDown", () => {
       wrapper = createWrapper({ modelValue: "5 minutes" });
 
       expect(wrapper.find('[data-test="histogram-interval-dropdown"]').exists()).toBe(true);
-      expect(wrapper.vm.histogramIntervalModel).toBe('5 minutes');
+      expect(wrapper.vm.histogramIntervalModel).toBe("5 minutes");
     });
 
     it("should have null value for undefined modelValue (Auto)", () => {
@@ -273,7 +272,7 @@ describe("HistogramIntervalDropDown", () => {
       wrapper = createWrapper({ modelValue: "invalid_interval" });
 
       // When invalid value is provided, the model stores the value as-is
-      expect(wrapper.vm.histogramIntervalModel).toBe('invalid_interval');
+      expect(wrapper.vm.histogramIntervalModel).toBe("invalid_interval");
     });
 
     it("should handle empty string value", () => {
@@ -281,7 +280,7 @@ describe("HistogramIntervalDropDown", () => {
 
       // Empty string should be treated as Auto (null) or stored as empty
       // Component uses props.modelValue ?? null - empty string is truthy
-      expect(wrapper.vm.histogramIntervalModel).toBe('');
+      expect(wrapper.vm.histogramIntervalModel).toBe("");
     });
 
     it("should handle component unmounting gracefully", () => {
@@ -300,7 +299,7 @@ describe("HistogramIntervalDropDown", () => {
 
       await wrapper.setProps({ modelValue: "30 minutes" });
 
-      expect(wrapper.vm.histogramIntervalModel).toBe('30 minutes');
+      expect(wrapper.vm.histogramIntervalModel).toBe("30 minutes");
     });
 
     it("should maintain reactivity with multiple prop changes", async () => {
@@ -310,7 +309,7 @@ describe("HistogramIntervalDropDown", () => {
         { modelValue: "1 minute", expected: "1 minute" },
         { modelValue: "1 hour", expected: "1 hour" },
         { modelValue: "1 day", expected: "1 day" },
-        { modelValue: null, expected: null }
+        { modelValue: null, expected: null },
       ];
 
       for (const { modelValue, expected } of values) {
@@ -334,52 +333,70 @@ describe("HistogramIntervalDropDown", () => {
     it("should include second-based intervals", () => {
       wrapper = createWrapper();
 
-      const secondIntervals = wrapper.vm.histogramIntervalOptions.filter(
-        (opt: any) => opt.label.includes('second')
+      const secondIntervals = wrapper.vm.histogramIntervalOptions.filter((opt: any) =>
+        opt.label.includes("second"),
       );
 
       expect(secondIntervals.length).toBe(4);
       expect(secondIntervals.map((opt: any) => opt.label)).toEqual([
-        '1 second', '5 seconds', '10 seconds', '30 seconds'
+        "1 second",
+        "5 seconds",
+        "10 seconds",
+        "30 seconds",
       ]);
     });
 
     it("should include minute-based intervals", () => {
       wrapper = createWrapper();
 
-      const minuteIntervals = wrapper.vm.histogramIntervalOptions.filter(
-        (opt: any) => opt.label.includes('minute')
+      const minuteIntervals = wrapper.vm.histogramIntervalOptions.filter((opt: any) =>
+        opt.label.includes("minute"),
       );
 
       expect(minuteIntervals.length).toBe(6);
       expect(minuteIntervals.map((opt: any) => opt.label)).toEqual([
-        '1 minute', '5 minutes', '10 minutes', '15 minutes', '30 minutes', '45 minutes'
+        "1 minute",
+        "5 minutes",
+        "10 minutes",
+        "15 minutes",
+        "30 minutes",
+        "45 minutes",
       ]);
     });
 
     it("should include hour-based intervals", () => {
       wrapper = createWrapper();
 
-      const hourIntervals = wrapper.vm.histogramIntervalOptions.filter(
-        (opt: any) => opt.label.includes('hour')
+      const hourIntervals = wrapper.vm.histogramIntervalOptions.filter((opt: any) =>
+        opt.label.includes("hour"),
       );
 
       expect(hourIntervals.length).toBe(6);
       expect(hourIntervals.map((opt: any) => opt.label)).toEqual([
-        '1 hour', '2 hours', '3 hours', '6 hours', '8 hours', '12 hours'
+        "1 hour",
+        "2 hours",
+        "3 hours",
+        "6 hours",
+        "8 hours",
+        "12 hours",
       ]);
     });
 
     it("should include day-based intervals", () => {
       wrapper = createWrapper();
 
-      const dayIntervals = wrapper.vm.histogramIntervalOptions.filter(
-        (opt: any) => opt.label.includes('day')
+      const dayIntervals = wrapper.vm.histogramIntervalOptions.filter((opt: any) =>
+        opt.label.includes("day"),
       );
 
       expect(dayIntervals.length).toBe(6);
       expect(dayIntervals.map((opt: any) => opt.label)).toEqual([
-        '1 day', '2 days', '3 days', '5 days', '7 days', '30 days'
+        "1 day",
+        "2 days",
+        "3 days",
+        "5 days",
+        "7 days",
+        "30 days",
       ]);
     });
   });

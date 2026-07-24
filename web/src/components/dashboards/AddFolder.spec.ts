@@ -37,8 +37,7 @@ const OFormStub = {
 // OFormInput stub: a basic input so the parent renders without the real wrapper.
 const OFormInputStub = {
   name: "OFormInput",
-  template:
-    '<input class="o-form-input-stub" :data-test="$attrs[\'data-test\']" />',
+  template: '<input class="o-form-input-stub" :data-test="$attrs[\'data-test\']" />',
   props: ["name", "label", "required"],
 };
 
@@ -115,9 +114,7 @@ describe("AddFolder", () => {
   it("should render description input field", () => {
     const wrapper = createWrapper();
 
-    const descInput = wrapper.find(
-      '[data-test="dashboard-folder-add-description"]',
-    );
+    const descInput = wrapper.find('[data-test="dashboard-folder-add-description"]');
     expect(descInput.exists()).toBe(true);
   });
 
@@ -220,9 +217,7 @@ describe("AddFolder", () => {
 
   it("should handle folder creation error gracefully", async () => {
     const commons = await import("@/utils/commons");
-    (commons.createFolder as any).mockRejectedValueOnce(
-      new Error("Folder creation failed"),
-    );
+    (commons.createFolder as any).mockRejectedValueOnce(new Error("Folder creation failed"));
 
     const wrapper = createWrapper({ editMode: false });
 
@@ -235,9 +230,7 @@ describe("AddFolder", () => {
 
   it("should handle folder update error gracefully", async () => {
     const commons = await import("@/utils/commons");
-    (commons.updateFolder as any).mockRejectedValueOnce(
-      new Error("Folder updation failed"),
-    );
+    (commons.updateFolder as any).mockRejectedValueOnce(new Error("Folder updation failed"));
 
     const wrapper = createWrapper({ editMode: true, folderId: "folder1" });
 

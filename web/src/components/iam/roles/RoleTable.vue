@@ -80,7 +80,7 @@ const columns: OTableColumnDef[] = [
     @update:global-filter="emit('update:globalFilter', $event)"
   >
     <template #toolbar>
-      <div class="flex items-center gap-2 w-full">
+      <div class="flex w-full items-center gap-2">
         <OSearchInput
           :model-value="globalFilter"
           :placeholder="t('iam.searchRole')"

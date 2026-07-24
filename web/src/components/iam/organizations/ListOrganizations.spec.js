@@ -1,6 +1,6 @@
-import { mount, flushPromises  } from "@vue/test-utils";
-import { describe, it, expect, vi, beforeEach, afterEach  } from "vitest";
-import { createRouter, createMemoryHistory  } from 'vue-router';
+import { mount, flushPromises } from "@vue/test-utils";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { createRouter, createMemoryHistory } from "vue-router";
 import i18n from "@/locales";
 import ListOrganizations from "./ListOrganizations.vue";
 import organizationsService from "@/services/organizations";
@@ -55,8 +55,8 @@ describe("ListOrganizations", () => {
       history: createMemoryHistory(),
       routes: [
         {
-          path: '/organizations',
-          name: 'organizations',
+          path: "/organizations",
+          name: "organizations",
           component: ListOrganizations,
         },
       ],
@@ -121,10 +121,10 @@ describe("ListOrganizations", () => {
         },
         stubs: {
           AddUpdateOrganization: {
-            name: 'AddUpdateOrganization',
+            name: "AddUpdateOrganization",
             template: '<div class="add-update-organization-stub" v-if="open" />',
-            props: ['open', 'modelValue'],
-            emits: ['update:open', 'updated'],
+            props: ["open", "modelValue"],
+            emits: ["update:open", "updated"],
           },
           NoData: true,
         },
@@ -179,14 +179,8 @@ describe("ListOrganizations", () => {
       // The row index is rendered by OTable's `show-index` prop, so there is no
       // "#" column in the definition. Non-cloud columns are:
       // name, identifier, type, status, actions = 5
-      expect(columns.map(c => c.id)).toEqual([
-        "name",
-        "identifier",
-        "type",
-        "status",
-        "actions",
-      ]);
-      expect(columns.map(c => c.id)).not.toContain("plan");
+      expect(columns.map((c) => c.id)).toEqual(["name", "identifier", "type", "status", "actions"]);
+      expect(columns.map((c) => c.id)).not.toContain("plan");
       expect(columns[columns.length - 1].isAction).toBe(true);
     });
 
@@ -216,7 +210,7 @@ describe("ListOrganizations", () => {
       await flushPromises();
       // When isCloud is true a "plan" column is inserted before "actions":
       // name, identifier, type, status, plan, actions = 6
-      expect(wrapperWithCloud.vm.columns.map(c => c.id)).toEqual([
+      expect(wrapperWithCloud.vm.columns.map((c) => c.id)).toEqual([
         "name",
         "identifier",
         "type",
@@ -370,7 +364,7 @@ describe("ListOrganizations", () => {
   describe("Route Action Handling", () => {
     it("opens dialog with populated data when route action is update via watcher", async () => {
       await router.push({
-        path: '/organizations',
+        path: "/organizations",
         query: {
           action: "update",
           to_be_updated_org_id: "org-update-1",
@@ -387,7 +381,7 @@ describe("ListOrganizations", () => {
 
     it.skip("opens dialog on mount when route has action=add", async () => {
       // Push the route before mounting so onMounted sees it
-      await router.push({ path: '/organizations', query: { action: "add" } });
+      await router.push({ path: "/organizations", query: { action: "add" } });
       await router.isReady();
 
       const freshWrapper = mount(ListOrganizations, {
@@ -407,7 +401,7 @@ describe("ListOrganizations", () => {
     it("opens dialog with populated data on mount when route has action=update", async () => {
       // Push the route before mounting so onMounted sees it
       await router.push({
-        path: '/organizations',
+        path: "/organizations",
         query: {
           action: "update",
           to_be_updated_org_id: "mount-org-id",
@@ -434,7 +428,7 @@ describe("ListOrganizations", () => {
 
   describe("Add Organization Dialog", () => {
     it("should open add organization dialog", async () => {
-      await router.push('/organizations');
+      await router.push("/organizations");
       await flushPromises();
 
       await wrapper.vm.addOrganization();
@@ -447,7 +441,7 @@ describe("ListOrganizations", () => {
     });
 
     it("should track add organization button click", async () => {
-      await router.push('/organizations');
+      await router.push("/organizations");
       await flushPromises();
 
       const mockEvent = {
@@ -463,8 +457,8 @@ describe("ListOrganizations", () => {
 
     it("should hide add organization dialog", async () => {
       await router.push({
-        path: '/organizations',
-        query: { action: 'add', org_identifier: 'test-org' }
+        path: "/organizations",
+        query: { action: "add", org_identifier: "test-org" },
       });
       await flushPromises();
 
@@ -478,8 +472,8 @@ describe("ListOrganizations", () => {
 
     it("should handle dialog state on route change", async () => {
       await router.push({
-        path: '/organizations',
-        query: { action: "add" }
+        path: "/organizations",
+        query: { action: "add" },
       });
       await flushPromises();
       await wrapper.vm.$nextTick();
@@ -492,22 +486,22 @@ describe("ListOrganizations", () => {
       await flushPromises();
       await wrapper.vm.$nextTick();
 
-      const addUpdate = wrapper.findComponent({ name: 'AddUpdateOrganization' });
+      const addUpdate = wrapper.findComponent({ name: "AddUpdateOrganization" });
       expect(addUpdate.exists()).toBe(true);
-      expect(addUpdate.props('open')).toBe(true);
+      expect(addUpdate.props("open")).toBe(true);
     });
 
     it("should close dialog when AddUpdateOrganization emits update:open false", async () => {
-      await router.push('/organizations');
+      await router.push("/organizations");
       await flushPromises();
       wrapper.vm.showAddOrganizationDialog = true;
       await flushPromises();
       await wrapper.vm.$nextTick();
 
-      const addUpdate = wrapper.findComponent({ name: 'AddUpdateOrganization' });
+      const addUpdate = wrapper.findComponent({ name: "AddUpdateOrganization" });
       expect(addUpdate.exists()).toBe(true);
 
-      await addUpdate.vm.$emit('update:open', false);
+      await addUpdate.vm.$emit("update:open", false);
       await flushPromises();
       await wrapper.vm.$nextTick();
 
@@ -519,11 +513,11 @@ describe("ListOrganizations", () => {
       await flushPromises();
       await wrapper.vm.$nextTick();
 
-      const addUpdate = wrapper.findComponent({ name: 'AddUpdateOrganization' });
+      const addUpdate = wrapper.findComponent({ name: "AddUpdateOrganization" });
       expect(addUpdate.exists()).toBe(true);
 
       organizationsService.list.mockClear();
-      await addUpdate.vm.$emit('updated');
+      await addUpdate.vm.$emit("updated");
       await flushPromises();
 
       expect(organizationsService.list).toHaveBeenCalled();
@@ -542,7 +536,7 @@ describe("ListOrganizations", () => {
 
   describe("Organization Updates", () => {
     it("should handle successful organization addition", async () => {
-      await router.push('/organizations');
+      await router.push("/organizations");
       await flushPromises();
 
       await wrapper.vm.updateOrganizationList();
@@ -565,10 +559,12 @@ describe("ListOrganizations", () => {
       await wrapper.vm.updateOrganizationList();
 
       // updateOrganizationList calls toast() for success notification
-      expect(toast).toHaveBeenCalledWith(expect.objectContaining({
-        variant: "success",
-        message: "Organization added successfully.",
-      }));
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "success",
+          message: "Organization added successfully.",
+        }),
+      );
     });
 
     it("should show updated message when isUpdated is true", async () => {
@@ -578,10 +574,12 @@ describe("ListOrganizations", () => {
 
       await wrapper.vm.updateOrganizationList();
 
-      expect(toast).toHaveBeenCalledWith(expect.objectContaining({
-        variant: "success",
-        message: "Organization updated successfully.",
-      }));
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "success",
+          message: "Organization updated successfully.",
+        }),
+      );
     });
   });
 
@@ -610,11 +608,13 @@ describe("ListOrganizations", () => {
       wrapper.vm.joinOrganization();
 
       expect(wrapper.vm.showJoinOrganizationDialog).toBe(false);
-      expect(toast).toHaveBeenCalledWith(expect.objectContaining({
-        variant: "success",
-        message: "Request completed successfully.",
-        timeout: 5000,
-      }));
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "success",
+          message: "Request completed successfully.",
+          timeout: 5000,
+        }),
+      );
     });
 
     it("should copy API key to clipboard when copyAPIKey is called", async () => {
@@ -628,7 +628,6 @@ describe("ListOrganizations", () => {
   });
 
   describe("Error Handling", () => {
-
     it("should handle empty organization list", async () => {
       organizationsService.list.mockResolvedValueOnce({ data: { data: [] } });
       await wrapper.vm.getOrganizations();
@@ -670,7 +669,7 @@ describe("ListOrganizations", () => {
   describe("Edge Cases", () => {
     it("falls back to empty string when update route lacks to_be_updated_org_name", async () => {
       await router.push({
-        path: '/organizations',
+        path: "/organizations",
         query: { action: "update" }, // no to_be_updated_org_id or to_be_updated_org_name
       });
       await flushPromises();

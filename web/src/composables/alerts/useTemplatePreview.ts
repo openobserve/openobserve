@@ -32,10 +32,7 @@ function isOpaqueToken(name: string): boolean {
 
 const TOKEN_RE = /\{([^{}]+)\}/g;
 
-export function renderTemplate(
-  body: string,
-  ctx: PreviewContext,
-): PreviewSegment[] {
+export function renderTemplate(body: string, ctx: PreviewContext): PreviewSegment[] {
   const segments: PreviewSegment[] = [];
   if (!body) return segments;
 

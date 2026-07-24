@@ -11,15 +11,15 @@ vi.mock("@/services/iam", () => ({
 }));
 
 import { getResources, updateRole } from "@/services/iam";
-import {
-  buildReadonlyPermissions,
-  seedReadonlyRolePermissions,
-} from "./readonlyPreset";
+import { buildReadonlyPermissions, seedReadonlyRolePermissions } from "./readonlyPreset";
 
 describe("buildReadonlyPermissions", () => {
   it("grants AllowList + AllowGet on visible top-level resources", () => {
     const perms = buildReadonlyPermissions(
-      [{ key: "stream", visible: true }, { key: "alert", visible: true }],
+      [
+        { key: "stream", visible: true },
+        { key: "alert", visible: true },
+      ],
       "default",
       false,
     );
@@ -53,9 +53,7 @@ describe("buildReadonlyPermissions", () => {
       false,
     );
     // settings: AllowList hidden; logs_cache: both read perms hidden.
-    expect(perms).toEqual([
-      { object: "settings:_all_default", permission: "AllowGet" },
-    ]);
+    expect(perms).toEqual([{ object: "settings:_all_default", permission: "AllowGet" }]);
   });
 
   it("excludes the org resource outside the meta org (mirrors EditRole's setPermission guard)", () => {
@@ -118,8 +116,6 @@ describe("seedReadonlyRolePermissions", () => {
   it("propagates failures so the caller can surface a warning", async () => {
     vi.mocked(getResources).mockRejectedValue(new Error("boom"));
 
-    await expect(
-      seedReadonlyRolePermissions("viewer", "default", false),
-    ).rejects.toThrow("boom");
+    await expect(seedReadonlyRolePermissions("viewer", "default", false)).rejects.toThrow("boom");
   });
 });

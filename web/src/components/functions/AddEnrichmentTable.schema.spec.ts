@@ -24,9 +24,9 @@ describe("AddEnrichmentTable.schema", () => {
 
   describe("name (required + trim)", () => {
     it("requires a non-empty name", () => {
-      expect(
-        errorPaths(createSchema, { name: "", source: "url", url: "https://x.com" }),
-      ).toContain("name");
+      expect(errorPaths(createSchema, { name: "", source: "url", url: "https://x.com" })).toContain(
+        "name",
+      );
       expect(
         errorPaths(createSchema, { name: "   ", source: "url", url: "https://x.com" }),
       ).toContain("name");
@@ -41,16 +41,12 @@ describe("AddEnrichmentTable.schema", () => {
 
   describe("file (required when source === file)", () => {
     it("requires a file when source is file", () => {
-      expect(
-        errorPaths(createSchema, { name: "t", source: "file", file: "" }),
-      ).toContain("file");
+      expect(errorPaths(createSchema, { name: "t", source: "file", file: "" })).toContain("file");
     });
 
     it("passes when a file is provided", () => {
       const file = new File(["a"], "a.csv", { type: "text/csv" });
-      expect(
-        errorPaths(createSchema, { name: "t", source: "file", file }),
-      ).not.toContain("file");
+      expect(errorPaths(createSchema, { name: "t", source: "file", file })).not.toContain("file");
     });
 
     it("does not require a file when source is url", () => {
@@ -62,15 +58,13 @@ describe("AddEnrichmentTable.schema", () => {
 
   describe("url (required + http(s):// when source === url)", () => {
     it("requires a url for a new table", () => {
-      expect(
-        errorPaths(createSchema, { name: "t", source: "url", url: "" }),
-      ).toContain("url");
+      expect(errorPaths(createSchema, { name: "t", source: "url", url: "" })).toContain("url");
     });
 
     it("requires an http(s):// prefix", () => {
-      expect(
-        errorPaths(createSchema, { name: "t", source: "url", url: "ftp://x.com" }),
-      ).toContain("url");
+      expect(errorPaths(createSchema, { name: "t", source: "url", url: "ftp://x.com" })).toContain(
+        "url",
+      );
       expect(
         errorPaths(createSchema, { name: "t", source: "url", url: "example.com/data.csv" }),
       ).toContain("url");
@@ -118,10 +112,9 @@ describe("AddEnrichmentTable.schema", () => {
 
   it("accepts a fully valid file record", () => {
     const file = new File(["a"], "a.csv", { type: "text/csv" });
-    expect(
-      createSchema.safeParse({ name: "t", source: "file", file, append: false })
-        .success,
-    ).toBe(true);
+    expect(createSchema.safeParse({ name: "t", source: "file", file, append: false }).success).toBe(
+      true,
+    );
   });
 
   it("accepts a fully valid url record", () => {

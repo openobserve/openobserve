@@ -61,20 +61,20 @@ describe("DashboardHeader", () => {
     it("should initialize with default prop values", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.props('title')).toBe("");
-      expect(wrapper.props('backButton')).toBe(false);
+      expect(wrapper.props("title")).toBe("");
+      expect(wrapper.props("backButton")).toBe(false);
     });
 
     it("should accept custom prop values", () => {
       const customProps = {
         title: "Custom Title",
-        backButton: true
+        backButton: true,
       };
 
       wrapper = createWrapper(customProps);
 
-      expect(wrapper.props('title')).toBe("Custom Title");
-      expect(wrapper.props('backButton')).toBe(true);
+      expect(wrapper.props("title")).toBe("Custom Title");
+      expect(wrapper.props("backButton")).toBe(true);
     });
   });
 
@@ -128,15 +128,17 @@ describe("DashboardHeader", () => {
     it("should not show back button by default", () => {
       wrapper = createWrapper();
 
-      const backButton = wrapper.findComponent({ name: 'OButton' });
+      const backButton = wrapper.findComponent({ name: "OButton" });
       expect(backButton.exists()).toBe(false);
     });
 
     it("should show back button when backButton prop is true", () => {
       wrapper = createWrapper({ backButton: true });
 
-      const backButtonContainer = wrapper.find('[data-test="dashboard-header-back-button-container"]');
-      const backButton = wrapper.findComponent({ name: 'OButton' });
+      const backButtonContainer = wrapper.find(
+        '[data-test="dashboard-header-back-button-container"]',
+      );
+      const backButton = wrapper.findComponent({ name: "OButton" });
 
       expect(backButtonContainer.exists()).toBe(true);
       expect(backButton.exists()).toBe(true);
@@ -145,10 +147,10 @@ describe("DashboardHeader", () => {
     it("should have correct back button attributes", () => {
       wrapper = createWrapper({ backButton: true });
 
-      const backButton = wrapper.findComponent({ name: 'OButton' });
+      const backButton = wrapper.findComponent({ name: "OButton" });
 
-      expect(backButton.props('variant')).toBe('outline');
-      expect(backButton.props('size')).toBe('icon-xs');
+      expect(backButton.props("variant")).toBe("outline");
+      expect(backButton.props("size")).toBe("icon-xs");
       // Migration replaced the legacy margin class with mr-2.
       expect(backButton.classes().some((c) => c.includes("mr-2"))).toBe(true);
     });
@@ -156,36 +158,36 @@ describe("DashboardHeader", () => {
     it("should emit back event when back button is clicked", async () => {
       wrapper = createWrapper({ backButton: true });
 
-      const backButton = wrapper.findComponent({ name: 'OButton' });
-      await backButton.trigger('click');
+      const backButton = wrapper.findComponent({ name: "OButton" });
+      await backButton.trigger("click");
 
-      expect(wrapper.emitted('back')).toBeTruthy();
-      expect(wrapper.emitted('back')).toHaveLength(1);
+      expect(wrapper.emitted("back")).toBeTruthy();
+      expect(wrapper.emitted("back")).toHaveLength(1);
     });
 
     it("should emit back event multiple times when clicked multiple times", async () => {
       wrapper = createWrapper({ backButton: true });
 
-      const backButton = wrapper.findComponent({ name: 'OButton' });
-      await backButton.trigger('click');
-      await backButton.trigger('click');
-      await backButton.trigger('click');
+      const backButton = wrapper.findComponent({ name: "OButton" });
+      await backButton.trigger("click");
+      await backButton.trigger("click");
+      await backButton.trigger("click");
 
-      expect(wrapper.emitted('back')).toHaveLength(3);
+      expect(wrapper.emitted("back")).toHaveLength(3);
     });
 
     it("should toggle back button visibility when prop changes", async () => {
       wrapper = createWrapper({ backButton: false });
 
-      expect(wrapper.findComponent({ name: 'OButton' }).exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "OButton" }).exists()).toBe(false);
 
       await wrapper.setProps({ backButton: true });
 
-      expect(wrapper.findComponent({ name: 'OButton' }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OButton" }).exists()).toBe(true);
 
       await wrapper.setProps({ backButton: false });
 
-      expect(wrapper.findComponent({ name: 'OButton' }).exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "OButton" }).exists()).toBe(false);
     });
   });
 
@@ -194,7 +196,7 @@ describe("DashboardHeader", () => {
       wrapper = mount(DashboardHeader, {
         props: { title: "Test" },
         slots: {
-          right: '<button data-test="custom-button">Custom Button</button>'
+          right: '<button data-test="custom-button">Custom Button</button>',
         },
         global: {
           plugins: [],
@@ -210,7 +212,7 @@ describe("DashboardHeader", () => {
       wrapper = mount(DashboardHeader, {
         props: { title: "Test" },
         slots: {
-          right: '<span data-test="span-1">Span 1</span><span data-test="span-2">Span 2</span>'
+          right: '<span data-test="span-1">Span 1</span><span data-test="span-2">Span 2</span>',
         },
         global: {
           plugins: [],
@@ -224,7 +226,9 @@ describe("DashboardHeader", () => {
     it("should handle empty right slot", () => {
       wrapper = createWrapper({ title: "Test" });
 
-      const rightSlotContainer = wrapper.find('[data-test="dashboard-header-right-slot-container"]');
+      const rightSlotContainer = wrapper.find(
+        '[data-test="dashboard-header-right-slot-container"]',
+      );
       expect(rightSlotContainer.exists()).toBe(true);
       expect(rightSlotContainer.text()).toBe("");
     });
@@ -241,7 +245,7 @@ describe("DashboardHeader", () => {
       wrapper = mount(DashboardHeader, {
         props: { title: "Test" },
         slots: {
-          right: complexSlotContent
+          right: complexSlotContent,
         },
         global: {
           plugins: [],
@@ -264,20 +268,22 @@ describe("DashboardHeader", () => {
       expect(findTitle(wrapper)?.exists()).toBe(true);
 
       // Only the back button div and right slot container exist post-migration.
-      expect(wrapper.find('[data-test="dashboard-header-back-button-container"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboard-header-right-slot-container"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-header-back-button-container"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="dashboard-header-right-slot-container"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should render the separator with its data-test attribute", () => {
       wrapper = createWrapper();
 
-      const separator = wrapper.findComponent({ name: 'OSeparator' });
+      const separator = wrapper.findComponent({ name: "OSeparator" });
       expect(separator.exists()).toBe(true);
       // Spacing now lives on the header row (my-2 mx-2); the separator
       // itself carries no margin class after the OTable/layout migration.
-      expect(separator.attributes("data-test")).toBe(
-        "dashboard-header-separator",
-      );
+      expect(separator.attributes("data-test")).toBe("dashboard-header-separator");
     });
 
     it("should maintain layout structure without back button", () => {
@@ -286,8 +292,12 @@ describe("DashboardHeader", () => {
       expect(findTitle(wrapper)?.exists()).toBe(true);
 
       // Should have only right slot container when no back button.
-      expect(wrapper.find('[data-test="dashboard-header-back-button-container"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="dashboard-header-right-slot-container"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-header-back-button-container"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.find('[data-test="dashboard-header-right-slot-container"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should maintain layout structure with back button", () => {
@@ -296,8 +306,12 @@ describe("DashboardHeader", () => {
       expect(findTitle(wrapper)?.exists()).toBe(true);
 
       // Should have both back button and right slot containers.
-      expect(wrapper.find('[data-test="dashboard-header-back-button-container"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboard-header-right-slot-container"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-header-back-button-container"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="dashboard-header-right-slot-container"]').exists()).toBe(
+        true,
+      );
     });
   });
 
@@ -306,7 +320,7 @@ describe("DashboardHeader", () => {
       wrapper = createWrapper({ backButton: true });
 
       expect(wrapper.vm.onBackClicked).toBeDefined();
-      expect(typeof wrapper.vm.onBackClicked).toBe('function');
+      expect(typeof wrapper.vm.onBackClicked).toBe("function");
     });
 
     it("should call onBackClicked when back button is triggered programmatically", async () => {
@@ -316,13 +330,13 @@ describe("DashboardHeader", () => {
 
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.emitted('back')).toBeTruthy();
+      expect(wrapper.emitted("back")).toBeTruthy();
     });
 
     it("should not have back event emitted without back button", () => {
       wrapper = createWrapper({ backButton: false });
 
-      expect(wrapper.emitted('back')).toBeFalsy();
+      expect(wrapper.emitted("back")).toBeFalsy();
     });
   });
 
@@ -330,26 +344,26 @@ describe("DashboardHeader", () => {
     it("should handle string title prop", () => {
       wrapper = createWrapper({ title: "Valid String Title" });
 
-      expect(wrapper.props('title')).toBe("Valid String Title");
+      expect(wrapper.props("title")).toBe("Valid String Title");
     });
 
     it("should handle boolean backButton prop", () => {
       wrapper = createWrapper({ backButton: true });
 
-      expect(wrapper.props('backButton')).toBe(true);
+      expect(wrapper.props("backButton")).toBe(true);
     });
 
     it("should handle boolean false for backButton", () => {
       wrapper = createWrapper({ backButton: false });
 
-      expect(wrapper.props('backButton')).toBe(false);
+      expect(wrapper.props("backButton")).toBe(false);
     });
 
     it("should use default values when props are not provided", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.props('title')).toBe("");
-      expect(wrapper.props('backButton')).toBe(false);
+      expect(wrapper.props("title")).toBe("");
+      expect(wrapper.props("backButton")).toBe(false);
     });
   });
 
@@ -357,7 +371,7 @@ describe("DashboardHeader", () => {
     it("should be focusable when back button is present", () => {
       wrapper = createWrapper({ backButton: true });
 
-      const backButton = wrapper.findComponent({ name: 'OButton' });
+      const backButton = wrapper.findComponent({ name: "OButton" });
       expect(backButton.exists()).toBe(true);
     });
 
@@ -367,24 +381,22 @@ describe("DashboardHeader", () => {
       const titleElement = findTitle(wrapper);
       expect(titleElement?.exists()).toBe(true);
       // The migrated heading uses text-base + font-semibold.
-      expect(
-        titleElement?.classes().some((c) => c.includes("text-base")),
-      ).toBe(true);
+      expect(titleElement?.classes().some((c) => c.includes("text-base"))).toBe(true);
     });
 
     it("should support keyboard navigation for back button", async () => {
       wrapper = createWrapper({ backButton: true });
 
-      const backButton = wrapper.findComponent({ name: 'OButton' });
+      const backButton = wrapper.findComponent({ name: "OButton" });
 
       // Simulate keyboard events
-      await backButton.trigger('keydown.enter');
-      await backButton.trigger('keydown.space');
+      await backButton.trigger("keydown.enter");
+      await backButton.trigger("keydown.space");
 
       // Should still be able to click
-      await backButton.trigger('click');
+      await backButton.trigger("click");
 
-      expect(wrapper.emitted('back')).toBeTruthy();
+      expect(wrapper.emitted("back")).toBeTruthy();
     });
   });
 
@@ -415,7 +427,7 @@ describe("DashboardHeader", () => {
       await wrapper.setProps({ title: "Final", backButton: true });
 
       expect(findTitle(wrapper)?.text()).toBe("Final");
-      expect(wrapper.findComponent({ name: 'OButton' }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "OButton" }).exists()).toBe(true);
     });
 
     it("should maintain component integrity after multiple re-renders", async () => {
@@ -424,13 +436,13 @@ describe("DashboardHeader", () => {
       for (let i = 0; i < 10; i++) {
         await wrapper.setProps({
           title: `Title ${i}`,
-          backButton: i % 2 === 0
+          backButton: i % 2 === 0,
         });
       }
 
       expect(wrapper.exists()).toBe(true);
       expect(findTitle(wrapper)?.text()).toBe("Title 9");
-      expect(wrapper.findComponent({ name: 'OButton' }).exists()).toBe(false); // 9 % 2 !== 0
+      expect(wrapper.findComponent({ name: "OButton" }).exists()).toBe(false); // 9 % 2 !== 0
     });
   });
 });

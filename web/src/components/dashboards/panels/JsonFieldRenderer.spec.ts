@@ -4,7 +4,6 @@ import JsonFieldRenderer from "./JsonFieldRenderer.vue";
 import store from "@/test/unit/helpers/store";
 import { chartColor } from "@/utils/chartTheme";
 
-
 describe("JsonFieldRenderer Component", () => {
   let wrapper: any;
 

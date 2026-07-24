@@ -153,17 +153,12 @@ const useQuery = () => {
         aggs: {
           histogram:
             "select histogram(" +
-            (data?.timestamp_column ||
-              store.state.zoConfig.timestamp_column ||
-              "_timestamp") +
+            (data?.timestamp_column || store.state.zoConfig.timestamp_column || "_timestamp") +
             ", '[INTERVAL]') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key",
         },
       };
 
-      req.aggs.histogram = req.aggs.histogram.replaceAll(
-        "[INTERVAL]",
-        data.timeInterval,
-      );
+      req.aggs.histogram = req.aggs.histogram.replaceAll("[INTERVAL]", data.timeInterval);
 
       req.query.sql = req.query.sql.replaceAll(
         "[QUERY_FUNCTIONS]",
@@ -177,11 +172,9 @@ const useQuery = () => {
         data.parsedQuery?.whereClause || "",
       );
 
-      if (data?.timestamps?.startTime)
-        req.query.start_time = data.timestamps.startTime;
+      if (data?.timestamps?.startTime) req.query.start_time = data.timestamps.startTime;
 
-      if (data?.timestamps?.endTime)
-        req.query.end_time = data.timestamps.endTime;
+      if (data?.timestamps?.endTime) req.query.end_time = data.timestamps.endTime;
 
       if (store.state.zoConfig.sql_base64_enabled) {
         req["encoding"] = "base64";

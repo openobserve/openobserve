@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="[
       props.scrollEl
         ? 'relative'
-        : 'o2-scroll-container overflow-auto rounded-none! overflow-x-auto table-container relative',
+        : 'o2-scroll-container table-container relative overflow-auto overflow-x-auto rounded-none!',
     ]"
     class="text-text-body"
   >
@@ -28,10 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       (e.g. streaming_aggs replacing values). Same component dashboard panels
       use; driven by backend streaming progress. The full skeleton below is
       shown only on first load (no rows yet). -->
-    <LoadingProgress
-      :loading="loading"
-      :loadingProgressPercentage="loadingProgressPercentage"
-    />
+    <LoadingProgress :loading="loading" :loadingProgressPercentage="loadingProgressPercentage" />
     <!-- Row/cell actions live in a right-click context menu rather than a hover
       overlay: the overlay had to cover the cell text to be reachable, and it
       could only ever be offered on the handful of columns wide enough to host
@@ -40,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #trigger>
         <table
           data-test="logs-search-result-logs-table"
-          class="w-full table-auto logs-table"
+          class="logs-table w-full table-auto"
           @contextmenu.capture="handleTableContextMenu"
           :style="{
             minWidth: tableMinWidth,
@@ -53,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="headerGroup in table.getHeaderGroups()"
             :key="headerGroup.id"
           >
-            <vue-draggable
+            <VueDraggable
               v-model="columnOrder"
               :element="'table'"
               :animation="200"
@@ -63,27 +60,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 { 'cursor-move': table.getState().columnOrder.length > 1 },
                 // Header-row chrome via centralized token utilities (same tokens
                 // OTable uses): background band + full-width underline on the row.
-                'bg-table-header-bg border-b border-table-header-border',
+                'bg-table-header-bg border-table-header-border border-b',
               ]"
               :style="{ width: '100%', minWidth: '100%' }"
               tag="tr"
               @start="(event) => handleDragStart(event)"
               @end="() => handleDragEnd()"
-              class="flex items-center h-8"
+              class="flex h-8 items-center"
             >
               <th
                 v-for="(header, headerIndex) in headerGroup.headers"
                 :key="header.id"
                 :id="header.id"
-                class="px-2 relative table-head text-ellipsis"
-                :style="
-                  columnStyle(
-                    header,
-                    headerIndex,
-                    headerGroup.headers.length,
-                    'header',
-                  )
-                "
+                class="table-head relative px-2 text-ellipsis"
+                :style="columnStyle(header, headerIndex, headerGroup.headers.length, 'header')"
                 :data-test="`log-search-result-table-th-${header.id}`"
               >
                 <!-- Column separator / resize handle. The separator LINE renders on
@@ -92,30 +82,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  The drag interactivity + hover accent only apply when the column
                  is resizable. Matches the OTable spec: short 1px --color-border. -->
                 <div
-                  @dblclick="
-                    header.column.getCanResize() && header.column.resetSize()
-                  "
+                  @dblclick="header.column.getCanResize() && header.column.resetSize()"
                   @mousedown.self.prevent.stop="
-                    header.column.getCanResize() &&
-                    header.getResizeHandler()?.($event)
+                    header.column.getCanResize() && header.getResizeHandler()?.($event)
                   "
                   @touchstart.self.prevent.stop="
-                    header.column.getCanResize() &&
-                    header.getResizeHandler()?.($event)
+                    header.column.getCanResize() && header.getResizeHandler()?.($event)
                   "
                   :class="[
-                    'absolute right-0 top-0 h-full flex items-center justify-end select-none touch-none z-10 group/resizer',
-                    header.column.getCanResize()
-                      ? 'resizer w-1.25 cursor-col-resize'
-                      : 'w-2',
+                    'group/resizer absolute top-0 right-0 z-10 flex h-full touch-none items-center justify-end select-none',
+                    header.column.getCanResize() ? 'resizer w-1.25 cursor-col-resize' : 'w-2',
                   ]"
                 >
                   <div
                     :class="[
                       'rounded-full transition-all duration-150',
                       header.column.getIsResizing()
-                        ? 'w-0.5 h-full bg-table-resize-handle'
-                        : 'w-px h-4 bg-border-default group-hover/resizer:w-0.5 group-hover/resizer:h-full group-hover/resizer:bg-[var(--color-table-resize-handle)]',
+                        ? 'bg-table-resize-handle h-full w-0.5'
+                        : 'bg-border-default h-4 w-px group-hover/resizer:h-full group-hover/resizer:w-0.5 group-hover/resizer:bg-[var(--color-table-resize-handle)]',
                     ]"
                   />
                 </div>
@@ -124,17 +108,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="!header.isPlaceholder"
                   :class="[
                     'text-left',
-                    header.column.getCanSort()
-                      ? 'cursor-pointer select-none'
-                      : '',
+                    header.column.getCanSort() ? 'cursor-pointer select-none' : '',
                   ]"
-                  @click="
-                    getSortingHandler(
-                      $event,
-                      header.column.getToggleSortingHandler(),
-                    )
-                  "
-                  class="overflow-hidden text-ellipsis text-table-header-text text-xs font-medium"
+                  @click="getSortingHandler($event, header.column.getToggleSortingHandler())"
+                  class="text-table-header-text overflow-hidden text-xs font-medium text-ellipsis"
                 >
                   <FlexRender
                     :render="header.column.columnDef.header"
@@ -149,47 +126,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       (header.column.columnDef.meta as any).showWrap)
                   "
                   :data-test="`log-add-data-from-column-${header.column.columnDef.header}`"
-                  class="invisible flex items-center absolute right-2 top-0 h-full pl-3 bg-table-header-bg column-actions"
+                  class="bg-table-header-bg column-actions invisible absolute top-0 right-2 flex h-full items-center pl-3"
                 >
                   <OIcon
                     v-if="(header.column.columnDef.meta as any).closable"
                     :data-test="`logs-search-result-table-th-remove-${header.column.columnDef.header}-btn`"
                     name="close"
-                    class="close-icon cursor-pointer text-icon-color hover:text-text-heading transition-colors"
+                    class="close-icon text-icon-color hover:text-text-heading cursor-pointer transition-colors"
                     :title="t('common.close')"
                     size="xs"
                     @click.stop="closeColumn(header.column.columnDef)"
                   />
                 </div>
               </th>
-            </vue-draggable>
+            </VueDraggable>
 
             <tr v-if="!loading && errMsg != ''" class="w-full">
               <td :colspan="columnOrder.length" class="font-bold opacity-70">
-                <div class="text-sm font-medium font-bold bg-warning">
+                <div class="bg-warning text-sm font-bold font-medium">
                   <OIcon size="xs" name="warning" class="mr-1" />
                   {{ errMsg }}
                 </div>
               </td>
             </tr>
-            <tr
-              data-test="log-search-result-function-error"
-              v-if="functionErrorMsg != ''"
-            >
+            <tr data-test="log-search-result-function-error" v-if="functionErrorMsg != ''">
               <td :colspan="columnOrder.length" class="font-bold opacity-60">
-                <div
-                  class="text-sm font-medium font-bold pl-2 bg-status-warning-bg"
-                >
+                <div class="bg-status-warning-bg pl-2 text-sm font-bold font-medium">
                   <OButton
                     variant="ghost"
                     size="icon-xs"
-                    class="mr-1 log-row-expand-btn"
+                    class="log-row-expand-btn mr-1"
                     data-test="table-row-expand-menu"
                     @click.capture.stop="expandFunctionError"
                     ><OIcon
-                      :name="
-                        isFunctionErrorOpen ? 'expand-more' : 'chevron-right'
-                      "
+                      :name="isFunctionErrorOpen ? 'expand-more' : 'chevron-right'"
                       size="sm" /></OButton
                   ><b>
                     <OIcon name="warning" size="sm" />
@@ -199,10 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </td>
             </tr>
             <tr v-if="functionErrorMsg != '' && isFunctionErrorOpen">
-              <td
-                :colspan="columnOrder.length"
-                class="opacity-70 px-2 bg-status-warning-bg"
-              >
+              <td :colspan="columnOrder.length" class="bg-status-warning-bg px-2 opacity-70">
                 <pre>{{ functionErrorMsg }}</pre>
               </td>
             </tr>
@@ -221,13 +188,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <tr
               v-for="r in SKEL_ROW_COUNT"
               :key="`skel-${r}`"
-              class="logs-skel-row flex items-center w-full opacity-0 h-[1.8125rem] bg-log-table-row-bg border-b border-log-table-row-border"
+              class="logs-skel-row bg-log-table-row-bg border-log-table-row-border flex h-[1.8125rem] w-full items-center border-b opacity-0"
               :style="{ animationDelay: `${(r - 1) * 40}ms` }"
             >
               <!-- No columns loaded yet (first page load) — full-width shimmer bar -->
-              <td v-if="!headers?.length" class="w-full px-4 overflow-hidden">
+              <td v-if="!headers?.length" class="w-full overflow-hidden px-4">
                 <span
-                  class="logs-skel-pill inline-block h-3 rounded-default"
+                  class="logs-skel-pill rounded-default inline-block h-3"
                   :style="{ width: `${skelCellWidth(r - 1, 0)}%` }"
                   aria-hidden="true"
                 />
@@ -237,17 +204,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <td
                   v-for="(header, c) in headers"
                   :key="header.id"
-                  class="px-2 overflow-hidden"
+                  class="overflow-hidden px-2"
                   :class="c === 0 ? 'pl-4' : ''"
                   :style="skelTdStyle(header, c)"
                 >
                   <span
-                    class="logs-skel-pill inline-block h-3 rounded-default"
+                    class="logs-skel-pill rounded-default inline-block h-3"
                     :style="{
-                      width:
-                        c === 0
-                          ? `${SKEL_TIMESTAMP_PX}px`
-                          : `${skelCellWidth(r - 1, c)}%`,
+                      width: c === 0 ? `${SKEL_TIMESTAMP_PX}px` : `${skelCellWidth(r - 1, c)}%`,
                     }"
                     aria-hidden="true"
                   />
@@ -268,10 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="relative"
             :style="{ height: totalSize + 'px' }"
           >
-            <template
-              v-for="virtualRow in virtualRows"
-              :key="formattedRows[virtualRow.index]?.id"
-            >
+            <template v-for="virtualRow in virtualRows" :key="formattedRows[virtualRow.index]?.id">
               <tr
                 :data-test="`logs-search-result-detail-${
                   (tableRows[virtualRow.index] as any)[
@@ -284,89 +245,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   width: '100%',
                 }"
                 :data-index="virtualRow.index"
-                :data-expanded="
-                  formattedRows?.[virtualRow.index]?.original?.isExpandedRow
-                "
+                :data-expanded="formattedRows?.[virtualRow.index]?.original?.isExpandedRow"
                 :tabindex="
-                  !(formattedRows[virtualRow.index]?.original as any)
-                    ?.isExpandedRow
-                    ? 0
-                    : undefined
+                  !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow ? 0 : undefined
                 "
-                :ref="
-                  (node: any) => node && rowVirtualizer.measureElement(node)
-                "
+                :ref="(node: any) => node && rowVirtualizer.measureElement(node)"
                 :class="[
                   'absolute flex w-full items-center justify-start border-b',
-                  !(formattedRows[virtualRow.index]?.original as any)
-                    ?.isExpandedRow
+                  !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
                     ? 'cursor-pointer'
                     : 'cursor-default',
-                  wrap ||
-                  (formattedRows[virtualRow.index]?.original as any)
-                    ?.isExpandedRow
+                  wrap || (formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
                     ? 'break-all'
                     : '',
-                  (tableRows[virtualRow.index] as any)[
-                    store.state.zoConfig.timestamp_column
-                  ] === highlightTimestamp &&
-                  !(formattedRows[virtualRow.index]?.original as any)
-                    ?.isExpandedRow
+                  (tableRows[virtualRow.index] as any)[store.state.zoConfig.timestamp_column] ===
+                    highlightTimestamp &&
+                  !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
                     ? 'bg-table-row-selected-bg'
-                    : !(formattedRows[virtualRow.index]?.original as any)
-                          ?.isExpandedRow
+                    : !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
                       ? 'log-row-base bg-log-table-row-bg'
                       : '',
-                  !(formattedRows[virtualRow.index]?.original as any)
-                    ?.isExpandedRow
-                    ? 'table-row-hover table-row-focus focus-visible:outline-none transition-[background-color,box-shadow] duration-120 [transition-timing-function:ease-in-out] border-b-log-table-row-border!'
+                  !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
+                    ? 'table-row-hover table-row-focus border-b-log-table-row-border! transition-[background-color,box-shadow] duration-120 [transition-timing-function:ease-in-out] focus-visible:outline-none'
                     : '',
                 ]"
                 @click="
-                  !(formattedRows[virtualRow.index]?.original as any)
-                    ?.isExpandedRow &&
-                  handleDataRowClick(
-                    tableRows[virtualRow.index],
-                    virtualRow.index,
-                  )
+                  !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow &&
+                  handleDataRowClick(tableRows[virtualRow.index], virtualRow.index)
                 "
                 @keydown="
-                  !(formattedRows[virtualRow.index]?.original as any)
-                    ?.isExpandedRow &&
-                  handleRowKeydown(
-                    $event,
-                    tableRows[virtualRow.index],
-                    virtualRow.index,
-                  )
+                  !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow &&
+                  handleRowKeydown($event, tableRows[virtualRow.index], virtualRow.index)
                 "
               >
                 <!-- Status color line for entire row -->
                 <div
-                  v-if="
-                    !(formattedRows[virtualRow.index]?.original as any)
-                      ?.isExpandedRow
-                  "
-                  class="absolute left-0 inset-y-0 w-1 z-10"
+                  v-if="!(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow"
+                  class="absolute inset-y-0 left-0 z-10 w-1"
                   data-test="log-table-row-status-color"
-                  :data-test-status-level="
-                    getRowStatusLevel(tableRows[virtualRow.index])
-                  "
+                  :data-test-status-level="getRowStatusLevel(tableRows[virtualRow.index])"
                   :style="{
-                    backgroundColor: getRowStatusColor(
-                      tableRows[virtualRow.index],
-                    ),
+                    backgroundColor: getRowStatusColor(tableRows[virtualRow.index]),
                   }"
                 />
                 <td
-                  v-if="
-                    (formattedRows[virtualRow.index]?.original as any)
-                      ?.isExpandedRow
-                  "
+                  v-if="(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow"
                   :colspan="columnOrder.length"
                   :data-test="`log-search-result-expanded-row-${virtualRow.index}`"
-                  class="w-full relative"
+                  class="relative w-full"
                 >
-                  <json-preview
+                  <JsonPreview
                     :value="tableRows[virtualRow.index - 1] as any"
                     show-copy-button
                     class="py-1.5"
@@ -378,13 +306,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @copy="copyLogToClipboard"
                     @add-field-to-table="addFieldToTable"
                     @add-search-term="addSearchTerm"
-                    @view-trace="
-                      viewTrace(formattedRows[virtualRow.index - 1]?.original)
-                    "
+                    @view-trace="viewTrace(formattedRows[virtualRow.index - 1]?.original)"
                     @show-correlation="
-                      showCorrelation(
-                        formattedRows[virtualRow.index - 1]?.original,
-                      )
+                      showCorrelation(formattedRows[virtualRow.index - 1]?.original)
                     "
                     :streamName="jsonpreviewStreamName"
                     @send-to-ai-chat="sendToAiChat"
@@ -392,17 +316,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </td>
                 <template v-else>
                   <td
-                    v-for="(cell, cellIndex) in formattedRows[
-                      virtualRow.index
-                    ].getVisibleCells()"
+                    v-for="(cell, cellIndex) in formattedRows[virtualRow.index].getVisibleCells()"
                     :key="cell.id"
                     :data-test="
-                      'log-table-column-' +
-                      virtualRow.index +
-                      '-' +
-                      cell.column.columnDef.id
+                      'log-table-column-' + virtualRow.index + '-' + cell.column.columnDef.id
                     "
-                    class="py-none px-2 flex items-center justify-start relative"
+                    class="py-none relative flex items-center justify-start px-2"
                     :class="[...tableCellClass, { 'pl-4': cellIndex === 0 }]"
                     :style="
                       columnStyle(
@@ -418,14 +337,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="cellIndex == 0"
                       variant="ghost"
                       size="icon-xs"
-                      class="mr-1 log-row-expand-btn"
+                      class="log-row-expand-btn mr-1"
                       data-test="table-row-expand-menu"
                       @click.capture.stop="handleExpandRow(virtualRow.index)"
                       ><OIcon
                         :name="
-                          expandedRowIndices.has(virtualRow.index)
-                            ? 'expand-more'
-                            : 'chevron-right'
+                          expandedRowIndices.has(virtualRow.index) ? 'expand-more' : 'chevron-right'
                         "
                         size="sm"
                     /></OButton>
@@ -476,11 +393,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OContextMenuItem
             data-test="log-context-menu-include-term"
             @select="
-              addSearchTerm(
-                contextCell.columnId,
-                toSearchTermValue(contextCell.value),
-                'include',
-              )
+              addSearchTerm(contextCell.columnId, toSearchTermValue(contextCell.value), 'include')
             "
           >
             <!-- size="sm" matches the registry icons on the other items so the
@@ -497,11 +410,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OContextMenuItem
             data-test="log-context-menu-exclude-term"
             @select="
-              addSearchTerm(
-                contextCell.columnId,
-                toSearchTermValue(contextCell.value),
-                'exclude',
-              )
+              addSearchTerm(contextCell.columnId, toSearchTermValue(contextCell.value), 'exclude')
             "
           >
             <template #icon-left>
@@ -536,15 +445,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import {
-  ref,
-  computed,
-  watch,
-  nextTick,
-  onMounted,
-  onBeforeUnmount,
-  ComputedRef,
-} from "vue";
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount, ComputedRef } from "vue";
 import type { PropType } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import {
@@ -682,9 +583,7 @@ useTextHighlighter();
 const { processedResults, processHitsInChunks } = useLogsHighlighter();
 
 // Typed view of the highlighter cache for indexed template lookups.
-const processedResultsMap = computed<Record<string, string>>(
-  () => processedResults.value,
-);
+const processedResultsMap = computed<Record<string, string>>(() => processedResults.value);
 
 const getSortingHandler = (e: Event, fn: any) => {
   return fn(e);
@@ -725,8 +624,7 @@ const contextCellIsStreamField = computed(() => {
   const columnId = contextCell.value?.columnId;
   if (!columnId) return false;
   return (
-    props.selectedStreamFields?.find((field) => field.name === columnId)
-      ?.isSchemaField ?? false
+    props.selectedStreamFields?.find((field) => field.name === columnId)?.isSchemaField ?? false
   );
 });
 
@@ -984,8 +882,7 @@ const measureRowsContentWidth = () => {
   // Grow only while the same result set is on screen: rows that scroll into
   // view may be longer than anything measured so far, and a table that
   // narrowed again mid-scroll would shift every row under the pointer.
-  if (widest > rowsContentWidth.value)
-    rowsContentWidth.value = Math.ceil(widest);
+  if (widest > rowsContentWidth.value) rowsContentWidth.value = Math.ceil(widest);
 };
 
 // Reads layout, so it runs once per frame at most rather than on every
@@ -1006,9 +903,7 @@ const resetRowsContentWidth = () => {
 // max() rather than a bare pixel value: the table must still fill the container
 // when the rows are narrower than it.
 const tableMinWidth = computed(() =>
-  rowsContentWidth.value > 0
-    ? `max(100%, ${rowsContentWidth.value}px)`
-    : "100%",
+  rowsContentWidth.value > 0 ? `max(100%, ${rowsContentWidth.value}px)` : "100%",
 );
 
 const debouncedUpdate = debounce((newColSizes) => {
@@ -1053,9 +948,7 @@ const skelTdStyle = (header: any, c: number): Record<string, string> => {
 watch(
   () => headers.value,
   (newVal) => {
-    isResizingHeader.value = newVal.some((header: any) =>
-      header.column.getIsResizing(),
-    );
+    isResizingHeader.value = newVal.some((header: any) => header.column.getIsResizing());
   },
   {
     deep: true,
@@ -1065,9 +958,7 @@ watch(
 const parentRef = ref<HTMLElement | null>(null);
 
 const isFirefox = computed(() => {
-  return (
-    typeof document !== "undefined" && CSS.supports("-moz-appearance", "none")
-  );
+  return typeof document !== "undefined" && CSS.supports("-moz-appearance", "none");
 });
 
 // Cache for expanded row heights
@@ -1076,8 +967,7 @@ const expandedRowHeights = ref<{ [key: number]: number }>({});
 const rowVirtualizerOptions = computed(() => {
   return {
     count: formattedRows.value.length,
-    getScrollElement: () =>
-      (props.scrollEl as HTMLElement | null) ?? parentRef.value,
+    getScrollElement: () => (props.scrollEl as HTMLElement | null) ?? parentRef.value,
     scrollMargin: props.scrollMargin,
     estimateSize: (index: number) => {
       // Check if this is an expanded row (odd indices after expansion)
@@ -1092,8 +982,7 @@ const rowVirtualizerOptions = computed(() => {
         ? (element: any) => {
             const index = parseInt(element.dataset.index);
             // Only measure expanded rows (check if it's actually an expanded row)
-            const isExpandedRow =
-              formattedRows.value[index]?.original?.isExpandedRow;
+            const isExpandedRow = formattedRows.value[index]?.original?.isExpandedRow;
             if (isExpandedRow) {
               const height = element.getBoundingClientRect().height;
               expandedRowHeights.value[index] = height;
@@ -1116,11 +1005,9 @@ watch(virtualRows, scheduleRowsMeasure, { flush: "post" });
 
 // A new result set, a wrap toggle or a column change invalidates the measured
 // width outright — start over instead of keeping the old high-water mark.
-watch(
-  () => [props.rows, props.columns, props.wrap, props.defaultColumns],
-  resetRowsContentWidth,
-  { flush: "post" },
-);
+watch(() => [props.rows, props.columns, props.wrap, props.defaultColumns], resetRowsContentWidth, {
+  flush: "post",
+});
 
 // +22 adds bottom padding so the last virtual row isn't clipped by the container
 const totalSize = computed(() => rowVirtualizer.value.getTotalSize() + 30);
@@ -1139,11 +1026,7 @@ const setExpandedRows = () => {
 const copyLogToClipboard = (value: any, copyAsJson: boolean = true) => {
   emits("copy", value, copyAsJson);
 };
-const addSearchTerm = (
-  field: string,
-  field_value: string | number | boolean,
-  action: string,
-) => {
+const addSearchTerm = (field: string, field_value: string | number | boolean, action: string) => {
   emits("addSearchTerm", field, field_value, action);
 };
 
@@ -1159,11 +1042,7 @@ const addSearchTerm = (
  * value reaches the query as its JSON rather than "[object Object]".
  */
 const toSearchTermValue = (value: unknown): string | number | boolean => {
-  if (
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean"
-  ) {
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
     return value;
   }
   if (value === null || value === undefined) return "null";
@@ -1178,9 +1057,7 @@ const closeColumn = (data: any) => {
 };
 
 const handleDragStart = (event: any) => {
-  if (
-    columnOrder.value[event.oldIndex] === store.state.zoConfig.timestamp_column
-  ) {
+  if (columnOrder.value[event.oldIndex] === store.state.zoConfig.timestamp_column) {
     isResizingHeader.value = true;
   } else {
     isResizingHeader.value = false;
@@ -1272,9 +1149,7 @@ const expandRow = async (index: number) => {
     // Force the virtualizer to recalculate all sizes
     if (rowVirtualizer.value) {
       // Find the actual expanded row element
-      const expandedElement = document.querySelector(
-        `[data-index="${index + 1}"]`,
-      );
+      const expandedElement = document.querySelector(`[data-index="${index + 1}"]`);
       if (expandedElement && rowVirtualizer.value.measureElement) {
         rowVirtualizer.value.measureElement(expandedElement);
       }
@@ -1349,9 +1224,7 @@ const handleRowKeydown = (event: KeyboardEvent, row: any, index: number) => {
         : (event.currentTarget as HTMLElement).previousElementSibling;
     while (sibling && !sibling.matches("tr[tabindex]")) {
       sibling =
-        event.key === "ArrowDown"
-          ? sibling.nextElementSibling
-          : sibling.previousElementSibling;
+        event.key === "ArrowDown" ? sibling.nextElementSibling : sibling.previousElementSibling;
     }
     if (sibling instanceof HTMLElement) sibling.focus();
   }
@@ -1377,10 +1250,7 @@ const handleTableContextMenu = (event: MouseEvent) => {
 // Records which cell the right-click landed on. Runs on the td, so it fires
 // before OContextMenu's own handler on the table (which defers a tick) — by the
 // time the menu renders, `contextCell` already describes the clicked cell.
-const handleCellContextMenu = (cell: {
-  column: { id: string };
-  row: { original: unknown };
-}) => {
+const handleCellContextMenu = (cell: { column: { id: string }; row: { original: unknown } }) => {
   const row = (cell.row.original ?? {}) as Record<string, unknown>;
   contextCell.value = {
     columnId: cell.column.id,
@@ -1403,11 +1273,7 @@ const showCorrelation = (row: any) => {
   emits("show-correlation", row);
 };
 
-const sendToAiChat = (
-  value: any,
-  isEntireRow: boolean = false,
-  append: boolean = true,
-) => {
+const sendToAiChat = (value: any, isEntireRow: boolean = false, append: boolean = true) => {
   if (isEntireRow) {
     //here we will get the original value of the "row"
     //and we need to filter the row if props.columns have any filtered cols that user applied
@@ -1439,9 +1305,7 @@ const checkIfSourceColumnPresent = (columns: any) => {
 const filterRowBasedOnColumns = (row: any, columns: any) => {
   //we need to filter the row based on the columns that user have applied
   //here we need to filter row not columns based on the columns that user have applied
-  const columnsToFilter = columns.filter(
-    (column: any) => column.id !== "source",
-  );
+  const columnsToFilter = columns.filter((column: any) => column.id !== "source");
   return columnsToFilter.reduce((acc: any, column: any) => {
     acc[column.id] = row[column.id];
     return acc;

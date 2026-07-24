@@ -144,31 +144,27 @@ describe("isDatetimeChanged — defensive cases", () => {
   // First load: no prev → always treat as changed so the initial
   // search can run.
   it("returns true when prev is null", () => {
-    expect(
-      isDatetimeChanged(null, { startTime: 1, endTime: 2 }),
-    ).toBe(true);
+    expect(isDatetimeChanged(null, { startTime: 1, endTime: 2 })).toBe(true);
   });
 
   it("returns true when prev is undefined", () => {
-    expect(
-      isDatetimeChanged(undefined, { startTime: 1, endTime: 2 }),
-    ).toBe(true);
+    expect(isDatetimeChanged(undefined, { startTime: 1, endTime: 2 })).toBe(true);
   });
 
   // String-typed timestamps (some date pickers emit strings) — the
   // comparison still works because `===` checks values, not types.
   it("compares string timestamps via strict equality", () => {
     expect(
-      isDatetimeChanged(
-        { startTime: "100", endTime: "200" } as any,
-        { startTime: "100", endTime: "200" },
-      ),
+      isDatetimeChanged({ startTime: "100", endTime: "200" } as any, {
+        startTime: "100",
+        endTime: "200",
+      }),
     ).toBe(false);
     expect(
-      isDatetimeChanged(
-        { startTime: "100", endTime: "200" } as any,
-        { startTime: "999", endTime: "200" },
-      ),
+      isDatetimeChanged({ startTime: "100", endTime: "200" } as any, {
+        startTime: "999",
+        endTime: "200",
+      }),
     ).toBe(true);
   });
 
@@ -177,10 +173,10 @@ describe("isDatetimeChanged — defensive cases", () => {
   // emits is unusual and worth surfacing as a search refresh.
   it("treats string vs number as different (strict equality)", () => {
     expect(
-      isDatetimeChanged(
-        { startTime: 100, endTime: 200 } as any,
-        { startTime: "100", endTime: "200" },
-      ),
+      isDatetimeChanged({ startTime: 100, endTime: 200 } as any, {
+        startTime: "100",
+        endTime: "200",
+      }),
     ).toBe(true);
   });
 });
