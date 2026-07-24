@@ -18,18 +18,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div v-if="!promqlMode && dashboardPanelData.data.type == 'geomap'">
     <!-- latitude container -->
     <div class="flex flex-row pl-3">
-      <div class="flex min-w-32.5 items-center whitespace-nowrap">
+      <div class="flex min-w-24 items-center whitespace-nowrap">
+        <span
+          class="rounded-default bg-badge-indigo-ol-text mr-1.5 h-2 w-2 shrink-0"
+          aria-hidden="true"
+        ></span>
         {{ t("panel.latitude") }}
         <OIcon name="info-outline" size="sm" class="ml-1" />
         <OTooltip :content="Hint" />
       </div>
       <span class="mx-0.5 flex items-center">:</span>
       <div
-        class="axis-container droppable flex w-full flex-1 flex-wrap border-2 border-dashed border-transparent"
+        class="axis-container droppable flex min-h-8 w-full flex-1 flex-wrap items-center border border-dashed border-transparent"
         :class="{
           'border-dotted border-white bg-[rgba(0,0,0,0.042)]':
             dashboardPanelData.meta.dragAndDrop.dragging,
-          'bg-field-list-row-hover-bg transition-all duration-200':
+          'bg-field-list-row-hover-bg transition-colors duration-200':
             dashboardPanelData.meta.dragAndDrop.dragging &&
             dashboardPanelData.meta.dragAndDrop.currentDragArea == 'latitude',
         }"
@@ -40,8 +44,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-latitude-layout"
       >
         <OButtonGroup
-          class="axis-field my-1 mr-2 overflow-hidden"
+          class="axis-field border-border-default border-s-badge-indigo-ol-border bg-surface-panel my-0.5 mr-2 overflow-hidden border border-s-2"
           radius="sm"
+          :divided="false"
           v-if="
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
               ?.latitude
@@ -57,28 +62,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <OButton
-            variant="outline"
+            variant="ghost"
             size="icon-chip"
-            class="cursor-grab"
+            class="!w-4 cursor-grab"
             :data-test="`dashboard-latitude-item-${latitudeLabel}-drag`"
           >
             <template #icon-left>
-              <OIcon name="drag-indicator" size="xs" />
+              <OIcon name="drag-indicator" size="xs" class="text-text-secondary" />
             </template>
           </OButton>
           <ODropdown>
             <template #trigger>
               <OButton
-                variant="primary"
+                variant="ghost"
                 size="chip-12"
+                class="!ps-1 !pe-0"
                 :data-test="`dashboard-latitude-item-${latitudeLabel}`"
               >
-                {{ latitudeLabel }}
+                <AxisFieldChipLabel :label="latitudeLabel" />
                 <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-geo-maps-query-builder-dropdown h-[20.1875rem] w-[48.1875rem]! translate-y-2 rounded-none p-4 shadow-md"
+              class="field-function-menu-popup dashboard-geo-maps-query-builder-dropdown w-[48.1875rem]! translate-y-2 overflow-hidden rounded-none p-0 shadow-md"
               :data-test="`dashboard-latitude-item-${latitudeLabel}-menu`"
             >
               <div
@@ -109,40 +115,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </ODropdown>
           <OButton
-            variant="outline"
+            variant="ghost"
             size="icon-chip"
+            class="-ms-1 !w-4"
             :data-test="`dashboard-latitude-item-${latitudeLabel}-remove`"
             @click="removeLatitude()"
-            icon-left="close"
           >
+            <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
           </OButton>
         </OButtonGroup>
         <div
-          class="py-1 text-center text-xs font-bold"
+          class="flex min-w-0 flex-1 items-center justify-center text-center text-xs whitespace-nowrap"
           v-if="
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
               .latitude == null
           "
         >
-          <div class="mt-1">{{ Hint }}</div>
+          <div>{{ Hint }}</div>
         </div>
       </div>
     </div>
     <OSeparator />
     <!-- longitude container -->
     <div class="flex flex-row pl-3">
-      <div class="flex min-w-32.5 items-center whitespace-nowrap">
+      <div class="flex min-w-24 items-center whitespace-nowrap">
+        <span
+          class="rounded-default bg-badge-orange-ol-text mr-1.5 h-2 w-2 shrink-0"
+          aria-hidden="true"
+        ></span>
         {{ t("panel.longitude") }}
         <OIcon name="info-outline" size="sm" class="ml-1" />
         <OTooltip :content="Hint" />
       </div>
       <span class="mx-0.5 flex items-center">:</span>
       <div
-        class="axis-container droppable flex w-full flex-1 flex-wrap border-2 border-dashed border-transparent"
+        class="axis-container droppable flex min-h-8 w-full flex-1 flex-wrap items-center border border-dashed border-transparent"
         :class="{
           'border-dotted border-white bg-[rgba(0,0,0,0.042)]':
             dashboardPanelData.meta.dragAndDrop.dragging,
-          'bg-field-list-row-hover-bg transition-all duration-200':
+          'bg-field-list-row-hover-bg transition-colors duration-200':
             dashboardPanelData.meta.dragAndDrop.dragging &&
             dashboardPanelData.meta.dragAndDrop.currentDragArea == 'longitude',
         }"
@@ -153,8 +164,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-longitude-layout"
       >
         <OButtonGroup
-          class="axis-field my-1 mr-2 overflow-hidden"
+          class="axis-field border-border-default border-s-badge-orange-ol-border bg-surface-panel my-0.5 mr-2 overflow-hidden border border-s-2"
           radius="sm"
+          :divided="false"
           v-if="
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
               ?.longitude
@@ -170,28 +182,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <OButton
-            variant="outline"
+            variant="ghost"
             size="icon-chip"
-            class="cursor-grab"
+            class="!w-4 cursor-grab"
             :data-test="`dashboard-longitude-item-${longitudeLabel}-drag`"
           >
             <template #icon-left>
-              <OIcon name="drag-indicator" size="xs" />
+              <OIcon name="drag-indicator" size="xs" class="text-text-secondary" />
             </template>
           </OButton>
           <ODropdown>
             <template #trigger>
               <OButton
-                variant="primary"
+                variant="ghost"
                 size="chip-12"
+                class="!ps-1 !pe-0"
                 :data-test="`dashboard-longitude-item-${longitudeLabel}`"
               >
-                {{ longitudeLabel }}
+                <AxisFieldChipLabel :label="longitudeLabel" />
                 <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-geo-maps-query-builder-dropdown h-[20.1875rem] w-[48.1875rem]! translate-y-2 rounded-none p-4 shadow-md"
+              class="field-function-menu-popup dashboard-geo-maps-query-builder-dropdown w-[48.1875rem]! translate-y-2 overflow-hidden rounded-none p-0 shadow-md"
               :data-test="`dashboard-longitude-item-${longitudeLabel}-menu`"
             >
               <div
@@ -222,40 +235,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </ODropdown>
           <OButton
-            variant="outline"
+            variant="ghost"
             size="icon-chip"
+            class="-ms-1 !w-4"
             :data-test="`dashboard-longitude-item-${longitudeLabel}-remove`"
             @click="removeLongitude()"
-            icon-left="close"
           >
+            <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
           </OButton>
         </OButtonGroup>
         <div
-          class="py-1 text-center text-xs font-bold"
+          class="flex min-w-0 flex-1 items-center justify-center text-center text-xs whitespace-nowrap"
           v-if="
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
               .longitude == null
           "
         >
-          <div class="mt-1">{{ Hint }}</div>
+          <div>{{ Hint }}</div>
         </div>
       </div>
     </div>
     <OSeparator />
     <!-- weight container -->
     <div class="flex flex-row pl-3">
-      <div class="flex min-w-32.5 items-center whitespace-nowrap">
+      <div class="flex min-w-24 items-center whitespace-nowrap">
+        <span
+          class="rounded-default bg-badge-success-ol-text mr-1.5 h-2 w-2 shrink-0"
+          aria-hidden="true"
+        ></span>
         {{ t("panel.weight") }}
         <OIcon name="info-outline" size="sm" class="ml-1" />
         <OTooltip :content="WeightHint" />
       </div>
       <span class="mx-0.5 flex items-center">:</span>
       <div
-        class="axis-container droppable flex w-full flex-1 flex-wrap border-2 border-dashed border-transparent"
+        class="axis-container droppable flex min-h-8 w-full flex-1 flex-wrap items-center border border-dashed border-transparent"
         :class="{
           'border-dotted border-white bg-[rgba(0,0,0,0.042)]':
             dashboardPanelData.meta.dragAndDrop.dragging,
-          'bg-field-list-row-hover-bg transition-all duration-200':
+          'bg-field-list-row-hover-bg transition-colors duration-200':
             dashboardPanelData.meta.dragAndDrop.dragging &&
             dashboardPanelData.meta.dragAndDrop.currentDragArea == 'weight',
         }"
@@ -266,8 +284,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-weight-layout"
       >
         <OButtonGroup
-          class="axis-field my-1 mr-2 overflow-hidden"
+          class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel my-0.5 mr-2 overflow-hidden border border-s-2"
           radius="sm"
+          :divided="false"
           v-if="
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
               ?.weight
@@ -283,28 +302,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <OButton
-            variant="outline"
+            variant="ghost"
             size="icon-chip"
-            class="cursor-grab"
+            class="!w-4 cursor-grab"
             :data-test="`dashboard-weight-item-${weightLabel}-drag`"
           >
             <template #icon-left>
-              <OIcon name="drag-indicator" size="xs" />
+              <OIcon name="drag-indicator" size="xs" class="text-text-secondary" />
             </template>
           </OButton>
           <ODropdown>
             <template #trigger>
               <OButton
-                variant="primary"
+                variant="ghost"
                 size="chip-12"
+                class="!ps-1 !pe-0"
                 :data-test="`dashboard-weight-item-${weightLabel}`"
               >
-                {{ weightLabel }}
+                <AxisFieldChipLabel :label="weightLabel" />
                 <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-geo-maps-query-builder-dropdown h-[20.1875rem] w-[48.1875rem]! translate-y-2 rounded-none p-4 shadow-md"
+              class="field-function-menu-popup dashboard-geo-maps-query-builder-dropdown w-[48.1875rem]! translate-y-2 overflow-hidden rounded-none p-0 shadow-md"
               :data-test="`dashboard-weight-item-${weightLabel}-menu`"
             >
               <div
@@ -335,31 +355,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </ODropdown>
           <OButton
-            variant="outline"
+            variant="ghost"
             size="icon-chip"
+            class="-ms-1 !w-4"
             :data-test="`dashboard-weight-item-${weightLabel}-remove`"
             @click="removeWeight()"
-            icon-left="close"
           >
+            <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
           </OButton>
         </OButtonGroup>
         <div
-          class="py-1 text-center text-xs font-bold"
+          class="flex min-w-0 flex-1 items-center justify-center text-center text-xs whitespace-nowrap"
           v-if="
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
               .weight == null
           "
         >
-          <div class="mt-1">{{ WeightHint }}</div>
+          <div>{{ WeightHint }}</div>
         </div>
       </div>
     </div>
     <template v-if="showJoinsAndFilters">
       <OSeparator />
-      <DashboardJoinsOption :dashboardData="dashboardData"></DashboardJoinsOption>
+      <DashboardJoinsOption
+        :dashboardData="dashboardData"
+        label-width-class="min-w-24"
+      ></DashboardJoinsOption>
       <OSeparator />
       <!-- filters container -->
-      <DashboardFiltersOption :dashboardData="dashboardData"></DashboardFiltersOption>
+      <DashboardFiltersOption
+        :dashboardData="dashboardData"
+        label-width-class="min-w-24"
+      ></DashboardFiltersOption>
     </template>
   </div>
 </template>
@@ -382,10 +409,12 @@ import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOpti
 import { buildSQLQueryFromInput } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 import { MAX_FIELD_LABEL_CHARS } from "@/utils/dashboard/constants";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import AxisFieldChipLabel from "@/components/dashboards/addPanel/AxisFieldChipLabel.vue";
 
 export default defineComponent({
   name: "DashboardGeoMapsQueryBuilder",
   components: {
+    AxisFieldChipLabel,
     OSeparator,
     OButtonGroup,
     OButton,

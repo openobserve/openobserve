@@ -1,21 +1,34 @@
 <template>
   <div v-if="shouldShowJoins" class="w-full" data-test="dashboard-joins-container">
     <div class="flex flex-row pl-3">
-      <div class="flex min-w-32.5 items-center text-sm whitespace-nowrap">
+      <div class="flex items-center text-sm whitespace-nowrap" :class="labelWidthClass">
+        <span
+          class="rounded-default bg-badge-teal-ol-text mr-1.5 h-2 w-2 shrink-0"
+          aria-hidden="true"
+        ></span>
         {{ t("panel.joins") }}
       </div>
       <span class="mx-0.5 flex items-center">:</span>
       <div
-        class="m-1.25 flex flex-row flex-wrap items-center gap-2"
+        class="flex min-h-8 flex-row flex-wrap items-center gap-2 pl-0.5"
         data-test="dashboard-filter-layout"
       >
-        <div v-for="(joinObj, index) in currentJoins" :key="index" class="my-1 mr-2 flex flex-row">
-          <OButtonGroup class="axis-field" radius="sm">
+        <div
+          v-for="(joinObj, index) in currentJoins"
+          :key="index"
+          class="my-0.5 mr-2 flex flex-row"
+        >
+          <OButtonGroup
+            class="axis-field border-border-default border-s-badge-teal-ol-border bg-surface-panel border border-s-2"
+            radius="sm"
+            :divided="false"
+          >
             <ODropdown>
               <template #trigger>
                 <OButton
-                  variant="primary"
+                  variant="ghost"
                   size="chip-12"
+                  class="!pe-0"
                   :data-test="`dashboard-join-item-${index}`"
                   icon-right="arrow-drop-down"
                 >
@@ -23,23 +36,23 @@
                     <LeftJoinTypeSvg
                       v-if="joinObj?.joinType === 'left'"
                       :shouldFill="true"
-                      class="h-5 w-5 shrink-0 filter-[brightness(0)_invert(1)]"
+                      class="text-text-secondary h-5 w-5 shrink-0"
                     />
                     <InnerJoinTypeSvg
                       v-else-if="joinObj?.joinType === 'inner'"
                       :shouldFill="true"
-                      class="h-5 w-5 shrink-0 filter-[brightness(0)_invert(1)]"
+                      class="text-text-secondary h-5 w-5 shrink-0"
                     />
                     <RightJoinTypeSvg
                       v-else-if="joinObj?.joinType === 'right'"
                       :shouldFill="true"
-                      class="h-5 w-5 shrink-0 filter-[brightness(0)_invert(1)]"
+                      class="text-text-secondary h-5 w-5 shrink-0"
                     />
-                    <span class="leading-none">{{ joinObj?.stream }}</span>
+                    <span class="text-text-body leading-none">{{ joinObj?.stream }}</span>
                   </div>
                 </OButton>
               </template>
-              <div class="p-4" :data-test="`dashboard-join-menu-${index}`">
+              <div class="p-0" :data-test="`dashboard-join-menu-${index}`">
                 <AddJoinPopUp
                   v-model="currentJoins[index]"
                   :joinIndex="index"
@@ -48,20 +61,21 @@
               </div>
             </ODropdown>
             <OButton
-              variant="outline"
+              variant="ghost"
               size="icon-chip"
+              class="-ms-1 !w-4"
               :data-test="`dashboard-join-item-${index}-remove`"
               @click="handleRemoveJoin(index)"
               :aria-label="t('panel.removeJoin')"
-              icon-left="close"
             >
+              <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
               <OTooltip :content="t('panel.removeJoin')" />
             </OButton>
           </OButtonGroup>
         </div>
         <OButton
-          variant="primary"
-          size="icon-xs-circle"
+          variant="outline"
+          size="icon-chip"
           data-test="dashboard-add-join-btn"
           @click="handleAddJoin"
           :aria-label="t('panel.addJoin')"
@@ -80,6 +94,7 @@ import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useI18n } from "vue-i18n";
 import { watchDebounced } from "@vueuse/core";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
@@ -145,9 +160,17 @@ export default defineComponent({
     ODropdown,
     AddJoinPopUp,
     OTooltip,
+    OIcon,
     LeftJoinTypeSvg,
     InnerJoinTypeSvg,
     RightJoinTypeSvg,
+  },
+
+  // labelWidthClass keeps the ":" separator aligned with the parent chart's
+  // axis labels (e.g. geomap's wider "Longitude"). Defaults to the main
+  // builder's width.
+  props: {
+    labelWidthClass: { type: String, default: "min-w-20" },
   },
 
   setup() {

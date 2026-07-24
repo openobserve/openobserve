@@ -18,18 +18,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div v-if="!promqlMode && dashboardPanelData.data.type == 'maps'">
     <!-- name container -->
     <div class="flex flex-row pl-3">
-      <div class="flex min-w-32.5 items-center whitespace-nowrap">
+      <div class="flex min-w-20 items-center whitespace-nowrap">
+        <span
+          class="rounded-default bg-badge-indigo-ol-text mr-1.5 h-2 w-2 shrink-0"
+          aria-hidden="true"
+        ></span>
         {{ t("panel.mapname") }}
         <OIcon name="info-outline" size="sm" class="ml-1" />
         <OTooltip :content="Hint" />
       </div>
       <span class="mr-0.5 ml-0.5 flex items-center">:</span>
       <div
-        class="axis-container droppable scroll flex w-full flex-1 flex-wrap border-2 border-dashed border-transparent"
+        class="axis-container droppable scroll flex min-h-8 w-full flex-1 flex-wrap items-center border border-dashed border-transparent"
         :class="{
           '[border-style:dotted] border-white bg-[rgba(0,0,0,0.042)]':
             dashboardPanelData.meta.dragAndDrop.dragging,
-          'bg-field-list-row-hover-bg transition-all duration-200':
+          'bg-field-list-row-hover-bg transition-colors duration-200':
             dashboardPanelData.meta.dragAndDrop.dragging &&
             dashboardPanelData.meta.dragAndDrop.currentDragArea == 'name',
         }"
@@ -40,8 +44,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-name-layout"
       >
         <OButtonGroup
-          class="axis-field my-1 mr-2 overflow-hidden"
+          class="axis-field border-border-default border-s-badge-indigo-ol-border bg-surface-panel my-0.5 mr-2 overflow-hidden border border-s-2"
           radius="sm"
+          :divided="false"
           v-if="
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
               ?.name
@@ -57,28 +62,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <OButton
-            variant="outline"
+            variant="ghost"
             size="icon-chip"
-            class="cursor-grab"
+            class="!w-4 cursor-grab"
             :data-test="`dashboard-name-item-${nameLabel}-drag`"
           >
             <template #icon-left>
-              <OIcon name="drag-indicator" size="xs" />
+              <OIcon name="drag-indicator" size="xs" class="text-text-secondary" />
             </template>
           </OButton>
           <ODropdown>
             <template #trigger>
               <OButton
-                variant="primary"
+                variant="ghost"
                 size="chip-12"
+                class="!ps-1 !pe-0"
                 :data-test="`dashboard-name-item-${nameLabel}`"
               >
-                {{ nameLabel }}
+                <AxisFieldChipLabel :label="nameLabel" />
                 <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-maps-query-builder-dropdown h-[20.1875rem] w-[48.1875rem]! translate-y-2 rounded-none p-4 shadow-md"
+              class="field-function-menu-popup dashboard-maps-query-builder-dropdown w-[48.1875rem]! translate-y-2 overflow-hidden rounded-none p-0 shadow-md"
               :data-test="`dashboard-name-item-${nameLabel}-menu`"
             >
               <div
@@ -113,40 +119,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </ODropdown>
           <OButton
-            variant="outline"
+            variant="ghost"
             size="icon-chip"
+            class="-ms-1 !w-4"
             :data-test="`dashboard-name-item-${nameLabel}-remove`"
             @click="removeMapName()"
-            icon-left="close"
           >
+            <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
           </OButton>
         </OButtonGroup>
         <div
-          class="py-1 text-center text-xs font-bold"
+          class="flex min-w-0 flex-1 items-center justify-center text-center text-xs whitespace-nowrap"
           v-if="
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
               .name == null
           "
         >
-          <div class="mt-1">{{ Hint }}</div>
+          <div>{{ Hint }}</div>
         </div>
       </div>
     </div>
     <OSeparator />
     <!-- value for maps container -->
     <div class="flex flex-row pl-3">
-      <div class="flex min-w-32.5 items-center whitespace-nowrap">
+      <div class="flex min-w-20 items-center whitespace-nowrap">
+        <span
+          class="rounded-default bg-badge-success-ol-text mr-1.5 h-2 w-2 shrink-0"
+          aria-hidden="true"
+        ></span>
         {{ t("panel.mapvalue") }}
         <OIcon name="info-outline" size="sm" class="ml-1" />
         <OTooltip :content="Hint" />
       </div>
       <span class="mr-0.5 ml-0.5 flex items-center">:</span>
       <div
-        class="axis-container droppable scroll flex w-full flex-1 flex-wrap border-2 border-dashed border-transparent"
+        class="axis-container droppable scroll flex min-h-8 w-full flex-1 flex-wrap items-center border border-dashed border-transparent"
         :class="{
           '[border-style:dotted] border-white bg-[rgba(0,0,0,0.042)]':
             dashboardPanelData.meta.dragAndDrop.dragging,
-          'bg-field-list-row-hover-bg transition-all duration-200':
+          'bg-field-list-row-hover-bg transition-colors duration-200':
             dashboardPanelData.meta.dragAndDrop.dragging &&
             dashboardPanelData.meta.dragAndDrop.currentDragArea == 'value_for_maps',
         }"
@@ -157,8 +168,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-value_for_maps-layout"
       >
         <OButtonGroup
-          class="axis-field my-1 mr-2 overflow-hidden"
+          class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel my-0.5 mr-2 overflow-hidden border border-s-2"
           radius="sm"
+          :divided="false"
           v-if="
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
               ?.value_for_maps
@@ -174,28 +186,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <OButton
-            variant="outline"
+            variant="ghost"
             size="icon-chip"
-            class="cursor-grab"
+            class="!w-4 cursor-grab"
             :data-test="`dashboard-value_for_maps-item-${valueLabel}-drag`"
           >
             <template #icon-left>
-              <OIcon name="drag-indicator" size="xs" />
+              <OIcon name="drag-indicator" size="xs" class="text-text-secondary" />
             </template>
           </OButton>
           <ODropdown>
             <template #trigger>
               <OButton
-                variant="primary"
+                variant="ghost"
                 size="chip-12"
+                class="!ps-1 !pe-0"
                 :data-test="`dashboard-value_for_maps-item-${valueLabel}`"
               >
-                {{ valueLabel }}
+                <AxisFieldChipLabel :label="valueLabel" />
                 <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-maps-query-builder-dropdown h-[20.1875rem] w-[48.1875rem]! translate-y-2 rounded-none p-4 shadow-md"
+              class="field-function-menu-popup dashboard-maps-query-builder-dropdown w-[48.1875rem]! translate-y-2 overflow-hidden rounded-none p-0 shadow-md"
               :data-test="`dashboard-value_for_maps-item-${valueLabel}-menu`"
             >
               <div
@@ -230,22 +243,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </ODropdown>
           <OButton
-            variant="outline"
+            variant="ghost"
             size="icon-chip"
+            class="-ms-1 !w-4"
             :data-test="`dashboard-value_for_maps-item-${valueLabel}-remove`"
             @click="removeMapValue()"
-            icon-left="close"
           >
+            <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
           </OButton>
         </OButtonGroup>
         <div
-          class="py-1 text-center text-xs font-bold"
+          class="flex min-w-0 flex-1 items-center justify-center text-center text-xs whitespace-nowrap"
           v-if="
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
               .value_for_maps == null
           "
         >
-          <div class="mt-1">{{ Hint }}</div>
+          <div>{{ Hint }}</div>
         </div>
       </div>
     </div>
@@ -276,10 +290,12 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import AxisFieldChipLabel from "@/components/dashboards/addPanel/AxisFieldChipLabel.vue";
 
 export default defineComponent({
   name: "DashboardMapsQueryBuilder",
   components: {
+    AxisFieldChipLabel,
     OSeparator,
     OButtonGroup,
     OButton,

@@ -1,22 +1,21 @@
+<!-- Copyright 2026 OpenObserve Inc. -->
+
 <template>
   <div class="w-full" data-test="dashboard-raw-query-builder">
-    <div class="query-section" data-test="dashboard-raw-query-section">
-      <div class="query-label" data-test="dashboard-raw-query-title">Query</div>
-      <div class="query-label text-xs" data-test="dashboard-raw-query-instruction">
-        Write a SQL query for complex actions.
-      </div>
-
+    <div class="flex flex-col" data-test="dashboard-raw-query-section">
       <OTextarea
         v-model="fields.rawQuery"
-        :rows="6"
+        :rows="10"
+        :placeholder="t('dashboard.rawQueryBuilder.instruction')"
         data-test="dashboard-raw-query-textarea"
-        class="mt-0.5"
+        class="w-full"
       />
     </div>
   </div>
 </template>
 <script lang="ts">
 import { ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 
 export default {
@@ -30,6 +29,7 @@ export default {
   },
   emits: ["update:modelValue"],
   setup(props, { emit }) {
+    const { t } = useI18n();
     const fields = ref(props.modelValue);
 
     watch(
@@ -41,6 +41,7 @@ export default {
     );
 
     return {
+      t,
       fields,
     };
   },

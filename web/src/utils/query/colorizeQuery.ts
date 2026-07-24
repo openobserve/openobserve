@@ -1,13 +1,15 @@
 import { editor, languages } from "monaco-editor/esm/vs/editor/editor.api";
 import { vrlLanguageDefinition } from "@/utils/query/vrlLanguageDefinition";
+import { promqlLanguageDefinition } from "@/utils/query/promqlLanguageDefinition";
 
 let languagesRegistered = false;
 
 const registerLanguages = async () => {
   if (languagesRegistered) return;
 
-  // Register PromQL
+  // Register PromQL (Monaco has no built-in PromQL — the tokenizer is ours)
   languages.register({ id: "promql" });
+  languages.setMonarchTokensProvider("promql", promqlLanguageDefinition as any);
 
   // Register VRL
   languages.register({ id: "vrl" });

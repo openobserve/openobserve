@@ -285,6 +285,9 @@
   --color-badge-purple-ol-border: var(--color-purple-400);
   --color-badge-purple-ol-text: var(--color-purple-400);
 
+  /* magenta: match the query editor's dark function colour */
+  --color-badge-magenta-ol-text: #ff00ff;
+
   /* teal: brighten solid bg and outline for dark mode */
   --color-badge-teal-solid-bg: var(--color-teal-400);
   --color-badge-teal-ol-text: var(--color-teal-300);
@@ -320,6 +323,11 @@
   --color-badge-blue-ol-text: var(--color-blue-300);
   --color-badge-blue-soft-bg: color-mix(in srgb, var(--color-blue-400) 15%, transparent);
   --color-badge-blue-soft-text: var(--color-blue-400);
+
+  /* Editor bracket-pair colorization — Monaco vs-dark defaults */
+  --color-bracket-1: #ffd700;
+  --color-bracket-2: #da70d6;
+  --color-bracket-3: #179fff;
 
   /* purple (solid/soft variants): brighten for dark mode */
   --color-badge-purple-solid-bg: var(--color-purple-400);

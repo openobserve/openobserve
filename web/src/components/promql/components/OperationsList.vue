@@ -2,12 +2,16 @@
   <div class="flex flex-row pl-2">
     <div
       data-test="promql-operations-list-label"
-      class="flex min-w-21.5 items-center text-sm whitespace-nowrap"
+      class="flex min-w-24 items-center whitespace-nowrap"
     >
+      <span
+        class="rounded-default bg-badge-purple-ol-text mr-1.5 h-2 w-2 shrink-0"
+        aria-hidden="true"
+      ></span>
       {{ t("panel.operations") }}
     </div>
     <span class="mr-0.5 ml-0.5 flex items-center">:</span>
-    <div class="scroll m-0.5 flex flex-wrap items-center gap-2">
+    <div class="scroll m-0.5 flex flex-wrap items-center gap-2 min-h-8">
       <!-- Operations with Drag and Drop -->
       <draggable
         v-if="props.operations.length"
@@ -19,28 +23,32 @@
       >
         <template v-for="(element, index) in props.operations" :key="getItemKey(element, index)">
           <div data-test="promql-operations-item">
-            <OButtonGroup class="axis-field" radius="sm">
+            <OButtonGroup
+              class="axis-field border-border-default border-s-badge-purple-ol-border bg-surface-panel overflow-hidden border border-s-2"
+              radius="sm"
+              :divided="false"
+            >
               <OButton
-                variant="outline"
+                variant="ghost"
                 size="icon-chip"
-                class="drag-handle cursor-grab active:cursor-grabbing"
+                class="drag-handle cursor-grab active:cursor-grabbing !w-4"
                 :data-test="`promql-operation-drag-${index}`"
               >
                 <template #icon-left>
-                  <OIcon name="drag-indicator" size="xs" />
+                  <OIcon name="drag-indicator" size="xs" class="text-text-secondary" />
                 </template>
                 <OTooltip :content="t('metrics.operationsList.dragToReorder')" side="top" />
               </OButton>
               <ODropdown>
                 <template #trigger>
                   <OButton
-                    variant="primary"
-                    size="chip"
-                    class="!text-xs"
+                    variant="ghost"
+                    size="chip-12"
+                    class="!ps-1 !pe-0"
                     :no-wrap="true"
                     :data-test="`promql-operation-${index}`"
                   >
-                    {{ computedLabel(element) }}
+                    <AxisFieldChipLabel :label="computedLabel(element)" />
                     <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
                   </OButton>
                 </template>
@@ -108,12 +116,13 @@
                 </div>
               </ODropdown>
               <OButton
-                variant="outline"
+                variant="ghost"
                 size="icon-chip"
+                class="-ms-1 !w-4"
                 @click="removeOperation(index)"
                 :data-test="`promql-operation-remove-${index}`"
-                icon-left="close"
               >
+                <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
               </OButton>
             </OButtonGroup>
           </div>
@@ -122,8 +131,8 @@
 
       <!-- Add Button -->
       <OButton
-        variant="ghost-primary"
-        size="sm"
+        variant="outline"
+        size="icon-chip"
         @click="showOperationSelector = true"
         class="add-operation-btn"
         data-test="promql-add-operation"
@@ -188,6 +197,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import AxisFieldChipLabel from "@/components/dashboards/addPanel/AxisFieldChipLabel.vue";
 import { useI18n } from "vue-i18n";
 import { VueDraggableNext as draggable } from "vue-draggable-next";
 import { PromqlStep, PromqlStepSpec } from "@/components/promql/types";

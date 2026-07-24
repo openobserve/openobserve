@@ -954,7 +954,7 @@ describe("DashboardSankeyChartBuilder", () => {
       wrapper = createWrapper();
 
       const sourceContainer = wrapper.find('[data-test="dashboard-source-layout"]');
-      expect(sourceContainer.classes()).toContain("transition-all");
+      expect(sourceContainer.classes()).toContain("transition-colors");
     });
 
     it("should not apply drop-entered class when drag area doesn't match", () => {
@@ -965,7 +965,7 @@ describe("DashboardSankeyChartBuilder", () => {
       wrapper = createWrapper();
 
       const sourceContainer = wrapper.find('[data-test="dashboard-source-layout"]');
-      expect(sourceContainer.classes()).not.toContain("transition-all");
+      expect(sourceContainer.classes()).not.toContain("transition-colors");
     });
   });
 

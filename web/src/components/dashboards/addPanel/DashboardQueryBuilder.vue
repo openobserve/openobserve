@@ -28,18 +28,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex w-full flex-row pl-3" v-if="dashboardPanelData.data.type != 'metric'">
       <div class="flex-1">
         <div class="flex flex-row">
-          <div class="layout-name flex min-w-32.5 items-center whitespace-nowrap">
+          <div class="layout-name flex items-center whitespace-nowrap" :class="labelWidthClass">
+            <span
+              class="rounded-default bg-badge-indigo-ol-text mr-1.5 h-2 w-2 shrink-0"
+              aria-hidden="true"
+            ></span>
             {{ currentXLabel }}
             <OIcon name="info-outline" size="sm" class="ml-1" />
             <OTooltip :content="xAxisHint" />
           </div>
           <span class="layout-separator mx-0.5 flex items-center">:</span>
           <div
-            class="axis-container droppable scroll flex w-full flex-1 flex-wrap border-2 border-dashed border-transparent text-center"
+            class="axis-container droppable scroll flex min-h-8 w-full flex-1 flex-wrap items-center border border-dashed border-transparent text-center"
             :class="{
               '[border-style:dotted] border-white bg-[rgba(0,0,0,0.042)]':
                 dashboardPanelData.meta.dragAndDrop.dragging,
-              'bg-field-list-row-hover-bg transition-all duration-200':
+              'bg-field-list-row-hover-bg transition-colors duration-200':
                 dashboardPanelData.meta.dragAndDrop.dragging &&
                 dashboardPanelData.meta.dragAndDrop.currentDragArea == 'x',
             }"
@@ -57,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-x-layout"
           >
             <div
-              class="my-1 mr-2 flex"
+              class="my-0.5 mr-2 flex"
               v-for="(itemX, index) in dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields?.x"
@@ -74,37 +78,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 &nbsp;
               </div>
               <OButtonGroup
-                class="axis-field overflow-hidden"
+                class="axis-field border-border-default border-s-badge-indigo-ol-border bg-surface-panel overflow-hidden border border-s-2"
                 radius="sm"
+                :divided="false"
                 :draggable="true"
                 @dragstart="onFieldDragStart($event, itemX, 'x', Number(index))"
                 @drop="onDrop($event, 'x', Number(index))"
                 @dragenter="onDragEnter($event, 'x', index)"
               >
                 <OButton
-                  variant="outline"
+                  variant="ghost"
                   size="icon-chip"
-                  class="cursor-grab"
+                  class="!w-4 cursor-grab"
                   :data-test="`dashboard-x-item-${itemX?.alias}-drag`"
                 >
                   <template #icon-left>
-                    <OIcon name="drag-indicator" size="xs" />
+                    <OIcon name="drag-indicator" size="xs" class="text-text-secondary" />
                   </template>
                 </OButton>
                 <ODropdown>
                   <template #trigger>
                     <OButton
-                      variant="primary"
+                      variant="ghost"
                       size="chip-12"
+                      class="!ps-1 !pe-0"
                       :data-test="`dashboard-x-item-${itemX?.alias}`"
                     >
-                      {{ xLabel[index] }}
+                      <AxisFieldChipLabel :label="xLabel[index]" />
                       <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
                     </OButton>
                   </template>
                   <div
                     :data-test="`dashboard-x-item-${itemX?.alias}-menu`"
-                    class="field-function-menu-popup dashboard-query-builder-dropdown p-2"
+                    class="field-function-menu-popup dashboard-query-builder-dropdown overflow-hidden p-0"
                     :style="{
                       width:
                         dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
@@ -130,23 +136,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </ODropdown>
                 <OButton
-                  variant="outline"
+                  variant="ghost"
                   size="icon-chip"
+                  class="-ms-1 !w-4"
                   :data-test="`dashboard-x-item-${itemX?.alias}-remove`"
                   @click="removeXAxisItemByIndex(Number(index))"
-                  icon-left="close"
                 >
+                  <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
                 </OButton>
               </OButtonGroup>
             </div>
             <div
-              class="flex w-full items-center justify-center py-1 text-center text-xs font-bold"
+              class="flex min-w-0 flex-1 items-center justify-center text-center text-xs whitespace-nowrap"
               v-if="
                 dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
                   ?.x?.length < 1
               "
             >
-              <div class="mt-1">{{ xAxisHint }}</div>
+              <div>{{ xAxisHint }}</div>
             </div>
           </div>
         </div>
@@ -170,6 +177,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Separator between X and Breakdown/Pivot -->
           <OSeparator vertical class="mr-4" />
           <div class="layout-name flex min-w-0 items-center whitespace-nowrap">
+            <span
+              class="rounded-default bg-badge-orange-ol-text mr-1.5 h-2 w-2 shrink-0"
+              aria-hidden="true"
+            ></span>
             {{
               dashboardPanelData.data.type == "table" ? t("panel.pivotField") : t("panel.breakdown")
             }}
@@ -192,11 +203,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <span class="layout-separator mx-0.5 flex items-center">:</span>
           <div
-            class="axis-container droppable scroll flex w-full flex-1 flex-wrap border-2 border-dashed border-transparent text-center"
+            class="axis-container droppable scroll flex min-h-8 w-full flex-1 flex-wrap items-center border border-dashed border-transparent text-center"
             :class="{
               '[border-style:dotted] border-white bg-[rgba(0,0,0,0.042)]':
                 dashboardPanelData.meta.dragAndDrop.dragging,
-              'bg-field-list-row-hover-bg transition-all duration-200':
+              'bg-field-list-row-hover-bg transition-colors duration-200':
                 dashboardPanelData.meta.dragAndDrop.dragging &&
                 dashboardPanelData.meta.dragAndDrop.currentDragArea == 'breakdown',
             }"
@@ -214,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-b-layout"
           >
             <div
-              class="my-1 mr-2 flex"
+              class="my-0.5 mr-2 flex"
               v-for="(itemB, index) in dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields?.breakdown"
@@ -231,37 +242,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 &nbsp;
               </div>
               <OButtonGroup
-                class="axis-field overflow-hidden"
+                class="axis-field border-border-default border-s-badge-orange-ol-border bg-surface-panel overflow-hidden border border-s-2"
                 radius="sm"
+                :divided="false"
                 :draggable="true"
                 @dragstart="onFieldDragStart($event, itemB, 'breakdown', Number(index))"
                 @drop="onDrop($event, 'breakdown', Number(index))"
                 @dragenter="onDragEnter($event, 'breakdown', index)"
               >
                 <OButton
-                  variant="outline"
+                  variant="ghost"
                   size="icon-chip"
-                  class="cursor-grab"
+                  class="!w-4 cursor-grab"
                   :data-test="`dashboard-b-item-${itemB?.alias}-drag`"
                 >
                   <template #icon-left>
-                    <OIcon name="drag-indicator" size="xs" />
+                    <OIcon name="drag-indicator" size="xs" class="text-text-secondary" />
                   </template>
                 </OButton>
                 <ODropdown>
                   <template #trigger>
                     <OButton
-                      variant="primary"
+                      variant="ghost"
                       size="chip-12"
+                      class="!ps-1 !pe-0"
                       :data-test="`dashboard-b-item-${itemB?.alias}`"
                     >
-                      {{ bLabel[index] }}
+                      <AxisFieldChipLabel :label="bLabel[index]" />
                       <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
                     </OButton>
                   </template>
                   <div
                     :data-test="`dashboard-b-item-${itemB?.alias}-menu`"
-                    class="field-function-menu-popup dashboard-query-builder-dropdown p-2"
+                    class="field-function-menu-popup dashboard-query-builder-dropdown overflow-hidden p-0"
                     :style="{
                       width:
                         dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
@@ -287,23 +300,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </ODropdown>
                 <OButton
-                  variant="outline"
+                  variant="ghost"
                   size="icon-chip"
+                  class="-ms-1 !w-4"
                   :data-test="`dashboard-b-item-${itemB?.alias}-remove`"
                   @click="removeBreakdownItemByIndex(Number(index))"
-                  icon-left="close"
                 >
+                  <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
                 </OButton>
               </OButtonGroup>
             </div>
             <div
-              class="flex w-full items-center justify-center py-1 text-center text-xs font-bold"
+              class="flex min-w-0 flex-1 items-center justify-center text-center text-xs whitespace-nowrap"
               v-if="
                 !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
                   ?.breakdown?.length
               "
             >
-              <div class="mt-1">{{ bAxisHint }}</div>
+              <div>{{ bAxisHint }}</div>
             </div>
           </div>
         </div>
@@ -312,18 +326,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OSeparator v-if="dashboardPanelData.data.type != 'metric'" />
     <!-- y axis container -->
     <div class="flex flex-row pl-3">
-      <div class="layout-name flex min-w-32.5 items-center whitespace-nowrap">
+      <div class="layout-name flex items-center whitespace-nowrap" :class="labelWidthClass">
+        <span
+          class="rounded-default bg-badge-success-ol-text mr-1.5 h-2 w-2 shrink-0"
+          aria-hidden="true"
+        ></span>
         {{ currentYLabel }}
         <OIcon name="info-outline" size="sm" class="ml-1" />
         <OTooltip :content="yAxisHint" />
       </div>
       <span class="layout-separator mx-0.5 flex items-center">:</span>
       <div
-        class="axis-container droppable scroll flex w-full flex-1 flex-wrap border-2 border-dashed border-transparent text-center"
+        class="axis-container droppable scroll flex min-h-8 w-full flex-1 flex-wrap items-center border border-dashed border-transparent text-center"
         :class="{
           '[border-style:dotted] border-white bg-[rgba(0,0,0,0.042)]':
             dashboardPanelData.meta.dragAndDrop.dragging,
-          'bg-field-list-row-hover-bg transition-all duration-200':
+          'bg-field-list-row-hover-bg transition-colors duration-200':
             dashboardPanelData.meta.dragAndDrop.dragging &&
             dashboardPanelData.meta.dragAndDrop.currentDragArea == 'y',
         }"
@@ -341,7 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-y-layout"
       >
         <div
-          class="my-1 mr-2 flex"
+          class="my-0.5 mr-2 flex"
           v-for="(itemY, index) in dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].fields?.y"
@@ -358,37 +376,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             &nbsp;
           </div>
           <OButtonGroup
-            class="axis-field overflow-hidden"
+            class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel overflow-hidden border border-s-2"
             radius="sm"
+            :divided="false"
             :draggable="true"
             @dragstart="onFieldDragStart($event, itemY, 'y', Number(index))"
             @drop="onDrop($event, 'y', Number(index))"
             @dragenter="onDragEnter($event, 'y', index)"
           >
             <OButton
-              variant="outline"
+              variant="ghost"
               size="icon-chip"
-              class="cursor-grab"
+              class="!w-4 cursor-grab"
               :data-test="`dashboard-y-item-${itemY?.alias}-drag`"
             >
               <template #icon-left>
-                <OIcon name="drag-indicator" size="xs" />
+                <OIcon name="drag-indicator" size="xs" class="text-text-secondary" />
               </template>
             </OButton>
             <ODropdown>
               <template #trigger>
                 <OButton
-                  variant="primary"
+                  variant="ghost"
                   size="chip-12"
+                  class="!ps-1 !pe-0"
                   :data-test="`dashboard-y-item-${itemY?.alias}`"
                 >
-                  {{ yLabel[index] }}
+                  <AxisFieldChipLabel :label="yLabel[index]" />
                   <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
                 </OButton>
               </template>
               <div
                 :data-test="`dashboard-y-item-${itemY?.alias}-menu`"
-                class="field-function-menu-popup dashboard-query-builder-dropdown p-2"
+                class="field-function-menu-popup dashboard-query-builder-dropdown overflow-hidden p-0"
                 :style="{
                   width:
                     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
@@ -414,23 +434,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </ODropdown>
             <OButton
-              variant="outline"
+              variant="ghost"
               size="icon-chip"
+              class="-ms-1 !w-4"
               :data-test="`dashboard-y-item-${itemY?.alias}-remove`"
               @click="removeYAxisItemByIndex(Number(index))"
-              icon-left="close"
             >
+              <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
             </OButton>
           </OButtonGroup>
         </div>
         <div
-          class="flex w-full items-center justify-center py-1 text-center text-xs font-bold"
+          class="flex min-w-0 flex-1 items-center justify-center text-center text-xs whitespace-nowrap"
           v-if="
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.y
               ?.length < 1
           "
         >
-          <div class="mt-1">{{ yAxisHint }}</div>
+          <div>{{ yAxisHint }}</div>
         </div>
       </div>
     </div>
@@ -438,18 +459,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <span v-if="dashboardPanelData.data.type === 'heatmap'">
       <OSeparator />
       <div class="flex flex-row pl-3">
-        <div class="layout-name flex min-w-32.5 items-center whitespace-nowrap">
+        <div class="layout-name flex items-center whitespace-nowrap" :class="labelWidthClass">
+          <span
+            class="rounded-default bg-badge-success-ol-text mr-1.5 h-2 w-2 shrink-0"
+            aria-hidden="true"
+          ></span>
           {{ dashboardPanelData.data.type == "heatmap" ? t("panel.zAxis") : "" }}
           <OIcon name="info-outline" size="sm" class="ml-1" />
           <OTooltip :content="zAxisHint" />
         </div>
         <span class="layout-separator mx-0.5 flex items-center">:</span>
         <div
-          class="axis-container droppable scroll flex w-full flex-1 flex-wrap border-2 border-dashed border-transparent text-center"
+          class="axis-container droppable scroll flex min-h-8 w-full flex-1 flex-wrap items-center border border-dashed border-transparent text-center"
           :class="{
             '[border-style:dotted] border-white bg-[rgba(0,0,0,0.042)]':
               dashboardPanelData.meta.dragAndDrop.dragging,
-            'bg-field-list-row-hover-bg transition-all duration-200':
+            'bg-field-list-row-hover-bg transition-colors duration-200':
               dashboardPanelData.meta.dragAndDrop.dragging &&
               dashboardPanelData.meta.dragAndDrop.currentDragArea == 'z',
           }"
@@ -467,7 +492,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-z-layout"
         >
           <div
-            class="my-1 mr-2 flex"
+            class="my-0.5 mr-2 flex"
             v-for="(itemZ, index) in dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields?.z"
@@ -484,37 +509,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               &nbsp;
             </div>
             <OButtonGroup
-              class="axis-field overflow-hidden"
+              class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel overflow-hidden border border-s-2"
               radius="sm"
+              :divided="false"
               :draggable="true"
               @dragstart="onFieldDragStart($event, itemZ, 'z', Number(index))"
               @drop="onDrop($event, 'z', Number(index))"
               @dragenter="onDragEnter($event, 'z', index)"
             >
               <OButton
-                variant="outline"
+                variant="ghost"
                 size="icon-chip"
-                class="cursor-grab"
+                class="!w-4 cursor-grab"
                 :data-test="`dashboard-z-item-${itemZ?.alias}-drag`"
               >
                 <template #icon-left>
-                  <OIcon name="drag-indicator" size="xs" />
+                  <OIcon name="drag-indicator" size="xs" class="text-text-secondary" />
                 </template>
               </OButton>
               <ODropdown>
                 <template #trigger>
                   <OButton
-                    variant="primary"
+                    variant="ghost"
                     size="chip-12"
+                    class="!ps-1 !pe-0"
                     :data-test="`dashboard-z-item-${itemZ?.alias}`"
                   >
-                    {{ zLabel[index] }}
+                    <AxisFieldChipLabel :label="zLabel[index]" />
                     <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
                   </OButton>
                 </template>
                 <div
                   :data-test="`dashboard-z-item-${itemZ?.alias}-menu`"
-                  class="field-function-menu-popup dashboard-query-builder-dropdown p-2"
+                  class="field-function-menu-popup dashboard-query-builder-dropdown overflow-hidden p-0"
                   :style="{
                     width:
                       dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
@@ -540,33 +567,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </ODropdown>
               <OButton
-                variant="outline"
+                variant="ghost"
                 size="icon-chip"
+                class="-ms-1 !w-4"
                 :data-test="`dashboard-z-item-${itemZ?.alias}-remove`"
                 @click="removeZAxisItemByIndex(Number(index))"
-                icon-left="close"
               >
+                <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
               </OButton>
             </OButtonGroup>
           </div>
           <div
-            class="flex w-full items-center justify-center py-1 text-center text-xs font-bold"
+            class="flex min-w-0 flex-1 items-center justify-center text-center text-xs whitespace-nowrap"
             v-if="
               dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields?.z
                 ?.length < 1
             "
           >
-            <div class="mt-1">{{ zAxisHint }}</div>
+            <div>{{ zAxisHint }}</div>
           </div>
         </div>
       </div>
     </span>
     <template v-if="showJoinsAndFilters">
       <OSeparator />
-      <DashboardJoinsOption :dashboardData="dashboardData"></DashboardJoinsOption>
+      <DashboardJoinsOption
+        :dashboardData="dashboardData"
+        :label-width-class="labelWidthClass"
+      ></DashboardJoinsOption>
       <OSeparator />
       <!-- filters container -->
-      <DashboardFiltersOption :dashboardData="dashboardData"></DashboardFiltersOption>
+      <DashboardFiltersOption
+        :dashboardData="dashboardData"
+        :label-width-class="labelWidthClass"
+      ></DashboardFiltersOption>
     </template>
   </div>
 
@@ -603,6 +637,7 @@ import useNotifications from "@/composables/useNotifications";
 import DashboardFiltersOption from "@/views/Dashboards/addPanel/DashboardFiltersOption.vue";
 import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOption.vue";
 import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
+import AxisFieldChipLabel from "@/components/dashboards/addPanel/AxisFieldChipLabel.vue";
 import { buildSQLQueryFromInput } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 import { useStore } from "vuex";
 import { MAX_FIELD_LABEL_CHARS, FIELD_FUNCTION_MENU_WIDTH } from "@/utils/dashboard/constants";
@@ -647,6 +682,7 @@ export default defineComponent({
     DashboardFiltersOption,
     DashboardJoinsOption,
     DynamicFunctionPopUp,
+    AxisFieldChipLabel,
     LabelFilterEditor,
     OperationsList,
     PromQLBuilderOptions,
@@ -715,6 +751,14 @@ export default defineComponent({
         ? t("panel.xAxisShort")
         : t("panel.yAxisShort");
     });
+
+    // Axis-label column width: wide enough for the current chart's longest
+    // label so every ":" separator (axis rows + Joins + Filters) lines up.
+    // Table uses long labels ("First Column" / "Other Columns" / "Row Fields"
+    // / "Value Fields"); every other type uses the short "X-Axis"/"Y-Axis".
+    const labelWidthClass = computed(() =>
+      dashboardPanelData.data.type == "table" ? "min-w-32.5" : "min-w-20",
+    );
 
     // Joins and Filters hide themselves in custom-SQL mode; the separators
     // around them must follow the same condition or they stack into a
@@ -1487,6 +1531,7 @@ export default defineComponent({
       onDragEnd,
       currentXLabel,
       currentYLabel,
+      labelWidthClass,
       isPivotMode,
       reorderItems,
       showJoinsAndFilters,

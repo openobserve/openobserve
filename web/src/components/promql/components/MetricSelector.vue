@@ -3,8 +3,12 @@
     <div class="flex flex-row pl-3">
       <div
         data-test="promql-metric-selector-label"
-        class="flex min-w-32.5 items-center text-sm whitespace-nowrap"
+        class="flex min-w-24 items-center whitespace-nowrap"
       >
+        <span
+          class="rounded-default bg-badge-indigo-ol-text mr-1.5 h-2 w-2 shrink-0"
+          aria-hidden="true"
+        ></span>
         {{ t("panel.metric") }}
       </div>
       <span class="mr-0.5 ml-0.5 flex items-center">:</span>

@@ -602,6 +602,36 @@ describe("SelectFunction", () => {
       await flushPromises();
       expect(wrapper.vm.fields.args[0].type).toBe("number");
     });
+
+    it("should expose the supported types for an argument", () => {
+      const modelValue = {
+        functionName: "concat",
+        args: [{ type: "string", value: "test" }],
+      };
+      wrapper = createWrapper({ modelValue });
+      // concat arg 0 supports field / string / function
+      const types = wrapper.vm
+        .getSupportedTypeBasedOnFunctionNameAndIndex("concat", 0)
+        .map((typeOption: { value: string }) => typeOption.value);
+      expect(types).toContain("field");
+      expect(types).toContain("string");
+      expect(types).toContain("function");
+    });
+
+    it("should reset the value to an empty object when the arg type changes to field", async () => {
+      const modelValue = {
+        functionName: "concat",
+        args: [{ type: "string", value: "test" }],
+      };
+      wrapper = createWrapper({ modelValue });
+
+      wrapper.vm.fields.args[0].type = "field";
+      wrapper.vm.onArgTypeChange(wrapper.vm.fields.args[0]);
+      await flushPromises();
+
+      expect(wrapper.vm.fields.args[0].type).toBe("field");
+      expect(wrapper.vm.fields.args[0].value).toEqual({});
+    });
   });
 
   describe("Vertical Line Rendering", () => {
