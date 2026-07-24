@@ -233,11 +233,11 @@ describe("useEnterpriseRoutes.ts", () => {
       expect(organizationsRoute.path).toBe("organizations");
     });
 
-    // Test 19: Should have 4 children in basic configuration
-    it("should have 4 children in basic configuration", () => {
+    // Test 19: Should have 5 children in basic configuration
+    it("should have 5 children in basic configuration", () => {
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      expect(iamRoute.children.length).toBe(4);
+      expect(iamRoute.children.length).toBe(5);
     });
 
     // Test 20: Should have only 1 route in basic configuration
@@ -346,11 +346,11 @@ describe("useEnterpriseRoutes.ts", () => {
       expect(quotaRoute).toBeDefined();
     });
 
-    // Test 33: Should have 11 children in cloud configuration
-    it("should have 11 children in cloud configuration", () => {
+    // Test 33: Should have 12 children in cloud configuration
+    it("should have 12 children in cloud configuration", () => {
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      expect(iamRoute.children.length).toBe(11);
+      expect(iamRoute.children.length).toBe(12);
     });
 
     // Test 34: iam + synthetics + 5 synthetics sub-routes + actions + 2 incidents + workflows = 11
@@ -378,7 +378,7 @@ describe("useEnterpriseRoutes.ts", () => {
     it("should add enterprise IAM routes", () => {
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      expect(iamRoute.children.length).toBe(10);
+      expect(iamRoute.children.length).toBe(11);
     });
 
     // Test 37: iam + synthetics + 5 synthetics sub-routes + actions + 2 incidents + workflows = 11
@@ -405,7 +405,7 @@ describe("useEnterpriseRoutes.ts", () => {
     it("should have all IAM children when both flags are true", () => {
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      expect(iamRoute.children.length).toBe(11);
+      expect(iamRoute.children.length).toBe(12);
     });
   });
 

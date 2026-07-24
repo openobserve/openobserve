@@ -9,6 +9,7 @@ import type {
   SyntheticsLocation,
   SyntheticsDevice,
   SyntheticsFolder,
+  AgentSetup,
 } from "@/types/synthetics";
 import useSyntheticsRecorder from "@/composables/useSyntheticsRecorder";
 import { journeyToWireSteps } from "@/utils/synthetics/mapRecordedStep";
@@ -34,6 +35,7 @@ import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import BrowserJourney from "@/components/synthetics/journey/BrowserJourney.vue";
 import CheckConfigure from "@/components/synthetics/configure/CheckConfigure.vue";
+import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer.vue";
 import CreateBrowserTestSkeleton from "@/components/synthetics/CreateBrowserTestSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyBrowserCheck from "@/lib/core/EmptyState/illustrations/EmptyBrowserCheck.vue";
@@ -122,15 +124,32 @@ async function fetchFolders() {
   }
 }
 
+// ── Private agent setup (drawer opened from the locations card) ──────────
+const showAgentSetup = ref(false);
+const agentSetup = ref<AgentSetup | null>(null);
+
+async function openAgentSetup() {
+  showAgentSetup.value = true;
+  if (agentSetup.value) return;
+  try {
+    const org = store.state.selectedOrganization.identifier;
+    const res = await syntheticsService.getAgentSetup(org);
+    agentSetup.value = (res.data ?? null) as AgentSetup | null;
+  } catch {
+    agentSetup.value = null;
+  }
+}
+
 async function fetchLocations() {
   try {
     const org = store.state.selectedOrganization.identifier;
     const res = await syntheticsService.getLocations(org);
     const data = res.data ?? {};
-    // Browser tests are Lambda-only today — private (agent-served) locations
-    // cannot run them, so they are excluded from this picker.
+    // Public browser locations (Lambda) plus private locations whose agents
+    // advertise `browser` (self-hosted browser agent). A protocol-only private
+    // location is excluded — it can't run browser checks.
     locations.value = ((data.locations ?? []) as SyntheticsLocation[]).filter(
-      (l) => l.kind !== "private" && l.enabled !== false,
+      (l) => l.enabled !== false && (l.kind !== "private" || (l.types ?? []).includes("browser")),
     );
     browsers.value = (data.browsers ?? []) as string[];
     devices.value = (data.devices ?? []) as SyntheticsDevice[];
@@ -802,12 +821,31 @@ function onClearResults() {
               :destinations="destinations"
               :folders="folders"
               :validation-errors="validationErrors"
+              allow-private-locations
               class="w-full!"
               @refresh:destinations="fetchDestinations"
               @update:check="onConfigureUpdate"
+              @setup-agent="openAgentSetup"
             />
           </OStep>
         </OStepper>
+
+        <!-- Private browser-agent setup drawer; locations reload on close so a
+           freshly registered location becomes selectable without leaving. -->
+        <AgentSetupDrawer
+          v-model:open="showAgentSetup"
+          agent-type="browser"
+          :token="agentSetup?.token"
+          :org="agentSetup?.org"
+          :o2-url="agentSetup?.o2_url"
+          :script-url="agentSetup?.script_url"
+          :install="agentSetup?.install"
+          @update:open="
+            (open: boolean) => {
+              if (!open) fetchLocations();
+            }
+          "
+        />
 
         <!-- Sticky footer — tab-aware, always visible -->
         <div

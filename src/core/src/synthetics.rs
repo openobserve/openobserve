@@ -145,7 +145,6 @@ fn build_slack_json(n: &CheckNotification) -> String {
     lines.push(format!(
         "*Time:* <!date^{checked_secs}^{{date_time_secs}}|{checked_secs}>"
     ));
-    lines.push(format!("<{}|View run details →>", run_url(n)));
 
     serde_json::json!({ "text": lines.join("\n") }).to_string()
 }

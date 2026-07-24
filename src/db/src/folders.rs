@@ -20,6 +20,7 @@ use config::{
         alerts::alert::ListAlertsParams,
         dashboards::{ListDashboardsParams, reports::ListReportsParams},
         folder::{DEFAULT_FOLDER, Folder, FolderType},
+        synthetics::ListSyntheticsParams,
     },
 };
 use infra::{
@@ -70,6 +71,10 @@ pub enum FolderError {
     /// An error that occurs when trying to delete a folder that contains reports.
     #[error("Folder contains reports. Please move/delete reports from folder.")]
     DeleteWithReports,
+
+    /// An error that occurs when trying to delete a folder that contains synthetics.
+    #[error("Folder contains synthetics. Please move/delete synthetics from folder.")]
+    DeleteWithSynthetics,
 
     /// An error that occurs when trying to delete a folder that cannot be found.
     #[error("Folder not found")]
@@ -267,8 +272,15 @@ pub async fn delete_folder(
                 return Err(FolderError::DeleteWithReports);
             }
         }
-        // Synthetics monitor cleanup is handled by the enterprise synthetics handler.
-        FolderType::Synthetics => {}
+        FolderType::Synthetics => {
+            let params = ListSyntheticsParams {
+                folder_id: Some(folder_id.to_string()),
+                ..Default::default()
+            };
+            if table::synthetics_monitors::count(client, org_id, &params).await? > 0 {
+                return Err(FolderError::DeleteWithSynthetics);
+            }
+        }
     };
 
     if !table::folders::exists(org_id, folder_id, folder_type).await? {

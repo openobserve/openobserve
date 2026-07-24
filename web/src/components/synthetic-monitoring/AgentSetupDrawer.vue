@@ -120,10 +120,6 @@
           {{ t("synthetics.privateLocations.setup.step3Body") }}
         </p>
       </div>
-
-      <p class="text-text-muted border-border-default border-t pt-3 text-xs">
-        {{ t("synthetics.privateLocations.setup.browserNote") }}
-      </p>
     </div>
   </ODrawer>
 </template>
@@ -153,6 +149,9 @@ const props = defineProps<{
   scriptUrl?: string | null;
   /** Pre-fills the agent name — used when recovering a specific known agent. */
   agentName?: string | null;
+  /** Which agent to install. `browser` adds `--type=browser`, which selects the
+   *  Playwright browser-probe image; default `protocol` installs the Go agent. */
+  agentType?: "protocol" | "browser";
 }>();
 const emit = defineEmits<{ (e: "update:open", open: boolean): void }>();
 
@@ -162,21 +161,15 @@ const platform = ref<string | number>("docker");
 const draftLocation = ref("");
 const draftAgentName = ref("");
 
-/** A non-empty starting point for the org-level composer — never blank, so a
- *  user who copies without editing still gets a usable command. Regenerated
- *  on every fresh open (not sticky), so two agents set up back-to-back don't
- *  default to the same location name. */
-function generateDefaultLocationName(): string {
-  const suffix = Math.floor(1000 + Math.random() * 9000);
-  return `private-location-${suffix}`;
-}
-
 watch(
   () => props.open,
   (open) => {
     if (!open) return;
-    draftLocation.value =
-      props.locationName || (props.locationId ? "" : generateDefaultLocationName());
+    // Start BLANK (not an auto-generated `private-location-XXXX`) so the operator
+    // deliberately names the location — and reuses that name across agents (a
+    // location is a pool of interchangeable agents, not one location per agent).
+    // `required` on the input + the copy guard below stop a blank from shipping.
+    draftLocation.value = props.locationName || "";
     draftAgentName.value = props.agentName || "";
   },
 );
@@ -221,6 +214,8 @@ const composedCommand = computed(() => {
   } else {
     lines.push(`  --location="${draftLocation.value || "<location-name>"}" \\`);
   }
+  // Browser agents run the Playwright image (container-only — docker/k8s/linux).
+  if (props.agentType === "browser") lines.push(`  --type=browser \\`);
   if (draftAgentName.value) lines.push(`  --agent-name="${draftAgentName.value}"`);
   // Join continuation lines; the last line carries no trailing backslash.
   return lines.map((l, i) => (i === lines.length - 1 ? l.replace(/ \\$/, "") : l)).join("\n");

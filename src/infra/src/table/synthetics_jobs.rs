@@ -203,16 +203,34 @@ pub async fn lease_batch<C: ConnectionTrait>(
     limit: i64,
     now_us: i64,
     lease_secs: i64,
+    browser: Option<bool>,
 ) -> Result<Vec<LeasedRow>, errors::Error> {
     let lease_expires_at = now_us + lease_secs * 1_000_000;
 
     // Step 1: pick candidate IDs.
-    let ids: Vec<String> = Entity::find()
+    //
+    // `browser` narrows the candidate set to jobs the caller can actually run,
+    // keyed off the `browser_devices` column (the only queryable type
+    // discriminator — the check type itself lives in `metadata` JSON):
+    //   Some(true)  → browser jobs only  (browser_devices IS NOT NULL)
+    //   Some(false) → protocol jobs only (browser_devices IS NULL)
+    //   None        → no filter (dispatcher: public pools are already
+    //                 type-segmented net-<region> vs aws-browser)
+    // Without this a net agent and a browser agent sharing one private pool
+    // race for every job — the net agent leases a browser job and fails it with
+    // "unsupported check type: browser".
+    let mut query = Entity::find()
         .select_only()
         .column(Column::Id)
         .filter(Column::Pool.eq(pool))
         .filter(Column::Status.eq(0i32))
-        .filter(Column::ValidUntil.gt(now_us))
+        .filter(Column::ValidUntil.gt(now_us));
+    query = match browser {
+        Some(true) => query.filter(Column::BrowserDevices.is_not_null()),
+        Some(false) => query.filter(Column::BrowserDevices.is_null()),
+        None => query,
+    };
+    let ids: Vec<String> = query
         .order_by_asc(Column::ScheduledTs)
         .limit(limit as u64)
         .into_tuple::<String>()
@@ -223,7 +241,13 @@ pub async fn lease_batch<C: ConnectionTrait>(
         return Ok(vec![]);
     }
 
-    // Step 2: mark them leased.
+    // Step 2: atomically claim. The `status = 0` guard makes this safe when
+    // multiple agents lease the SAME pool concurrently (the HA case — many
+    // agents per private location). Two agents can pick the same candidate id
+    // in step 1, but only ONE UPDATE flips a given row 0→1: the racing UPDATE
+    // blocks on the row lock, then re-evaluates `status = 0` (now false) and
+    // claims nothing for that row. Without this guard both would "win" the row
+    // and run the check twice (duplicate results).
     Entity::update_many()
         .col_expr(Column::Status, Expr::value(1i32))
         .col_expr(Column::ClaimedBy, Expr::value(claimed_by))
@@ -234,12 +258,18 @@ pub async fn lease_batch<C: ConnectionTrait>(
             Expr::col(Column::DispatchAttempts).add(1i32),
         )
         .filter(Column::Id.is_in(ids.clone()))
+        .filter(Column::Status.eq(0i32))
         .exec(conn)
         .await?;
 
-    // Step 3: return the leased rows (dispatch_attempts already incremented).
+    // Step 3: return ONLY the rows THIS call actually won — pinned by our
+    // (claimed_by, claimed_at) stamp. A racing agent that lost the guard above
+    // shares the candidate `ids` but did not stamp these rows, so it won't
+    // re-return them. (dispatch_attempts already incremented.)
     let models = Entity::find()
         .filter(Column::Id.is_in(ids))
+        .filter(Column::ClaimedBy.eq(claimed_by))
+        .filter(Column::ClaimedAt.eq(now_us))
         .all(conn)
         .await?;
 
