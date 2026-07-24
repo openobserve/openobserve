@@ -27,21 +27,20 @@ describe("useToolbarPins defaults", () => {
     window.localStorage.clear();
   });
 
-  it("pins ONLY histogram by default on a pristine profile", async () => {
+  it("pins histogram AND savedViews by default on a pristine profile", async () => {
     const { useToolbarPins } = await importFresh();
     const { isPinned } = useToolbarPins();
     expect(isPinned("histogram")).toBe(true);
-    expect(isPinned("savedViews")).toBe(false);
+    expect(isPinned("savedViews")).toBe(true);
     expect(isPinned("sqlMode")).toBe(false);
   });
 
-  it("keeps savedViews pinned for a user who pinned it explicitly", async () => {
-    window.localStorage.setItem(
-      "logs_toolbar_pinned_items",
-      JSON.stringify(["histogram", "savedViews"]),
-    );
+  it("keeps savedViews unpinned for a user who unpinned it explicitly", async () => {
     const { useToolbarPins } = await importFresh();
-    expect(useToolbarPins().isPinned("savedViews")).toBe(true);
+    useToolbarPins().togglePin("savedViews");
+    expect(window.localStorage.getItem("logs_toolbar_savedviews_pin_decided")).toBe("true");
+    const fresh = await importFresh();
+    expect(fresh.useToolbarPins().isPinned("savedViews")).toBe(false);
   });
 
   it("keeps the histogram decided-flag behavior intact", async () => {
@@ -57,6 +56,6 @@ describe("useToolbarPins defaults", () => {
     const { togglePin, pinnedItems } = useToolbarPins();
     togglePin("syntaxGuide");
     togglePin("sqlMode");
-    expect(pinnedItems.value).toEqual(["histogram", "sqlMode", "syntaxGuide"]);
+    expect(pinnedItems.value).toEqual(["histogram", "sqlMode", "savedViews", "syntaxGuide"]);
   });
 });

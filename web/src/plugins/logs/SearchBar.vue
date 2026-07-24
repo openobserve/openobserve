@@ -198,102 +198,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip :content="t('search.quickModeLabel')" />
           </OButton>
 
-          <!-- Saved Views (pinned) — button group styled to match the function
-             selector for visual consistency: open-list dropdown trigger + create. -->
-          <OButtonGroup
+          <!-- Saved Views (pinned) — one control, one popover: browse, apply,
+             create, favorite, update-to-current, rename, and delete inline. -->
+          <SavedViewsMenu
             v-if="showPinnedSavedViews"
+            ref="savedViewsMenuRef"
             data-test="logs-search-bar-saved-views-pinned"
-            class="element-box-shadow border-button-outline-border border p-0"
-          >
-            <!-- A real dropdown, not a modal: one click to open, one click to
-               apply. The heavyweight list dialog stays reachable via Manage. -->
-            <ODropdown
-              :open="savedViewsDropdownOpen"
-              side="bottom"
-              align="start"
-              @update:open="onSavedViewsDropdownOpenChange"
-            >
-              <template #trigger>
-                <OButton
-                  data-test="logs-search-bar-saved-views-pinned-list-btn"
-                  variant="ghost"
-                  size="icon-toolbar"
-                >
-                  <OIcon name="saved-search" size="sm" />
-                  <OIcon name="arrow-drop-down" size="sm" class="-ml-0.5" />
-                  <OTooltip :content="t('search.listSavedViews')" :side-offset="2" />
-                </OButton>
-              </template>
-              <ODropdownGroup :label="t('search.savedViewsLabel')">
-                <div
-                  v-if="searchObj.loadingSavedView"
-                  class="text-text-secondary flex items-center gap-2 px-3 py-1.5 text-sm"
-                >
-                  <OSpinner size="xs" />
-                  {{ t("confirmDialog.loading") }}
-                </div>
-                <div
-                  v-else-if="sortedSavedViews.length"
-                  class="max-h-72 overflow-y-auto overscroll-contain"
-                  data-test="logs-search-bar-saved-views-menu-list"
-                >
-                  <ODropdownItem
-                    v-for="view in sortedSavedViews"
-                    :key="view.view_id"
-                    :data-test="`logs-search-bar-saved-views-menu-apply-${view.view_name}`"
-                    @select="applySavedView(view)"
-                  >
-                    <template #icon-left>
-                      <OIcon
-                        :name="favoriteViews.includes(view.view_id) ? 'star' : 'saved-search'"
-                        size="sm"
-                        :class="favoriteViews.includes(view.view_id) ? 'text-favorite' : ''"
-                      />
-                    </template>
-                    <span class="max-w-56 truncate">{{ view.view_name }}</span>
-                    <template #icon-right>
-                      <OButton
-                        variant="ghost"
-                        size="icon-xs-sq"
-                        icon-left="edit"
-                        class="ms-auto"
-                        :title="t('search.updateSavedViewWithCurrent')"
-                        :data-test="`logs-search-bar-saved-views-menu-update-${view.view_name}`"
-                        @click.stop.prevent="quickUpdateSavedView(view)"
-                      />
-                    </template>
-                  </ODropdownItem>
-                </div>
-                <ODropdownItem v-else disabled>
-                  {{ t("search.savedViewsNotFound") }}
-                </ODropdownItem>
-              </ODropdownGroup>
-              <ODropdownSeparator />
-              <ODropdownItem
-                icon-left="save"
-                data-test="logs-search-bar-saved-views-menu-create"
-                @select="fnSavedView"
-              >
-                {{ t("search.createSavedView") }}
-              </ODropdownItem>
-              <ODropdownItem
-                icon-left="settings"
-                data-test="logs-search-bar-saved-views-menu-manage"
-                @select="openSavedViewsList"
-              >
-                {{ t("search.manageSavedViews") }}
-              </ODropdownItem>
-            </ODropdown>
-            <OButton
-              data-test="logs-search-bar-saved-views-pinned-create-btn"
-              variant="ghost"
-              size="icon-toolbar"
-              @click="fnSavedView"
-            >
-              <OIcon name="save" size="sm" />
-              <OTooltip :content="t('search.createSavedView')" :side-offset="6" />
-            </OButton>
-          </OButtonGroup>
+            :views="searchObj.data.savedViews"
+            :favorites="favoriteViews"
+            :loading="searchObj.loadingSavedView"
+            :active-view-id="activeSavedViewId"
+            :stream-selected="searchObj.data.stream.selectedStream.length > 0"
+            @load="loadSavedView"
+            @apply="applySavedView"
+            @create="createSavedViews"
+            @update="quickUpdateSavedView"
+            @rename="renameSavedView"
+            @delete="deleteSavedViewById"
+            @toggle-favorite="onToggleFavoriteSavedView"
+          />
 
           <!-- Syntax Guide (pinned) — icon+label, becomes icon-only at narrow widths -->
           <SyntaxGuide
@@ -495,50 +418,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <ODropdownSeparator />
 
-          <!-- SAVED VIEWS -->
-          <ODropdownGroup :label="t('search.menuGroupSavedViews')">
-            <template #label-action>
-              <OButton
-                data-test="logs-search-bar-menu-pin-saved-views-btn"
-                variant="ghost-neutral"
-                size="icon-sm"
-                :title="
-                  isPinned('savedViews') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')
-                "
-                @click.stop="togglePin('savedViews')"
-              >
-                <OIcon :name="isPinned('savedViews') ? 'keep' : 'keep-outline'" size="sm" />
-              </OButton>
-            </template>
-            <ODropdownItem
-              data-test="logs-search-bar-menu-list-saved-views-btn"
-              @select="openSavedViewsList"
+          <!-- SAVED VIEWS — browse/create/manage now live in the toolbar
+             popover (SavedViewsMenu). The menu keeps only the pin toggle so the
+             control can be hidden from the toolbar. -->
+          <div class="flex w-full items-center pr-2">
+            <span
+              class="text-dropdown-item-text flex min-w-0 items-center gap-2 px-2 py-1.5 text-sm"
             >
-              <template #icon-left>
-                <span
-                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
-                >
-                  <OIcon name="format-list-bulleted" size="sm" />
-                </span>
-              </template>
-              {{ t("search.listSavedViews") }}
-            </ODropdownItem>
-
-            <ODropdownItem
-              data-test="logs-search-bar-menu-create-saved-view-btn"
-              shortcut-id="logsSaveView"
-              @select="fnSavedView"
+              <OIcon name="saved-search" size="sm" class="text-text-secondary shrink-0" />
+              {{ t("search.savedViewsTitle") }}
+            </span>
+            <OButton
+              data-test="logs-search-bar-menu-pin-saved-views-btn"
+              variant="ghost-neutral"
+              size="icon-sm"
+              class="ml-auto"
+              :title="
+                isPinned('savedViews') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')
+              "
+              @click.stop="togglePin('savedViews')"
             >
-              <template #icon-left>
-                <span
-                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
-                >
-                  <OIcon name="add" size="sm" />
-                </span>
-              </template>
-              {{ t("search.createSavedView") }}
-            </ODropdownItem>
-          </ODropdownGroup>
+              <OIcon :name="isPinned('savedViews') ? 'keep' : 'keep-outline'" size="sm" />
+            </OButton>
+          </div>
 
           <ODropdownSeparator />
 
@@ -1446,18 +1348,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </ODialog>
 
     <ODialog
-      data-test="search-bar-confirm-saved-view-dialog"
-      ref="confirmSavedViewDialog"
-      v-model:open="confirmSavedViewDialogVisible"
-      size="xs"
-      :secondary-button-label="t('confirmDialog.cancel')"
-      :primary-button-label="t('confirmDialog.ok')"
-      @click:secondary="cancelConfirmDialog"
-      @click:primary="confirmDialogOK"
-    >
-      <p>{{ confirmMessageSavedView }}</p>
-    </ODialog>
-    <ODialog
       data-test="search-bar-custom-download-dialog"
       v-model:open="customDownloadDialog"
       size="md"
@@ -1504,45 +1394,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButtonGroup>
         </div>
       </div>
-    </ODialog>
-    <ODialog
-      data-test="search-bar-store-state-saved-view-dialog"
-      v-model:open="store.state.savedViewDialog"
-      size="md"
-      form-id="saved-view-form"
-      :title="t('search.savedViewsLabel')"
-      :secondary-button-label="t('confirmDialog.cancel')"
-      :primary-button-label="t('common.save')"
-      @click:secondary="store.state.savedViewDialog = false"
-    >
-      <OForm
-        id="saved-view-form"
-        ref="savedViewFormRef"
-        :schema="savedViewSchema"
-        :default-values="savedViewDefaults"
-        @submit="handleSavedView"
-      >
-        <div v-if="isSavedViewAction == 'create'">
-          <OFormInput
-            name="savedViewName"
-            data-test="add-alert-name-input"
-            :label="t('search.savedViewName')"
-            required
-          />
-        </div>
-        <div v-else>
-          <OFormSelect
-            name="savedViewSelectedName"
-            data-test="saved-view-name-select"
-            :options="searchObj.data.savedViews"
-            label-key="view_name"
-            value-key="view_id"
-            :label="t('search.savedViewName')"
-            class="py-2"
-            required
-          />
-        </div>
-      </OForm>
     </ODialog>
     <ODialog
       data-test="search-bar-store-state-saved-function-dialog"
@@ -1675,199 +1526,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmBuildModeChange = false"
       v-model="confirmBuildModeChange"
     />
-    <ConfirmDialog
-      :title="t('search.deleteSavedView')"
-      :message="t('search.deleteSavedViewConfirm')"
-      @update:ok="confirmDeleteSavedViews"
-      @update:cancel="confirmDelete = false"
-      v-model="confirmDelete"
-    />
-    <ConfirmDialog
-      :title="t('search.updateSavedView')"
-      :message="t('search.updateSavedViewConfirm')"
-      @update:ok="confirmUpdateSavedViews"
-      @update:cancel="confirmUpdate = false"
-      v-model="confirmUpdate"
-    />
     <!-- Query Plan Dialog -->
     <QueryPlanDialog v-model="showExplainDialog" :searchObj="searchObj" />
-
-    <!-- Saved Views List Dialog -->
-    <ODialog
-      v-model:open="savedViewsListDialog"
-      size="lg"
-      :title="t('search.savedViewsLabel')"
-      data-test="saved-views-list-dialog"
-    >
-      <div>
-        <div data-test="logs-search-saved-view-list" class="flex">
-          <div
-            class="flex flex-col"
-            :class="localSavedViews.length > 0 ? 'border-card-glass-border border-r' : ''"
-            :style="localSavedViews.length > 0 ? 'width: 60%' : 'width: 100%'"
-          >
-            <div class="flex flex-col" style="max-height: 486px; min-height: 280px">
-              <OTable
-                data-test="log-search-saved-view-list-fields-table"
-                :data="searchObj.data.savedViews"
-                :columns="savedViewColumns"
-                row-key="view_id"
-                :global-filter="searchObj.data.savedViewFilterFields"
-                :page-size="rowsPerPage"
-                :page-size-options="[10, 20, 50]"
-                class="saved-view-table o2-table-hide-header h-full! max-h-full"
-              >
-                <template #top>
-                  <div class="box-border w-full min-w-0 px-2 py-2">
-                    <OSearchInput
-                      data-test="log-search-saved-view-field-search-input"
-                      v-model="searchObj.data.savedViewFilterFields"
-                      clearable
-                      :debounce="300"
-                      class="w-full"
-                      :placeholder="t('search.searchSavedView')"
-                    />
-                  </div>
-                  <div v-if="searchObj.loadingSavedView == true" class="w-full p-2">
-                    <div class="text-sm font-bold font-medium">
-                      <OSpinner size="xs" />
-                      {{ t("confirmDialog.loading") }}
-                    </div>
-                  </div>
-                </template>
-                <template #cell-view_name="{ row, value }">
-                  <div
-                    class="w-full min-w-0 cursor-pointer truncate text-sm"
-                    :title="value"
-                    :data-test="`logs-search-bar-apply-${value}-saved-view-btn`"
-                    @click.stop="
-                      applySavedView(row);
-                      savedViewsListDialog = false;
-                    "
-                  >
-                    {{ value }}
-                  </div>
-                </template>
-                <template #cell-actions="{ row }">
-                  <div class="flex items-center gap-0.5">
-                    <OButton
-                      :title="t('common.favourite')"
-                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover"
-                      variant="ghost-neutral"
-                      size="icon-sm"
-                      :data-test="`logs-search-bar-favorite-${row.view_id}-saved-view-btn`"
-                      @click.stop="
-                        handleFavoriteSavedView(row, favoriteViews.includes(row.view_id))
-                      "
-                    >
-                      <OIcon
-                        :name="favoriteViews.includes(row.view_id) ? 'star' : 'star-outline'"
-                        size="xs"
-                        :class="favoriteViews.includes(row.view_id) ? 'text-favorite' : ''"
-                      />
-                    </OButton>
-                    <OButton
-                      :title="t('common.edit')"
-                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover"
-                      variant="ghost-neutral"
-                      size="icon-sm"
-                      :data-test="`logs-search-bar-update-${row.view_id}-saved-view-btn`"
-                      @click.stop="handleUpdateSavedView(row)"
-                    >
-                      <OIcon name="edit" size="xs" />
-                    </OButton>
-                    <OButton
-                      :title="t('common.delete')"
-                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover"
-                      variant="ghost-neutral"
-                      size="icon-sm"
-                      :data-test="`logs-search-bar-delete-${row.view_id}-saved-view-btn`"
-                      @click.stop="handleDeleteSavedView(row)"
-                    >
-                      <OIcon name="delete" size="xs" />
-                    </OButton>
-                  </div>
-                </template>
-                <template #empty>
-                  <div v-if="searchObj.loadingSavedView == false" class="w-full p-2 text-center">
-                    <span>{{ t("search.savedViewsNotFound") }}</span>
-                  </div>
-                </template>
-              </OTable>
-            </div>
-          </div>
-
-          <div class="ml-0 flex w-[40%] flex-col pl-3" v-if="localSavedViews.length > 0">
-            <div class="flex flex-col" style="max-height: 480px; min-height: 280px">
-              <OTable
-                data-test="log-search-saved-view-favorite-list-fields-table"
-                :data="localSavedViews"
-                :columns="savedViewColumns"
-                row-key="view_id"
-                pagination="none"
-                class="saved-view-table o2-table-hide-header h-full! max-h-full"
-              >
-                <template #top>
-                  <div
-                    class="text-muted-foreground p-2 text-xs leading-6 font-bold tracking-wide uppercase"
-                  >
-                    {{ t("search.favoriteViews") }}
-                  </div>
-                  <div class="border-border my-1 border-t" />
-                </template>
-                <template #cell-view_name="{ row, value }">
-                  <div
-                    class="w-full min-w-0 cursor-pointer truncate text-sm"
-                    :title="value"
-                    :data-test="`logs-search-bar-dialog-favorite-saved-view-row-${value}`"
-                    @click.stop="
-                      applySavedView(row);
-                      savedViewsListDialog = false;
-                    "
-                  >
-                    {{ value }}
-                  </div>
-                </template>
-                <template #cell-actions="{ row }">
-                  <div class="flex items-center gap-0.5">
-                    <OButton
-                      :title="t('common.favourite')"
-                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover"
-                      variant="ghost-neutral"
-                      size="icon-sm"
-                      :data-test="`logs-search-bar-favorite-${row.view_id}-saved-view-btn`"
-                      @click.stop="handleFavoriteSavedView(row, true)"
-                    >
-                      <OIcon name="star" size="xs" class="text-favorite" />
-                    </OButton>
-                    <OButton
-                      :title="t('common.edit')"
-                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover"
-                      variant="ghost-neutral"
-                      size="icon-sm"
-                      :data-test="`logs-search-bar-update-${row.view_id}-favorite-saved-view-btn`"
-                      @click.stop="handleUpdateSavedView(row)"
-                    >
-                      <OIcon name="edit" size="xs" />
-                    </OButton>
-                    <OButton
-                      :title="t('common.delete')"
-                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover"
-                      variant="ghost-neutral"
-                      size="icon-sm"
-                      :data-test="`logs-search-bar-delete-${row.view_id}-favorite-saved-view-btn`"
-                      @click.stop="handleDeleteSavedView(row)"
-                    >
-                      <OIcon name="delete" size="xs" />
-                    </OButton>
-                  </div>
-                </template>
-              </OTable>
-            </div>
-          </div>
-        </div>
-      </div>
-    </ODialog>
   </div>
 </template>
 
@@ -1893,7 +1553,6 @@ import { useTheme } from "@/composables/useTheme";
 import DateTime from "@/components/DateTime.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTable from "@/lib/core/Table/OTable.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import useLogs from "@/composables/useLogs";
@@ -1901,6 +1560,7 @@ import { useToolbarResponsive } from "@/composables/useToolbarResponsive";
 import { useToolbarPins } from "@/composables/useToolbarPins";
 import useStreams from "@/composables/useStreams";
 import SyntaxGuide from "./SyntaxGuide.vue";
+import SavedViewsMenu from "@/components/logs/SavedViewsMenu.vue";
 import jsTransformService from "@/services/jstransform";
 import searchService from "@/services/search";
 
@@ -1967,10 +1627,8 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import { hasFieldCondition, removeFieldCondition } from "@/plugins/logs/filterUtils";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -1981,7 +1639,6 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTree from "@/lib/data/Tree/OTree.vue";
 import { makeSavedViewSchema, type SavedViewForm } from "./SearchBar.SavedView.schema";
-import { sortSavedViews } from "./savedViewsSort";
 import { makeSavedFunctionSchema, type SavedFunctionForm } from "./SearchBar.SavedFunction.schema";
 
 const defaultValue: any = () => {
@@ -2052,6 +1709,7 @@ export default defineComponent({
     ShareButton,
     OButton,
     SyntaxGuide,
+    SavedViewsMenu,
     AutoRefreshInterval,
     ConfirmDialog,
     TransformSelector,
@@ -2063,17 +1721,14 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OFormToggleGroup,
-    OSpinner,
     OTooltip,
     OInput,
-    OSearchInput,
     OSelect,
     OForm,
     OFormInput,
     OFormSelect,
     OSwitch,
     OTree,
-    OTable,
   },
   emits: [
     "searchdata",
@@ -2414,6 +2069,9 @@ export default defineComponent({
     const showExplainDialog = ref(false);
     const confirmDelete = ref(false);
     const deleteViewID = ref("");
+    // view_id of the saved view currently applied — drives the toolbar label
+    // and the active-row highlight in SavedViewsMenu.
+    const activeSavedViewId = ref("");
     const savedViewDropdownModel = ref(false);
     const savedViewsListDialog = ref(false);
     const moreOptionsDropdownModel = ref(false);
@@ -3466,6 +3124,9 @@ export default defineComponent({
       emit("onChangeInterval");
     };
 
+    // Opens the Saved Views popover straight into inline create mode. Invoked by
+    // the "save view" keyboard shortcut (logsSaveView) from Index.vue.
+    const savedViewsMenuRef = ref<{ openCreate?: () => void } | null>(null);
     const fnSavedView = () => {
       if (searchObj.data.stream.selectedStream.length == 0) {
         toast({
@@ -3474,28 +3135,11 @@ export default defineComponent({
         });
         return;
       }
-      store.dispatch("setSavedViewDialog", true);
-      isSavedViewAction.value = "create";
-      savedViewDropdownModel.value = false;
+      savedViewsMenuRef.value?.openCreate?.();
     };
 
-    const openSavedViewsList = () => {
-      loadSavedView();
-      savedViewsListDialog.value = true;
-    };
-
-    // ── Saved views quick dropdown (pinned toolbar) ──────────────────────
     // Controlled open state so a quick update can close the menu itself.
     const savedViewsDropdownOpen = ref(false);
-    const onSavedViewsDropdownOpenChange = (open: boolean) => {
-      savedViewsDropdownOpen.value = open;
-      // Lazy-fetch the list the first time the menu opens.
-      if (open) loadSavedView();
-    };
-
-    const sortedSavedViews = computed(() =>
-      sortSavedViews(searchObj.data.savedViews, favoriteViews.value),
-    );
 
     // One-click overwrite of a view with the current search state — no list
     // dialog, no stacked confirm dialog.
@@ -3549,6 +3193,7 @@ export default defineComponent({
         .then(async (res) => {
           if (res.status == 200) {
             store.dispatch("setSavedViewFlag", true);
+            activeSavedViewId.value = item.view_id;
             const extractedObj = res.data.data;
 
             // A saved view's columns are an explicit user choice, not a system
@@ -4011,6 +3656,64 @@ export default defineComponent({
       }
     };
 
+    // Inline delete from SavedViewsMenu — the menu already collected the
+    // confirmation inline, so this just targets the id and reuses the existing
+    // delete flow (no confirm modal).
+    const deleteSavedViewById = (view: any) => {
+      deleteViewID.value = view.view_id;
+      if (activeSavedViewId.value === view.view_id) activeSavedViewId.value = "";
+      deleteSavedViews();
+    };
+
+    // Rename = change the name only, preserving the saved query. We fetch the
+    // stored view state and PUT it back unchanged with the new name, so unlike
+    // "update to current" it never overwrites the query.
+    const renameSavedView = ({ view, name }: { view: any; name: string }) => {
+      const trimmed = (name ?? "").trim();
+      if (!trimmed || trimmed === view.view_name) return;
+      const dismiss = toast({
+        message: t("logs.searchBar.updatingSavedView"),
+        variant: "loading",
+        timeout: 0,
+      });
+      savedviewsService
+        .getViewDetail(store.state.selectedOrganization.identifier, view.view_id)
+        .then((detail) => {
+          if (detail.status != 200) {
+            dismiss();
+            toast({ message: t("search.errorUpdatingSavedView"), variant: "error" });
+            return;
+          }
+          // detail.data.data wraps the stored view; its `.data` is the search
+          // state (the same shape applySavedView restores from).
+          const viewObj = { data: detail.data.data.data, view_name: trimmed };
+          return savedviewsService
+            .put(store.state.selectedOrganization.identifier, view.view_id, viewObj)
+            .then((res) => {
+              dismiss();
+              if (res.status == 200) {
+                searchObj.data.savedViews.forEach((item: any, index: number) => {
+                  if (item.view_id == view.view_id) {
+                    searchObj.data.savedViews[index].view_name = trimmed;
+                  }
+                });
+                toast({ message: t("search.viewUpdatedSuccessfully"), variant: "success" });
+                getSavedViews();
+              } else {
+                toast({
+                  message: `${t("search.errorUpdatingSavedView")} ${res.data.error_detail}`,
+                  variant: "error",
+                });
+              }
+            });
+        })
+        .catch((err) => {
+          dismiss();
+          toast({ message: t("search.errorUpdatingSavedView"), variant: "error" });
+          console.log("Error while renaming saved view", err);
+        });
+    };
+
     const getSearchObj = () => {
       try {
         delete searchObj.meta.scrollInfo;
@@ -4086,6 +3789,8 @@ export default defineComponent({
                 view_id: res.data.view_id,
                 view_name: viewName,
               });
+              // The just-saved view becomes the active one.
+              activeSavedViewId.value = res.data.view_id;
               toast({
                 message: t("search.viewCreatedSuccessfully"),
                 variant: "success",
@@ -4392,6 +4097,12 @@ export default defineComponent({
           variant: "success",
         });
       }
+    };
+
+    // Adapts SavedViewsMenu's toggle-favorite (view only) to the existing
+    // handler, which takes the current favorite state as its second argument.
+    const onToggleFavoriteSavedView = (view: any) => {
+      handleFavoriteSavedView(view, favoriteViews.value.includes(view.view_id));
     };
 
     const filterSavedViewFn = (rows: any, terms: any) => {
@@ -4945,13 +4656,13 @@ export default defineComponent({
       updateTimezone,
       dateTimeRef,
       fnSavedView,
-      openSavedViewsList,
+      savedViewsMenuRef,
       applySavedView,
-      savedViewsDropdownOpen,
-      onSavedViewsDropdownOpenChange,
-      sortedSavedViews,
       quickUpdateSavedView,
-      isSavedViewAction,
+      renameSavedView,
+      deleteSavedViewById,
+      onToggleFavoriteSavedView,
+      activeSavedViewId,
       // Saved-view OForm (schema returned from setup() so the Options-API
       // template resolves :schema; a bare import would be out of scope).
       savedViewSchema,

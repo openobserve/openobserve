@@ -40,9 +40,10 @@ const STORAGE_KEY = "logs_toolbar_pinned_items";
 // arrays persisted before the item existed as a pin key) means "never
 // decided", not "unpinned" — the per-item flag below records the user's first
 // explicit pin/unpin, after which STORAGE_KEY alone is authoritative.
-const DEFAULT_PINNED: ToolbarPinKey[] = ["histogram"];
+const DEFAULT_PINNED: ToolbarPinKey[] = ["histogram", "savedViews"];
 const PIN_DECIDED_KEYS: Partial<Record<ToolbarPinKey, string>> = {
   histogram: "logs_toolbar_histogram_pin_decided",
+  savedViews: "logs_toolbar_savedviews_pin_decided",
 };
 
 const isValidKey = (key: string): key is ToolbarPinKey =>
