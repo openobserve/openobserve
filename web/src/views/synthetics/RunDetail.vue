@@ -50,7 +50,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #title>
           <span class="inline-flex min-w-0 items-center gap-2">
-            <span data-test="synthetics-run-detail-title" class="truncate">{{ displayMonitorName }}</span>
+            <span data-test="synthetics-run-detail-title" class="truncate">{{
+              displayMonitorName
+            }}</span>
             <BetaBadge />
           </span>
         </template>
