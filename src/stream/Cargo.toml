@@ -15,6 +15,7 @@ enterprise = [
     "config/enterprise",
     "db/enterprise",
     "enrichment-data/enterprise",
+    "schema/enterprise",
 ]
 cloud = [
     "enterprise",
@@ -39,7 +40,6 @@ db.workspace = true
 enrichment-data.workspace = true
 hashbrown.workspace = true
 infra.workspace = true
-itertools.workspace = true
 log.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 schema.workspace = true
