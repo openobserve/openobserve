@@ -399,15 +399,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <!-- Zero metrics in the org — a "set up ingestion" state, not a filter
-             miss. Keeps the metrics-specific heading and the docs link. -->
+             miss. `:actions` replaces the preset's generic "Set up ingestion"
+             card with the metrics-specific one (a bare action-label would lose
+             to the preset's cards), and the click goes to the in-app Data
+             Sources metrics page, where ingestion is actually set up — not out
+             to external docs. -->
           <OEmptyState
             v-else-if="!grid.cards.value.length"
             size="block"
             preset="no-streams"
             :title="t('metrics.explorer.noMetrics')"
-            :action-label="t('metrics.explorer.learnIngest')"
+            :actions="noMetricsActions"
             data-test="metrics-explorer-no-metrics"
-            @action="openIngestDocs"
+            @action="openMetricsIngestion"
           />
 
           <!-- FAVOURITES with none added yet — the reason is not "filters hid
@@ -973,8 +977,22 @@ export default defineComponent({
       return actions;
     });
 
-    const openIngestDocs = () => {
-      window.open("https://openobserve.ai/docs/user-guide/metrics/", "_blank", "noopener");
+    /** The zero-metrics action card — same shape as the preset's, metrics-specific copy. */
+    const noMetricsActions = [
+      {
+        id: "setup-ingestion",
+        icon: "cloud-upload",
+        titleKey: "metrics.explorer.setupIngestion",
+        descriptionKey: "metrics.explorer.setupIngestionDesc",
+      },
+    ];
+
+    /** The zero-metrics remedy: the in-app Data Sources metrics page. */
+    const openMetricsIngestion = () => {
+      router.push({
+        name: "ingestMetrics",
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      });
     };
 
     const onEmptyStateAction = (id?: string) => {
@@ -1756,7 +1774,8 @@ export default defineComponent({
       noMatchDescription,
       noMatchActions,
       onEmptyStateAction,
-      openIngestDocs,
+      noMetricsActions,
+      openMetricsIngestion,
       showMoreLabel,
       badgeLabels: BADGE_LABELS,
       queriesFor,
