@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-if="filterMode === 'stream'"
         data-test="sessions-list-stream-selector"
-        class="w-56 flex-shrink-0"
+        class="w-64 flex-shrink-0"
       >
         <OSkeleton type="text" v-if="!streamsLoaded" class="w-full h-8.5" />
         <OSelect
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="activeStream"
           :label="t('traces.sessionsList.streamLabel')"
           label-position="inside"
-          :options="availableStreams.map((s) => ({ label: s, value: s }))"
+          :options="streamSelectOptions"
           labelKey="label"
           valueKey="value"
           class="w-full rounded-default"
@@ -67,21 +67,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-else
         data-test="sessions-list-agent-selector"
-        class="w-56 flex-shrink-0"
+        class="w-64 flex-shrink-0"
       >
-        <OSkeleton type="text" v-if="!agentsLoaded" class="w-full h-8.5" />
         <OSelect
-          v-else
           v-model="activeAgent"
           :label="t('traces.sessionsList.agent')"
           label-position="inside"
           :options="agentSelectOptions"
           labelKey="label"
           valueKey="value"
+          :loading="!agentsLoaded"
           class="w-full rounded-default"
           @update:model-value="onAgentChange"
-        />
+        >
+          <!-- On selection show the agent NAME only (or All Agents); env/version
+               are badges. Classes mirror OSelect's default label span. -->
+          <template #trigger>
+            <span
+              class="flex-1 text-start truncate text-xs leading-4 text-select-text"
+            >
+              {{ selectedAgent ? selectedAgent.name : t("traces.allAgents") }}
+            </span>
+          </template>
+        </OSelect>
       </div>
+      <!-- Scope chips: env/version of the scoped agent — only in Agent mode and
+           when a specific agent (not All Agents) is selected. -->
+      <OAgentBadges
+        v-if="filterMode === 'agent' && selectedAgent"
+        :env="selectedAgent.env"
+        :version="selectedAgent.version"
+        data-test="sessions-scope-badges"
+      />
     </div>
 
     <!-- Streams exist: OTable owns the data surface (column chooser, server-side
@@ -254,7 +271,11 @@ import {
   splitNumberWithUnit,
   splitDuration,
 } from "./llmInsightsDashboard.utils";
-import { buildAgentSelectOptions } from "./agentOptionFormat";
+import {
+  buildAgentSelectOptions,
+  buildStreamSelectOptions,
+} from "./agentOptionFormat";
+import OAgentBadges from "@/components/shared/OAgentBadges.vue";
 
 interface Props {
   streamName: string;
@@ -307,14 +328,11 @@ const AGENT_LS_KEY = "sessionsList_agentFilter";
 // Default scope is "agent" — the AI module is agent-centric. Explicit choices
 // still win (URL `?type=`, then saved localStorage preference); the agent
 // default applies only when neither is present.
+// Default scope is ALWAYS "agent" — every AI page lands on Agent for consistency.
+// Only an explicit `?type=stream` URL param overrides it (a stale saved
+// preference must not silently land on Stream).
 const filterMode = ref<"stream" | "agent">(
-  urlType === "agent"
-    ? "agent"
-    : urlType === "stream"
-      ? "stream"
-      : localStorage.getItem(MODE_LS_KEY) === "stream"
-        ? "stream"
-        : "agent",
+  urlType === "stream" ? "stream" : "agent",
 );
 const activeAgent = ref<string>(localStorage.getItem(AGENT_LS_KEY) || ALL_AGENTS_VALUE);
 // `agents` / `agentsLoaded` are module-scoped (see useSessions) so the agent
@@ -333,6 +351,9 @@ const rowsPerPageOptions = [20, 50, 100, 250, 500];
 
 const agentSelectOptions = computed(() =>
   buildAgentSelectOptions(agents.value, t, { includeAllAgents: true }),
+);
+const streamSelectOptions = computed(() =>
+  buildStreamSelectOptions(availableStreams.value, agents.value, t),
 );
 
 const selectedAgent = computed<GenAiAgentListItem | null>(() => {

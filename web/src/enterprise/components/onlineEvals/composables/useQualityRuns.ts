@@ -60,6 +60,8 @@ export interface QualityRunRow {
   targetStreamType: string;
   agentName: string;
   agentId: string;
+  agentEnv: string;
+  agentVersion: string;
   scorerId: string;
   jobId: string;
   latencyMs: number | null;
@@ -82,6 +84,8 @@ export interface RawQualityScoreRow {
   source_stream_type?: string | null;
   agent_name?: string | null;
   agent_id?: string | null;
+  agent_env?: string | null;
+  agent_version?: string | null;
   scorer_id?: string | null;
   job_id?: string | null;
   value_numeric?: number | string | null;
@@ -179,6 +183,8 @@ export function buildQualityRunsSql(
     "  source_stream_type,",
     "  agent_name,",
     "  agent_id,",
+    "  agent_env,",
+    "  agent_version,",
     "  scorer_id,",
     "  job_id,",
     "  value_numeric,",
@@ -295,6 +301,8 @@ export function mapQualityRunRow(raw: RawQualityScoreRow, config: ScoreConfig): 
     targetStreamType: String(raw.source_stream_type ?? "traces"),
     agentName: String(raw.agent_name ?? ""),
     agentId: String(raw.agent_id ?? ""),
+    agentEnv: String(raw.agent_env ?? ""),
+    agentVersion: String(raw.agent_version ?? ""),
     scorerId: String(raw.scorer_id ?? ""),
     jobId: String(raw.job_id ?? ""),
     latencyMs: null,

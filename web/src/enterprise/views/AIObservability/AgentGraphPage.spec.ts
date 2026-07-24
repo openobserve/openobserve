@@ -254,7 +254,7 @@ describe("AgentGraphPage — agent-mode stream gating", () => {
     const labelByValue = Object.fromEntries(
       opts.map((o) => [o.attributes("data-option"), o.text()]),
     );
-    expect(labelByValue["streamA"]).toContain("(1 aiObservability.agentGraph.agentCountSingular)");
-    expect(labelByValue["streamB"]).toContain("(2 aiObservability.agentGraph.agentCountPlural)");
+    expect(labelByValue["streamA"]).toContain("(1 traces.agentCountSingular)");
+    expect(labelByValue["streamB"]).toContain("(2 traces.agentCountPlural)");
   });
 });

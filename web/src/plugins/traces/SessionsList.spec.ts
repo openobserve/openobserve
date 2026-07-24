@@ -334,9 +334,9 @@ describe("SessionsList — loading state", () => {
 
 describe("SessionsList — sessions table", () => {
   it("should fetch stream sessions with no agent filter when in stream mode", async () => {
-    // Default scope is "agent" now — opt into stream mode via the persisted
-    // preference, the same path a returning user takes.
-    localStorage.setItem("sessionsList_filterMode", "stream");
+    // Default scope is "agent" now — stream mode is opted into ONLY via the URL
+    // `?type=stream` param (a stale saved preference must not land on stream).
+    mockRouteQuery = { type: "stream" };
     const wrapper = await mountComponent();
     await refreshComponent(wrapper);
 
@@ -344,7 +344,7 @@ describe("SessionsList — sessions table", () => {
   });
 
   it("should not load agents while refreshing when in stream mode", async () => {
-    localStorage.setItem("sessionsList_filterMode", "stream");
+    mockRouteQuery = { type: "stream" };
     const wrapper = await mountComponent();
     await refreshComponent(wrapper);
 

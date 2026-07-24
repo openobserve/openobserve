@@ -6431,6 +6431,8 @@
   "traces": {
     "agentDefaultVariant": "default",
     "allAgents": "All Agents",
+    "agentCountSingular": "agent",
+    "agentCountPlural": "agents",
     "serviceGraph": {
       "searchPlaceholder": "Search Services",
       "noStreamsDetected": "No streams detected. Ensure service graph metrics include stream_name labels.",
@@ -7766,9 +7768,7 @@
       "stream": "Stream",
       "agent": "Agent",
       "noAgentsTitle": "No agents found",
-      "noAgentsDescription": "No agents were discovered in this time range. Try widening the time range, or check that your traces include gen_ai agent attributes.",
-      "agentCountSingular": "agent",
-      "agentCountPlural": "agents"
+      "noAgentsDescription": "No agents were discovered in this time range. Try widening the time range, or check that your traces include gen_ai agent attributes."
     },
     "kpi": {
       "totalCost": "Total Cost",
