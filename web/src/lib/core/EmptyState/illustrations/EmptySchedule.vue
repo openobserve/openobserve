@@ -38,8 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <circle cx="210" cy="44" r="1.6" />
     </g>
 
-    <!-- job queue card (matches the standard 156-wide card used by the other
-         empty-state illustrations so it renders at a consistent size) -->
+    <!-- job queue card (standard 156-wide card, matching the other empty-state illustrations) -->
     <rect
       x="42"
       y="46"

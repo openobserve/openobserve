@@ -38,8 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- bell (swings) -->
     <g>
-      <!-- swings around the top loop (120 48) — matches the old view-box
-           transform-origin: 120px 48px, now in user units. -->
+      <!-- swings around the top loop (pivot 120 48) -->
       <animateTransform
         v-if="animated"
         attributeName="transform"
@@ -91,9 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </g>
 
     <!-- notification badge (pulses) -->
-    <!-- scales around its own centre (146 58): a compensating translate keeps the
-         centre fixed while the badge scales, reproducing the old fill-box
-         transform-origin: center (SMIL scale is otherwise origin-relative). -->
+    <!-- scale about centre (146 58); the paired translate keeps that centre fixed -->
     <g>
       <animateTransform
         v-if="animated"

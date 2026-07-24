@@ -77,14 +77,13 @@ const TS_HEX_ALLOWLIST = [
 // chartTheme are the JS *consumption* seams; themeManager is the theme *applier* — it
 // resolves store.state.theme into the mode to apply (upstream of every token, so it
 // cannot consume a token without circularity).
-//   • ThemeSwitcher.vue is the toggle control itself. A theme switch cannot be written
-//     without naming "dark" — the `darkMode` flag OR a `theme === 'dark'` compare both
-//     trip the regex — so it is the one canonical home for that decision, not the
-//     fragmentation the category targets.
+//   • ThemeSwitcher.vue is the toggle control — can't be written without naming
+//     "dark" (a `darkMode` flag or `theme === 'dark'` compare), so it's the one
+//     canonical home for that decision, not the fragmentation the category targets.
 //   • convertLogData.ts reads --color-theme-accent to paint an ECharts canvas bar.
-//     applyThemeColors (utils/theme.ts) sets that token inline on document.body in dark
-//     mode and on document.documentElement in light, so the consumer must know which
-//     element carries it — a var() cannot resolve on a <canvas>.
+//     applyThemeColors (utils/theme.ts) sets that token on document.body in dark and
+//     document.documentElement in light, so the consumer must know which element
+//     carries it — a var() can't resolve on a <canvas>.
 const DARK_SEAM_ALLOWLIST = [
   "composables/useTheme.ts",
   "utils/chartTheme.ts",
@@ -93,12 +92,12 @@ const DARK_SEAM_ALLOWLIST = [
   "utils/logs/convertLogData.ts",
 ];
 
-// Files allowed to keep an UNSCOPED <style> block. An unscoped block leaks globally,
-// so it is debt by default — but a few blocks legitimately must reach past the
-// component's own subtree, which a `scoped` block physically cannot do:
+// Files allowed to keep an UNSCOPED <style> block. Unscoped leaks globally so it's
+// debt by default — but a few blocks must reach past the component's own subtree,
+// which `scoped` physically can't:
 //   • ViewDashboard.vue: its @media print / fullscreen rules target external ancestors
-//     (.o2-app-root, main, .o2-content-scroll, .scroll) that live outside the SFC, so
-//     the block is unscoped on purpose (carries a keep(complex-state) note).
+//     (.o2-app-root, main, .o2-content-scroll, .scroll) outside the SFC — unscoped on
+//     purpose (carries a keep(complex-state) note).
 const UNSCOPED_STYLE_ALLOWLIST = [
   "views/Dashboards/ViewDashboard.vue",
 ];
@@ -206,25 +205,19 @@ function styleBlocks(text) {
 }
 
 // ── rawVarInComponent (F.6), CONTEXT-AWARE ─────────────────────────────────
-// A raw `var(--color-*)` inside a component <style> block is debt ONLY when a
-// registered utility (bg-x / text-x / border-x) could actually replace it. In a
-// handful of CSS positions a utility PHYSICALLY cannot — there the raw var() is
-// the correct and only option, exactly like the TS_HEX / DARK_SEAM allowlists
-// above exempt patterns that are correct-in-context. So we count an occurrence
-// only when it is NOT in one of these structurally-CSS-only positions:
-//   • inside :deep(…)             — targets a child component's internal DOM; the
-//                                   parent cannot put a utility class on it
-//   • inside color-mix()/gradient — a utility cannot be a mix input / colour stop
+// A raw `var(--color-*)` in a component <style> block is debt ONLY where a
+// registered utility (bg-x / text-x / border-x) could replace it. In a few CSS
+// positions a utility physically cannot, so the raw var() is correct — like the
+// TS_HEX / DARK_SEAM allowlists above. We skip an occurrence when it is:
+//   • inside :deep(…)             — a child's internal DOM; no parent class reaches it
+//   • inside color-mix()/gradient — a utility can't be a mix input / colour stop
 //   • a pseudo-element rule (::before/::after/::-webkit-scrollbar/::placeholder…)
-//                                 — utilities have no pseudo-element surface here
 //   • inside @keyframes           — animated colour steps have no utility form
-//   • a CSS custom-property def (--x: var(…)) — a utility cannot DEFINE a var that
-//                                   sibling rules / child DOM then read
-// It is judged PER-OCCURRENCE, deliberately NOT by the block's keep() comment:
-// keep() is MANDATORY on every surviving <style> block (it justifies the block's
-// existence — see countUnjustifiedBlocks), so a block-level exemption would zero
-// the whole category. A block can legitimately exist for one keyframe yet still
-// carry an avoidable raw var() in a plain rule — this counts that, not the block.
+//   • a CSS custom-property def (--x: var(…)) — a utility can't DEFINE a var
+// Judged PER-OCCURRENCE, not by the block's keep() comment: keep() is mandatory on
+// every surviving block (see countUnjustifiedBlocks), so a block-level exemption
+// would zero the category. A block kept for one keyframe can still carry an
+// avoidable raw var() in a plain rule — this counts that, not the block.
 
 // selector-nesting stack (raw selector texts, incl. leading comments) at `target`
 function selectorStackAt(css, target) {
@@ -303,13 +296,12 @@ function countFile(file, rel) {
   const isSpec = rel.includes(".spec.");
 
   if (isVue) {
-    // Per-category sanctioned exceptions (same idiom as the .ts allowlists): a file may
-    // carry ONE specific bypass for a reason the category cannot express, while every
-    // OTHER category still applies to it in full.
-    //   • darkMechanism  → DARK_SEAM_ALLOWLIST (ThemeSwitcher is the toggle control; it
-    //     cannot be written without a dark flag / a `theme === 'dark'` compare).
-    //   • unscopedStyle  → UNSCOPED_STYLE_ALLOWLIST (a block whose selectors must reach
-    //     external ancestors — print / fullscreen — physically cannot be scoped).
+    // Per-category sanctioned exceptions (like the .ts allowlists): a file may carry
+    // ONE specific bypass the category can't express, while every OTHER category
+    // still applies in full.
+    //   • darkMechanism → DARK_SEAM_ALLOWLIST (ThemeSwitcher, the toggle control).
+    //   • unscopedStyle → UNSCOPED_STYLE_ALLOWLIST (selectors that must reach external
+    //     ancestors — print / fullscreen — can't be scoped).
     const skip = (k) =>
       (k === "darkMechanism" && DARK_SEAM_ALLOWLIST.some((p) => rel.endsWith(p))) ||
       (k === "unscopedStyle" && UNSCOPED_STYLE_ALLOWLIST.some((p) => rel.endsWith(p)));

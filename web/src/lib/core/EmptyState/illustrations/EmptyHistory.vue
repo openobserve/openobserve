@@ -84,8 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       stroke-linecap="round"
       opacity="0.75"
     />
-    <!-- minute hand sweeps a full turn (linear). Pivot 120 88 = clock centre,
-         in user units — replaces the old transform-origin: 120px 88px. -->
+    <!-- minute hand sweeps a full turn (linear); pivot 120 88 = clock centre -->
     <line
       x1="120"
       y1="88"

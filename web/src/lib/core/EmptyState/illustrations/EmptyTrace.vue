@@ -70,8 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <rect x="96" y="126" width="58" height="9" rx="4.5" fill="var(--color-primary-400)" />
     </g>
 
-    <!-- sweeping scan line: sweeps left→right across the waterfall, brightening
-         at mid-sweep. 116 = user units (viewBox space), same as the old 116px. -->
+    <!-- sweeping scan line: left→right across the waterfall, brightening at mid-sweep -->
     <line
       x1="60"
       y1="58"

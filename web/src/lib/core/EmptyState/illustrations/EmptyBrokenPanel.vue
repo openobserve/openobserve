@@ -88,9 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- loose bolt (wobbles) -->
-    <!-- drawn around 0,0 and placed by the base translate(170 136); the wobble
-         rotates around that local origin and adds a 2-unit bob, composed onto the
-         base via additive="sum" (replaces the old view-box origin 170px 136px). -->
+    <!-- drawn around 0,0, placed by translate(170 136); wobble rotates about that origin + a 2-unit bob, additive onto the base -->
     <g transform="translate(170 136)">
       <animateTransform
         v-if="animated"
@@ -131,9 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </g>
 
     <!-- warning (pulses) -->
-    <!-- scales around its own centre (120 40): a compensating translate holds the
-         centre fixed while it scales, reproducing the old fill-box
-         transform-origin: center; opacity breathes in step. -->
+    <!-- scale about centre (120 40); the paired translate keeps that centre fixed; opacity breathes in step -->
     <g>
       <animate
         v-if="animated"

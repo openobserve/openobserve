@@ -113,9 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         stroke="var(--color-border-strong)"
         stroke-width="1.75"
       />
-      <!-- cloud — matches the "cloud-upload" icon used on the ingestion CTA
-           elsewhere, so this source clearly reads as a cloud/agent source
-           (Feather Icons' well-tested "cloud" path, scaled to fit) -->
+      <!-- cloud — Feather Icons' "cloud" path, matching the ingestion CTA's cloud-upload icon so this reads as a cloud/agent source -->
       <g
         transform="translate(174.5 15) scale(0.9)"
         fill="none"
@@ -128,8 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </g>
     </g>
 
-    <!-- dashed flowchart connectors: right-angle routing with rounded-default elbows,
-         merging onto the database like a real diagram, not diagonal lines -->
+    <!-- dashed flowchart connectors: right-angle routing with rounded-default elbows, merging onto the database like a real diagram -->
     <g
       stroke="var(--color-primary-300)"
       stroke-width="1.75"
@@ -171,8 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       stroke-width="2.25"
     />
 
-    <!-- landing dots on the database rim, pulsing as packets arrive. Base
-         opacity 0.6 = the frozen rest state (was es-static opacity: 0.6). -->
+    <!-- landing dots on the database rim, pulsing as packets arrive; base opacity 0.6 = frozen rest state -->
     <circle cx="104" cy="107" r="2.25" fill="var(--color-primary-400)" opacity="0.6">
       <animate
         v-if="animated"
@@ -212,8 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </circle>
 
-    <!-- packets travelling from each source down to the database. Base
-         opacity 0 = frozen/hidden rest state (was es-static opacity: 0). -->
+    <!-- packets travelling from each source down to the database; base opacity 0 = frozen/hidden rest state -->
     <circle cx="52" cy="46" r="3" fill="var(--color-primary-500)" opacity="0">
       <animateTransform
         v-if="animated"
@@ -276,8 +271,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </circle>
 
-    <!-- ambient sparkles: scale twinkle about their own centre (additive="sum"
-         composes with each group's translate) -->
+    <!-- ambient sparkles: additive scale twinkle about each group's own centre -->
     <g transform="translate(206 118)">
       <animateTransform
         v-if="animated"

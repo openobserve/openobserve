@@ -175,8 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </g>
 
-    <!-- warning (pulses): scale about its centre (214 107). SMIL scale is
-         origin-based, so the paired translate compensates to keep it in place. -->
+    <!-- warning (pulses): scale about centre (214 107); the paired translate keeps it in place -->
     <g>
       <animateTransform
         v-if="animated"

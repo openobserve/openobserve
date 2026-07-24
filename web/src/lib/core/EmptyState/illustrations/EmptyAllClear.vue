@@ -53,9 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </g>
 
     <!-- check badge (pops) -->
-    <!-- scales around its own centre (262 92): a compensating translate holds the
-         centre fixed while it scales, reproducing the old fill-box
-         transform-origin: center; the check inside inherits the scale. -->
+    <!-- scale about centre (262 92); the paired translate keeps that centre fixed -->
     <g>
       <animateTransform
         v-if="animated"
@@ -111,9 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </path>
     </g>
-    <!-- twinkling sparkles: each is a symmetric star drawn around 0,0, so the
-         scale (composed onto the base translate via additive="sum") twinkles it in
-         place; b is offset by a negative begin to desync from a. -->
+    <!-- twinkling sparkles: star drawn around 0,0, additive scale twinkles in place; b's negative begin desyncs it from a -->
     <g transform="translate(300 120)">
       <animate
         v-if="animated"

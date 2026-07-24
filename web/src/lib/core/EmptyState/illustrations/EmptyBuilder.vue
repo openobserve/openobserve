@@ -89,9 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <circle cx="204" cy="96" r="3" fill="var(--color-primary-600)" />
 
-    <!-- empty slot (pulses in place). Scale about the slot's own centre (145,173):
-         the paired translate compensates so the scale stays centred (was
-         transform-box: fill-box; transform-origin: center). -->
+    <!-- empty slot (pulses in place); scale about centre (145,173), the paired translate keeps it centred -->
     <g>
       <animateTransform
         v-if="animated"

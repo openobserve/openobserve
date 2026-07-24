@@ -31,10 +31,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     role="img"
     aria-label="No data found"
   >
-    <!-- backdrop blob (slow parallax drift + faint breathe). The translate folds
-         in the scale-about-centre compensation (fill-box centre 191.2,131): its
-         peak = (5,-4) + centre·(1-1.02) = (1.18,-6.62), keeping the 1.02 scale
-         centred instead of drifting from the origin. -->
+    <!-- backdrop blob (parallax drift + breathe); translate folds in the scale-about-centre
+         compensation (centre 191.2,131): peak (5,-4) + centre·(1-1.02) = (1.18,-6.62) -->
     <g>
       <animateTransform
         v-if="animated"
