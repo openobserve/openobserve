@@ -1343,4 +1343,25 @@ describe("useDragAndDrop", () => {
       expect(useDnD.pipelineObj.pendingEdge).toBeNull();
     });
   });
+
+  // Repro for: after a stream source is added (which auto-adds a paired
+  // destination whose node_type is 'stream'), deleting the SOURCE then deleting
+  // the DESTINATION did nothing. CustomNode's delete-confirm runs
+  // checkIfDefaultDestinationNode() for stream-typed nodes; with no source node
+  // left, getInputNodeStream() called hasOwnProperty on `undefined?.data` and
+  // THREW, aborting the confirm dialog before it opened.
+  describe("checkIfDefaultDestinationNode — no source node", () => {
+    it("returns false instead of throwing when no source node exists", () => {
+      useDnD.pipelineObj.currentSelectedPipeline.nodes = [
+        {
+          id: "dest",
+          type: "output",
+          io_type: "output",
+          data: { node_type: "stream", stream_name: "logs" },
+        },
+      ];
+      expect(() => useDnD.checkIfDefaultDestinationNode("dest")).not.toThrow();
+      expect(useDnD.checkIfDefaultDestinationNode("dest")).toBe(false);
+    });
+  });
 });

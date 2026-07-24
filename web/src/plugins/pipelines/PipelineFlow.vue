@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          first node belongs where a source lives, leaving the canvas below it
          free for the steps that follow. -->
 
-  <div v-if="isCanvasEmpty" class="absolute top-32 left-1/2 z-10 -translate-x-1/2">
+  <div v-if="needsSource" class="absolute top-32 left-1/2 z-10 -translate-x-1/2">
     <!-- Scaled by the LIVE viewport zoom. Real nodes are drawn inside
            `.vue-flow__viewport`, which carries the canvas transform, so at the
            default 0.8 zoom this overlay — a sibling of that transform, not a
@@ -227,6 +227,19 @@ export default {
     );
     const vueFlowRef: Ref<VueFlowStore | null> = ref(null);
     const isCanvasEmpty = computed(() => pipelineObj.currentSelectedPipeline.nodes.length === 0);
+    // The start node ("Choose a Source") shows whenever the pipeline has NO
+    // SOURCE — not only when the canvas is empty. A pipeline needs exactly one
+    // source, and the palette is collapsed by default, so if the user deletes
+    // the source while other nodes remain they'd be stranded with no way to add
+    // one back. Keying off "no input node" (io_type/type "input", the same
+    // source test hasInputNodeFn uses) covers both the empty canvas and the
+    // source-deleted-mid-graph case.
+    const needsSource = computed(
+      () =>
+        !pipelineObj.currentSelectedPipeline.nodes.some(
+          (n: any) => n.io_type === "input" || n.type === "input",
+        ),
+    );
     const showEdgeHelpNotification = ref(false);
     let notificationTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -300,6 +313,7 @@ export default {
       vueFlowRef,
       resetTransform,
       isCanvasEmpty,
+      needsSource,
       openSourcePicker,
       viewport,
       store,
