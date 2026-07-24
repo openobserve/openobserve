@@ -240,6 +240,12 @@ function onCellActionsLeave() {
           ? 'px-1 align-middle'
           : 'px-2 align-middle',
       bordered && !pivotMerge?.hideBorder ? 'border-table-row-divider border-b' : '',
+      // Pivot: vertical divider at top-level group boundaries, aligned with the
+      // header. Skipped on sticky total columns, which already have a box-shadow
+      // separator that would otherwise double up.
+      meta?._pivotGroupBorder && !(stickyColTotals?.value && meta?._isTotalColumn)
+        ? 'border-table-row-divider border-l'
+        : '',
       alignClass,
       isAction ? 'w-0 whitespace-nowrap' : '',
       isPinned

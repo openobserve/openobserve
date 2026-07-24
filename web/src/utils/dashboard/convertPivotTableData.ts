@@ -44,12 +44,12 @@ function buildPivotHeaderLevels(
   showRowTotals: boolean,
   timestampFieldAliases: Set<string>,
   timezone: string,
-): any[] {
+): { levels: any[]; topLevelBoundaries: Set<number> } {
   const pivotCount = breakdownFields.length;
   const yCount = yFields.length;
   const needsMultiRowHeader = pivotCount > 1 || yCount > 1;
 
-  if (!needsMultiRowHeader) return [];
+  if (!needsMultiRowHeader) return { levels: [], topLevelBoundaries: new Set<number>() };
 
   const levels: any[] = [];
 
@@ -58,8 +58,11 @@ function buildPivotHeaderLevels(
   const parsedKeys = allPivotKeys.map((pk) => pk.split(PIVOT_TABLE_SEPARATOR));
 
   // Track top-level (level 0) group boundary positions (leaf column indices)
-  // These propagate down so borders align across all header rows.
-  const topLevelBoundaries: Set<number> = new Set();
+  // These propagate down so borders align across all header rows. Seed with 0
+  // so the FIRST value group also gets a left divider — that is the vertical
+  // separator between the row-field (e.g. Timestamp) column and the pivot
+  // values, which otherwise had no border while the inner groups did.
+  const topLevelBoundaries: Set<number> = new Set([0]);
 
   const formatPivotLabel = (value: string, levelIndex: number) => {
     if (!value) return value;
@@ -99,11 +102,11 @@ function buildPivotHeaderLevels(
         topLevelBoundaries.add(leafColPos);
       }
 
-      // For deeper levels, check if this cell starts at a top-level boundary
-      const hasBorder =
-        lvl === 0
-          ? cells.length > 0 // level 0: border on every group except first
-          : topLevelBoundaries.has(leafColPos); // deeper: align with level 0
+      // Border on any cell that starts at a top-level boundary. `topLevelBoundaries`
+      // is seeded with 0 and grows as level-0 groups are emitted, so the first
+      // group (after the row-field column) and every subsequent group get a
+      // consistent left divider, aligned across all header rows.
+      const hasBorder = topLevelBoundaries.has(leafColPos);
 
       const cell: any = {
         key: `${lvl}_${groupValue}_${i}`,
@@ -177,7 +180,7 @@ function buildPivotHeaderLevels(
     }
   }
 
-  return levels;
+  return { levels, topLevelBoundaries };
 }
 
 /**
@@ -386,6 +389,19 @@ export const convertPivotTableData = (
   const timestampFieldAliases = detectTimestampFields(xFields, tableRows);
   const breakdownTimestampAliases = detectTimestampFields(breakdownFields, tableRows);
 
+  // Build the multi-level header metadata up front: its top-level group
+  // boundaries are reused below to draw matching vertical dividers on the body
+  // value columns (so header and body borders line up, and the row-field column
+  // is separated from the values consistently).
+  const { levels: pivotHeaderLevels, topLevelBoundaries } = buildPivotHeaderLevels(
+    breakdownFields,
+    allPivotKeys,
+    yFields,
+    showRowTotals,
+    breakdownTimestampAliases,
+    timezone,
+  );
+
   for (const xField of xFields) {
     const col: any = {
       name: xField.alias,
@@ -412,6 +428,10 @@ export const convertPivotTableData = (
       const colKey = `${pk}_${yField.alias}`;
       // Mark the first Y column of each pivot group as a group boundary
       const isGroupStart = yIdx === 0;
+      // Draw a left divider on body cells at the same top-level group boundaries
+      // the header uses, so the vertical dividers line up header-to-body.
+      const leafIndex = pkIdx * yFields.length + yIdx;
+      const hasGroupBorder = topLevelBoundaries.has(leafIndex);
 
       // When multi-row headers are used, parent headers provide context,
       // so the leaf column label is just the value field label ("Count").
@@ -437,6 +457,7 @@ export const convertPivotTableData = (
         align: "right",
         sortable: true,
         _groupStart: isGroupStart,
+        _pivotGroupBorder: hasGroupBorder,
         sort: (a: any, b: any) => (Number(a) || 0) - (Number(b) || 0),
         format: (val: any) =>
           formatNumericValue(
@@ -474,6 +495,7 @@ export const convertPivotTableData = (
         align: "right",
         sortable: true,
         _groupStart: tIdx === 0,
+        _pivotGroupBorder: topLevelBoundaries.has(allPivotKeys.length * yFields.length + tIdx),
         _isTotalColumn: true,
         _totalColRightIndex: yFields.length - 1 - tIdx,
         sort: (a: any, b: any) => (Number(a) || 0) - (Number(b) || 0),
@@ -491,15 +513,8 @@ export const convertPivotTableData = (
     }
   }
 
-  // --- Step 6: Build N-level header metadata ---
-  const pivotHeaderLevels = buildPivotHeaderLevels(
-    breakdownFields,
-    allPivotKeys,
-    yFields,
-    showRowTotals,
-    breakdownTimestampAliases,
-    timezone,
-  );
+  // --- Step 6: header metadata (pivotHeaderLevels) is built up front above so
+  // its group boundaries can drive the body column dividers. ---
 
   // --- Step 7: Separate sticky total row if needed ---
   let stickyTotalRow: any = undefined;

@@ -260,7 +260,10 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
             ? 'pivot-value-header text-secondary text-xs font-medium'
             : 'pivot-group-header text-secondary text-center text-xs font-medium',
           {
-            'border-border-default border-l':
+            // Same divider token as the body cells (border-table-row-divider)
+            // so vertical group dividers match header-to-body and align with the
+            // horizontal row dividers.
+            'border-table-row-divider border-l':
               cell.hasBorder && !(stickyColTotals && cell._isTotalHeader),
           },
           {
