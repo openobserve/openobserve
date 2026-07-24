@@ -2081,7 +2081,6 @@
     "search": "Search Workflows",
     "refresh": "Refresh Workflows",
     "trigger": "Trigger",
-    "triggerAlertFired": "Alert Fired",
     "steps": "Steps",
     "status": "Status",
     "updated": "Updated",
@@ -2133,13 +2132,21 @@
       "cta": "Create Workflow",
       "soonCta": "Available In A Future Release",
       "comingSoon": "Coming Soon",
-      "soon": "Soon",
-      "alertFired": "Alert Fired",
-      "alertFiredDesc": "Run When An Alert Fires",
-      "schedule": "Schedule",
-      "scheduleDesc": "Run On A Schedule",
-      "webhook": "Webhook",
-      "webhookDesc": "Run On An Incoming Webhook"
+      "soon": "Soon"
+    },
+    "triggerKind": {
+      "alertFired": {
+        "label": "Alert Fired",
+        "node": "Alert Trigger",
+        "desc": "Run When An Alert Fires",
+        "intro": "When a linked alert fires, every downstream step receives this payload."
+      },
+      "incidentEvent": {
+        "label": "Incident Event",
+        "node": "Incident Trigger",
+        "desc": "Run On An Incident Lifecycle Event",
+        "intro": "When an incident event occurs, every downstream step receives this payload."
+      }
     },
     "triggerMeta": {
       "orgId": "Organization ID the alert belongs to.",
@@ -2227,7 +2234,6 @@
       "kindTrigger": "Trigger",
       "kindLogic": "Logic",
       "kindAction": "Action",
-      "alertTrigger": "Alert Trigger",
       "condition": "Condition",
       "function": "Function",
       "sendToDestination": "Destination",
@@ -2252,7 +2258,6 @@
       "triggerAlertsNone": "No Alerts Found In This Organization.",
       "triggerAlertsError": "Unable To Load Alerts",
       "triggerNote": "This Workflow Runs When Any Of The Selected Alerts Fires.",
-      "triggerPayloadIntro": "When a linked alert fires, every downstream step receives this payload.",
       "triggerStructureTitle": "Payload Structure",
       "triggerStructureHint": "Hover A Field For Details",
       "triggerDetailHint": "Hover Or Focus A Field Above To See Its Type And Meaning.",

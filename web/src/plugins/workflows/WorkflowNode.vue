@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!--
   Workflow canvas node — a thin wrapper over the shared FlowNodeCard. The card
   frame/handles/icon/label are shared with pipelines; this component adds the
-  workflow interactions: click-to-edit, hover-delete (trigger is fixed), and the
+  workflow interactions: click-to-edit, hover-delete (trigger deletable too), and the
   hover-`+` "add next step" affordance (Condition is a single-output filter, so
   one output — no true/false branch).
 -->
@@ -45,10 +45,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-else class="whitespace-nowrap">{{ nodeLabel }}</div>
     </template>
 
-    <!-- hover actions (delete) — trigger is fixed -->
+    <!-- hover actions (delete) — the trigger is deletable too, so the user can
+         swap its kind (deleting it brings back the "Choose a Trigger" start node). -->
     <template #actions>
       <div
-        v-show="showButtons && meta?.category !== 'trigger'"
+        v-show="showButtons"
         class="absolute -top-7.5 right-0 flex gap-1.5 z-10 pt-1.25 px-1.25 pb-2.5"
         :data-test="`workflow-node-${data?.node_type}-actions`"
         @mouseenter="handleActionsEnter"
@@ -142,6 +143,7 @@ import useWorkflowCanvas, {
   nodeMeta,
   workflowObj,
   nodeConfigDetail,
+  triggerDef,
 } from "./useWorkflowCanvas";
 
 const props = defineProps<{
@@ -192,7 +194,10 @@ const nodeLabel = computed(() => {
   const data = props.data;
   const type = data?.node_type;
   const fallback = meta.value ? t(meta.value.titleKey) : type;
-  if (type === "workflow_trigger") return fallback;
+  // The trigger card shows its KIND's title (Alert Trigger, Incident Trigger, …),
+  // resolved from the registry so new kinds label themselves.
+  if (type === "workflow_trigger")
+    return t(triggerDef(data?.trigger_kind).nodeTitleKey);
   return nodeConfigDetail(data, 28) || fallback;
 });
 // Icon for this node type: the pipeline node image as an "img:<url>" string
