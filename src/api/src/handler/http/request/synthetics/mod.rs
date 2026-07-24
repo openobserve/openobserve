@@ -1393,6 +1393,13 @@ pub async fn agent_setup(Path(org_id): Path<String>) -> Response {
 
 // ── Agent token management (list / rotate / revoke) ─────────────────────────
 
+#[derive(Debug, Deserialize)]
+pub struct CreateAgentTokenRequest {
+    /// Operator-chosen name (e.g. per region/site). Required; must be unique in
+    /// the org and not "default".
+    pub name: String,
+}
+
 #[derive(Debug, Default, Deserialize)]
 pub struct RotateAgentTokenRequest {
     /// Optional operator-chosen name (e.g. per region/agent). Omitted → a
@@ -1440,6 +1447,58 @@ pub async fn list_agent_tokens(Path(org_id): Path<String>) -> Response {
     #[cfg(not(feature = "enterprise"))]
     {
         let _ = org_id;
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/synthetics/agent-tokens",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "CreateSyntheticsAgentToken",
+    summary = "Create a named, non-default agent token (shown once)",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    request_body(content = Object, description = r#"{"name": "us-east"}"#, content_type = "application/json"),
+    responses(
+        (status = 200, description = "New token (shown once)", content_type = "application/json", body = Object),
+        (status = 400, description = "Name missing/reserved/duplicate"),
+        (status = 403, description = "Admin or Root role required"),
+    ),
+)]
+pub async fn create_agent_token(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Json(body): Json<CreateAgentTokenRequest>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        match o2_enterprise::enterprise::synthetics::service::create_agent_token(
+            &org_id,
+            &body.name,
+            &user_email.user_id,
+        )
+        .await
+        {
+            Ok(secret) => MetaHttpResponse::json(secret),
+            Err(e) => {
+                let msg = e.to_string();
+                if msg.contains("already exists")
+                    || msg.contains("reserved")
+                    || msg.contains("required")
+                {
+                    return MetaHttpResponse::bad_request(msg);
+                }
+                tracing::error!("[synthetics] create_agent_token: {e}");
+                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg)
+                    .into_response()
+            }
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, body);
         MetaHttpResponse::forbidden("Not Supported")
     }
 }
