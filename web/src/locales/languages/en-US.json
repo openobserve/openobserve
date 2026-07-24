@@ -5500,6 +5500,7 @@
         "helpAria": "About {name}: {help}",
         "refreshAria": "Refresh {name}",
         "refreshTooltip": "Refresh this metric",
+        "refreshToApplyTimeRange": "Refresh to apply the selected time range",
         "configureAria": "Configure function for {name}",
         "configureTooltip": "Configure function",
         "favoriteAddAria": "Add {name} to your favorites",
