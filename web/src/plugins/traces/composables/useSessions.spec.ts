@@ -587,6 +587,26 @@ describe("useSessions — fetchSession: SessionDetail derivation", () => {
 });
 
 // ---------------------------------------------------------------------------
+// fetchSessionSpans
+// ---------------------------------------------------------------------------
+
+describe("useSessions — fetchSessionSpans", () => {
+  it("uses the canonical tool name field without legacy tool fields", async () => {
+    mockExecuteQuery.mockResolvedValue([{ span_id: "span-1" }]);
+
+    const { fetchSessionSpans } = useSessions();
+    const result = await fetchSessionSpans("default", ["trace-1"], 1000, 2000);
+
+    const sql = mockExecuteQuery.mock.calls[0][0] as string;
+    expect(sql).toContain("gen_ai_tool_name");
+    expect(sql).not.toMatch(/\btool_name\b/);
+    expect(sql).not.toContain("tool_args");
+    expect(mockExecuteQuery).toHaveBeenCalledWith(sql, 1000, 2000);
+    expect(result).toEqual([{ span_id: "span-1" }]);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // cancelAll
 // ---------------------------------------------------------------------------
 
