@@ -4,7 +4,7 @@ import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useStore } from 'vuex'
-import type { BrowserCheck, SyntheticsLocation, SyntheticsDevice, SyntheticsFolder } from '@/types/synthetics'
+import type { BrowserCheck, SyntheticsLocation, SyntheticsDevice, SyntheticsFolder, AgentSetup } from '@/types/synthetics'
 import useSyntheticsRecorder from '@/composables/useSyntheticsRecorder'
 import { journeyToWireSteps } from '@/utils/synthetics/mapRecordedStep'
 import { buildCreateBrowserTestPayload, mapResponseToBrowserCheck } from '@/utils/synthetics/buildPayload'
@@ -23,6 +23,7 @@ import OStepper from '@/lib/navigation/Stepper/OStepper.vue'
 import OStep from '@/lib/navigation/Stepper/OStep.vue'
 import BrowserJourney from '@/components/synthetics/journey/BrowserJourney.vue'
 import CheckConfigure from '@/components/synthetics/configure/CheckConfigure.vue'
+import AgentSetupDrawer from '@/components/synthetic-monitoring/AgentSetupDrawer.vue'
 import CreateBrowserTestSkeleton from '@/components/synthetics/CreateBrowserTestSkeleton.vue'
 import OEmptyState from '@/lib/core/EmptyState/OEmptyState.vue'
 import EmptyBrowserCheck from '@/lib/core/EmptyState/illustrations/EmptyBrowserCheck.vue'
@@ -108,6 +109,22 @@ async function fetchFolders() {
     folders.value = (res ?? []) as SyntheticsFolder[]
   } catch {
     folders.value = []
+  }
+}
+
+// ── Private agent setup (drawer opened from the locations card) ──────────
+const showAgentSetup = ref(false)
+const agentSetup = ref<AgentSetup | null>(null)
+
+async function openAgentSetup() {
+  showAgentSetup.value = true
+  if (agentSetup.value) return
+  try {
+    const org = store.state.selectedOrganization.identifier
+    const res = await syntheticsService.getAgentSetup(org)
+    agentSetup.value = (res.data ?? null) as AgentSetup | null
+  } catch {
+    agentSetup.value = null
   }
 }
 
@@ -741,9 +758,23 @@ function onClearResults() {
             class="w-full!"
             @refresh:destinations="fetchDestinations"
             @update:check="onConfigureUpdate"
+            @setup-agent="openAgentSetup"
           />
         </OStep>
       </OStepper>
+
+      <!-- Private browser-agent setup drawer; locations reload on close so a
+           freshly registered location becomes selectable without leaving. -->
+      <AgentSetupDrawer
+        v-model:open="showAgentSetup"
+        agent-type="browser"
+        :token="agentSetup?.token"
+        :org="agentSetup?.org"
+        :o2-url="agentSetup?.o2_url"
+        :script-url="agentSetup?.script_url"
+        :install="agentSetup?.install"
+        @update:open="(open: boolean) => { if (!open) fetchLocations() }"
+      />
 
       <!-- Sticky footer — tab-aware, always visible -->
       <div class="flex items-center px-3 py-2.5 gap-2 border-t border-border-default shrink-0 bg-surface-base">

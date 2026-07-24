@@ -120,10 +120,6 @@
           {{ t("synthetics.privateLocations.setup.step3Body") }}
         </p>
       </div>
-
-      <p class="text-xs text-text-muted border-t border-border-default pt-3">
-        {{ t("synthetics.privateLocations.setup.browserNote") }}
-      </p>
     </div>
   </ODrawer>
 </template>
@@ -153,6 +149,9 @@ const props = defineProps<{
   scriptUrl?: string | null;
   /** Pre-fills the agent name — used when recovering a specific known agent. */
   agentName?: string | null;
+  /** Which agent to install. `browser` adds `--type=browser`, which selects the
+   *  Playwright browser-probe image; default `protocol` installs the Go agent. */
+  agentType?: "protocol" | "browser";
 }>();
 const emit = defineEmits<{ (e: "update:open", open: boolean): void }>();
 
@@ -217,6 +216,8 @@ const composedCommand = computed(() => {
   } else {
     lines.push(`  --location="${draftLocation.value || "<location-name>"}" \\`);
   }
+  // Browser agents run the Playwright image (container-only — docker/k8s/linux).
+  if (props.agentType === "browser") lines.push(`  --type=browser \\`);
   if (draftAgentName.value) lines.push(`  --agent-name="${draftAgentName.value}"`);
   // Join continuation lines; the last line carries no trailing backslash.
   return lines
