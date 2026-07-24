@@ -121,8 +121,9 @@ const ODropdownSeparatorStub = {
 
 const OTooltipStub = {
   name: "OTooltipStub",
-  template: '<div class="otooltip-stub" />',
-  props: ["content", "side", "contentClass"],
+  template:
+    '<div class="otooltip-stub" :data-content="content" :data-content-class="contentClass"><slot /></div>',
+  props: ["content", "side", "contentClass", "delay"],
 };
 
 const OEmptyStateStub = {
@@ -630,6 +631,168 @@ describe("MonitorTable", () => {
       expect(duplicateBtn.exists()).toBe(true);
       const moreBtn = wrapper.find('[data-test="monitor-table-more-btn"]');
       expect(moreBtn.exists()).toBe(true);
+    });
+  });
+
+  // ── Cell tooltips (OTooltip wrapping) ──────────────────────────────────
+
+  describe("cell tooltips", () => {
+    // ── Name cell ──────────────────────────────────────────────────────
+
+    describe("name cell", () => {
+      it("renders OTooltip wrapping the name with cursor-help when name is present", () => {
+        wrapper = mountMonitorTable();
+        // Per row: name=idx+0, url=idx+1, locations=idx+2, then 4 action OTooltips.
+        const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
+        expect(tooltips.length).toBeGreaterThanOrEqual(3);
+        const nameTooltip = tooltips[0];
+        expect(nameTooltip.props("content")).toBe("HTTP Health Check");
+        expect(nameTooltip.find("span.cursor-help").exists()).toBe(true);
+      });
+
+      it("renders em-dash fallback span without OTooltip when name is absent", () => {
+        wrapper = mountMonitorTable({
+          data: [{ ...mockMonitorList[0], name: undefined as any, id: "test-no-name" }],
+        });
+        const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
+        // Only URL + locations + 4 actions = 6 OTooltips (name cell skipped)
+        expect(tooltips.length).toBe(6);
+        // The em-dash fallback should appear in the DOM
+        expect(wrapper.text()).toContain("—");
+      });
+    });
+
+    // ── URL cell ───────────────────────────────────────────────────────
+
+    describe("url cell", () => {
+      it("renders OTooltip wrapping the URL with cursor-help when URL is present", () => {
+        wrapper = mountMonitorTable();
+        const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
+        const urlTooltip = tooltips[1];
+        expect(urlTooltip.props("content")).toBe("https://example.com/health");
+        expect(urlTooltip.find("span.cursor-help").exists()).toBe(true);
+      });
+
+      it("renders em-dash fallback span without OTooltip when URL is absent", () => {
+        wrapper = mountMonitorTable({
+          data: [{ ...mockMonitorList[0], url: undefined as any, id: "test-no-url" }],
+        });
+        const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
+        // Name + locations + 4 actions = 6 OTooltips (URL cell skipped)
+        expect(tooltips.length).toBe(6);
+        // URL tooltip at index 1 is now the locations tooltip (shifted)
+        expect(tooltips[1].props("content")).toContain("us-east-1");
+        expect(wrapper.text()).toContain("—");
+      });
+    });
+
+    // ── Locations cell ─────────────────────────────────────────────────
+
+    describe("locations cell", () => {
+      it("renders OTooltip with formatted location list using locationNames", () => {
+        wrapper = mountMonitorTable({
+          locationNames: {
+            "us-east-1": "US East (N. Virginia)",
+            "eu-west-1": "EU (Ireland)",
+          },
+        });
+        const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
+        const locTooltip = tooltips[2];
+        expect(locTooltip.props("content")).toBe("US East (N. Virginia)\nEU (Ireland)");
+        expect(locTooltip.props("contentClass")).toContain("whitespace-pre-wrap");
+      });
+
+      it("falls back to raw location IDs when locationNames is empty", () => {
+        wrapper = mountMonitorTable();
+        const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
+        const locTooltip = tooltips[2];
+        expect(locTooltip.props("content")).toBe("us-east-1\neu-west-1");
+      });
+
+      it("falls back to raw IDs for locations not in the locationNames map", () => {
+        wrapper = mountMonitorTable({
+          locationNames: { "us-east-1": "US East" },
+        });
+        const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
+        const locTooltip = tooltips[2];
+        // eu-west-1 is not mapped, so it falls back to the raw id
+        expect(locTooltip.props("content")).toBe("US East\neu-west-1");
+      });
+
+      it("shows first location label and cursor-help class", () => {
+        wrapper = mountMonitorTable();
+        const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
+        const locTooltip = tooltips[2];
+        expect(locTooltip.text()).toContain("us-east-1");
+        expect(locTooltip.find(".cursor-help").exists()).toBe(true);
+      });
+
+      it("shows +N badge when more than one location", () => {
+        wrapper = mountMonitorTable();
+        // Row 0 (mockMonitorHttp): 2 locations => "+1"
+        // Row 2 (mockMonitorBrowser): 3 locations => "+2"
+        const text = wrapper.text();
+        expect(text).toContain("+1");
+        expect(text).toContain("+2");
+      });
+
+      it("does not show count badge when only one location", () => {
+        wrapper = mountMonitorTable();
+        const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
+        // Row 1 (mockMonitorTcp) has 1 location. Its locations OTooltip is at index 9.
+        const row1LocTooltip = tooltips[9];
+        const row1LocText = row1LocTooltip.text();
+        expect(row1LocText).toContain("us-east-1");
+        expect(row1LocText).not.toContain("+");
+      });
+
+      it("renders em-dash fallback without OTooltip when locations are empty", () => {
+        wrapper = mountMonitorTable({
+          data: [{ ...mockMonitorList[0], locations: [] as any, id: "test-no-loc" }],
+        });
+        const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
+        // Name + URL + 4 actions = 6 OTooltips (locations cell skipped)
+        expect(tooltips.length).toBe(6);
+        expect(wrapper.text()).toContain("—");
+      });
+
+      it("has delay=0 for instant tooltip appearance", () => {
+        wrapper = mountMonitorTable();
+        const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
+        const locTooltip = tooltips[2];
+        expect(locTooltip.props("delay")).toBe(0);
+      });
+    });
+
+    // ── formatLocationsList helper ──────────────────────────────────────
+
+    describe("formatLocationsList", () => {
+      it("joins location labels with newlines when all IDs are in the map", () => {
+        wrapper = mountMonitorTable({
+          locationNames: {
+            "us-east-1": "US East (N. Virginia)",
+            "eu-west-1": "EU (Ireland)",
+            "ap-southeast-1": "Asia Pacific (Singapore)",
+          },
+        });
+        const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
+        // Row 2 (mockMonitorBrowser) has 3 locations, its loc OTooltip is at index 16
+        const row2LocTooltip = tooltips[16];
+        expect(row2LocTooltip.props("content")).toBe(
+          "US East (N. Virginia)\nEU (Ireland)\nAsia Pacific (Singapore)",
+        );
+      });
+
+      it("handles location IDs not in the map by returning the raw ID", () => {
+        wrapper = mountMonitorTable({
+          locationNames: { "us-east-1": "US East" },
+        });
+        const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
+        // Row 2 has ["us-east-1", "eu-west-1", "ap-southeast-1"]
+        // Only us-east-1 is mapped; eu-west-1 and ap-southeast-1 fall back to raw IDs
+        const row2LocTooltip = tooltips[16];
+        expect(row2LocTooltip.props("content")).toBe("US East\neu-west-1\nap-southeast-1");
+      });
     });
   });
 });

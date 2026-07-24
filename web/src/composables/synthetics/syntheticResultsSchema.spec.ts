@@ -25,6 +25,8 @@ import {
   buildLastRunSql,
   buildRunsSql,
   buildRunsWithStepsSql,
+  deviceIconName,
+  deviceLabel,
   mapHistogram,
   mapKpi,
   mapRun,
@@ -247,7 +249,7 @@ describe("aggregateStepStats", () => {
       ts: 1_700_000_000_500_000,
       engine: "chromium",
       location: "us-east-1",
-      device: "laptop_large",
+      device: "desktop",
       error: "",
       run_id: "run-1",
       execution_id: "exec-1",
@@ -430,5 +432,49 @@ describe("aggregateStepStats", () => {
     const loginBuckets = result.trendBuckets.filter((b) => b.stepName === "Click login");
     expect(loginBuckets.length).toBeGreaterThan(0);
     expect(loginBuckets[0].avgDurationMs).toBeGreaterThan(0);
+  });
+});
+
+describe("deviceIconName", () => {
+  it("should return the correct icon for desktop", () => {
+    expect(deviceIconName("desktop")).toBe("computer");
+  });
+
+  it("should return the correct icon for tablet", () => {
+    expect(deviceIconName("tablet")).toBe("tablet");
+  });
+
+  it("should return the correct icon for mobile", () => {
+    expect(deviceIconName("mobile")).toBe("smartphone");
+  });
+
+  it("should fall back to 'devices' icon for an unknown device ID", () => {
+    expect(deviceIconName("unknown_device")).toBe("devices");
+  });
+
+  it("should fall back to 'devices' icon for an empty string", () => {
+    expect(deviceIconName("")).toBe("devices");
+  });
+});
+
+describe("deviceLabel", () => {
+  it("should return the correct label for desktop", () => {
+    expect(deviceLabel("desktop")).toBe("Desktop");
+  });
+
+  it("should return the correct label for tablet", () => {
+    expect(deviceLabel("tablet")).toBe("Tablet");
+  });
+
+  it("should return the correct label for mobile", () => {
+    expect(deviceLabel("mobile")).toBe("Mobile");
+  });
+
+  it("should fall back to the raw device ID for an unknown device", () => {
+    expect(deviceLabel("some_custom_device")).toBe("some_custom_device");
+  });
+
+  it("should fall back to the raw ID for an empty string", () => {
+    expect(deviceLabel("")).toBe("");
   });
 });

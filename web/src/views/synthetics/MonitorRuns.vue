@@ -421,9 +421,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
                         >
                           <OIcon :name="b.icon" size="sm" class="text-text-secondary flex-none" />
-                          <span class="text-text-body w-20 flex-none text-xs font-semibold">
-                            {{ b.name }}
-                          </span>
+                          <OTooltip :content="b.name">
+                            <span
+                              class="text-text-body w-20 flex-none cursor-help truncate text-xs font-semibold"
+                            >
+                              {{ b.name }}
+                            </span>
+                          </OTooltip>
                           <div
                             class="bg-text-disabled/25! h-1.5 min-w-10 flex-1 overflow-hidden rounded-full"
                           >
@@ -459,9 +463,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
                         >
                           <OIcon :name="l.icon" size="sm" class="text-text-secondary flex-none" />
-                          <span class="text-text-body w-27.5 flex-none text-xs font-semibold">
-                            {{ l.name }}
-                          </span>
+                          <OTooltip :content="l.name">
+                            <span
+                              class="text-text-body w-40 flex-none cursor-help truncate text-xs font-semibold"
+                            >
+                              {{ l.name }}
+                            </span>
+                          </OTooltip>
                           <div
                             class="bg-text-disabled/25! h-1.5 min-w-10 flex-1 overflow-hidden rounded-full"
                           >
@@ -480,7 +488,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </div>
                     <div
-                      v-if="!isBrowser"
+                      v-if="isBrowser"
                       class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
                     >
                       <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
@@ -497,15 +505,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
                         >
                           <OIcon :name="d.icon" size="sm" class="text-text-secondary flex-none" />
-                          <span class="text-text-body w-20 flex-none text-xs font-semibold">
-                            {{ d.name }}
-                          </span>
+                          <OTooltip :content="d.name">
+                            <span
+                              class="text-text-body text-capitalize w-18 flex-none cursor-help truncate text-xs font-semibold"
+                            >
+                              {{ d.name }}
+                            </span>
+                          </OTooltip>
                           <div
                             class="bg-text-disabled/25! h-1.5 min-w-10 flex-1 overflow-hidden rounded-full"
                           >
                             <div
                               class="h-full rounded-full"
                               :style="{ width: d.pct, background: d.barColor }"
+                            />
+                          </div>
+                          <span
+                            class="w-12 text-right font-mono text-xs font-bold tabular-nums"
+                            :style="{ color: d.textColor }"
+                          >
+                            {{ d.pct }}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div
+                      v-if="!isBrowser"
+                      class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
+                    >
+                      <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
+                        <OIcon name="schedule" size="sm" class="text-accent" />
+                        <span class="text-text-heading text-sm font-bold">
+                          {{ t("synthetics.runs.durationByLocation") }}
+                        </span>
+                      </div>
+                      <div class="border-border-default border-t" />
+                      <div class="px-2 py-2">
+                        <div
+                          v-for="d in locationDurationBreakdown"
+                          :key="d.id ?? d.name"
+                          class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
+                        >
+                          <OIcon :name="d.icon" size="sm" class="text-text-secondary flex-none" />
+                          <OTooltip :content="d.name">
+                            <span
+                              class="text-text-body w-34 flex-none cursor-help truncate text-xs font-semibold"
+                            >
+                              {{ d.name }}
+                            </span>
+                          </OTooltip>
+                          <div
+                            class="bg-text-disabled/25! h-1.5 min-w-10 flex-1 overflow-hidden rounded-full"
+                          >
+                            <div
+                              class="h-full rounded-full"
+                              :style="{ width: d.barPct || d.pct, background: d.barColor }"
                             />
                           </div>
                           <span
@@ -1010,6 +1064,7 @@ import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -1035,6 +1090,7 @@ import webkitSvgUrl from "@/assets/images/synthetics/webkit.svg";
 import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 import syntheticsService from "@/services/synthetics";
 import { locationDisplayLabel } from "@/utils/synthetics/format";
+import { formatTimeWithSuffix } from "@/utils/formatters";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 defineOptions({ name: "SyntheticMonitorRuns" });
@@ -1112,7 +1168,7 @@ const effectiveP95Ms = computed(() => synthetics.effectiveP95Ms.value);
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 function fmtDur(ms: number): string {
-  return ms >= 1000 ? (ms / 1000).toFixed(1) + "s" : ms + "ms";
+  return formatTimeWithSuffix(ms * 1000);
 }
 
 function browserIcon(name: string): string {
@@ -1583,7 +1639,7 @@ const timelineSegments = computed<TimelineSegment[]>(() => {
               });
 
     const execDetails: TimelineExecution[] = executions.map((e) => ({
-      location: e.location,
+      location: locationLabel(e.location),
       browserEngine: e.browser,
       device: e.device,
       status:
@@ -1781,9 +1837,10 @@ const locationDurationBreakdown = computed<BreakdownItem[]>(() => {
   }));
   const maxAvg = Math.max(...entries.map((e) => e.avgMs), 1);
 
-  return entries.map(({ name, avgMs }) => ({
-    name,
-    icon: getIconForRegion(name),
+  return entries.map(({ name: rawId, avgMs }) => ({
+    name: locationLabel(rawId),
+    id: rawId,
+    icon: getIconForRegion(rawId),
     pct: fmtDur(avgMs),
     barPct: Math.round((avgMs / maxAvg) * 100) + "%",
     barColor: "var(--color-primary-500)",

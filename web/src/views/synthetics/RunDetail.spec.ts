@@ -102,22 +102,6 @@ describe("RunDetail", () => {
     wrapper = mount(RunDetail, {
       global: {
         stubs: {
-          OTabs: {
-            template: '<div class="otabs-stub"><slot /></div>',
-            props: ["modelValue"],
-          },
-          OTab: {
-            template: '<div class="otab-stub"><slot /></div>',
-            props: ["name"],
-          },
-          OTabPanels: {
-            template: '<div class="otabpanels-stub"><slot /></div>',
-            props: ["modelValue"],
-          },
-          OTabPanel: {
-            template: '<div class="otabpanel-stub"><slot /></div>',
-            props: ["name"],
-          },
           OCard: {
             template: '<div class="ocard-stub"><slot /></div>',
           },
@@ -140,11 +124,6 @@ describe("RunDetail", () => {
           OBadge: {
             template: '<span class="obadge-stub"><slot /></span>',
             props: ["variant", "size", "icon"],
-          },
-          OEmptyState: {
-            template:
-              '<div class="oemptystate-stub"><slot name="title" /><slot name="description" /></div>',
-            props: ["preset"],
           },
         },
       },
@@ -177,10 +156,6 @@ describe("RunDetail", () => {
     expect(chips.length).toBe(5);
   });
 
-  it("should render the summary tab by default", () => {
-    expect(wrapper.find('[data-test="synthetics-run-detail-summary-tab"]').exists()).toBe(true);
-  });
-
   it("should render prev/next navigation buttons", () => {
     expect(wrapper.find('[data-test="synthetics-run-detail-prev-btn"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="synthetics-run-detail-next-btn"]').exists()).toBe(true);
@@ -192,12 +167,5 @@ describe("RunDetail", () => {
 
   it("should render the back button", () => {
     expect(wrapper.find('[data-test="synthetics-run-detail-back-btn"]').exists()).toBe(true);
-  });
-
-  it("should render three placeholder tabs with correct states", () => {
-    expect(wrapper.find('[data-test="synthetics-run-detail-tab-summary"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="synthetics-run-detail-tab-logs"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="synthetics-run-detail-tab-traces"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="synthetics-run-detail-tab-rum"]').exists()).toBe(true);
   });
 });
