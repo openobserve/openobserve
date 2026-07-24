@@ -1,9 +1,9 @@
 <template>
   <div class="w-full" data-test="dashboard-raw-query-builder">
     <div class="query-section" data-test="dashboard-raw-query-section">
-      <div class="query-label" data-test="dashboard-raw-query-title">{{ t('common.query') }}</div>
+      <div class="query-label" data-test="dashboard-raw-query-title">{{ t("common.query") }}</div>
       <div class="query-label text-xs" data-test="dashboard-raw-query-instruction">
-        {{ t('dashboard.rawQueryBuilder.instruction') }}
+        {{ t("dashboard.rawQueryBuilder.instruction") }}
       </div>
 
       <OTextarea

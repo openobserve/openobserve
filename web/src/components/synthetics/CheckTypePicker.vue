@@ -68,7 +68,7 @@ function onSelect(card: CheckTypeCard) {
         class="absolute top-2 right-2 z-10"
         data-test="check-type-picker-coming-soon-badge"
       >
-        {{ t('synthetics.newCheck.comingSoon') }}
+        {{ t("synthetics.newCheck.comingSoon") }}
       </OTag>
       <EmptyStateActionCard
         :icon="card.icon"

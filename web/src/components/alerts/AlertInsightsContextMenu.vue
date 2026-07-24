@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="context-menu-configure-dedup"
         >
           <OIcon name="tune" size="sm" class="mr-2" />
-          <span>{{ t('alerts.insights.actions.configureDedup') }}</span>
+          <span>{{ t("alerts.insights.actions.configureDedup") }}</span>
         </div>
         <div
           class="menu-item flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="context-menu-edit-alert"
         >
           <OIcon name="edit" size="sm" class="mr-2" />
-          <span>{{ t('alerts.insights.actions.editAlert') }}</span>
+          <span>{{ t("alerts.insights.actions.editAlert") }}</span>
         </div>
         <div
           class="menu-item flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="context-menu-view-history"
         >
           <OIcon name="history" size="sm" class="mr-2" />
-          <span>{{ t('alerts.insights.actions.viewAlertHistory') }}</span>
+          <span>{{ t("alerts.insights.actions.viewAlertHistory") }}</span>
         </div>
       </div>
       <OSeparator />
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="context-menu-cancel"
         >
           <OIcon name="close" size="sm" class="mr-2" />
-          <span>{{ t('common.cancel') }}</span>
+          <span>{{ t("common.cancel") }}</span>
         </div>
       </div>
     </template>

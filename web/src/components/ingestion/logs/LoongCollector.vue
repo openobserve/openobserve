@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <IngestionContent>
     <CopyContent class="copy-content-container-cls" :content="content" />
     <IngestionDocLink href="https://github.com/alibaba/loongcollector">
-      {{ t('ingestion.loongCollectorDocLinkText') }}
+      {{ t("ingestion.loongCollectorDocLinkText") }}
     </IngestionDocLink>
   </IngestionContent>
 </template>

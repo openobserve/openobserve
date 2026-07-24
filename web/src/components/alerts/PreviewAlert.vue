@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex h-full flex-col items-center justify-center gap-2"
       >
         <OIcon name="edit" size="xl" class="opacity-20" />
-        <span class="text-sm opacity-40">{{ t('alerts.writeQueryToSeePreview') }}</span>
+        <span class="text-sm opacity-40">{{ t("alerts.writeQueryToSeePreview") }}</span>
       </div>
       <PanelSchemaRenderer
         ref="panelRendererRef"

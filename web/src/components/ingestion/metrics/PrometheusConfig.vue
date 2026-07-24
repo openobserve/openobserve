@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <IngestionDocLink
       href="https://openobserve.ai/blog/send-metrics-using-kube-prometheus-stack-to-openobserve"
     >
-      {{ t('ingestion.prometheusDocLinkText') }}</IngestionDocLink
+      {{ t("ingestion.prometheusDocLinkText") }}</IngestionDocLink
     >
   </IngestionContent>
 </template>

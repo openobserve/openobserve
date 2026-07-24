@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <IngestionDocLink
       href="https://openobserve.ai/blog/how-to-send-kubernetes-logs-using-fluent-bit"
     >
-      {{ t('ingestion.fluentBitDocLinkText') }}</IngestionDocLink
+      {{ t("ingestion.fluentBitDocLinkText") }}</IngestionDocLink
     >
   </IngestionContent>
 </template>

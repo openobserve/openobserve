@@ -327,7 +327,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
           data-test="organization-menu-no-data"
           class="text-compact text-text-secondary w-full py-7 text-center"
         >
-          {{ t('organization.noOrganizationsFound') }}
+          {{ t("organization.noOrganizationsFound") }}
         </div>
       </div>
     </ODropdown>

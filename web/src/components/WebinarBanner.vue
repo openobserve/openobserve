@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="dismiss"
         data-test="webinar-top-bar-dismiss-btn"
       >
-        {{ t('components.webinarBanner.dismiss') }}
+        {{ t("components.webinarBanner.dismiss") }}
       </OButton>
     </div>
   </div>

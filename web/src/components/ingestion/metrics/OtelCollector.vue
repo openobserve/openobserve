@@ -1,11 +1,11 @@
 <template>
   <IngestionContent>
     <div class="flex flex-col gap-2">
-      <div class="text-base font-semibold">{{ t('ingestion.otlpHttp') }}</div>
+      <div class="text-base font-semibold">{{ t("ingestion.otlpHttp") }}</div>
       <ContentCopy :content="getOtelHttpConfig" />
     </div>
     <div class="flex flex-col gap-2" v-if="config.isCloud == 'false'">
-      <div class="text-base font-semibold">{{ t('ingestion.otlpGrpc') }}</div>
+      <div class="text-base font-semibold">{{ t("ingestion.otlpGrpc") }}</div>
       <ContentCopy :content="getOtelGrpcConfig" />
     </div>
   </IngestionContent>

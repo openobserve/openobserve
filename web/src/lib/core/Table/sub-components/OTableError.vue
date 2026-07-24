@@ -29,7 +29,7 @@ defineSlots<{
             class="rounded-default bg-white/20 px-3 py-1 text-sm transition-colors hover:bg-white/30"
             @click="$emit('retry')"
           >
-            {{ t('common.retry') }}
+            {{ t("common.retry") }}
           </button>
         </template>
       </OBanner>

@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="rounded-default text-2xs text-theme-accent inline-flex items-center gap-1 bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] px-2 py-0.5 font-medium whitespace-nowrap dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_20%,transparent)]"
         >
           <OIcon name="format-list-numbered" size="xs" />
-          {{ formatNumber(node.metrics.output_rows) }} {{ t('search.rows') }}
+          {{ formatNumber(node.metrics.output_rows) }} {{ t("search.rows") }}
         </span>
         <span
           v-if="node.metrics.elapsed_compute"

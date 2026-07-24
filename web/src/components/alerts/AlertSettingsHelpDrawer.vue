@@ -248,12 +248,16 @@ defineExpose({ applyTemplate, previewTemplate });
       <div v-if="showLegend" data-test="help-legend" class="help-legend">
         <span class="help-legend__title">{{ t("alerts.alertSettings.helpLegendTitle") }}</span>
         <span class="help-legend__item">
-          <span class="help-legend__swatch help-legend__swatch--live">{{ t("alerts.alertSettings.helpLegendLiveExample") }}</span>
+          <span class="help-legend__swatch help-legend__swatch--live">{{
+            t("alerts.alertSettings.helpLegendLiveExample")
+          }}</span>
           <span class="help-legend__sep">=</span>
           {{ t("alerts.alertSettings.helpLegendLive") }}
         </span>
         <span class="help-legend__item">
-          <span class="help-legend__swatch help-legend__swatch--sample">{{ t("alerts.alertSettings.helpLegendSampleExample") }}</span>
+          <span class="help-legend__swatch help-legend__swatch--sample">{{
+            t("alerts.alertSettings.helpLegendSampleExample")
+          }}</span>
           <span class="help-legend__sep">=</span>
           {{ t("alerts.alertSettings.helpLegendSample") }}
         </span>

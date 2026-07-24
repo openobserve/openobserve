@@ -28,14 +28,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-text-heading text-base leading-6 font-semibold"
           data-test="database-deprecation-banner-title"
         >
-          {{ t('components.databaseDeprecationBanner.title') }}
+          {{ t("components.databaseDeprecationBanner.title") }}
         </span>
         <br />
         <span
           class="text-text-secondary text-sm leading-5 font-normal"
           data-test="database-deprecation-banner-subtitle"
         >
-          {{ t('components.databaseDeprecationBanner.description') }}
+          {{ t("components.databaseDeprecationBanner.description") }}
         </span>
       </div>
       <div class="col-auto ml-2">

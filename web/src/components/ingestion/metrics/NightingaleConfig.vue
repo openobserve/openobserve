@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <IngestionContent>
     <CopyContent class="copy-content-container-cls" :content="content" />
     <IngestionDocLink href="https://github.com/ccfos/nightingale">
-      {{ t('ingestion.nightingaleDocLinkText') }}
+      {{ t("ingestion.nightingaleDocLinkText") }}
     </IngestionDocLink>
   </IngestionContent>
 </template>
