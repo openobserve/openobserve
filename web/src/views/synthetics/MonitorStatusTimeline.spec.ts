@@ -24,13 +24,13 @@ interface TimelineExecution {
   location: string;
   browserEngine: string;
   device: string;
-  status: "pass" | "fail";
+  status: "pass" | "warning" | "fail" | "error";
   errorSnippet: string | null;
 }
 
 interface TimelineSegment {
   runId: string;
-  status: "all-pass" | "mixed" | "all-fail";
+  status: "all-pass" | "all-warning" | "mixed" | "all-fail";
   color: string;
   title: string;
   timestampMs: number;
@@ -59,9 +59,7 @@ function makeFailExec(overrides?: Partial<TimelineExecution>): TimelineExecution
   };
 }
 
-function makeSegment(
-  overrides?: Partial<TimelineSegment>,
-): TimelineSegment {
+function makeSegment(overrides?: Partial<TimelineSegment>): TimelineSegment {
   return {
     runId: "run-001",
     status: "all-pass",
@@ -80,6 +78,7 @@ const defaultProps = {
   mixedCount: "0",
   startLabel: "Start",
   endLabel: "End",
+  isBrowser: true,
 };
 
 // ── Mount factory ──────────────────────────────────────────────────────────
@@ -118,9 +117,7 @@ describe("MonitorStatusTimeline", () => {
         mixedCount: "2",
       });
 
-      expect(
-        wrapper.find('[data-test="monitor-status-timeline"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="monitor-status-timeline"]').exists()).toBe(true);
     });
 
     it("should render timeline bars for each segment", () => {
@@ -241,11 +238,7 @@ describe("MonitorStatusTimeline", () => {
     });
 
     it("should show correct pass/fail counts in tooltip header", () => {
-      const executions: TimelineExecution[] = [
-        makePassExec(),
-        makePassExec(),
-        makeFailExec(),
-      ];
+      const executions: TimelineExecution[] = [makePassExec(), makePassExec(), makeFailExec()];
       wrapper = makeWrapper({
         segments: [makeSegment({ executions })],
       });
@@ -254,6 +247,45 @@ describe("MonitorStatusTimeline", () => {
       const text = tooltip.text();
       expect(text).toContain("2 passed");
       expect(text).toContain("1 failed");
+    });
+  });
+
+  describe("isBrowser prop", () => {
+    it("should render per-execution details with device text when isBrowser is true", () => {
+      const executions: TimelineExecution[] = [
+        makePassExec({ location: "us-east-1", browserEngine: "Chromium", device: "laptop" }),
+        makeFailExec({ location: "us-east-1", browserEngine: "Firefox", device: "tablet" }),
+      ];
+      wrapper = makeWrapper({
+        segments: [makeSegment({ executions })],
+        isBrowser: true,
+      });
+
+      const tooltip = wrapper.find(".otooltip-stub");
+      const text = tooltip.text();
+      // Per-execution device labels should be visible
+      expect(text).toContain("laptop");
+      expect(text).toContain("tablet");
+    });
+
+    it("should NOT render per-execution detail rows when isBrowser is false", () => {
+      const executions: TimelineExecution[] = [
+        makePassExec({ location: "us-east-1", browserEngine: "Chromium", device: "laptop" }),
+        makeFailExec({ location: "eu-west-1", browserEngine: "Firefox", device: "tablet" }),
+      ];
+      wrapper = makeWrapper({
+        segments: [makeSegment({ executions })],
+        isBrowser: false,
+      });
+
+      const tooltip = wrapper.find(".otooltip-stub");
+      const text = tooltip.text();
+      // Location group headers should still be shown
+      expect(text).toContain("us-east-1");
+      expect(text).toContain("eu-west-1");
+      // But per-execution device labels should NOT be shown
+      expect(text).not.toContain("laptop");
+      expect(text).not.toContain("tablet");
     });
   });
 
@@ -270,9 +302,13 @@ describe("MonitorStatusTimeline", () => {
       // We should have at least 2 bars with style (the timeline segments)
       // plus potentially more from the legend dots.
       // Just verify bars exist with color classes
-      const allNodes = wrapper.findAll('[data-test="monitor-status-timeline"] > div > div > div > div > div > div');
+      const allNodes = wrapper.findAll(
+        '[data-test="monitor-status-timeline"] > div > div > div > div > div > div',
+      );
       // The color class is bound to each segment div inside the scroll area
-      const bars_in_scroll = wrapper.find('[data-test="monitor-status-timeline"]').findAll('[class*="bg-"]');
+      const bars_in_scroll = wrapper
+        .find('[data-test="monitor-status-timeline"]')
+        .findAll('[class*="bg-"]');
       expect(bars_in_scroll.length).toBeGreaterThanOrEqual(2);
     });
   });

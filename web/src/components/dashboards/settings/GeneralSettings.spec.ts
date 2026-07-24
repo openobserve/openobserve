@@ -35,7 +35,6 @@ import store from "@/test/unit/helpers/store";
 import { getDashboard, updateDashboard } from "@/utils/commons";
 import { createRouter, createWebHistory } from "vue-router";
 
-
 const mockDashboardData = {
   dashboardId: "dashboard-1",
   title: "Test Dashboard",
@@ -56,27 +55,28 @@ describe("GeneralSettings", () => {
   let wrapper: any;
   let router: any;
 
-
   beforeEach(async () => {
     vi.clearAllMocks();
 
     // Create mock router
     router = createRouter({
       history: createWebHistory(),
-      routes: [{
-        path: '/',
-        name: 'dashboard',
-        component: { template: '<div></div>' }
-      }]
+      routes: [
+        {
+          path: "/",
+          name: "dashboard",
+          component: { template: "<div></div>" },
+        },
+      ],
     });
 
     // Push route with query parameters and wait for navigation
     await router.push({
-      path: '/',
+      path: "/",
       query: {
         dashboard: "dashboard-1",
         folder: "default",
-      }
+      },
     });
     await router.isReady();
 
@@ -97,7 +97,7 @@ describe("GeneralSettings", () => {
     // Reset and configure mocks before each test
     vi.mocked(getDashboard).mockReset();
     vi.mocked(updateDashboard).mockReset();
-    
+
     vi.mocked(getDashboard).mockResolvedValue(mockData);
     vi.mocked(updateDashboard).mockResolvedValue({} as any);
 
@@ -141,14 +141,14 @@ describe("GeneralSettings", () => {
 
     // Wait for all async operations to complete
     await flushPromises();
-    await new Promise(resolve => setTimeout(resolve, 100)); // Give more time for onMounted async operations
+    await new Promise((resolve) => setTimeout(resolve, 100)); // Give more time for onMounted async operations
     await flushPromises(); // Ensure all promises are flushed
-    
+
     // Mock form validation after component is fully mounted
     if (wrapper.vm.addDashboardForm) {
       wrapper.vm.addDashboardForm.validate = vi.fn().mockResolvedValue(true);
     }
-    
+
     return wrapper;
   };
 
@@ -156,22 +156,14 @@ describe("GeneralSettings", () => {
     it("should render general settings form", async () => {
       wrapper = await createWrapper();
 
-      expect(
-        wrapper.findComponent('[data-test="dashboard-header"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="dashboard-general-setting-name"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper
-          .find('[data-test="dashboard-general-setting-description"]')
-          .exists(),
-      ).toBe(true);
-      expect(
-        wrapper
-          .find('[data-test="dashboard-general-setting-dynamic-filter"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.findComponent('[data-test="dashboard-header"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-general-setting-name"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-general-setting-description"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="dashboard-general-setting-dynamic-filter"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should render datetime picker when dateTimeValue exists", async () => {
@@ -181,27 +173,19 @@ describe("GeneralSettings", () => {
       wrapper.vm.dateTimeValue = mockDashboardData.defaultDatetimeDuration;
       await wrapper.vm.$nextTick();
 
-      expect(
-        wrapper
-          .find('[data-test="dashboard-general-setting-datetime-picker"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-general-setting-datetime-picker"]').exists()).toBe(
+        true,
+      );
       expect(wrapper.find('[data-test="datetime-picker"]').exists()).toBe(true);
     });
 
     it("should render form buttons", async () => {
       wrapper = await createWrapper();
 
-      expect(
-        wrapper
-          .find('[data-test="dashboard-general-setting-cancel-btn"]')
-          .exists(),
-      ).toBe(true);
-      expect(
-        wrapper
-          .find('[data-test="dashboard-general-setting-save-btn"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-general-setting-cancel-btn"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="dashboard-general-setting-save-btn"]').exists()).toBe(true);
     });
 
     it("should render dashboard header with correct title", async () => {
@@ -216,11 +200,7 @@ describe("GeneralSettings", () => {
     it("should load dashboard data on mount", async () => {
       wrapper = await createWrapper();
 
-      expect(getDashboard).toHaveBeenCalledWith(
-        store,
-        "dashboard-1",
-        "default",
-      );
+      expect(getDashboard).toHaveBeenCalledWith(store, "dashboard-1", "default");
     });
 
     it("should populate form fields with loaded data", async () => {
@@ -230,9 +210,7 @@ describe("GeneralSettings", () => {
       // load re-baselines all of them via form.reset() (no local mirrors).
       const form = wrapper.findComponent({ name: "OForm" });
       expect(form.vm.form.state.values.name).toBe(mockDashboardData.title);
-      expect(form.vm.form.state.values.description).toBe(
-        mockDashboardData.description,
-      );
+      expect(form.vm.form.state.values.description).toBe(mockDashboardData.description);
       expect(form.vm.form.state.values.showDynamicFilters).toBe(
         mockDashboardData.variables.showDynamicFilters,
       );
@@ -241,14 +219,14 @@ describe("GeneralSettings", () => {
     it("should handle loading errors gracefully", async () => {
       // Test error scenarios by checking component resilience
       // Since the component doesn't have built-in error handling, we expect it to maintain functionality
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
       wrapper = await createWrapper();
 
       // Component should render even when errors might occur
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.find('[data-test="dashboard-general-setting-name"]').exists()).toBe(true);
-      
+
       consoleErrorSpy.mockRestore();
     });
   });
@@ -263,9 +241,7 @@ describe("GeneralSettings", () => {
       form.vm.form.setFieldValue("name", "");
       await wrapper.vm.$nextTick();
 
-      const saveBtn = wrapper.find(
-        '[data-test="dashboard-general-setting-save-btn"]',
-      );
+      const saveBtn = wrapper.find('[data-test="dashboard-general-setting-save-btn"]');
       expect(saveBtn.element.disabled).toBe(false);
     });
 
@@ -276,9 +252,7 @@ describe("GeneralSettings", () => {
       form.vm.form.setFieldValue("name", "Valid Dashboard Name");
       await wrapper.vm.$nextTick();
 
-      const saveBtn = wrapper.find(
-        '[data-test="dashboard-general-setting-save-btn"]',
-      );
+      const saveBtn = wrapper.find('[data-test="dashboard-general-setting-save-btn"]');
       expect(saveBtn.element.disabled).toBe(false);
     });
   });
@@ -287,9 +261,7 @@ describe("GeneralSettings", () => {
     it("should update dashboard title when input changes", async () => {
       wrapper = await createWrapper();
 
-      const nameInput = wrapper.find(
-        '[data-test="dashboard-general-setting-name"] input',
-      );
+      const nameInput = wrapper.find('[data-test="dashboard-general-setting-name"] input');
       await nameInput.setValue("Updated Dashboard Name");
 
       // The form owns `name` now (no local title mirror).
@@ -300,9 +272,7 @@ describe("GeneralSettings", () => {
     it("should update dashboard description when input changes", async () => {
       wrapper = await createWrapper();
 
-      const descInput = wrapper.find(
-        '[data-test="dashboard-general-setting-description"] input',
-      );
+      const descInput = wrapper.find('[data-test="dashboard-general-setting-description"] input');
       await descInput.setValue("Updated description");
 
       // The form owns `description` now — assert via the form state.
@@ -328,16 +298,13 @@ describe("GeneralSettings", () => {
       wrapper.vm.dateTimeValue = {
         startTime: mockDashboardData.defaultDatetimeDuration.startTime,
         endTime: mockDashboardData.defaultDatetimeDuration.endTime,
-        relativeTimePeriod:
-          mockDashboardData.defaultDatetimeDuration.relativeTimePeriod,
+        relativeTimePeriod: mockDashboardData.defaultDatetimeDuration.relativeTimePeriod,
         valueType: mockDashboardData.defaultDatetimeDuration.type,
       };
-      
+
       await wrapper.vm.$nextTick();
 
-      const dateTimePicker = wrapper.findComponent(
-        '[data-test="datetime-picker"]',
-      );
+      const dateTimePicker = wrapper.findComponent('[data-test="datetime-picker"]');
       const newDateTime = {
         startTime: new Date("2023-02-01T00:00:00Z"),
         endTime: new Date("2023-02-01T23:59:59Z"),
@@ -358,9 +325,7 @@ describe("GeneralSettings", () => {
       // Drive the REAL submit path: type into the form-owned name field, then
       // run the form's validate→@submit→save chain. The validated `value.name`
       // is what reaches updateDashboard (no local title mirror).
-      const nameInput = wrapper.find(
-        '[data-test="dashboard-general-setting-name"] input',
-      );
+      const nameInput = wrapper.find('[data-test="dashboard-general-setting-name"] input');
       await nameInput.setValue("Updated Dashboard");
 
       const form = wrapper.findComponent({ name: "OForm" });
@@ -383,8 +348,7 @@ describe("GeneralSettings", () => {
 
       // Mock slow API response
       vi.mocked(updateDashboard).mockImplementation(
-        () =>
-          new Promise((resolve) => setTimeout(() => resolve({} as any), 100)),
+        () => new Promise((resolve) => setTimeout(() => resolve({} as any), 100)),
       );
 
       // Drive the real form submit; OForm owns the loading state (isSubmitting),
@@ -433,9 +397,7 @@ describe("GeneralSettings", () => {
     it("should emit close event when cancel button is clicked", async () => {
       wrapper = await createWrapper();
 
-      const cancelBtn = wrapper.find(
-        '[data-test="dashboard-general-setting-cancel-btn"]',
-      );
+      const cancelBtn = wrapper.find('[data-test="dashboard-general-setting-cancel-btn"]');
       expect(cancelBtn.exists()).toBe(true);
       expect(cancelBtn.element.tagName.toLowerCase()).toBe("button");
 
@@ -445,7 +407,6 @@ describe("GeneralSettings", () => {
       expect(wrapper.emitted()).toHaveProperty("close");
       expect(wrapper.emitted("close")).toHaveLength(1);
     });
-
   });
 
   describe("Datetime Picker Integration", () => {
@@ -456,17 +417,14 @@ describe("GeneralSettings", () => {
       wrapper.vm.dateTimeValue = {
         startTime: mockDashboardData.defaultDatetimeDuration.startTime,
         endTime: mockDashboardData.defaultDatetimeDuration.endTime,
-        relativeTimePeriod:
-          mockDashboardData.defaultDatetimeDuration.relativeTimePeriod,
+        relativeTimePeriod: mockDashboardData.defaultDatetimeDuration.relativeTimePeriod,
         valueType: mockDashboardData.defaultDatetimeDuration.type,
       };
       wrapper.vm.initialTimezone = "UTC";
-      
+
       await wrapper.vm.$nextTick();
 
-      const dateTimePicker = wrapper.findComponent(
-        '[data-test="datetime-picker"]',
-      );
+      const dateTimePicker = wrapper.findComponent('[data-test="datetime-picker"]');
       expect(dateTimePicker.props("initialTimezone")).toBe("UTC");
       expect(dateTimePicker.props("autoApplyDashboard")).toBe(true);
     });
@@ -479,16 +437,13 @@ describe("GeneralSettings", () => {
       wrapper.vm.dateTimeValue = {
         startTime: mockDashboardData.defaultDatetimeDuration.startTime,
         endTime: mockDashboardData.defaultDatetimeDuration.endTime,
-        relativeTimePeriod:
-          mockDashboardData.defaultDatetimeDuration.relativeTimePeriod,
+        relativeTimePeriod: mockDashboardData.defaultDatetimeDuration.relativeTimePeriod,
         valueType: mockDashboardData.defaultDatetimeDuration.type,
       };
-      
+
       await wrapper.vm.$nextTick();
 
-      const dateTimePicker = wrapper.findComponent(
-        '[data-test="datetime-picker"]',
-      );
+      const dateTimePicker = wrapper.findComponent('[data-test="datetime-picker"]');
       expect(dateTimePicker.isVisible()).toBe(false);
     });
 
@@ -500,16 +455,13 @@ describe("GeneralSettings", () => {
       wrapper.vm.dateTimeValue = {
         startTime: mockDashboardData.defaultDatetimeDuration.startTime,
         endTime: mockDashboardData.defaultDatetimeDuration.endTime,
-        relativeTimePeriod:
-          mockDashboardData.defaultDatetimeDuration.relativeTimePeriod,
+        relativeTimePeriod: mockDashboardData.defaultDatetimeDuration.relativeTimePeriod,
         valueType: mockDashboardData.defaultDatetimeDuration.type,
       };
-      
+
       await wrapper.vm.$nextTick();
 
-      const dateTimePicker = wrapper.findComponent(
-        '[data-test="datetime-picker"]',
-      );
+      const dateTimePicker = wrapper.findComponent('[data-test="datetime-picker"]');
       expect(dateTimePicker.exists()).toBe(true);
     });
 
@@ -528,7 +480,6 @@ describe("GeneralSettings", () => {
     });
   });
 
-
   describe("Error Handling", () => {
     it("should handle missing dashboard data", async () => {
       // Mock getDashboard to return empty data instead of null to simulate real API behavior
@@ -541,7 +492,7 @@ describe("GeneralSettings", () => {
           endTime: null,
           relativeTimePeriod: "15m",
           type: "relative",
-        }
+        },
       });
 
       wrapper = await createWrapper();
@@ -567,7 +518,7 @@ describe("GeneralSettings", () => {
           endTime: null,
           relativeTimePeriod: "15m",
           type: "relative",
-        }
+        },
       };
 
       vi.mocked(getDashboard).mockResolvedValue(malformedData);
@@ -605,8 +556,8 @@ describe("GeneralSettings", () => {
       const conflictError = {
         response: {
           status: 409,
-          data: { message: "Dashboard was modified by another user" }
-        }
+          data: { message: "Dashboard was modified by another user" },
+        },
       };
 
       vi.mocked(updateDashboard).mockReset();
@@ -625,9 +576,9 @@ describe("GeneralSettings", () => {
     it("should handle missing variables data gracefully", async () => {
       const dataWithoutVariables = {
         ...mockDashboardData,
-        variables: undefined
+        variables: undefined,
       };
-      
+
       vi.mocked(getDashboard).mockResolvedValue(dataWithoutVariables);
       wrapper = await createWrapper();
 
@@ -643,22 +594,19 @@ describe("GeneralSettings", () => {
 
       // OInput renders a <label> tag with text content
       const nameComponent = wrapper.findComponent('[data-test="dashboard-general-setting-name"]');
-      const descComponent = wrapper.findComponent('[data-test="dashboard-general-setting-description"]');
+      const descComponent = wrapper.findComponent(
+        '[data-test="dashboard-general-setting-description"]',
+      );
 
       expect(nameComponent.props("label")).toContain("Name");
       expect(descComponent.props("label")).toBeDefined();
     });
 
-
     it("should have proper button roles", async () => {
       wrapper = await createWrapper();
 
-      const saveBtn = wrapper.find(
-        '[data-test="dashboard-general-setting-save-btn"]',
-      );
-      const cancelBtn = wrapper.find(
-        '[data-test="dashboard-general-setting-cancel-btn"]',
-      );
+      const saveBtn = wrapper.find('[data-test="dashboard-general-setting-save-btn"]');
+      const cancelBtn = wrapper.find('[data-test="dashboard-general-setting-cancel-btn"]');
 
       // Both buttons render as <button> elements
       expect(saveBtn.element.tagName.toLowerCase()).toBe("button");
@@ -686,9 +634,7 @@ describe("GeneralSettings", () => {
     it("should debounce form input changes", async () => {
       wrapper = await createWrapper();
 
-      const nameInput = wrapper.find(
-        '[data-test="dashboard-general-setting-name"] input',
-      );
+      const nameInput = wrapper.find('[data-test="dashboard-general-setting-name"] input');
 
       // Rapid input changes
       await nameInput.setValue("A");

@@ -396,7 +396,11 @@
   "aiObservability": {
     "agentGraph": {
       "agent": "11b39c93777e8f1f",
+      "agentCountPlural": "8c70b25cbbbe8e79",
+      "agentCountSingular": "d4f0bc5a29de06b5",
       "allAgents": "54c32d3e2cfa1cc8",
+      "noAgentsDescription": "dc072e65561443f6",
+      "noAgentsTitle": "0661615149895720",
       "stream": "1eec3071dd26e224"
     },
     "behavior": {
@@ -515,7 +519,7 @@
       "agentGraph": "03dd95bd5e150c02",
       "evalJobs": "0705c22ffb80996d",
       "llmInsights": "bbce2071d201974a",
-      "quality": "65cdcc4426d4c374",
+      "quality": "5dcae7a5f7574f3f",
       "scoreConfigs": "304057455b0b613a",
       "scorers": "878432bff9a6bb68",
       "sessions": "83d750c6d1e62762"
@@ -1853,12 +1857,17 @@
     "contactUs": "98b67063cf8e584d",
     "copy": "e21f935f11d7e966",
     "copyError": "978a1dc5401a2164",
+    "copyRange": "be0f4ccd5f12c3d0",
     "copySuccess": "d37078fe6a1faa15",
     "copyToClipboard": "b749e205302cc219",
     "create": "4759498ac2a719c6",
     "custom": "494ca78f7374e46f",
     "darkMode": "df8c7c89b3e4cfb1",
     "date": "99c40ab405926cb5",
+    "dateRange": "8061bfb29ce82f35",
+    "dateRangeCopied": "f6572e6cc0308a61",
+    "dateRangePasteError": "2c748bcb6075304e",
+    "dateRangePasted": "3e15b3f669c459e6",
     "datetimeAbsolute": "f0b91d59b2e271ab",
     "datetimeMessage": "dfe7d74839c7b8b0",
     "datetimeRelative": "4c21f201848310b7",
@@ -1923,6 +1932,7 @@
     "operator": "291101a07fe980e9",
     "output": "b2439bcb8dee14b6",
     "password": "e7cf3ef4f17c3999",
+    "pasteRange": "b592abe0ae82cb02",
     "pleaseWait": "2dfd888fdd5e8018",
     "previous": "a57b08a480b822a0",
     "process": "e083bd83e9d3e97e",
@@ -2339,6 +2349,7 @@
       "markdown": "0e52f6b9d02515c5",
       "sankey": "362c638c72a060cd"
     },
+    "collapseAllSections": "19c93466338e3d2b",
     "colorBySeries": "33ee246da467a5d0",
     "colorBySeriesPopUp": {
       "addNewColor": "5027851bbdf49c28",
@@ -2595,6 +2606,7 @@
     "escapeSingleQuotes": "e4d63a6f74a32c83",
     "escapeSingleQuotesTooltip": "902feeb31ba57324",
     "exitFullscreen": "5a164f4b6296ba9b",
+    "expandAllSections": "1b891bf032f8b1f5",
     "export": "11baedbf6c841274",
     "extraOptions": "d0db8b5e364b6989",
     "favorites": "7a1f2a83aca9a081",
@@ -3689,8 +3701,7 @@
     },
     "stepPicker": {
       "noMatch": "dc5fd200953aaea5",
-      "search": "82da5bdc9ea571d4",
-      "title": "517604fc98ff22ea"
+      "search": "82da5bdc9ea571d4"
     }
   },
   "function": {
@@ -4211,6 +4222,7 @@
     "languagesLabel": "73d87075dd9f09ac",
     "linux": "4828e60247c1636f",
     "logsLabel": "ea2100dc89ae9fe2",
+    "macos": "aed6b7aa2a0511a9",
     "manageTokensBtnLabel": "558e32f8487b0dd9",
     "mcp": {
       "auth": {
@@ -4495,7 +4507,9 @@
     "cellActions": {
       "copy": "e21f935f11d7e966",
       "excludeTerm": "98f4cecd4686ebd3",
-      "includeTerm": "234a74c6de3a4264"
+      "includeTerm": "234a74c6de3a4264",
+      "sendRowToAi": "a9af162510bac3ae",
+      "sendValueToAi": "9bacfa48874648a1"
     },
     "chunkedContent": {
       "loadMore": "ddf84eb3eb50d957",
@@ -4867,7 +4881,7 @@
     "settings": "74a883a037bc227f",
     "signOut": "0b184bc5d5341998",
     "slack": "b27fb38ba323745c",
-    "synthetic": "4a85827ad80e8635",
+    "synthetic": "f45c092981915635",
     "template": "0575f29df888a27e",
     "tickets": "567a8b5f8f5ce3c5",
     "traces": "998741a58ed2b411",
@@ -5320,8 +5334,7 @@
     "buttons": {
       "cancel": "19766ed6ccb2f4a3",
       "close": "7d9eb7acb13e2462",
-      "create": "4759498ac2a719c6",
-      "createAndActivate": "e31dc8b1dfb4daf7",
+      "createAndActivate": "347fa348fdb09b21",
       "remove": "c3812fc4acb861d5",
       "save": "1509f561f2416598",
       "saveAsDraft": "6c462142d3681836"
@@ -5348,9 +5361,15 @@
         "scorers": "d8598427499abb65",
         "status": "920e413c7d411b61",
         "stream": "1eec3071dd26e224",
-        "successRate": "49da60f8a292ccc4"
+        "successRate": "49da60f8a292ccc4",
+        "targetScope": "b073f6c68ef87211"
       },
-      "createTitle": "b2a7755cd3d1598a",
+      "completionHelp": {
+        "session": "44ca6653be3fa389",
+        "trace": "e45ebc86c7274baa"
+      },
+      "completionSection": "74382a22fa1f728f",
+      "createTitle": "f8b8a3dffabfe0a4",
       "createdAndActivated": "dfd25baf0a6f4be9",
       "createdButActivateFailed": "1eacbfcd907554df",
       "deleteBulkButton": "e2d0a54968ead24e",
@@ -5370,13 +5389,32 @@
         },
         "filterEmpty": "5e77a75705cd208b",
         "filterLabel": "638e249f4a15ebb8",
-        "inputMappingSection": "01cf363e1204e7d9",
+        "idleWindowLabel": "9c30e81893225091",
+        "inputMappingSection": "9ff3f14f5b591f22",
         "kpis": {
           "avgLatency": "758eae1300e53fd7",
           "scorers": "d8598427499abb65",
           "successRate": "5068c6c343ffda3e",
           "totalRuns": "4ccf1d74a7bf30cc"
         },
+        "manualError": "382e3847df2d9076",
+        "manualHelp": "c70f03a0f867de13",
+        "manualReasonLabel": "f81ab834de5f8491",
+        "manualReasonPlaceholder": "aded747ed100ebf1",
+        "manualSection": "5308ba9899d13ef0",
+        "manualSessionIdLabel": "cb9ac5c561daa670",
+        "manualSessionIdPlaceholder": "5c3a09bf22e12411",
+        "manualSpanIdLabel": "4d970def4e9aeeb9",
+        "manualSpanIdPlaceholder": "945783800b818473",
+        "manualSubmit": "d5de717676c700fe",
+        "manualSuccess": "e3561a722f78c321",
+        "manualTargetIdLabel": "32a09089e43818d6",
+        "manualTargetRequired": "78b4f547d33901ce",
+        "manualTraceIdLabel": "c4cbbc62b68462a0",
+        "manualTraceIdPlaceholder": "e7f3c28e57123eae",
+        "manualVariablesLabel": "cf0a660653ca2795",
+        "manualVariablesObjectError": "e673b32d6f8631da",
+        "maxAgeLabel": "c3f3d5fbc9df3ea7",
         "metadataSection": "9eddf573cb509f1f",
         "pipelineLabel": "2ee44497e1df70af",
         "producesPrefix": "a68d63e3af6bbe13",
@@ -5415,12 +5453,14 @@
           "failures": "7bd31a025d29d8ec",
           "runs": "848f54e89660cea4"
         },
-        "targetSection": "978354db0c00fc78",
+        "targetScopeLabel": "cb22271713252649",
+        "targetSection": "b0674a97faae73bf",
         "updatedLabel": "3a5ecca188c0579c",
         "versionLabel": "dd167905de0defca",
         "viewScorerHint": "dcc839a4015c4b7d"
       },
-      "editTitle": "e8b8dca30fc1ef34",
+      "detailsSection": "45989de49fb7f66d",
+      "editTitle": "1867089a17dd105d",
       "empty": {
         "chipSampling": "5904adfaf2a38724",
         "chipScorers": "260ccaf55161184c",
@@ -5428,19 +5468,71 @@
         "description": "8ef57fe942f56f29",
         "title": "6411b2901ea1d48e"
       },
+      "endSignal": {
+        "hint": {
+          "session": "9b6792900d7ab78e",
+          "trace": "467125166838a0eb"
+        },
+        "title": "632b540c67cdd3e1"
+      },
       "filter": {
-        "hint": "781a5c04b455275e",
+        "hint": {
+          "session": "62dfd8f912be4c39",
+          "span": "781a5c04b455275e",
+          "trace": "3cbd9389ca82e786"
+        },
         "title": "fc8cd83bdd1bd3dc"
       },
+      "filteringSection": "da12ab901ff9849c",
+      "idleWindowHelp": "04827dc7cf79faad",
+      "idleWindowHelpEmpty": "57358a1b7d6e8d83",
+      "idleWindowLabel": "b2c3531c4146f874",
       "inputMapping": {
-        "hint": "d9122b5de93cb505",
+        "hint": {
+          "session": "519a0697bdb93079",
+          "span": "89d025cbce91b81b",
+          "trace": "3cbbba66ca7cb0f2"
+        },
         "noVariables": "9d6150acdb4a0823",
         "selectScorers": "9effbe5f21567ea2",
-        "title": "a6d2507ad1c2be43",
+        "systemProvided": {
+          "badge": "bf14547c80a88f47",
+          "columns": {
+            "description": "3cdcae8e2ee0ce0f",
+            "source": "0e570ca6fabe24f9",
+            "variable": "a0ac2e4224503241"
+          },
+          "description": "96322c594e581748",
+          "selectorRequired": "5796f344d57e8435",
+          "title": "ba112a78cd9b04a7",
+          "variables": {
+            "input": {
+              "trace": "b6bec50de2750e82"
+            },
+            "output": {
+              "trace": "078f80923419eb8e"
+            },
+            "spans": {
+              "trace": "c3d361441ab0db75"
+            },
+            "statistics": {
+              "session": "6dea39818c0c1033",
+              "trace": "2b4e5d09e5441a01"
+            },
+            "steps": {
+              "session": "6d11de0abbce4788",
+              "trace": "d59a422557bbb94c"
+            }
+          }
+        },
+        "title": "a18aaffcb1094df2",
         "variableCount": "382749111e46bfdc"
       },
       "listSubtitle": "bb018861fb7b4245",
       "listTitle": "b9f4405cc53cea2c",
+      "maxAgeHelp": "578e46e7f6894880",
+      "maxAgeHelpEmpty": "d41dc9a7c1732a20",
+      "maxAgeLabel": "35541e107455799c",
       "nameLabel": "dcd1d5223f73b3a9",
       "namePlaceholder": "6eb64d3c2741f8cd",
       "newButton": "c27d8ac369fd6c76",
@@ -5452,34 +5544,55 @@
       },
       "preview": {
         "emptyValue": "bda050585a00f0f6",
-        "hint": "1686b1bce4ddff56",
         "matchedError": "c198e0914f2079b5",
         "matchedIncomplete": "0c75fcf26ce9541f",
-        "matchedLoading": "8f5aa303985bb824",
-        "matchedSuffix": "c8173bda02c6adf6",
+        "scopes": {
+          "session": {
+            "hint": "5dd78622bba67659",
+            "matchedLoading": "5e682b66c73fc11f",
+            "matchedSuffix": "cc385d31983dc8e4",
+            "title": "a562ae9c6cc190bf"
+          },
+          "span": {
+            "hint": "1686b1bce4ddff56",
+            "matchedLoading": "8f5aa303985bb824",
+            "matchedSuffix": "c8173bda02c6adf6",
+            "title": "513fc52b5a7950e5"
+          },
+          "trace": {
+            "hint": "ccea2e7bb0651d29",
+            "matchedLoading": "66e0117ac52557ac",
+            "matchedSuffix": "f11d1f51b0f3725d",
+            "title": "7aafc281b2bfa887"
+          }
+        },
         "statusDraft": "ebf12ef47cf575b3",
         "statusEditing": "fab4539d26e078ca",
         "summaryName": "dcd1d5223f73b3a9",
         "summaryStatus": "920e413c7d411b61",
         "summaryTitle": "8e76a94ac8320d51",
-        "summaryType": "baaddf70fb5d432b",
-        "title": "513fc52b5a7950e5"
+        "summaryType": "baaddf70fb5d432b"
       },
-      "samplingHelp": "917cb1f67f4b8064",
+      "samplingHelp": "4c4907f92dcd443e",
       "samplingModeLabel": "85c48f0fdc8b2b7e",
       "samplingModes": {
         "all": "a52ace420f2175d0",
         "count": "37bac4952becf21a",
         "rate": "45b63ffd01af7b9c"
       },
-      "samplingValueAllHelp": "97416ac20bd099d1",
-      "samplingValueHelp": "65cf77217ba7e530",
-      "samplingValueLabel": "c170993a23b92ff5",
+      "samplingValueAllHelp": "bd795cbc892037ee",
+      "samplingValueHelp": "936a328a7831969b",
+      "samplingValueLabel": "78647d84956ab921",
+      "samplingValuePreview": "7bfd62e0b4bf8736",
       "saveError": "eafbcac9d10283fd",
       "scorerCount": "695caf5f531a057b",
       "scorerPicker": {
         "empty": "79e2f709f5b736e3",
-        "hint": "f8bc0b2fabf27033",
+        "hint": {
+          "session": "4822ca13ed258b79",
+          "span": "c9a4fc737fd8ff35",
+          "trace": "fd1b1354c9d4d6d4"
+        },
         "meta": "52fb56d05b91dcfd",
         "placeholder": "b580635321f8c658",
         "searchPlaceholder": "4f3adfb277c23dd1",
@@ -5489,18 +5602,61 @@
       "scorersSection": "22877ccbf5822713",
       "searchPlaceholder": "989ecb5d07fd4c76",
       "selectAtLeastOne": "bf829be36bb639cd",
+      "selector": {
+        "hint": {
+          "trace": "74c967456464ef8d"
+        },
+        "title": "60b62778b49df89a"
+      },
+      "spanSelector": {
+        "bindingHelp": "f8e4c8d9461cc08c",
+        "budget": "895c2adab6df65b5",
+        "createForScorer": "40e784289d74d8c9",
+        "createForScorerTitle": "944720fd4fc3e056",
+        "customSchema": "c58d1a23ed9d60ae",
+        "defaultSchema": "33fd7fad92fdfa50",
+        "defaultSchemaHelp": "a372faaf1276ceed",
+        "editorTitle": "571d5ce417fb34b8",
+        "fields": "616f48c1db195b6f",
+        "fieldsHelp": "503f97449900ea7e",
+        "maximumSpans": "c1bb7e85f9787f2c",
+        "name": "40f804c8e29341b8",
+        "schemaMode": "9160e7463b05046d",
+        "select": "134ea9e45be9488b",
+        "validation": {
+          "binding": "1256ffb14eb0450b",
+          "budget": "83c08101c06b13a5",
+          "duplicateName": "d6f0a0ac17aa0204",
+          "fields": "8199ea3618848b67",
+          "filter": "0f527c97a19f797c",
+          "maximumSpans": "3ad06f5663d9b364",
+          "name": "d25a9785620fcf74"
+        }
+      },
       "stepper": {
         "mapping": "1ff9a5f8b4bd530e",
         "sampling": "e41f08d35dd171fa",
         "scorers": "d8598427499abb65",
         "target": "978354db0c00fc78"
       },
-      "streamLabel": "c465de8833e2a7b2",
-      "streamPlaceholder": "9d600968731570be",
+      "streamLabel": "1eec3071dd26e224",
+      "streamPlaceholder": "fe88b13a08b6d051",
       "streamTypeLabel": "74e61e305b5bd502",
       "streamTypePlaceholder": "b5ac69fc467c01f3",
-      "targetSection": "978354db0c00fc78",
+      "targetScopeHelp": {
+        "session": "7ba2aeeca7bdccad",
+        "span": "a0ccef67b9d6290b",
+        "trace": "654ba948a77cfd76"
+      },
+      "targetScopeLabel": "cb22271713252649",
+      "targetScopes": {
+        "session": "6959b4159575d8dd",
+        "span": "5b0e83c19eb41845",
+        "trace": "7e14c3d7dd12bbd0"
+      },
+      "targetSection": "b0674a97faae73bf",
       "validation": {
+        "idleWindowMinimum": "efa9749f3e7cf9b9",
         "nameRequired": "5efe8581905f533d",
         "samplingValueRequired": "1598eb8928912900",
         "streamRequired": "5dada492f9cf8085"
@@ -5550,7 +5706,13 @@
       "useAsDefault": "c57f9b482b23f3d7"
     },
     "quality": {
+      "agentLabel": "11b39c93777e8f1f",
       "agentPlaceholder": "54c32d3e2cfa1cc8",
+      "dataTypes": {
+        "booleanShort": "49f411f0a1a7f719",
+        "categoricalShort": "48735c4fae42d150",
+        "numericShort": "03732d19e64b727a"
+      },
       "detail": {
         "categoryDistributionTitle": "4a0f40cef45fc3b8",
         "compositionTitle": "f0b62ea1ea39ed81",
@@ -5558,77 +5720,113 @@
         "drillTitle": "56017c7f4a9e36e0",
         "empty": {
           "description": "33a0c0ddb152c545",
-          "title": "c28eabc50c6172de"
+          "descriptionScoped": "040bea517fb3dd81",
+          "title": "c28eabc50c6172de",
+          "titleScoped": "0f6ba020af4d8734"
         },
+        "health": {
+          "noThreshold": "757555170371d25d",
+          "summary": "e4ef8942e7382c26",
+          "thresholdOnly": "f7e60f4f5bf81dcd",
+          "title": "bb2dc38ee25dd468"
+        },
+        "healthyRateTitle": "fb401c8635c7b907",
         "kpis": {
           "average": "b38ae2c5b84529e8",
           "coverage": "523487a5de21adb5",
+          "falseRate": "9274b4e0211a61dd",
           "healthy": "7f1e323b6272c620",
           "p50": "fa4cedf31b643396",
           "p50p95": "8e6605a38fe614de",
           "p95": "aebf8ec133e867b7",
+          "targetsScored": "5e1eea4fa8c36200",
+          "trueRate": "d5c5a6de7f1f2849",
           "unhealthy": "317b1fbc1e13beeb"
         },
         "legendAvg": "41835ff14ac6b8c7",
+        "legendFalseCount": "20ee2de2332893c8",
         "legendHealthy": "87695fdac81728b9",
+        "legendHealthyRate": "cfbdb2419025378c",
         "legendP95": "f771f4d32eee4ed2",
         "legendThreshold": "0bfbdd46a5674de7",
+        "legendTrueCount": "dad221927b66d136",
+        "legendTrueRate": "d5c5a6de7f1f2849",
         "legendUnhealthy": "85826072c3d4c3a4",
         "loading": "f3051ab55cc051a4",
         "noData": "2887c63c9003316c",
         "passRateTitle": "7f5f0c88cd8ea959",
         "trendSubtitle": "88d23d170f7df25c",
         "trendTitle": "9e217716c4e03eee",
-        "trueFalseTitle": "427cbdc3dde45771"
+        "trueFalseTitle": "427cbdc3dde45771",
+        "trueRateTitle": "7fd6f91f0c0ad748"
       },
       "kpis": {
-        "evaluated": {
-          "hint": "0758c449357a7cdb",
-          "title": "30a83d69d63c19b4",
-          "unit": "e3b0c44298fc1c14"
-        },
         "evaluationCost": {
           "hint": "543941109dd65af4",
           "title": "dd5b14b252fc637d",
           "unit": "09fc96082d34c2df"
         },
-        "jobSuccess": {
-          "hint": "7c85737527d8bb72",
-          "title": "57e8714c4adfc983",
-          "unit": "bbf3f11cb5b43e70"
-        },
         "latencyP95": {
-          "hint": "4678a7a26da152e7",
-          "title": "0dbe1746da5ca2e9",
+          "hint": "fda1be82566d381b",
+          "title": "dddc206eaf9f7ec2",
           "unit": "043a718774c572bd"
         },
         "noData": "bda050585a00f0f6",
+        "noPriorData": "e80c62b92be4c15a",
+        "scoreResults": {
+          "hint": "93f4c2fe6c240b5c",
+          "title": "db1a23cbdc30e12d",
+          "unit": "e3b0c44298fc1c14"
+        },
         "scorerFailures": {
           "hint": "17228c106b523251",
           "title": "4997bcc2bd10ef67",
           "unit": "e3b0c44298fc1c14"
         },
+        "scorerSuccess": {
+          "hint": "74e167e9398d0b54",
+          "title": "ff716aa8a234d071",
+          "unit": "bbf3f11cb5b43e70"
+        },
         "vsPrev": "1c2453c2978f9985"
       },
+      "kpisAriaLabel": "49409b7c87cbb436",
       "loading": "bd4a24c593b8bcb3",
       "overview": {
         "columns": {
-          "coverage": "523487a5de21adb5",
+          "health": "55898449eb74fb2e",
+          "quality": "1b2c08a8733d7ff1",
+          "scopeMix": "55479bfa00b783b8",
           "scoreConfig": "84039a14d5ad9a94",
           "threshold": "98809439fae63170",
           "totalScores": "fe5f9ade2071a6eb",
-          "trend": "9e217716c4e03eee",
           "type": "baaddf70fb5d432b",
           "unhealthy": "317b1fbc1e13beeb",
-          "updated": "3a5ecca188c0579c"
+          "updated": "3a5ecca188c0579c",
+          "volumeTrend": "180920ae5ef94340"
         },
         "countSuffix": "d725e3cfd9ba5209",
         "emptyNoConfigsHint": "7d0e04e8b6f04dd9",
         "emptyNoConfigsTitle": "6a6b2f26adf7ec3e",
         "emptyWaitingHint": "6f0964ed1098bd7b",
         "emptyWaitingTitle": "8e2ca047f6e823a3",
+        "health": {
+          "noDataHint": "78737bac13daa445",
+          "noThresholdHint": "a708e7ac6bddb316",
+          "thresholdSummary": "5154cd5d6e1c2a4a"
+        },
         "noThreshold": "c3a8e1856a8403ef",
+        "relativeTime": {
+          "daysAgo": "33a682af5904321a",
+          "monthsAgo": "7289f8e6f0ed365e"
+        },
         "searchPlaceholder": "8bd11a03fc493153",
+        "status": {
+          "healthy": "7f1e323b6272c620",
+          "noData": "dcb61373fe73eca0",
+          "noThreshold": "237cddc737b07bf1",
+          "unhealthy": "c1ebc7817870e5be"
+        },
         "title": "2009ba306d3351b3",
         "waitingPrimaryCta": "383b04e676ad9c26",
         "waitingRefreshCta": "0e91610117029a62",
@@ -5637,10 +5835,47 @@
         "waitingStepRefresh": "b935f047bb812e07"
       },
       "refresh": "0e91610117029a62",
+      "runs": {
+        "columns": {
+          "agent": "11b39c93777e8f1f",
+          "reasoning": "d8211e24e83d1600",
+          "result": "38e5a46cbc5ad328",
+          "target": "978354db0c00fc78",
+          "time": "ca533a85286317b4"
+        },
+        "empty": "20c547d2d24ce30e",
+        "emptyUnhealthy": "cc13d51eb9e8b753",
+        "filterLabel": "8659d92fb947e840",
+        "filters": {
+          "all": "7d87c534d08f768a",
+          "unhealthy": "317b1fbc1e13beeb"
+        },
+        "footerTitle": "7ab1f79821de48d3",
+        "health": {
+          "healthy": "7f1e323b6272c620",
+          "unhealthy": "317b1fbc1e13beeb"
+        },
+        "hint": "814307c2d705e314",
+        "noReasoning": "b20ff56cb508dc0c",
+        "noThresholdHint": "e40d1f44676c2c45",
+        "queryError": "8ab4ae56eee26833",
+        "title": "66055b66d4d610b4",
+        "unknownAgent": "342b4ab21e2eb31a",
+        "unknownScope": "6246e12e56bc3aa2"
+      },
       "scopeLabel": "7f56fdd178785271",
+      "scopes": {
+        "all": "a52ace420f2175d0",
+        "filterHint": "395e2b0c8bb6b19e",
+        "filterLabel": "503647ae568c573b",
+        "session": "6959b4159575d8dd",
+        "span": "5b0e83c19eb41845",
+        "trace": "7e14c3d7dd12bbd0"
+      },
       "sidebar": {
         "allConfigs": "d1da712ff756faed",
-        "empty": "f080d773961f349b"
+        "empty": "f080d773961f349b",
+        "scoreCount": "f11958e5bde8a2cb"
       },
       "sourceStream": {
         "all": "7ba01d16e615fc96",
@@ -5676,10 +5911,9 @@
         "type": "baaddf70fb5d432b",
         "usedBy": "681bf81aba87bd68"
       },
-      "createButton": "4759498ac2a719c6",
       "createInfoNumeric": "340691c8ee8e85a7",
       "createInfoSubtitle": "87c5258771825942",
-      "createTitle": "8a57cb187da2ddd9",
+      "createTitle": "c316a039f9d07f96",
       "dataTypeCannotChange": "75b85dd153379b79",
       "dataTypeHelp": {
         "boolean": "a416fa8416797694",
@@ -5736,7 +5970,6 @@
         "categorical": "d59e3842e1503787",
         "numeric": "3f8b44e65b65a469"
       },
-      "editTitlePrefix": "464c4ffd019e1e96",
       "empty": {
         "chipThreshold": "982f454a6caf406a",
         "chipTypes": "ae97d5a6aba6dda3",
@@ -5784,7 +6017,6 @@
       "noHealthy": "bda050585a00f0f6",
       "numericRangeLabel": "60c1eaa98db91554",
       "optional": "59be71333c960fd0",
-      "saveButton": "dd0ae7a5cbcf2339",
       "saveError": "26ef725ecd25a17c",
       "searchPlaceholder": "0ca9674572388326",
       "sectionTitle": "8c70f1c12bd720da",
@@ -5819,8 +6051,8 @@
         "usedBy": "681bf81aba87bd68",
         "version": "dd167905de0defca"
       },
-      "createTitleLlm": "7556ccb933e39abf",
-      "createTitleRemote": "e384e90581304599",
+      "createTitleLlm": "abf2597484c88774",
+      "createTitleRemote": "379a8872407317cb",
       "defaultModelPreviewLabel": "d4ef9503bf80da03",
       "descriptionLabel": "526e0087cc3f254d",
       "descriptionPlaceholder": "aafb8729372ce843",
@@ -5881,8 +6113,8 @@
         "versionLabel": "dd167905de0defca",
         "versionsIntro": "cf7ef0f4ba338da3"
       },
-      "editTitleLlm": "45951b738ad187d5",
-      "editTitleRemote": "0e68f84e093dbec3",
+      "editTitleLlm": "98f8f724b53567cc",
+      "editTitleRemote": "0d47f046ba636cca",
       "empty": {
         "chipCode": "340f463033e0fd5d",
         "chipLlmJudge": "c7b08a64bb5189e8",
@@ -5912,9 +6144,8 @@
         "typeNumber": "12886f9d00055adf",
         "typeString": "473287f8298dba71"
       },
-      "extraFieldsHint": "6e79ef125149021d",
-      "extraFieldsLabel": "ff9029b9c5f78f81",
-      "extraFieldsOptional": "59be71333c960fd0",
+      "extraFieldsHint": "cda07a329da6e16d",
+      "extraFieldsLabel": "1a261624c9804625",
       "headersSection": "9db70467e7c52134",
       "healthyLabel": "05b604311f7ef0ae",
       "identitySection": "999f23fcd7bec707",
@@ -5932,7 +6163,7 @@
         "outputMessages": "ace70a9ce0d04504",
         "title": "d8055f4af8bb75be"
       },
-      "includeReasoningHint": "3b5999b1ea3ef2af",
+      "includeReasoningHint": "52feece4c9b44962",
       "includeReasoningLabel": "08a9f904283ce8f3",
       "judgeSection": "0e37077800f83bc4",
       "latestSuffix": "6a47e389bb83ebee",
@@ -5952,10 +6183,50 @@
       "pinVersion": "cf33cc06330ecec2",
       "producesScoreConfigLabel": "84039a14d5ad9a94",
       "producesScoreConfigNone": "7bc46614e5243c06",
-      "producesScoreHelp": "a04310115eabfecb",
-      "promptHelp": "c013c12aa42dc4ab",
       "promptLabel": "a4811a51e57cf524",
-      "promptVariablesLabel": "e60c9dd59ee23ad5",
+      "promptVariableGuide": {
+        "columns": {
+          "variable": "a0ac2e4224503241"
+        },
+        "description": "65c7b2c6bf2c6f19",
+        "indexDescription": "ba3f284a2d32b991",
+        "scopes": {
+          "session": "6959b4159575d8dd",
+          "span": "5b0e83c19eb41845",
+          "trace": "7e14c3d7dd12bbd0"
+        },
+        "statuses": {
+          "jobMapped": "905169e67d5c9151",
+          "requiresSelector": "4e5c815c3920a22d",
+          "selectorRequired": "5796f344d57e8435",
+          "systemProvided": "bf14547c80a88f47",
+          "unavailable": "67a926f7008e2b0e"
+        },
+        "title": "b85a89cdef56e8e7",
+        "variables": {
+          "inputOutput": {
+            "session": "dcf09de2f663ead4",
+            "span": "83d2f2fb1e6f76a2",
+            "trace": "d1ebdcf43e6b0b75"
+          },
+          "spans": {
+            "session": "69dac0a5911be3e6",
+            "span": "7f158665a0a646f2",
+            "trace": "240485a871096d93"
+          },
+          "statistics": {
+            "session": "6dea39818c0c1033",
+            "span": "7f158665a0a646f2",
+            "trace": "2b4e5d09e5441a01"
+          },
+          "steps": {
+            "session": "6d11de0abbce4788",
+            "span": "7f158665a0a646f2",
+            "trace": "d59a422557bbb94c"
+          }
+        }
+      },
+      "promptVariablesLabel": "59fe5953e482989f",
       "providerHelp": "ab3d301bf54b40f5",
       "providerHelpSettingsLink": "74a883a037bc227f",
       "providerLabel": "472590ae974d4c1f",
@@ -6005,7 +6276,7 @@
       "scoreConfigVersionLabel": "5afcbb4ae4ffdf9d",
       "searchPlaceholder": "b73c243999e70f74",
       "selectedPrefix": "bef9d85df8ea13fe",
-      "subtitleLlm": "e81827a56c2925e3",
+      "subtitleLlm": "78658b59a3585764",
       "subtitleRemote": "1323b27224355b38",
       "testPanel": {
         "disabledHint": "af9dfbb4c32b55f3",
@@ -6256,6 +6527,8 @@
     "buildQuery": "7893934014fc4b25",
     "cancel": "19766ed6ccb2f4a3",
     "cancelChangesConfirm": "855227e90d5f0198",
+    "chooseSource": "939a307b6891aed3",
+    "collapseNodes": "a16f8b1b6d734ebf",
     "conditionNode": "39b36d38d6eb03c8",
     "conditionTitle": "f3f1389eaeb80cc5",
     "conditionTooltip": "fcda298df3a44d35",
@@ -6279,7 +6552,6 @@
     "destinationStreamTooltip": "0aaa664d174199d4",
     "destination_type": "8c47e4f7f5ab4b2b",
     "discardChangesTitle": "e07e053c2e10b3f1",
-    "dragDropNodesHere": "1c43ffaded55032c",
     "edit": "464c4ffd019e1e96",
     "editPipelineJSON": "203e49c04ed940b4",
     "editPipelineJson": "1f74d84a5ad4cbea",
@@ -6319,6 +6591,7 @@
     "noTemplatesFound": "01e715ada85867e2",
     "nodeName": "d42bae668acb9bf9",
     "nodes": "7ac362063b9f2046",
+    "openNodes": "f08476bd8858cefb",
     "orgRequiredOpenobserve": "84f99344d1bed1ea",
     "output": "b2439bcb8dee14b6",
     "periodGreaterThanZero": "ace1da7e8165eea2",
@@ -6351,7 +6624,9 @@
     "setVariables": "6d1dd77d599ecadf",
     "sourceNode": "0e570ca6fabe24f9",
     "sourceNodeRequired": "f31e5d5f238a9739",
+    "sourceQueryDesc": "cc1c1f7010066b88",
     "sourceQueryTooltip": "5e3c5929a5117d0b",
+    "sourceStreamDesc": "412a95c22c38e9cb",
     "sourceStreamTooltip": "8da6fcbae9436759",
     "sqlQuery": "c55f53cb65d341a0",
     "startBeforeEndTime": "016b45a94da72511",
@@ -6558,6 +6833,7 @@
     "createdAt": "3d44337010bfbdf7",
     "cron": "5b7bb1fa97159bc0",
     "cronExpression": "9e6e7de6b9d693c9",
+    "cronFormatTooltip": "c71f7b3d872cae21",
     "customDimensions": "ada3cbb58b281c4c",
     "dashboard": "67b696468610b879",
     "dashboardFolder": "74ccd43303847f26",
@@ -7625,6 +7901,7 @@
     "groupDestinationsTemplates": "e1519faa048f7625",
     "groupGeneral": "c910d474dcd724bf",
     "groupOperations": "358cc201f87d9dc9",
+    "groupSynthetics": "f45c092981915635",
     "header": "74a883a037bc227f",
     "id": "12156e921bdb6085",
     "importModelPricing": {
@@ -7993,6 +8270,8 @@
       "logsSearchHistory": "145dd6f1992eb214",
       "logsToggleHistogram": "bebe67d66ebc5b81",
       "logsToggleSidebar": "9cf94e5f212e1985",
+      "metricsAddToDashboard": "81c5e9c7bb53cc85",
+      "metricsCopyUrl": "d31483e209cd5b1d",
       "metricsRefresh": "0e91610117029a62",
       "metricsRunQuery": "0d22af93dcbbff3e",
       "modelPricingRefresh": "3cf8d66227384dc2",
@@ -8252,16 +8531,22 @@
       "nameHint": "e15877f3e42e1b1c",
       "newBrowserCheck": "8fc313f5a618fae6",
       "setupCheckAgain": "fb7099ad8e818d42",
+      "setupConnected": "1e60046f4ce465e2",
       "setupDescription": "e7f73abe2c932116",
+      "setupIconActivateHint": "0685bc6640cebd3a",
       "setupIncognitoDone": "11a6767d5674c7e4",
       "setupIncognitoHint": "b1c8d996678a09fa",
       "setupInstalled": "bbc5f19bfae54975",
       "setupOpenRecord": "a2a5b5aabd6c4123",
+      "setupReady": "1e60046f4ce465e2",
       "setupRecorder": "30de8954a5c772c6",
       "setupSkip": "81f4efaa024b7eff",
       "setupStep1Description": "b65f03c515f59564",
       "setupStep1Title": "f80e94498a0ade00",
-      "setupStep2Title": "0dfe640d366c38c1",
+      "setupStep2Description": "803fb2c32e6c3541",
+      "setupStep2Title": "54178362a4e01b8e",
+      "setupStep3IncognitoHint": "b1c8d996678a09fa",
+      "setupStep3Title": "0dfe640d366c38c1",
       "startingUrl": "f6363cfb962a6d21",
       "stepConfigure": "6defafa2caa65304",
       "stepJourney": "fe50ed105fe46709",
@@ -8271,6 +8556,8 @@
     "dialog": {
       "bulkDeleteBody": "50f9f03a34eb45cb",
       "bulkDeleteTitle": "a922972f13a21176",
+      "deleteSingleBody": "9f2b5712c05f4dae",
+      "deleteSingleTitle": "f3396b63fc6b18e4",
       "duplicateTitle": "521288199a56bfcb"
     },
     "empty": {
@@ -8370,11 +8657,88 @@
       "unknown": "b764cdc0eab71374"
     },
     "locations": {
+      "addLocation": "140d3619b9e5f38e",
+      "bottomHeader": "f0a5e562723ae8c0",
+      "bulkDeleteConfirmMessage": "698dbbbae7951eaf",
+      "bulkDeleteConfirmTitle": "53e8beee53a9bc04",
+      "bulkDeleteFailed": "17b9b205ef48f13f",
+      "bulkDeletePartial": "0fb5a27978b6344b",
+      "bulkDeleteSuccess": "6a58ebe915993b91",
+      "bulkDisableFailed": "e5c94038efc73db2",
+      "bulkDisabledPartial": "1b526a06275ae782",
+      "bulkDisabledSuccess": "3915b20cb8342bee",
+      "bulkEnableFailed": "d83b97a074004e04",
+      "bulkEnabledPartial": "f80a3bccdc679777",
+      "bulkEnabledSuccess": "6bbb879d52d786b9",
+      "cancel": "19766ed6ccb2f4a3",
       "comingSoon": "a3e67bf579522f6e",
+      "createClose": "a6982593d2af7133",
+      "createFailed": "3c7e9d18127ae740",
+      "createSuccess": "1cf286e3862ab346",
+      "createTitle": "140d3619b9e5f38e",
+      "customProviderLabel": "0382e4dec018b8d5",
+      "customProviderPlaceholder": "161edba16ee29a2a",
+      "customProviderRequired": "5507e04986c78fad",
+      "deleteConfirmMessage": "9e29b29cb658a58b",
+      "deleteConfirmTitle": "a85b0a956298c86a",
+      "deleteFailed": "6a3d8746c75d245f",
+      "deleteSuccess": "3977384adfbb4bac",
+      "description": "337e6d6ad49ca32d",
+      "disable": "b7e3e4aa4257b9a1",
+      "disabledSuccess": "8f6dd89eb4bf520c",
+      "disabling": "fb7bdec372eeef3f",
+      "editTitle": "c081701b7edff206",
       "empty": "700b7a8095d27aa8",
+      "enable": "5342e09f2729fbc6",
+      "enabled": "92c1cdfdf4cb9cf6",
+      "enabledSuccess": "baddb982aaffbe99",
+      "enabling": "e22c24238eb035dd",
+      "exportFailed": "dfa151b64f607c4c",
+      "exportSuccess": "6e996f204e8b1c2f",
+      "exportTitle": "3664895579f0a7e6",
+      "fetchFailed": "2b9cd608c0b23f71",
+      "importFailed": "218b4690e23eb203",
+      "importJsonLabel": "e1707cf55a2306c2",
+      "importLabelRequired": "95245644a5b9a637",
+      "importPlaceholder": "e2dd37fdb06343c6",
+      "importProviderRequired": "a170ffd11fcddb6e",
+      "importRegionRequired": "6d1171d52b414317",
+      "importSuccess": "43ba6c60ebbc44f2",
+      "importTitle": "2cff9baabf56ca00",
+      "invalidJson": "70410685471d0577",
+      "label": "0e66373f45dcf3dd",
+      "labelPlaceholder": "dec566b4ca508159",
+      "labelRequired": "27107c05c535d647",
+      "liveAgents": "1c9864876eed588f",
+      "liveAgentsNamed": "7e34b0acba144094",
       "locationAwsEast": "cf7c0714c4c53cc2",
+      "locationId": "47689c2a178f5377",
+      "noPreview": "9e83b313b7b39878",
+      "offlineSince": "9b8ef60a4a6865b3",
+      "offlineWarning": "445d875bcd11a0b6",
+      "pendingAgent": "a10c20283be2e5f5",
+      "preview": "324b134f57c70c72",
+      "privateBadge": "c63eb6720c6e8849",
+      "privateEmptyBody": "8f3f7d795aff535a",
+      "privateTitle": "92405762b4605149",
+      "provider": "472590ae974d4c1f",
+      "providerOther": "f97e9da0e3b879f0",
+      "providerPlaceholder": "71e2ca7b1c9f58dc",
+      "providerRequired": "b801c250b9999625",
+      "publicTitle": "591935b15b1c88e2",
+      "region": "d3a008ef1335692d",
+      "regionPlaceholder": "17e85ba419e931c7",
+      "regionRequired": "0547785eb4df74c7",
+      "searchPlaceholder": "5e5a3153c9c9ed86",
+      "selectedCount": "a09061ee15c7e454",
+      "setupAgent": "773c776ac63d415e",
       "subtitle": "d70c4ffd773ca949",
-      "title": "95c61170318a2851"
+      "title": "95c61170318a2851",
+      "toggleFailed": "bf60121ca191b16e",
+      "updateClose": "ec146cf4339c74c6",
+      "updateFailed": "84c3a675a48ff67e",
+      "updateSuccess": "962906f4f658a9a2",
+      "uploadFile": "af8554d4d87663b0"
     },
     "newCheck": {
       "back": "de07d07209556c79",
@@ -8390,6 +8754,7 @@
       "loadEditFailed": "7b1928809f0de0a4",
       "modalSubtitle": "fc15d0f77021245b",
       "modalTitle": "583f1d0575249e75",
+      "notFoundInOrg": "236a1d5f7cc2e375",
       "pageTitle": "8f2b3514a0a2029c",
       "saveCheck": "1d343384e4bac4c7",
       "saveFailed": "5bb721c58f49bb25",
@@ -8409,7 +8774,78 @@
       "willBeCreatedIn": "5cf821e86d65d9e0"
     },
     "pageSubtitle": "f7871deef1e8ee30",
-    "pageTitle": "e05b70b116e87387",
+    "pageTitle": "f45c092981915635",
+    "privateLocations": {
+      "copySetupCmd": "6300595b1dfda210",
+      "deleteBlocked": "60563a43c7f26ca7",
+      "deleteBody": "996dd971e1fe06de",
+      "deleteTitle": "383e202b85478821",
+      "detail": {
+        "agentName": "11b39c93777e8f1f",
+        "agentsSubtitle": "e1ba4bf7a102f71e",
+        "agentsTitle": "279b44d2ab4b40c0",
+        "back": "7e411e6d1fb73865",
+        "checkName": "dcd1d5223f73b3a9",
+        "checksTitle": "10014025dca36813",
+        "noAgents": "53f30015179ba65a",
+        "noChecks": "3709b844e6f621e3",
+        "notFound": "8df056a568a44b88",
+        "pool": "f13024272c385f73",
+        "recoverAgent": "89b30efff94e5cf4",
+        "title": "57d84785ba9c4e19",
+        "version": "dd167905de0defca"
+      },
+      "empty": {
+        "action": "e4cfcb1fa10f3763",
+        "description": "d502f949c5603bf2",
+        "title": "ed022abff5c07e0b"
+      },
+      "fixHighlightedFields": "6cbcc039c9703376",
+      "searchPlaceholder": "32b9f49fccf4f071",
+      "setup": {
+        "agentNameHint": "418caf0905d67df6",
+        "agentNameLabel": "ef0e0c2e3faaab98",
+        "agentNamePlaceholder": "3ab98db0713fc67d",
+        "browserNote": "2e1dd1f6770a8fdb",
+        "locationNameLabel": "eab349b2861c7e3d",
+        "locationNamePlaceholder": "aec274c692ea69c8",
+        "noToken": "6304de22918fed2e",
+        "step1Body": "f2dc8a3e29f7f297",
+        "step1Title": "833c2e33e68c9bfe",
+        "step2Body": "115ccb7b5f58bbc4",
+        "step2Title": "0596f9d6745c70ac",
+        "step3Body": "dbd961d5e9bf4a7f",
+        "step3Title": "13c09832fc765c33",
+        "tabDocker": "e6169e958b37ce86",
+        "tabK8s": "a37d07fe30048d3a",
+        "tabLinux": "4828e60247c1636f",
+        "tabWindows": "d598026a9cbc6050",
+        "title": "4be7e94944cf4e27"
+      },
+      "setupAgent": "e4cfcb1fa10f3763",
+      "status": {
+        "offline": "a1794783aab72d20",
+        "online": "0d21bd52022ca7f7",
+        "pending": "331551b0de4157c9"
+      },
+      "table": {
+        "agents": "279b44d2ab4b40c0",
+        "checks": "de07d07209556c79",
+        "checksPerMin": "4b367a14fa6b1c3b",
+        "lastSeen": "21fd79c7de52e1cf",
+        "name": "dcd1d5223f73b3a9",
+        "region": "d3a008ef1335692d",
+        "types": "a5fc918683bf9602"
+      },
+      "toast": {
+        "copied": "e73c9b4a61d6f615",
+        "copyFailed": "978a1dc5401a2164",
+        "deleteFailed": "6a3d8746c75d245f",
+        "deleted": "d8504313eb155667",
+        "locationRequired": "3335200d18a21df8"
+      },
+      "urlRequired": "677d0a8e72df23d5"
+    },
     "protocolConfig": {
       "http": {
         "addAssertion": "c23b291f94a76b46",
@@ -8507,6 +8943,7 @@
       "failed": "031a8f0f659df890",
       "failedRuns": "6a44dbfe4b28be46",
       "jumpToLastRun": "62a62143467d5602",
+      "jumpToLatestData": "e49f00aafe7c84fc",
       "lastRun": "9c05e80faaf8a6c1",
       "location": "15b61974b2707a7b",
       "monitors": "d2ea1516fbd01374",
@@ -8647,10 +9084,13 @@
       "tabSteps": "1de3df70ddf4faab",
       "timelineAllFailed": "efbbb17bb1350c3c",
       "timelineAllPassed": "81ed0638ff1c2348",
+      "timelineAllWarning": "668f03d7e2fbd893",
       "timelineMixed": "b40e35d4a981a470",
       "timelineNow": "fe18013d93d22f4f",
       "triggerManual": "b0b9fe24ffa96291",
       "triggerSchedule": "f4830a1dae298044",
+      "warning": "e981ddae45d8f4ca",
+      "warningRuns": "69530efbaab8b039",
       "window1h": "3e88e2410dc4c412",
       "window24h": "5c37cf8f018b4ac5",
       "windowDays": "b902e3177b30cd13",
@@ -8788,7 +9228,9 @@
     "tabs": {
       "all": "a52ace420f2175d0",
       "browser": "d31de1a5c5c8ba2a",
+      "checks": "de07d07209556c79",
       "http": "56d6f32151ad8474",
+      "private": "7e411e6d1fb73865",
       "ssh": "01c4d3c21642b217",
       "tcp": "2e9430507b92dee1",
       "tls": "d1c18ec0b1092683"
@@ -8826,6 +9268,7 @@
     },
     "validation": {
       "firstStepMustNavigate": "53dbadd32807c339",
+      "fixHighlightedFields": "6cbcc039c9703376",
       "locationsRequired": "4a570dd72884bf09",
       "nameRequired": "604fd1b2e29c688a",
       "selectorRequired": "f4bd6b29fff4f577",
@@ -9636,10 +10079,10 @@
     "actions": "ff8059dc6752afdd",
     "addStepRequired": "6792f09c3a1457f4",
     "backToList": "326af632991b32f4",
-    "canvasEmpty": "a19643786d83a50b",
+    "chooseTrigger": "1cb8680317054630",
     "comingSoon": "f0e658fab147026b",
     "connectAllNodes": "c720a933050980f9",
-    "create": "d041ce31a2fb7f8e",
+    "create": "750c4da495f2d442",
     "createConfirm": "4759498ac2a719c6",
     "createError": "d6662e5506e5bc4c",
     "createSuccess": "0b9dc4bbc8b93634",
@@ -9734,11 +10177,9 @@
       "kindTrigger": "8b9c643731c94119",
       "notConfigured": "166da63c51e7215d",
       "paletteCollapse": "be6eb1fc3b05bf9d",
-      "paletteTitle": "7ac362063b9f2046",
       "sectionDestination": "293d404a500f5f9a",
       "sectionTransform": "d2d68041b53daa75",
       "sendToDestination": "293d404a500f5f9a",
-      "stepDialogTitle": "e45a4474b464a35f",
       "stepNoMatch": "b617336f2394e926",
       "stepSearchPlaceholder": "0e01c94a0a506dda",
       "triggerAlertsError": "13059c4fb60e9cf8",

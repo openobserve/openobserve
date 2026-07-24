@@ -19,7 +19,6 @@ import PromQLChartConfig from "./PromQLChartConfig.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 // Mock useDashboardPanel
 vi.mock("../../../composables/dashboard/useDashboardPanel", () => ({
   default: vi.fn(() => ({
@@ -101,18 +100,14 @@ describe("PromQLChartConfig", () => {
 
       supportedTypes.forEach((type) => {
         wrapper = createWrapper({ chartType: type });
-        expect(
-          wrapper.find('[data-test="dashboard-config-aggregation"]').exists(),
-        ).toBe(true);
+        expect(wrapper.find('[data-test="dashboard-config-aggregation"]').exists()).toBe(true);
         wrapper.unmount();
       });
     });
 
     it("should not show aggregation config for unsupported chart types", () => {
       wrapper = createWrapper({ chartType: "table" });
-      expect(
-        wrapper.find('[data-test="dashboard-config-aggregation"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-config-aggregation"]').exists()).toBe(false);
     });
   });
 
@@ -145,25 +140,15 @@ describe("PromQLChartConfig", () => {
     it("should render geomap config for geomap chart type", () => {
       wrapper = createWrapper({ chartType: "geomap" });
 
-      expect(
-        wrapper.find('[data-test="dashboard-config-geo-lat-label"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="dashboard-config-geo-lon-label"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper
-          .find('[data-test="dashboard-config-geo-weight-label"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-config-geo-lat-label"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-config-geo-lon-label"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-config-geo-weight-label"]').exists()).toBe(true);
     });
 
     it("should not render geomap config for other chart types", () => {
       wrapper = createWrapper({ chartType: "table" });
 
-      expect(
-        wrapper.find('[data-test="dashboard-config-geo-lat-label"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-config-geo-lat-label"]').exists()).toBe(false);
     });
 
     it("should default geomap labels", () => {
@@ -192,21 +177,15 @@ describe("PromQLChartConfig", () => {
     it("should render maps config for maps chart type", () => {
       wrapper = createWrapper({ chartType: "maps" });
 
-      expect(
-        wrapper.find('[data-test="dashboard-config-maps-name-label"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-config-maps-name-label"]').exists()).toBe(true);
       // dashboard-config-maps-type (mapsMapType select) was removed in config redesign (PR #10917)
-      expect(
-        wrapper.find('[data-test="dashboard-config-maps-type"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-config-maps-type"]').exists()).toBe(false);
     });
 
     it("should not render maps config for other chart types", () => {
       wrapper = createWrapper({ chartType: "table" });
 
-      expect(
-        wrapper.find('[data-test="dashboard-config-maps-name-label"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-config-maps-name-label"]').exists()).toBe(false);
     });
 
     it("should default maps configuration", () => {
@@ -230,11 +209,7 @@ describe("PromQLChartConfig", () => {
     it("should render table config for table chart type", () => {
       wrapper = createWrapper({ chartType: "table" });
 
-      expect(
-        wrapper
-          .find('[data-test="dashboard-config-promql-table-mode"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-config-promql-table-mode"]').exists()).toBe(true);
     });
 
     it("should have correct table mode options", () => {
@@ -242,9 +217,7 @@ describe("PromQLChartConfig", () => {
 
       expect(wrapper.vm.promqlTableModeOptions).toHaveLength(3);
       expect(wrapper.vm.promqlTableModeOptions[0].value).toBe("single");
-      expect(wrapper.vm.promqlTableModeOptions[1].value).toBe(
-        "expanded_timeseries",
-      );
+      expect(wrapper.vm.promqlTableModeOptions[1].value).toBe("expanded_timeseries");
       expect(wrapper.vm.promqlTableModeOptions[2].value).toBe("all");
     });
 
@@ -271,11 +244,7 @@ describe("PromQLChartConfig", () => {
       await wrapper.vm.$nextTick();
       await flushPromises();
 
-      expect(
-        wrapper
-          .find('[data-test="dashboard-config-table-aggregations"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-config-table-aggregations"]').exists()).toBe(true);
     });
 
     it("should not show aggregations selector in single mode", async () => {
@@ -284,11 +253,9 @@ describe("PromQLChartConfig", () => {
       wrapper.vm.promqlTableMode = "single";
       await flushPromises();
 
-      expect(
-        wrapper
-          .find('[data-test="dashboard-config-table-aggregations"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-config-table-aggregations"]').exists()).toBe(
+        false,
+      );
     });
 
     it("should default to last aggregation", () => {
@@ -302,11 +269,7 @@ describe("PromQLChartConfig", () => {
       wrapper.vm.tableAggregations = ["min", "max", "avg"];
       await flushPromises();
 
-      expect(mockDashboardPanelData.data.config.table_aggregations).toEqual([
-        "min",
-        "max",
-        "avg",
-      ]);
+      expect(mockDashboardPanelData.data.config.table_aggregations).toEqual(["min", "max", "avg"]);
     });
 
     it("should format aggregations display correctly", async () => {
@@ -318,11 +281,7 @@ describe("PromQLChartConfig", () => {
       wrapper.unmount();
 
       // Test multiple aggregations - recreate wrapper with new data
-      mockDashboardPanelData.data.config.table_aggregations = [
-        "last",
-        "min",
-        "max",
-      ];
+      mockDashboardPanelData.data.config.table_aggregations = ["last", "min", "max"];
       wrapper = createWrapper({ chartType: "table" });
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.tableAggregations).toEqual(["last", "min", "max"]);
@@ -337,17 +296,12 @@ describe("PromQLChartConfig", () => {
       await flushPromises();
 
       expect(wrapper.text()).toContain("Column Filters");
-      expect(
-        wrapper.find('[data-test="dashboard-config-visible-columns"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="dashboard-config-hidden-columns"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-config-visible-columns"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-config-hidden-columns"]').exists()).toBe(true);
     });
 
     it("should show column filters in expanded_timeseries mode", async () => {
-      mockDashboardPanelData.data.config.promql_table_mode =
-        "expanded_timeseries";
+      mockDashboardPanelData.data.config.promql_table_mode = "expanded_timeseries";
       wrapper = createWrapper({ chartType: "table" });
       await wrapper.vm.$nextTick();
       await flushPromises();
@@ -361,9 +315,7 @@ describe("PromQLChartConfig", () => {
       wrapper.vm.promqlTableMode = "single";
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="dashboard-config-visible-columns"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-config-visible-columns"]').exists()).toBe(false);
     });
 
     it("should update visible columns", async () => {
@@ -372,10 +324,7 @@ describe("PromQLChartConfig", () => {
       wrapper.vm.visibleColumns = ["job", "instance"];
       await flushPromises();
 
-      expect(mockDashboardPanelData.data.config.visible_columns).toEqual([
-        "job",
-        "instance",
-      ]);
+      expect(mockDashboardPanelData.data.config.visible_columns).toEqual(["job", "instance"]);
     });
 
     it("should update hidden columns", async () => {
@@ -384,9 +333,7 @@ describe("PromQLChartConfig", () => {
       wrapper.vm.hiddenColumns = ["__name__"];
       await flushPromises();
 
-      expect(mockDashboardPanelData.data.config.hidden_columns).toEqual([
-        "__name__",
-      ]);
+      expect(mockDashboardPanelData.data.config.hidden_columns).toEqual(["__name__"]);
     });
 
     it("should format visible columns display correctly", async () => {
@@ -405,11 +352,7 @@ describe("PromQLChartConfig", () => {
       wrapper.unmount();
 
       // Test multiple columns
-      mockDashboardPanelData.data.config.visible_columns = [
-        "job",
-        "instance",
-        "status",
-      ];
+      mockDashboardPanelData.data.config.visible_columns = ["job", "instance", "status"];
       wrapper = createWrapper({ chartType: "table" });
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.visibleColumns).toEqual(["job", "instance", "status"]);
@@ -431,11 +374,7 @@ describe("PromQLChartConfig", () => {
       wrapper.unmount();
 
       // Test multiple columns
-      mockDashboardPanelData.data.config.hidden_columns = [
-        "__name__",
-        "le",
-        "quantile",
-      ];
+      mockDashboardPanelData.data.config.hidden_columns = ["__name__", "le", "quantile"];
       wrapper = createWrapper({ chartType: "table" });
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.hiddenColumns).toEqual(["__name__", "le", "quantile"]);
@@ -450,19 +389,14 @@ describe("PromQLChartConfig", () => {
       await flushPromises();
 
       expect(wrapper.text()).toContain("Sticky Columns");
-      expect(
-        wrapper
-          .find('[data-test="dashboard-config-sticky-first-column"]')
-          .exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="dashboard-config-sticky-columns"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-config-sticky-first-column"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="dashboard-config-sticky-columns"]').exists()).toBe(true);
     });
 
     it("should show sticky columns config in expanded_timeseries mode", async () => {
-      mockDashboardPanelData.data.config.promql_table_mode =
-        "expanded_timeseries";
+      mockDashboardPanelData.data.config.promql_table_mode = "expanded_timeseries";
       wrapper = createWrapper({ chartType: "table" });
       await wrapper.vm.$nextTick();
       await flushPromises();
@@ -476,11 +410,9 @@ describe("PromQLChartConfig", () => {
       wrapper.vm.promqlTableMode = "single";
       await flushPromises();
 
-      expect(
-        wrapper
-          .find('[data-test="dashboard-config-sticky-first-column"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-config-sticky-first-column"]').exists()).toBe(
+        false,
+      );
     });
 
     it("should update sticky first column", async () => {
@@ -508,9 +440,7 @@ describe("PromQLChartConfig", () => {
       wrapper.vm.stickyColumns = ["job"];
       await flushPromises();
 
-      expect(mockDashboardPanelData.data.config.sticky_columns).toEqual([
-        "job",
-      ]);
+      expect(mockDashboardPanelData.data.config.sticky_columns).toEqual(["job"]);
     });
 
     it("should disable sticky columns selector when sticky first column is enabled", async () => {
@@ -521,9 +451,7 @@ describe("PromQLChartConfig", () => {
       await flushPromises();
 
       // Component uses OSelect now; verify sticky-columns element exists
-      const stickyColumnsSelect = wrapper.find(
-        '[data-test="dashboard-config-sticky-columns"]',
-      );
+      const stickyColumnsSelect = wrapper.find('[data-test="dashboard-config-sticky-columns"]');
       expect(stickyColumnsSelect.exists()).toBe(true);
     });
 
@@ -557,25 +485,20 @@ describe("PromQLChartConfig", () => {
       await wrapper.vm.$nextTick();
       await flushPromises();
 
-      expect(
-        wrapper
-          .find('[data-test="dashboard-config-column-order-button"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-config-column-order-button"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should show column order config in expanded_timeseries mode", async () => {
-      mockDashboardPanelData.data.config.promql_table_mode =
-        "expanded_timeseries";
+      mockDashboardPanelData.data.config.promql_table_mode = "expanded_timeseries";
       wrapper = createWrapper({ chartType: "table" });
       await wrapper.vm.$nextTick();
       await flushPromises();
 
-      expect(
-        wrapper
-          .find('[data-test="dashboard-config-column-order-button"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-config-column-order-button"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should not show column order in single mode", async () => {
@@ -584,11 +507,9 @@ describe("PromQLChartConfig", () => {
       wrapper.vm.promqlTableMode = "single";
       await flushPromises();
 
-      expect(
-        wrapper
-          .find('[data-test="dashboard-config-column-order-button"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-config-column-order-button"]').exists()).toBe(
+        false,
+      );
     });
 
     it("should open column order popup when button is clicked", async () => {
@@ -597,9 +518,7 @@ describe("PromQLChartConfig", () => {
       await wrapper.vm.$nextTick();
       await flushPromises();
 
-      const button = wrapper.find(
-        '[data-test="dashboard-config-column-order-button"]',
-      );
+      const button = wrapper.find('[data-test="dashboard-config-column-order-button"]');
       await button.trigger("click");
       await wrapper.vm.$nextTick();
       await flushPromises();
@@ -628,10 +547,7 @@ describe("PromQLChartConfig", () => {
       wrapper.vm.saveColumnOrder(["column1", "column2"]);
       await flushPromises();
 
-      expect(mockDashboardPanelData.data.config.column_order).toEqual([
-        "column1",
-        "column2",
-      ]);
+      expect(mockDashboardPanelData.data.config.column_order).toEqual(["column1", "column2"]);
       expect(wrapper.vm.showColumnOrderPopup).toBe(false);
     });
 
@@ -651,11 +567,7 @@ describe("PromQLChartConfig", () => {
       wrapper.unmount();
 
       // Test multiple columns
-      mockDashboardPanelData.data.config.column_order = [
-        "job",
-        "instance",
-        "status",
-      ];
+      mockDashboardPanelData.data.config.column_order = ["job", "instance", "status"];
       wrapper = createWrapper({ chartType: "table" });
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.columnOrder).toEqual(["job", "instance", "status"]);
@@ -668,10 +580,7 @@ describe("PromQLChartConfig", () => {
       Object.assign(mockDashboardPanelData, {
         data: {
           config: {},
-          queries: [
-            { fields: { stream: "stream1" } },
-            { fields: { stream: "stream2" } },
-          ],
+          queries: [{ fields: { stream: "stream1" } }, { fields: { stream: "stream2" } }],
         },
         meta: {
           streamFields: {
@@ -713,11 +622,7 @@ describe("PromQLChartConfig", () => {
             groupedFields: [
               {
                 name: "stream1",
-                schema: [
-                  { name: "zebra" },
-                  { name: "apple" },
-                  { name: "banana" },
-                ],
+                schema: [{ name: "zebra" }, { name: "apple" }, { name: "banana" }],
               },
             ],
           },
@@ -728,11 +633,7 @@ describe("PromQLChartConfig", () => {
       await wrapper.vm.$nextTick();
       await flushPromises();
 
-      expect(wrapper.vm.availableColumnOptions).toEqual([
-        "apple",
-        "banana",
-        "zebra",
-      ]);
+      expect(wrapper.vm.availableColumnOptions).toEqual(["apple", "banana", "zebra"]);
     });
 
     it("should return empty array when no stream fields", async () => {
@@ -836,9 +737,7 @@ describe("PromQLChartConfig", () => {
 
       wrapper.vm.addToVisibleColumns("new_column");
 
-      expect(mockDashboardPanelData.data.config.visible_columns).toContain(
-        "new_column",
-      );
+      expect(mockDashboardPanelData.data.config.visible_columns).toContain("new_column");
     });
 
     it("should not create column value when empty", () => {
@@ -851,9 +750,8 @@ describe("PromQLChartConfig", () => {
       wrapper.vm.addToVisibleColumns("existing");
 
       expect(
-        mockDashboardPanelData.data.config.visible_columns.filter(
-          (v: string) => v === "existing",
-        ).length,
+        mockDashboardPanelData.data.config.visible_columns.filter((v: string) => v === "existing")
+          .length,
       ).toBe(1);
     });
   });
@@ -950,15 +848,11 @@ describe("PromQLChartConfig", () => {
 
       wrapper.vm.visibleColumns = ["field1"];
       await flushPromises();
-      expect(mockDashboardPanelData.data.config.visible_columns).toEqual([
-        "field1",
-      ]);
+      expect(mockDashboardPanelData.data.config.visible_columns).toEqual(["field1"]);
 
       wrapper.vm.visibleColumns = [];
       await flushPromises();
-      expect(
-        mockDashboardPanelData.data.config.visible_columns,
-      ).toBeUndefined();
+      expect(mockDashboardPanelData.data.config.visible_columns).toBeUndefined();
     });
   });
 
@@ -992,17 +886,11 @@ describe("PromQLChartConfig", () => {
         column_order: ["field1", "field2"],
         ...overrides,
       };
-      mockDashboardPanelData.data.queries = [
-        { fields: { stream: "stream1" } },
-      ];
+      mockDashboardPanelData.data.queries = [{ fields: { stream: "stream1" } }];
       mockDashboardPanelData.meta.streamFields.groupedFields = [
         {
           name: "stream1",
-          schema: [
-            { name: "field1" },
-            { name: "field2" },
-            { name: "field3" },
-          ],
+          schema: [{ name: "field1" }, { name: "field2" }, { name: "field3" }],
         },
       ];
 
@@ -1017,9 +905,7 @@ describe("PromQLChartConfig", () => {
 
       // The legacy data-test was applied to the removed dialog.
       // It must not appear in the migrated template.
-      expect(
-        wrapper.find('[data-test="column-order-dialog"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="column-order-dialog"]').exists()).toBe(false);
     });
 
     it("should pass showColumnOrderPopup as :open prop on ColumnOrderPopUp (closed initially)", async () => {
@@ -1083,15 +969,9 @@ describe("PromQLChartConfig", () => {
 
       const popup = wrapper.findComponent({ name: "ColumnOrderPopUp" });
       expect(popup.exists()).toBe(true);
-      expect(popup.props("availableColumns")).toEqual(
-        wrapper.vm.filteredAvailableColumns,
-      );
+      expect(popup.props("availableColumns")).toEqual(wrapper.vm.filteredAvailableColumns);
       // With no visible/hidden filters all three fields are available
-      expect(popup.props("availableColumns")).toEqual([
-        "field1",
-        "field2",
-        "field3",
-      ]);
+      expect(popup.props("availableColumns")).toEqual(["field1", "field2", "field3"]);
     });
 
     it("should respect visible_columns filter when forwarding available-columns", async () => {

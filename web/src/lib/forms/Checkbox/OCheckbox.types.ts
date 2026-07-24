@@ -73,8 +73,7 @@ export interface CheckboxGroupContext {
   isChecked(_value: CheckboxPrimitive): boolean;
 }
 
-export const CHECKBOX_GROUP_KEY: InjectionKey<CheckboxGroupContext> =
-  Symbol("CheckboxGroup");
+export const CHECKBOX_GROUP_KEY: InjectionKey<CheckboxGroupContext> = Symbol("CheckboxGroup");
 
 export interface CheckboxGroupProps {
   /** Array of currently checked values */

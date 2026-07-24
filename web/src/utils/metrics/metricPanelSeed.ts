@@ -26,11 +26,7 @@
  */
 
 import { buildMetricCardFor, type MetricStream } from "./metricFamily";
-import {
-  getMetricDefaults,
-  PANEL_RATE_WINDOW,
-  resolveVariant,
-} from "./metricDefaults";
+import { getMetricDefaults, PANEL_RATE_WINDOW, resolveVariant } from "./metricDefaults";
 import { buildPanelDataForCard } from "./metricsHandoff";
 
 export interface PromqlSeed {
@@ -152,8 +148,7 @@ export function buildPromqlSeed(
    * Custom-form query in a Builder panel is rewritten to a bare `metric{}` the
    * moment the user touches anything.
    */
-  const expressible = (v: any) =>
-    !opts.requireBuilder || !!v.queries?.[0]?.builder;
+  const expressible = (v: any) => !opts.requireBuilder || !!v.queries?.[0]?.builder;
 
   // Free to change the chart type ⇒ the rule set's default variant wins.
   // Otherwise honour the type the user already chose and pick the best variant
@@ -289,10 +284,7 @@ export function seedOwnsChartType(
   if (!text || !metric) return false;
   if (text === `${metric}{}`) return false;
 
-  return (
-    text ===
-    seedQueryFor(metric, streams, { ...opts, allowChartTypeChange: false })
-  );
+  return text === seedQueryFor(metric, streams, { ...opts, allowChartTypeChange: false });
 }
 
 /**

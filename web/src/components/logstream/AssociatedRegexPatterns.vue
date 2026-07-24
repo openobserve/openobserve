@@ -1,21 +1,15 @@
 <template>
-  <div
-    style="width: 60vw; height: calc(100vh - 59px)"
-    :class="'bg-surface-base'"
-  >
-    <div
-      class="flex items-center flex-nowrap justify-between px-4 py-2"
-    >
+  <div style="width: 60vw; height: calc(100vh - 59px)" :class="'bg-surface-base'">
+    <div class="flex flex-nowrap items-center justify-between px-4 py-2">
       <div class="flex items-center">
         <div class="col-auto"></div>
-        <div
-          class="flex items-center"
-          data-test="associated-regex-patterns-title-text"
-        >
-          <span class="breadcrumb-text text-lg font-normal leading-6 cursor-pointer text-brand-indigo" @click="closeDialog"
-            >{{ t('regex_patterns.associated_breadcrumb') }} &gt; &nbsp;
+        <div class="flex items-center" data-test="associated-regex-patterns-title-text">
+          <span
+            class="breadcrumb-text text-brand-indigo cursor-pointer text-lg leading-6 font-normal"
+            @click="closeDialog"
+            >{{ t("regex_patterns.associated_breadcrumb") }} &gt; &nbsp;
           </span>
-          <span class="associated-field-name text-lg font-normal leading-6 text-text-heading">
+          <span class="associated-field-name text-text-heading text-lg leading-6 font-normal">
             {{ fieldName }}
           </span>
         </div>
@@ -50,27 +44,40 @@
             <div class="pattern-list-wrapper">
               <OCollapsible
                 v-model="appliedPatternsExpandedRef"
-                :label="t('regex_patterns.applied_patterns_count', { count: appliedPatterns.length })"
+                :label="
+                  t('regex_patterns.applied_patterns_count', { count: appliedPatterns.length })
+                "
                 class="mt-2 text-sm font-[600]"
                 data-test="associated-regex-patterns-applied-patterns-expansion-item"
               >
                 <div
                   v-if="filteredAppliedPatterns.length === 0"
-                  class="py-3 px-2 text-xs opacity-50"
+                  class="px-2 py-3 text-xs opacity-50"
                   data-test="associated-regex-patterns-applied-patterns-table"
                 >
-                  {{ t('regex_patterns.no_data_available') }}
+                  {{ t("regex_patterns.no_data_available") }}
                 </div>
-                <ul v-else class="list-none p-0 m-0" data-test="associated-regex-patterns-applied-patterns-table">
+                <ul
+                  v-else
+                  class="m-0 list-none p-0"
+                  data-test="associated-regex-patterns-applied-patterns-table"
+                >
                   <li
                     v-for="row in filteredAppliedPatterns"
                     :key="row.pattern_id"
                     :data-test="`associated-regex-patterns-applied-patterns-table-row-${row.pattern_id}`"
-                    class="cursor-pointer flex justify-between items-center px-2 py-2.5 border-b text-compact font-[600]"
-                    :class="checkCurrentUserClickedPattern(row.pattern_name) ? 'text-tab-text-color bg-theme-tab-bg' : ''"
+                    class="text-compact flex cursor-pointer items-center justify-between border-b px-2 py-2.5 font-[600]"
+                    :class="
+                      checkCurrentUserClickedPattern(row.pattern_name)
+                        ? 'text-tab-text-color bg-theme-tab-bg'
+                        : ''
+                    "
                     @click="handlePatternClick(row)"
                   >
-                    <span class="regex-pattern-name whitespace-nowrap overflow-hidden max-w-[10vw] truncate normal-case!">{{ row.pattern_name }}</span>
+                    <span
+                      class="regex-pattern-name max-w-[10vw] truncate overflow-hidden whitespace-nowrap normal-case!"
+                      >{{ row.pattern_name }}</span
+                    >
                     <OIcon name="check" size="xs" />
                   </li>
                 </ul>
@@ -84,16 +91,26 @@
                 class="mt-2 text-sm font-[600]"
                 data-test="associated-regex-patterns-all-patterns-expansion-item"
               >
-                <ul class="list-none p-0 m-0" data-test="associated-regex-patterns-all-patterns-table">
+                <ul
+                  class="m-0 list-none p-0"
+                  data-test="associated-regex-patterns-all-patterns-table"
+                >
                   <li
                     v-for="row in filteredAllPatterns"
                     :key="row.pattern_id"
                     :data-test="`associated-regex-patterns-all-patterns-table-row-${row.pattern_id}`"
-                    class="cursor-pointer flex justify-between items-center px-2 py-2.5 border-b text-compact font-[600]"
-                    :class="checkCurrentUserClickedPattern(row.pattern_name) ? 'text-tab-text-color bg-theme-tab-bg' : ''"
+                    class="text-compact flex cursor-pointer items-center justify-between border-b px-2 py-2.5 font-[600]"
+                    :class="
+                      checkCurrentUserClickedPattern(row.pattern_name)
+                        ? 'text-tab-text-color bg-theme-tab-bg'
+                        : ''
+                    "
                     @click="handlePatternClick(row)"
                   >
-                    <span class="regex-pattern-name whitespace-nowrap overflow-hidden max-w-[10vw] truncate normal-case!">{{ row.pattern_name }}</span>
+                    <span
+                      class="regex-pattern-name max-w-[10vw] truncate overflow-hidden whitespace-nowrap normal-case!"
+                      >{{ row.pattern_name }}</span
+                    >
                     <OIcon v-if="checkIfPatternIsApplied(row.pattern_id)" name="check" size="xs" />
                   </li>
                 </ul>
@@ -104,11 +121,11 @@
       </div>
       <OSeparator vertical />
       <!-- here we will have the right side section -->
-      <div class="w-[75%] flex flex-col" style="height: calc(100vh - 59px)">
+      <div class="flex w-[75%] flex-col" style="height: calc(100vh - 59px)">
         <div class="flex-1 overflow-y-auto pt-3">
           <div
             v-if="!userClickedPattern"
-            class="flex flex-col items-center justify-center h-full gap-4 px-6 py-12"
+            class="flex h-full flex-col items-center justify-center gap-4 px-6 py-12"
           >
             <img
               data-test="associated-regex-patterns-no-pattern-image"
@@ -117,31 +134,28 @@
               alt=""
             />
             <span
-              class="text-base font-semibold leading-8"
+              class="text-base leading-8 font-semibold"
               data-test="associated-regex-patterns-no-pattern-applied-title"
-              >{{ t('regex_patterns.no_patterns_applied_title') }}</span
+              >{{ t("regex_patterns.no_patterns_applied_title") }}</span
             >
             <span
-              class="text-sm font-normal leading-3 text-center"
+              class="text-center text-sm leading-3 font-normal"
               data-test="associated-regex-patterns-no-pattern-applied-subtitle"
-              >{{ t('regex_patterns.no_patterns_applied_subtitle') }}</span
+              >{{ t("regex_patterns.no_patterns_applied_subtitle") }}</span
             >
           </div>
-          <div
-            v-else
-            class="flex flex-col gap-3 px-3 pb-4"
-          >
+          <div v-else class="flex flex-col gap-3 px-3 pb-4">
             <!-- Pattern Info Card -->
             <div
-              class="section-card p-3 rounded-default border bg-surface-subtle border-border-default"
+              class="section-card rounded-default bg-surface-subtle border-border-default border p-3"
             >
               <div class="flex flex-col gap-2">
                 <div class="flex flex-col gap-1">
-                  <span class="individual-section-title text-xs font-[500] text-text-secondary">
-                    {{ t('regex_patterns.pattern_name') }}
+                  <span class="individual-section-title text-text-secondary text-xs font-[500]">
+                    {{ t("regex_patterns.pattern_name") }}
                   </span>
                   <span
-                    class="individual-section-value text-sm font-[700] text-text-body"
+                    class="individual-section-value text-text-body text-sm font-[700]"
                     data-test="associated-regex-patterns-pattern-name"
                   >
                     {{ userClickedPattern.pattern_name }}
@@ -151,17 +165,17 @@
                 <OSeparator />
 
                 <div class="flex flex-col gap-1">
-                  <span class="individual-section-title text-xs font-[500] text-text-secondary">
-                    {{ t('regex_patterns.description') }}
+                  <span class="individual-section-title text-text-secondary text-xs font-[500]">
+                    {{ t("regex_patterns.description") }}
                   </span>
                   <span
-                    class="individual-section-value text-sm font-[700] text-text-body"
+                    class="individual-section-value text-text-body text-sm font-[700]"
                     data-test="associated-regex-patterns-pattern-description"
                   >
                     {{
                       userClickedPattern.description
                         ? userClickedPattern.description
-                        : t('regex_patterns.no_description')
+                        : t("regex_patterns.no_description")
                     }}
                   </span>
                 </div>
@@ -170,13 +184,13 @@
 
             <!-- Configuration Card -->
             <div
-              class="section-card p-3 rounded-default border bg-surface-subtle border-border-default"
+              class="section-card rounded-default bg-surface-subtle border-border-default border p-3"
             >
               <div class="flex gap-4">
                 <!-- when value matches -->
-                <div class="flex flex-col gap-1.5 flex-1">
-                  <span class="individual-section-title text-xs font-[500] text-text-secondary">
-                    {{ t('regex_patterns.when_value_matches') }}
+                <div class="flex flex-1 flex-col gap-1.5">
+                  <span class="individual-section-title text-text-secondary text-xs font-[500]">
+                    {{ t("regex_patterns.when_value_matches") }}
                   </span>
                   <ORadioGroup v-model="policy">
                     <div class="flex flex-col gap-1">
@@ -186,8 +200,12 @@
                           data-test="associated-regex-patterns-redact-radio"
                           size="sm"
                         />
-                        <span class="font-[600] text-compact">{{ t('regex_patterns.redact') }}</span>
-                        <span class="font-[400] text-xs opacity-60">{{ t('regex_patterns.redact_hint') }}</span>
+                        <span class="text-compact font-[600]">{{
+                          t("regex_patterns.redact")
+                        }}</span>
+                        <span class="text-xs font-[400] opacity-60">{{
+                          t("regex_patterns.redact_hint")
+                        }}</span>
                       </div>
                       <div class="flex items-center gap-2">
                         <ORadio
@@ -195,8 +213,10 @@
                           data-test="associated-regex-patterns-drop-field-radio"
                           size="sm"
                         />
-                        <span class="font-[600] text-compact">{{ t('regex_patterns.drop') }}</span>
-                        <span class="font-[400] text-xs opacity-60">{{ t('regex_patterns.drop_hint') }}</span>
+                        <span class="text-compact font-[600]">{{ t("regex_patterns.drop") }}</span>
+                        <span class="text-xs font-[400] opacity-60">{{
+                          t("regex_patterns.drop_hint")
+                        }}</span>
                       </div>
                       <div class="flex items-center gap-2">
                         <ORadio
@@ -204,8 +224,10 @@
                           data-test="associated-regex-patterns-hash-radio"
                           size="sm"
                         />
-                        <span class="font-[600] text-compact">{{ t('regex_patterns.hash') }}</span>
-                        <span class="font-[400] text-xs opacity-60">{{ t('regex_patterns.hash_hint') }}</span>
+                        <span class="text-compact font-[600]">{{ t("regex_patterns.hash") }}</span>
+                        <span class="text-xs font-[400] opacity-60">{{
+                          t("regex_patterns.hash_hint")
+                        }}</span>
                       </div>
                     </div>
                   </ORadioGroup>
@@ -214,9 +236,9 @@
                 <OSeparator vertical />
 
                 <!-- detect at section -->
-                <div class="flex flex-col gap-1.5 min-w-30">
-                  <span class="individual-section-title text-xs font-[500] text-text-secondary">
-                    {{ t('regex_patterns.detect_at') }}
+                <div class="flex min-w-30 flex-col gap-1.5">
+                  <span class="individual-section-title text-text-secondary text-xs font-[500]">
+                    {{ t("regex_patterns.detect_at") }}
                   </span>
                   <div class="flex flex-col gap-1.5">
                     <OCheckbox
@@ -238,18 +260,16 @@
               </div>
             </div>
 
-            <OSeparator class="bg-separator-strong" />
+            <OSeparator />
 
             <!-- Test Pattern Card -->
             <div
-              class="section-card p-3 rounded-default border bg-surface-subtle border-border-default"
+              class="section-card rounded-default bg-surface-subtle border-border-default border p-3"
             >
               <div class="flex flex-col gap-2.5">
                 <div class="flex items-center justify-between">
-                  <span
-                    class="text-compact font-bold leading-6"
-                  >
-                    {{ t('regex_patterns.test_pattern') }}
+                  <span class="text-compact leading-6 font-bold">
+                    {{ t("regex_patterns.test_pattern") }}
                   </span>
                   <OButton
                     :disabled="testString.length === 0 || testLoading"
@@ -257,21 +277,17 @@
                     size="sm-action"
                     @click="testStringOutput"
                   >
-                    <span class="text-xs">{{ t('regex_patterns.test_input') }}</span>
+                    <span class="text-xs">{{ t("regex_patterns.test_input") }}</span>
                   </OButton>
                 </div>
 
                 <div class="flex flex-col gap-1">
-                  <span
-                    class="text-xs font-medium leading-6 text-text-secondary"
-                  >
-                    {{ t('regex_patterns.regex_pattern_label') }}
+                  <span class="text-text-secondary text-xs leading-6 font-medium">
+                    {{ t("regex_patterns.regex_pattern_label") }}
                   </span>
-                  <div
-                    class="p-2 rounded-default font-mono text-2xs break-all bg-surface-base"
-                  >
+                  <div class="rounded-default text-2xs bg-surface-base p-2 font-mono break-all">
                     <span
-                      class="regex-pattern-text text-xs font-normal leading-6 break-all whitespace-pre-wrap overflow-wrap-anywhere text-text-secondary"
+                      class="regex-pattern-text overflow-wrap-anywhere text-text-secondary text-xs leading-6 font-normal break-all whitespace-pre-wrap"
                       data-test="associated-regex-patterns-regex-pattern"
                     >
                       {{ userClickedPattern.pattern }}
@@ -289,10 +305,7 @@
                       :label="t('regex_patterns.input_string')"
                       class="py-md h-6"
                     />
-                    <div
-                      v-if="expandState.regexTestString"
-                      class="regex-pattern-input mt-2"
-                    >
+                    <div v-if="expandState.regexTestString" class="regex-pattern-input mt-2">
                       <OInput
                         data-test="add-regex-test-string-input"
                         v-model="testString"
@@ -311,10 +324,7 @@
                       :label="t('regex_patterns.output')"
                       class="py-md h-6"
                     />
-                    <div
-                      v-if="expandState.outputString"
-                      class="regex-pattern-input mt-2"
-                    >
+                    <div v-if="expandState.outputString" class="regex-pattern-input mt-2">
                       <OInput
                         v-if="outputString.length > 0"
                         data-test="add-regex-test-string-input"
@@ -326,24 +336,16 @@
                       />
                       <div
                         v-else
-                        class="flex flex-col items-center justify-center h-27.75 bg-surface-base [border-left:1px_solid_var(--color-border-default)] [border-right:1px_solid_var(--color-border-default)] [border-bottom:1px_solid_var(--color-border-default)]"
+                        class="bg-surface-base flex h-27.75 flex-col items-center justify-center [border-bottom:1px_solid_var(--color-border-default)] [border-left:1px_solid_var(--color-border-default)] [border-right:1px_solid_var(--color-border-default)]"
                       >
                         <div v-if="!testLoading && outputString.length === 0">
-                          <OIcon
-                            name="lightbulb"
-                            size="md"
-                            class="text-icon-color"
-                          />
-                          <span
-                            class="text-xs font-[400] text-center text-text-secondary"
-                          >
-                            {{ t('regex_patterns.click_test_input_hint') }}
+                          <OIcon name="lightbulb" size="md" class="text-icon-color" />
+                          <span class="text-text-secondary text-center text-xs font-[400]">
+                            {{ t("regex_patterns.click_test_input_hint") }}
                           </span>
                         </div>
                         <div v-else-if="testLoading">
-                          <span
-                            class="flex items-center justify-center h-27.75"
-                          >
+                          <span class="flex h-27.75 items-center justify-center">
                             <OSpinner size="sm" />
                           </span>
                         </div>
@@ -359,24 +361,25 @@
               <OButton
                 variant="outline"
                 size="sm-action"
-                :data-test="checkIfPatternIsApplied(userClickedPattern.pattern_id) ? 'associated-regex-patterns-remove-pattern-btn' : 'associated-regex-patterns-add-pattern-btn'"
+                :data-test="
+                  checkIfPatternIsApplied(userClickedPattern.pattern_id)
+                    ? 'associated-regex-patterns-remove-pattern-btn'
+                    : 'associated-regex-patterns-add-pattern-btn'
+                "
                 @click="handleAddOrRemovePattern"
                 :icon-left="
-                  checkIfPatternIsApplied(userClickedPattern.pattern_id)
-                    ? 'delete'
-                    : 'add'
+                  checkIfPatternIsApplied(userClickedPattern.pattern_id) ? 'delete' : 'add'
                 "
               >
                 {{
                   checkIfPatternIsApplied(userClickedPattern.pattern_id)
-                    ? t('regex_patterns.remove_pattern')
-                    : t('regex_patterns.add_pattern')
+                    ? t("regex_patterns.remove_pattern")
+                    : t("regex_patterns.add_pattern")
                 }}
               </OButton>
             </div>
           </div>
         </div>
-
       </div>
     </div>
   </div>
@@ -390,17 +393,16 @@
 </template>
 
 <script lang="ts">
-
-import { defineComponent, nextTick, onMounted, PropType, ref, watch, computed } from 'vue';
-import { useStore } from 'vuex';
-import regexPatternsService from '@/services/regex_pattern';
-import { convertUnixToDateFormat, getImageURL } from '@/utils/zincutils';
+import { defineComponent, nextTick, onMounted, PropType, ref, watch, computed } from "vue";
+import { useStore } from "vuex";
+import regexPatternsService from "@/services/regex_pattern";
+import { convertUnixToDateFormat, getImageURL } from "@/utils/zincutils";
 import { debounce } from "lodash-es";
-import { useToast } from '@/lib/feedback/Toast/useToast';
-import { useI18n } from 'vue-i18n';
-import FullViewContainer from '../functions/FullViewContainer.vue';
-import ConfirmDialog from '../ConfirmDialog.vue';
-import OButton from '@/lib/core/Button/OButton.vue';
+import { useToast } from "@/lib/feedback/Toast/useToast";
+import { useI18n } from "vue-i18n";
+import FullViewContainer from "../functions/FullViewContainer.vue";
+import ConfirmDialog from "../ConfirmDialog.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -409,7 +411,7 @@ import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export interface PatternAssociation {
   field: string;
@@ -444,13 +446,7 @@ export default defineComponent({
       required: true,
     },
   },
-  emits: [
-    "closeDialog",
-    "addPattern",
-    "removePattern",
-    "updateSettings",
-    "updateAppliedPattern",
-  ],
+  emits: ["closeDialog", "addPattern", "removePattern", "updateSettings", "updateAppliedPattern"],
   setup(props, { emit }) {
     const store = useStore();
     const filterPattern = ref("");
@@ -485,12 +481,7 @@ export default defineComponent({
     const hasPatternChanges = ref(false);
     // Add a debounced emit function
     const debouncedEmit = debounce(
-      (
-        pattern: PatternAssociation,
-        fieldName: string,
-        patternId: string,
-        attribute: string,
-      ) => {
+      (pattern: PatternAssociation, fieldName: string, patternId: string, attribute: string) => {
         emit("updateAppliedPattern", pattern, fieldName, patternId, attribute);
       },
       300,
@@ -548,21 +539,17 @@ export default defineComponent({
       if (store.state.organizationData.regexPatterns.length == 0) {
         await getRegexPatterns();
       } else {
-        allPatterns.value = store.state.organizationData.regexPatterns.map(
-          (pattern: any) => ({
-            ...pattern,
-            pattern_name: pattern.name,
-            pattern_id: pattern.id,
-            apply_at: "",
-            policy: "",
-            field: props.fieldName,
-          }),
-        );
+        allPatterns.value = store.state.organizationData.regexPatterns.map((pattern: any) => ({
+          ...pattern,
+          pattern_name: pattern.name,
+          pattern_id: pattern.id,
+          apply_at: "",
+          policy: "",
+          field: props.fieldName,
+        }));
       }
       // Initialize the applied patterns map
-      appliedPatternsMap.value = new Map(
-        props.data.map((p: any) => [p.pattern_id, p]),
-      );
+      appliedPatternsMap.value = new Map(props.data.map((p: any) => [p.pattern_id, p]));
       //this is used to toggle the applied patterns and all patterns expansion items
       //so that we can show the applied patterns and all patterns in the applied patterns and all patterns list
       await nextTick();
@@ -601,17 +588,13 @@ export default defineComponent({
       () => {
         isFormDirty.value = true;
         appliedPatterns.value = [...props.data];
-        appliedPatternsMap.value = new Map(
-          props.data.map((p: any) => [p.pattern_id, p]),
-        );
+        appliedPatternsMap.value = new Map(props.data.map((p: any) => [p.pattern_id, p]));
       },
     );
     watch(
       () => policy.value,
       (newVal) => {
-        if (
-          checkIfPatternIsAppliedAndUpdate(userClickedPattern.value.pattern_id)
-        ) {
+        if (checkIfPatternIsAppliedAndUpdate(userClickedPattern.value.pattern_id)) {
           let updatedPattern = {
             ...userClickedPattern.value,
             policy: newVal,
@@ -628,9 +611,7 @@ export default defineComponent({
     watch(
       () => apply_at.value,
       (newVal) => {
-        if (
-          checkIfPatternIsAppliedAndUpdate(userClickedPattern.value.pattern_id)
-        ) {
+        if (checkIfPatternIsAppliedAndUpdate(userClickedPattern.value.pattern_id)) {
           if (newVal.length == 0) {
             showWarningToRemovePattern();
           }
@@ -670,13 +651,14 @@ export default defineComponent({
         }));
         store.dispatch("setRegexPatterns", allPatterns.value);
       } catch (error) {
-        const e = error as { response?: { data?: { message?: string } }; data?: { message?: string } };
+        const e = error as {
+          response?: { data?: { message?: string } };
+          data?: { message?: string };
+        };
         toast({
           variant: "error",
           message:
-            e?.response?.data?.message ||
-            e?.data?.message ||
-            "Error fetching regex patterns",
+            e?.response?.data?.message || e?.data?.message || "Error fetching regex patterns",
         });
       } finally {
         listLoading.value = false;
@@ -712,14 +694,9 @@ export default defineComponent({
     const handleAddOrRemovePattern = () => {
       if (checkIfPatternIsApplied(userClickedPattern.value.pattern_id)) {
         //remove pattern
-        emit(
-          "removePattern",
-          userClickedPattern.value.pattern_id,
-          props.fieldName,
-        );
+        emit("removePattern", userClickedPattern.value.pattern_id, props.fieldName);
         appliedPatterns.value = appliedPatterns.value.filter(
-          (pattern: any) =>
-            pattern.pattern_id !== userClickedPattern.value.pattern_id,
+          (pattern: any) => pattern.pattern_id !== userClickedPattern.value.pattern_id,
         );
         appliedPatternsMap.value.delete(userClickedPattern.value.pattern_id);
         // Set flag when pattern is removed
@@ -776,8 +753,7 @@ export default defineComponent({
         // Only update isFormDirty if there are no pattern add/remove changes
         if (!hasPatternChanges.value) {
           isFormDirty.value =
-            applied_pattern.policy !== policy.value ||
-            applied_pattern.apply_at !== apply_at_value;
+            applied_pattern.policy !== policy.value || applied_pattern.apply_at !== apply_at_value;
         }
         return true;
       }
@@ -788,9 +764,7 @@ export default defineComponent({
     watch(
       () => props.data,
       (newVal) => {
-        appliedPatternsMap.value = new Map(
-          newVal.map((p) => [p.pattern_id, p]),
-        );
+        appliedPatternsMap.value = new Map(newVal.map((p) => [p.pattern_id, p]));
       },
       { immediate: true },
     );
@@ -815,9 +789,7 @@ export default defineComponent({
       //and set it to the apply_at value
       //we need to get the previous value of apply_at values
       //so we are transforming the apply_at value to the previous value of apply_at values
-      apply_at.value = transformApplyAtValue(
-        userClickedPattern.value?.apply_at,
-      );
+      apply_at.value = transformApplyAtValue(userClickedPattern.value?.apply_at);
     };
 
     const transformApplyAtValue = (applyAtValue: string) => {

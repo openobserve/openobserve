@@ -29,9 +29,7 @@ const props = withDefaults(defineProps<SearchInputProps>(), {
 const emit = defineEmits<SearchInputEmits>();
 
 // OInput only supports sm | md; xs maps to sm for the wrapper height
-const inputSize = computed<InputSize>(() =>
-  props.size === "md" ? "md" : "sm",
-);
+const inputSize = computed<InputSize>(() => (props.size === "md" ? "md" : "sm"));
 
 // Icon size follows OSearchInput size 1-to-1
 const iconSize = computed(() => (props.size === "xs" ? "xs" : "sm"));
@@ -51,11 +49,7 @@ const iconSize = computed(() => (props.size === "xs" ? "xs" : "sm"));
     @clear="emit('clear')"
   >
     <template #icon-left>
-      <OIcon
-        name="search"
-        :size="iconSize"
-        class="cursor-pointer"
-      />
+      <OIcon name="search" :size="iconSize" class="cursor-pointer" />
     </template>
 
     <!-- Forwarded so a search field can carry a control INSIDE its border — the

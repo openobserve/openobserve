@@ -23,8 +23,7 @@ import { getDefaultDashboardPanelData } from "@/composables/dashboard/useDashboa
 import store from "@/stores";
 
 const BASE = "https://o2.example/web";
-const build = (intent: any) =>
-  buildMetricsUrl({ orgId: "default", baseUrl: BASE, ...intent });
+const build = (intent: any) => buildMetricsUrl({ orgId: "default", baseUrl: BASE, ...intent });
 
 describe("buildMetricsUrl", () => {
   it("targets /metrics under the given base and sets org_identifier", () => {
@@ -34,15 +33,11 @@ describe("buildMetricsUrl", () => {
   });
 
   it("emits the metrics_data base blob when provided", () => {
-    expect(build({ base: "BLOB" }).searchParams.get("metrics_data")).toBe(
-      "BLOB",
-    );
+    expect(build({ base: "BLOB" }).searchParams.get("metrics_data")).toBe("BLOB");
   });
 
   it("emits a relative period", () => {
-    expect(
-      build({ time: { period: "15m" } }).searchParams.get("period"),
-    ).toBe("15m");
+    expect(build({ time: { period: "15m" } }).searchParams.get("period")).toBe("15m");
   });
 
   it("emits absolute from/to", () => {

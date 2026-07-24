@@ -22,9 +22,7 @@ defineSlots<CheckboxGroupSlots>();
 
 function toggle(value: CheckboxPrimitive) {
   const current: CheckboxGroupValue = props.modelValue ?? [];
-  const next = current.includes(value)
-    ? current.filter((v) => v !== value)
-    : [...current, value];
+  const next = current.includes(value) ? current.filter((v) => v !== value) : [...current, value];
   emit("update:modelValue", next);
 }
 

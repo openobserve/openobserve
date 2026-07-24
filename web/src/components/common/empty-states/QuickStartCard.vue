@@ -24,29 +24,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <button
     type="button"
-    class="group relative flex items-center gap-3 w-64 max-w-full h-16 ps-3 pe-3.5 rounded-default border border-border-default bg-surface-base text-left cursor-pointer transition-[color,background-color,border-color,box-shadow,transform] duration-150 outline-none hover:shadow-md hover:border-primary-400 hover:bg-tabs-hover-bg focus-visible:ring-[0.125rem] focus-visible:ring-primary-500/40"
+    class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex h-16 w-64 max-w-full cursor-pointer items-center gap-3 border ps-3 pe-3.5 text-left transition-[color,background-color,border-color,box-shadow,transform] duration-150 outline-none hover:shadow-md focus-visible:ring-[0.125rem]"
   >
     <span
-      class="relative inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default bg-tabs-active-bg text-tabs-active-text transition-colors group-hover:bg-primary-600 group-hover:text-text-inverse"
+      class="rounded-default bg-tabs-active-bg text-tabs-active-text group-hover:bg-accent group-hover:text-text-inverse relative inline-flex h-10 w-10 shrink-0 items-center justify-center transition-colors"
     >
       <OIcon :name="icon" size="md" />
     </span>
 
-    <span class="relative flex-1 min-w-0">
-      <span class="block text-sm font-semibold truncate text-text-heading">{{
-        label
-      }}</span>
-      <span
-        v-if="sublabel"
-        class="block text-xs truncate text-text-secondary"
-        >{{ sublabel }}</span
-      >
+    <span class="relative min-w-0 flex-1">
+      <span class="text-text-heading block truncate text-sm font-semibold">{{ label }}</span>
+      <span v-if="sublabel" class="text-text-secondary block truncate text-xs">{{ sublabel }}</span>
     </span>
 
     <OIcon
       name="chevron-right"
       size="sm"
-      class="relative shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-primary-600"
+      class="text-text-disabled group-hover:text-accent relative shrink-0 transition-transform group-hover:translate-x-0.5"
     />
   </button>
 </template>

@@ -19,7 +19,6 @@ import { reactive } from "vue";
 import { createStore } from "vuex";
 import i18n from "@/locales";
 
-
 // ---------------------------------------------------------------------------
 // Mock search service
 // ---------------------------------------------------------------------------
@@ -62,10 +61,7 @@ const mockSearchObj = reactive({
     serviceColors: {} as Record<string, string>,
     redirectedFromLogs: false,
     searchApplied: false,
-    metricsRangeFilters: new Map<
-      string,
-      { panelTitle: string; start: number; end: number }
-    >(),
+    metricsRangeFilters: new Map<string, { panelTitle: string; start: number; end: number }>(),
     queryEditorPlaceholderFlag: true,
     liveMode: false,
     serviceGraphVisualizationType: "tree" as "tree" | "graph",
@@ -144,8 +140,7 @@ const mockSearchObj = reactive({
 // Mock useTraces composable
 // ---------------------------------------------------------------------------
 const mockGetOrSetServiceColor = vi.fn(
-  (serviceName: string) =>
-    mockSearchObj.meta.serviceColors[serviceName] ?? "#9e9e9e",
+  (serviceName: string) => mockSearchObj.meta.serviceColors[serviceName] ?? "#9e9e9e",
 );
 
 vi.mock("@/composables/useTraces", () => ({
@@ -377,13 +372,7 @@ function mountServicesCatalog(
         },
         CellActions: {
           template: '<div data-test="services-catalog-cell-actions" />',
-          props: [
-            "column",
-            "row",
-            "selectedStreamFields",
-            "hideSearchTermActions",
-            "hideAi",
-          ],
+          props: ["column", "row", "selectedStreamFields", "hideSearchTermActions", "hideAi"],
           emits: ["copy", "add-search-term"],
         },
         TraceServiceCell: {
@@ -398,16 +387,10 @@ function mountServicesCatalog(
         },
         ServiceGraphNodeSidePanel: {
           template: '<div data-test="services-catalog-node-side-panel" />',
-          props: [
-            "selectedNode",
-            "graphData",
-            "timeRange",
-            "visible",
-            "streamFilter",
-          ],
+          props: ["selectedNode", "graphData", "timeRange", "visible", "streamFilter"],
           emits: ["close", "view-traces"],
         },
-        "OIcon": false,
+        OIcon: false,
       },
     },
   });
@@ -455,13 +438,11 @@ describe("ServicesCatalog", () => {
     it("should show empty state when services array is empty and not loading", async () => {
       // Mock fetch to immediately call complete without any data, so
       // isLoading transitions back to false and the empty state renders.
-      mockFetchQueryDataWithHttpStream.mockImplementation(
-        (_req: any, callbacks: any) => {
-          if (callbacks?.complete) {
-            callbacks.complete(null, {});
-          }
-        },
-      );
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        if (callbacks?.complete) {
+          callbacks.complete(null, {});
+        }
+      });
 
       wrapper = mountServicesCatalog();
       await flushPromises();
@@ -511,31 +492,29 @@ describe("ServicesCatalog", () => {
     it("should pass loading=false to TenstackTable when data is loaded", async () => {
       // Mock fetch to call the data callback first (so the table has rows and
       // is shown via v-else), then call complete to set isLoading to false.
-      mockFetchQueryDataWithHttpStream.mockImplementation(
-        (_req: any, callbacks: any) => {
-          const hits = mockServices.slice(0, 1).map((s) => ({
-            service_name: s.service_name,
-            total_requests: s.total_requests,
-            error_count: s.error_count,
-            error_rate: s.error_rate,
-            avg_duration_ns: s.avg_duration_ns,
-            max_duration_ns: s.max_duration_ns,
-            p50_latency_ns: s.p50_latency_ns,
-            p95_latency_ns: s.p95_latency_ns,
-            p99_latency_ns: s.p99_latency_ns,
-          }));
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        const hits = mockServices.slice(0, 1).map((s) => ({
+          service_name: s.service_name,
+          total_requests: s.total_requests,
+          error_count: s.error_count,
+          error_rate: s.error_rate,
+          avg_duration_ns: s.avg_duration_ns,
+          max_duration_ns: s.max_duration_ns,
+          p50_latency_ns: s.p50_latency_ns,
+          p95_latency_ns: s.p95_latency_ns,
+          p99_latency_ns: s.p99_latency_ns,
+        }));
 
-          if (callbacks?.data) {
-            callbacks.data(null, {
-              type: "search_response_hits",
-              content: { results: { hits } },
-            });
-          }
-          if (callbacks?.complete) {
-            callbacks.complete(null, {});
-          }
-        },
-      );
+        if (callbacks?.data) {
+          callbacks.data(null, {
+            type: "search_response_hits",
+            content: { results: { hits } },
+          });
+        }
+        if (callbacks?.complete) {
+          callbacks.complete(null, {});
+        }
+      });
 
       wrapper = mountServicesCatalog();
       await flushPromises();
@@ -554,31 +533,29 @@ describe("ServicesCatalog", () => {
   describe("table renders services", () => {
     it("should render service rows when services array has items", async () => {
       // Mock fetch to call the data callback with mock hits and then complete
-      mockFetchQueryDataWithHttpStream.mockImplementation(
-        (_req: any, callbacks: any) => {
-          const hits = mockServices.map((s) => ({
-            service_name: s.service_name,
-            total_requests: s.total_requests,
-            error_count: s.error_count,
-            error_rate: s.error_rate,
-            avg_duration_ns: s.avg_duration_ns,
-            max_duration_ns: s.max_duration_ns,
-            p50_latency_ns: s.p50_latency_ns,
-            p95_latency_ns: s.p95_latency_ns,
-            p99_latency_ns: s.p99_latency_ns,
-          }));
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        const hits = mockServices.map((s) => ({
+          service_name: s.service_name,
+          total_requests: s.total_requests,
+          error_count: s.error_count,
+          error_rate: s.error_rate,
+          avg_duration_ns: s.avg_duration_ns,
+          max_duration_ns: s.max_duration_ns,
+          p50_latency_ns: s.p50_latency_ns,
+          p95_latency_ns: s.p95_latency_ns,
+          p99_latency_ns: s.p99_latency_ns,
+        }));
 
-          if (callbacks?.data) {
-            callbacks.data(null, {
-              type: "search_response_hits",
-              content: { results: { hits } },
-            });
-          }
-          if (callbacks?.complete) {
-            callbacks.complete(null, {});
-          }
-        },
-      );
+        if (callbacks?.data) {
+          callbacks.data(null, {
+            type: "search_response_hits",
+            content: { results: { hits } },
+          });
+        }
+        if (callbacks?.complete) {
+          callbacks.complete(null, {});
+        }
+      });
 
       wrapper = mountServicesCatalog();
       await flushPromises();
@@ -594,31 +571,29 @@ describe("ServicesCatalog", () => {
     });
 
     it("should render the table component", async () => {
-      mockFetchQueryDataWithHttpStream.mockImplementation(
-        (_req: any, callbacks: any) => {
-          const hits = mockServices.slice(0, 1).map((s) => ({
-            service_name: s.service_name,
-            total_requests: s.total_requests,
-            error_count: s.error_count,
-            error_rate: s.error_rate,
-            avg_duration_ns: s.avg_duration_ns,
-            max_duration_ns: s.max_duration_ns,
-            p50_latency_ns: s.p50_latency_ns,
-            p95_latency_ns: s.p95_latency_ns,
-            p99_latency_ns: s.p99_latency_ns,
-          }));
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        const hits = mockServices.slice(0, 1).map((s) => ({
+          service_name: s.service_name,
+          total_requests: s.total_requests,
+          error_count: s.error_count,
+          error_rate: s.error_rate,
+          avg_duration_ns: s.avg_duration_ns,
+          max_duration_ns: s.max_duration_ns,
+          p50_latency_ns: s.p50_latency_ns,
+          p95_latency_ns: s.p95_latency_ns,
+          p99_latency_ns: s.p99_latency_ns,
+        }));
 
-          if (callbacks?.data) {
-            callbacks.data(null, {
-              type: "search_response_hits",
-              content: { results: { hits } },
-            });
-          }
-          if (callbacks?.complete) {
-            callbacks.complete(null, {});
-          }
-        },
-      );
+        if (callbacks?.data) {
+          callbacks.data(null, {
+            type: "search_response_hits",
+            content: { results: { hits } },
+          });
+        }
+        if (callbacks?.complete) {
+          callbacks.complete(null, {});
+        }
+      });
 
       wrapper = mountServicesCatalog();
       await flushPromises();
@@ -634,31 +609,29 @@ describe("ServicesCatalog", () => {
   describe("filter input", () => {
     it("should filter the services list when text is entered", async () => {
       // Populate services via the streaming callback
-      mockFetchQueryDataWithHttpStream.mockImplementation(
-        (_req: any, callbacks: any) => {
-          const hits = mockServices.map((s) => ({
-            service_name: s.service_name,
-            total_requests: s.total_requests,
-            error_count: s.error_count,
-            error_rate: s.error_rate,
-            avg_duration_ns: s.avg_duration_ns,
-            max_duration_ns: s.max_duration_ns,
-            p50_latency_ns: s.p50_latency_ns,
-            p95_latency_ns: s.p95_latency_ns,
-            p99_latency_ns: s.p99_latency_ns,
-          }));
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        const hits = mockServices.map((s) => ({
+          service_name: s.service_name,
+          total_requests: s.total_requests,
+          error_count: s.error_count,
+          error_rate: s.error_rate,
+          avg_duration_ns: s.avg_duration_ns,
+          max_duration_ns: s.max_duration_ns,
+          p50_latency_ns: s.p50_latency_ns,
+          p95_latency_ns: s.p95_latency_ns,
+          p99_latency_ns: s.p99_latency_ns,
+        }));
 
-          if (callbacks?.data) {
-            callbacks.data(null, {
-              type: "search_response_hits",
-              content: { results: { hits } },
-            });
-          }
-          if (callbacks?.complete) {
-            callbacks.complete(null, {});
-          }
-        },
-      );
+        if (callbacks?.data) {
+          callbacks.data(null, {
+            type: "search_response_hits",
+            content: { results: { hits } },
+          });
+        }
+        if (callbacks?.complete) {
+          callbacks.complete(null, {});
+        }
+      });
 
       wrapper = mountServicesCatalog();
       await flushPromises();
@@ -671,37 +644,33 @@ describe("ServicesCatalog", () => {
       await flushPromises();
 
       expect(wrapper.vm.filteredServices).toHaveLength(1);
-      expect(wrapper.vm.filteredServices[0].service_name).toBe(
-        "payment-service",
-      );
+      expect(wrapper.vm.filteredServices[0].service_name).toBe("payment-service");
     });
 
     it("should be case-insensitive when filtering", async () => {
-      mockFetchQueryDataWithHttpStream.mockImplementation(
-        (_req: any, callbacks: any) => {
-          const hits = mockServices.map((s) => ({
-            service_name: s.service_name,
-            total_requests: s.total_requests,
-            error_count: s.error_count,
-            error_rate: s.error_rate,
-            avg_duration_ns: s.avg_duration_ns,
-            max_duration_ns: s.max_duration_ns,
-            p50_latency_ns: s.p50_latency_ns,
-            p95_latency_ns: s.p95_latency_ns,
-            p99_latency_ns: s.p99_latency_ns,
-          }));
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        const hits = mockServices.map((s) => ({
+          service_name: s.service_name,
+          total_requests: s.total_requests,
+          error_count: s.error_count,
+          error_rate: s.error_rate,
+          avg_duration_ns: s.avg_duration_ns,
+          max_duration_ns: s.max_duration_ns,
+          p50_latency_ns: s.p50_latency_ns,
+          p95_latency_ns: s.p95_latency_ns,
+          p99_latency_ns: s.p99_latency_ns,
+        }));
 
-          if (callbacks?.data) {
-            callbacks.data(null, {
-              type: "search_response_hits",
-              content: { results: { hits } },
-            });
-          }
-          if (callbacks?.complete) {
-            callbacks.complete(null, {});
-          }
-        },
-      );
+        if (callbacks?.data) {
+          callbacks.data(null, {
+            type: "search_response_hits",
+            content: { results: { hits } },
+          });
+        }
+        if (callbacks?.complete) {
+          callbacks.complete(null, {});
+        }
+      });
 
       wrapper = mountServicesCatalog();
       await flushPromises();
@@ -715,31 +684,29 @@ describe("ServicesCatalog", () => {
     });
 
     it("should show all services when filter text is cleared", async () => {
-      mockFetchQueryDataWithHttpStream.mockImplementation(
-        (_req: any, callbacks: any) => {
-          const hits = mockServices.map((s) => ({
-            service_name: s.service_name,
-            total_requests: s.total_requests,
-            error_count: s.error_count,
-            error_rate: s.error_rate,
-            avg_duration_ns: s.avg_duration_ns,
-            max_duration_ns: s.max_duration_ns,
-            p50_latency_ns: s.p50_latency_ns,
-            p95_latency_ns: s.p95_latency_ns,
-            p99_latency_ns: s.p99_latency_ns,
-          }));
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        const hits = mockServices.map((s) => ({
+          service_name: s.service_name,
+          total_requests: s.total_requests,
+          error_count: s.error_count,
+          error_rate: s.error_rate,
+          avg_duration_ns: s.avg_duration_ns,
+          max_duration_ns: s.max_duration_ns,
+          p50_latency_ns: s.p50_latency_ns,
+          p95_latency_ns: s.p95_latency_ns,
+          p99_latency_ns: s.p99_latency_ns,
+        }));
 
-          if (callbacks?.data) {
-            callbacks.data(null, {
-              type: "search_response_hits",
-              content: { results: { hits } },
-            });
-          }
-          if (callbacks?.complete) {
-            callbacks.complete(null, {});
-          }
-        },
-      );
+        if (callbacks?.data) {
+          callbacks.data(null, {
+            type: "search_response_hits",
+            content: { results: { hits } },
+          });
+        }
+        if (callbacks?.complete) {
+          callbacks.complete(null, {});
+        }
+      });
 
       wrapper = mountServicesCatalog();
       await flushPromises();
@@ -756,31 +723,29 @@ describe("ServicesCatalog", () => {
     });
 
     it("should show an empty filtered list when no services match the filter", async () => {
-      mockFetchQueryDataWithHttpStream.mockImplementation(
-        (_req: any, callbacks: any) => {
-          const hits = mockServices.map((s) => ({
-            service_name: s.service_name,
-            total_requests: s.total_requests,
-            error_count: s.error_count,
-            error_rate: s.error_rate,
-            avg_duration_ns: s.avg_duration_ns,
-            max_duration_ns: s.max_duration_ns,
-            p50_latency_ns: s.p50_latency_ns,
-            p95_latency_ns: s.p95_latency_ns,
-            p99_latency_ns: s.p99_latency_ns,
-          }));
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        const hits = mockServices.map((s) => ({
+          service_name: s.service_name,
+          total_requests: s.total_requests,
+          error_count: s.error_count,
+          error_rate: s.error_rate,
+          avg_duration_ns: s.avg_duration_ns,
+          max_duration_ns: s.max_duration_ns,
+          p50_latency_ns: s.p50_latency_ns,
+          p95_latency_ns: s.p95_latency_ns,
+          p99_latency_ns: s.p99_latency_ns,
+        }));
 
-          if (callbacks?.data) {
-            callbacks.data(null, {
-              type: "search_response_hits",
-              content: { results: { hits } },
-            });
-          }
-          if (callbacks?.complete) {
-            callbacks.complete(null, {});
-          }
-        },
-      );
+        if (callbacks?.data) {
+          callbacks.data(null, {
+            type: "search_response_hits",
+            content: { results: { hits } },
+          });
+        }
+        if (callbacks?.complete) {
+          callbacks.complete(null, {});
+        }
+      });
 
       wrapper = mountServicesCatalog();
       await flushPromises();
@@ -793,31 +758,29 @@ describe("ServicesCatalog", () => {
 
     it("should handle null/undefined filterText gracefully when filterText is not initialized", async () => {
       // Populate services via the streaming callback
-      mockFetchQueryDataWithHttpStream.mockImplementation(
-        (_req: any, callbacks: any) => {
-          const hits = mockServices.map((s) => ({
-            service_name: s.service_name,
-            total_requests: s.total_requests,
-            error_count: s.error_count,
-            error_rate: s.error_rate,
-            avg_duration_ns: s.avg_duration_ns,
-            max_duration_ns: s.max_duration_ns,
-            p50_latency_ns: s.p50_latency_ns,
-            p95_latency_ns: s.p95_latency_ns,
-            p99_latency_ns: s.p99_latency_ns,
-          }));
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        const hits = mockServices.map((s) => ({
+          service_name: s.service_name,
+          total_requests: s.total_requests,
+          error_count: s.error_count,
+          error_rate: s.error_rate,
+          avg_duration_ns: s.avg_duration_ns,
+          max_duration_ns: s.max_duration_ns,
+          p50_latency_ns: s.p50_latency_ns,
+          p95_latency_ns: s.p95_latency_ns,
+          p99_latency_ns: s.p99_latency_ns,
+        }));
 
-          if (callbacks?.data) {
-            callbacks.data(null, {
-              type: "search_response_hits",
-              content: { results: { hits } },
-            });
-          }
-          if (callbacks?.complete) {
-            callbacks.complete(null, {});
-          }
-        },
-      );
+        if (callbacks?.data) {
+          callbacks.data(null, {
+            type: "search_response_hits",
+            content: { results: { hits } },
+          });
+        }
+        if (callbacks?.complete) {
+          callbacks.complete(null, {});
+        }
+      });
 
       wrapper = mountServicesCatalog();
       await flushPromises();
@@ -846,31 +809,29 @@ describe("ServicesCatalog", () => {
   // -----------------------------------------------------------------------
   describe("status bar", () => {
     beforeEach(() => {
-      mockFetchQueryDataWithHttpStream.mockImplementation(
-        (_req: any, callbacks: any) => {
-          const hits = mockServices.map((s) => ({
-            service_name: s.service_name,
-            total_requests: s.total_requests,
-            error_count: s.error_count,
-            error_rate: s.error_rate,
-            avg_duration_ns: s.avg_duration_ns,
-            max_duration_ns: s.max_duration_ns,
-            p50_latency_ns: s.p50_latency_ns,
-            p95_latency_ns: s.p95_latency_ns,
-            p99_latency_ns: s.p99_latency_ns,
-          }));
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        const hits = mockServices.map((s) => ({
+          service_name: s.service_name,
+          total_requests: s.total_requests,
+          error_count: s.error_count,
+          error_rate: s.error_rate,
+          avg_duration_ns: s.avg_duration_ns,
+          max_duration_ns: s.max_duration_ns,
+          p50_latency_ns: s.p50_latency_ns,
+          p95_latency_ns: s.p95_latency_ns,
+          p99_latency_ns: s.p99_latency_ns,
+        }));
 
-          if (callbacks?.data) {
-            callbacks.data(null, {
-              type: "search_response_hits",
-              content: { results: { hits } },
-            });
-          }
-          if (callbacks?.complete) {
-            callbacks.complete(null, {});
-          }
-        },
-      );
+        if (callbacks?.data) {
+          callbacks.data(null, {
+            type: "search_response_hits",
+            content: { results: { hits } },
+          });
+        }
+        if (callbacks?.complete) {
+          callbacks.complete(null, {});
+        }
+      });
     });
 
     it("should show correct critical count", async () => {
@@ -899,33 +860,31 @@ describe("ServicesCatalog", () => {
 
     it("should render the pill with only total when all services are healthy", async () => {
       mockFetchQueryDataWithHttpStream.mockReset();
-      mockFetchQueryDataWithHttpStream.mockImplementation(
-        (_req: any, callbacks: any) => {
-          const hits = [
-            {
-              service_name: "svc-a",
-              total_requests: 100,
-              error_count: 0,
-              error_rate: 0,
-              avg_duration_ns: 1000,
-              max_duration_ns: 2000,
-              p50_latency_ns: 800,
-              p95_latency_ns: 1500,
-              p99_latency_ns: 1800,
-            },
-          ];
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        const hits = [
+          {
+            service_name: "svc-a",
+            total_requests: 100,
+            error_count: 0,
+            error_rate: 0,
+            avg_duration_ns: 1000,
+            max_duration_ns: 2000,
+            p50_latency_ns: 800,
+            p95_latency_ns: 1500,
+            p99_latency_ns: 1800,
+          },
+        ];
 
-          if (callbacks?.data) {
-            callbacks.data(null, {
-              type: "search_response_hits",
-              content: { results: { hits } },
-            });
-          }
-          if (callbacks?.complete) {
-            callbacks.complete(null, {});
-          }
-        },
-      );
+        if (callbacks?.data) {
+          callbacks.data(null, {
+            type: "search_response_hits",
+            content: { results: { hits } },
+          });
+        }
+        if (callbacks?.complete) {
+          callbacks.complete(null, {});
+        }
+      });
 
       wrapper = mountServicesCatalog();
       await flushPromises();
@@ -951,33 +910,31 @@ describe("ServicesCatalog", () => {
     it("should only show relevant status counts", async () => {
       // Override: only healthy services (no critical)
       mockFetchQueryDataWithHttpStream.mockReset();
-      mockFetchQueryDataWithHttpStream.mockImplementation(
-        (_req: any, callbacks: any) => {
-          const hits = [
-            {
-              service_name: "svc-a",
-              total_requests: 100,
-              error_count: 0,
-              error_rate: 0,
-              avg_duration_ns: 1000,
-              max_duration_ns: 2000,
-              p50_latency_ns: 800,
-              p95_latency_ns: 1500,
-              p99_latency_ns: 1800,
-            },
-          ];
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        const hits = [
+          {
+            service_name: "svc-a",
+            total_requests: 100,
+            error_count: 0,
+            error_rate: 0,
+            avg_duration_ns: 1000,
+            max_duration_ns: 2000,
+            p50_latency_ns: 800,
+            p95_latency_ns: 1500,
+            p99_latency_ns: 1800,
+          },
+        ];
 
-          if (callbacks?.data) {
-            callbacks.data(null, {
-              type: "search_response_hits",
-              content: { results: { hits } },
-            });
-          }
-          if (callbacks?.complete) {
-            callbacks.complete(null, {});
-          }
-        },
-      );
+        if (callbacks?.data) {
+          callbacks.data(null, {
+            type: "search_response_hits",
+            content: { results: { hits } },
+          });
+        }
+        if (callbacks?.complete) {
+          callbacks.complete(null, {});
+        }
+      });
 
       wrapper = mountServicesCatalog();
       await flushPromises();
@@ -992,31 +949,29 @@ describe("ServicesCatalog", () => {
   // -----------------------------------------------------------------------
   describe("sorting", () => {
     beforeEach(() => {
-      mockFetchQueryDataWithHttpStream.mockImplementation(
-        (_req: any, callbacks: any) => {
-          const hits = mockServices.map((s) => ({
-            service_name: s.service_name,
-            total_requests: s.total_requests,
-            error_count: s.error_count,
-            error_rate: s.error_rate,
-            avg_duration_ns: s.avg_duration_ns,
-            max_duration_ns: s.max_duration_ns,
-            p50_latency_ns: s.p50_latency_ns,
-            p95_latency_ns: s.p95_latency_ns,
-            p99_latency_ns: s.p99_latency_ns,
-          }));
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        const hits = mockServices.map((s) => ({
+          service_name: s.service_name,
+          total_requests: s.total_requests,
+          error_count: s.error_count,
+          error_rate: s.error_rate,
+          avg_duration_ns: s.avg_duration_ns,
+          max_duration_ns: s.max_duration_ns,
+          p50_latency_ns: s.p50_latency_ns,
+          p95_latency_ns: s.p95_latency_ns,
+          p99_latency_ns: s.p99_latency_ns,
+        }));
 
-          if (callbacks?.data) {
-            callbacks.data(null, {
-              type: "search_response_hits",
-              content: { results: { hits } },
-            });
-          }
-          if (callbacks?.complete) {
-            callbacks.complete(null, {});
-          }
-        },
-      );
+        if (callbacks?.data) {
+          callbacks.data(null, {
+            type: "search_response_hits",
+            content: { results: { hits } },
+          });
+        }
+        if (callbacks?.complete) {
+          callbacks.complete(null, {});
+        }
+      });
     });
 
     it("should default sortBy to 'status' and sortOrder to 'desc'", async () => {
@@ -1037,9 +992,7 @@ describe("ServicesCatalog", () => {
 
       const names = wrapper.vm.sortedServices.map((s: any) => s.service_name);
       // healthy first (api-gateway, database-proxy), then degraded, warning, critical
-      expect(names.slice(0, 2)).toEqual(
-        expect.arrayContaining(["api-gateway", "database-proxy"]),
-      );
+      expect(names.slice(0, 2)).toEqual(expect.arrayContaining(["api-gateway", "database-proxy"]));
       expect(names[2]).toBe("auth-service");
       expect(names[3]).toBe("payment-service");
       expect(names[4]).toBe("notification-service");
@@ -1055,9 +1008,7 @@ describe("ServicesCatalog", () => {
       expect(names[0]).toBe("notification-service");
       expect(names[1]).toBe("payment-service");
       expect(names[2]).toBe("auth-service");
-      expect(names.slice(3, 5)).toEqual(
-        expect.arrayContaining(["api-gateway", "database-proxy"]),
-      );
+      expect(names.slice(3, 5)).toEqual(expect.arrayContaining(["api-gateway", "database-proxy"]));
     });
 
     it("should sort by numeric column correctly when sortOrder is asc", async () => {
@@ -1068,9 +1019,7 @@ describe("ServicesCatalog", () => {
       wrapper.vm.sortOrder = "asc";
       await flushPromises();
 
-      const counts = wrapper.vm.sortedServices.map(
-        (s: any) => s.total_requests,
-      );
+      const counts = wrapper.vm.sortedServices.map((s: any) => s.total_requests);
       expect(counts).toEqual([800, 2000, 5000, 10000, 20000]);
     });
 
@@ -1145,31 +1094,29 @@ describe("ServicesCatalog", () => {
   // -----------------------------------------------------------------------
   describe("status pills", () => {
     beforeEach(() => {
-      mockFetchQueryDataWithHttpStream.mockImplementation(
-        (_req: any, callbacks: any) => {
-          const hits = mockServices.map((s) => ({
-            service_name: s.service_name,
-            total_requests: s.total_requests,
-            error_count: s.error_count,
-            error_rate: s.error_rate,
-            avg_duration_ns: s.avg_duration_ns,
-            max_duration_ns: s.max_duration_ns,
-            p50_latency_ns: s.p50_latency_ns,
-            p95_latency_ns: s.p95_latency_ns,
-            p99_latency_ns: s.p99_latency_ns,
-          }));
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        const hits = mockServices.map((s) => ({
+          service_name: s.service_name,
+          total_requests: s.total_requests,
+          error_count: s.error_count,
+          error_rate: s.error_rate,
+          avg_duration_ns: s.avg_duration_ns,
+          max_duration_ns: s.max_duration_ns,
+          p50_latency_ns: s.p50_latency_ns,
+          p95_latency_ns: s.p95_latency_ns,
+          p99_latency_ns: s.p99_latency_ns,
+        }));
 
-          if (callbacks?.data) {
-            callbacks.data(null, {
-              type: "search_response_hits",
-              content: { results: { hits } },
-            });
-          }
-          if (callbacks?.complete) {
-            callbacks.complete(null, {});
-          }
-        },
-      );
+        if (callbacks?.data) {
+          callbacks.data(null, {
+            type: "search_response_hits",
+            content: { results: { hits } },
+          });
+        }
+        if (callbacks?.complete) {
+          callbacks.complete(null, {});
+        }
+      });
     });
 
     it("should render critical pill when statusCounts.critical > 0", async () => {
@@ -1204,46 +1151,38 @@ describe("ServicesCatalog", () => {
 
     it("should not render any status pills when all services are healthy", async () => {
       mockFetchQueryDataWithHttpStream.mockReset();
-      mockFetchQueryDataWithHttpStream.mockImplementation(
-        (_req: any, callbacks: any) => {
-          const hits = [
-            {
-              service_name: "svc-a",
-              total_requests: 100,
-              error_count: 0,
-              error_rate: 0,
-              avg_duration_ns: 1000,
-              max_duration_ns: 2000,
-              p50_latency_ns: 800,
-              p95_latency_ns: 1500,
-              p99_latency_ns: 1800,
-            },
-          ];
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        const hits = [
+          {
+            service_name: "svc-a",
+            total_requests: 100,
+            error_count: 0,
+            error_rate: 0,
+            avg_duration_ns: 1000,
+            max_duration_ns: 2000,
+            p50_latency_ns: 800,
+            p95_latency_ns: 1500,
+            p99_latency_ns: 1800,
+          },
+        ];
 
-          if (callbacks?.data) {
-            callbacks.data(null, {
-              type: "search_response_hits",
-              content: { results: { hits } },
-            });
-          }
-          if (callbacks?.complete) {
-            callbacks.complete(null, {});
-          }
-        },
-      );
+        if (callbacks?.data) {
+          callbacks.data(null, {
+            type: "search_response_hits",
+            content: { results: { hits } },
+          });
+        }
+        if (callbacks?.complete) {
+          callbacks.complete(null, {});
+        }
+      });
 
       wrapper = mountServicesCatalog();
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="services-catalog-pill-critical"]').exists(),
-      ).toBe(false);
-      expect(
-        wrapper.find('[data-test="services-catalog-pill-warning"]').exists(),
-      ).toBe(false);
-      expect(
-        wrapper.find('[data-test="services-catalog-pill-degraded"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="services-catalog-pill-critical"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="services-catalog-pill-warning"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="services-catalog-pill-degraded"]').exists()).toBe(false);
     });
   });
 
@@ -1252,47 +1191,33 @@ describe("ServicesCatalog", () => {
   // -----------------------------------------------------------------------
   describe.skip("status legend", () => {
     it("should render the status legend", async () => {
-      mockFetchQueryDataWithHttpStream.mockImplementation(
-        (_req: any, callbacks: any) => {
-          if (callbacks?.complete) {
-            callbacks.complete(null, {});
-          }
-        },
-      );
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        if (callbacks?.complete) {
+          callbacks.complete(null, {});
+        }
+      });
 
       wrapper = mountServicesCatalog();
       await flushPromises();
 
-      const legend = wrapper.find(
-        '[data-test="services-catalog-status-legend"]',
-      );
+      const legend = wrapper.find('[data-test="services-catalog-status-legend"]');
       expect(legend.exists()).toBe(true);
     });
 
     it("should render all four legend items", async () => {
-      mockFetchQueryDataWithHttpStream.mockImplementation(
-        (_req: any, callbacks: any) => {
-          if (callbacks?.complete) {
-            callbacks.complete(null, {});
-          }
-        },
-      );
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        if (callbacks?.complete) {
+          callbacks.complete(null, {});
+        }
+      });
 
       wrapper = mountServicesCatalog();
       await flushPromises();
 
-      const healthyLegend = wrapper.find(
-        '[data-test="services-catalog-legend-healthy"]',
-      );
-      const degradedLegend = wrapper.find(
-        '[data-test="services-catalog-legend-degraded"]',
-      );
-      const warningLegend = wrapper.find(
-        '[data-test="services-catalog-legend-warning"]',
-      );
-      const criticalLegend = wrapper.find(
-        '[data-test="services-catalog-legend-critical"]',
-      );
+      const healthyLegend = wrapper.find('[data-test="services-catalog-legend-healthy"]');
+      const degradedLegend = wrapper.find('[data-test="services-catalog-legend-degraded"]');
+      const warningLegend = wrapper.find('[data-test="services-catalog-legend-warning"]');
+      const criticalLegend = wrapper.find('[data-test="services-catalog-legend-critical"]');
 
       expect(healthyLegend.exists()).toBe(true);
       expect(degradedLegend.exists()).toBe(true);
@@ -1304,9 +1229,7 @@ describe("ServicesCatalog", () => {
       wrapper = mountServicesCatalog();
       await flushPromises();
 
-      const legend = wrapper.find(
-        '[data-test="services-catalog-status-legend"]',
-      );
+      const legend = wrapper.find('[data-test="services-catalog-status-legend"]');
       // Legend is outside the v-if="!isLoading && services.length > 0" block,
       // so it always renders.
       expect(legend.exists()).toBe(true);
@@ -1318,30 +1241,28 @@ describe("ServicesCatalog", () => {
   // -----------------------------------------------------------------------
   describe("type-filter tab counts", () => {
     function mockAllServices() {
-      mockFetchQueryDataWithHttpStream.mockImplementation(
-        (_req: any, callbacks: any) => {
-          const hits = mockServices.map((s) => ({
-            service_name: s.service_name,
-            total_requests: s.total_requests,
-            error_count: s.error_count,
-            error_rate: s.error_rate,
-            avg_duration_ns: s.avg_duration_ns,
-            max_duration_ns: s.max_duration_ns,
-            p50_latency_ns: s.p50_latency_ns,
-            p95_latency_ns: s.p95_latency_ns,
-            p99_latency_ns: s.p99_latency_ns,
-          }));
-          if (callbacks?.data) {
-            callbacks.data(null, {
-              type: "search_response_hits",
-              content: { results: { hits } },
-            });
-          }
-          if (callbacks?.complete) {
-            callbacks.complete(null, {});
-          }
-        },
-      );
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        const hits = mockServices.map((s) => ({
+          service_name: s.service_name,
+          total_requests: s.total_requests,
+          error_count: s.error_count,
+          error_rate: s.error_rate,
+          avg_duration_ns: s.avg_duration_ns,
+          max_duration_ns: s.max_duration_ns,
+          p50_latency_ns: s.p50_latency_ns,
+          p95_latency_ns: s.p95_latency_ns,
+          p99_latency_ns: s.p99_latency_ns,
+        }));
+        if (callbacks?.data) {
+          callbacks.data(null, {
+            type: "search_response_hits",
+            content: { results: { hits } },
+          });
+        }
+        if (callbacks?.complete) {
+          callbacks.complete(null, {});
+        }
+      });
     }
 
     it("shows the total on the All tab and the count on the Services tab", async () => {
@@ -1363,9 +1284,7 @@ describe("ServicesCatalog", () => {
       wrapper = mountServicesCatalog();
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="services-catalog-status-pill"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="services-catalog-status-pill"]').exists()).toBe(false);
     });
 
     it("does not render the type filter when loading", async () => {
@@ -1377,9 +1296,7 @@ describe("ServicesCatalog", () => {
       await flushPromises();
 
       // Type filter is inside v-if="!isLoading && services.length > 0".
-      expect(
-        wrapper.find('[data-test="services-catalog-type-filter"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="services-catalog-type-filter"]').exists()).toBe(false);
     });
   });
 
@@ -1388,31 +1305,29 @@ describe("ServicesCatalog", () => {
   // -----------------------------------------------------------------------
   describe("row click", () => {
     it("should toggle side panel open when a row is clicked", async () => {
-      mockFetchQueryDataWithHttpStream.mockImplementation(
-        (_req: any, callbacks: any) => {
-          const hits = mockServices.slice(0, 1).map((s) => ({
-            service_name: s.service_name,
-            total_requests: s.total_requests,
-            error_count: s.error_count,
-            error_rate: s.error_rate,
-            avg_duration_ns: s.avg_duration_ns,
-            max_duration_ns: s.max_duration_ns,
-            p50_latency_ns: s.p50_latency_ns,
-            p95_latency_ns: s.p95_latency_ns,
-            p99_latency_ns: s.p99_latency_ns,
-          }));
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        const hits = mockServices.slice(0, 1).map((s) => ({
+          service_name: s.service_name,
+          total_requests: s.total_requests,
+          error_count: s.error_count,
+          error_rate: s.error_rate,
+          avg_duration_ns: s.avg_duration_ns,
+          max_duration_ns: s.max_duration_ns,
+          p50_latency_ns: s.p50_latency_ns,
+          p95_latency_ns: s.p95_latency_ns,
+          p99_latency_ns: s.p99_latency_ns,
+        }));
 
-          if (callbacks?.data) {
-            callbacks.data(null, {
-              type: "search_response_hits",
-              content: { results: { hits } },
-            });
-          }
-          if (callbacks?.complete) {
-            callbacks.complete(null, {});
-          }
-        },
-      );
+        if (callbacks?.data) {
+          callbacks.data(null, {
+            type: "search_response_hits",
+            content: { results: { hits } },
+          });
+        }
+        if (callbacks?.complete) {
+          callbacks.complete(null, {});
+        }
+      });
 
       wrapper = mountServicesCatalog();
       await flushPromises();
@@ -1421,9 +1336,7 @@ describe("ServicesCatalog", () => {
       expect(wrapper.vm.showSidePanel).toBe(false);
 
       // Click the first row via the TenstackTable stub
-      const firstRow = wrapper.find(
-        '[data-test="services-catalog-row-name-api-gateway"]',
-      );
+      const firstRow = wrapper.find('[data-test="services-catalog-row-name-api-gateway"]');
       await firstRow.trigger("click");
 
       expect(wrapper.vm.showSidePanel).toBe(true);
@@ -1431,38 +1344,34 @@ describe("ServicesCatalog", () => {
     });
 
     it("should close side panel when same row is clicked again", async () => {
-      mockFetchQueryDataWithHttpStream.mockImplementation(
-        (_req: any, callbacks: any) => {
-          const hits = mockServices.slice(0, 1).map((s) => ({
-            service_name: s.service_name,
-            total_requests: s.total_requests,
-            error_count: s.error_count,
-            error_rate: s.error_rate,
-            avg_duration_ns: s.avg_duration_ns,
-            max_duration_ns: s.max_duration_ns,
-            p50_latency_ns: s.p50_latency_ns,
-            p95_latency_ns: s.p95_latency_ns,
-            p99_latency_ns: s.p99_latency_ns,
-          }));
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        const hits = mockServices.slice(0, 1).map((s) => ({
+          service_name: s.service_name,
+          total_requests: s.total_requests,
+          error_count: s.error_count,
+          error_rate: s.error_rate,
+          avg_duration_ns: s.avg_duration_ns,
+          max_duration_ns: s.max_duration_ns,
+          p50_latency_ns: s.p50_latency_ns,
+          p95_latency_ns: s.p95_latency_ns,
+          p99_latency_ns: s.p99_latency_ns,
+        }));
 
-          if (callbacks?.data) {
-            callbacks.data(null, {
-              type: "search_response_hits",
-              content: { results: { hits } },
-            });
-          }
-          if (callbacks?.complete) {
-            callbacks.complete(null, {});
-          }
-        },
-      );
+        if (callbacks?.data) {
+          callbacks.data(null, {
+            type: "search_response_hits",
+            content: { results: { hits } },
+          });
+        }
+        if (callbacks?.complete) {
+          callbacks.complete(null, {});
+        }
+      });
 
       wrapper = mountServicesCatalog();
       await flushPromises();
 
-      const firstRow = wrapper.find(
-        '[data-test="services-catalog-row-name-api-gateway"]',
-      );
+      const firstRow = wrapper.find('[data-test="services-catalog-row-name-api-gateway"]');
 
       // First click opens
       await firstRow.trigger("click");
@@ -1479,74 +1388,71 @@ describe("ServicesCatalog", () => {
   // Status badge classes per row
   // -----------------------------------------------------------------------
   describe("status badges", () => {
-
     it("should derive correct status from error rate", async () => {
       // Load services with known error rates and verify the derived status
       // per row matches the expected status.
-      mockFetchQueryDataWithHttpStream.mockImplementation(
-        (_req: any, callbacks: any) => {
-          const hits = [
-            // 0.5% -> healthy
-            {
-              service_name: "svc-healthy",
-              total_requests: 100,
-              error_count: 0,
-              error_rate: 0.5,
-              avg_duration_ns: 1000,
-              max_duration_ns: 2000,
-              p50_latency_ns: 800,
-              p95_latency_ns: 1500,
-              p99_latency_ns: 1800,
-            },
-            // 2% -> degraded
-            {
-              service_name: "svc-degraded",
-              total_requests: 100,
-              error_count: 2,
-              error_rate: 2,
-              avg_duration_ns: 1000,
-              max_duration_ns: 2000,
-              p50_latency_ns: 800,
-              p95_latency_ns: 1500,
-              p99_latency_ns: 1800,
-            },
-            // 7% -> warning
-            {
-              service_name: "svc-warning",
-              total_requests: 100,
-              error_count: 7,
-              error_rate: 7,
-              avg_duration_ns: 1000,
-              max_duration_ns: 2000,
-              p50_latency_ns: 800,
-              p95_latency_ns: 1500,
-              p99_latency_ns: 1800,
-            },
-            // 12% -> critical
-            {
-              service_name: "svc-critical",
-              total_requests: 100,
-              error_count: 12,
-              error_rate: 12,
-              avg_duration_ns: 1000,
-              max_duration_ns: 2000,
-              p50_latency_ns: 800,
-              p95_latency_ns: 1500,
-              p99_latency_ns: 1800,
-            },
-          ];
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        const hits = [
+          // 0.5% -> healthy
+          {
+            service_name: "svc-healthy",
+            total_requests: 100,
+            error_count: 0,
+            error_rate: 0.5,
+            avg_duration_ns: 1000,
+            max_duration_ns: 2000,
+            p50_latency_ns: 800,
+            p95_latency_ns: 1500,
+            p99_latency_ns: 1800,
+          },
+          // 2% -> degraded
+          {
+            service_name: "svc-degraded",
+            total_requests: 100,
+            error_count: 2,
+            error_rate: 2,
+            avg_duration_ns: 1000,
+            max_duration_ns: 2000,
+            p50_latency_ns: 800,
+            p95_latency_ns: 1500,
+            p99_latency_ns: 1800,
+          },
+          // 7% -> warning
+          {
+            service_name: "svc-warning",
+            total_requests: 100,
+            error_count: 7,
+            error_rate: 7,
+            avg_duration_ns: 1000,
+            max_duration_ns: 2000,
+            p50_latency_ns: 800,
+            p95_latency_ns: 1500,
+            p99_latency_ns: 1800,
+          },
+          // 12% -> critical
+          {
+            service_name: "svc-critical",
+            total_requests: 100,
+            error_count: 12,
+            error_rate: 12,
+            avg_duration_ns: 1000,
+            max_duration_ns: 2000,
+            p50_latency_ns: 800,
+            p95_latency_ns: 1500,
+            p99_latency_ns: 1800,
+          },
+        ];
 
-          if (callbacks?.data) {
-            callbacks.data(null, {
-              type: "search_response_hits",
-              content: { results: { hits } },
-            });
-          }
-          if (callbacks?.complete) {
-            callbacks.complete(null, {});
-          }
-        },
-      );
+        if (callbacks?.data) {
+          callbacks.data(null, {
+            type: "search_response_hits",
+            content: { results: { hits } },
+          });
+        }
+        if (callbacks?.complete) {
+          callbacks.complete(null, {});
+        }
+      });
 
       wrapper = mountServicesCatalog();
       await flushPromises();
@@ -1563,64 +1469,50 @@ describe("ServicesCatalog", () => {
   // -----------------------------------------------------------------------
   describe("error rate color classes", () => {
     it("should return correct class for critical error rate (>10%)", async () => {
-      mockFetchQueryDataWithHttpStream.mockImplementation(
-        (_req: any, callbacks: any) => {
-          if (callbacks?.complete) {
-            callbacks.complete(null, {});
-          }
-        },
-      );
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        if (callbacks?.complete) {
+          callbacks.complete(null, {});
+        }
+      });
 
       wrapper = mountServicesCatalog();
       await flushPromises();
 
-      expect(wrapper.vm.errorRateClass(15)).toContain(
-        "text-service-health-critical",
-      );
+      expect(wrapper.vm.errorRateClass(15)).toContain("text-service-health-critical");
     });
 
     it("should return correct class for warning error rate (5-10%)", async () => {
-      mockFetchQueryDataWithHttpStream.mockImplementation(
-        (_req: any, callbacks: any) => {
-          if (callbacks?.complete) {
-            callbacks.complete(null, {});
-          }
-        },
-      );
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        if (callbacks?.complete) {
+          callbacks.complete(null, {});
+        }
+      });
 
       wrapper = mountServicesCatalog();
       await flushPromises();
 
-      expect(wrapper.vm.errorRateClass(7)).toContain(
-        "text-service-health-degraded",
-      );
+      expect(wrapper.vm.errorRateClass(7)).toContain("text-service-health-degraded");
     });
 
     it("should return correct class for degraded error rate (1-5%)", async () => {
-      mockFetchQueryDataWithHttpStream.mockImplementation(
-        (_req: any, callbacks: any) => {
-          if (callbacks?.complete) {
-            callbacks.complete(null, {});
-          }
-        },
-      );
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        if (callbacks?.complete) {
+          callbacks.complete(null, {});
+        }
+      });
 
       wrapper = mountServicesCatalog();
       await flushPromises();
 
-      expect(wrapper.vm.errorRateClass(2)).toContain(
-        "text-service-health-warning",
-      );
+      expect(wrapper.vm.errorRateClass(2)).toContain("text-service-health-warning");
     });
 
     it("should return empty string for healthy error rate (<=1%)", async () => {
-      mockFetchQueryDataWithHttpStream.mockImplementation(
-        (_req: any, callbacks: any) => {
-          if (callbacks?.complete) {
-            callbacks.complete(null, {});
-          }
-        },
-      );
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        if (callbacks?.complete) {
+          callbacks.complete(null, {});
+        }
+      });
 
       wrapper = mountServicesCatalog();
       await flushPromises();
@@ -1634,13 +1526,11 @@ describe("ServicesCatalog", () => {
   // -----------------------------------------------------------------------
   describe("formatPercent", () => {
     it("should format a number with two decimal places and percent sign", async () => {
-      mockFetchQueryDataWithHttpStream.mockImplementation(
-        (_req: any, callbacks: any) => {
-          if (callbacks?.complete) {
-            callbacks.complete(null, {});
-          }
-        },
-      );
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        if (callbacks?.complete) {
+          callbacks.complete(null, {});
+        }
+      });
 
       wrapper = mountServicesCatalog();
       await flushPromises();
@@ -1696,13 +1586,11 @@ describe("ServicesCatalog", () => {
   // -----------------------------------------------------------------------
   describe("P99 warning threshold", () => {
     it("should have P99_WARN_NS set to 1 second (1,000,000,000 ns)", async () => {
-      mockFetchQueryDataWithHttpStream.mockImplementation(
-        (_req: any, callbacks: any) => {
-          if (callbacks?.complete) {
-            callbacks.complete(null, {});
-          }
-        },
-      );
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        if (callbacks?.complete) {
+          callbacks.complete(null, {});
+        }
+      });
 
       wrapper = mountServicesCatalog();
       await flushPromises();
@@ -1737,25 +1625,15 @@ describe("ServicesCatalog", () => {
     describe("stream selector renders", () => {
       it("should render stream selector and populate availableStreams when streams are returned", async () => {
         mockGetStreams.mockResolvedValueOnce({
-          list: [
-            { name: "default" },
-            { name: "production" },
-            { name: "staging" },
-          ],
+          list: [{ name: "default" }, { name: "production" }, { name: "staging" }],
         });
 
         wrapper = mountServicesCatalog();
         await flushPromises();
 
-        const selector = wrapper.find(
-          '[data-test="services-catalog-stream-selector"]',
-        );
+        const selector = wrapper.find('[data-test="services-catalog-stream-selector"]');
         expect(selector.exists()).toBe(true);
-        expect(wrapper.vm.availableStreams).toEqual([
-          "default",
-          "production",
-          "staging",
-        ]);
+        expect(wrapper.vm.availableStreams).toEqual(["default", "production", "staging"]);
       });
 
       it("should render stream selector when no streams are available", async () => {
@@ -1764,9 +1642,7 @@ describe("ServicesCatalog", () => {
         wrapper = mountServicesCatalog();
         await flushPromises();
 
-        const selector = wrapper.find(
-          '[data-test="services-catalog-stream-selector"]',
-        );
+        const selector = wrapper.find('[data-test="services-catalog-stream-selector"]');
         expect(selector.exists()).toBe(true);
         expect(wrapper.vm.availableStreams).toEqual([]);
       });
@@ -1891,9 +1767,7 @@ describe("ServicesCatalog", () => {
         };
         await flushPromises();
 
-        expect(localStorage.getItem("servicesCatalog_streamFilter")).toBe(
-          "production",
-        );
+        expect(localStorage.getItem("servicesCatalog_streamFilter")).toBe("production");
       });
 
       it("should NOT call loadServicesCatalog when the global stream value is unchanged", async () => {
@@ -1991,10 +1865,7 @@ describe("ServicesCatalog", () => {
         // before calling atob.
         const urlSafeSql = callArgs.queryReq.query.sql;
         const decodedSql = atob(
-          urlSafeSql
-            .replace(/-/g, "+")
-            .replace(/_/g, "/")
-            .replace(/\./g, "="),
+          urlSafeSql.replace(/-/g, "+").replace(/_/g, "/").replace(/\./g, "="),
         );
         expect(decodedSql).toContain('FROM "production-stream"');
       });
@@ -2046,9 +1917,7 @@ describe("ServicesCatalog", () => {
 
     it("shows only instrumented services under the default Services tab", async () => {
       wrapper = await mountWithRows(mixedRows);
-      const names = wrapper.vm.filteredServices.map(
-        (s: any) => s.service_name,
-      );
+      const names = wrapper.vm.filteredServices.map((s: any) => s.service_name);
       expect(names.sort()).toEqual(["backend-pos-web", "backend-tss-login"]);
     });
 
@@ -2108,15 +1977,14 @@ describe("ServicesCatalog", () => {
 
       wrapper.vm.onTypeFilterChange("datastore");
       await flushPromises();
-      expect(
-        wrapper.vm.filteredServices.map((s: any) => s.service_name).sort(),
-      ).toEqual(["orders-db", "redis-prod"]);
+      expect(wrapper.vm.filteredServices.map((s: any) => s.service_name).sort()).toEqual([
+        "orders-db",
+        "redis-prod",
+      ]);
 
       wrapper.vm.onTypeFilterChange("external");
       await flushPromises();
-      expect(
-        wrapper.vm.filteredServices.map((s: any) => s.service_name),
-      ).toEqual(["google.com"]);
+      expect(wrapper.vm.filteredServices.map((s: any) => s.service_name)).toEqual(["google.com"]);
     });
 
     it("applies the text filter within the active type tab", async () => {
@@ -2124,9 +1992,7 @@ describe("ServicesCatalog", () => {
       wrapper.vm.onTypeFilterChange("datastore");
       wrapper.vm.filterText = "redis";
       await flushPromises();
-      expect(
-        wrapper.vm.filteredServices.map((s: any) => s.service_name),
-      ).toEqual(["redis-prod"]);
+      expect(wrapper.vm.filteredServices.map((s: any) => s.service_name)).toEqual(["redis-prod"]);
     });
 
     it("hides type tabs with no entities but always keeps Services", async () => {
@@ -2156,9 +2022,7 @@ describe("ServicesCatalog", () => {
       expect(wrapper.vm.typeFilter).toBe("queue");
 
       // Replace inventory with services only — the Queue tab vanishes.
-      wrapper.vm.services = mixedRows.filter(
-        (r) => !r.infer_service_type,
-      );
+      wrapper.vm.services = mixedRows.filter((r) => !r.infer_service_type);
       await flushPromises();
       expect(wrapper.vm.typeFilter).toBe("service");
     });
@@ -2195,16 +2059,27 @@ describe("ServicesCatalog", () => {
       wrapper.vm.onTypeFilterChange("all");
       wrapper.vm.filterText = "order"; // matches queue 'refund-order' + db 'orders-db'
       await flushPromises();
-      expect(
-        wrapper.vm.filteredServices.map((s: any) => s.service_name).sort(),
-      ).toEqual(["orders-db", "refund-order"]);
+      expect(wrapper.vm.filteredServices.map((s: any) => s.service_name).sort()).toEqual([
+        "orders-db",
+        "refund-order",
+      ]);
     });
 
     describe("status counts scoped to the active type tab", () => {
       // Two datastores: one degraded, one healthy. One critical service.
       const statusRows = [
-        { service_name: "svc-crit", infer_service_type: undefined, status: "critical", error_rate: 20 },
-        { service_name: "db-degraded", infer_service_type: "database", status: "degraded", error_rate: 3 },
+        {
+          service_name: "svc-crit",
+          infer_service_type: undefined,
+          status: "critical",
+          error_rate: 20,
+        },
+        {
+          service_name: "db-degraded",
+          infer_service_type: "database",
+          status: "degraded",
+          error_rate: 3,
+        },
         { service_name: "db-ok", infer_service_type: "database", status: "healthy", error_rate: 0 },
       ].map((r) => ({
         total_requests: 100,
@@ -2298,15 +2173,11 @@ describe("ServicesCatalog", () => {
       it("renders the bracket count only for tabs with unhealthy entities", async () => {
         wrapper = await mountWithRows(healthRows);
         expect(
-          wrapper
-            .find('[data-test="services-catalog-type-unhealthy-datastore"]')
-            .exists(),
+          wrapper.find('[data-test="services-catalog-type-unhealthy-datastore"]').exists(),
         ).toBe(true);
-        expect(
-          wrapper
-            .find('[data-test="services-catalog-type-unhealthy-queue"]')
-            .exists(),
-        ).toBe(false);
+        expect(wrapper.find('[data-test="services-catalog-type-unhealthy-queue"]').exists()).toBe(
+          false,
+        );
       });
     });
   });

@@ -38,12 +38,17 @@ vi.mock("vue-i18n", () => ({
   useI18n: vi.fn(() => ({ t: (key: string) => key })),
 }));
 
+vi.mock("vue-router", () => ({
+  useRoute: vi.fn(() => ({ query: {} })),
+}));
+
 // ── Stubs for O2 and layout components ──────────────────────────────────────
 vi.mock("@/lib/core/PageHeader/OPageHeader.vue", () => ({
   default: {
     name: "OPageHeader",
     props: ["subtitle", "back", "drawerMode"],
-    template: '<div data-test="app-page-header"><slot name="title"></slot><slot name="title-trail"></slot></div>',
+    template:
+      '<div data-test="app-page-header"><slot name="title"></slot><slot name="title-trail"></slot></div>',
   },
 }));
 
@@ -311,9 +316,7 @@ describe("ProtocolRunSummary", () => {
       mockGetSynthetics.mockResolvedValueOnce({
         data: {
           config: {
-            assertions: [
-              { field: "status_code", operator: "equals", value: "200" },
-            ],
+            assertions: [{ field: "status_code", operator: "equals", value: "200" }],
           },
         },
       });

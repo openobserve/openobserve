@@ -21,7 +21,6 @@ import store from "@/test/unit/helpers/store";
 import searchService from "@/services/search";
 import { chartColor } from "@/utils/chartTheme";
 
-
 // ── Stubs for migrated ODialog / ODrawer ────────────────────────────────────
 // Mirror the real contract: v-model:open, title, size and the named slots
 // (default + header-right) that SearchJobInspector relies on.
@@ -32,7 +31,7 @@ const oDrawerStub = {
     '<div data-test="o-drawer-title">{{ title }}</div>' +
     '<div data-test="o-drawer-header-right"><slot name="header-right" /></div>' +
     '<div data-test="o-drawer-body"><slot /></div>' +
-    '</div>',
+    "</div>",
   props: ["open", "size", "title"],
   emits: ["update:open"],
 };
@@ -43,7 +42,7 @@ const oDialogStub = {
     '<div data-test="o-dialog" v-if="open">' +
     '<div data-test="o-dialog-title">{{ title }}</div>' +
     '<div data-test="o-dialog-body"><slot /></div>' +
-    '</div>',
+    "</div>",
   props: ["open", "size", "title"],
   emits: ["update:open"],
 };
@@ -89,8 +88,20 @@ const setProfileData = (wrapper: any, overrides: object = {}) => {
     data_records: 1000,
     scan_records: 50000,
     events: [
-      { component: "flight:leader get file id", duration: 300, timestamp: "0", search_role: "leader", node_name: "node-1" },
-      { component: "service:search leader finish", duration: 50, timestamp: "1", search_role: "leader", node_name: "node-1" },
+      {
+        component: "flight:leader get file id",
+        duration: 300,
+        timestamp: "0",
+        search_role: "leader",
+        node_name: "node-1",
+      },
+      {
+        component: "service:search leader finish",
+        duration: 50,
+        timestamp: "1",
+        search_role: "leader",
+        node_name: "node-1",
+      },
     ],
     ...overrides,
   };
@@ -375,12 +386,8 @@ describe("SearchJobInspector — getDurationColor", () => {
     setProfileData(wrapper, {
       events: [{ component: "a", duration: 100, timestamp: "0" }],
     });
-    expect(wrapper.vm.getDurationColor(100)).toBe(
-      chartColor("--color-service-health-critical"),
-    ); // 100% → critical
-    expect(wrapper.vm.getDurationColor(76)).toBe(
-      chartColor("--color-service-health-critical"),
-    ); // 76% → critical
+    expect(wrapper.vm.getDurationColor(100)).toBe(chartColor("--color-service-health-critical")); // 100% → critical
+    expect(wrapper.vm.getDurationColor(76)).toBe(chartColor("--color-service-health-critical")); // 76% → critical
   });
 
   it("returns orange for > 50% and <= 75% of maxDuration", () => {
@@ -388,12 +395,8 @@ describe("SearchJobInspector — getDurationColor", () => {
     setProfileData(wrapper, {
       events: [{ component: "a", duration: 100, timestamp: "0" }],
     });
-    expect(wrapper.vm.getDurationColor(51)).toBe(
-      chartColor("--color-service-health-degraded"),
-    );
-    expect(wrapper.vm.getDurationColor(75)).toBe(
-      chartColor("--color-service-health-degraded"),
-    );
+    expect(wrapper.vm.getDurationColor(51)).toBe(chartColor("--color-service-health-degraded"));
+    expect(wrapper.vm.getDurationColor(75)).toBe(chartColor("--color-service-health-degraded"));
   });
 
   it("returns yellow for > 25% and <= 50% of maxDuration", () => {
@@ -401,12 +404,8 @@ describe("SearchJobInspector — getDurationColor", () => {
     setProfileData(wrapper, {
       events: [{ component: "a", duration: 100, timestamp: "0" }],
     });
-    expect(wrapper.vm.getDurationColor(26)).toBe(
-      chartColor("--color-service-health-warning"),
-    );
-    expect(wrapper.vm.getDurationColor(50)).toBe(
-      chartColor("--color-service-health-warning"),
-    );
+    expect(wrapper.vm.getDurationColor(26)).toBe(chartColor("--color-service-health-warning"));
+    expect(wrapper.vm.getDurationColor(50)).toBe(chartColor("--color-service-health-warning"));
   });
 
   it("returns green for <= 25% of maxDuration", () => {
@@ -414,12 +413,8 @@ describe("SearchJobInspector — getDurationColor", () => {
     setProfileData(wrapper, {
       events: [{ component: "a", duration: 100, timestamp: "0" }],
     });
-    expect(wrapper.vm.getDurationColor(25)).toBe(
-      chartColor("--color-service-health-healthy"),
-    );
-    expect(wrapper.vm.getDurationColor(1)).toBe(
-      chartColor("--color-service-health-healthy"),
-    );
+    expect(wrapper.vm.getDurationColor(25)).toBe(chartColor("--color-service-health-healthy"));
+    expect(wrapper.vm.getDurationColor(1)).toBe(chartColor("--color-service-health-healthy"));
   });
 });
 
@@ -443,9 +438,7 @@ describe("SearchJobInspector — hierarchicalEvents level properties", () => {
           component: "parent",
           duration: 200,
           timestamp: "0",
-          events: [
-            { component: "child", duration: 50, timestamp: "1" },
-          ],
+          events: [{ component: "child", duration: 50, timestamp: "1" }],
         },
       ],
     });
@@ -466,7 +459,13 @@ describe("SearchJobInspector — hasNoData", () => {
 
   it("is true when events array is empty", () => {
     const wrapper = mountComponent();
-    wrapper.vm.profileData = { sql: "", start_time: "", end_time: "", total_duration: 0, events: [] };
+    wrapper.vm.profileData = {
+      sql: "",
+      start_time: "",
+      end_time: "",
+      total_duration: 0,
+      events: [],
+    };
     expect(wrapper.vm.hasNoData).toBe(true);
   });
 
@@ -503,9 +502,7 @@ describe("SearchJobInspector — hierarchicalEvents tree", () => {
           component: "follower parent",
           duration: 200,
           timestamp: "0",
-          events: [
-            { component: "child step", duration: 50, timestamp: "1" },
-          ],
+          events: [{ component: "child step", duration: 50, timestamp: "1" }],
         },
       ],
     });
@@ -540,7 +537,9 @@ describe("SearchJobInspector — hierarchicalEvents tree", () => {
 describe("SearchJobInspector — fetchProfileData", () => {
   it("sets loading to true while fetch is in flight, false after resolve", async () => {
     let resolvePromise: (val: any) => void;
-    const pendingPromise = new Promise((res) => { resolvePromise = res; });
+    const pendingPromise = new Promise((res) => {
+      resolvePromise = res;
+    });
     vi.mocked(searchService.get_search_profile).mockReturnValueOnce(pendingPromise as any);
 
     const wrapper = mountComponent();
@@ -657,9 +656,9 @@ describe("SearchJobInspector — ODrawer (SQL) & ODialog (Trace ID) migration", 
     wrapper.vm.showSqlDialog = true;
     await flushPromises();
 
-    expect(
-      wrapper.find('[data-test="inspector-sql-query-content"]').text()
-    ).toBe("No SQL query available");
+    expect(wrapper.find('[data-test="inspector-sql-query-content"]').text()).toBe(
+      "No SQL query available",
+    );
   });
 
   it("exposes the Copy SQL button inside the ODrawer header-right slot when sql is present", async () => {
@@ -670,9 +669,7 @@ describe("SearchJobInspector — ODrawer (SQL) & ODialog (Trace ID) migration", 
 
     const headerRight = wrapper.find('[data-test="o-drawer-header-right"]');
     expect(headerRight.exists()).toBe(true);
-    expect(
-      headerRight.find('[data-test="inspector-copy-sql-btn"]').exists()
-    ).toBe(true);
+    expect(headerRight.find('[data-test="inspector-copy-sql-btn"]').exists()).toBe(true);
   });
 
   it("hides the Copy SQL button in the header-right slot when profileData.sql is empty", async () => {
@@ -681,9 +678,7 @@ describe("SearchJobInspector — ODrawer (SQL) & ODialog (Trace ID) migration", 
     wrapper.vm.showSqlDialog = true;
     await flushPromises();
 
-    expect(
-      wrapper.find('[data-test="inspector-copy-sql-btn"]').exists()
-    ).toBe(false);
+    expect(wrapper.find('[data-test="inspector-copy-sql-btn"]').exists()).toBe(false);
   });
 
   it("closes the SQL ODrawer when it emits update:open=false (v-model:open contract)", async () => {
@@ -707,9 +702,7 @@ describe("SearchJobInspector — ODrawer (SQL) & ODialog (Trace ID) migration", 
 
     const dialog = wrapper.find('[data-test="o-dialog"]');
     expect(dialog.exists()).toBe(true);
-    expect(wrapper.find('[data-test="o-dialog-title"]').text()).toBe(
-      "Full Trace ID"
-    );
+    expect(wrapper.find('[data-test="o-dialog-title"]').text()).toBe("Full Trace ID");
   });
 
   it("renders the traceId from the route inside the ODialog body", async () => {
@@ -718,9 +711,7 @@ describe("SearchJobInspector — ODrawer (SQL) & ODialog (Trace ID) migration", 
     await flushPromises();
 
     // mockRoute.query.trace_id === "abc123"
-    expect(wrapper.find('[data-test="o-dialog-body"]').text()).toContain(
-      "abc123"
-    );
+    expect(wrapper.find('[data-test="o-dialog-body"]').text()).toContain("abc123");
   });
 
   it("closes the Trace ID ODialog when it emits update:open=false (v-model:open contract)", async () => {
@@ -742,9 +733,7 @@ describe("SearchJobInspector — ODrawer (SQL) & ODialog (Trace ID) migration", 
     wrapper.vm.copySql();
     await flushPromises();
 
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-      "SELECT COUNT(*) FROM logs"
-    );
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith("SELECT COUNT(*) FROM logs");
     expect(wrapper.vm.copiedSql).toBe(true);
   });
 

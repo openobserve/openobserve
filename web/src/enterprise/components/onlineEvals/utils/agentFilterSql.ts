@@ -37,20 +37,14 @@ export function buildEvaluatorAgentFilterWhere(
   agent: AgentFilterSelection | null | undefined,
 ): string | null {
   if (!agent) return null;
-  const field = agent.id
-    ? "attributes_target_agent_id"
-    : "attributes_target_agent_name";
+  const field = agent.id ? "attributes_target_agent_id" : "attributes_target_agent_name";
   const value = agent.id ?? agent.name;
   if (!value) return null;
   return `${field} = '${escapeSqlString(String(value))}'`;
 }
 
-export function combineWhere(
-  ...clauses: Array<string | null | undefined>
-): string | null {
-  const filtered = clauses.filter((clause): clause is string =>
-    Boolean(clause),
-  );
+export function combineWhere(...clauses: Array<string | null | undefined>): string | null {
+  const filtered = clauses.filter((clause): clause is string => Boolean(clause));
   if (filtered.length === 0) return null;
   return filtered.map((clause) => `(${clause})`).join(" AND ");
 }

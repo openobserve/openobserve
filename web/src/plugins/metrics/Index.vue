@@ -26,78 +26,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     bleed
   >
-      <template #actions>
-        <syntax-guide-metrics />
-        <MetricLegends />
-        <DateTimePickerDashboard
-          v-if="
-            !['html', 'markdown'].includes(dashboardPanelData.data.type) &&
-            selectedDate
-          "
-          v-model="selectedDate"
-          ref="dateTimePickerRef"
-          :disable="disable"
-          class="h-8"
-          data-test="metrics-date-picker"
-        />
-        <AutoRefreshInterval
-          v-if="
-            !['html', 'markdown', 'custom_chart'].includes(
-              dashboardPanelData.data.type,
-            )
-          "
-          v-model="refreshInterval"
-          trigger
-          :min-refresh-interval="
-            store.state?.zoConfig?.min_auto_refresh_interval || 5
-          "
-          @trigger="runQuery"
-          class="h-8"
-          data-test="metrics-auto-refresh"
-        />
-        <ShareButton
-          v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
-          :url="metricsShareUrl"
-          variant="outline"
-          size="icon-toolbar"
-          data-test="metrics-share-btn"
-          class="h-8"
-        />
-        <template
-          v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
+    <template #actions>
+      <SyntaxGuideMetrics />
+      <MetricLegends />
+      <DateTimePickerDashboard
+        v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type) && selectedDate"
+        v-model="selectedDate"
+        ref="dateTimePickerRef"
+        :disable="disable"
+        class="h-8"
+        data-test="metrics-date-picker"
+      />
+      <AutoRefreshInterval
+        v-if="!['html', 'markdown', 'custom_chart'].includes(dashboardPanelData.data.type)"
+        v-model="refreshInterval"
+        trigger
+        :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
+        @trigger="runQuery"
+        class="h-8"
+        data-test="metrics-auto-refresh"
+      />
+      <ShareButton
+        v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
+        :url="metricsShareUrl"
+        variant="outline"
+        size="icon-toolbar"
+        data-test="metrics-share-btn"
+        shortcut-id="metricsCopyUrl"
+        class="h-8"
+      />
+      <template v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)">
+        <OButton
+          v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length"
+          variant="outline-destructive"
+          size="sm-toolbar"
+          data-test="metrics-cancel"
+          @click="cancelAddPanelQuery"
         >
-          <OButton
-            v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length"
-            variant="outline-destructive"
-            size="sm-toolbar"
-            data-test="metrics-cancel"
-            @click="cancelAddPanelQuery"
-          >
-            <span class="relative flex items-center justify-center">
-              <span class="invisible">{{ t("metrics.runQuery") }}</span>
-              <span class="absolute">{{ t("panel.cancel") }}</span>
-            </span>
-          </OButton>
-          <OButton
-            v-else
-            variant="primary"
-            size="sm-toolbar"
-            data-test="metrics-apply"
-            :loading="disable"
-            :disabled="disable"
-            @click="runQuery"
-          >
-            {{ t("metrics.runQuery") }}
-          </OButton>
-        </template>
+          <span class="relative flex items-center justify-center">
+            <span class="invisible">{{ t("metrics.runQuery") }}</span>
+            <span class="absolute">{{ t("panel.cancel") }}</span>
+          </span>
+        </OButton>
+        <OButton
+          v-else
+          variant="primary"
+          size="sm-toolbar"
+          data-test="metrics-apply"
+          :loading="disable"
+          :disabled="disable"
+          @click="runQuery"
+        >
+          {{ t("metrics.runQuery") }}
+          <OTooltip :content="t('metrics.runQuery')" shortcut-id="metricsRunQuery" />
+        </OButton>
       </template>
+    </template>
     <!-- PanelEditor Content Area -->
     <PanelEditor
       ref="panelEditorRef"
       pageType="metrics"
       :editMode="false"
       :dashboardData="currentDashboardData.data"
-      :variablesData="({} as unknown as PanelEditorVariablesData)"
+      :variablesData="{} as unknown as PanelEditorVariablesData"
       :selectedDateTime="dashboardPanelData.meta.dateTime"
       @addToDashboard="addToDashboard"
       @chartApiError="handleChartApiError"
@@ -105,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- Add to Dashboard Dialog -->
-    <add-to-dashboard
+    <AddToDashboard
       v-model:open="showAddToDashboardDialog"
       :dashboardPanelData="dashboardPanelData"
       @save="addPanelToDashboard"
@@ -139,10 +130,7 @@ import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
-import {
-  PanelEditor,
-  type PanelEditorVariablesData,
-} from "@/components/dashboards/PanelEditor";
+import { PanelEditor, type PanelEditorVariablesData } from "@/components/dashboards/PanelEditor";
 import { saveMetricsStream, restoreMetricsStream } from "@/utils/streamPersist";
 import useDefaultPanelFields from "@/composables/dashboard/useDefaultPanelFields";
 import { useRoute, useRouter } from "vue-router";
@@ -166,6 +154,7 @@ const AddToDashboard = defineAsyncComponent(() => {
   return import("./../metrics/AddToDashboard.vue");
 });
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
@@ -182,6 +171,7 @@ export default defineComponent({
     AutoRefreshInterval,
     PanelEditor,
     OButton,
+    OTooltip,
     ShareButton,
   },
   setup() {
@@ -198,12 +188,8 @@ export default defineComponent({
     const route = useRoute();
     const router = useRouter();
     const { showErrorNotification } = useNotifications();
-    const {
-      dashboardPanelData,
-      resetDashboardPanelData,
-      resetAggregationFunction,
-      validatePanel,
-    } = useDashboardPanelData("metrics");
+    const { dashboardPanelData, resetDashboardPanelData, resetAggregationFunction, validatePanel } =
+      useDashboardPanelData("metrics");
     const { applyDefaultPanelFields } = useDefaultPanelFields("metrics");
     const editMode = ref(false);
     const selectedDate: any = ref({
@@ -238,9 +224,7 @@ export default defineComponent({
       dashboardPanelData.data.queries[0].fields.stream_type = "metrics";
 
       if (store.state.zoConfig?.auto_query_enabled) {
-        const persisted = restoreMetricsStream(
-          store.state.selectedOrganization.identifier,
-        );
+        const persisted = restoreMetricsStream(store.state.selectedOrganization.identifier);
         if (persisted) {
           dashboardPanelData.data.queries[0].fields.stream = persisted;
         }
@@ -262,9 +246,8 @@ export default defineComponent({
         metrics_data: encodeMetricsConfig(getMetricsConfig(dashboardPanelData)),
       };
       const changed =
-        Object.keys(query).some(
-          (k) => String(query[k]) !== String(route.query[k] ?? ""),
-        ) || Object.keys(route.query).some((k) => !(k in query));
+        Object.keys(query).some((k) => String(query[k]) !== String(route.query[k] ?? "")) ||
+        Object.keys(route.query).some((k) => !(k in query));
       if (changed) router.replace({ query }).catch(() => {});
     };
 
@@ -323,10 +306,7 @@ export default defineComponent({
       }
 
       sp.set("refresh", refreshIntervalToLabel(refreshInterval.value));
-      sp.set(
-        "metrics_data",
-        encodeMetricsConfig(getMetricsConfig(dashboardPanelData)),
-      );
+      sp.set("metrics_data", encodeMetricsConfig(getMetricsConfig(dashboardPanelData)));
       return url.href;
     });
 
@@ -387,10 +367,7 @@ export default defineComponent({
       () => dashboardPanelData.data.queries[0]?.fields?.stream,
       async (stream: string, oldStream: string) => {
         if (store.state.zoConfig?.auto_query_enabled && stream) {
-          saveMetricsStream(
-            store.state.selectedOrganization.identifier,
-            stream,
-          );
+          saveMetricsStream(store.state.selectedOrganization.identifier, stream);
         }
 
         // Seed the default query when a stream becomes available in builder mode
@@ -464,10 +441,7 @@ export default defineComponent({
     // Auto-apply config changes that don't require API calls (similar to dashboard)
     const debouncedUpdateChartConfig = debounce((newVal) => {
       if (!isEqual(chartData.value, newVal)) {
-        const configNeedsApiCall = checkIfConfigChangeRequiredApiCallOrNot(
-          chartData.value,
-          newVal,
-        );
+        const configNeedsApiCall = checkIfConfigChangeRequiredApiCallOrNot(chartData.value, newVal);
 
         if (!configNeedsApiCall) {
           chartData.value = JSON.parse(JSON.stringify(newVal));
@@ -488,10 +462,7 @@ export default defineComponent({
 
       // check if name of panel is there
       if (!onlyChart) {
-        if (
-          dashboardData.data.title == null ||
-          dashboardData.data.title.trim() == ""
-        ) {
+        if (dashboardData.data.title == null || dashboardData.data.title.trim() == "") {
           errors.push(t("metrics.index.namePanelRequired"));
         }
       }
@@ -500,9 +471,7 @@ export default defineComponent({
       validatePanel(errors, isFieldsValidationRequired);
 
       if (errors.length) {
-        showErrorNotification(
-          t("metrics.index.errorsFixTryAgain"),
-        );
+        showErrorNotification(t("metrics.index.errorsFixTryAgain"));
       }
 
       if (errors.length) {
@@ -512,10 +481,7 @@ export default defineComponent({
       }
     };
 
-    const handleChartApiError = (errorMessage: {
-      message: string;
-      code: string;
-    }) => {
+    const handleChartApiError = (errorMessage: { message: string; code: string }) => {
       if (errorMessage?.message) {
         const errorList = errorData.errors ?? [];
         errorList.splice(0);
@@ -552,10 +518,7 @@ export default defineComponent({
     });
 
     // provide variablesAndPanelsDataLoadingState to share data between components
-    provide(
-      "variablesAndPanelsDataLoadingState",
-      variablesAndPanelsDataLoadingState,
-    );
+    provide("variablesAndPanelsDataLoadingState", variablesAndPanelsDataLoadingState);
 
     const searchRequestTraceIds = computed(() => {
       const searchIds = Object.values(
@@ -574,9 +537,7 @@ export default defineComponent({
     const disable = ref(false);
 
     watch(variablesAndPanelsDataLoadingState, () => {
-      const panelsValues = Object.values(
-        variablesAndPanelsDataLoadingState.panels,
-      );
+      const panelsValues = Object.values(variablesAndPanelsDataLoadingState.panels);
       disable.value = panelsValues.some((item: any) => item === true);
     });
 
@@ -588,9 +549,7 @@ export default defineComponent({
       if (errors.length) {
         // set errors into errorData
         errorData.errors = errors;
-        showErrorNotification(
-          t("metrics.index.errorsFixTryAgain"),
-        );
+        showErrorNotification(t("metrics.index.errorsFixTryAgain"));
         return;
       } else {
         showAddToDashboardDialog.value = true;
@@ -634,6 +593,30 @@ export default defineComponent({
           runQuery();
         },
       },
+      {
+        id: "metricsFocusQuery",
+        handler: () => {
+          // The metrics PromQL editor is Monaco — focus its inner textarea.
+          const el = document.querySelector<HTMLElement>(
+            '[data-test="dashboard-panel-query-editor"] textarea, [data-test="dashboard-panel-query-editor"] .monaco-editor textarea, [data-test="dashboard-panel-query-editor"] .cm-editor',
+          );
+          el?.focus();
+        },
+      },
+      {
+        id: "metricsAddToDashboard",
+        handler: () => {
+          if (isInputFocused()) return;
+          addToDashboard();
+        },
+      },
+      {
+        id: "metricsCopyUrl",
+        handler: () => {
+          // Reuse ShareButton's short-URL + clipboard + toast flow.
+          document.querySelector<HTMLElement>('[data-test="metrics-share-btn"]')?.click();
+        },
+      },
     ]);
 
     return {
@@ -666,5 +649,3 @@ export default defineComponent({
   },
 });
 </script>
-
-

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <base-import
+  <BaseImport
     ref="baseImportRef"
     title="Import Pipeline"
     test-prefix="pipeline"
@@ -28,21 +28,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Output Section with Pipeline-specific Error Display -->
     <template #output-content>
-      <div class="w-full h-full flex flex-col border-l border-border-default" style="min-width: 400px;">
+      <div
+        class="border-border-default flex h-full w-full flex-col border-l"
+        style="min-width: 400px"
+      >
         <div
           v-if="pipelineErrorsToDisplay.length > 0"
-          class="text-center text-sm font-semibold text-text-heading py-3 shrink-0"
+          class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"
         >
           Error Validations
         </div>
-        <div v-else class="text-center text-sm font-semibold text-text-heading py-3 shrink-0">Output Messages</div>
+        <div v-else class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold">
+          Output Messages
+        </div>
         <OSeparator class="mt-1 shrink-0" />
-        <div class="error-report-container flex-1 min-h-0">
+        <div class="error-report-container min-h-0 flex-1 resize-none overflow-auto">
           <!-- Pipeline Errors Section -->
-          <div
-            class="p-2.5 mb-2.5"
-            v-if="pipelineErrorsToDisplay.length > 0"
-          >
+          <div class="mb-2.5 p-2.5" v-if="pipelineErrorsToDisplay.length > 0">
             <div>
               <!-- Iterate through the outer array -->
               <div
@@ -60,10 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- pipeline name should not be empty -->
                   <span
                     class="text-status-negative"
-                    v-if="
-                      typeof errorMessage === 'object' &&
-                      errorMessage.field == 'pipeline_name'
-                    "
+                    v-if="typeof errorMessage === 'object' && errorMessage.field == 'pipeline_name'"
                   >
                     {{ errorMessage.message }}
 
@@ -74,13 +73,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :label="t('alerts.name') + ' *'"
                         class="showLabelOnTop"
                         :error="touchedPipelineName[index] && !userSelectedPipelineName[index]"
-                        :error-message="touchedPipelineName[index] && !userSelectedPipelineName[index] ? 'Name is required' : ''"
+                        :error-message="
+                          touchedPipelineName[index] && !userSelectedPipelineName[index]
+                            ? 'Name is required'
+                            : ''
+                        "
                         tabindex="0"
-                        @update:model-value="(val: string | number) => {
-                          touchedPipelineName[index] = true;
-                          userSelectedPipelineName[index] = val as string;
-                          updatePipelineName(val as string, index);
-                        }"
+                        @update:model-value="
+                          (val: string | number) => {
+                            touchedPipelineName[index] = true;
+                            userSelectedPipelineName[index] = val as string;
+                            updatePipelineName(val as string, index);
+                          }
+                        "
                       />
                     </div>
                   </span>
@@ -88,8 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span
                     class="text-status-negative"
                     v-else-if="
-                      typeof errorMessage === 'object' &&
-                      errorMessage.field == 'source_stream_name'
+                      typeof errorMessage === 'object' && errorMessage.field == 'source_stream_name'
                     "
                   >
                     {{ errorMessage.message }}
@@ -99,11 +103,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :model-value="userSelectedStreamName[index] || ''"
                         :options="streamList"
                         :label="t('alerts.stream_name') + ' *'"
-                        class="py-2 showLabelOnTop no-case"
-                        @update:model-value="(val) => {
-                          userSelectedStreamName[index] = val as string;
-                          updateStreamFields(val, index);
-                        }"
+                        class="showLabelOnTop no-case py-2"
+                        @update:model-value="
+                          (val) => {
+                            userSelectedStreamName[index] = val as string;
+                            updateStreamFields(val, index);
+                          }
+                        "
                         @search="handleDynamicStreamName($event, index)"
                       />
                     </div>
@@ -112,8 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span
                     class="text-status-negative"
                     v-else-if="
-                      typeof errorMessage === 'object' &&
-                      errorMessage.field == 'source_stream_type'
+                      typeof errorMessage === 'object' && errorMessage.field == 'source_stream_type'
                     "
                   >
                     {{ errorMessage.message }}
@@ -123,15 +128,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :model-value="userSelectedStreamType[index] || ''"
                         :options="streamTypes"
                         :label="t('alerts.streamType') + ' *'"
-                        class="py-2 showLabelOnTop no-case"
+                        class="showLabelOnTop no-case py-2"
                         style="width: 300px"
                         :error="touchedStreamType[index] && !userSelectedStreamType[index]"
-                        :error-message="touchedStreamType[index] && !userSelectedStreamType[index] ? 'Stream type is required' : ''"
-                        @update:model-value="(val: any) => {
-                          touchedStreamType[index] = true;
-                          userSelectedStreamType[index] = val;
-                          getSourceStreamsList(val, index);
-                        }"
+                        :error-message="
+                          touchedStreamType[index] && !userSelectedStreamType[index]
+                            ? 'Stream type is required'
+                            : ''
+                        "
+                        @update:model-value="
+                          (val: any) => {
+                            touchedStreamType[index] = true;
+                            userSelectedStreamType[index] = val;
+                            getSourceStreamsList(val, index);
+                          }
+                        "
                       />
                     </div>
                   </span>
@@ -139,13 +150,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span
                     class="text-status-negative"
                     v-else-if="
-                      typeof errorMessage === 'object' &&
-                      errorMessage.field == 'sql_query_missing'
+                      typeof errorMessage === 'object' && errorMessage.field == 'sql_query_missing'
                     "
                   >
                     {{ errorMessage.message }}
                     <div>
-                      <query-editor
+                      <QueryEditor
                         class="w-full"
                         style="height: 200px"
                         data-test="pipeline-import-sql-query-input"
@@ -153,10 +163,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :label="'SQL Query'"
                         :debounceTime="300"
                         language="sql"
-                        @update:query="(val) => {
-                          userSelectedSqlQuery[index] = val;
-                          updateSqlQuery(val, index);
-                        }"
+                        @update:query="
+                          (val) => {
+                            userSelectedSqlQuery[index] = val;
+                            updateSqlQuery(val, index);
+                          }
+                        "
                       />
                     </div>
                   </span>
@@ -175,25 +187,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :model-value="userSelectedDestinationStreamType[index] || ''"
                         :options="destinationStreamTypes"
                         :label="t('alerts.streamType') + ' *'"
-                        class="py-2 showLabelOnTop no-case"
+                        class="showLabelOnTop no-case py-2"
                         style="width: 300px"
-                        :error="touchedDestinationStreamType[index] && !userSelectedDestinationStreamType[index]"
-                        :error-message="touchedDestinationStreamType[index] && !userSelectedDestinationStreamType[index] ? 'Stream type is required' : ''"
-                        @update:model-value="(val: any) => {
-                          touchedDestinationStreamType[index] = true;
-                          userSelectedDestinationStreamType[index] = val;
-                          getDestinationStreamsList(val, index);
-                        }"
+                        :error="
+                          touchedDestinationStreamType[index] &&
+                          !userSelectedDestinationStreamType[index]
+                        "
+                        :error-message="
+                          touchedDestinationStreamType[index] &&
+                          !userSelectedDestinationStreamType[index]
+                            ? 'Stream type is required'
+                            : ''
+                        "
+                        @update:model-value="
+                          (val: any) => {
+                            touchedDestinationStreamType[index] = true;
+                            userSelectedDestinationStreamType[index] = val;
+                            getDestinationStreamsList(val, index);
+                          }
+                        "
                       />
                     </div>
                   </span>
                   <!-- destination stream name should not be empty -->
                   <span
                     class="text-status-negative"
-                    v-else-if="
-                      typeof errorMessage === 'object' &&
-                      errorMessage.field == 'org_id'
-                    "
+                    v-else-if="typeof errorMessage === 'object' && errorMessage.field == 'org_id'"
                   >
                     {{ errorMessage.message }}
                     <div style="width: 300px">
@@ -205,11 +224,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         labelKey="label"
                         valueKey="value"
                         searchable
-                        class="py-2 showLabelOnTop no-case"
-                        @update:model-value="(val: any) => {
-                          userSelectedOrgId[index] = val;
-                          updateOrgId(val?.value || val, index);
-                        }"
+                        class="showLabelOnTop no-case py-2"
+                        @update:model-value="
+                          (val: any) => {
+                            userSelectedOrgId[index] = val;
+                            updateOrgId(val?.value || val, index);
+                          }
+                        "
                       />
                     </div>
                   </span>
@@ -228,15 +249,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :model-value="userSelectedFunctionName[errorMessage.nodeIndex] || ''"
                         :options="existingFunctions"
                         :label="'Function Name'"
-                        class="py-2 showLabelOnTop no-case"
+                        class="showLabelOnTop no-case py-2"
                         style="width: 300px"
-                        :error="touchedFunctionName[errorMessage.nodeIndex] && !userSelectedFunctionName[errorMessage.nodeIndex]"
-                        :error-message="touchedFunctionName[errorMessage.nodeIndex] && !userSelectedFunctionName[errorMessage.nodeIndex] ? 'Function name is required' : ''"
-                        @update:model-value="(val: any) => {
-                          touchedFunctionName[errorMessage.nodeIndex] = true;
-                          userSelectedFunctionName[errorMessage.nodeIndex] = val;
-                          updateFunctionName(val, index, errorMessage.nodeIndex);
-                        }"
+                        :error="
+                          touchedFunctionName[errorMessage.nodeIndex] &&
+                          !userSelectedFunctionName[errorMessage.nodeIndex]
+                        "
+                        :error-message="
+                          touchedFunctionName[errorMessage.nodeIndex] &&
+                          !userSelectedFunctionName[errorMessage.nodeIndex]
+                            ? 'Function name is required'
+                            : ''
+                        "
+                        @update:model-value="
+                          (val: any) => {
+                            touchedFunctionName[errorMessage.nodeIndex] = true;
+                            userSelectedFunctionName[errorMessage.nodeIndex] = val;
+                            updateFunctionName(val, index, errorMessage.nodeIndex);
+                          }
+                        "
                       />
                     </div>
                   </span>
@@ -244,8 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span
                     class="text-status-negative"
                     v-else-if="
-                      typeof errorMessage === 'object' &&
-                      errorMessage.field == 'remote_destination'
+                      typeof errorMessage === 'object' && errorMessage.field == 'remote_destination'
                     "
                   >
                     {{ errorMessage.message }}
@@ -255,23 +285,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :model-value="userSelectedRemoteDestination[index] || ''"
                         :options="pipelineDestinations"
                         :label="'Remote Destination'"
-                        class="py-2 showLabelOnTop no-case"
+                        class="showLabelOnTop no-case py-2"
                         style="width: 300px"
-                        :error="touchedRemoteDestination[index] && !userSelectedRemoteDestination[index]"
-                        :error-message="touchedRemoteDestination[index] && !userSelectedRemoteDestination[index] ? 'Remote destination is required' : ''"
-                        @update:model-value="(val: any) => {
-                          touchedRemoteDestination[index] = true;
-                          userSelectedRemoteDestination[index] = val;
-                          updateRemoteDestination(val, index);
-                        }"
+                        :error="
+                          touchedRemoteDestination[index] && !userSelectedRemoteDestination[index]
+                        "
+                        :error-message="
+                          touchedRemoteDestination[index] && !userSelectedRemoteDestination[index]
+                            ? 'Remote destination is required'
+                            : ''
+                        "
+                        @update:model-value="
+                          (val: any) => {
+                            touchedRemoteDestination[index] = true;
+                            userSelectedRemoteDestination[index] = val;
+                            updateRemoteDestination(val, index);
+                          }
+                        "
                       />
                     </div>
                   </span>
                   <span
                     class="text-status-negative"
                     v-else-if="
-                      typeof errorMessage === 'object' &&
-                      errorMessage.field == 'source_timezone'
+                      typeof errorMessage === 'object' && errorMessage.field == 'source_timezone'
                     "
                   >
                     {{ errorMessage.message }}
@@ -282,15 +319,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :options="timezoneOptions"
                         :label="'Timezone'"
                         searchable
-                        class="py-2 showLabelOnTop no-case"
+                        class="showLabelOnTop no-case py-2"
                         style="width: 300px"
                         :error="touchedTimezone[index] && !userSelectedTimezone[index]"
-                        :error-message="touchedTimezone[index] && !userSelectedTimezone[index] ? 'Timezone is required' : ''"
-                        @update:model-value="(val: any) => {
-                          touchedTimezone[index] = true;
-                          userSelectedTimezone[index] = val;
-                          updateTimezone(val, index);
-                        }"
+                        :error-message="
+                          touchedTimezone[index] && !userSelectedTimezone[index]
+                            ? 'Timezone is required'
+                            : ''
+                        "
+                        @update:model-value="
+                          (val: any) => {
+                            touchedTimezone[index] = true;
+                            userSelectedTimezone[index] = val;
+                            updateTimezone(val, index);
+                          }
+                        "
                       />
                     </div>
                   </span>
@@ -300,9 +343,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="p-2.5 mb-2.5" v-if="pipelineCreators.length > 0">
+          <div class="mb-2.5 p-2.5" v-if="pipelineCreators.length > 0">
             <div
-              class="text-base mb-2.5 uppercase text-primary"
+              class="text-primary mb-2.5 text-base uppercase"
               data-test="pipeline-import-creation-title"
             >
               Pipeline Creation
@@ -319,24 +362,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   'text-status-negative': !val.success,
                 }"
                 class="whitespace-pre-wrap"
-                style="
-                  word-wrap: break-word;
-                  overflow-wrap: break-word;
-                "
+                style="word-wrap: break-word; overflow-wrap: break-word"
                 :data-test="`pipeline-import-creation-${index}-message`"
               >
-                <pre
-                  class="whitespace-pre-wrap"
-                  style="word-break: break-word"
-                  >{{ val.message }}</pre
-                >
+                <pre class="whitespace-pre-wrap" style="word-break: break-word">{{
+                  val.message
+                }}</pre>
               </div>
             </div>
           </div>
         </div>
       </div>
     </template>
-  </base-import>
+  </BaseImport>
 
   <!-- Actions live in the pipeline shell's OPageHeader (Functions.vue), next
        to the "Pipelines › Import" breadcrumb — the shell owns the single header
@@ -367,13 +405,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  onMounted,
-  computed,
-  defineAsyncComponent,
-} from "vue";
+import { defineComponent, ref, onMounted, computed, defineAsyncComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -385,7 +417,7 @@ import usePipelines from "@/composables/usePipelines";
 import BaseImport from "../common/BaseImport.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import {
   detectConditionsVersion,
   convertV0ToV2,
@@ -399,9 +431,7 @@ export default defineComponent({
     OSeparator,
     OButton,
     BaseImport,
-    QueryEditor: defineAsyncComponent(
-      () => import("@/components/CodeQueryEditor.vue"),
-    ),
+    QueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
     OInput: defineAsyncComponent(() => import("@/lib/forms/Input/OInput.vue")),
     OSelect: defineAsyncComponent(() => import("@/lib/forms/Select/OSelect.vue")),
   },
@@ -464,16 +494,11 @@ export default defineComponent({
         if (baseImportRef.value) {
           baseImportRef.value.jsonArrayOfObj = val;
         }
-      }
+      },
     });
 
     const streamTypes = ["logs", "metrics", "traces"];
-    const destinationStreamTypes = [
-      "logs",
-      "metrics",
-      "traces",
-      "enrichment_tables",
-    ];
+    const destinationStreamTypes = ["logs", "metrics", "traces", "enrichment_tables"];
     const existingFunctions = ref<any>([]);
     const pipelineDestinations = ref<any>([]);
     const alertDestinations = ref<any>([]);
@@ -490,8 +515,7 @@ export default defineComponent({
           label: org.identifier,
           value: org.identifier,
           disable:
-            !org.identifier ||
-            org.identifier !== store.state.selectedOrganization.identifier,
+            !org.identifier || org.identifier !== store.state.selectedOrganization.identifier,
         };
       });
     });
@@ -504,8 +528,7 @@ export default defineComponent({
       return tz;
     });
 
-    const browserTime =
-      "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
+    const browserTime = "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
 
     // Add the UTC option
     timezoneOptions.unshift("UTC");
@@ -516,19 +539,12 @@ export default defineComponent({
         baseImportRef.value.jsonArrayOfObj[index].sql_query = sqlQuery;
         baseImportRef.value.jsonArrayOfObj[index].source.query_condition.sql = sqlQuery;
         baseImportRef.value.jsonArrayOfObj[index].nodes.forEach((node: any) => {
-          if (
-            node.io_type == "input" &&
-            node.data.query_condition.type == "sql"
-          ) {
+          if (node.io_type == "input" && node.data.query_condition.type == "sql") {
             node.data.query_condition.sql = sqlQuery;
           }
         });
         // Directly update jsonStr without triggering editor re-render
-        baseImportRef.value.jsonStr = JSON.stringify(
-          baseImportRef.value.jsonArrayOfObj,
-          null,
-          2
-        );
+        baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
       }
     };
 
@@ -548,18 +564,11 @@ export default defineComponent({
         });
         baseImportRef.value.jsonArrayOfObj[index].stream_name = stream_name;
         // Directly update jsonStr without triggering editor re-render
-        baseImportRef.value.jsonStr = JSON.stringify(
-          baseImportRef.value.jsonArrayOfObj,
-          null,
-          2
-        );
+        baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
       }
     };
 
-    const updateRemoteDestination = (
-      remoteDestination: string,
-      index: number,
-    ) => {
+    const updateRemoteDestination = (remoteDestination: string, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].nodes.forEach((node: any) => {
           if (node.data.node_type == "remote_stream") {
@@ -567,11 +576,7 @@ export default defineComponent({
           }
         });
         // Directly update jsonStr without triggering editor re-render
-        baseImportRef.value.jsonStr = JSON.stringify(
-          baseImportRef.value.jsonArrayOfObj,
-          null,
-          2
-        );
+        baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
       }
     };
 
@@ -583,11 +588,7 @@ export default defineComponent({
           }
         });
         // Directly update jsonStr without triggering editor re-render
-        baseImportRef.value.jsonStr = JSON.stringify(
-          baseImportRef.value.jsonArrayOfObj,
-          null,
-          2
-        );
+        baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
       }
     };
 
@@ -595,36 +596,20 @@ export default defineComponent({
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].name = pipelineName;
         // Directly update jsonStr without triggering editor re-render
-        baseImportRef.value.jsonStr = JSON.stringify(
-          baseImportRef.value.jsonArrayOfObj,
-          null,
-          2
-        );
+        baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
       }
     };
 
-    const updateFunctionName = (
-      functionName: any,
-      pipelineIndex: any,
-      nodeIndex: any,
-    ) => {
+    const updateFunctionName = (functionName: any, pipelineIndex: any, nodeIndex: any) => {
       if (baseImportRef.value?.jsonArrayOfObj[pipelineIndex]) {
         const node = baseImportRef.value.jsonArrayOfObj[pipelineIndex].nodes[nodeIndex];
 
-        if (
-          node &&
-          node.io_type === "default" &&
-          node.data.node_type === "function"
-        ) {
+        if (node && node.io_type === "default" && node.data.node_type === "function") {
           node.data.name = functionName;
         }
 
         // Directly update jsonStr without triggering editor re-render
-        baseImportRef.value.jsonStr = JSON.stringify(
-          baseImportRef.value.jsonArrayOfObj,
-          null,
-          2
-        );
+        baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
       }
     };
 
@@ -675,9 +660,7 @@ export default defineComponent({
 
         const parsedJson = JSON.parse(jsonString);
         // Convert single object to array if needed
-        jsonArrayOfObj.value = Array.isArray(parsedJson)
-          ? parsedJson
-          : [parsedJson];
+        jsonArrayOfObj.value = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
       } catch (e: any) {
         toast({
           message: e.message || "Invalid JSON format",
@@ -747,10 +730,7 @@ export default defineComponent({
       return false;
     };
 
-    const validateSourceStream = async (
-      streamName: string,
-      streamList: any[],
-    ) => {
+    const validateSourceStream = async (streamName: string, streamList: any[]) => {
       const response = await pipelinesService.getPipelineStreams(
         store.state.selectedOrganization.identifier,
       );
@@ -760,9 +740,7 @@ export default defineComponent({
           return stream.stream_name === streamName;
         });
       } else {
-        const usedStreamNames = usedStreams.map(
-          (stream: any) => stream.stream_name,
-        );
+        const usedStreamNames = usedStreams.map((stream: any) => stream.stream_name);
         const filteredStreamList = streamList.filter((stream: any) =>
           usedStreamNames.includes(stream),
         );
@@ -770,10 +748,7 @@ export default defineComponent({
       }
     };
 
-    const validateDestinationStream = async (
-      streamType: string,
-      streamName: string,
-    ) => {
+    const validateDestinationStream = async (streamType: string, streamName: string) => {
       try {
         // Fetch streams
         const response: any = await getStreams(streamType, false);
@@ -796,10 +771,7 @@ export default defineComponent({
       }
     };
 
-    const validateScheduledPipelineNodes = async (
-      input: any,
-      sqlQuery: string,
-    ) => {
+    const validateScheduledPipelineNodes = async (input: any, sqlQuery: string) => {
       if (input.source.source_type == "realtime") {
         return true;
       }
@@ -838,9 +810,7 @@ export default defineComponent({
         const orgId = node.data.org_id;
         const selectedOrgId = store.state.selectedOrganization.identifier;
 
-        return (
-          !isFunction && !isCondition && (!orgId || orgId !== selectedOrgId)
-        );
+        return !isFunction && !isCondition && (!orgId || orgId !== selectedOrgId);
       })
         ? false
         : true;
@@ -878,8 +848,7 @@ export default defineComponent({
       }
       //3. validate source stream name it should not be empty
       if (
-        (input.source.source_type == "realtime" &&
-          !input.source.stream_name.trim()) ||
+        (input.source.source_type == "realtime" && !input.source.stream_name.trim()) ||
         (input.source.source_type == "realtime" &&
           (await validateSourceStream(input.source.stream_name, [])))
       ) {
@@ -891,22 +860,15 @@ export default defineComponent({
 
       //call getStreamsList to update the stream list
       // not neded as we are updating the stream list while selecting the stream type
-      if (
-        input.source.stream_type &&
-        validStreamTypes.includes(input.source.stream_type)
-      ) {
+      if (input.source.stream_type && validStreamTypes.includes(input.source.stream_type)) {
         await getSourceStreamsList(input.source.stream_type, -1);
       }
 
-      const isValidScheduledPipeline = await validateScheduledPipelineNodes(
-        input,
-        "",
-      );
+      const isValidScheduledPipeline = await validateScheduledPipelineNodes(input, "");
       //5. validate source node sql query
       if (
         input.source.source_type == "scheduled" &&
-        ((input.source.query_condition.type == "sql" &&
-          !input.source.query_condition.sql) ||
+        ((input.source.query_condition.type == "sql" && !input.source.query_condition.sql) ||
           !isValidScheduledPipeline ||
           !input.sql_query)
       ) {
@@ -916,10 +878,7 @@ export default defineComponent({
         });
       }
 
-      const isValidQuery = await validateScheduledPipelineNodes(
-        input,
-        input.sql_query,
-      );
+      const isValidQuery = await validateScheduledPipelineNodes(input, input.sql_query);
       //validate sql query in scheduled pipeline
       if (
         (input.source.source_type == "scheduled" &&
@@ -948,18 +907,14 @@ export default defineComponent({
         input.source.trigger_condition.frequency_type == "minutes" &&
         input.source.trigger_condition.frequency < 1
       ) {
-        pipelineErrors.push(
-          `Pipeline - ${index}: Frequency should be greater than 0`,
-        );
+        pipelineErrors.push(`Pipeline - ${index}: Frequency should be greater than 0`);
       }
       if (
         input.source.source_type == "scheduled" &&
         input.source.trigger_condition.frequency_type == "cron" &&
         input.source.trigger_condition.period < 1
       ) {
-        pipelineErrors.push(
-          `Pipeline - ${index}: Period should be greater than 0`,
-        );
+        pipelineErrors.push(`Pipeline - ${index}: Period should be greater than 0`);
       }
       //should match in source as well as in nodes as well
 
@@ -974,26 +929,17 @@ export default defineComponent({
                 `Pipeline - ${index}: Frequency type should be cron and should match in source as well as in nodes so kindly check the frequency type in all nodes`,
               );
             }
-            if (
-              node.data.trigger_condition.cron !=
-              input.source.trigger_condition.cron
-            ) {
+            if (node.data.trigger_condition.cron != input.source.trigger_condition.cron) {
               pipelineErrors.push(
                 `Pipeline - ${index}: Cron should be same as in source and should match in all nodes so kindly check the cron in all nodes`,
               );
             }
-            if (
-              node.data.trigger_condition.period !=
-              input.source.trigger_condition.period
-            ) {
+            if (node.data.trigger_condition.period != input.source.trigger_condition.period) {
               pipelineErrors.push(
                 `Pipeline - ${index}: Period should be same as in source and should match in all nodes so kindly check the period in all nodes`,
               );
             }
-            if (
-              node.data.trigger_condition.timezone !=
-              input.source.trigger_condition.timezone
-            ) {
+            if (node.data.trigger_condition.timezone != input.source.trigger_condition.timezone) {
               pipelineErrors.push(
                 `Pipeline - ${index}: Timezone should be same as in source and should match in all nodes so kindly check the timezone in all nodes`,
               );
@@ -1012,10 +958,7 @@ export default defineComponent({
                 `Pipeline - ${index}: Frequency type should be minutes and should match in source as well as in nodes so kindly check the frequency type in all nodes`,
               );
             }
-            if (
-              node.data.trigger_condition.frequency !=
-              input.source.trigger_condition.frequency
-            ) {
+            if (node.data.trigger_condition.frequency != input.source.trigger_condition.frequency) {
               pipelineErrors.push(
                 `Pipeline - ${index}: Frequency should be same as in source and should match in all nodes so kindly check the frequency in all nodes`,
               );
@@ -1037,10 +980,7 @@ export default defineComponent({
       }
 
       // validate destination node in scheduled pipeline
-      if (
-        input.source.source_type == "scheduled" ||
-        input.source.source_type == "realtime"
-      ) {
+      if (input.source.source_type == "scheduled" || input.source.source_type == "realtime") {
         const validationPromises = input.nodes.map(async () => {});
         // Wait for all validation to complete
         await Promise.all(validationPromises);
@@ -1051,16 +991,10 @@ export default defineComponent({
         let functionCounter = 0;
 
         input.nodes.forEach((node: any, nodeIndex: number) => {
-          if (
-            node.io_type === "default" &&
-            node.data.node_type === "function"
-          ) {
+          if (node.io_type === "default" && node.data.node_type === "function") {
             functionCounter++;
 
-            if (
-              !node.data.name ||
-              !existingFunctions.value.includes(node.data.name)
-            ) {
+            if (!node.data.name || !existingFunctions.value.includes(node.data.name)) {
               pipelineErrors.push({
                 message: `Pipeline - ${pipelineIndex}, Function-${functionCounter}: Function name is required and should be in the existing functions list`,
                 field: `function_name_${nodeIndex}`,
@@ -1088,7 +1022,7 @@ export default defineComponent({
 
             // Validate the condition format (V0, V1, or V2)
             const validateV2Condition = (item: any): boolean => {
-              if (item.filterType === 'group') {
+              if (item.filterType === "group") {
                 if (!Array.isArray(item.conditions)) {
                   pipelineErrors.push({
                     message: `Pipeline - ${index}, Node ${nodeIndex}: V2 group must have a conditions array.`,
@@ -1097,7 +1031,7 @@ export default defineComponent({
                   return false;
                 }
                 return item.conditions.every((nestedItem: any) => validateV2Condition(nestedItem));
-              } else if (item.filterType === 'condition') {
+              } else if (item.filterType === "condition") {
                 if (!item.column || !item.operator || item.value === undefined) {
                   pipelineErrors.push({
                     message: `Pipeline - ${index}, Node ${nodeIndex}: V2 condition must have column, operator, and value.`,
@@ -1143,7 +1077,7 @@ export default defineComponent({
                 });
                 hasErrors = true;
               }
-            } else if (conditionsToValidate.filterType === 'group') {
+            } else if (conditionsToValidate.filterType === "group") {
               // V2 format
               if (!validateV2Condition(conditionsToValidate)) {
                 hasErrors = true;
@@ -1262,10 +1196,7 @@ export default defineComponent({
       }
     };
 
-    const getSourceStreamsList = async (
-      streamType: string,
-      index: number,
-    ) => {
+    const getSourceStreamsList = async (streamType: string, index: number) => {
       //update the stream type if user selects a different stream type
       if (index != -1 && baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].source.stream_type = streamType;
@@ -1276,24 +1207,16 @@ export default defineComponent({
           }
         });
         // Directly update jsonStr without triggering editor re-render
-        baseImportRef.value.jsonStr = JSON.stringify(
-          baseImportRef.value.jsonArrayOfObj,
-          null,
-          2
-        );
+        baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
       }
       try {
         const streamResponse: any = await getStreams(streamType, false);
         //these will be used for destination stream
-        const streamsNames = streamResponse.list.map(
-          (stream: any) => stream.name,
-        );
+        const streamsNames = streamResponse.list.map((stream: any) => stream.name);
         const usedStreams = await pipelinesService.getPipelineStreams(
           store.state.selectedOrganization.identifier,
         );
-        const usedStreamNames = usedStreams.data.list.map(
-          (stream: any) => stream.stream_name,
-        );
+        const usedStreamNames = usedStreams.data.list.map((stream: any) => stream.stream_name);
         //this is used to disable the stream names which are already used in the source stream
         streamList.value = streamsNames.map((stream: any) => {
           return {
@@ -1307,10 +1230,7 @@ export default defineComponent({
       }
     };
 
-    const getDestinationStreamsList = async (
-      streamType: string,
-      index: number,
-    ) => {
+    const getDestinationStreamsList = async (streamType: string, index: number) => {
       //update the stream type if user selects a different stream type
       if (index != -1 && baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].nodes.forEach((node: any) => {
@@ -1319,27 +1239,18 @@ export default defineComponent({
           }
         });
         // Directly update jsonStr without triggering editor re-render
-        baseImportRef.value.jsonStr = JSON.stringify(
-          baseImportRef.value.jsonArrayOfObj,
-          null,
-          2
-        );
+        baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
       }
       try {
         const streamResponse: any = await getStreams(streamType, false);
         //these will be used for destination stream
-        streamData.value = streamResponse.list.map(
-          (stream: any) => stream.name,
-        );
+        streamData.value = streamResponse.list.map((stream: any) => stream.name);
       } catch (error) {
         console.error("Error fetching streams:", error);
       }
     };
 
-    const getOutputStreamsList = async (
-      streamType: string,
-      index: number,
-    ) => {
+    const getOutputStreamsList = async (streamType: string, index: number) => {
       //update the stream type if user selects a different stream type
       if (index != -1 && baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].nodes.forEach((node: any) => {
@@ -1349,17 +1260,11 @@ export default defineComponent({
         });
 
         // Directly update jsonStr without triggering editor re-render
-        baseImportRef.value.jsonStr = JSON.stringify(
-          baseImportRef.value.jsonArrayOfObj,
-          null,
-          2
-        );
+        baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
       }
       try {
         const streamResponse: any = await getStreams(streamType, false);
-        streamData.value = streamResponse.list.map(
-          (stream: any) => stream.name,
-        );
+        streamData.value = streamResponse.list.map((stream: any) => stream.name);
       } catch (error) {
         console.error("Error fetching streams:", error);
       }
@@ -1374,11 +1279,7 @@ export default defineComponent({
           }
         });
         // Directly update jsonStr without triggering editor re-render
-        baseImportRef.value.jsonStr = JSON.stringify(
-          baseImportRef.value.jsonArrayOfObj,
-          null,
-          2
-        );
+        baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
       }
     };
 
@@ -1392,11 +1293,7 @@ export default defineComponent({
           }
         });
         // Directly update jsonStr without triggering editor re-render
-        baseImportRef.value.jsonStr = JSON.stringify(
-          baseImportRef.value.jsonArrayOfObj,
-          null,
-          2
-        );
+        baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
       }
     };
 
@@ -1420,11 +1317,7 @@ export default defineComponent({
           }
         });
         // Directly update jsonStr without triggering editor re-render
-        baseImportRef.value.jsonStr = JSON.stringify(
-          baseImportRef.value.jsonArrayOfObj,
-          null,
-          2
-        );
+        baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
       }
     };
 
@@ -1492,4 +1385,3 @@ export default defineComponent({
   },
 });
 </script>
-

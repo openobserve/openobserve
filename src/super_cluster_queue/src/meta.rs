@@ -65,7 +65,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                 let org_id = key_parts[2];
                 let name = key_parts[3];
                 if let Err(e) =
-                    openobserve_core::enrichment::storage::database::delete(org_id, name).await
+                    enrichment_data::enrichment::storage::database::delete(org_id, name).await
                 {
                     log::error!("delete enrichment table db data error: {e:?}");
                 }

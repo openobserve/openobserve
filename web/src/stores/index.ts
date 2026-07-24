@@ -14,11 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { createStore } from "vuex";
-import {
-  useLocalOrganization,
-  useLocalCurrentUser,
-  useLocalTimezone,
-} from "../utils/zincutils";
+import { useLocalOrganization, useLocalCurrentUser, useLocalTimezone } from "../utils/zincutils";
 import streams from "./streams";
 import logs from "./logs";
 import incidents from "./incidents";
@@ -134,8 +130,8 @@ export default createStore({
     // - Cleared when user clicks "Save" (saved permanently to localStorage & backend)
     // - Prevents other watchers/observers from overriding the preview color
     tempThemeColors: {
-      light: null,  // Hex color string (e.g., "#FF0000") or null
-      dark: null,   // Hex color string (e.g., "#0000FF") or null
+      light: null, // Hex color string (e.g., "#FF0000") or null
+      dark: null, // Hex color string (e.g., "#0000FF") or null
     } as Record<"light" | "dark", string | null>,
     // Share URL state for Safari-compatible clipboard copy
     // Polling mechanism checks this value and copies when available
@@ -315,10 +311,7 @@ export default createStore({
      * @param payload - { mode: 'light' | 'dark', color: '#hexcolor' }
      * Example: { mode: 'light', color: '#FF0000' }
      */
-    setTempThemeColor(
-      state,
-      payload: { mode: "light" | "dark"; color: string | null },
-    ) {
+    setTempThemeColor(state, payload: { mode: "light" | "dark"; color: string | null }) {
       state.tempThemeColors[payload.mode] = payload.color;
     },
     /**
@@ -531,6 +524,6 @@ export default createStore({
   modules: {
     streams,
     logs,
-    incidents
+    incidents,
   },
 });

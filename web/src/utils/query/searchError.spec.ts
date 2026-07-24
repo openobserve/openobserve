@@ -52,9 +52,7 @@ describe("the backend's ErrorCode envelope", () => {
   it("falls back to the raw string when the envelope's JSON is malformed", () => {
     // Better a mangled message than none: a blank tooltip reads as a second bug.
     const raw = "Error during planning: ErrorCode# {not json";
-    expect(parseSearchError({ response: { data: { error: raw } } }).message).toBe(
-      raw,
-    );
+    expect(parseSearchError({ response: { data: { error: raw } } }).message).toBe(raw);
   });
 
   it("leaves a plain message alone", () => {
@@ -194,8 +192,7 @@ describe("no call site is allowed to defeat the never-empty guarantee", () => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const path = join(dir, entry.name);
       if (entry.isDirectory()) out.push(...walk(path));
-      else if (SOURCE_EXTENSIONS.some((ext) => entry.name.endsWith(ext)))
-        out.push(path);
+      else if (SOURCE_EXTENSIONS.some((ext) => entry.name.endsWith(ext))) out.push(path);
     }
     return out;
   };
@@ -220,9 +217,7 @@ describe("never renders as a blank error", () => {
   );
 
   it("takes a caller-supplied fallback", () => {
-    expect(parseSearchError(null, "Preview failed").message).toBe(
-      "Preview failed",
-    );
+    expect(parseSearchError(null, "Preview failed").message).toBe("Preview failed");
   });
 
   it("truncates a message too long to display", () => {

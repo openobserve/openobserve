@@ -33,22 +33,96 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- floating stat chips behind the card -->
     <g transform="translate(34 56)">
-      <animateTransform v-if="animated" attributeName="transform" type="translate" additive="sum" values="0 0;0 -6;0 0" dur="4.2s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.2 1;0.4 0 0.2 1" keyTimes="0;0.5;1" />
-      <rect x="-16" y="-13" width="32" height="26" rx="6" fill="var(--color-surface-base)" stroke="var(--color-border-default)" stroke-width="1.5" />
-      <rect x="-9" y="-6" width="14" height="4" rx="2" fill="var(--color-border-strong)" opacity="0.5" />
+      <animateTransform
+        v-if="animated"
+        attributeName="transform"
+        type="translate"
+        additive="sum"
+        values="0 0;0 -6;0 0"
+        dur="4.2s"
+        repeatCount="indefinite"
+        calcMode="spline"
+        keySplines="0.4 0 0.2 1;0.4 0 0.2 1"
+        keyTimes="0;0.5;1"
+      />
+      <rect
+        x="-16"
+        y="-13"
+        width="32"
+        height="26"
+        rx="6"
+        fill="var(--color-surface-base)"
+        stroke="var(--color-border-default)"
+        stroke-width="1.5"
+      />
+      <rect
+        x="-9"
+        y="-6"
+        width="14"
+        height="4"
+        rx="2"
+        fill="var(--color-border-strong)"
+        opacity="0.5"
+      />
       <rect x="-9" y="2" width="18" height="5" rx="2.5" fill="var(--color-primary-500)" />
     </g>
     <g transform="translate(176 96)">
-      <animateTransform v-if="animated" attributeName="transform" type="translate" additive="sum" values="0 0;0 -7;0 0" dur="3.6s" begin="0.5s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.2 1;0.4 0 0.2 1" keyTimes="0;0.5;1" />
-      <rect x="-15" y="-12" width="30" height="24" rx="6" fill="var(--color-surface-base)" stroke="var(--color-border-default)" stroke-width="1.5" />
+      <animateTransform
+        v-if="animated"
+        attributeName="transform"
+        type="translate"
+        additive="sum"
+        values="0 0;0 -7;0 0"
+        dur="3.6s"
+        begin="0.5s"
+        repeatCount="indefinite"
+        calcMode="spline"
+        keySplines="0.4 0 0.2 1;0.4 0 0.2 1"
+        keyTimes="0;0.5;1"
+      />
+      <rect
+        x="-15"
+        y="-12"
+        width="30"
+        height="24"
+        rx="6"
+        fill="var(--color-surface-base)"
+        stroke="var(--color-border-default)"
+        stroke-width="1.5"
+      />
       <circle cx="-6" cy="0" r="5" fill="var(--color-primary-400)" />
-      <rect x="2" y="-2.5" width="10" height="5" rx="2.5" fill="var(--color-border-strong)" opacity="0.45" />
+      <rect
+        x="2"
+        y="-2.5"
+        width="10"
+        height="5"
+        rx="2.5"
+        fill="var(--color-border-strong)"
+        opacity="0.45"
+      />
     </g>
 
     <!-- main dashboard card -->
-    <rect x="58" y="40" width="92" height="78" rx="11" fill="var(--color-surface-base)" stroke="var(--color-border-strong)" stroke-width="1.5" />
+    <rect
+      x="58"
+      y="40"
+      width="92"
+      height="78"
+      rx="11"
+      fill="var(--color-surface-base)"
+      stroke="var(--color-border-strong)"
+      stroke-width="1.5"
+    />
     <!-- header -->
-    <rect x="68" y="50" width="30" height="5" rx="2.5" fill="var(--color-border-strong)" opacity="0.55" />
+    <rect
+      x="68"
+      y="50"
+      width="30"
+      height="5"
+      rx="2.5"
+      fill="var(--color-border-strong)"
+      opacity="0.55"
+    />
     <circle cx="140" cy="52.5" r="2.5" fill="var(--color-border-strong)" opacity="0.5" />
     <circle cx="132" cy="52.5" r="2.5" fill="var(--color-border-strong)" opacity="0.5" />
     <line x1="58" y1="62" x2="150" y2="62" stroke="var(--color-border-default)" stroke-width="1" />
@@ -64,8 +138,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       rx="2"
       :fill="bar.fill"
     >
-      <animate v-if="animated" attributeName="height" :values="bar.h" :dur="bar.dur" :begin="bar.begin" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.2 1;0.4 0 0.2 1" keyTimes="0;0.5;1" />
-      <animate v-if="animated" attributeName="y" :values="bar.y" :dur="bar.dur" :begin="bar.begin" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.2 1;0.4 0 0.2 1" keyTimes="0;0.5;1" />
+      <animate
+        v-if="animated"
+        attributeName="height"
+        :values="bar.h"
+        :dur="bar.dur"
+        :begin="bar.begin"
+        repeatCount="indefinite"
+        calcMode="spline"
+        keySplines="0.4 0 0.2 1;0.4 0 0.2 1"
+        keyTimes="0;0.5;1"
+      />
+      <animate
+        v-if="animated"
+        attributeName="y"
+        :values="bar.y"
+        :dur="bar.dur"
+        :begin="bar.begin"
+        repeatCount="indefinite"
+        calcMode="spline"
+        keySplines="0.4 0 0.2 1;0.4 0 0.2 1"
+        keyTimes="0;0.5;1"
+      />
     </rect>
 
     <!-- self-drawing sparkline (lower-right) -->
@@ -78,33 +172,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       stroke-linejoin="round"
       stroke-dasharray="90"
     >
-      <animate v-if="animated" attributeName="stroke-dashoffset" values="90;0;0;90" keyTimes="0;0.5;0.85;1" dur="4s" repeatCount="indefinite" />
+      <animate
+        v-if="animated"
+        attributeName="stroke-dashoffset"
+        values="90;0;0;90"
+        keyTimes="0;0.5;0.85;1"
+        dur="4s"
+        repeatCount="indefinite"
+      />
     </polyline>
     <circle cx="134" cy="82" r="3" fill="var(--color-primary-500)">
-      <animate v-if="animated" attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.45;0.5;0.85;1" dur="4s" repeatCount="indefinite" />
+      <animate
+        v-if="animated"
+        attributeName="opacity"
+        values="0;0;1;1;0"
+        keyTimes="0;0.45;0.5;0.85;1"
+        dur="4s"
+        repeatCount="indefinite"
+      />
     </circle>
 
     <!-- orbiting dot around the card -->
     <g>
-      <animateTransform v-if="animated" attributeName="transform" type="rotate" values="0 104 79;360 104 79" dur="9s" repeatCount="indefinite" />
+      <animateTransform
+        v-if="animated"
+        attributeName="transform"
+        type="rotate"
+        values="0 104 79;360 104 79"
+        dur="9s"
+        repeatCount="indefinite"
+      />
       <circle cx="104" cy="14" r="4.5" fill="var(--color-primary-500)" />
     </g>
 
     <!-- sparkles -->
     <g v-for="(s, i) in sparkles" :key="'s' + i" :transform="`translate(${s.x} ${s.y})`">
-      <path d="M0 -5.5 L1.4 -1.4 L5.5 0 L1.4 1.4 L0 5.5 L-1.4 1.4 L-5.5 0 L-1.4 -1.4 Z" fill="var(--color-primary-400)">
-        <animate v-if="animated" attributeName="opacity" values="0.2;1;0.2" :dur="s.dur" :begin="s.begin" repeatCount="indefinite" />
-        <animateTransform v-if="animated" attributeName="transform" type="scale" values="0.6;1.1;0.6" :dur="s.dur" :begin="s.begin" repeatCount="indefinite" />
+      <path
+        d="M0 -5.5 L1.4 -1.4 L5.5 0 L1.4 1.4 L0 5.5 L-1.4 1.4 L-5.5 0 L-1.4 -1.4 Z"
+        fill="var(--color-primary-400)"
+      >
+        <animate
+          v-if="animated"
+          attributeName="opacity"
+          values="0.2;1;0.2"
+          :dur="s.dur"
+          :begin="s.begin"
+          repeatCount="indefinite"
+        />
+        <animateTransform
+          v-if="animated"
+          attributeName="transform"
+          type="scale"
+          values="0.6;1.1;0.6"
+          :dur="s.dur"
+          :begin="s.begin"
+          repeatCount="indefinite"
+        />
       </path>
     </g>
   </svg>
 </template>
 
 <script setup lang="ts">
-withDefaults(
-  defineProps<{ width?: number; animated?: boolean }>(),
-  { width: 208, animated: true },
-);
+withDefaults(defineProps<{ width?: number; animated?: boolean }>(), { width: 208, animated: true });
 
 const BASE = 108;
 const mk = (x: number, lo: number, hi: number, dur: string, begin: string, fill: string) => ({

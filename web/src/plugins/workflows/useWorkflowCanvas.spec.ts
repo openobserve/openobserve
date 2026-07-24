@@ -37,6 +37,11 @@ vi.mock("@vue-flow/core", () => ({
   }),
 }));
 
+const mockToast = vi.fn();
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: any[]) => mockToast(...args),
+}));
+
 import workflowService from "@/services/workflows";
 import useWorkflowCanvas, {
   workflowObj,
@@ -44,12 +49,15 @@ import useWorkflowCanvas, {
   executeTestRun,
 } from "@/plugins/workflows/useWorkflowCanvas";
 
-const mockRun = workflowService.getWorkflowRun as unknown as ReturnType<
-  typeof vi.fn
->;
-const mockTest = workflowService.testWorkflow as unknown as ReturnType<
-  typeof vi.fn
->;
+const triggerNode = () => ({
+  id: "t1",
+  type: "input",
+  position: { x: 0, y: 0 },
+  data: { label: "t1", node_type: "workflow_trigger" },
+});
+
+const mockRun = workflowService.getWorkflowRun as unknown as ReturnType<typeof vi.fn>;
+const mockTest = workflowService.testWorkflow as unknown as ReturnType<typeof vi.fn>;
 
 describe("loadWorkflowRun — history run response mapping", () => {
   beforeEach(() => {
@@ -136,9 +144,7 @@ describe("loadWorkflowRun — history run response mapping", () => {
         },
       });
       await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "r1" });
-      expect((workflowObj.testRun.result as any).ghostNodeIds).toEqual([
-        "deleted-node",
-      ]);
+      expect((workflowObj.testRun.result as any).ghostNodeIds).toEqual(["deleted-node"]);
     });
 
     it("also flags a ghost referenced only by node_map (no error)", async () => {
@@ -149,9 +155,7 @@ describe("loadWorkflowRun — history run response mapping", () => {
         },
       });
       await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "r2" });
-      expect((workflowObj.testRun.result as any).ghostNodeIds).toEqual([
-        "old-node",
-      ]);
+      expect((workflowObj.testRun.result as any).ghostNodeIds).toEqual(["old-node"]);
     });
 
     it("is empty when the graph still matches the run", async () => {
@@ -173,9 +177,7 @@ describe("loadWorkflowRun — history run response mapping", () => {
         },
       });
       await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "r4" });
-      expect((workflowObj.testRun.result as any).ghostNodeIds).toEqual([
-        "zombie",
-      ]);
+      expect((workflowObj.testRun.result as any).ghostNodeIds).toEqual(["zombie"]);
     });
   });
 
@@ -297,5 +299,49 @@ describe("executeTestRun — ran-node scope + badge state", () => {
     expect(r.ok).toBe(false);
     expect(r.error).toBe("down");
     expect(workflowObj.testRun.result).toBeNull();
+  });
+});
+
+describe("trigger-first guard — palette adds are blocked until a trigger exists", () => {
+  const { addNodeToEnd, onDrop } = useWorkflowCanvas();
+
+  beforeEach(() => {
+    mockToast.mockClear();
+    workflowObj.currentSelectedWorkflow.nodes = [];
+    workflowObj.currentSelectedWorkflow.edges = [];
+    workflowObj.currentSelectedNodeData = null;
+    workflowObj.dialog = { show: false, name: "", expand: false };
+  });
+
+  it("addNodeToEnd (palette click) is blocked with a toast when no trigger exists", () => {
+    addNodeToEnd("condition");
+    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
+    expect(workflowObj.dialog.show).toBe(false);
+    expect(workflowObj.currentSelectedNodeData).toBeNull();
+  });
+
+  it("onDrop (palette drag) is blocked with a toast when no trigger exists", () => {
+    workflowObj.draggedNodeType = "function";
+    onDrop({ clientX: 10, clientY: 10 } as any);
+    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
+    expect(workflowObj.dialog.show).toBe(false);
+    expect(workflowObj.currentSelectedNodeData).toBeNull();
+  });
+
+  it("addNodeToEnd stages a node once a trigger is present", () => {
+    workflowObj.currentSelectedWorkflow.nodes = [triggerNode()];
+    addNodeToEnd("condition");
+    expect(mockToast).not.toHaveBeenCalled();
+    expect(workflowObj.dialog.show).toBe(true);
+    expect(workflowObj.currentSelectedNodeData?.data.node_type).toBe("condition");
+  });
+
+  it("onDrop stages a node once a trigger is present", () => {
+    workflowObj.currentSelectedWorkflow.nodes = [triggerNode()];
+    workflowObj.draggedNodeType = "function";
+    onDrop({ clientX: 10, clientY: 10 } as any);
+    expect(mockToast).not.toHaveBeenCalled();
+    expect(workflowObj.dialog.show).toBe(true);
+    expect(workflowObj.currentSelectedNodeData?.data.node_type).toBe("function");
   });
 });

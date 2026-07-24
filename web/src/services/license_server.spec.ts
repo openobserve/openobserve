@@ -174,7 +174,7 @@ describe("license_server service", () => {
       mockHttpInstance.post.mockRejectedValue(new Error("License update failed"));
 
       await expect(licenseServer.update_license("bad-key")).rejects.toThrow(
-        "License update failed"
+        "License update failed",
       );
     });
 
@@ -193,9 +193,7 @@ describe("license_server service", () => {
       };
       mockHttpInstance.post.mockRejectedValue(unauthorizedError);
 
-      await expect(licenseServer.update_license("expired-key")).rejects.toEqual(
-        unauthorizedError
-      );
+      await expect(licenseServer.update_license("expired-key")).rejects.toEqual(unauthorizedError);
     });
 
     it("should always POST to /api/license regardless of key content", async () => {

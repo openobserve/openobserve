@@ -24,19 +24,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     id="organization-deduplication-settings-form"
     :form="form"
     v-slot="{ isSubmitting }"
-    class="w-full h-full bg-card-glass-bg flex flex-col"
+    class="bg-card-glass-bg flex h-full w-full flex-col"
   >
     <!-- Scrollable content area -->
-    <div class="flex-1 overflow-y-auto pr-2 pt-4">
+    <div class="flex-1 overflow-y-auto pt-4 pr-2">
       <div class="mb-4">
-        <div class="text-sm font-semibold leading-tight text-text-heading">
-          {{ t('alerts.correlation.title') }}
+        <div class="text-text-heading text-sm leading-tight font-semibold">
+          {{ t("alerts.correlation.title") }}
         </div>
-        <div class="text-xs text-text-secondary mt-1">
-          {{ t('alerts.correlation.description') }}
+        <div class="text-text-secondary mt-1 text-xs">
+          {{ t("alerts.correlation.description") }}
         </div>
-        <div class="text-xs text-text-secondary mt-1 italic">
-          {{ t('alerts.correlation.semanticFieldNote') }}
+        <div class="text-text-secondary mt-1 text-xs italic">
+          {{ t("alerts.correlation.semanticFieldNote") }}
         </div>
       </div>
 
@@ -46,7 +46,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
         class="mb-6"
         @click="loadConfig"
-      >{{ t('common.refresh') }}</OButton>
+        >{{ t("common.refresh") }}</OButton
+      >
 
       <!-- Enable Deduplication -->
       <div class="mb-6">
@@ -72,14 +73,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Cross-Alert Fingerprint Groups -->
       <div class="mb-6" v-if="enabled && alertDedupEnabled">
-        <div class="font-semibold pb-2 flex items-center">
-          {{ t('alerts.correlation.fingerprintGroups') }} <span class="text-status-error-text ml-1">*</span>
-          <OIcon
-            name="info"
-            size="sm"
-            class="ml-1 cursor-pointer"
-            :class="'text-text-secondary'"
-          >
+        <div class="flex items-center pb-2 font-semibold">
+          {{ t("alerts.correlation.fingerprintGroups") }}
+          <span class="text-status-error-text ml-1">*</span>
+          <OIcon name="info" size="sm" class="ml-1 cursor-pointer" :class="'text-text-secondary'">
             <OTooltip
               side="right"
               align="center"
@@ -87,8 +84,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </OIcon>
         </div>
-        <div class="text-sm text-text-secondary mb-2">
-          {{ t('alerts.correlation.fingerprintGroupsHint') }}
+        <div class="text-text-secondary mb-2 text-sm">
+          {{ t("alerts.correlation.fingerprintGroupsHint") }}
         </div>
         <!-- The selected group ids ARE the form's alert_fingerprint_groups
              array. Each per-group OCheckbox is a group member (value = id); the
@@ -106,22 +103,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Time Window -->
       <div class="mb-6">
-        <div class="font-semibold pb-2 flex items-center">
-          {{ t('alerts.correlation.defaultWindow') }}
-          <OIcon
-            name="info"
-            size="sm"
-            class="ml-1 cursor-pointer"
-            :class="'text-text-secondary'"
-           />
-            <OTooltip
-              side="right"
-              align="center"
-              :content="t('alerts.correlation.defaultWindowTooltip')"
-            />
+        <div class="flex items-center pb-2 font-semibold">
+          {{ t("alerts.correlation.defaultWindow") }}
+          <OIcon name="info" size="sm" class="ml-1 cursor-pointer" :class="'text-text-secondary'" />
+          <OTooltip
+            side="right"
+            align="center"
+            :content="t('alerts.correlation.defaultWindowTooltip')"
+          />
         </div>
-        <div class="text-sm text-text-secondary mb-2">
-          {{ t('alerts.correlation.defaultWindowDescription') }}
+        <div class="text-text-secondary mb-2 text-sm">
+          {{ t("alerts.correlation.defaultWindowDescription") }}
         </div>
         <OFormInput
           name="time_window_minutes"
@@ -135,19 +127,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Sticky footer with buttons -->
-    <div class="flex justify-end gap-3 pt-4 pb-2 border-t border-border-default bg-inherit sticky bottom-0">
+    <div
+      class="border-border-default sticky bottom-0 flex justify-end gap-3 border-t bg-inherit pt-4 pb-2"
+    >
       <OButton
         variant="outline"
         size="sm-action"
         :disabled="isSubmitting"
         @click="$emit('cancel')"
-      >{{ t('alerts.correlation.cancelButton') }}</OButton>
-      <OButton
-        variant="primary"
-        size="sm-action"
-        type="submit"
-        :loading="isSubmitting"
-      >{{ t('alerts.correlation.saveButton') }}</OButton>
+        >{{ t("alerts.correlation.cancelButton") }}</OButton
+      >
+      <OButton variant="primary" size="sm-action" type="submit" :loading="isSubmitting">{{
+        t("alerts.correlation.saveButton")
+      }}</OButton>
     </div>
   </OForm>
 </template>
@@ -157,9 +149,9 @@ import { ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import alertsService from "@/services/alerts";
-import OButton from '@/lib/core/Button/OButton.vue';
-import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
-import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OForm from "@/lib/forms/Form/OForm.vue";

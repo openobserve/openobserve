@@ -100,26 +100,23 @@ vi.mock("@/utils/synthetics/mapRecordedStep", () => ({
   journeyToWireSteps: vi.fn(() => []),
 }));
 
-vi.mock(
-  "@/components/synthetics/CreateBrowserTest.schema",
-  () => {
-    const { z } = require("zod");
-    return {
-      makeBrowserCheckGateSchema: (t: any) =>
-        z.object({
-          url: z.string().min(1, "URL is required"),
-          name: z.string().optional(),
-        }),
-      makeBrowserCheckSaveSchema: (t: any) =>
-        z.object({
-          name: z.string().min(1, "Name is required"),
-          url: z.string().optional(),
-          locations: z.array(z.any()).optional(),
-          journey: z.array(z.any()).optional(),
-        }),
-    };
-  },
-);
+vi.mock("@/components/synthetics/CreateBrowserTest.schema", () => {
+  const { z } = require("zod");
+  return {
+    makeBrowserCheckGateSchema: (t: any) =>
+      z.object({
+        url: z.string().min(1, "URL is required"),
+        name: z.string().optional(),
+      }),
+    makeBrowserCheckSaveSchema: (t: any) =>
+      z.object({
+        name: z.string().min(1, "Name is required"),
+        url: z.string().optional(),
+        locations: z.array(z.any()).optional(),
+        journey: z.array(z.any()).optional(),
+      }),
+  };
+});
 
 import CreateBrowserTest from "./CreateBrowserTest.vue";
 
@@ -142,7 +139,7 @@ const baseStubs = {
     emits: ["update:modelValue", "blur"],
   },
   OIcon: {
-    template: '<span />',
+    template: "<span />",
     props: ["name", "size", "class", "ariaHidden"],
   },
   OSwitch: {
@@ -152,12 +149,19 @@ const baseStubs = {
   },
   ODialog: {
     template: '<div v-if="open" :data-test="$attrs[\'data-test\']"><slot /></div>',
-    props: ["open", "size", "title", "primaryButtonLabel", "secondaryButtonLabel", "primaryButtonVariant"],
+    props: [
+      "open",
+      "size",
+      "title",
+      "primaryButtonLabel",
+      "secondaryButtonLabel",
+      "primaryButtonVariant",
+    ],
     emits: ["click:primary", "click:secondary", "update:open"],
     inheritAttrs: true,
   },
   OStepper: {
-    template: '<div><slot /></div>',
+    template: "<div><slot /></div>",
     props: ["modelValue", "navigable", "class"],
   },
   OStep: {
@@ -202,18 +206,18 @@ const baseStubs = {
     inheritAttrs: true,
   },
   EmptyBrowserCheck: {
-    template: '<div />',
+    template: "<div />",
     props: ["width"],
   },
   Teleport: {
-    template: '<div><slot /></div>',
+    template: "<div><slot /></div>",
   },
 };
 
 // ── Missing component stubs required by OPageLayout ──────────────────────
 const pageLayoutStubs = {
   OPageLayout: {
-    template: '<div><slot /></div>',
+    template: "<div><slot /></div>",
     props: ["title", "subtitle", "back", "class", "bleed"],
   },
 };
@@ -251,24 +255,16 @@ describe("CreateBrowserTest", () => {
       await flushPromises();
 
       expect(wrapper.exists()).toBe(true);
-      expect(
-        wrapper.find('[data-test="synthetics-create-url-input"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="synthetics-create-name-input"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-create-url-input"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-create-name-input"]').exists()).toBe(true);
     });
 
     it("should render Record journey and Build manually buttons", async () => {
       wrapper = mountPage();
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="synthetics-create-record-btn"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="synthetics-create-build-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-create-record-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-create-build-btn"]').exists()).toBe(true);
     });
 
     it("should disable action buttons when URL is empty", async () => {
@@ -300,9 +296,7 @@ describe("CreateBrowserTest", () => {
       await flushPromises();
 
       // Now we should be on the extension setup phase - check for the Open & Record button
-      expect(
-        wrapper.find('[data-test="synthetics-setup-open-record-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-setup-open-record-btn"]').exists()).toBe(true);
     });
   });
 
@@ -311,7 +305,7 @@ describe("CreateBrowserTest", () => {
       wrapper = mountPage({ editId: "check-123" });
       await flushPromises();
 
-      expect(mockServiceGet).toHaveBeenCalledWith("default", "check-123");
+      expect(mockServiceGet).toHaveBeenCalledWith("default", "check-123", "");
     });
 
     it("should NOT call syntheticsService.get when editId prop is not provided", async () => {
@@ -329,9 +323,9 @@ describe("CreateBrowserTest", () => {
       wrapper = mountPage({ editId: "check-123" });
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="synthetics-create-save-from-journey-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-create-save-from-journey-btn"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should NOT render 'Update Check' button when editId is not set, even in editor phase", async () => {
@@ -348,16 +342,12 @@ describe("CreateBrowserTest", () => {
 
       // We are now in the editor phase on step 1 — verify footer buttons
       // Continue and Cancel should be present
-      expect(
-        wrapper.find('[data-test="synthetics-create-continue-btn"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="synthetics-create-cancel-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-create-continue-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-create-cancel-btn"]').exists()).toBe(true);
       // Update Check button should NOT appear (no editId)
-      expect(
-        wrapper.find('[data-test="synthetics-create-save-from-journey-btn"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="synthetics-create-save-from-journey-btn"]').exists()).toBe(
+        false,
+      );
     });
   });
 

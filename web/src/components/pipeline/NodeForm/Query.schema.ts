@@ -13,10 +13,7 @@
 // `validateSqlQuery()` stays a pre-submit guard inside Query's onSubmit.
 
 import { z } from "zod";
-import {
-  getCronIntervalDifferenceInSeconds,
-  isAboveMinRefreshInterval,
-} from "@/utils/zincutils";
+import { getCronIntervalDifferenceInSeconds, isAboveMinRefreshInterval } from "@/utils/zincutils";
 
 // Minimal translator type — Query passes vue-i18n's `t`. Falls back to the
 // literal key so the schema is usable without an i18n instance (tests). Accepts
@@ -58,9 +55,7 @@ export function makeQuerySchema(min: number, t: Translate = (k) => k) {
       // every field (sql / promql / delay / stream_type / etc.).
       trigger_condition: z
         .object({
-          period: z.coerce
-            .number()
-            .min(1, t("pipeline.periodGreaterThanZero")),
+          period: z.coerce.number().min(1, t("pipeline.periodGreaterThanZero")),
           frequency_type: z.string().optional(),
           frequency: z.any().optional(),
           cron: z.string().optional().nullable(),

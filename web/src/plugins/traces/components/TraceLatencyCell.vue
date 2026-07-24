@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="trace-row-latency-bar"
-    class="flex flex-nowrap h-[0.85rem] rounded-default overflow-hidden w-full bg-card-glass-border"
+    class="rounded-default bg-card-glass-border flex h-[0.85rem] w-full flex-nowrap overflow-hidden"
   >
     <div
       v-for="[service, svc] in serviceEntries"
@@ -28,30 +28,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OTooltip side="left" align="center">
         <template #content>
-          <div
-            class="font-semibold mb-[0.35rem] tracking-[0.03rem] opacity-100 text-xs"
-          >
-            {{ t('traces.traceLatencyCell.spansAcrossServices', { spans: item.spans, services: serviceEntries.length }) }}
+          <div class="mb-[0.35rem] text-xs font-semibold tracking-[0.03rem] opacity-100">
+            {{
+              t("traces.traceLatencyCell.spansAcrossServices", {
+                spans: item.spans,
+                services: serviceEntries.length,
+              })
+            }}
           </div>
           <div
             v-for="[s, sv] in serviceEntries"
             :key="s"
-            class="grid items-center gap-x-2 py-[0.1rem] grid-cols-[0.5rem_1fr_auto_auto]"
-            :class="
-              s === service ? 'font-bold' : 'font-normal opacity-75'
-            "
+            class="grid grid-cols-[0.5rem_1fr_auto_auto] items-center gap-x-2 py-[0.1rem]"
+            :class="s === service ? 'font-bold' : 'font-normal opacity-75'"
           >
-            <span
-              class="inline-block w-2 h-2 rounded-full shrink-0"
-              :style="serviceDotStyle(s)"
-            />
+            <span class="inline-block h-2 w-2 shrink-0 rounded-full" :style="serviceDotStyle(s)" />
             <span class="truncate">{{ s }}</span>
-            <span class="text-right">{{
-              formatTimeWithSuffix((sv as any).duration)
-            }}</span>
-            <span class="text-right"
-              >{{ segmentPercent(sv as any).toFixed(1) }}%</span
-            >
+            <span class="text-right">{{ formatTimeWithSuffix((sv as any).duration) }}</span>
+            <span class="text-right">{{ segmentPercent(sv as any).toFixed(1) }}%</span>
           </div>
         </template>
       </OTooltip>
@@ -85,10 +79,7 @@ const serviceColors = computed(() => searchObj.meta.serviceColors ?? {});
 const totalDuration = computed(() => {
   const svcs = props.item.services ?? {};
   return (
-    Object.values(svcs).reduce<number>(
-      (acc, svc) => acc + ((svc as any).duration ?? 0),
-      0,
-    ) || 1
+    Object.values(svcs).reduce<number>((acc, svc) => acc + ((svc as any).duration ?? 0), 0) || 1
   );
 });
 

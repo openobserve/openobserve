@@ -45,22 +45,15 @@ export const isTimeStamp = (sample: any, treatAsNonTimestamp: any) => {
 
   // If treatAsNonTimestamp is false (timestamp field), check if all values are 16 digit numbers
   if (treatAsNonTimestamp === false) {
-    return sample.every((value: any) =>
-      microsecondsPattern.test(value?.toString()),
-    );
+    return sample.every((value: any) => microsecondsPattern.test(value?.toString()));
   }
   // If treatAsNonTimestamp is null or undefined, check if all values are 16 digits
   if (treatAsNonTimestamp === null || treatAsNonTimestamp === undefined) {
-    return sample.every((value: any) =>
-      microsecondsPattern.test(value?.toString()),
-    );
+    return sample.every((value: any) => microsecondsPattern.test(value?.toString()));
   }
 };
 
-export function convertOffsetToSeconds(
-  offset: string,
-  endISOTimestamp: number,
-) {
+export function convertOffsetToSeconds(offset: string, endISOTimestamp: number) {
   try {
     const periodValue = parseInt(offset.slice(0, -1)); // Extract the numeric part
     const period = offset.slice(-1); // Extract the last character (unit)
@@ -109,10 +102,7 @@ export function convertOffsetToSeconds(
     }
 
     // subtract period from endISOTimestamp
-    const startTimeStamp = subtractRelativeTime(
-      endISOTimestamp,
-      subtractObject,
-    );
+    const startTimeStamp = subtractRelativeTime(endISOTimestamp, subtractObject);
 
     // return difference of seconds between endISOTimestamp and startTimeStamp
     return {
@@ -129,10 +119,7 @@ export function convertOffsetToSeconds(
 }
 
 // Function to convert chart timestamp (timezone-adjusted) back to UTC
-export const getUTCTimestampFromZonedTimestamp = (
-  timestampMs: number,
-  currentTimeZone: string,
-) => {
+export const getUTCTimestampFromZonedTimestamp = (timestampMs: number, currentTimeZone: string) => {
   if (!timestampMs) return null;
 
   // Use fromZonedTime to convert from currentTimeZone back to UTC

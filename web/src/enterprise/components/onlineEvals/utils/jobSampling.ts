@@ -34,10 +34,7 @@ export function samplingRatePercent(value: string | number): number | null {
 }
 
 /** Validate and return the scalar rate used by the eval-job API. */
-export function parseSamplingRate(
-  value: string | number,
-  label: string,
-): number {
+export function parseSamplingRate(value: string | number, label: string): number {
   const input = String(value).trim();
   const rate = Number(input);
 

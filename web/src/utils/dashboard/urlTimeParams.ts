@@ -35,11 +35,7 @@ export type TimeQueryParams =
 export const queryParamsToSelectedDate = (
   params: LocationQuery | Record<string, any>,
 ): SelectedDate => ({
-  valueType: params.period
-    ? "relative"
-    : params.from && params.to
-      ? "absolute"
-      : "relative",
+  valueType: params.period ? "relative" : params.from && params.to ? "absolute" : "relative",
   startTime: params.from ? params.from : null,
   endTime: params.to ? params.to : null,
   relativeTimePeriod: params.period ? (params.period as string) : "15m",
@@ -78,5 +74,4 @@ export const refreshLabelToInterval = (
   return secs;
 };
 
-export const refreshIntervalToLabel = (seconds: number): string =>
-  generateDurationLabel(seconds);
+export const refreshIntervalToLabel = (seconds: number): string => generateDurationLabel(seconds);

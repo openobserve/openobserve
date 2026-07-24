@@ -115,14 +115,17 @@ export const DEFAULT_LOGS_CONFIG = {
     showDetailTab: false,
     showTransformEditor: false, // by default function / actions editor should be hidden
     searchApplied: false,
-    toggleSourceWrap: useLocalWrapContent()
-      ? JSON.parse(useLocalWrapContent())
-      : false,
+    toggleSourceWrap: useLocalWrapContent() ? JSON.parse(useLocalWrapContent()) : false,
     histogramDirtyFlag: false,
     logsVisualizeDirtyFlag: false,
     sqlMode: false,
     sqlModeManualTrigger: false,
     sqlModeEditTransition: false,
+    // True from when a URL / short-link restore sets the query until the
+    // (lazy-loaded) editor has actually applied it. Guards updateQueryValue()
+    // against the editor's transient empty emission during mount wiping the
+    // restored query. See SearchBar.updateQueryValue and useLogs.restoreUrlQueryParams.
+    pendingUrlQueryRestore: false,
     nlpMode: false,
     quickMode: false,
     // True when the current selectedFields were chosen automatically by the FTS
@@ -168,7 +171,12 @@ export const DEFAULT_LOGS_CONFIG = {
     errorDetail: "",
     errorCode: 0,
     filterErrMsg: "",
-    sqlSyntaxErrorRanges: [] as Array<{ startLine: number; endLine: number; column?: number; error: string }>,
+    sqlSyntaxErrorRanges: [] as Array<{
+      startLine: number;
+      endLine: number;
+      column?: number;
+      error: string;
+    }>,
     missingStreamMessage: "",
     additionalErrorMsg: "",
     savedViewFilterFields: "",

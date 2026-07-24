@@ -126,7 +126,6 @@ import { findFirstValidMappedValue } from "@/utils/dashboard/panelValidation";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 
-
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
@@ -189,9 +188,7 @@ describe("TableRenderer", () => {
 
     it("should render the table-wrapper div", () => {
       wrapper = createWrapper();
-      expect(
-        wrapper.find('[data-test="dashboard-table-renderer-wrapper"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-table-renderer-wrapper"]').exists()).toBe(true);
     });
 
     it("should render the TenstackTable with correct data-test attribute", () => {
@@ -497,11 +494,14 @@ describe("TableRenderer", () => {
 
     beforeEach(() => {
       capturedCsv = "";
-      vi.stubGlobal("Blob", class MockBlob {
-        constructor(parts: any[]) {
-          capturedCsv = String(parts?.[0] ?? "");
-        }
-      });
+      vi.stubGlobal(
+        "Blob",
+        class MockBlob {
+          constructor(parts: any[]) {
+            capturedCsv = String(parts?.[0] ?? "");
+          }
+        },
+      );
     });
 
     afterEach(() => {
@@ -538,9 +538,7 @@ describe("TableRenderer", () => {
 
     it("should not produce empty values when row data is keyed by field", () => {
       const data = {
-        columns: [
-          { name: "Timestamp", label: "Timestamp", field: "_timestamp", align: "left" },
-        ],
+        columns: [{ name: "Timestamp", label: "Timestamp", field: "_timestamp", align: "left" }],
         rows: [{ _timestamp: "2023-01-01T00:00:00Z" }],
       };
       wrapper = createWrapper({ data });
@@ -555,9 +553,7 @@ describe("TableRenderer", () => {
 
     it("should still work when name and field are identical", () => {
       const data = {
-        columns: [
-          { name: "count", label: "Count", field: "count", align: "right" },
-        ],
+        columns: [{ name: "count", label: "Count", field: "count", align: "right" }],
         rows: [{ count: 42 }],
       };
       wrapper = createWrapper({ data });
@@ -586,9 +582,7 @@ describe("TableRenderer", () => {
 
     it("should properly escape double quotes in CSV values", () => {
       const data = {
-        columns: [
-          { name: "msg", label: "Message", field: "msg", align: "left" },
-        ],
+        columns: [{ name: "msg", label: "Message", field: "msg", align: "left" }],
         rows: [{ msg: 'He said "hello"' }],
       };
       wrapper = createWrapper({ data });

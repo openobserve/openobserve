@@ -27,18 +27,11 @@ const useLocalStorage = (
     });
 
     const write = () => {
-      const val: unknown = isJSONValue
-        ? JSON.stringify(defaultValue)
-        : defaultValue;
+      const val: unknown = isJSONValue ? JSON.stringify(defaultValue) : defaultValue;
       window.localStorage.setItem(key, String(val));
     };
 
-    if (
-      window.localStorage.getItem(key) == null &&
-      !isDelete &&
-      defaultValue !== ""
-    )
-      write();
+    if (window.localStorage.getItem(key) == null && !isDelete && defaultValue !== "") write();
     else if (value.value !== defaultValue && defaultValue !== "") write();
 
     const remove = () => {
@@ -51,9 +44,7 @@ const useLocalStorage = (
 
     return value;
   } catch (e) {
-    console.log(
-      `Error: Error in UseLocalStorage for key: ${key}, error-message : ${e}`,
-    );
+    console.log(`Error: Error in UseLocalStorage for key: ${key}, error-message : ${e}`);
     return undefined;
   }
 };

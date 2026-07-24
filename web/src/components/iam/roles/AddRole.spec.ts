@@ -43,14 +43,7 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 
 const ODialogStub = {
   name: "ODialog",
-  props: [
-    "open",
-    "size",
-    "title",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "formId",
-  ],
+  props: ["open", "size", "title", "primaryButtonLabel", "secondaryButtonLabel", "formId"],
   emits: ["update:open", "click:primary", "click:secondary"],
   template: `
     <div data-test-stub="o-dialog" :data-open="open" :data-title="title" :data-form-id="formId">
@@ -122,9 +115,9 @@ describe("AddRole", () => {
 
     it("wires the OForm to the dialog via form-id", () => {
       expect(getForm(wrapper).exists()).toBe(true);
-      expect(
-        wrapper.find('[data-test-stub="o-dialog"]').attributes("data-form-id"),
-      ).toBe("add-role-form");
+      expect(wrapper.find('[data-test-stub="o-dialog"]').attributes("data-form-id")).toBe(
+        "add-role-form",
+      );
     });
 
     it("passes a Zod schema to OForm", () => {
@@ -152,9 +145,7 @@ describe("AddRole", () => {
     });
 
     it("shows the start-from presets", () => {
-      expect(
-        wrapper.find('[data-test="add-role-start-from-section"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-role-start-from-section"]').exists()).toBe(true);
     });
 
     it("keeps Save enabled (R3 — no disabled gate)", () => {
@@ -163,19 +154,13 @@ describe("AddRole", () => {
     });
 
     it("renders the dialog title", () => {
-      expect(
-        wrapper.find('[data-test-stub="o-dialog"]').attributes("data-title"),
-      ).toBeTruthy();
+      expect(wrapper.find('[data-test-stub="o-dialog"]').attributes("data-title")).toBeTruthy();
     });
 
     it("reflects the open prop on the dialog and defaults it to false", async () => {
-      expect(
-        wrapper.find('[data-test-stub="o-dialog"]').attributes("data-open"),
-      ).toBe("true");
+      expect(wrapper.find('[data-test-stub="o-dialog"]').attributes("data-open")).toBe("true");
       await wrapper.setProps({ open: false });
-      expect(
-        wrapper.find('[data-test-stub="o-dialog"]').attributes("data-open"),
-      ).toBe("false");
+      expect(wrapper.find('[data-test-stub="o-dialog"]').attributes("data-open")).toBe("false");
 
       const w = mount(AddRole, {
         global: { plugins: [store, i18n], stubs: { ODialog: ODialogStub } },

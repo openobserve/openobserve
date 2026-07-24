@@ -32,16 +32,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ConstrainedPage size="lg" class="o2-section-hub" data-test="section-hub">
     <div>
       <header v-if="title || description" class="mb-6">
-        <h1
-          v-if="title"
-          class="text-xl! font-semibold! text-text-heading"
-        >
+        <h1 v-if="title" class="text-text-heading text-xl! font-semibold!">
           {{ title }}
         </h1>
-        <p
-          v-if="description"
-          class="text-sm text-text-secondary mt-1"
-        >
+        <p v-if="description" class="text-text-secondary mt-1 text-sm">
           {{ description }}
         </p>
       </header>
@@ -52,25 +46,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="mb-8"
         :data-test="`section-hub-group-${group.label}`"
       >
-        <h2
-          v-if="group.label"
-          class="text-sm! font-semibold! text-text-heading mb-3"
-        >
+        <h2 v-if="group.label" class="text-text-heading mb-3 text-sm! font-semibold!">
           {{ group.label }}
         </h2>
-        <div
-          class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
-        >
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <button
             v-for="item in group.items"
             :key="item.key"
             type="button"
-            class="o2-hub-card group flex items-start gap-3 text-left p-4 rounded-default border border-border-default bg-surface-panel transition-colors hover:border-primary-500 hover:bg-surface-subtle outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            class="o2-hub-card group rounded-default border-border-default bg-surface-panel hover:border-accent hover:bg-surface-subtle focus-visible:ring-accent flex items-start gap-3 border p-4 text-left transition-colors outline-none focus-visible:ring-2"
             :data-test="item.dataTest || `section-hub-card-${item.key}`"
             @click="router.push(item.to)"
           >
             <span
-              class="shrink-0 mt-0.5 inline-flex items-center justify-center w-8 h-8 rounded-default bg-surface-subtle text-text-secondary transition-colors group-hover:bg-primary-50 group-hover:text-primary-600"
+              class="rounded-default bg-surface-subtle text-text-secondary group-hover:bg-tabs-hover-bg group-hover:text-accent mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center transition-colors"
             >
               <img
                 v-if="item.icon && isImg(item.icon)"
@@ -81,14 +70,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <OIcon v-else-if="item.icon" :name="item.icon as any" size="sm" />
             </span>
-            <span class="flex flex-col min-w-0">
+            <span class="flex min-w-0 flex-col">
               <span
-                class="text-sm font-semibold text-text-heading transition-colors group-hover:text-primary-600"
+                class="text-text-heading group-hover:text-accent text-sm font-semibold transition-colors"
                 >{{ item.label }}</span
               >
               <span
                 v-if="item.description"
-                class="text-xs text-text-secondary mt-0.5 leading-snug"
+                class="text-text-secondary mt-0.5 text-xs leading-snug"
                 >{{ item.description }}</span
               >
             </span>

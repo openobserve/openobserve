@@ -15,11 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="h-full bg-surface-base"
-  >
+  <div class="bg-surface-base h-full">
     <div>
-      <div class="flex justify-between items-center px-3 py-2">
+      <div class="flex items-center justify-between px-3 py-2">
         <div data-test="add-pipeline-section-title" style="font-size: var(--text-lg)">
           {{ t("pipeline.addPipeline") }}
         </div>
@@ -32,20 +30,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <div class="w-full bg-separator" style="height: 1px" />
+      <div class="bg-separator w-full" style="height: 1px" />
 
       <!-- Inline form — the Save button lives inside the <OForm>, so Enter submits
            natively via type="submit" (no form-id needed; R4 case 1). -->
-      <OForm
-        id="add-pipeline-form"
-        :form="form"
-        v-slot="{ isSubmitting }"
-      >
+      <OForm id="add-pipeline-form" :form="form" v-slot="{ isSubmitting }">
         <div class="px-3">
-          <div
-            data-test="add-pipeline-name-input"
-            class="alert-name-input o2-input pt-3"
-          >
+          <div data-test="add-pipeline-name-input" class="alert-name-input o2-input pt-3">
             <OFormInput
               name="name"
               :label="t('alerts.name')"
@@ -56,10 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="min-width: 480px"
             />
           </div>
-          <div
-            data-test="add-pipeline-description-input"
-            class="alert-name-input o2-input mb-2"
-          >
+          <div data-test="add-pipeline-description-input" class="alert-name-input o2-input mb-2">
             <OFormInput
               name="description"
               :label="t('alerts.description')"
@@ -84,10 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="min-width: 220px"
             />
           </div>
-          <div
-            data-test="add-pipeline-stream-select"
-            class="o2-input pt-0"
-          >
+          <div data-test="add-pipeline-stream-select" class="o2-input pt-0">
             <OFormSelect
               name="stream_name"
               :options="indexOptions"
@@ -103,20 +88,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div class="flex gap-2 mt-4 px-3">
+        <div class="mt-4 flex gap-2 px-3">
           <OButton
             variant="outline"
             size="sm-action"
             :disabled="isSubmitting"
             data-test="add-pipeline-cancel-btn"
-          >{{ t('alerts.cancel') }}</OButton>
+            >{{ t("alerts.cancel") }}</OButton
+          >
           <OButton
             variant="primary"
             size="sm-action"
             type="submit"
             :loading="isSubmitting"
             data-test="add-pipeline-submit-btn"
-          >{{ t('alerts.save') }}</OButton>
+            >{{ t("alerts.save") }}</OButton
+          >
         </div>
       </OForm>
     </div>
@@ -235,9 +222,7 @@ const filterColumns = (options: any[], val: String, update: Function) => {
   }
   update(() => {
     const value = val.toLowerCase();
-    filteredOptions = options.filter(
-      (column: any) => column.toLowerCase().indexOf(value) > -1,
-    );
+    filteredOptions = options.filter((column: any) => column.toLowerCase().indexOf(value) > -1);
   });
   return filteredOptions;
 };

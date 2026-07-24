@@ -27,11 +27,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     hasInput / hasOutput — whether to render the target / source handle
     inputPosition / outputPosition — handle sides (default top / bottom)
 
-  Slots: #body (the node's label/content), #actions (hover buttons),
-  #footer (hover-`+`). The shared node typography (15px / bold / left) lives on
-  the body container, so wrappers supply content — not styling — and both
-  canvases render identically.
+  Slots: #body (the node's label/content), #actions (hover buttons), #footer
+  (extra affordances under the card). The shared node typography (15px / bold /
+  left) lives on the body container, so wrappers supply content — not styling —
+  and both canvases render identically.
   Native @click / @mouseenter / @mouseleave fall through to the root element.
+
+  Emits: outputClick — the source handle was clicked (Pipelines uses it to open
+  the "add next step" picker; see the connect-on-click note in PipelineFlow).
 
   Card background/border colour comes from the VueFlow node wrapper
   (`.vue-flow__node-<ioType>`) styled by each flow, and the handle look from the
@@ -42,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- `flow-node` / `flow-node__container` are identifiers only — styling is
        utilities, so there is no style block. py-[0.3125rem] = the old 5px,
        mirroring the pipeline node's inner padding so the two match exactly. -->
-  <div class="flow-node flex items-center border-none cursor-pointer w-fit py-[0.3125rem]">
+  <div class="flow-node flex w-fit cursor-pointer items-center border-none py-[0.3125rem]">
     <Handle
       v-if="hasInput"
       id="input"
@@ -63,12 +66,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Shared node typography (0.9375rem = the old 15px / bold / left) lives
          here so every #body slot inherits it — wrappers supply content, not
          styling. Changing it here changes every node type at once. -->
-    <div
-      class="flow-node__container text-left min-w-0 text-sm! font-bold! leading-[1.4]!"
-    >
+    <div class="flow-node__container min-w-0 text-left text-sm! leading-[1.4]! font-bold!">
       <slot name="body" />
     </div>
 
+    <!-- Clicking the source dot is the "add next step" affordance (Pipelines).
+         Emitted rather than handled here so this stays presentational; a canvas
+         that does not listen keeps the plain handle. -->
     <Handle
       v-if="hasOutput"
       id="output"
@@ -76,6 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :position="outputPosition"
       :class="handleClass"
       :data-test="outputHandleTest"
+      @click.stop="emit('outputClick', $event)"
     />
 
     <!-- hover actions (delete, etc.) supplied by the wrapper -->
@@ -114,7 +119,9 @@ const props = withDefaults(
   },
 );
 
-const handleClass = computed(
-  () => `node_handle_custom handle_${props.ioType || "default"}`,
-);
+// Click on the source (output) handle — the wrapper decides what it means. The
+// event travels with it so the wrapper can anchor a popover at the click.
+const emit = defineEmits<{ (e: "outputClick", event: MouseEvent): void }>();
+
+const handleClass = computed(() => `node_handle_custom handle_${props.ioType || "default"}`);
 </script>

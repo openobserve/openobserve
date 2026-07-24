@@ -29,8 +29,7 @@ import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 export const convertSankeyData = (panelSchema: any, searchQueryData: any) => {
   // Validate that at least one query has all required fields
   const hasValidQuery = panelSchema.queries?.some(
-    (query: any) =>
-      query.fields?.source && query.fields?.target && query.fields?.value,
+    (query: any) => query.fields?.source && query.fields?.target && query.fields?.value,
   );
 
   if (
@@ -61,14 +60,8 @@ export const convertSankeyData = (panelSchema: any, searchQueryData: any) => {
     if (!query?.fields?.source) return;
 
     queryData.forEach((item: any) => {
-      const source = getDataValue(
-        item,
-        query.fields.source.alias,
-      );
-      const target = getDataValue(
-        item,
-        query.fields.target.alias,
-      );
+      const source = getDataValue(item, query.fields.source.alias);
+      const target = getDataValue(item, query.fields.target.alias);
       let value = getDataValue(item, query.fields.value.alias);
 
       if (source && target && value) {
@@ -99,8 +92,8 @@ export const convertSankeyData = (panelSchema: any, searchQueryData: any) => {
               value,
               panelSchema.config?.unit,
               panelSchema.config?.unit_custom,
-              panelSchema.config?.decimals
-            )
+              panelSchema.config?.decimals,
+            ),
           );
         }
 

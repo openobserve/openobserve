@@ -85,17 +85,20 @@ const props = defineProps({
   io_type: {
     type: String,
   },
+  // Set by the read-only list-row preview (PipelineView). The editor leaves it
+  // false. Mirrors `workflowObj.readOnly`, which WorkflowNode checks for the
+  // same reason: this component renders on a non-interactive surface too, and
+  // its click handlers mutate the SHARED pipelineObj singleton.
+  readOnly: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 defineEmits(["delete:node"]);
-const {
-  pipelineObj,
-  deletePipelineNode,
-  checkIfDefaultDestinationNode,
-  openStepPicker,
-} = useDragAndDrop();
+const { pipelineObj, deletePipelineNode, checkIfDefaultDestinationNode, openStepPicker } =
+  useDragAndDrop();
 const showButtons = ref(false);
-const showDeleteTooltip = ref(false);
 let hideButtonsTimeout: number | null = null;
 
 // last_error is set at runtime but absent from the base pipeline literal type;
@@ -104,12 +107,10 @@ const getLastError = (): {
   node_errors?: Record<string, NodeErrorInfo>;
 } | null => {
   const pipeline: unknown = pipelineObj.currentSelectedPipeline;
-  if (!pipeline || typeof pipeline !== "object" || !("last_error" in pipeline))
-    return null;
+  if (!pipeline || typeof pipeline !== "object" || !("last_error" in pipeline)) return null;
   const lastError: unknown = pipeline.last_error;
   if (!lastError || typeof lastError !== "object") return null;
-  const nodeErrors =
-    "node_errors" in lastError ? lastError.node_errors : undefined;
+  const nodeErrors = "node_errors" in lastError ? lastError.node_errors : undefined;
   return { node_errors: nodeErrors as Record<string, NodeErrorInfo> };
 };
 
@@ -126,8 +127,7 @@ const hasNodeError = computed(() => {
 // Get error info for current node
 const getNodeErrorInfo = computed(() => {
   const lastError = getLastError();
-  if (!lastError || !lastError.node_errors || props.id === undefined)
-    return null;
+  if (!lastError || !lastError.node_errors || props.id === undefined) return null;
 
   const nodeError = lastError.node_errors[props.id];
   if (!nodeError) return null;
@@ -139,9 +139,7 @@ const getNodeErrorInfo = computed(() => {
   // and the backend read path is untyped passthrough, so neither is converted
   // server-side. formatNodeErrorText owns that reconciliation; a bare join()
   // here rendered the tuple shape as "msg,[object Object]".
-  return formatNodeErrorText(nodeError, (count) =>
-    t("pipeline.moreErrors", { count }),
-  );
+  return formatNodeErrorText(nodeError, (count) => t("pipeline.moreErrors", { count }));
 });
 
 // Edge color mapping for different node types.
@@ -164,11 +162,7 @@ const getNodeColor = (ioType: string | undefined) => {
 };
 
 // Function to update edge colors on node hover
-const updateEdgeColors = (
-  nodeId: string | undefined,
-  color: string | null,
-  reset = false,
-) => {
+const updateEdgeColors = (nodeId: string | undefined, color: string | null, reset = false) => {
   if (pipelineObj.currentSelectedPipeline?.edges) {
     pipelineObj.currentSelectedPipeline.edges.forEach((edge: PipelineEdge) => {
       if (edge.source === nodeId) {
@@ -201,10 +195,7 @@ const updateEdgeColors = (
 };
 
 // Node hover handlers
-const handleNodeHover = (
-  nodeId: string | undefined,
-  ioType: string | undefined,
-) => {
+const handleNodeHover = (nodeId: string | undefined, ioType: string | undefined) => {
   const color = getNodeColor(ioType);
   updateEdgeColors(nodeId, color, false);
 
@@ -242,13 +233,6 @@ const handleActionButtonsLeave = () => {
 };
 
 // Handle delete tooltip show/hide
-const handleDeleteTooltipEnter = () => {
-  showDeleteTooltip.value = true;
-};
-
-const handleDeleteTooltipLeave = () => {
-  showDeleteTooltip.value = false;
-};
 
 // Navigate to function page to fix the error
 const navigateToFunction = (functionName: string | undefined) => {
@@ -284,6 +268,20 @@ const navigateToFunction = (functionName: string | undefined) => {
 const { t } = useI18n();
 const router = useRouter();
 const store = useStore();
+
+// Click handlers are inert on the read-only preview: both mutate the shared
+// pipelineObj singleton, so a stray click there would leak state into the
+// editor that opens next (the picker would pop open unbidden, anchored at the
+// stale click, pointing at a node id from a different pipeline).
+const onCardClick = () => {
+  if (props.readOnly) return;
+  editNode(props.id);
+};
+
+const onOutputClick = (event: MouseEvent) => {
+  if (props.readOnly) return;
+  openStepPicker(props.id, event);
+};
 
 const editNode = (id: string) => {
   //from id find the node from pipelineObj.currentSelectedPipelineData.nodes
@@ -324,8 +322,7 @@ const openCancelDialog = (id: string) => {
     props.data.node_type === "stream" &&
     checkIfDefaultDestinationNode(id)
   ) {
-    confirmDialogMeta.value.warningMessage =
-      defaultDestinationNodeWarningMessage;
+    confirmDialogMeta.value.warningMessage = defaultDestinationNodeWarningMessage;
   } else {
     confirmDialogMeta.value.warningMessage = "";
   }
@@ -362,8 +359,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
   // narrow through unknown to its runtime element shape.
   const nodeTypes = pipelineObj.nodeTypes as unknown as NodeType[];
   const node = nodeTypes.find(
-    (node: NodeType) =>
-      node.subtype === searchTerm && node.io_type === ioType,
+    (node: NodeType) => node.subtype === searchTerm && node.io_type === ioType,
   );
   return node ? node.icon : undefined;
 }
@@ -383,13 +379,14 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
       class="btn-fixed-width"
       @mouseenter="handleNodeHover(id, io_type)"
       @mouseleave="handleNodeLeave(id)"
-      @click="editNode(id)"
+      @click="onCardClick"
+      @output-click="onOutputClick"
     >
       <!-- Per-type label content -->
       <template #body>
         <div
           v-if="data.node_type == 'function'"
-          class="flex text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
+          class="flex w-auto text-left text-sm! leading-[1.4]! font-bold! text-wrap text-ellipsis"
           align="left"
         >
           {{ data.name }} -
@@ -399,13 +396,13 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
         <template v-else-if="data.node_type == 'stream'">
           <div
             v-if="data.stream_name && data.stream_name.hasOwnProperty('label')"
-            class="flex text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
+            class="flex w-auto text-left text-sm! leading-[1.4]! font-bold! text-wrap text-ellipsis"
           >
             {{ data.stream_type }} - {{ streamNameLabel }}
           </div>
           <div
             v-else
-            class="flex text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
+            class="flex w-auto text-left text-sm! leading-[1.4]! font-bold! text-wrap text-ellipsis"
           >
             {{ data.stream_type }} - {{ data.stream_name }}
           </div>
@@ -413,25 +410,24 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
 
         <div
           v-else-if="data.node_type == 'query'"
-          class="flex text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
+          class="flex w-auto text-left text-sm! leading-[1.4]! font-bold! text-wrap text-ellipsis"
         >
           {{ data.stream_type }} - {{ data.stream_name }}
         </div>
 
         <div
           v-else-if="data.node_type == 'remote_stream'"
-          class="flex text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
+          class="flex w-auto text-left text-sm! leading-[1.4]! font-bold! text-wrap text-ellipsis"
         >
           {{ data.destination_name }}
         </div>
 
         <div
           v-else-if="data.node_type == 'condition'"
-          class="text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
+          class="w-auto text-left text-sm! leading-[1.4]! font-bold! text-wrap text-ellipsis"
         >
           {{ getTruncatedConditions(data.condition || data.conditions) }}
         </div>
-
       </template>
 
       <!-- Error badge (function nodes) + delete button, shared across types -->
@@ -439,14 +435,14 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
         <div
           v-if="data.node_type == 'function' && hasNodeError"
           data-test="pipeline-node-error-badge"
-          class="absolute -top-3 -right-3 w-5 h-5 bg-status-negative border-2 border-white rounded-full flex items-center justify-center cursor-pointer z-[15] shadow-[0_0.125rem_0.375rem_color-mix(in_srgb,var(--color-status-negative)_50%,transparent)] transition-all duration-200 error-badge"
+          class="bg-status-negative error-badge absolute -top-3 -right-3 z-15 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border-2 border-white shadow-[0_0.125rem_0.375rem_color-mix(in_srgb,var(--color-status-negative)_50%,transparent)] transition-all duration-200"
           @click.stop="navigateToFunction(data.name)"
         >
           <OIcon name="error" size="sm" />
           <span
             data-test="pipeline-node-error-count"
             v-if="nodeErrorCount"
-            class="absolute -top-1.5 -right-1.5 bg-status-negative text-white text-3xs font-bold min-w-3.5 h-3.5 rounded-full flex items-center justify-center px-0.75 border-[0.09375rem] border-solid border-white shadow-[0_0.0625rem_0.1875rem_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
+            class="bg-status-negative text-3xs absolute -top-1.5 -right-1.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full border-[0.09375rem] border-solid border-white px-0.75 font-bold text-white shadow-[0_0.0625rem_0.1875rem_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
           >
             {{ nodeErrorCount }}
           </span>
@@ -461,7 +457,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
 
         <div
           v-show="showButtons"
-          class="absolute -top-7.5 right-0 flex gap-1.5 transition-all duration-300 z-10 pt-1.25 px-1.25 pb-2.5 node-action-buttons"
+          class="node-action-buttons absolute -top-7.5 right-0 z-10 flex gap-1.5 px-1.25 pt-1.25 pb-2.5 transition-all duration-300"
           :data-test="`pipeline-node-${io_type}-actions`"
           :style="{ '--node-color': getNodeColor(io_type) }"
           @mouseenter="handleActionButtonsEnter"
@@ -471,48 +467,27 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
             variant="ghost"
             size="icon"
             @click.stop="deleteNode(id)"
-            class="min-w-5! w-5! h-5! p-0! rounded-default! bg-surface-overlay/95! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! node-action-btn delete-btn"
+            class="rounded-default! bg-surface-overlay/95! node-action-btn delete-btn h-5! w-5! min-w-5! border! border-(--node-color)! p-0! text-(--node-color)! transition-all! duration-200!"
             :data-test="`pipeline-node-${io_type}-delete-btn`"
-            @mouseenter="handleDeleteTooltipEnter"
-            @mouseleave="handleDeleteTooltipLeave"
           >
             <OIcon name="delete" size="sm" />
+            <!-- Central OTooltip (same as the workflow node and the rest of the
+                 app). Replaced a hand-rolled `fixed`-positioned tooltip div that
+                 drifted inside the transformed Vue Flow node — reka-ui/Floating
+                 UI handles that correctly. -->
+            <OTooltip
+              :content="t('pipeline.deleteNodeTitle')"
+              side="top"
+              align="center"
+              :side-offset="8"
+            />
           </OButton>
-          <div
-            v-if="showDeleteTooltip"
-            class="fixed bg-status-negative text-white py-1.5 px-2.5 rounded-default text-2xs z-[1000] shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-black)_30%,transparent)] pointer-events-none whitespace-nowrap left-3.75"
-          >
-            Delete Node
-            <div class="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] [border-top-color:#dc2626]"></div>
-          </div>
-        </div>
-      </template>
-
-      <!-- hover-`+` "add next step" — non-terminal (non-output) nodes only. -->
-      <template #footer>
-        <div
-          v-show="showButtons && io_type !== 'output'"
-          class="pl-plus nodrag"
-          :data-test="`pipeline-node-${io_type}-add`"
-          @pointerdown.stop
-          @click.stop
-          @mouseenter="handleActionButtonsEnter"
-          @mouseleave="handleActionButtonsLeave"
-        >
-          <button
-            type="button"
-            class="pl-plus-btn border-2 border-dashed border-border-strong bg-surface-overlay text-text-muted hover:border-solid hover:border-accent hover:text-accent hover:bg-accent/10"
-            :data-test="`pipeline-node-${io_type}-add-btn`"
-            @click.stop="openStepPicker(id)"
-          >
-            <OIcon name="add" size="xs" />
-          </button>
         </div>
       </template>
     </FlowNodeCard>
   </div>
 
-  <confirm-dialog
+  <ConfirmDialog
     :title="confirmDialogMeta.title"
     :message="confirmDialogMeta.message"
     @update:ok="confirmDialogMeta.onConfirm()"
@@ -530,31 +505,14 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
    CustomNode renders in two places (the editor canvas and the list-row preview),
    so these must travel with the component rather than live in the editor.
 
-   hover-`+` "add next step" affordance — positioned below the node card. Its
-   colours live on the element as token utilities (see the template); only
-   geometry is here. Two legacy dark overrides were dropped rather than ported:
-   they keyed off Quasar's old body-level dark class, which this app never sets,
-   so they had been dead for a while — and the tokens now flip with the theme
-   on their own, which is what those rules were reaching for. */
-.pl-plus {
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  margin-top: 0.75rem;
-  transform: translateX(-50%);
-  z-index: 5;
-}
-.pl-plus-btn {
-  width: 1.625rem;
-  height: 1.625rem;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  transition: all 0.14s;
-}
+   The hover-`+` "add next step" button (`.pl-plus` / `.pl-plus-btn`) that used
+   to sit below the card is gone — clicking the source handle opens the step
+   picker instead, so the button and its geometry rules went with it. */
 
+/* The source handle doubles as the "add next step" affordance, so it takes a
+   pointer cursor rather than Vue Flow's connect crosshair. */
 :deep(.node_handle_custom) {
+  cursor: pointer;
   width: 1rem !important;
   height: 1rem !important;
   border: 0.1875rem solid color-mix(in srgb, var(--color-white) 90%, transparent);

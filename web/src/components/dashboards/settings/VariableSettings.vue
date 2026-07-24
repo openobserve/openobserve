@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="h-full max-h-full overflow-hidden">
-    <div v-if="isAddVariable" class="flex flex-col h-full max-h-full overflow-hidden">
+    <div v-if="isAddVariable" class="flex h-full max-h-full flex-col overflow-hidden">
       <AddSettingVariable
         v-if="isAddVariable"
         @save="handleSaveVariable"
@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :dashboardVariablesList="dashboardVariablesList"
       />
     </div>
-    <div v-else class="flex flex-col h-full max-h-full overflow-hidden">
+    <div v-else class="flex h-full max-h-full flex-col overflow-hidden">
       <DashboardHeader :title="t('dashboard.variableSettingsPage.variables')">
         <template #right>
           <div class="flex gap-2">
@@ -35,14 +35,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               @click="showVariablesDependenciesGraphPopUp = true"
               data-test="dashboard-variable-dependencies-btn"
-            >{{ t('dashboard.showDependencies') }}</OButton
+              >{{ t("dashboard.showDependencies") }}</OButton
             >
             <OButton
               variant="primary"
               size="sm"
               @click="addVariables"
               data-test="dashboard-add-variable-btn"
-            >{{ t("dashboard.newVariable") }}</OButton
+              >{{ t("dashboard.newVariable") }}</OButton
             >
           </div>
         </template>
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #cell-drag>
             <div
-              class="variable-drag-handle flex items-center justify-center cursor-move"
+              class="variable-drag-handle flex cursor-move items-center justify-center"
               data-test="dashboard-variable-settings-drag-handle"
             >
               <OIcon name="drag-indicator" size="sm" />
@@ -91,11 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-selection="{ row }">
-            {{
-              row.multiSelect
-                ? t("dashboard.isMultiSelect")
-                : t("dashboard.isSingleSelect")
-            }}
+            {{ row.multiSelect ? t("dashboard.isMultiSelect") : t("dashboard.isSingleSelect") }}
           </template>
 
           <template #cell-scope="{ row }">
@@ -112,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dashboard-variable-scope-badge"
                 v-else-if="getScopeType(row) === 'tabs'"
               >
-                {{ t('dashboard.variableSettingsPage.tabsCount', { n: row.tabs?.length || 0 }) }}
+                {{ t("dashboard.variableSettingsPage.tabsCount", { n: row.tabs?.length || 0 }) }}
               </OTag>
               <OTag
                 type="variableScope"
@@ -120,24 +116,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dashboard-variable-scope-badge"
                 v-else-if="getScopeType(row) === 'panels'"
               >
-                {{ t('dashboard.variableSettingsPage.panelsCount', { n: row.panels?.length || 0 }) }}
+                {{
+                  t("dashboard.variableSettingsPage.panelsCount", { n: row.panels?.length || 0 })
+                }}
               </OTag>
 
-              <OTooltip
-                v-if="getScopeType(row) === 'tabs' && row.tabs?.length"
-              >
+              <OTooltip v-if="getScopeType(row) === 'tabs' && row.tabs?.length">
                 <template #content>
-                  <div>{{ t('dashboard.appliedToTabs') }}</div>
+                  <div>{{ t("dashboard.appliedToTabs") }}</div>
                   <div v-for="tabId in row.tabs" :key="tabId">{{ getTabName(tabId) }}</div>
                 </template>
               </OTooltip>
 
-              <OTooltip
-                v-if="getScopeType(row) === 'panels' && row.panels?.length"
-              >
+              <OTooltip v-if="getScopeType(row) === 'panels' && row.panels?.length">
                 <template #content>
-                  <div>{{ t('dashboard.appliedToPanels') }}</div>
-                  <div v-for="panelId in row.panels" :key="panelId">{{ getPanelName(panelId) }}</div>
+                  <div>{{ t("dashboard.appliedToPanels") }}</div>
+                  <div v-for="panelId in row.panels" :key="panelId">
+                    {{ getPanelName(panelId) }}
+                  </div>
                 </template>
               </OTooltip>
             </div>
@@ -174,14 +170,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:cancel="confirmDeleteDialog = false"
           v-model="confirmDeleteDialog"
         />
-        <ODialog data-test="variable-settings-dependencies-graph-dialog" v-model:open="showVariablesDependenciesGraphPopUp" :width="60" :title="t('dashboard.variableSettingsPage.variablesDependencyGraph')">
+        <ODialog
+          data-test="variable-settings-dependencies-graph-dialog"
+          v-model:open="showVariablesDependenciesGraphPopUp"
+          :width="60"
+          :title="t('dashboard.variableSettingsPage.variablesDependencyGraph')"
+        >
           <div class="h-[60vh]">
             <VariablesDependenciesGraph
               :variablesList="dashboardVariablesList"
               :class="'bg-surface-base'"
-              @closePopUp="
-                () => (showVariablesDependenciesGraphPopUp = false)
-              "
+              @closePopUp="() => (showVariablesDependenciesGraphPopUp = false)"
             />
           </div>
         </ODialog>
@@ -203,11 +202,7 @@ import {
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
-import {
-  getDashboard,
-  deleteVariable,
-  updateDashboard,
-} from "../../../utils/commons";
+import { getDashboard, deleteVariable, updateDashboard } from "../../../utils/commons";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import AddSettingVariable from "./AddSettingVariable.vue";
@@ -222,10 +217,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import {
-  COL,
-  TABLE_INDEX_COL_SIZE,
-} from "@/lib/core/Table/OTable.types";
+import { COL, TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "VariableSettings",
@@ -363,9 +355,7 @@ export default defineComponent({
 
     // Function to get tab name by ID
     const getTabName = (tabId: string) => {
-      const tab = dashboardVariableData.data.tabs?.find(
-        (t: any) => t.tabId === tabId,
-      );
+      const tab = dashboardVariableData.data.tabs?.find((t: any) => t.tabId === tabId);
       return tab ? tab.name : t("dashboard.variableSettingsPage.deletedTab");
     };
 
@@ -408,7 +398,9 @@ export default defineComponent({
               t("dashboard.variableSettingsPage.variableReorderFailed"),
           );
         } else {
-          showErrorNotification(error?.message ?? t("dashboard.variableSettingsPage.variableReorderFailed"));
+          showErrorNotification(
+            error?.message ?? t("dashboard.variableSettingsPage.variableReorderFailed"),
+          );
         }
         await getDashboardData();
       }
@@ -429,11 +421,7 @@ export default defineComponent({
         handle: ".variable-drag-handle",
         onEnd: (evt: Sortable.SortableEvent) => {
           const { oldIndex, newIndex } = evt;
-          if (
-            oldIndex == null ||
-            newIndex == null ||
-            oldIndex === newIndex
-          ) {
+          if (oldIndex == null || newIndex == null || oldIndex === newIndex) {
             return;
           }
 
@@ -443,10 +431,7 @@ export default defineComponent({
           if (newIndex > oldIndex) {
             parent.insertBefore(evt.item, parent.children[oldIndex]);
           } else {
-            parent.insertBefore(
-              evt.item,
-              parent.children[oldIndex + 1] ?? null,
-            );
+            parent.insertBefore(evt.item, parent.children[oldIndex + 1] ?? null);
           }
 
           const list = [...dashboardVariablesList.value];
@@ -481,8 +466,7 @@ export default defineComponent({
         route.query.folder ?? "default",
       );
 
-      dashboardVariablesList.value =
-        dashboardVariableData.data?.variables?.list ?? [];
+      dashboardVariablesList.value = dashboardVariableData.data?.variables?.list ?? [];
     };
 
     const addVariables = () => {
@@ -522,9 +506,12 @@ export default defineComponent({
               t("dashboard.variableSettingsPage.variableDeletionFailed"),
           );
         } else {
-          showErrorNotification(error?.message ?? t("dashboard.variableSettingsPage.variableDeletionFailed"), {
-            timeout: 2000,
-          });
+          showErrorNotification(
+            error?.message ?? t("dashboard.variableSettingsPage.variableDeletionFailed"),
+            {
+              timeout: 2000,
+            },
+          );
         }
       }
     };

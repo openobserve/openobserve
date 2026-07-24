@@ -17,6 +17,7 @@ import { toZonedTime } from "date-fns-tz";
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 import { calculateDynamicNameGap } from "./chartDimensionUtils";
 import { formatDate, isTimeSeries, isTimeStamp } from "./dateTimeUtils";
+import { chartColor } from "../chartTheme";
 
 /**
  * Handles auto SQL time series conversion.
@@ -59,8 +60,7 @@ export const applyAutoSQLTimeSeries = (
 
     const timestampField = panelSchema.queries[0].fields?.x.find(
       (it: any) =>
-        !it.functionName &&
-        it?.args?.[0]?.value?.field == store.state?.zoConfig?.timestamp_column,
+        !it.functionName && it?.args?.[0]?.value?.field == store.state?.zoConfig?.timestamp_column,
     );
 
     //if x axis has time series
@@ -141,13 +141,7 @@ export const applyAutoSQLTimeSeries = (
         }
         // Recalculate nameGap with 0 rotation for time-based axis
         if (options.xAxis[0].name) {
-          options.xAxis[0].nameGap = calculateDynamicNameGap(
-            0,
-            120,
-            12,
-            25,
-            10,
-          );
+          options.xAxis[0].nameGap = calculateDynamicNameGap(0, 120, 12, 25, 10);
         }
       }
 
@@ -193,8 +187,7 @@ export const applyAutoSQLTimeSeries = (
         if (hoveredSeriesState?.value?.hoveredSeriesName) {
           // get the current series index from name
           const currentSeriesIndex = name.findIndex(
-            (it: any) =>
-              it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName,
+            (it: any) => it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName,
           );
 
           // if hovered series index is not -1 then take it to very first position
@@ -248,7 +241,7 @@ export const applyAutoSQLTimeSeries = (
         label: {
           fontsize: 12,
           precision: panelSchema.config?.decimals,
-          backgroundColor: store.state.theme === "dark" ? "#333" : "",
+          backgroundColor: chartColor("--color-chart-crosshair-bg"),
           formatter: function (params: any) {
             try {
               if (params?.axisDimension == "y")
@@ -319,10 +312,7 @@ export const applyCustomSQLTimeSeries = (
     options.xAxis.length > 0 &&
     options.xAxis[0].data.length > 0
   ) {
-    const sample = options.xAxis[0].data.slice(
-      0,
-      Math.min(20, options.xAxis[0].data.length),
-    );
+    const sample = options.xAxis[0].data.slice(0, Math.min(20, options.xAxis[0].data.length));
 
     const isTimeSeriesData = isTimeSeries(sample);
 
@@ -386,13 +376,7 @@ export const applyCustomSQLTimeSeries = (
         }
         // Recalculate nameGap with 0 rotation for time-based axis
         if (options.xAxis[0].name) {
-          options.xAxis[0].nameGap = calculateDynamicNameGap(
-            0,
-            120,
-            12,
-            25,
-            10,
-          );
+          options.xAxis[0].nameGap = calculateDynamicNameGap(0, 120, 12, 25, 10);
         }
       }
 
@@ -438,8 +422,7 @@ export const applyCustomSQLTimeSeries = (
           if (hoveredSeriesState?.value?.hoveredSeriesName) {
             // get the current series index from name
             const currentSeriesIndex = name?.findIndex(
-              (it: any) =>
-                it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName,
+              (it: any) => it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName,
             );
 
             // if hovered series index is not -1 then take it to very first position
@@ -458,9 +441,7 @@ export const applyCustomSQLTimeSeries = (
             if (it?.data?.[1] != null) {
               // check if the series is the current series being hovered
               // if have than bold it
-              if (
-                it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
-              )
+              if (it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName)
                 hoverText.push(
                   `<strong>${it?.marker} ${it?.seriesName} : ${formatUnitValue(
                     getUnitValue(
@@ -496,7 +477,7 @@ export const applyCustomSQLTimeSeries = (
         label: {
           fontsize: 12,
           precision: panelSchema.config?.decimals,
-          backgroundColor: store.state.theme === "dark" ? "#333" : "",
+          backgroundColor: chartColor("--color-chart-crosshair-bg"),
           formatter: function (params: any) {
             try {
               if (params?.axisDimension == "y")

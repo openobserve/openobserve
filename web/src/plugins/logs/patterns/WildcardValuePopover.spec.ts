@@ -45,7 +45,8 @@ describe("WildcardValuePopover", () => {
     name: "OButton",
     props: ["variant", "size"],
     emits: ["click"],
-    template: '<button :data-test="$attrs[\'data-test\']" @click.stop="$emit(\'click\')"><slot /></button>',
+    template:
+      "<button :data-test=\"$attrs['data-test']\" @click.stop=\"$emit('click')\"><slot /></button>",
   };
   const OIconStub = {
     name: "OIcon",
@@ -108,7 +109,10 @@ describe("WildcardValuePopover", () => {
     });
 
     it("should display descriptive label for <:IP> token", () => {
-      wrapper = mountComponent({ token: "<:IP>", displayValues: [{ value: "10.0.0.1", count: 5 }] });
+      wrapper = mountComponent({
+        token: "<:IP>",
+        displayValues: [{ value: "10.0.0.1", count: 5 }],
+      });
       // <:IP> maps to "ip" in wildcardLabel
       expect(wrapper.text()).toContain("ip");
     });
@@ -201,7 +205,10 @@ describe("WildcardValuePopover", () => {
     });
 
     it("should render the header for <:IP> token", () => {
-      wrapper = mountComponent({ token: "<:IP>", displayValues: [{ value: "10.0.0.1", count: 5 }] });
+      wrapper = mountComponent({
+        token: "<:IP>",
+        displayValues: [{ value: "10.0.0.1", count: 5 }],
+      });
       const headerEl = wrapper.find(".wcp__header");
       expect(headerEl.exists()).toBe(true);
     });

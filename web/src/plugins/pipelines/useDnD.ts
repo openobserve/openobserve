@@ -1,4 +1,3 @@
-
 /* Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
@@ -22,9 +21,6 @@ import { detectCycle } from "@/composables/flow/detectCycle";
 import { makeEdge } from "@/composables/flow/makeEdge";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
-
-
-
 const dialogObj = {
   show: false,
   name: "",
@@ -39,75 +35,95 @@ const defaultPipelineObj = {
   source: {
     source_type: "realtime",
   },
-  nodes:<any> [],
-  edges:<any> [],
+  nodes: <any>[],
+  edges: <any>[],
   org: "",
-  
 };
 
 const defaultObject = {
   dirtyFlag: false,
   isEditPipeline: false,
   isEditNode: false,
-  edgesChange:false,
-  draggedNode:<any> null,
+  edgesChange: false,
+  draggedNode: <any>null,
   isDragOver: false,
   isDragging: false,
   hasInputNode: false,
   currentSelectedNodeID: "",
-  currentSelectedNodeData : <any> {
+  currentSelectedNodeData: <any>{
     stream_type: "logs",
     stream_name: "",
-    dynamic_stream_name:"",
+    dynamic_stream_name: "",
     data: {},
-    type:"",
+    type: "",
   },
   dialog: dialogObj,
-  nodeTypes: [] as Array<{ label: string; icon: string; isSectionHeader: boolean; subtype?: string; io_type?: string; tooltip?: string }>,
+  nodeTypes: [] as Array<{
+    label: string;
+    icon: string;
+    isSectionHeader: boolean;
+    subtype?: string;
+    io_type?: string;
+    tooltip?: string;
+  }>,
+  // Node rail open/closed. Lives here rather than in PipelineEditor because the
+  // toggle sits in Vue Flow's control stack (PipelineFlow) while the rail it
+  // opens is rendered by the editor — shared state is the seam between them.
+  // Starts CLOSED so the canvas gets the full width on open.
+  showNodePalette: false,
   currentSelectedPipeline: defaultPipelineObj,
   pipelineWithoutChange: defaultPipelineObj,
   functions: {},
   // Edge to create when the staged node's config is saved (hover-`+` add-after).
   pendingEdge: <any>null,
-  // Step picker (searchable "add next step" dialog) — hover-`+` on a node opens
-  // it with the source node id; picking a type calls addNodeAfter.
-  stepPicker: { show: false, source: "" },
+  // Step picker (searchable dialog), in one of two modes:
+  //   "next"   — the node's source handle was clicked; `source` is that node id
+  //              and picking a type calls addNodeAfter.
+  //   "source" — the empty-canvas start node was clicked; there is no source
+  //              node yet, so `position` carries where to drop the first one
+  //              and picking a type calls addSourceNode.
+  stepPicker: {
+    show: false,
+    source: "",
+    mode: "next" as "next" | "source",
+    // Flow coords for the new node (source mode only).
+    position: null as { x: number; y: number } | null,
+    // Viewport coords of the click, so the picker opens at the node.
+    anchor: null as { x: number; y: number } | null,
+  },
   pipelineNameError: false,
   pipelineNameErrorMessage: "",
-  previousNodeOptions:<any>[],
-  userSelectedNode:<any>{},
-  userClickedNode : <any>{},
+  previousNodeOptions: <any>[],
+  userSelectedNode: <any>{},
+  userClickedNode: <any>{},
   // Realtime streams already used by other pipelines. Populated once when the
   // editor mounts (PipelineEditor): first with the in-flight request promise,
   // then with its resolved array. The Stream node drawer `await`s whichever it
   // finds, so a node drag never issues its own pipelines/streams request.
   // `null` = the editor hasn't started the fetch yet (true fallback only).
-  usedStreams:<any>null,
+  usedStreams: <any>null,
 };
 
 const pipelineObj = reactive(Object.assign({}, defaultObject));
 
 export { pipelineObj };
 export default function useDragAndDrop() {
+  const { screenToFlowCoordinate, onNodesInitialized, updateNode } = useVueFlow();
 
-  const { screenToFlowCoordinate, onNodesInitialized, updateNode } =
-    useVueFlow();
-
-    watch(
-      () => pipelineObj.isDragging,
-      (dragging) => {
-        document.body.style.userSelect = dragging ? "none" : "";
-      }
-    );
+  watch(
+    () => pipelineObj.isDragging,
+    (dragging) => {
+      document.body.style.userSelect = dragging ? "none" : "";
+    },
+  );
 
   function hasInputNodeFn() {
     pipelineObj.hasInputNode = pipelineObj.currentSelectedPipeline.nodes.some(
-      (node :any) => node.io_type === "input",
+      (node: any) => node.io_type === "input",
     );
   }
 
-  function onDragStart(event:any, node:any) {
- 
+  function onDragStart(event: any, node: any) {
     if (event.dataTransfer) {
       event.dataTransfer.setData("application/vueflow", node.io_type);
       event.dataTransfer.effectAllowed = "move";
@@ -125,7 +141,7 @@ export default function useDragAndDrop() {
    *
    * @param {DragEvent} event
    */
-  function onDragOver(event:any) {
+  function onDragOver(event: any) {
     event.preventDefault();
 
     if (pipelineObj.draggedNode?.io_type) {
@@ -152,15 +168,12 @@ export default function useDragAndDrop() {
    *
    * @param {DragEvent} event
    */
-  function onDrop(event:any ,offSet:any = {x:0,y:0}) {
-    if (
-      pipelineObj.hasInputNode &&
-      pipelineObj.draggedNode.io_type == "input"
-    ) {
+  function onDrop(event: any, offSet: any = { x: 0, y: 0 }) {
+    if (pipelineObj.hasInputNode && pipelineObj.draggedNode.io_type == "input") {
       toast({
         message: "Only 1 source node is allowed",
         variant: "warning",
-    });
+      });
       return;
     }
 
@@ -199,7 +212,6 @@ export default function useDragAndDrop() {
     pipelineObj.dialog.name = newNode.data.node_type;
     pipelineObj.dialog.show = true;
     pipelineObj.isEditNode = false;
-
   }
 
   // VueFlow @node-change handler — node state is driven by v-model, so this is
@@ -208,43 +220,46 @@ export default function useDragAndDrop() {
 
   function onNodesChange() {
     hasInputNodeFn();
-
   }
 
-  function onEdgesChange(changes:any) {
-    if(pipelineObj.isEditPipeline == true ){
+  function onEdgesChange(changes: any) {
+    if (pipelineObj.isEditPipeline == true) {
       pipelineObj.dirtyFlag = true;
-
     }
-    if(changes.length > 0){
+    if (changes.length > 0) {
       pipelineObj.edgesChange = true;
     }
   }
 
-  function onConnect(connection:any) {
-    if(connection.sourceHandle === "input" && connection.targetHandle === "input" || connection.sourceHandle === "output" && connection.targetHandle === "output"){
+  function onConnect(connection: any) {
+    if (
+      (connection.sourceHandle === "input" && connection.targetHandle === "input") ||
+      (connection.sourceHandle === "output" && connection.targetHandle === "output")
+    ) {
       toast({
         message: "Same type of edges / nodes cannot be connected",
         variant: "warning",
-    });
+      });
       return;
     }
-    const isConnectionAlreadyAvailable = pipelineObj.currentSelectedPipeline.edges.find((previousEdge:any) => previousEdge.targetNode.id === connection.target);
-    if(isConnectionAlreadyAvailable){
+    const isConnectionAlreadyAvailable = pipelineObj.currentSelectedPipeline.edges.find(
+      (previousEdge: any) => previousEdge.targetNode.id === connection.target,
+    );
+    if (isConnectionAlreadyAvailable) {
       toast({
         message: "Only one Incoming Edge to the node is allowed",
         variant: "warning",
-    });
+      });
       return;
     }
 
     const isCycle = detectCycle(pipelineObj.currentSelectedPipeline.edges, connection);
-    if(isCycle){
+    if (isCycle) {
       toast({
         message: "Adding this edge will create a cycle in the pipeline",
         variant: "warning",
-    });
-    return;
+      });
+      return;
     }
     // Add new connection (edge) to edges array (shared edge factory)
     const newEdge = makeEdge(connection.source, connection.target);
@@ -259,13 +274,13 @@ export default function useDragAndDrop() {
   // normalizes edge endpoints, so it accepts both plain source/target and
   // VueFlow's runtime-enriched sourceNode/targetNode.
 
-  function validateConnection({ source, target }:any) {
+  function validateConnection({ source, target }: any) {
     // Example validation rules
     const sourceNode = pipelineObj.currentSelectedPipeline.nodes.find(
-      (node:any) => node.id === source,
+      (node: any) => node.id === source,
     );
     const targetNode = pipelineObj.currentSelectedPipeline.nodes.find(
-      (node:any) => node.id === target,
+      (node: any) => node.id === target,
     );
 
     // Input-only node (cannot be the source of a connection)
@@ -281,12 +296,12 @@ export default function useDragAndDrop() {
     return true; // Allow connection for 'both' nodes
   }
 
-  function addNode(newNode:any) {  
+  function addNode(newNode: any) {
     // (Legacy userClickedNode/userSelectedNode auto-edge wiring removed — it
     // fired with an empty {} source and created bogus edges. Programmatic
     // "add step after" now wires a single pendingEdge below.)
 
-    if(pipelineObj.isEditPipeline == true ){
+    if (pipelineObj.isEditPipeline == true) {
       pipelineObj.dirtyFlag = true;
     }
     let currentSelectedNode = pipelineObj.currentSelectedNodeData;
@@ -296,7 +311,7 @@ export default function useDragAndDrop() {
 
         //find the index from pipelineObj.currentSelectedPipeline.nodes based on id
         const index = pipelineObj.currentSelectedPipeline.nodes.findIndex(
-          (node:any) => node.id === currentSelectedNode.id,
+          (node: any) => node.id === currentSelectedNode.id,
         );
 
         pipelineObj.currentSelectedPipeline.nodes[index] = currentSelectedNode;
@@ -326,59 +341,118 @@ export default function useDragAndDrop() {
       }
     }
 
-
-
-    
     pipelineObj.isEditNode = false;
     pipelineObj.pendingEdge = null;
     //here we will be adding a default output node when it is a realtime pipeline and user drags teh input node
-    if(pipelineObj.currentSelectedNodeData.type == 'input' && pipelineObj.currentSelectedNodeData.data.node_type == 'stream' && pipelineObj.currentSelectedPipeline.nodes.length === 1){
-      const position = {x:pipelineObj.currentSelectedNodeData.position.x, y:pipelineObj.currentSelectedNodeData.position.y+200};
+    if (
+      pipelineObj.currentSelectedNodeData.type == "input" &&
+      pipelineObj.currentSelectedNodeData.data.node_type == "stream" &&
+      pipelineObj.currentSelectedPipeline.nodes.length === 1
+    ) {
+      const position = {
+        x: pipelineObj.currentSelectedNodeData.position.x,
+        y: pipelineObj.currentSelectedNodeData.position.y + 200,
+      };
 
       const nodeId = getUUID();
-  
+
       const outputNode = {
         id: nodeId,
-        type: 'output',
-        io_type: 'output',
+        type: "output",
+        io_type: "output",
         position,
-        data: {...pipelineObj.currentSelectedNodeData.data,label: nodeId},
+        data: { ...pipelineObj.currentSelectedNodeData.data, label: nodeId },
       };
       pipelineObj.currentSelectedPipeline.nodes.push(outputNode);
-      const newEdge = makeEdge(
-        pipelineObj.currentSelectedNodeData.id,
-        outputNode.id,
-      );
+      const newEdge = makeEdge(pipelineObj.currentSelectedNodeData.id, outputNode.id);
       pipelineObj.currentSelectedPipeline.edges = [
         ...pipelineObj.currentSelectedPipeline.edges,
         newEdge,
       ];
     }
-        if(Object.prototype.hasOwnProperty.call(newNode, 'meta') && Object.prototype.hasOwnProperty.call(newNode.meta, 'append_data')){
-          pipelineObj.currentSelectedNodeData.meta = newNode.meta;
-          delete newNode.meta;
-          delete pipelineObj.currentSelectedNodeData.data.meta;
+    if (
+      Object.prototype.hasOwnProperty.call(newNode, "meta") &&
+      Object.prototype.hasOwnProperty.call(newNode.meta, "append_data")
+    ) {
+      pipelineObj.currentSelectedNodeData.meta = newNode.meta;
+      delete newNode.meta;
+      delete pipelineObj.currentSelectedNodeData.data.meta;
     }
   }
 
-  // Hover-`+` opens the step picker anchored to this source node.
-  function openStepPicker(sourceId: string) {
-    pipelineObj.stepPicker = { show: true, source: sourceId };
+  // Clicking a node's source handle opens the step picker anchored to it.
+  function openStepPicker(sourceId: string, event?: MouseEvent) {
+    pipelineObj.stepPicker = {
+      show: true,
+      source: sourceId,
+      mode: "next",
+      position: null,
+      anchor: event ? { x: event.clientX, y: event.clientY } : null,
+    };
   }
+
+  // The empty-canvas start node opens the SAME picker, restricted to sources.
+  // The click point becomes the new node's position, so the node lands where
+  // the placeholder the user clicked was sitting.
+  function openSourcePicker(event: MouseEvent) {
+    pipelineObj.stepPicker = {
+      show: true,
+      source: "",
+      mode: "source",
+      position: screenToFlowCoordinate({ x: event.clientX, y: event.clientY }),
+      anchor: { x: event.clientX, y: event.clientY },
+    };
+  }
+
   function closeStepPicker() {
-    pipelineObj.stepPicker = { show: false, source: "" };
+    pipelineObj.stepPicker = {
+      show: false,
+      source: "",
+      mode: "next",
+      position: null,
+      anchor: null,
+    };
+  }
+
+  // Start node picked: stage the pipeline's first (source) node and open its
+  // config modal. Mirrors onDrop — no edge, since nothing precedes it — and is
+  // committed on Save / discarded on Cancel exactly like a dropped node.
+  function addSourceNode(
+    item: { subtype: string; io_type: string },
+    position: { x: number; y: number } | null,
+  ) {
+    const nodeId = getUUID();
+    const newNode = {
+      id: nodeId,
+      type: item.io_type || "input",
+      io_type: item.io_type || "input",
+      position: position ?? { x: 0, y: 0 },
+      data: { label: nodeId, node_type: item.subtype },
+    };
+
+    // Same re-centering as onDrop: the position above is the click point, so
+    // shift by half the rendered size once dimensions are known.
+    const { off } = onNodesInitialized(() => {
+      updateNode(nodeId, (node) => ({
+        position: {
+          x: node.position.x - node.dimensions.width / 2,
+          y: node.position.y - node.dimensions.height / 2,
+        },
+      }));
+      off();
+    });
+
+    pipelineObj.currentSelectedNodeData = newNode;
+    pipelineObj.dialog.name = item.subtype;
+    pipelineObj.dialog.show = true;
+    pipelineObj.isEditNode = false;
   }
 
   // Hover-`+` "add step after": stage a new node below `sourceId` and open its
   // config modal. The node + the source->node edge are committed on Save
   // (addNode reads pendingEdge); discarded on Cancel (resetDialog clears it).
-  function addNodeAfter(
-    sourceId: string,
-    item: { subtype: string; io_type: string },
-  ) {
-    const src = pipelineObj.currentSelectedPipeline.nodes.find(
-      (n: any) => n.id === sourceId,
-    );
+  function addNodeAfter(sourceId: string, item: { subtype: string; io_type: string }) {
+    const src = pipelineObj.currentSelectedPipeline.nodes.find((n: any) => n.id === sourceId);
     if (!src || !item) return;
     // Offset siblings on the same source so they don't overlap (fan-out).
     const children = pipelineObj.currentSelectedPipeline.edges.filter(
@@ -402,9 +476,9 @@ export default function useDragAndDrop() {
     pipelineObj.dialog.show = true;
   }
 
-  function editNode(updatedNode:any) {
+  function editNode(updatedNode: any) {
     const index = pipelineObj.currentSelectedPipeline.nodes.findIndex(
-      (node:any) => node.id === updatedNode.id,
+      (node: any) => node.id === updatedNode.id,
     );
     if (index !== -1) {
       pipelineObj.currentSelectedPipeline.nodes[index] = {
@@ -413,45 +487,45 @@ export default function useDragAndDrop() {
       };
     }
   }
-  const comparePipelinesById = (pipeline1:any, pipeline2:any) => {
-    const compareIds = (items1:any, items2:any) => {
-      const extractAndSortIds = (items:any) =>
-        items.map((item:any) => item.id).sort();
+  const comparePipelinesById = (pipeline1: any, pipeline2: any) => {
+    const compareIds = (items1: any, items2: any) => {
+      const extractAndSortIds = (items: any) => items.map((item: any) => item.id).sort();
 
       const ids1 = extractAndSortIds(items1);
       const ids2 = extractAndSortIds(items2);
-  
+
       return JSON.stringify(ids1) === JSON.stringify(ids2);
     };
     const nodesEqual = compareIds(pipeline1.nodes, pipeline2.nodes);
-  
+
     return nodesEqual;
   };
 
-  function deletePipelineNode(nodeId:any) {
-    pipelineObj.currentSelectedPipeline.nodes =
-      pipelineObj.currentSelectedPipeline.nodes.filter(
-        (node:any) => node.id !== nodeId,
-      );
+  function deletePipelineNode(nodeId: any) {
+    pipelineObj.currentSelectedPipeline.nodes = pipelineObj.currentSelectedPipeline.nodes.filter(
+      (node: any) => node.id !== nodeId,
+    );
 
-    pipelineObj.currentSelectedPipeline.edges =
-      pipelineObj.currentSelectedPipeline.edges.filter(
-        (edge:any) => edge.source !== nodeId && edge.target !== nodeId,
-      );
+    pipelineObj.currentSelectedPipeline.edges = pipelineObj.currentSelectedPipeline.edges.filter(
+      (edge: any) => edge.source !== nodeId && edge.target !== nodeId,
+    );
     pipelineObj.currentSelectedNodeData = null;
     hasInputNodeFn();
 
     const arePipelinesEqualById = comparePipelinesById(
       pipelineObj.currentSelectedPipeline,
-      pipelineObj.pipelineWithoutChange
+      pipelineObj.pipelineWithoutChange,
     );
-    if(arePipelinesEqualById == true && pipelineObj.edgesChange == false && pipelineObj.isEditPipeline == true){
+    if (
+      arePipelinesEqualById == true &&
+      pipelineObj.edgesChange == false &&
+      pipelineObj.isEditPipeline == true
+    ) {
       pipelineObj.dirtyFlag = false;
     }
-    if(arePipelinesEqualById == false && pipelineObj.isEditPipeline == true){
+    if (arePipelinesEqualById == false && pipelineObj.isEditPipeline == true) {
       pipelineObj.dirtyFlag = true;
     }
-    
   }
 
   const resetPipelineData = () => {
@@ -462,29 +536,53 @@ export default function useDragAndDrop() {
     pipelineObj.dirtyFlag = false;
     pipelineObj.hasInputNode = false;
     pipelineObj.draggedNode = null;
+    // Transient editor state — the module singleton outlives one editor visit,
+    // so anything left set here leaks into the next pipeline that opens. The
+    // rail in particular documents itself as "starts CLOSED".
+    pipelineObj.showNodePalette = false;
+    pipelineObj.stepPicker = {
+      show: false,
+      source: "",
+      mode: "next",
+      position: null,
+      anchor: null,
+    };
+    pipelineObj.pendingEdge = null;
   };
 
   const getInputNodeStream = () => {
     const nodes = pipelineObj.currentSelectedPipeline?.nodes ?? [];
     const inputNode = nodes.find((node: any) => node.io_type === "input");
-    if(Object.prototype.hasOwnProperty.call(inputNode?.data, 'node_type') &&  inputNode.data.node_type === 'stream'){
+    // Guard `inputNode?.data` FIRST: with no source node, inputNode is undefined
+    // and `hasOwnProperty.call(undefined, …)` THROWS ("cannot convert undefined
+    // to object"). That throw is what broke deleting the auto-added destination
+    // after the source was removed — its node_type is 'stream' (copied from the
+    // source), so the delete-confirm dialog calls this, and the throw aborted
+    // the dialog before it could open, so the delete silently did nothing.
+    if (
+      inputNode?.data &&
+      Object.prototype.hasOwnProperty.call(inputNode.data, "node_type") &&
+      inputNode.data.node_type === "stream"
+    ) {
       return inputNode?.data?.stream_name?.value || inputNode.data.stream_name || "";
     }
-    else {
-      return null;
-    }
+    return null;
   };
 
   const checkIfDefaultDestinationNode = (id: string) => {
     const inputNodeStream = getInputNodeStream();
     if (!inputNodeStream) return false;
     const nodes = pipelineObj.currentSelectedPipeline?.nodes ?? [];
-    if(inputNodeStream){
-      return nodes.some((node: any) => node.id === id && node.type === 'output' && (node.data.stream_name.value === inputNodeStream || node.data.stream_name === inputNodeStream));
+    if (inputNodeStream) {
+      return nodes.some(
+        (node: any) =>
+          node.id === id &&
+          node.type === "output" &&
+          (node.data.stream_name.value === inputNodeStream ||
+            node.data.stream_name === inputNodeStream),
+      );
     }
   };
-
-  
 
   return {
     pipelineObj,
@@ -500,7 +598,9 @@ export default function useDragAndDrop() {
     addNode,
     addNodeAfter,
     openStepPicker,
+    openSourcePicker,
     closeStepPicker,
+    addSourceNode,
     editNode,
     deletePipelineNode,
     resetPipelineData,

@@ -102,22 +102,14 @@ export function applyGaugeChart(ctx: SQLContext): void {
       //which grid will be used
       gridIndex: index,
       // radius, progress and axisline width will be calculated based on grid width and height
-      radius: `${
-        Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 2 -
-        5
-      }px`,
+      radius: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 2 - 5}px`,
       progress: {
         show: true,
-        width: `${
-          Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 6
-        }`,
+        width: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 6}`,
       },
       axisLine: {
         lineStyle: {
-          width: `${
-            Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) /
-            6
-          }`,
+          width: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 6}`,
         },
       },
       title: {
@@ -132,14 +124,8 @@ export function applyGaugeChart(ctx: SQLContext): void {
       // x: left + width / 2,
       // y: top + height / 2,
       center: [
-        `${
-          parseFloat(options.grid[index].left) +
-          parseFloat(options.grid[index].width) / 2
-        }%`,
-        `${
-          parseFloat(options.grid[index].top) +
-          parseFloat(options.grid[index].height) / 2
-        }%`,
+        `${parseFloat(options.grid[index].left) + parseFloat(options.grid[index].width) / 2}%`,
+        `${parseFloat(options.grid[index].top) + parseFloat(options.grid[index].height) / 2}%`,
       ],
 
       data: [

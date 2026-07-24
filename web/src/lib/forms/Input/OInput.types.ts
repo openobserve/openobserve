@@ -86,7 +86,7 @@ export interface InputProps {
    * Position of the label: 'outside' renders above the field (default),
    * 'inside' renders as a compact floating mini-label inside the field border.
    */
-  labelPosition?: 'inside' | 'outside';
+  labelPosition?: "inside" | "outside";
 }
 
 export interface InputEmits {
@@ -97,6 +97,7 @@ export interface InputEmits {
   (_e: "keydown", _event: KeyboardEvent): void;
   (_e: "keyup", _event: KeyboardEvent): void;
   (_e: "keypress", _event: KeyboardEvent): void;
+  (_e: "paste", _event: ClipboardEvent): void;
 }
 
 export interface InputSlots {

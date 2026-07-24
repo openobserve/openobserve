@@ -29,8 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   WorkflowEditor); there are no editable fields.
 -->
 <template>
-  <div data-test="workflow-trigger-body" class="w-full flex flex-col">
-    <p class="text-xs text-text-secondary leading-normal mb-3">
+  <div data-test="workflow-trigger-body" class="flex w-full flex-col">
+    <p class="text-text-secondary mb-3 text-xs leading-normal">
       {{ t("workflow.node.triggerPayloadIntro") }}
     </p>
 
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          not always full-height), and the editor fills the wrapper. -->
     <div
       data-test="workflow-trigger-structure"
-      class="w-full h-110 rounded-default border border-border-default overflow-hidden"
+      class="rounded-default border-border-default h-110 w-full overflow-hidden border"
     >
       <QueryEditor
         editor-id="workflow-trigger-payload"
@@ -54,13 +54,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :show-line-numbers="false"
         :sticky-scroll="false"
         :query="payloadText"
-        class="w-full h-full!"
+        class="h-full! w-full"
       />
     </div>
 
     <!-- Kept from the old tree: without it the sample's job/level/log columns
          read as guaranteed, when they actually come from the alert's query. -->
-    <p class="text-xs text-text-secondary leading-normal mt-2 italic">
+    <p class="text-text-secondary mt-2 text-xs leading-normal italic">
       {{ t("workflow.node.triggerDataExampleNote") }}
     </p>
   </div>
@@ -74,9 +74,7 @@ import { buildTestSampleText } from "@/plugins/workflows/testSample";
 
 // Async like every other QueryEditor consumer — Monaco is already on this route
 // (Function node, Test dialog, Step Result drawer), so this adds no new chunk.
-const QueryEditor = defineAsyncComponent(
-  () => import("@/components/CodeQueryEditor.vue"),
-);
+const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
 const { t } = useI18n();
 

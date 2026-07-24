@@ -1,6 +1,6 @@
 /**
  * Core interfaces for the AI Context Provider System
- * 
+ *
  * Example Usage:
  * ```typescript
  * const logsContext: PageContext = {
@@ -17,7 +17,7 @@ export interface PageContext extends Record<string, any> {
 
 /**
  * Context provider interface that each page must implement
- * 
+ *
  * Example Implementation:
  * ```typescript
  * const logsProvider: ContextProvider = {

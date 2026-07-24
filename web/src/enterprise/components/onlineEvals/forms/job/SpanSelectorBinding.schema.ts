@@ -34,6 +34,10 @@ export const makeSpanSelectorSchema = (
           message: t("onlineEvals.job.spanSelector.validation.maximumSpans"),
         }),
       filterReady: z.boolean(),
+      // The filter-builder tree is form-owned (rendered in form mode via
+      // name-prefix="filterGroup") so each condition binds to a unique nested
+      // path. Its completeness is surfaced through `filterReady` above.
+      filterGroup: z.any(),
     })
     .superRefine((value, ctx) => {
       if (options.isDuplicateName(value.name, value.id)) {
@@ -61,9 +65,7 @@ export const makeSpanSelectorSchema = (
       }
 
       const fieldCount =
-        value.fieldMode === "default"
-          ? options.defaultFieldCount
-          : value.fields.length;
+        value.fieldMode === "default" ? options.defaultFieldCount : value.fields.length;
       if (
         value.maximumSpans * fieldCount * SPAN_SELECTOR_CHARS_PER_FIELD >
         SPAN_SELECTOR_BUDGET_CHARS
@@ -76,6 +78,4 @@ export const makeSpanSelectorSchema = (
       }
     });
 
-export type SpanSelectorForm = z.infer<
-  ReturnType<typeof makeSpanSelectorSchema>
->;
+export type SpanSelectorForm = z.infer<ReturnType<typeof makeSpanSelectorSchema>>;

@@ -15,6 +15,7 @@
 
 import { scaleLinear } from "d3-scale";
 import { isNumber } from "lodash-es";
+import { chartColor, chartNumber } from "../chartTheme";
 
 export enum ColorModeWithoutMinMax {
   PALETTE_CLASSIC_BY_SERIES = "palette-classic-by-series",
@@ -54,11 +55,26 @@ export const classicColorPaletteDarkTheme = [
   "#fef08a", // amber
 ];
 
-export const getColorPalette = (theme: string) => {
-  return theme === "dark"
-    ? classicColorPaletteDarkTheme
-    : classicColorPaletteLightTheme;
-};
+// Classic dashboard series palette. The light/dark swap now lives in the
+// --color-chart-series-* tokens (base.css / dark.css); this resolves them for
+// ECharts via chartColor(). `_theme` is kept for call-site compatibility but is
+// ignored — CSS owns the light/dark swap now, not a per-theme JS branch.
+// The classicColorPalette*Theme arrays above remain the token source of truth and
+// are still consumed directly by the log-histogram converters.
+export const getColorPalette = (_theme?: string): string[] => [
+  chartColor("--color-chart-series-1"),
+  chartColor("--color-chart-series-2"),
+  chartColor("--color-chart-series-3"),
+  chartColor("--color-chart-series-4"),
+  chartColor("--color-chart-series-5"),
+  chartColor("--color-chart-series-6"),
+  chartColor("--color-chart-series-7"),
+  chartColor("--color-chart-series-8"),
+  chartColor("--color-chart-series-9"),
+  chartColor("--color-chart-series-10"),
+  chartColor("--color-chart-series-11"),
+  chartColor("--color-chart-series-12"),
+];
 
 const isValidHexColor = (color: string): boolean => {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(color);
@@ -74,11 +90,7 @@ export const shadeColor = (
   if (!isValidHexColor(color)) {
     return null;
   }
-  if (
-    typeof value !== "number" ||
-    typeof min !== "number" ||
-    typeof max !== "number"
-  ) {
+  if (typeof value !== "number" || typeof min !== "number" || typeof max !== "number") {
     return null;
   }
   let percent = 0;
@@ -112,9 +124,7 @@ interface Metric {
   result?: MetricResult[];
 }
 
-export const getMetricMinMaxValue = (
-  searchQueryData: Metric[],
-): [number, number] => {
+export const getMetricMinMaxValue = (searchQueryData: Metric[]): [number, number] => {
   let min = Infinity;
   let max = -Infinity;
 
@@ -184,17 +194,11 @@ const getSeriesHash = (seriesName: string, colorPalette: string[]) => {
 type SeriesBy = "last" | "min" | "max";
 
 // `values` may be a bare number from gauge callers; the try/catch below absorbs the non-array case
-const getSeriesValueBasedOnSeriesBy = (
-  values: any,
-  seriesBy: SeriesBy,
-): number | null => {
+const getSeriesValueBasedOnSeriesBy = (values: any, seriesBy: SeriesBy): number | null => {
   try {
     const validValues = values.filter(
       (value: number | string) =>
-        value != null &&
-        value !== "" &&
-        isNumber(value) &&
-        !Number.isNaN(value),
+        value != null && value !== "" && isNumber(value) && !Number.isNaN(value),
     );
 
     if (validValues.length === 0) return null;
@@ -231,11 +235,7 @@ interface ColorConfig {
   seriesBy?: SeriesBy;
 }
 
-function getDomainPartitions(
-  chartMin: number,
-  chartMax: number,
-  numPartitions: number,
-) {
+function getDomainPartitions(chartMin: number, chartMax: number, numPartitions: number) {
   // If there's only one partition, return just chartMin and chartMax
   if (numPartitions < 2) {
     return [chartMin, chartMax];
@@ -274,9 +274,7 @@ export const getSeriesColor = (
   }
 
   if (!colorCfg) {
-    return colorPalette[
-      getSeriesHash(seriesName?.toString() ?? "", colorPalette)
-    ];
+    return colorPalette[getSeriesHash(seriesName?.toString() ?? "", colorPalette)];
   } else if (colorCfg.mode === "fixed") {
     return colorCfg?.fixedColor?.[0] ?? "#53ca53";
   } else if (colorCfg.mode === "shades") {
@@ -287,83 +285,49 @@ export const getSeriesColor = (
       chartMax,
     );
   } else if (colorCfg.mode === "palette-classic-by-series") {
-    return colorPalette[
-      getSeriesHash(seriesName?.toString() ?? "", colorPalette)
-    ];
+    return colorPalette[getSeriesHash(seriesName?.toString() ?? "", colorPalette)];
   } else if (colorCfg.mode === "palette-classic") {
     return null;
   } else {
     const d3ColorObj = scaleLinear(
-      getDomainPartitions(
-        chartMin,
-        chartMax,
-        colorCfg?.fixedColor?.length ?? colorPalette.length,
-      ),
+      getDomainPartitions(chartMin, chartMax, colorCfg?.fixedColor?.length ?? colorPalette.length),
       colorCfg?.fixedColor?.length ? colorCfg.fixedColor : colorPalette,
     );
     return d3ColorObj(
-      (getSeriesValueBasedOnSeriesBy(value, colorCfg?.seriesBy ?? "last") ??
-        chartMin) as number,
+      (getSeriesValueBasedOnSeriesBy(value, colorCfg?.seriesBy ?? "last") ?? chartMin) as number,
     );
   }
 };
 
-const getColorForTableLight = [
-  "#FFCDEE",
-  "#FFD2D3",
-  "#C8FCFA",
-  "#B2DAFB",
-  "#C0E9FC",
-  "#FFCDE5",
-  "#C0EFF5",
-  "#FFFDBA",
-  "#E6F3FF",
-  "#F2B9B9",
-  "#A6E8F0",
-  "#C8E5FC",
-  "#E8A3F4",
-  "#C0E5E2",
-  "#C9FFBD",
-  "#F8B1C9",
-  "#BDDFFF",
-  "#D2B9FF",
-  "#D2EBDA",
-  "#C0E3C2",
-  "#F0F8E8",
-  "#FFF2CC",
-  "#FFE6E6",
-  "#E8F4FD",
+// Dashboard table row-highlight palette. The light/dark swap lives in the
+// --color-chart-table-* tokens (base.css / dark.css); this resolves them via
+// chartColor(). `_theme` kept for call-site compatibility, ignored.
+export const getColorForTable = (_theme?: string): string[] => [
+  chartColor("--color-chart-table-1"),
+  chartColor("--color-chart-table-2"),
+  chartColor("--color-chart-table-3"),
+  chartColor("--color-chart-table-4"),
+  chartColor("--color-chart-table-5"),
+  chartColor("--color-chart-table-6"),
+  chartColor("--color-chart-table-7"),
+  chartColor("--color-chart-table-8"),
+  chartColor("--color-chart-table-9"),
+  chartColor("--color-chart-table-10"),
+  chartColor("--color-chart-table-11"),
+  chartColor("--color-chart-table-12"),
+  chartColor("--color-chart-table-13"),
+  chartColor("--color-chart-table-14"),
+  chartColor("--color-chart-table-15"),
+  chartColor("--color-chart-table-16"),
+  chartColor("--color-chart-table-17"),
+  chartColor("--color-chart-table-18"),
+  chartColor("--color-chart-table-19"),
+  chartColor("--color-chart-table-20"),
+  chartColor("--color-chart-table-21"),
+  chartColor("--color-chart-table-22"),
+  chartColor("--color-chart-table-23"),
+  chartColor("--color-chart-table-24"),
 ];
-
-const getColorForTableDark = [
-  "rgba(255, 100, 180, 0.15)",
-  "rgba(255, 100, 110, 0.15)",
-  "rgba(100, 240, 230, 0.15)",
-  "rgba(90, 170, 240, 0.15)",
-  "rgba(100, 210, 240, 0.15)",
-  "rgba(255, 100, 160, 0.15)",
-  "rgba(100, 220, 230, 0.15)",
-  "rgba(255, 250, 100, 0.15)",
-  "rgba(160, 200, 255, 0.15)",
-  "rgba(230, 130, 130, 0.15)",
-  "rgba(100, 210, 225, 0.15)",
-  "rgba(100, 190, 240, 0.15)",
-  "rgba(200, 100, 240, 0.15)",
-  "rgba(100, 200, 195, 0.15)",
-  "rgba(130, 240, 120, 0.15)",
-  "rgba(240, 130, 170, 0.15)",
-  "rgba(130, 190, 255, 0.15)",
-  "rgba(170, 120, 255, 0.15)",
-  "rgba(150, 210, 170, 0.15)",
-  "rgba(130, 200, 135, 0.15)",
-  "rgba(210, 240, 180, 0.15)",
-  "rgba(255, 230, 130, 0.15)",
-  "rgba(255, 180, 180, 0.15)",
-  "rgba(180, 225, 245, 0.15)",
-];
-
-export const getColorForTable = (theme: string): string[] =>
-  theme === "dark" ? getColorForTableDark : getColorForTableLight;
 
 /**
  * Converts a color string (hex, rgb, or rgba) into an rgba string with the
@@ -402,11 +366,11 @@ export const colorToRgba = (color: string, alpha: number): string => {
  * the data. Theme-aware: faint white on dark, faint black on light. Shared by
  * the PromQL and SQL chart builders so the grid look stays consistent.
  */
-export const getGridLineStyle = (theme: string) => ({
+export const getGridLineStyle = (_theme?: string) => ({
   type: "dashed",
   width: 1,
-  color:
-    theme === "dark" ? "rgba(255, 255, 255, 0.12)" : "rgba(0, 0, 0, 0.08)",
+  // light/dark swap lives in the --color-chart-gridline token (base/dark css).
+  color: chartColor("--color-chart-gridline"),
 });
 
 /**
@@ -414,10 +378,11 @@ export const getGridLineStyle = (theme: string) => ({
  * from a translucent series color at the top to fully transparent at the
  * bottom. `color` should be the resolved concrete series color.
  */
-export const getAreaGradientColor = (color: string, theme?: string) => {
-  const isDark = theme === "dark";
-  const topAlpha = isDark ? 1 : 0.9;
-  const bottomAlpha = isDark ? 1 : 0.4;
+export const getAreaGradientColor = (color: string, _theme?: string) => {
+  // The fade opacities' light/dark swap lives in the --chart-area-fill-*-opacity
+  // tokens (base/dark css); `_theme` kept for call-site compatibility, ignored.
+  const topAlpha = chartNumber("--chart-area-fill-top-opacity", 0.9);
+  const bottomAlpha = chartNumber("--chart-area-fill-bottom-opacity", 0.4);
   return {
     type: "linear",
     x: 0,
@@ -446,12 +411,10 @@ export const getAreaStyleOverride = (
   seriesName: any,
   theme: string,
 ) => {
-  const isAreaChart =
-    panelType === "area" || panelType === "area-stacked";
+  const isAreaChart = panelType === "area" || panelType === "area-stacked";
   if (!isAreaChart || !baseAreaStyle) return {};
   const palette = getColorPalette(theme);
-  const color =
-    resolvedColor ?? palette[getSeriesHash(seriesName?.toString() ?? "", palette)];
+  const color = resolvedColor ?? palette[getSeriesHash(seriesName?.toString() ?? "", palette)];
   return {
     areaStyle: {
       ...baseAreaStyle,

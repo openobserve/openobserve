@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OBadge
     variant="primary-outline"
     size="sm"
-    class="uppercase tracking-wide font-semibold"
+    class="font-semibold tracking-wide uppercase"
     data-test="beta-badge"
   >
     {{ t("common.beta") }}

@@ -20,7 +20,11 @@ import serviceStreamsApi, {
   type StreamInfo,
 } from "./service_streams";
 import { filterDimensionsForCorrelation } from "@/utils/telemetryCorrelation";
-import { loadIdentityConfig, clearIdentityConfigCache, clearAllIdentityConfigCache } from "@/utils/identityConfig";
+import {
+  loadIdentityConfig,
+  clearIdentityConfigCache,
+  clearAllIdentityConfigCache,
+} from "@/utils/identityConfig";
 
 // Types matching backend API responses
 export interface Incident {
@@ -107,7 +111,6 @@ export interface IncidentCorrelatedStreams {
   correlationData: CorrelationResponse | null;
 }
 
-
 const incidents = {
   /**
    * List incidents with optional filtering and pagination
@@ -117,7 +120,7 @@ const incidents = {
     status?: string,
     limit: number = 50,
     offset: number = 0,
-    keyword?: string
+    keyword?: string,
   ) => {
     let url = `/api/v2/${org_identifier}/alerts/incidents?limit=${limit}&offset=${offset}`;
     if (status) {
@@ -134,7 +137,7 @@ const incidents = {
    */
   get: (org_identifier: string, incident_id: string) => {
     return http().get<IncidentWithAlerts>(
-      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}`
+      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}`,
     );
   },
 
@@ -144,11 +147,11 @@ const incidents = {
   updateStatus: (
     org_identifier: string,
     incident_id: string,
-    status: "open" | "acknowledged" | "resolved"
+    status: "open" | "acknowledged" | "resolved",
   ) => {
     return http().patch<Incident>(
       `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/update`,
-      { status }
+      { status },
     );
   },
 
@@ -158,11 +161,11 @@ const incidents = {
   updateIncident: (
     org_identifier: string,
     incident_id: string,
-    updates: { title?: string; severity?: string }
+    updates: { title?: string; severity?: string },
   ) => {
     return http().patch<Incident | UpdateSeverityResponse>(
       `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/update`,
-      updates
+      updates,
     );
   },
 
@@ -170,9 +173,7 @@ const incidents = {
    * Get incident statistics
    */
   getStats: (org_identifier: string) => {
-    return http().get<IncidentStats>(
-      `/api/v2/${org_identifier}/alerts/incidents/stats`
-    );
+    return http().get<IncidentStats>(`/api/v2/${org_identifier}/alerts/incidents/stats`);
   },
 
   /**
@@ -181,12 +182,12 @@ const incidents = {
   triggerRca: (
     org_identifier: string,
     incident_id: string,
-    params: { reanalysis?: boolean } = {}
+    params: { reanalysis?: boolean } = {},
   ) => {
     return http().post<{ rca_content: string }>(
       `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca`,
       null,
-      { params }
+      { params },
     );
   },
 
@@ -203,7 +204,7 @@ const incidents = {
    */
   getCorrelatedStreams: async (
     org_identifier: string,
-    incident: Incident
+    incident: Incident,
   ): Promise<IncidentCorrelatedStreams> => {
     const allDimensions = incident.group_values ?? {};
 
@@ -214,9 +215,11 @@ const incidents = {
 
       // Filter dimensions to only include disambiguation fields
       filteredDimensions = filterDimensionsForCorrelation(allDimensions, identityConfig);
-
     } catch (err) {
-      console.warn("[incidents] Failed to load identity config for dimension filtering, using all dimensions:", err);
+      console.warn(
+        "[incidents] Failed to load identity config for dimension filtering, using all dimensions:",
+        err,
+      );
     }
 
     const request: CorrelationRequest = {
@@ -263,19 +266,16 @@ const incidents = {
    * Get event timeline for an incident
    */
   getEvents: (org_identifier: string, incident_id: string) => {
-    return http().get(
-      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/events`
-    );
+    return http().get(`/api/v2/${org_identifier}/alerts/incidents/${incident_id}/events`);
   },
 
   /**
    * Post a comment on an incident
    */
   postComment: (org_identifier: string, incident_id: string, comment: string) => {
-    return http().post(
-      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/events/comment`,
-      { comment }
-    );
+    return http().post(`/api/v2/${org_identifier}/alerts/incidents/${incident_id}/events/comment`, {
+      comment,
+    });
   },
 
   /**

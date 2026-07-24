@@ -28,13 +28,7 @@ describe("computeTreeLayout — entry-edge roots (agent-graph regression)", () =
     // so roots was empty, BFS never ran, and EVERY node collapsed to depth 0 —
     // which drew gpt-4o hanging off the wrong parent instead of under Worker.
     const g = {
-      nodes: [
-        N("orchestrator"),
-        N("Supervisor"),
-        N("Worker"),
-        N("gpt-4o"),
-        N("run_query"),
-      ],
+      nodes: [N("orchestrator"), N("Supervisor"), N("Worker"), N("gpt-4o"), N("run_query")],
       edges: [
         { from: null, to: "orchestrator" },
         E("orchestrator", "Supervisor"),
@@ -116,12 +110,7 @@ describe("computeTreeLayout — rows (Y)", () => {
     // Two parents, each with two leaves — 4 leaves must not overlap.
     const g = {
       nodes: [N("p1"), N("p2"), N("l1"), N("l2"), N("l3"), N("l4")],
-      edges: [
-        E("p1", "l1"),
-        E("p1", "l2"),
-        E("p2", "l3"),
-        E("p2", "l4"),
-      ],
+      edges: [E("p1", "l1"), E("p1", "l2"), E("p2", "l3"), E("p2", "l4")],
     };
     const pos = computeTreeLayout(g);
     const leafYs = ["l1", "l2", "l3", "l4"].map((id) => pos.get(id)!.y);

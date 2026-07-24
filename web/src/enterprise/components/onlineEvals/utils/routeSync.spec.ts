@@ -113,9 +113,10 @@ describe("computeViewState — view action", () => {
   });
 
   it("opens the scorer detail drawer", () => {
-    expect(
-      computeViewState({ tab: "scorers", action: "view", id: "s2-entity" }, ROWS),
-    ).toEqual({ kind: "viewScorer", row: S2 });
+    expect(computeViewState({ tab: "scorers", action: "view", id: "s2-entity" }, ROWS)).toEqual({
+      kind: "viewScorer",
+      row: S2,
+    });
   });
 
   it("opens the job detail drawer", () => {
@@ -126,15 +127,15 @@ describe("computeViewState — view action", () => {
   });
 
   it("returns 'none' when the row is not found", () => {
-    expect(
-      computeViewState({ tab: "jobs", action: "view", id: "missing" }, ROWS),
-    ).toEqual({ kind: "none" });
+    expect(computeViewState({ tab: "jobs", action: "view", id: "missing" }, ROWS)).toEqual({
+      kind: "none",
+    });
   });
 
   it("returns 'none' when the active tab is 'quality'", () => {
-    expect(
-      computeViewState({ tab: "quality", action: "view", id: "anything" }, ROWS),
-    ).toEqual({ kind: "none" });
+    expect(computeViewState({ tab: "quality", action: "view", id: "anything" }, ROWS)).toEqual({
+      kind: "none",
+    });
   });
 
   it("returns 'none' when action is 'view' but id is missing", () => {
@@ -153,19 +154,13 @@ describe("computeViewState — scoreConfigs add/edit", () => {
 
   it("returns 'scoreConfigEdit' when id resolves", () => {
     expect(
-      computeViewState(
-        { tab: "scoreConfigs", action: "update", id: "sc2-entity" },
-        ROWS,
-      ),
+      computeViewState({ tab: "scoreConfigs", action: "update", id: "sc2-entity" }, ROWS),
     ).toEqual({ kind: "scoreConfigEdit", row: SC2 });
   });
 
   it("returns 'none' when scoreConfig id does not match", () => {
     expect(
-      computeViewState(
-        { tab: "scoreConfigs", action: "update", id: "missing" },
-        ROWS,
-      ),
+      computeViewState({ tab: "scoreConfigs", action: "update", id: "missing" }, ROWS),
     ).toEqual({ kind: "none" });
   });
 });
@@ -179,40 +174,36 @@ describe("computeViewState — scorers add flow", () => {
 
   it("jumps to the form page when scorer_type is supplied", () => {
     expect(
-      computeViewState(
-        { tab: "scorers", action: "add", scorer_type: "llm_judge" },
-        ROWS,
-      ),
+      computeViewState({ tab: "scorers", action: "add", scorer_type: "llm_judge" }, ROWS),
     ).toEqual({ kind: "scorerFormCreate", scorerType: "llm_judge" });
   });
 
   it("preserves the scorer_type value verbatim", () => {
     expect(
-      computeViewState(
-        { tab: "scorers", action: "add", scorer_type: "remote" },
-        ROWS,
-      ),
+      computeViewState({ tab: "scorers", action: "add", scorer_type: "remote" }, ROWS),
     ).toEqual({ kind: "scorerFormCreate", scorerType: "remote" });
   });
 });
 
 describe("computeViewState — scorer/job edit", () => {
   it("opens the scorer form in edit mode", () => {
-    expect(
-      computeViewState({ tab: "scorers", action: "update", id: "s1-entity" }, ROWS),
-    ).toEqual({ kind: "scorerFormEdit", row: S1 });
+    expect(computeViewState({ tab: "scorers", action: "update", id: "s1-entity" }, ROWS)).toEqual({
+      kind: "scorerFormEdit",
+      row: S1,
+    });
   });
 
   it("opens the job form in edit mode", () => {
-    expect(
-      computeViewState({ tab: "jobs", action: "update", id: "j1" }, ROWS),
-    ).toEqual({ kind: "jobFormEdit", row: J1 });
+    expect(computeViewState({ tab: "jobs", action: "update", id: "j1" }, ROWS)).toEqual({
+      kind: "jobFormEdit",
+      row: J1,
+    });
   });
 
   it("returns 'none' on edit when id does not resolve", () => {
-    expect(
-      computeViewState({ tab: "jobs", action: "update", id: "missing" }, ROWS),
-    ).toEqual({ kind: "none" });
+    expect(computeViewState({ tab: "jobs", action: "update", id: "missing" }, ROWS)).toEqual({
+      kind: "none",
+    });
   });
 });
 

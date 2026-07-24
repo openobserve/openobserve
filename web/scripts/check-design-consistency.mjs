@@ -72,9 +72,16 @@ const TS_HEX_ALLOWLIST = [
   "components/ingestion/ai/content/",
 ];
 
-// The two sanctioned dark-mode seams (§3.R.1) — the only files allowed to read
-// theme / declare an isDark flag, so they are exempt from the darkMechanism count.
-const DARK_SEAM_ALLOWLIST = ["composables/useTheme.ts", "utils/chartTheme.ts"];
+// The sanctioned dark-mode seams (§3.R.1) — the only files allowed to read theme /
+// declare an isDark flag, so they are exempt from the darkMechanism count. useTheme +
+// chartTheme are the JS *consumption* seams; themeManager is the theme *applier* — it
+// resolves store.state.theme into the mode to apply (upstream of every token, so it
+// cannot consume a token without circularity).
+const DARK_SEAM_ALLOWLIST = [
+  "composables/useTheme.ts",
+  "utils/chartTheme.ts",
+  "utils/themeManager.ts",
+];
 
 // Files allowed to carry a literal font stack. Email markup renders inside a mail
 // client, which can load neither our webfont nor our custom properties, so a

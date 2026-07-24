@@ -160,13 +160,13 @@ const effectiveSideOffset = computed(() => props.sideOffset);
 const contentStyle = computed(() => ({
   maxWidth: props.maxWidth,
   filter: [
-    'drop-shadow(0 0 1px rgba(0,0,0,0.15))',
-    'drop-shadow(0 4px 12px rgba(0,0,0,0.14))',
-  ].join(' '),
+    "drop-shadow(0 0 1px rgba(0,0,0,0.15))",
+    "drop-shadow(0 4px 12px rgba(0,0,0,0.14))",
+  ].join(" "),
 }));
 
 const contentClasses = computed(() => [
-  "z-[10100] px-2.5 py-1.5",
+  "z-10100 px-2.5 py-1.5",
   "bg-surface-overlay rounded-default",
   "text-xs text-text-body font-medium leading-relaxed",
   // Force long unbreakable tokens (file paths, hashes, URLs) to wrap inside the
@@ -209,19 +209,11 @@ const contentClasses = computed(() => [
           :style="contentStyle"
           :class="contentClasses"
         >
-          <span :class="(shortcut || shortcutId) ? 'inline-flex items-center gap-1.5' : ''">
+          <span :class="shortcut || shortcutId ? 'inline-flex items-center gap-1.5' : ''">
             <slot name="content">{{ content }}</slot>
-            <OShortcut
-              v-if="shortcut || shortcutId"
-              :keys="shortcut"
-              :id="shortcutId"
-            />
+            <OShortcut v-if="shortcut || shortcutId" :keys="shortcut" :id="shortcutId" />
           </span>
-          <TooltipArrow
-            :width="10"
-            :height="5"
-            :class="'fill-surface-overlay'"
-          />
+          <TooltipArrow :width="10" :height="5" :class="'fill-surface-overlay'" />
         </TooltipContent>
       </TooltipPortal>
     </TooltipRoot>
@@ -245,7 +237,7 @@ const contentClasses = computed(() => [
         <TooltipTrigger
           as="span"
           :reference="parentEl ?? undefined"
-          style="display:none"
+          style="display: none"
           aria-hidden="true"
         />
         <TooltipPortal>
@@ -261,25 +253,17 @@ const contentClasses = computed(() => [
             @mouseenter="onContentEnter"
             @mouseleave="onContentLeave"
           >
-            <span :class="(shortcut || shortcutId) ? 'inline-flex items-center gap-1.5' : ''">
+            <span :class="shortcut || shortcutId ? 'inline-flex items-center gap-1.5' : ''">
               <slot name="content">{{ content }}</slot>
-              <OShortcut
-              v-if="shortcut || shortcutId"
-              :keys="shortcut"
-              :id="shortcutId"
-            />
+              <OShortcut v-if="shortcut || shortcutId" :keys="shortcut" :id="shortcutId" />
             </span>
-            <TooltipArrow
-              :width="10"
-              :height="5"
-              :class="'fill-surface-overlay'"
-            />
+            <TooltipArrow :width="10" :height="5" :class="'fill-surface-overlay'" />
           </TooltipContent>
         </TooltipPortal>
       </TooltipRoot>
     </TooltipProvider>
     <!-- Anchor placeholder: inserted at the real DOM position to resolve parentElement.
          `style="display:none"` is required, not decorative — see the note above. -->
-    <span ref="childAnchorRef" style="display:none" aria-hidden="true" />
+    <span ref="childAnchorRef" style="display: none" aria-hidden="true" />
   </template>
 </template>

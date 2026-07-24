@@ -1,74 +1,91 @@
 // Copyright 2026 OpenObserve Inc.
 <template>
   <OPageLayout
-    :title="detail?.name || t('synthetics.privateLocations.detail.title')"
+    :title="detail?.label || t('synthetics.privateLocations.detail.title')"
     icon="location-on"
-    :back="{ label: t('synthetics.privateLocations.detail.back'), to: { name: 'synthetic' } }"
+    :back="{
+      label: t('synthetics.privateLocations.detail.back'),
+      to: { name: 'synthetics', query: { section: 'private' } },
+    }"
     bleed
   >
-      <template #title-trail>
-        <OBadge v-if="detail" :variant="statusVariant(detail.status)" :dot="true" size="sm">
-          {{ t(`synthetics.privateLocations.status.${detail.status}`) }}
-        </OBadge>
-      </template>
-      <template #actions>
-        <OButton
-          variant="outline"
-          size="sm"
-          icon-left="content-copy"
-          :disabled="!detail"
-          data-test="synthetics-private-location-detail-setup-btn"
-          @click="openSetup"
-        >
-          {{ t("synthetics.privateLocations.copySetupCmd") }}
-        </OButton>
-        <OButton
-          variant="outline"
-          size="icon-sm"
-          icon-left="refresh"
-          :loading="loading"
-          :title="t('common.refresh')"
-          data-test="synthetics-private-location-detail-refresh-btn"
-          @click="load"
-        />
-      </template>
+    <template #title-trail>
+      <OBadge v-if="detail" :variant="statusVariant(detail.status)" :dot="true" size="sm">
+        {{ t(`synthetics.privateLocations.status.${detail.status}`) }}
+      </OBadge>
+    </template>
+    <template #actions>
+      <OButton
+        variant="outline"
+        size="sm"
+        icon-left="content-copy"
+        :disabled="!detail"
+        data-test="synthetics-private-location-detail-setup-btn"
+        @click="openSetup()"
+      >
+        {{ t("synthetics.privateLocations.copySetupCmd") }}
+      </OButton>
+      <OButton
+        variant="outline"
+        size="icon-sm"
+        icon-left="refresh"
+        :loading="loading"
+        :title="t('common.refresh')"
+        data-test="synthetics-private-location-detail-refresh-btn"
+        @click="load"
+      />
+    </template>
 
-    <div class="flex-1 min-h-0 overflow-y-auto">
+    <div class="min-h-0 flex-1 overflow-y-auto">
       <div v-if="detail" class="flex flex-col gap-6 p-6">
         <!-- Summary strip -->
-        <div class="flex flex-wrap items-center gap-6 rounded-default border border-border-default bg-surface-subtle px-4 py-3 text-sm">
+        <div
+          class="rounded-default border-border-default bg-surface-subtle flex flex-wrap items-center gap-6 border px-4 py-3 text-sm"
+        >
           <div class="flex flex-col">
-            <span class="text-xs text-text-muted">{{ t("synthetics.privateLocations.table.agents") }}</span>
+            <span class="text-text-muted text-xs">{{
+              t("synthetics.privateLocations.table.agents")
+            }}</span>
             <span class="font-medium">{{ detail.live_agents }}/{{ detail.agents_total }}</span>
           </div>
           <div class="flex flex-col">
-            <span class="text-xs text-text-muted">{{ t("synthetics.privateLocations.table.checks") }}</span>
+            <span class="text-text-muted text-xs">{{
+              t("synthetics.privateLocations.table.checks")
+            }}</span>
             <span class="font-medium">{{ detail.monitors_count }}</span>
           </div>
           <div class="flex flex-col">
-            <span class="text-xs text-text-muted">{{ t("synthetics.privateLocations.table.checksPerMin") }}</span>
+            <span class="text-text-muted text-xs">{{
+              t("synthetics.privateLocations.table.checksPerMin")
+            }}</span>
             <span class="font-medium">~{{ detail.checks_per_min }}</span>
           </div>
           <div v-if="detail.version" class="flex flex-col">
-            <span class="text-xs text-text-muted">{{ t("synthetics.privateLocations.detail.version") }}</span>
+            <span class="text-text-muted text-xs">{{
+              t("synthetics.privateLocations.detail.version")
+            }}</span>
             <span class="font-medium">v{{ detail.version }}</span>
           </div>
           <div class="flex flex-col">
-            <span class="text-xs text-text-muted">{{ t("synthetics.privateLocations.detail.pool") }}</span>
+            <span class="text-text-muted text-xs">{{
+              t("synthetics.privateLocations.detail.pool")
+            }}</span>
             <span class="font-mono text-xs">{{ detail.pool }}</span>
           </div>
           <div v-if="detail.last_seen_at" class="flex flex-col">
-            <span class="text-xs text-text-muted">{{ t("synthetics.privateLocations.table.lastSeen") }}</span>
+            <span class="text-text-muted text-xs">{{
+              t("synthetics.privateLocations.table.lastSeen")
+            }}</span>
             <span class="font-medium">{{ formatTimeAgoUs(detail.last_seen_at) }}</span>
           </div>
         </div>
 
         <!-- Agents (read-only, self-registered) -->
         <div class="flex flex-col gap-2">
-          <h3 class="text-sm font-medium text-text-heading">
+          <h3 class="text-text-heading text-sm font-medium">
             {{ t("synthetics.privateLocations.detail.agentsTitle") }}
           </h3>
-          <p class="text-xs text-text-muted">
+          <p class="text-text-muted text-xs">
             {{ t("synthetics.privateLocations.detail.agentsSubtitle") }}
           </p>
           <OTable
@@ -106,12 +123,24 @@
             <template #cell-lastSeen="{ row }">
               {{ formatTimeAgoUs((row as any).last_seen_at) }}
             </template>
+            <template #cell-actions="{ row }">
+              <div class="flex items-center gap-1" @click.stop>
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  icon-left="content-copy"
+                  :title="t('synthetics.privateLocations.detail.recoverAgent')"
+                  :data-test="`synthetics-private-location-agent-recover-btn-${(row as any).id}`"
+                  @click="openSetup((row as any).name)"
+                />
+              </div>
+            </template>
           </OTable>
         </div>
 
         <!-- Assigned checks -->
         <div class="flex flex-col gap-2">
-          <h3 class="text-sm font-medium text-text-heading">
+          <h3 class="text-text-heading text-sm font-medium">
             {{ t("synthetics.privateLocations.detail.checksTitle") }}
           </h3>
           <OTable
@@ -158,8 +187,9 @@
     <AgentSetupDrawer
       v-model:open="showSetup"
       :install="detail?.install"
-      :location-name="detail?.name"
+      :location-name="detail?.label"
       :location-id="detail?.id"
+      :agent-name="setupAgentName"
       :token="agentSetup?.token"
       :org="agentSetup?.org"
       :o2-url="agentSetup?.o2_url"
@@ -195,8 +225,18 @@ const detail = ref<SyntheticLocationDetail | null>(null);
 const loading = ref(false);
 const showSetup = ref(false);
 const agentSetup = ref<AgentSetup | null>(null);
+const setupAgentName = ref<string | null>(null);
 
-async function openSetup() {
+/** Opens the setup drawer. With an explicit agentName (from a specific
+ *  Agents-table row's "Recover" action), the drawer pre-fills --agent-name
+ *  so recovering a known — possibly offline — agent is a straight
+ *  copy-paste. Without one (the page-level button), default to this
+ *  location's sole agent when there's exactly one — the common case, and
+ *  restarting it should keep the same identity. Ambiguous with 0 or 2+
+ *  agents, so leave it blank (auto-generate) there. */
+async function openSetup(agentName?: string) {
+  const agents = detail.value?.agents ?? [];
+  setupAgentName.value = agentName ?? (agents.length === 1 ? agents[0].name : null);
   showSetup.value = true;
   if (agentSetup.value) return;
   try {
@@ -215,10 +255,7 @@ const statusVariant = (status: string) =>
 async function load() {
   loading.value = true;
   try {
-    const res = await syntheticsService.getLocation(
-      orgIdentifier.value,
-      String(route.params.id),
-    );
+    const res = await syntheticsService.getLocation(orgIdentifier.value, String(route.params.id));
     detail.value = res.data as SyntheticLocationDetail;
   } catch (err) {
     detail.value = null;
@@ -231,10 +268,16 @@ async function load() {
 onMounted(load);
 
 const openMonitor = (row: { id: string; name: string }) => {
+  const orgIdentifier = route.query.org_identifier;
   router.push({
     name: "synthetic-monitor-results",
     params: { id: row.id },
-    query: { name: row.name },
+    query: {
+      name: row.name,
+      ...(typeof orgIdentifier === "string" && orgIdentifier
+        ? { org_identifier: orgIdentifier }
+        : {}),
+    },
   });
 };
 
@@ -279,6 +322,15 @@ const agentColumns = computed<OTableColumnDef[]>(() => [
     size: 110,
     minSize: 90,
     sortable: true,
+  },
+  {
+    id: "actions",
+    header: "",
+    accessorKey: "id",
+    size: 60,
+    minSize: 60,
+    sortable: false,
+    isAction: true,
   },
 ]);
 

@@ -27,24 +27,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #tooltip>
         <OTooltip max-width="300px">
           <template #content>
-            <b>{{ t('dashboard.promQLChartConfig.aggTooltipTitle') }}</b>
-            {{ t('dashboard.promQLChartConfig.aggTooltipDesc') }}
+            <b>{{ t("dashboard.promQLChartConfig.aggTooltipTitle") }}</b>
+            {{ t("dashboard.promQLChartConfig.aggTooltipDesc") }}
             <br /><br />
-            <b>{{ t('dashboard.promQLChartConfig.aggLastLabel') }}</b> {{ t('dashboard.promQLChartConfig.aggLastDesc') }}
+            <b>{{ t("dashboard.promQLChartConfig.aggLastLabel") }}</b>
+            {{ t("dashboard.promQLChartConfig.aggLastDesc") }}
             <br />
-            <b>{{ t('dashboard.promQLChartConfig.aggFirstLabel') }}</b> {{ t('dashboard.promQLChartConfig.aggFirstDesc') }}
+            <b>{{ t("dashboard.promQLChartConfig.aggFirstLabel") }}</b>
+            {{ t("dashboard.promQLChartConfig.aggFirstDesc") }}
             <br />
-            <b>{{ t('dashboard.promQLChartConfig.aggMinMaxLabel') }}</b> {{ t('dashboard.promQLChartConfig.aggMinMaxDesc') }}
+            <b>{{ t("dashboard.promQLChartConfig.aggMinMaxLabel") }}</b>
+            {{ t("dashboard.promQLChartConfig.aggMinMaxDesc") }}
             <br />
-            <b>{{ t('dashboard.promQLChartConfig.aggAvgLabel') }}</b> {{ t('dashboard.promQLChartConfig.aggAvgDesc') }}
+            <b>{{ t("dashboard.promQLChartConfig.aggAvgLabel") }}</b>
+            {{ t("dashboard.promQLChartConfig.aggAvgDesc") }}
             <br />
-            <b>{{ t('dashboard.promQLChartConfig.aggSumLabel') }}</b> {{ t('dashboard.promQLChartConfig.aggSumDesc') }}
+            <b>{{ t("dashboard.promQLChartConfig.aggSumLabel") }}</b>
+            {{ t("dashboard.promQLChartConfig.aggSumDesc") }}
             <br />
-            <b>{{ t('dashboard.promQLChartConfig.aggCountLabel') }}</b> {{ t('dashboard.promQLChartConfig.aggCountDesc') }}
+            <b>{{ t("dashboard.promQLChartConfig.aggCountLabel") }}</b>
+            {{ t("dashboard.promQLChartConfig.aggCountDesc") }}
             <br />
-            <b>{{ t('dashboard.promQLChartConfig.aggRangeLabel') }}</b> {{ t('dashboard.promQLChartConfig.aggRangeDesc') }}
+            <b>{{ t("dashboard.promQLChartConfig.aggRangeLabel") }}</b>
+            {{ t("dashboard.promQLChartConfig.aggRangeDesc") }}
             <br />
-            <b>{{ t('dashboard.promQLChartConfig.aggDiffLabel') }}</b> {{ t('dashboard.promQLChartConfig.aggDiffDesc') }}
+            <b>{{ t("dashboard.promQLChartConfig.aggDiffLabel") }}</b>
+            {{ t("dashboard.promQLChartConfig.aggDiffDesc") }}
           </template>
         </OTooltip>
       </template>
@@ -61,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #tooltip>
           <OTooltip max-width="300px">
             <template #content>
-              {{ t('dashboard.promQLChartConfig.geoLatTooltip') }}
+              {{ t("dashboard.promQLChartConfig.geoLatTooltip") }}
             </template>
           </OTooltip>
         </template>
@@ -76,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #tooltip>
           <OTooltip max-width="300px">
             <template #content>
-              {{ t('dashboard.promQLChartConfig.geoLonTooltip') }}
+              {{ t("dashboard.promQLChartConfig.geoLonTooltip") }}
             </template>
           </OTooltip>
         </template>
@@ -91,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #tooltip>
           <OTooltip max-width="300px">
             <template #content>
-              {{ t('dashboard.promQLChartConfig.geoWeightTooltip') }}
+              {{ t("dashboard.promQLChartConfig.geoWeightTooltip") }}
             </template>
           </OTooltip>
         </template>
@@ -109,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #tooltip>
           <OTooltip max-width="300px">
             <template #content>
-              {{ t('dashboard.promQLChartConfig.mapsNameTooltip') }}
+              {{ t("dashboard.promQLChartConfig.mapsNameTooltip") }}
             </template>
           </OTooltip>
         </template>
@@ -129,13 +137,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #tooltip>
           <OTooltip max-width="300px">
             <template #content>
-              <b>{{ t('dashboard.promQLChartConfig.promqlTableModeTooltipTitle') }}</b>
-              {{ t('dashboard.promQLChartConfig.promqlTableModeTooltipDesc') }}
+              <b>{{ t("dashboard.promQLChartConfig.promqlTableModeTooltipTitle") }}</b>
+              {{ t("dashboard.promQLChartConfig.promqlTableModeTooltipDesc") }}
               <br /><br />
-              <b>{{ t('dashboard.promQLChartConfig.tableModeTimeSeriesLabel') }}</b> {{ t('dashboard.promQLChartConfig.tableModeTimeSeriesDesc') }} <br /><br />
-              <b>{{ t('dashboard.promQLChartConfig.tableModeTimeSeriesMetaLabel') }}</b> {{ t('dashboard.promQLChartConfig.tableModeTimeSeriesMetaDesc') }} <br /><br />
-              <b>{{ t('dashboard.promQLChartConfig.tableModeAggregateLabel') }}</b> {{ t('dashboard.promQLChartConfig.tableModeAggregateDesc') }} <br /><br />
-              <b>{{ t('dashboard.promQLChartConfig.noteLabel') }}</b> {{ t('dashboard.promQLChartConfig.promqlTableModeNoteDesc') }}
+              <b>{{ t("dashboard.promQLChartConfig.tableModeTimeSeriesLabel") }}</b>
+              {{ t("dashboard.promQLChartConfig.tableModeTimeSeriesDesc") }} <br /><br />
+              <b>{{ t("dashboard.promQLChartConfig.tableModeTimeSeriesMetaLabel") }}</b>
+              {{ t("dashboard.promQLChartConfig.tableModeTimeSeriesMetaDesc") }} <br /><br />
+              <b>{{ t("dashboard.promQLChartConfig.tableModeAggregateLabel") }}</b>
+              {{ t("dashboard.promQLChartConfig.tableModeAggregateDesc") }} <br /><br />
+              <b>{{ t("dashboard.promQLChartConfig.noteLabel") }}</b>
+              {{ t("dashboard.promQLChartConfig.promqlTableModeNoteDesc") }}
             </template>
           </OTooltip>
         </template>
@@ -153,14 +165,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #tooltip>
             <OTooltip max-width="350px">
               <template #content>
-                <b>{{ t('dashboard.promQLChartConfig.tableAggTooltipTitle') }}</b>
-                {{ t('dashboard.promQLChartConfig.tableAggTooltipDesc') }}
+                <b>{{ t("dashboard.promQLChartConfig.tableAggTooltipTitle") }}</b>
+                {{ t("dashboard.promQLChartConfig.tableAggTooltipDesc") }}
                 <br /><br />
-                {{ t('dashboard.promQLChartConfig.tableAggSingle') }}
+                {{ t("dashboard.promQLChartConfig.tableAggSingle") }}
                 <br />
-                {{ t('dashboard.promQLChartConfig.tableAggMultiple') }}
+                {{ t("dashboard.promQLChartConfig.tableAggMultiple") }}
                 <br /><br />
-                {{ t('dashboard.promQLChartConfig.tableAggExample') }}
+                {{ t("dashboard.promQLChartConfig.tableAggExample") }}
               </template>
             </OTooltip>
           </template>
@@ -168,19 +180,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- Column Filters -->
-      <template
-        v-if="
-          promqlTableMode === 'all' || promqlTableMode === 'expanded_timeseries'
-        "
-      >
+      <template v-if="promqlTableMode === 'all' || promqlTableMode === 'expanded_timeseries'">
         <div
           v-show="
             isConfigOptionVisible('promqlTable', 'visible-columns') ||
             isConfigOptionVisible('promqlTable', 'hidden-columns')
           "
-          class="mb-2 text-sm font-medium mt-3"
+          class="mt-3 mb-2 text-sm font-medium"
         >
-          {{ t('dashboard.promQLChartConfig.columnFilters') }}
+          {{ t("dashboard.promQLChartConfig.columnFilters") }}
         </div>
 
         <OSelect
@@ -197,16 +205,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #tooltip>
             <OTooltip max-width="400px">
               <template #content>
-                <b>{{ t('dashboard.promQLChartConfig.visibleColumnsTitle') }}</b>
+                <b>{{ t("dashboard.promQLChartConfig.visibleColumnsTitle") }}</b>
                 <br /><br />
-                {{ t('dashboard.promQLChartConfig.visibleColumnsDesc') }}
+                {{ t("dashboard.promQLChartConfig.visibleColumnsDesc") }}
                 <br /><br />
-                <b>{{ t('dashboard.promQLChartConfig.howToUse') }}</b><br />
-                {{ t('dashboard.promQLChartConfig.bulletSelectFromDropdown') }}<br />
-                {{ t('dashboard.promQLChartConfig.bulletTypeCustom') }}<br />
-                {{ t('dashboard.promQLChartConfig.bulletLeaveEmpty') }}
+                <b>{{ t("dashboard.promQLChartConfig.howToUse") }}</b
+                ><br />
+                {{ t("dashboard.promQLChartConfig.bulletSelectFromDropdown") }}<br />
+                {{ t("dashboard.promQLChartConfig.bulletTypeCustom") }}<br />
+                {{ t("dashboard.promQLChartConfig.bulletLeaveEmpty") }}
                 <br /><br />
-                <b>{{ t('dashboard.promQLChartConfig.noteLabel') }}</b> {{ t('dashboard.promQLChartConfig.visibleColumnsNote') }}
+                <b>{{ t("dashboard.promQLChartConfig.noteLabel") }}</b>
+                {{ t("dashboard.promQLChartConfig.visibleColumnsNote") }}
               </template>
             </OTooltip>
           </template>
@@ -226,16 +236,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #tooltip>
             <OTooltip max-width="400px">
               <template #content>
-                <b>{{ t('dashboard.promQLChartConfig.hiddenColumnsTitle') }}</b>
+                <b>{{ t("dashboard.promQLChartConfig.hiddenColumnsTitle") }}</b>
                 <br /><br />
-                {{ t('dashboard.promQLChartConfig.hiddenColumnsDesc') }}
+                {{ t("dashboard.promQLChartConfig.hiddenColumnsDesc") }}
                 <br /><br />
-                <b>{{ t('dashboard.promQLChartConfig.howToUse') }}</b><br />
-                {{ t('dashboard.promQLChartConfig.bulletSelectFromDropdown') }}<br />
-                {{ t('dashboard.promQLChartConfig.bulletTypeCustom') }}<br />
-                {{ t('dashboard.promQLChartConfig.bulletAllOtherShown') }}
+                <b>{{ t("dashboard.promQLChartConfig.howToUse") }}</b
+                ><br />
+                {{ t("dashboard.promQLChartConfig.bulletSelectFromDropdown") }}<br />
+                {{ t("dashboard.promQLChartConfig.bulletTypeCustom") }}<br />
+                {{ t("dashboard.promQLChartConfig.bulletAllOtherShown") }}
                 <br /><br />
-                <b>{{ t('dashboard.promQLChartConfig.tipLabel') }}</b> {{ t('dashboard.promQLChartConfig.hiddenColumnsTip') }}
+                <b>{{ t("dashboard.promQLChartConfig.tipLabel") }}</b>
+                {{ t("dashboard.promQLChartConfig.hiddenColumnsTip") }}
               </template>
             </OTooltip>
           </template>
@@ -243,19 +255,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- Sticky Columns -->
-      <template
-        v-if="
-          promqlTableMode === 'all' || promqlTableMode === 'expanded_timeseries'
-        "
-      >
+      <template v-if="promqlTableMode === 'all' || promqlTableMode === 'expanded_timeseries'">
         <div
           v-show="
             isConfigOptionVisible('promqlTable', 'sticky-first-column') ||
             isConfigOptionVisible('promqlTable', 'sticky-columns')
           "
-          class="mb-2 text-sm font-medium mt-3"
+          class="mt-3 mb-2 text-sm font-medium"
         >
-          {{ t('dashboard.promQLChartConfig.stickyColumns') }}
+          {{ t("dashboard.promQLChartConfig.stickyColumns") }}
         </div>
 
         <OSwitch
@@ -268,10 +276,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #tooltip>
             <OTooltip max-width="300px">
               <template #content>
-                <b>{{ t('dashboard.promQLChartConfig.stickyFirstColumnTooltipTitle') }}</b>
-                {{ t('dashboard.promQLChartConfig.stickyFirstColumnTooltipDesc') }}
+                <b>{{ t("dashboard.promQLChartConfig.stickyFirstColumnTooltipTitle") }}</b>
+                {{ t("dashboard.promQLChartConfig.stickyFirstColumnTooltipDesc") }}
                 <br /><br />
-                {{ t('dashboard.promQLChartConfig.stickyFirstColumnTooltipNote') }}
+                {{ t("dashboard.promQLChartConfig.stickyFirstColumnTooltipNote") }}
               </template>
             </OTooltip>
           </template>
@@ -292,16 +300,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #tooltip>
             <OTooltip max-width="400px">
               <template #content>
-                <b>{{ t('dashboard.promQLChartConfig.stickyColumns') }}</b>
+                <b>{{ t("dashboard.promQLChartConfig.stickyColumns") }}</b>
                 <br /><br />
-                {{ t('dashboard.promQLChartConfig.stickyColumnsDesc') }}
+                {{ t("dashboard.promQLChartConfig.stickyColumnsDesc") }}
                 <br /><br />
-                <b>{{ t('dashboard.promQLChartConfig.howToUse') }}</b><br />
-                {{ t('dashboard.promQLChartConfig.bulletSelectFromDropdown') }}<br />
-                {{ t('dashboard.promQLChartConfig.bulletTypeCustom') }}<br />
-                {{ t('dashboard.promQLChartConfig.bulletStickyScroll') }}
+                <b>{{ t("dashboard.promQLChartConfig.howToUse") }}</b
+                ><br />
+                {{ t("dashboard.promQLChartConfig.bulletSelectFromDropdown") }}<br />
+                {{ t("dashboard.promQLChartConfig.bulletTypeCustom") }}<br />
+                {{ t("dashboard.promQLChartConfig.bulletStickyScroll") }}
                 <br /><br />
-                <b>{{ t('dashboard.promQLChartConfig.noteLabel') }}</b> {{ t('dashboard.promQLChartConfig.stickyColumnsNote') }}
+                <b>{{ t("dashboard.promQLChartConfig.noteLabel") }}</b>
+                {{ t("dashboard.promQLChartConfig.stickyColumnsNote") }}
               </template>
             </OTooltip>
           </template>
@@ -309,21 +319,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- Column Order Configuration -->
-      <template
-        v-if="
-          promqlTableMode === 'all' || promqlTableMode === 'expanded_timeseries'
-        "
-      >
+      <template v-if="promqlTableMode === 'all' || promqlTableMode === 'expanded_timeseries'">
         <div
-          v-show="
-            isConfigOptionVisible('promqlTable', 'configure-column-order')
-          "
+          v-show="isConfigOptionVisible('promqlTable', 'configure-column-order')"
           class="font-semibold"
         ></div>
         <OButton
-          v-show="
-            isConfigOptionVisible('promqlTable', 'configure-column-order')
-          "
+          v-show="isConfigOptionVisible('promqlTable', 'configure-column-order')"
           variant="outline"
           size="sm"
           @click="openColumnOrderPopup"
@@ -379,13 +381,8 @@ export default defineComponent({
   },
   setup(props) {
     const { t } = useI18n();
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
-    const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
 
     // Aggregation function options
     const aggregationOptions = [
@@ -403,9 +400,7 @@ export default defineComponent({
     // Chart types that support aggregation
     const chartsWithAggregation = ["pie", "donut", "geomap", "maps"];
 
-    const showAggregationConfig = computed(() =>
-      chartsWithAggregation.includes(props.chartType),
-    );
+    const showAggregationConfig = computed(() => chartsWithAggregation.includes(props.chartType));
 
     // Aggregation value
     const aggregationValue = computed({
@@ -518,7 +513,10 @@ export default defineComponent({
     // Options for PromQL table mode
     const promqlTableModeOptions = [
       { label: t("dashboard.promQLChartConfig.tableModeOptionSingle"), value: "single" },
-      { label: t("dashboard.promQLChartConfig.tableModeOptionExpanded"), value: "expanded_timeseries" },
+      {
+        label: t("dashboard.promQLChartConfig.tableModeOptionExpanded"),
+        value: "expanded_timeseries",
+      },
       { label: t("dashboard.promQLChartConfig.tableModeOptionAggregate"), value: "all" },
     ];
 
@@ -541,16 +539,13 @@ export default defineComponent({
         }
 
         // Find the stream in groupedFields
-        const streamFields =
-          dashboardPanelData.meta.streamFields.groupedFields.find(
-            (group: any) => group.name === streamName,
-          );
+        const streamFields = dashboardPanelData.meta.streamFields.groupedFields.find(
+          (group: any) => group.name === streamName,
+        );
 
         if (streamFields?.schema) {
           // Extract field names from schema and add to set (automatically removes duplicates)
-          const fieldNames = streamFields.schema
-            .map((field: any) => field.name)
-            .filter(Boolean);
+          const fieldNames = streamFields.schema.map((field: any) => field.name).filter(Boolean);
 
           fieldNames.forEach((name: string) => allFieldNames.add(name));
         }
@@ -636,8 +631,7 @@ export default defineComponent({
         if (!dashboardPanelData.data.config) {
           dashboardPanelData.data.config = {};
         }
-        dashboardPanelData.data.config.column_order =
-          value && value.length > 0 ? value : undefined;
+        dashboardPanelData.data.config.column_order = value && value.length > 0 ? value : undefined;
       },
     });
 
@@ -711,4 +705,3 @@ export default defineComponent({
   },
 });
 </script>
-

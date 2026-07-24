@@ -125,15 +125,7 @@ export interface TableColumnConfig {
   align: "left" | "center" | "right";
   sortable: boolean;
   format?: (val: any) => string;
-  type?:
-    | "string"
-    | "number"
-    | "timestamp"
-    | "duration"
-    | "bytes"
-    | "boolean"
-    | "link"
-    | "json";
+  type?: "string" | "number" | "timestamp" | "duration" | "bytes" | "boolean" | "link" | "json";
 }
 
 /**

@@ -70,14 +70,7 @@ import {
 // tests drive the form's own submit so the schema runs deterministically.
 const ODialogStub = {
   name: "ODialog",
-  props: [
-    "open",
-    "size",
-    "title",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "formId",
-  ],
+  props: ["open", "size", "title", "primaryButtonLabel", "secondaryButtonLabel", "formId"],
   emits: ["update:open", "click:primary", "click:secondary"],
   template: `
     <div data-test-stub="o-dialog" :data-open="String(open)" :data-title="title" :data-form-id="formId">
@@ -119,8 +112,7 @@ function mountComp(props: Record<string, unknown> = {}): VueWrapper<any> {
   });
 }
 
-const getForm = (wrapper: VueWrapper<any>) =>
-  wrapper.findComponent({ name: "OForm" });
+const getForm = (wrapper: VueWrapper<any>) => wrapper.findComponent({ name: "OForm" });
 const getNameInput = (wrapper: VueWrapper<any>) =>
   wrapper.find('[data-test="iam-add-service-account-name-input"] input');
 const getDescriptionInput = (wrapper: VueWrapper<any>) =>
@@ -151,15 +143,11 @@ describe("AddServiceAccount", () => {
     });
 
     it("works for org ids with underscores, digits, and ksuids (in the local part)", () => {
-      expect(buildServiceAccountEmail("k1", "_meta")).toBe(
-        "k1._meta@sa.internal",
+      expect(buildServiceAccountEmail("k1", "_meta")).toBe("k1._meta@sa.internal");
+      expect(buildServiceAccountEmail("k1", "my_org1")).toBe("k1.my_org1@sa.internal");
+      expect(buildServiceAccountEmail("k1", "2sfVQduPNzuGpSeoGSbNCM7oQKp")).toBe(
+        "k1.2sfvqdupnzugpseogsbncm7oqkp@sa.internal",
       );
-      expect(buildServiceAccountEmail("k1", "my_org1")).toBe(
-        "k1.my_org1@sa.internal",
-      );
-      expect(
-        buildServiceAccountEmail("k1", "2sfVQduPNzuGpSeoGSbNCM7oQKp"),
-      ).toBe("k1.2sfvqdupnzugpseogsbncm7oqkp@sa.internal");
     });
 
     it("round-trips the friendly name from the identifier", () => {
@@ -169,22 +157,14 @@ describe("AddServiceAccount", () => {
     });
 
     it("leaves legacy real-email accounts unchanged", () => {
-      expect(isSyntheticServiceAccountEmail("bot@example.com", "default")).toBe(
-        false,
-      );
+      expect(isSyntheticServiceAccountEmail("bot@example.com", "default")).toBe(false);
       // An identifier scoped to ANOTHER org must not match either.
-      expect(
-        isSyntheticServiceAccountEmail("bob.other@sa.internal", "default"),
-      ).toBe(false);
-      expect(serviceAccountDisplayName("bot@example.com", "default")).toBe(
-        "bot@example.com",
-      );
+      expect(isSyntheticServiceAccountEmail("bob.other@sa.internal", "default")).toBe(false);
+      expect(serviceAccountDisplayName("bot@example.com", "default")).toBe("bot@example.com");
     });
 
     it("caps the name so the local part stays within 64 chars", () => {
-      expect(maxServiceAccountNameLength("default")).toBe(
-        64 - "default".length - 1,
-      );
+      expect(maxServiceAccountNameLength("default")).toBe(64 - "default".length - 1);
     });
   });
 
@@ -212,13 +192,11 @@ describe("AddServiceAccount", () => {
       });
       await nextTick();
 
-      expect(
-        w.find('[data-test="iam-add-service-account-name-input"]').exists(),
-      ).toBe(false);
+      expect(w.find('[data-test="iam-add-service-account-name-input"]').exists()).toBe(false);
       expect(getDescriptionInput(w).exists()).toBe(true);
-      expect(
-        w.find('[data-test-stub="o-dialog"]').attributes("data-title"),
-      ).toBe("Update Service Account");
+      expect(w.find('[data-test-stub="o-dialog"]').attributes("data-title")).toBe(
+        "Update Service Account",
+      );
       w.unmount();
     });
 
@@ -247,9 +225,7 @@ describe("AddServiceAccount", () => {
 
       expect(getForm(wrapper).vm.form.state.isValid).toBe(false);
       expect(service_accounts.create).not.toHaveBeenCalled();
-      expect(wrapper.text()).toContain(
-        "Use lowercase letters, numbers and hyphens",
-      );
+      expect(wrapper.text()).toContain("Use lowercase letters, numbers and hyphens");
     });
 
     it("blocks submit when the name contains invalid characters", async () => {
@@ -268,9 +244,7 @@ describe("AddServiceAccount", () => {
     });
 
     it("blocks submit when the name exceeds the org-derived cap", async () => {
-      await getNameInput(wrapper).setValue(
-        "a".repeat(maxServiceAccountNameLength("default") + 1),
-      );
+      await getNameInput(wrapper).setValue("a".repeat(maxServiceAccountNameLength("default") + 1));
       await submitForm(wrapper);
 
       expect(service_accounts.create).not.toHaveBeenCalled();
@@ -362,9 +336,7 @@ describe("AddServiceAccount", () => {
 
       expect(wrapper.emitted("update:open")).toBeFalsy();
       expect(wrapper.emitted("updated")).toBeFalsy();
-      expect(mockToast).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "error" }),
-      );
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
     });
 
     it("does not throw on a 403 failure during create", async () => {
@@ -387,9 +359,7 @@ describe("AddServiceAccount", () => {
         label: "fresh_role",
         value: "fresh_role",
       });
-      expect(getForm(wrapper).vm.form.state.values.roles).toEqual([
-        "fresh_role",
-      ]);
+      expect(getForm(wrapper).vm.form.state.values.roles).toEqual(["fresh_role"]);
     });
 
     it("onRoleAdded is idempotent (no duplicate option or selection)", async () => {
@@ -397,12 +367,8 @@ describe("AddServiceAccount", () => {
       await wrapper.vm.onRoleAdded({ role_name: "fresh_role" });
       await nextTick();
 
-      expect(
-        wrapper.vm.roleOptions.filter((o: any) => o.value === "fresh_role"),
-      ).toHaveLength(1);
-      expect(getForm(wrapper).vm.form.state.values.roles).toEqual([
-        "fresh_role",
-      ]);
+      expect(wrapper.vm.roleOptions.filter((o: any) => o.value === "fresh_role")).toHaveLength(1);
+      expect(getForm(wrapper).vm.form.state.values.roles).toEqual(["fresh_role"]);
     });
 
     it("a role selected via onRoleAdded is included in the grant fan-out", async () => {
@@ -413,9 +379,7 @@ describe("AddServiceAccount", () => {
       await wrapper.vm.onRoleAdded({ role_name: "fresh_role" });
       await submitForm(wrapper);
 
-      expect(updateRole).toHaveBeenCalledWith(
-        expect.objectContaining({ role_id: "fresh_role" }),
-      );
+      expect(updateRole).toHaveBeenCalledWith(expect.objectContaining({ role_id: "fresh_role" }));
       await expect(wrapper.emitted("updated")![0][3]).resolves.toEqual({
         assigned: { roles: ["fresh_role"], groups: [] },
         failed: { roles: [], groups: [] },
@@ -450,9 +414,7 @@ describe("AddServiceAccount", () => {
           remove_users: [],
         },
       });
-      expect(mockToast).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "success" }),
-      );
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
     });
 
     it("warns instead of claiming success when the seeding yields zero grants", async () => {
@@ -464,12 +426,8 @@ describe("AddServiceAccount", () => {
       });
 
       expect(updateRole).not.toHaveBeenCalled();
-      expect(mockToast).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "warning" }),
-      );
-      expect(mockToast).not.toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "success" }),
-      );
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
+      expect(mockToast).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
     });
 
     it("does not seed permissions for the custom (empty) preset", async () => {
@@ -490,12 +448,8 @@ describe("AddServiceAccount", () => {
         startFrom: "readonly",
       });
 
-      expect(mockToast).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "warning" }),
-      );
-      expect(getForm(wrapper).vm.form.state.values.roles).toEqual([
-        "viewer_role",
-      ]);
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
+      expect(getForm(wrapper).vm.form.state.values.roles).toEqual(["viewer_role"]);
     });
   });
 

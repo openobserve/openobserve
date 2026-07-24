@@ -8,11 +8,11 @@ import OpenVPN from "@/components/ingestion/security/OpenVPN.vue";
 vi.mock("@/composables/useIngestion", () => ({
   default: vi.fn(() => ({
     endpoint: "https://api.example.com/ingest",
-    securityContent: "curl -X POST https://api.example.com/ingest -d '{\"stream\": \"[STREAM_NAME]\"}' ",
+    securityContent:
+      'curl -X POST https://api.example.com/ingest -d \'{"stream": "[STREAM_NAME]"}\' ',
     securityDocURLs: { openvpn: "https://docs.example.com/openvpn" },
   })),
 }));
-
 
 describe("OpenVPN.vue", () => {
   let store: any;
@@ -24,7 +24,12 @@ describe("OpenVPN.vue", () => {
     return mount(OpenVPN, {
       global: {
         plugins: [store],
-        stubs: { CopyContent: { template: '<div data-test="copy-content-stub">{{ content }}</div>', props: ["content"] } },
+        stubs: {
+          CopyContent: {
+            template: '<div data-test="copy-content-stub">{{ content }}</div>',
+            props: ["content"],
+          },
+        },
       },
     });
   };

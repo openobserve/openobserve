@@ -30,12 +30,7 @@ import { getCountryName } from "../countryMappings";
 export class MapsConverter implements PromQLChartConverter {
   supportedTypes = ["maps"];
 
-  convert(
-    processedData: ProcessedPromQLData[],
-    panelSchema: any,
-    store: any,
-    extras: any,
-  ) {
+  convert(processedData: ProcessedPromQLData[], panelSchema: any, store: any, extras: any) {
     const config: MapsConfig & Record<string, any> = panelSchema.config || {};
     const aggregation = config.aggregation || "last";
 
@@ -98,13 +93,9 @@ export class MapsConverter implements PromQLChartConverter {
     // Calculate min/max values from data (matching SQL implementation)
     const numericValues = mapData
       .map((item: any) => item.value)
-      .filter(
-        (value: any): value is number =>
-          typeof value === "number" && !Number.isNaN(value),
-      );
+      .filter((value: any): value is number => typeof value === "number" && !Number.isNaN(value));
 
-    const minValue =
-      numericValues.length === 1 ? 0 : Math.min(...numericValues);
+    const minValue = numericValues.length === 1 ? 0 : Math.min(...numericValues);
     const maxValue = Math.max(...numericValues);
 
     // Return map chart configuration

@@ -25,16 +25,11 @@ pub mod authz;
 pub mod bootstrap;
 pub mod cache;
 pub mod cluster_info;
-pub mod compact;
 pub mod dashboards;
 use ::common;
 use ::db;
-pub mod enrichment;
-pub mod enrichment_table;
 pub mod error_suggest;
-pub mod file_list;
 use ::db::folders;
-use search_service::file_list_dump;
 pub mod functions;
 pub mod functions_cache;
 pub mod github;
@@ -42,7 +37,6 @@ pub mod grpc;
 pub mod http;
 pub mod ingestion;
 pub mod ingestion_tokens;
-pub mod ingestion_types;
 pub mod kv;
 #[cfg(feature = "enterprise")]
 pub mod llm_evaluations;
@@ -60,17 +54,13 @@ pub mod org_storage_providers;
 pub mod org_usage;
 pub mod organization;
 pub mod pipeline;
-pub mod promql;
 #[cfg(feature = "enterprise")]
 pub mod providers;
 #[cfg(feature = "enterprise")]
 pub mod ratelimit;
 pub mod runtime_metrics;
-pub mod schema;
 pub mod schema_watcher;
 use search_service as search;
-#[cfg(feature = "enterprise")]
-pub mod search_jobs;
 pub mod self_reporting;
 pub mod service;
 pub mod session;
@@ -80,7 +70,6 @@ pub mod stream;
 pub mod stream_utils;
 pub mod synthetics;
 pub mod system_settings;
-pub mod tantivy;
 pub mod tls;
 pub mod traces;
 #[cfg(feature = "cloud")]
