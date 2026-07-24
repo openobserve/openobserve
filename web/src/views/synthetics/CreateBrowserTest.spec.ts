@@ -123,7 +123,7 @@ import CreateBrowserTest from "./CreateBrowserTest.vue";
 // ── Stubs ────────────────────────────────────────────────────────────────
 const baseStubs = {
   OPageHeader: {
-    template: '<div data-test="synthetics-header"><slot /></div>',
+    template: '<div data-test="synthetics-header"><slot name="title" /><slot /></div>',
     props: ["title", "subtitle", "back"],
   },
   OButton: {
@@ -212,12 +212,15 @@ const baseStubs = {
   Teleport: {
     template: "<div><slot /></div>",
   },
+  BetaBadge: {
+    template: '<span data-test="beta-badge">BETA</span>',
+  },
 };
 
 // ── Missing component stubs required by OPageLayout ──────────────────────
 const pageLayoutStubs = {
   OPageLayout: {
-    template: "<div><slot /></div>",
+    template: '<div><slot name="title" /><slot /></div>',
     props: ["title", "subtitle", "back", "class", "bleed"],
   },
 };
@@ -275,6 +278,13 @@ describe("CreateBrowserTest", () => {
       const buildBtn = wrapper.find('[data-test="synthetics-create-build-btn"]');
       expect(recordBtn.attributes("disabled")).toBeDefined();
       expect(buildBtn.attributes("disabled")).toBeDefined();
+    });
+
+    it("should render the Beta badge in the page title", async () => {
+      wrapper = mountPage();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="beta-badge"]').exists()).toBe(true);
     });
   });
 
