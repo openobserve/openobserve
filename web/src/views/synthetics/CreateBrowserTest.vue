@@ -116,10 +116,13 @@ async function fetchLocations() {
     const org = store.state.selectedOrganization.identifier
     const res = await syntheticsService.getLocations(org)
     const data = res.data ?? {}
-    // Browser tests are Lambda-only today — private (agent-served) locations
-    // cannot run them, so they are excluded from this picker.
+    // Public browser locations (Lambda) plus private locations whose agents
+    // advertise `browser` (self-hosted browser agent). A protocol-only private
+    // location is excluded — it can't run browser checks.
     locations.value = ((data.locations ?? []) as SyntheticsLocation[]).filter(
-      (l) => l.kind !== 'private' && l.enabled !== false,
+      (l) =>
+        l.enabled !== false &&
+        (l.kind !== 'private' || (l.types ?? []).includes('browser')),
     )
     browsers.value = (data.browsers ?? []) as string[]
     devices.value = (data.devices ?? []) as SyntheticsDevice[]
@@ -734,6 +737,7 @@ function onClearResults() {
             :destinations="destinations"
             :folders="folders"
             :validation-errors="validationErrors"
+            allow-private-locations
             class="w-full!"
             @refresh:destinations="fetchDestinations"
             @update:check="onConfigureUpdate"
