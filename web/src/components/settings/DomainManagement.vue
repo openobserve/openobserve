@@ -251,35 +251,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="q-pa-md">
-          <!-- Radio Button Options -->
+          <!-- Access policy for this domain (allow/block are mutually exclusive per domain) -->
           <div class="q-mb-xs">
             <q-radio
-              v-model="domain.allowAllUsers"
-              :val="true"
+              v-model="domain.policy"
+              val="allow_all"
               :label="t('settings.allowAllUsersFromDomain', { domain: '@'+domain.name })"
               color="primary"
             />
           </div>
-          
-          <div class="q-mb-md">
+
+          <div class="q-mb-xs">
             <q-radio
-              v-model="domain.allowAllUsers"
-              :val="false"
+              v-model="domain.policy"
+              val="allow_specific"
               :label="t('settings.allowOnlySpecificUsers', { domain: '@'+domain.name })"
               color="primary"
             />
           </div>
 
+          <div class="q-mb-xs">
+            <q-radio
+              v-model="domain.policy"
+              val="block_specific"
+              :label="t('settings.blockSpecificUsers', { domain: '@'+domain.name })"
+              color="negative"
+            />
+          </div>
+
+          <div class="q-mb-md">
+            <q-radio
+              v-model="domain.policy"
+              val="block_all"
+              :label="t('settings.blockAllUsersFromDomain', { domain: '@'+domain.name })"
+              color="negative"
+            />
+          </div>
+
           <!-- Info message for all users -->
-          <div 
-            v-if="domain.allowAllUsers"
+          <div
+            v-if="domain.policy === 'allow_all'"
             class="q-pa-sm bg-blue-1 text-blue-8 rounded-borders q-mb-md"
           >
             {{ t("settings.allUsersAllowedMessage", { domain: '@'+domain.name }) }}
           </div>
 
-          <!-- Specific users section -->
-          <div v-if="!domain.allowAllUsers" class="specific-users-section">
+          <!-- Info message for whole-domain block -->
+          <div
+            v-if="domain.policy === 'block_all'"
+            class="q-pa-sm bg-red-1 text-red-8 rounded-borders q-mb-md"
+          >
+            {{ t("settings.allUsersBlockedMessage", { domain: '@'+domain.name }) }}
+          </div>
+
+          <!-- Specific allowed users section -->
+          <div v-if="domain.policy === 'allow_specific'" class="specific-users-section">
             <div class="row q-gutter-md items-center q-mb-md">
               <div class="col">
                 <q-input
@@ -309,9 +335,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <!-- Email List -->
+            <!-- Allowed Email List -->
             <div v-if="domain.allowedEmails && domain.allowedEmails.length > 0">
-              <div 
+              <div
                 v-for="(email, emailIndex) in domain.allowedEmails"
                 :key="email"
                 class="email-item row items-center justify-between q-pa-sm q-mb-xs"
@@ -329,6 +355,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
             </div>
+          </div>
+
+          <!-- Specific blocked users section -->
+          <div v-if="domain.policy === 'block_specific'" class="specific-users-section">
+            <div class="row q-gutter-md items-center q-mb-md">
+              <div class="col">
+                <q-input
+                  v-model="domain.newBlockedEmail"
+                  :label="t('settings.blockedEmailPlaceholder', { domain: '@' + domain.name })"
+                  color="input-border"
+                  bg-color="input-bg"
+                  class="email-input"
+                  outlined
+                  dense
+                  @keydown.enter="addBlockedEmail(domain)"
+                  :rules="[
+                    (val) => !val || isValidEmail(val, domain.name) || t('settings.invalidEmail')
+                  ]"
+                />
+              </div>
+              <div class="col-auto q-my-none">
+                <q-btn
+                  :label="t('settings.addBlockedEmail')"
+                  color="negative"
+                  class="text-bold text-capitalize no-border"
+                  @click="addBlockedEmail(domain)"
+                  :disabled="!domain.newBlockedEmail || !isValidEmail(domain.newBlockedEmail, domain.name)"
+                  unelevated
+                  dense
+                />
+              </div>
+            </div>
+
+            <!-- Blocked Email List -->
+            <div v-if="domain.blockedEmails && domain.blockedEmails.length > 0">
+              <div
+                v-for="(email, emailIndex) in domain.blockedEmails"
+                :key="email"
+                class="email-item blocked-email-item row items-center justify-between q-pa-sm q-mb-xs"
+              >
+                <div class="text-body2">{{ email }}</div>
+                <q-btn
+                  icon="close"
+                  flat
+                  round
+                  dense
+                  size="sm"
+                  color="negative"
+                  @click="removeBlockedEmail(domain, emailIndex)"
+                  :title="t('common.delete')"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Hint for any block policy -->
+          <div
+            v-if="domain.policy === 'block_specific' || domain.policy === 'block_all'"
+            class="text-caption text-grey-6 q-mt-sm"
+          >
+            {{ t("settings.blockedUsersHint") }}
           </div>
         </div>
       </div>
@@ -368,11 +455,15 @@ import jstransform from "@/services/jstransform";
 import organizations from "@/services/organizations";
 import searchService from "@/services/search";
 
+type DomainPolicy = "allow_all" | "allow_specific" | "block_specific" | "block_all";
+
 interface Domain {
   name: string;
-  allowAllUsers: boolean;
+  policy: DomainPolicy;
   allowedEmails: string[];
+  blockedEmails: string[];
   newEmail: string;
+  newBlockedEmail: string;
 }
 
 const { t } = useI18n();
@@ -428,15 +519,54 @@ const loadDomainSettings = async () => {
   try {
     const response = await domainManagement.getDomainRestrictions(store.state.zoConfig.meta_org);
 
-    if (response.data && response.data.domains) {
-      const loadedDomains = response.data.domains
-        .filter((domain: any) => domain && typeof domain === 'object' && domain.domain) // Filter out invalid entries
-        .map((domain: any) => ({
-          name: domain.domain,
-          allowAllUsers: domain.allow_all_users,
-          allowedEmails: domain.allowed_emails || []
-        }));
-      domains.splice(0, domains.length, ...loadedDomains);
+    if (response.data) {
+      // Decompose the flat backend model (domains + blocked_domains + blocked_emails) into one
+      // per-domain card each, keyed by domain name. Policy precedence when a domain appears in
+      // more than one list: block_all > block_specific > allow rules (block wins over allow).
+      const byDomain = new Map<string, Domain>();
+      const ensure = (name: string): Domain => {
+        const key = name.toLowerCase();
+        if (!byDomain.has(key)) {
+          byDomain.set(key, {
+            name,
+            policy: "allow_all",
+            allowedEmails: [],
+            blockedEmails: [],
+            newEmail: "",
+            newBlockedEmail: "",
+          });
+        }
+        return byDomain.get(key) as Domain;
+      };
+
+      // Allow rules
+      (response.data.domains || [])
+        .filter((d: any) => d && typeof d === "object" && d.domain)
+        .forEach((d: any) => {
+          const card = ensure(d.domain);
+          card.policy = d.allow_all_users ? "allow_all" : "allow_specific";
+          card.allowedEmails = d.allowed_emails || [];
+        });
+
+      // Blocked specific emails — grouped under their domain
+      (response.data.blocked_emails || [])
+        .filter((e: any) => typeof e === "string" && e.includes("@"))
+        .forEach((email: string) => {
+          const domainPart = email.split("@")[1];
+          const card = ensure(domainPart);
+          card.policy = "block_specific";
+          card.blockedEmails.push(email.toLowerCase());
+        });
+
+      // Blocked whole domains — highest precedence
+      (response.data.blocked_domains || [])
+        .filter((d: any) => typeof d === "string" && d)
+        .forEach((d: string) => {
+          const card = ensure(d);
+          card.policy = "block_all";
+        });
+
+      domains.splice(0, domains.length, ...Array.from(byDomain.values()));
     }
 
     // Load claim parser function from organization settings
@@ -542,9 +672,11 @@ const addDomain = () => {
 
   domains.push({
     name: newDomain.value,
-    allowAllUsers: true,
+    policy: "allow_all",
     allowedEmails: [],
-    newEmail: ""
+    blockedEmails: [],
+    newEmail: "",
+    newBlockedEmail: ""
   });
 
   newDomain.value = "";
@@ -585,30 +717,37 @@ const addEmail = (domain: Domain) => {
     return;
   }
 
+  // Stage the entry — persisted only on Save. No success toast (avoid implying it's saved).
   domain.allowedEmails.push(domain.newEmail.toLowerCase());
   domain.newEmail = "";
-
-  q.notify({
-    type: "positive",
-    message: t("settings.emailAdded"),
-    timeout: 3000,
-  });
 };
 
 const removeEmail = (domain: Domain, emailIndex: number) => {
-  q.dialog({
-    title: t("common.confirm"),
-    message: t("settings.confirmRemoveEmail", { email: domain.allowedEmails[emailIndex] }),
-    cancel: true,
-    persistent: true,
-  }).onOk(() => {
-    domain.allowedEmails.splice(emailIndex, 1);
+  // Staged removal — takes effect on Save. Remove instantly (no confirm dialog / success toast).
+  domain.allowedEmails.splice(emailIndex, 1);
+};
+
+const addBlockedEmail = (domain: Domain) => {
+  if (!domain.newBlockedEmail || !isValidEmail(domain.newBlockedEmail, domain.name)) return;
+
+  if (domain.blockedEmails.includes(domain.newBlockedEmail.toLowerCase())) {
     q.notify({
-      type: "positive",
-      message: t("settings.emailRemoved"),
+      type: "negative",
+      message: t("settings.emailAlreadyExists"),
       timeout: 3000,
     });
-  });
+    return;
+  }
+
+  // Stage the entry — it is persisted only when the user clicks Save. No success toast here, so
+  // we don't imply it's already saved.
+  domain.blockedEmails.push(domain.newBlockedEmail.toLowerCase());
+  domain.newBlockedEmail = "";
+};
+
+const removeBlockedEmail = (domain: Domain, emailIndex: number) => {
+  // Staged removal — takes effect on Save. Remove instantly (no confirm dialog / success toast).
+  domain.blockedEmails.splice(emailIndex, 1);
 };
 
 // Load VRL functions from _meta org
@@ -787,7 +926,7 @@ const saveChanges = async () => {
   try {
     // Validate all domains have proper configuration
     for (const domain of domains) {
-      if (!domain.allowAllUsers && domain.allowedEmails.length === 0) {
+      if (domain.policy === "allow_specific" && domain.allowedEmails.length === 0) {
         q.notify({
           type: "negative",
           message: t("settings.domainNeedsEmails", { domain: domain.name }),
@@ -796,15 +935,35 @@ const saveChanges = async () => {
         saving.value = false;
         return;
       }
+      if (domain.policy === "block_specific" && domain.blockedEmails.length === 0) {
+        q.notify({
+          type: "negative",
+          message: t("settings.domainNeedsBlockedEmails", { domain: domain.name }),
+          timeout: 3000,
+        });
+        saving.value = false;
+        return;
+      }
     }
 
-    // Prepare data for API
+    // Compose the flat backend model from the per-domain cards.
     const domainData: any = {
-      domains: domains.map(domain => ({
-        domain: domain.name,
-        allow_all_users: domain.allowAllUsers,
-        allowed_emails: !domain.allowAllUsers ? domain.allowedEmails : []
-      }))
+      // Allow rules → domains[]
+      domains: domains
+        .filter(d => d.policy === "allow_all" || d.policy === "allow_specific")
+        .map(domain => ({
+          domain: domain.name,
+          allow_all_users: domain.policy === "allow_all",
+          allowed_emails: domain.policy === "allow_specific" ? domain.allowedEmails : []
+        })),
+      // Whole-domain blocks → blocked_domains[]
+      blocked_domains: domains
+        .filter(d => d.policy === "block_all")
+        .map(domain => domain.name),
+      // Specific blocked users → flat blocked_emails[]
+      blocked_emails: domains
+        .filter(d => d.policy === "block_specific")
+        .flatMap(domain => domain.blockedEmails)
     };
 
     // Save to backend API
@@ -878,6 +1037,11 @@ const resetForm = () => {
   border: 1px solid #e0e0e0;
 }
 
+.blocked-email-item {
+  background: #fff5f5;
+  border-color: #f3c6c6;
+}
+
 .error-section {
   border-left: 3px solid #c10015;
 }
@@ -916,6 +1080,11 @@ const resetForm = () => {
   .email-item {
     background: #2a2a2a;
     border-color: #444;
+  }
+
+  .blocked-email-item {
+    background: #2a1f1f;
+    border-color: #5a3a3a;
   }
 
   .error-section {

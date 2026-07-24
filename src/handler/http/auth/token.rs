@@ -70,6 +70,21 @@ pub async fn token_validator(
         Ok(res) => {
             let user_id = &res.0.user_email;
             if res.0.is_valid {
+                // System-wide blocklist. This path validates Dex-issued session tokens (the UI
+                // `access_token: "session …"` cookie flow), which are EXTERNAL SSO identities by
+                // construction — so a blocked email must be denied on EVERY request, not only at
+                // login. Placed before user/permission resolution so it covers all endpoints and
+                // the special-allow arms (invites, org list, MCP) too.
+                if matches!(
+                    o2_enterprise::enterprise::domain_management::evaluate_cached(user_id).await,
+                    o2_enterprise::enterprise::domain_management::meta::AccessDecision::Deny
+                ) {
+                    log::warn!(
+                        "Blocked external identity denied at session token validation: {user_id}"
+                    );
+                    return Err((ErrorUnauthorized("Unauthorized Access"), req));
+                }
+
                 // for member sub i.e. invitation, we must check user directly from db, because
                 // the else-arm here will check if user is present in given org. However before
                 // accepting the invitation, user will not be added to the org,

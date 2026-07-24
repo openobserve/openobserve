@@ -947,6 +947,54 @@ async fn refresh_token_with_dex(req: actix_web::HttpRequest) -> HttpResponse {
                 return HttpResponse::Unauthorized().json("access token is empty".to_string());
             }
 
+            // Blocklist: a refresh must not resurrect a blocked user. Decode the freshly minted
+            // access token; if the identity is blocked, deny WITHOUT minting a session and clear
+            // the auth cookie, so the FE's 401 → /dex_refresh → retry loop terminates
+            // at the login page.
+            {
+                let keys = get_dex_jwks().await;
+                let refreshed_email = verify_decode_token(
+                    &access_token,
+                    &keys,
+                    &get_dex_config().client_id,
+                    false,
+                    true,
+                )
+                .ok()
+                .map(|ver| ver.0.user_email);
+                let blocked = match &refreshed_email {
+                    Some(email) => matches!(
+                        o2_enterprise::enterprise::domain_management::evaluate_cached(email).await,
+                        o2_enterprise::enterprise::domain_management::meta::AccessDecision::Deny
+                    ),
+                    None => false,
+                };
+                if blocked {
+                    let email = refreshed_email.unwrap_or_default();
+                    log::warn!("Blocked external identity denied at token refresh: {email}");
+                    audit_message.response_meta.http_response_code = 401;
+                    audit_message._timestamp = now_micros();
+                    audit(audit_message).await;
+
+                    let conf = get_config();
+                    let cleared = base64::encode(&json::to_string(&AuthTokens::default()).unwrap());
+                    let mut auth_cookie = Cookie::new("auth_tokens", cleared);
+                    auth_cookie.set_expires(
+                        time::OffsetDateTime::now_utc()
+                            + time::Duration::seconds(conf.auth.cookie_max_age),
+                    );
+                    auth_cookie.set_http_only(true);
+                    auth_cookie.set_secure(conf.auth.cookie_secure_only);
+                    auth_cookie.set_path("/");
+                    if conf.auth.cookie_same_site_lax {
+                        auth_cookie.set_same_site(SameSite::Lax);
+                    } else {
+                        auth_cookie.set_same_site(SameSite::None);
+                    }
+                    return HttpResponse::Unauthorized().cookie(auth_cookie).finish();
+                }
+            }
+
             // store session_id in cluster co-ordinator
             let _ = crate::service::session::set_session(&session_id, &access_token).await;
 
