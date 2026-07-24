@@ -533,6 +533,28 @@ describe("Use Logs Composable", () => {
       expect(wrapper.vm.searchObj.data.datetime.relativeTimePeriod).toBe("15m");
     });
 
+    it("should decode the SQL query and flag pendingUrlQueryRestore (share-link restore guard)", async () => {
+      // base64 of: SELECT * FROM "e2e_automate"  (matches the real short-URL `query` param)
+      wrapper.vm.router.currentRoute.value.query = {
+        stream: "e2e_automate",
+        period: "15m",
+        sql_mode: "true",
+        query: "U0VMRUNUICogRlJPTSAiZTJlX2F1dG9tYXRlIg==",
+      };
+
+      const { restoreUrlQueryParams } = wrapper.vm;
+      await restoreUrlQueryParams();
+      await nextTick();
+
+      // Query is decoded into state and SQL mode restored
+      expect(wrapper.vm.searchObj.data.query).toBe('SELECT * FROM "e2e_automate"');
+      expect(wrapper.vm.searchObj.data.editorValue).toBe('SELECT * FROM "e2e_automate"');
+      expect(wrapper.vm.searchObj.meta.sqlMode).toBe(true);
+      // Restore is flagged pending so the lazy editor's transient empty emission
+      // can't wipe the restored query in updateQueryValue().
+      expect(wrapper.vm.searchObj.meta.pendingUrlQueryRestore).toBe(true);
+    });
+
     it("should handle SQL mode and encoded query", async () => {
       const encodedQuery = btoa("SELECT * FROM logs");
       wrapper.vm.router.currentRoute.value.query = {
