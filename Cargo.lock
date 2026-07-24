@@ -7364,6 +7364,7 @@ dependencies = [
  "openobserve-cipher",
  "openobserve-core",
  "openobserve-mcp",
+ "openobserve-sourcemaps",
  "opentelemetry",
  "opentelemetry-proto",
  "parking_lot 0.12.5",
@@ -7574,7 +7575,6 @@ dependencies = [
  "serde",
  "serde_json",
  "snap",
- "sourcemap",
  "stream",
  "svix-ksuid",
  "thiserror 2.0.18",
@@ -7593,7 +7593,6 @@ dependencies = [
  "wal",
  "webpki-roots 1.0.6",
  "x509-parser",
- "zip 8.2.0",
 ]
 
 [[package]]
@@ -7657,6 +7656,28 @@ dependencies = [
  "tokio",
  "url",
  "utoipa",
+]
+
+[[package]]
+name = "openobserve-sourcemaps"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "chrono",
+ "config",
+ "db",
+ "hashbrown 0.16.1",
+ "infra",
+ "log",
+ "o2_enterprise",
+ "proto",
+ "sea-orm",
+ "serde",
+ "sourcemap",
+ "tokio",
+ "tonic",
+ "zip 8.2.0",
 ]
 
 [[package]]

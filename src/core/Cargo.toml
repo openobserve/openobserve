@@ -127,9 +127,7 @@ ingester.workspace = true
 wal.workspace = true
 chromiumoxide.workspace = true
 lettre.workspace = true
-zip.workspace = true
 futures-util.workspace = true
-sourcemap.workspace = true
 
 [dev-dependencies]
 multer.workspace = true
