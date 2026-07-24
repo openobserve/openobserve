@@ -15,110 +15,121 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col gap-1.5 w-full shrink-0 px-1 py-2">
+  <div class="flex w-full shrink-0 flex-col gap-1.5 px-1 py-2">
     <!-- Header row: oldest … legend … newest -->
     <div class="flex items-center justify-between px-1">
-      <span class="text-2xs tabular-nums text-text-secondary">
+      <span class="text-2xs text-text-secondary tabular-nums">
         {{ oldestLabel }}
       </span>
 
       <div class="flex items-center gap-3">
-        <span v-if="firingCount > 0" class="flex items-center gap-1 text-2xs">
-          <span class="inline-block w-2 h-2 rounded-default bg-badge-error-solid-bg" />
-          <span class="font-medium text-badge-error-soft-text">{{ firingCount }} {{ firingLabel }}</span>
+        <span v-if="firingCount > 0" class="text-2xs flex items-center gap-1">
+          <span class="rounded-default bg-badge-error-solid-bg inline-block h-2 w-2" />
+          <span class="text-badge-error-soft-text font-medium"
+            >{{ firingCount }} {{ firingLabel }}</span
+          >
         </span>
-        <span class="flex items-center gap-1 text-2xs text-text-secondary">
-          <span class="inline-block w-2 h-2 rounded-default bg-badge-success-solid-bg" />
+        <span class="text-2xs text-text-secondary flex items-center gap-1">
+          <span class="rounded-default bg-badge-success-solid-bg inline-block h-2 w-2" />
           {{ okCount }} {{ okLabel }}
         </span>
-        <span v-if="skippedCount > 0" class="flex items-center gap-1 text-2xs text-text-muted">
-          <span class="inline-block w-2 h-2 rounded-default bg-border-default" />
-          {{ skippedCount }} {{ t('alerts.historyTimeline.skipped') }}
+        <span v-if="skippedCount > 0" class="text-2xs text-text-muted flex items-center gap-1">
+          <span class="rounded-default bg-border-default inline-block h-2 w-2" />
+          {{ skippedCount }} {{ t("alerts.historyTimeline.skipped") }}
         </span>
-        <span v-if="hasFlappingZone" class="flex items-center gap-1 text-2xs font-semibold text-badge-purple-ol-text brightness-90">
-          <span class="inline-block w-2 h-2 rounded-default o2-flap-swatch" />
-          {{ t('alerts.historyTimeline.flapping') }}
+        <span
+          v-if="hasFlappingZone"
+          class="text-2xs text-badge-purple-ol-text flex items-center gap-1 font-semibold brightness-90"
+        >
+          <span class="rounded-default o2-flap-swatch inline-block h-2 w-2" />
+          {{ t("alerts.historyTimeline.flapping") }}
         </span>
       </div>
 
-      <span class="text-2xs tabular-nums text-text-secondary">
+      <span class="text-2xs text-text-secondary tabular-nums">
         {{ newestLabel }}
       </span>
     </div>
 
     <!-- Timeline strip + transition labels -->
-    <div class="flex flex-col gap-0.75 w-full px-1">
-
-    <!-- Strip -->
-    <div class="flex gap-0.5 w-full h-6 items-stretch overflow-visible">
-      <template v-for="(seg, i) in segments" :key="i">
-        <!-- Flapping zone — alternating hatched red/green cells + callout pill -->
-        <div
-          v-if="seg.type === 'flapping'"
-          class="flex gap-0.5 items-stretch relative min-w-3"
-          :style="{ flex: seg.weight }"
-          @mouseenter="hoveredIndex = i"
-          @mouseleave="hoveredIndex = null"
-        >
-          <!-- Persistent callout pill above the zone -->
+    <div class="flex w-full flex-col gap-0.75 px-1">
+      <!-- Strip -->
+      <div class="flex h-6 w-full items-stretch gap-0.5 overflow-visible">
+        <template v-for="(seg, i) in segments" :key="i">
+          <!-- Flapping zone — alternating hatched red/green cells + callout pill -->
           <div
-            class="o2-flap-pill absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.25 whitespace-nowrap px-3 py-1 rounded-full text-xs font-semibold pointer-events-none shadow-md text-badge-purple-solid-text bg-badge-purple-solid-bg"
+            v-if="seg.type === 'flapping'"
+            class="relative flex min-w-3 items-stretch gap-0.5"
+            :style="{ flex: seg.weight }"
+            @mouseenter="hoveredIndex = i"
+            @mouseleave="hoveredIndex = null"
           >
-            <span class="font-semibold">{{ '⚡' }} {{ t('alerts.historyTimeline.flapping') }}</span>
-            <span class="opacity-60 font-normal">•</span>{{ seg.flips }} {{ t('alerts.historyTimeline.flipsSuffix') }}
-            <span class="opacity-60 font-normal">•</span>{{ seg.durationLabel }}
+            <!-- Persistent callout pill above the zone -->
+            <div
+              class="o2-flap-pill text-badge-purple-solid-text bg-badge-purple-solid-bg pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 flex -translate-x-1/2 items-center gap-1.25 rounded-full px-3 py-1 text-xs font-semibold whitespace-nowrap shadow-md"
+            >
+              <span class="font-semibold"
+                >{{ "⚡" }} {{ t("alerts.historyTimeline.flapping") }}</span
+              >
+              <span class="font-normal opacity-60">•</span>{{ seg.flips }}
+              {{ t("alerts.historyTimeline.flipsSuffix") }}
+              <span class="font-normal opacity-60">•</span>{{ seg.durationLabel }}
+            </div>
+            <div
+              v-for="(cell, c) in seg.cells"
+              :key="c"
+              class="rounded-default o2-flap-cell min-w-1.5 flex-1"
+              :style="{ backgroundColor: blockColor(cell.status) }"
+            />
           </div>
-          <div
-            v-for="(cell, c) in seg.cells"
-            :key="c"
-            class="flex-1 rounded-default min-w-1.5 o2-flap-cell"
-            :style="{ backgroundColor: blockColor(cell.status) }"
-          />
-        </div>
 
-        <!-- Normal block -->
-        <div
-          v-else
-          class="flex-1 rounded-default min-w-1 cursor-default relative transition-opacity duration-100 hover:opacity-75"
-          :style="{ flex: seg.weight, background: blockColor(seg.status) }"
-          @mouseenter="hoveredIndex = i"
-          @mouseleave="hoveredIndex = null"
-        >
-          <!-- Render ABOVE the strip (like the flapping pill) so the tooltip
+          <!-- Normal block -->
+          <div
+            v-else
+            class="rounded-default relative min-w-1 flex-1 cursor-default transition-opacity duration-100 hover:opacity-75"
+            :style="{ flex: seg.weight, background: blockColor(seg.status) }"
+            @mouseenter="hoveredIndex = i"
+            @mouseleave="hoveredIndex = null"
+          >
+            <!-- Render ABOVE the strip (like the flapping pill) so the tooltip
                never collides with — or gets clipped by — the history table that
                sits directly below the timeline. -->
-          <div
-            v-if="hoveredIndex === i"
-            class="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 whitespace-nowrap rounded-default px-2.5 py-1.5 text-2xs leading-[1.4] pointer-events-none shadow-md bg-surface-overlay border border-border-default text-text-body"
-          >
-            <div class="font-semibold capitalize flex items-center gap-1.5">
-              <span
-                class="inline-block w-2 h-2 rounded-default shrink-0"
-                :style="{ background: blockColor(seg.status) }"
-              />
-              {{ normalizeStatus(seg.status) }}
+            <div
+              v-if="hoveredIndex === i"
+              class="rounded-default text-2xs bg-surface-overlay border-border-default text-text-body pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 border px-2.5 py-1.5 leading-[1.4] whitespace-nowrap shadow-md"
+            >
+              <div class="flex items-center gap-1.5 font-semibold capitalize">
+                <span
+                  class="rounded-default inline-block h-2 w-2 shrink-0"
+                  :style="{ background: blockColor(seg.status) }"
+                />
+                {{ normalizeStatus(seg.status) }}
+              </div>
+              <div class="mt-0.5 opacity-60">{{ seg.startLabel }}</div>
+              <div v-if="seg.count > 1" class="text-3xs opacity-50">
+                {{ seg.count }} {{ t("alerts.historyTimeline.evaluationsSuffix") }}
+              </div>
             </div>
-            <div class="opacity-60 mt-0.5">{{ seg.startLabel }}</div>
-            <div v-if="seg.count > 1" class="opacity-50 text-3xs">{{ seg.count }} {{ t('alerts.historyTimeline.evaluationsSuffix') }}</div>
           </div>
-        </div>
-      </template>
-    </div><!-- /strip -->
+        </template>
+      </div>
+      <!-- /strip -->
 
-    <!-- Transition tick labels — placed by cumulative width; labels that would
+      <!-- Transition tick labels — placed by cumulative width; labels that would
          overlap the previously shown one are skipped to keep them readable. -->
-    <div class="w-full relative h-3.5">
-      <span
-        v-for="(tick, i) in tickLabels"
-        :key="i"
-        class="absolute top-0 text-3xs tabular-nums whitespace-nowrap -translate-x-1/2 text-text-secondary"
-        :style="{ left: tick.leftPct + '%' }"
-      >
-        {{ tick.label }}
-      </span>
-    </div><!-- /tick labels -->
-
-    </div><!-- /strip + labels wrapper -->
+      <div class="relative h-3.5 w-full">
+        <span
+          v-for="(tick, i) in tickLabels"
+          :key="i"
+          class="text-3xs text-text-secondary absolute top-0 -translate-x-1/2 whitespace-nowrap tabular-nums"
+          :style="{ left: tick.leftPct + '%' }"
+        >
+          {{ tick.label }}
+        </span>
+      </div>
+      <!-- /tick labels -->
+    </div>
+    <!-- /strip + labels wrapper -->
   </div>
 </template>
 
@@ -170,20 +181,18 @@ function blockColor(status: string): string {
 
 // ── Sorted rows ─────────────────────────────────────────────────────────────
 
-const sorted = computed(() =>
-  [...props.history].sort((a, b) => a.timestamp - b.timestamp),
-);
+const sorted = computed(() => [...props.history].sort((a, b) => a.timestamp - b.timestamp));
 
 // ── Stats ───────────────────────────────────────────────────────────────────
 
 const firingCount = computed(() => props.history.filter((r) => isFiring(r.status)).length);
-const okCount     = computed(() => props.history.filter((r) => isOk(r.status)).length);
-const skippedCount = computed(() =>
-  props.history.filter((r) => !isFiring(r.status) && !isOk(r.status)).length,
+const okCount = computed(() => props.history.filter((r) => isOk(r.status)).length);
+const skippedCount = computed(
+  () => props.history.filter((r) => !isFiring(r.status) && !isOk(r.status)).length,
 );
 
 // ── Flapping detection ───────────────────────────────────────────────────────
-const MIN_WINDOW      = 4;
+const MIN_WINDOW = 4;
 const MIN_TRANSITIONS = 3;
 const MAX_STABLE_TAIL = 2;
 
@@ -208,18 +217,30 @@ const flappingMask = computed<boolean[]>(() => {
       const cur = rowState(rows[j].status);
       if (cur !== "other" && prev !== "other" && cur !== prev) transitions++;
       if (cur !== "other") prev = cur;
-      if (transitions >= MIN_TRANSITIONS) { windowEnd = j; break; }
+      if (transitions >= MIN_TRANSITIONS) {
+        windowEnd = j;
+        break;
+      }
     }
-    if (windowEnd === -1) { i++; continue; }
+    if (windowEnd === -1) {
+      i++;
+      continue;
+    }
 
     let zoneEnd = windowEnd;
     let stableTail = 0;
     let lastState = rowState(rows[zoneEnd].status);
     for (let j = zoneEnd + 1; j < n; j++) {
       const cur = rowState(rows[j].status);
-      if (cur === "other") { zoneEnd = j; stableTail = 0; continue; }
+      if (cur === "other") {
+        zoneEnd = j;
+        stableTail = 0;
+        continue;
+      }
       if (cur !== lastState) {
-        lastState = cur; zoneEnd = j; stableTail = 0;
+        lastState = cur;
+        zoneEnd = j;
+        stableTail = 0;
       } else {
         stableTail++;
         if (stableTail >= MAX_STABLE_TAIL) break;
@@ -227,7 +248,10 @@ const flappingMask = computed<boolean[]>(() => {
       }
     }
     // trim stable tail
-    while (zoneEnd > windowEnd && rowState(rows[zoneEnd].status) === rowState(rows[zoneEnd - 1].status)) {
+    while (
+      zoneEnd > windowEnd &&
+      rowState(rows[zoneEnd].status) === rowState(rows[zoneEnd - 1].status)
+    ) {
       zoneEnd--;
     }
 
@@ -254,7 +278,7 @@ type Segment =
       startLabel: string;
       endLabel: string;
     }
-  | { type: "normal";   weight: number; count: number; status: string; startLabel: string };
+  | { type: "normal"; weight: number; count: number; status: string; startLabel: string };
 
 const MAX_BLOCKS = 60;
 
@@ -275,7 +299,7 @@ const segments = computed<Segment[]>(() => {
     const bucketSize = rows.length / MAX_BLOCKS;
     displayRows = Array.from({ length: MAX_BLOCKS }, (_, b) => {
       const start = Math.floor(b * bucketSize);
-      const end   = Math.min(Math.floor((b + 1) * bucketSize), rows.length);
+      const end = Math.min(Math.floor((b + 1) * bucketSize), rows.length);
       const bucket = rows.slice(start, end);
       const bucketFlapping = flappingMask.value.slice(start, end).some(Boolean);
       // worst status in bucket
@@ -323,7 +347,8 @@ const segments = computed<Segment[]>(() => {
     } else {
       const status = cur.status;
       let j = i;
-      while (j < displayRows.length && !displayRows[j].flapping && displayRows[j].status === status) j++;
+      while (j < displayRows.length && !displayRows[j].flapping && displayRows[j].status === status)
+        j++;
       segs.push({
         type: "normal",
         weight: j - i,
@@ -379,8 +404,10 @@ function toMs(ts: number): number {
 function formatTimestamp(ts: number): string {
   if (!ts) return "";
   return new Date(toMs(ts)).toLocaleString([], {
-    month: "short", day: "numeric",
-    hour: "2-digit", minute: "2-digit",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 

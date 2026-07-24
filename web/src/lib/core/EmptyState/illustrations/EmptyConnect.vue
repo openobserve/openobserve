@@ -41,44 +41,135 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <circle cx="120" cy="86" r="72" fill="var(--color-primary-500)" opacity="0.05" />
     <ellipse cx="120" cy="169" rx="48" ry="6" fill="var(--color-primary-900)" opacity="0.1" />
     <g fill="var(--color-border-default)" opacity="0.5">
-      <circle cx="30" cy="92" r="2" /><circle cx="210" cy="92" r="2" /><circle cx="52" cy="130" r="1.6" /><circle cx="188" cy="130" r="1.6" /><circle cx="120" cy="60" r="1.6" />
+      <circle cx="30" cy="92" r="2" />
+      <circle cx="210" cy="92" r="2" />
+      <circle cx="52" cy="130" r="1.6" />
+      <circle cx="188" cy="130" r="1.6" />
+      <circle cx="120" cy="60" r="1.6" />
     </g>
 
     <!-- source nodes across the top: server / code / upload -->
     <g>
-      <rect x="36" y="16" width="32" height="26" rx="6" fill="var(--color-surface-base)" stroke="var(--color-border-strong)" stroke-width="1.75" />
-      <line x1="42" y1="24" x2="55" y2="24" stroke="var(--color-border-strong)" stroke-width="1.75" stroke-linecap="round" opacity="0.6" />
-      <line x1="42" y1="31" x2="55" y2="31" stroke="var(--color-border-strong)" stroke-width="1.75" stroke-linecap="round" opacity="0.6" />
+      <rect
+        x="36"
+        y="16"
+        width="32"
+        height="26"
+        rx="6"
+        fill="var(--color-surface-base)"
+        stroke="var(--color-border-strong)"
+        stroke-width="1.75"
+      />
+      <line
+        x1="42"
+        y1="24"
+        x2="55"
+        y2="24"
+        stroke="var(--color-border-strong)"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        opacity="0.6"
+      />
+      <line
+        x1="42"
+        y1="31"
+        x2="55"
+        y2="31"
+        stroke="var(--color-border-strong)"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        opacity="0.6"
+      />
       <circle cx="60" cy="24" r="1.6" fill="var(--color-primary-500)" />
       <circle cx="60" cy="31" r="1.6" fill="var(--color-primary-400)" />
     </g>
     <g>
-      <rect x="104" y="8" width="32" height="26" rx="6" fill="var(--color-surface-base)" stroke="var(--color-border-strong)" stroke-width="1.75" />
-      <path d="M115 17.5 l-4.5 3.5 4.5 3.5 M125 17.5 l4.5 3.5 -4.5 3.5" stroke="var(--color-primary-500)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
+      <rect
+        x="104"
+        y="8"
+        width="32"
+        height="26"
+        rx="6"
+        fill="var(--color-surface-base)"
+        stroke="var(--color-border-strong)"
+        stroke-width="1.75"
+      />
+      <path
+        d="M115 17.5 l-4.5 3.5 4.5 3.5 M125 17.5 l4.5 3.5 -4.5 3.5"
+        stroke="var(--color-primary-500)"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
     </g>
     <g>
-      <rect x="172" y="16" width="32" height="26" rx="6" fill="var(--color-surface-base)" stroke="var(--color-border-strong)" stroke-width="1.75" />
+      <rect
+        x="172"
+        y="16"
+        width="32"
+        height="26"
+        rx="6"
+        fill="var(--color-surface-base)"
+        stroke="var(--color-border-strong)"
+        stroke-width="1.75"
+      />
       <!-- cloud — matches the "cloud-upload" icon used on the ingestion CTA
            elsewhere, so this source clearly reads as a cloud/agent source
            (Feather Icons' well-tested "cloud" path, scaled to fit) -->
-      <g transform="translate(174.5 15) scale(0.9)" fill="none" stroke="var(--color-primary-400)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <g
+        transform="translate(174.5 15) scale(0.9)"
+        fill="none"
+        stroke="var(--color-primary-400)"
+        stroke-width="1.9"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
         <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
       </g>
     </g>
 
     <!-- dashed flowchart connectors: right-angle routing with rounded-default elbows,
          merging onto the database like a real diagram, not diagonal lines -->
-    <g stroke="var(--color-primary-300)" stroke-width="1.75" stroke-dasharray="4 5" stroke-linecap="round" fill="none">
+    <g
+      stroke="var(--color-primary-300)"
+      stroke-width="1.75"
+      stroke-dasharray="4 5"
+      stroke-linecap="round"
+      fill="none"
+    >
       <path d="M52 46 L52 64 Q52 70 58 70 L98 70 Q104 70 104 76 L104 104" />
       <path d="M120 38 L120 100" />
       <path d="M188 46 L188 64 Q188 70 182 70 L142 70 Q136 70 136 76 L136 104" />
     </g>
 
     <!-- database cylinder receiving the streams -->
-    <path d="M88 112 V158 A32 7.5 0 0 0 152 158 V112" fill="var(--color-surface-base)" stroke="var(--color-border-strong)" stroke-width="2.25" />
-    <path d="M88 127 A32 7.5 0 0 0 152 127" stroke="var(--color-border-default)" stroke-width="1.5" opacity="0.7" />
-    <path d="M88 143 A32 7.5 0 0 0 152 143" stroke="var(--color-border-default)" stroke-width="1.5" opacity="0.7" />
-    <ellipse cx="120" cy="112" rx="32" ry="7.5" fill="var(--color-surface-subtle)" stroke="var(--color-border-strong)" stroke-width="2.25" />
+    <path
+      d="M88 112 V158 A32 7.5 0 0 0 152 158 V112"
+      fill="var(--color-surface-base)"
+      stroke="var(--color-border-strong)"
+      stroke-width="2.25"
+    />
+    <path
+      d="M88 127 A32 7.5 0 0 0 152 127"
+      stroke="var(--color-border-default)"
+      stroke-width="1.5"
+      opacity="0.7"
+    />
+    <path
+      d="M88 143 A32 7.5 0 0 0 152 143"
+      stroke="var(--color-border-default)"
+      stroke-width="1.5"
+      opacity="0.7"
+    />
+    <ellipse
+      cx="120"
+      cy="112"
+      rx="32"
+      ry="7.5"
+      fill="var(--color-surface-subtle)"
+      stroke="var(--color-border-strong)"
+      stroke-width="2.25"
+    />
 
     <!-- landing dots on the database rim, pulsing as packets arrive -->
     <circle class="es-in es-in-a" cx="104" cy="107" r="2.25" fill="var(--color-primary-400)" />
@@ -92,10 +183,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- ambient sparkles -->
     <g class="es-spark es-spark-a" transform="translate(206 118)">
-      <path d="M0 -6 L1.4 -1.4 L6 0 L1.4 1.4 L0 6 L-1.4 1.4 L-6 0 L-1.4 -1.4 Z" fill="var(--color-primary-400)" />
+      <path
+        d="M0 -6 L1.4 -1.4 L6 0 L1.4 1.4 L0 6 L-1.4 1.4 L-6 0 L-1.4 -1.4 Z"
+        fill="var(--color-primary-400)"
+      />
     </g>
     <g class="es-spark es-spark-b" transform="translate(36 116)">
-      <path d="M0 -5 L1.2 -1.2 L5 0 L1.2 1.2 L0 5 L-1.2 1.2 L-5 0 L-1.2 -1.2 Z" fill="var(--color-primary-300)" />
+      <path
+        d="M0 -5 L1.2 -1.2 L5 0 L1.2 1.2 L0 5 L-1.2 1.2 L-5 0 L-1.2 -1.2 Z"
+        fill="var(--color-primary-300)"
+      />
     </g>
   </svg>
 </template>
@@ -105,10 +202,7 @@ import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
 
-withDefaults(
-  defineProps<{ width?: number; animated?: boolean }>(),
-  { width: 260, animated: true },
-);
+withDefaults(defineProps<{ width?: number; animated?: boolean }>(), { width: 260, animated: true });
 </script>
 
 <style scoped>

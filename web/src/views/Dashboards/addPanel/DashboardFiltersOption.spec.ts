@@ -84,12 +84,7 @@ vi.mock("./Group.vue", () => ({
       "loadFilterItem",
       "dashboardPanelData",
     ],
-    emits: [
-      "add-condition",
-      "add-group",
-      "remove-group",
-      "logical-operator-change",
-    ],
+    emits: ["add-condition", "add-group", "remove-group", "logical-operator-change"],
   },
 }));
 
@@ -180,15 +175,11 @@ describe("DashboardFiltersOption", () => {
     });
 
     it("renders the separator between label and filter area", () => {
-      expect(
-        wrapper.find('[data-test="dashboard-filter-layout-separator"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-filter-layout-separator"]').exists()).toBe(true);
     });
 
     it("renders the filter layout container", () => {
-      expect(
-        wrapper.find('[data-test="dashboard-filter-layout"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-filter-layout"]').exists()).toBe(true);
     });
 
     it("hides the filter section when query is custom SQL", async () => {
@@ -197,15 +188,11 @@ describe("DashboardFiltersOption", () => {
       mockPanelData.data.queryType = "sql";
       await wrapper.vm.$nextTick();
 
-      expect(
-        wrapper.find('[data-test="dashboard-filter-layout-label"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-filter-layout-label"]').exists()).toBe(false);
     });
 
     it("renders the Group component when topLevelGroup exists", () => {
-      expect(
-        wrapper.find('[data-test="dashboard-filter-group-component"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-filter-group-component"]').exists()).toBe(true);
     });
 
     it("does not render Group when filter is null", async () => {
@@ -213,9 +200,7 @@ describe("DashboardFiltersOption", () => {
       delete (mockPanelData.data.queries[0].fields as any).filter;
       await wrapper.vm.$nextTick();
 
-      expect(
-        wrapper.find('[data-test="dashboard-filter-group-component"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-filter-group-component"]').exists()).toBe(false);
     });
 
     it("passes correct props to Group component", () => {
@@ -410,9 +395,7 @@ describe("DashboardFiltersOption", () => {
             {
               filterType: "group",
               logicalOperator: "AND",
-              conditions: [
-                { filterType: "condition", logicalOperator: "AND" },
-              ],
+              conditions: [{ filterType: "condition", logicalOperator: "AND" }],
             },
           ],
         },
@@ -445,9 +428,7 @@ describe("DashboardFiltersOption", () => {
         {
           filterType: "group",
           logicalOperator: "AND",
-          conditions: [
-            { filterType: "other", logicalOperator: "AND" },
-          ],
+          conditions: [{ filterType: "other", logicalOperator: "AND" }],
         },
       ];
 
@@ -496,9 +477,7 @@ describe("DashboardFiltersOption", () => {
     });
 
     it("handles null operator in conditions", () => {
-      (mockPanelData.data.queries[0].fields.filter as any).conditions = [
-        { operator: null },
-      ];
+      (mockPanelData.data.queries[0].fields.filter as any).conditions = [{ operator: null }];
 
       const items = wrapper.vm.dashboardVariablesFilterItems(0);
       expect(items).toHaveLength(2);
@@ -525,10 +504,7 @@ describe("DashboardFiltersOption", () => {
 
       const items = wrapper2.vm.dashboardVariablesFilterItems(0);
       expect(items).toHaveLength(2);
-      expect(items.map((i: { label: string }) => i.label)).toEqual([
-        "globalVar",
-        "tabVar",
-      ]);
+      expect(items.map((i: { label: string }) => i.label)).toEqual(["globalVar", "tabVar"]);
       wrapper2.unmount();
     });
 
@@ -552,10 +528,7 @@ describe("DashboardFiltersOption", () => {
 
       const items = wrapper2.vm.dashboardVariablesFilterItems(0);
       expect(items).toHaveLength(2);
-      expect(items.map((i: { label: string }) => i.label)).toEqual([
-        "globalVar",
-        "panelVar",
-      ]);
+      expect(items.map((i: { label: string }) => i.label)).toEqual(["globalVar", "panelVar"]);
       wrapper2.unmount();
     });
 
@@ -565,9 +538,7 @@ describe("DashboardFiltersOption", () => {
         props: {
           dashboardData: {
             variables: {
-              list: [
-                { name: "newPanelVar", panels: ["current_panel"] },
-              ],
+              list: [{ name: "newPanelVar", panels: ["current_panel"] }],
             },
           },
         },

@@ -46,12 +46,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import { safeHttpUrl } from "./subs";
-import type {
-  CardSubstitutions,
-  RichCardContent,
-  RichCardStep,
-  StepChipKind,
-} from "./types";
+import type { CardSubstitutions, RichCardContent, RichCardStep, StepChipKind } from "./types";
 import { useStreamDetect, prefersReducedMotion } from "./useStreamDetect";
 import { useI18n } from "vue-i18n";
 
@@ -99,11 +94,7 @@ const connectedHeadline = computed(() =>
       : "Connected — Traces Are Flowing",
 );
 const viewDataLabel = computed(() =>
-  isMetricsStream.value
-    ? "View Streams"
-    : isLogsStream.value
-      ? "View Logs"
-      : "View Traces",
+  isMetricsStream.value ? "View Streams" : isLogsStream.value ? "View Logs" : "View Traces",
 );
 const viewDataIcon = computed(() =>
   isMetricsStream.value ? "list" : isLogsStream.value ? "article" : "timeline",
@@ -129,9 +120,7 @@ const viewData = async () => {
   // we send the user to the Streams page (where the new sqlserver_* streams
   // appear) rather than a pre-filtered explorer.
   if (isMetricsStream.value) {
-    router
-      .push({ name: "logstreams", query: { org_identifier: props.subs.org } })
-      .catch(() => {});
+    router.push({ name: "logstreams", query: { org_identifier: props.subs.org } }).catch(() => {});
     return;
   }
 
@@ -147,21 +136,15 @@ const viewData = async () => {
   } else {
     query.tab = "spans";
   }
-  router
-    .push({ name: isLogsStream.value ? "logs" : "traces", query })
-    .catch(() => {});
+  router.push({ name: isLogsStream.value ? "logs" : "traces", query }).catch(() => {});
 };
 
 // Logo precedence per theme: manifest override → content (frontmatter) → none.
 // In dark mode the dark variant is preferred, falling back to the light logo.
 // `logoFailed` falls back to the monogram if the image can't load.
 const logoFailed = ref(false);
-const logoLight = computed(
-  () => props.logoUrl || props.content.provider.logo || "",
-);
-const logoDark = computed(
-  () => props.logoUrlDark || props.content.provider.logoDark || "",
-);
+const logoLight = computed(() => props.logoUrl || props.content.provider.logo || "");
+const logoDark = computed(() => props.logoUrlDark || props.content.provider.logoDark || "");
 const logoSrc = computed(() => {
   if (logoFailed.value) return "";
   return (isDark.value && logoDark.value) || logoLight.value;
@@ -195,9 +178,7 @@ const watchedStream = computed(() =>
 // reactively, like `{stream}` above. We aggregate every step's inputs so a value
 // can fill code anywhere, and seed from defaults so all keys exist (keeps
 // mutations reactive) and code shows sensible values before the user edits.
-const allInputs = computed(() =>
-  props.content.steps.flatMap((s) => s.inputs ?? []),
-);
+const allInputs = computed(() => props.content.steps.flatMap((s) => s.inputs ?? []));
 const inputValues = ref<Record<string, string>>(
   Object.fromEntries(allInputs.value.map((i) => [i.id, i.default])),
 );
@@ -255,9 +236,7 @@ const variantSel = ref<Record<string, string>>({});
 // configure sharing "os") move together; otherwise by the step's own id.
 const variantKey = (step: RichCardStep): string => step.variantGroup ?? step.id;
 const currentVariantId = (step: RichCardStep): string | undefined =>
-  step.variants?.length
-    ? variantSel.value[variantKey(step)] ?? step.variants[0].id
-    : undefined;
+  step.variants?.length ? (variantSel.value[variantKey(step)] ?? step.variants[0].id) : undefined;
 const activeVariant = (step: RichCardStep) =>
   step.variants?.find((v) => v.id === currentVariantId(step));
 const selectVariant = (key: string, variantId: unknown) => {
@@ -281,20 +260,15 @@ const isStepDone = (step: RichCardStep) => {
 };
 
 const onStepAction = (step: RichCardStep, index: number) => {
-  if (step.completeOn === "action")
-    actioned.value = { ...actioned.value, [step.id]: true };
+  if (step.completeOn === "action") actioned.value = { ...actioned.value, [step.id]: true };
   emit("step-action", step.action!.id);
   scrollToStep(index + 1);
 };
 
 // First not-done step is "active"; -1 once everything is done. OStepper's
 // model is 1-based step numbers (0 = none active, i.e. all done).
-const activeIndex = computed(() =>
-  props.content.steps.findIndex((s) => !isStepDone(s)),
-);
-const activeStepNumber = computed(() =>
-  activeIndex.value >= 0 ? activeIndex.value + 1 : 0,
-);
+const activeIndex = computed(() => props.content.steps.findIndex((s) => !isStepDone(s)));
+const activeStepNumber = computed(() => (activeIndex.value >= 0 ? activeIndex.value + 1 : 0));
 
 // Detection runs only when the user clicks Test in the status bar
 // (detect.check()) — one check per click, never automatically.
@@ -314,8 +288,7 @@ const scrollToStep = (i: number) => {
     });
 };
 const onStepCopy = (step: RichCardStep, index: number) => {
-  if (step.completeOn === "copy")
-    copied.value = { ...copied.value, [step.id]: true };
+  if (step.completeOn === "copy") copied.value = { ...copied.value, [step.id]: true };
   scrollToStep(index + 1);
 };
 
@@ -352,15 +325,12 @@ const JUMP_LINK_RE = /\[([^\]]+)\]\(#(advanced|troubleshooting)\)/g;
 const noteMd = (s: string) =>
   inlineMd(s).replace(
     JUMP_LINK_RE,
-    (_m, label, target) =>
-      `<a href="#" class="note-jump" data-jump="${target}">${label}</a>`,
+    (_m, label, target) => `<a href="#" class="note-jump" data-jump="${target}">${label}</a>`,
   );
 
 // Delegated so the anchors rendered by v-html above stay clickable.
 const onNoteClick = (e: MouseEvent) => {
-  const el = (e.target as HTMLElement)?.closest?.("[data-jump]") as
-    | HTMLElement
-    | null;
+  const el = (e.target as HTMLElement)?.closest?.("[data-jump]") as HTMLElement | null;
   if (!el) return;
   e.preventDefault();
   if (el.dataset.jump === "advanced") openAdvanced();
@@ -368,16 +338,12 @@ const onNoteClick = (e: MouseEvent) => {
 };
 
 const chipIcon = (kind: StepChipKind) =>
-  ({ terminal: "", editor: "code", run: "play-arrow", traces: "timeline" })[
-    kind
-  ];
+  ({ terminal: "", editor: "code", run: "play-arrow", traces: "timeline" })[kind];
 // A code block with a filename is a file, not a shell command — render it with
 // editor chrome even under a terminal-chip step. Needed when one step mixes
 // command and file variants (e.g. RUM's npm install vs CDN HTML snippet).
 const codeChrome = (step: RichCardStep): "terminal" | "editor" =>
-  !displayCode(step)?.filename && step.chip?.kind === "terminal"
-    ? "terminal"
-    : "editor";
+  !displayCode(step)?.filename && step.chip?.kind === "terminal" ? "terminal" : "editor";
 
 const extras = computed(() => props.content.extras ?? {});
 const hasInstallerAccordion = computed(
@@ -491,17 +457,11 @@ function fireConfetti() {
         </div>
         <p class="c-sub">{{ content.provider.tagline }}</p>
         <div class="pv-meta">
-          <OTag
-            v-if="content.provider.runtime"
-            type="setupCardMeta"
-            value="runtime"
-            >{{ content.provider.runtime }}</OTag
-          >
-          <OTag
-            v-if="content.provider.setupTime"
-            type="setupCardMeta"
-            value="setuptime"
-            >{{ content.provider.setupTime }} {{ t('ingestion.setupCard.setup') }}</OTag
+          <OTag v-if="content.provider.runtime" type="setupCardMeta" value="runtime">{{
+            content.provider.runtime
+          }}</OTag>
+          <OTag v-if="content.provider.setupTime" type="setupCardMeta" value="setuptime"
+            >{{ content.provider.setupTime }} {{ t("ingestion.setupCard.setup") }}</OTag
           >
           <template v-if="content.provider.metaBadges">
             <OTag
@@ -641,11 +601,7 @@ function fireConfetti() {
               </template>
             </OCodeBlock>
 
-            <p
-              v-if="currentVariantNote(step)"
-              class="step-note"
-              @click="onNoteClick"
-            >
+            <p v-if="currentVariantNote(step)" class="step-note" @click="onNoteClick">
               <OIcon name="info-outline" size="sm" />
               <span v-html="noteMd(currentVariantNote(step) || '')"></span>
             </p>
@@ -681,45 +637,41 @@ function fireConfetti() {
             </div>
 
             <div v-if="step.pills?.length" class="pill-list mt-2">
-              <OTag
-                v-for="p in step.pills"
-                :key="p"
-                type="fieldTag"
-                value="softsm"
-                >{{ p }}</OTag
-              >
+              <OTag v-for="p in step.pills" :key="p" type="fieldTag" value="softsm">{{ p }}</OTag>
             </div>
 
             <!-- Live status bar + fix box on the detection-anchor step -->
             <template v-if="step.detectionAnchor">
-              <div
-                class="statusbar mt-3"
-                :class="detect.state.value"
-                data-test="ai-c-statusbar"
-              >
+              <div class="statusbar mt-3" :class="detect.state.value" data-test="ai-c-statusbar">
                 <span class="sb-dot" />
                 <span v-if="detect.idle.value" class="sb-txt"
-                  >{{ t('ingestion.setupCard.notTestedYet') }}<span class="sb-sub"
-                    >{{ t('ingestion.setupCard.startIngestingTestFor') }} {{ dataNoun }}</span
+                  >{{ t("ingestion.setupCard.notTestedYet")
+                  }}<span class="sb-sub"
+                    >{{ t("ingestion.setupCard.startIngestingTestFor") }} {{ dataNoun }}</span
                   ></span
                 >
                 <span v-else-if="detect.checking.value" class="sb-txt"
-                  >{{ t('ingestion.setupCard.checkingFor') }} {{ dataNoun }}{{ t('ingestion.setupCard.ellipsis') }}<span class="sb-sub"
-                    >{{ t('ingestion.setupCard.on') }} {{ watchedStream }}</span
+                  >{{ t("ingestion.setupCard.checkingFor") }} {{ dataNoun
+                  }}{{ t("ingestion.setupCard.ellipsis")
+                  }}<span class="sb-sub"
+                    >{{ t("ingestion.setupCard.on") }} {{ watchedStream }}</span
                   ></span
                 >
                 <span v-else-if="detect.connected.value" class="sb-txt"
-                  >{{ connectedHeadline }}<span class="sb-sub"
-                    >{{ detect.count.value }} {{ countUnit
-                    }}{{ detect.count.value === 1 ? "" : "s"
+                  >{{ connectedHeadline
+                  }}<span class="sb-sub"
+                    >{{ detect.count.value }} {{ countUnit }}{{ detect.count.value === 1 ? "" : "s"
                     }}<template v-if="content.detect.modelLabel">
                       · {{ content.detect.modelLabel }}</template
                     ></span
                   ></span
                 >
                 <span v-else class="sb-txt sb-warn"
-                  >{{ t('ingestion.setupCard.no') }} {{ dataNoun }} {{ t('ingestion.setupCard.foundYet') }}<span class="sb-sub"
-                    >{{ t('ingestion.setupCard.nothingOn') }} {{ watchedStream }} {{ t('ingestion.setupCard.runAppAndTestAgain') }}</span
+                  >{{ t("ingestion.setupCard.no") }} {{ dataNoun }}
+                  {{ t("ingestion.setupCard.foundYet")
+                  }}<span class="sb-sub"
+                    >{{ t("ingestion.setupCard.nothingOn") }} {{ watchedStream }}
+                    {{ t("ingestion.setupCard.runAppAndTestAgain") }}</span
                   ></span
                 >
 
@@ -731,7 +683,7 @@ function fireConfetti() {
                   data-test="ai-c-test"
                   @click="detect.check()"
                 >
-                  {{ t('common.test') }}
+                  {{ t("common.test") }}
                 </OButton>
                 <OButton
                   v-else-if="detect.checking.value"
@@ -740,7 +692,7 @@ function fireConfetti() {
                   :loading="true"
                   data-test="ai-c-checking"
                 >
-                  {{ t('ingestion.setupCard.checking') }}
+                  {{ t("ingestion.setupCard.checking") }}
                 </OButton>
                 <OButton
                   v-else-if="detect.connected.value"
@@ -760,13 +712,13 @@ function fireConfetti() {
                   data-test="ai-c-recheck"
                   @click="detect.check()"
                 >
-                  {{ t('ingestion.setupCard.testAgain') }}
+                  {{ t("ingestion.setupCard.testAgain") }}
                 </OButton>
               </div>
 
               <div v-if="showFixHint" class="fixbox mt-3">
                 <div class="fixbox-h">
-                  <OIcon name="warning" size="sm" /> {{ t('ingestion.setupCard.mostLikelyFix') }}
+                  <OIcon name="warning" size="sm" /> {{ t("ingestion.setupCard.mostLikelyFix") }}
                   {{ extras.fixTitle || "Instrument Before Importing The Client" }}
                 </div>
                 <p class="fixbox-p">
@@ -788,7 +740,7 @@ function fireConfetti() {
                     data-test="ai-c-fix-recheck"
                     @click="detect.check()"
                   >
-                    {{ t('ingestion.setupCard.iFixedItTestAgain') }}
+                    {{ t("ingestion.setupCard.iFixedItTestAgain") }}
                   </OButton>
                   <OButton
                     v-if="extras.troubleshooting?.length"
@@ -797,7 +749,7 @@ function fireConfetti() {
                     data-test="ai-c-see-troubleshooting"
                     @click="openTroubleshooting()"
                   >
-                    {{ t('ingestion.setupCard.seeAllTroubleshooting') }}
+                    {{ t("ingestion.setupCard.seeAllTroubleshooting") }}
                   </OButton>
                 </div>
               </div>
@@ -854,29 +806,22 @@ function fireConfetti() {
         >
           <div class="acc-body">
             <template v-if="extras.installs?.length">
-              {{ t('ingestion.setupCard.installsViaPip') }}
+              {{ t("ingestion.setupCard.installsViaPip") }}
               <div class="pill-list mt-2">
-                <OTag
-                  v-for="p in extras.installs"
-                  :key="p"
-                  type="fieldTag"
-                  value="softsm"
-                  >{{ p }}</OTag
-                >
+                <OTag v-for="p in extras.installs" :key="p" type="fieldTag" value="softsm">{{
+                  p
+                }}</OTag>
               </div>
             </template>
             <template v-if="extras.envVars?.length">
               <div class="mt-3">
-                {{ t('ingestion.setupCard.writesTheseKeysTo') }} <code>./.env</code> {{ t('ingestion.setupCard.idempotentSuffix') }}
+                {{ t("ingestion.setupCard.writesTheseKeysTo") }} <code>./.env</code>
+                {{ t("ingestion.setupCard.idempotentSuffix") }}
               </div>
               <div class="pill-list mt-2">
-                <OTag
-                  v-for="p in extras.envVars"
-                  :key="p"
-                  type="fieldTag"
-                  value="softsm"
-                  >{{ p }}</OTag
-                >
+                <OTag v-for="p in extras.envVars" :key="p" type="fieldTag" value="softsm">{{
+                  p
+                }}</OTag>
               </div>
             </template>
           </div>
@@ -891,11 +836,7 @@ function fireConfetti() {
           class="acc-item"
         >
           <div class="acc-body">
-            <div
-              v-for="(r, i) in extras.troubleshooting"
-              :key="i"
-              class="ts-row"
-            >
+            <div v-for="(r, i) in extras.troubleshooting" :key="i" class="ts-row">
               <div class="ts-q"><OIcon name="warning" size="sm" /> {{ r.q }}</div>
               <div class="ts-a" v-html="inlineMd(r.a)"></div>
             </div>
@@ -927,12 +868,10 @@ function fireConfetti() {
 
       <!-- Footer -->
       <div class="pv-foot">
-        <OIcon name="open-in-new" size="sm" /> {{ t('ingestion.setupCard.fullIntegrationDocs') }}&nbsp;
-        <a
-          :href="safeHttpUrl(content.docUrl)"
-          target="_blank"
-          rel="noopener noreferrer"
-          >{{ content.provider.name }} {{ t('ingestion.setupCard.arrow') }}</a
+        <OIcon name="open-in-new" size="sm" />
+        {{ t("ingestion.setupCard.fullIntegrationDocs") }}&nbsp;
+        <a :href="safeHttpUrl(content.docUrl)" target="_blank" rel="noopener noreferrer"
+          >{{ content.provider.name }} {{ t("ingestion.setupCard.arrow") }}</a
         >
         <!-- Secondary guides (e.g. GCP's Google Workspace page) — real anchors,
              beside the primary doc link rather than buried in an accordion. -->
@@ -943,17 +882,14 @@ function fireConfetti() {
             target="_blank"
             rel="noopener noreferrer"
             :data-test="`ai-doc-link-${l.label.toLowerCase().replace(/\s+/g, '-')}`"
-            >{{ l.label }} {{ t('ingestion.setupCard.arrow') }}</a
+            >{{ l.label }} {{ t("ingestion.setupCard.arrow") }}</a
           >
         </template>
         <span v-if="content.slackUrl" class="ml-auto"
-          >{{ t('ingestion.setupCard.stuck') }}
-          <a
-            :href="safeHttpUrl(content.slackUrl)"
-            target="_blank"
-            rel="noopener noreferrer"
-            >{{ t('ingestion.setupCard.askOnSlack') }}</a
-          ></span
+          >{{ t("ingestion.setupCard.stuck") }}
+          <a :href="safeHttpUrl(content.slackUrl)" target="_blank" rel="noopener noreferrer">{{
+            t("ingestion.setupCard.askOnSlack")
+          }}</a></span
         >
       </div>
     </div>

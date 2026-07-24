@@ -1,132 +1,120 @@
 <template>
-  <div
-    data-test="test-function-section"
-    class="flex items-center flex-wrap pb-2"
-  >
-    <div
-      data-test="test-function-query-section"
-      class="test-function-query-container w-full"
-    >
+  <div data-test="test-function-section" class="flex flex-wrap items-center pb-2">
+    <div data-test="test-function-query-section" class="test-function-query-container w-full">
       <FullViewContainer
-          data-test="test-function-query-title-section"
-          name="function"
-          v-model:is-expanded="expandState.query"
-          :label="t('common.query')"
-        >
-          <template #left>
-            <OIcon
-              v-if="!!sqlQueryErrorMsg"
-              name="info-outline"
-              class="text-status-error-text mx-1 cursor-pointer"
-              size="sm"
-            >
-              <OTooltip
-                side="right"
-                align="center"
-                :side-offset="10"
-                :content="sqlQueryErrorMsg"
-              />
-            </OIcon>
-          </template>
-          <template #right>
-            <OButton
-              variant="primary"
-              size="sm-action"
-              :disabled="!selectedStream.name || !inputQuery || loading.events"
-              @click="getResults"
-            >
-              <OIcon name="search" size="sm"  class="mr-1" />
-              {{ t('search.runQuery') }}
-            </OButton>
-          </template>
-        </FullViewContainer>
-        <div
-          class="flex items-center flex-wrap gap-x-3 py-2 w-full bg-surface-base"
-          v-show="expandState.query"
-          data-test="test-function-query-editor-section"
-        >
-          <div class="function-stream-select-input w-25">
-            <div class="text-xs text-text-label">
-              {{ t("alerts.streamType") + " *" }}
-            </div>
-
-            <OSelect
-              v-model="selectedStream.type"
-              :options="streamTypes"
-              labelKey="label"
-              valueKey="value"
-              @update:model-value="updateStreams()"
-              style="width: 100px"
-            />
-          </div>
-          <div class="function-stream-select-input w-75">
-            <div class="text-xs text-text-label">
-              {{ t("alerts.stream_name") + " *" }}
-            </div>
-            <OSelect
-              v-model="selectedStream.name"
-              :options="filteredStreams"
-              :loading="isFetchingStreams"
-              :placeholder="t('pipeline.selectStream')"
-              searchable
-              style="min-width: 120px"
-              @search="filterStreams"
-              @update:model-value="updateQuery"
-            />
-          </div>
-          <div class="functions-duration-input w-82.5">
-            <div class="text-xs text-text-label">
-              {{ t("common.duration") + " *" }}
-            </div>
-
-            <DateTime
-              :label="t('alerts.startTime')"
-              class="py-1 w-full"
-              auto-apply
-              :default-type="dateTime.type"
-              :default-absolute-time="{
-                startTime: dateTime.startTime,
-                endTime: dateTime.endTime,
-              }"
-              :default-relative-time="dateTime.relativeTimePeriod"
-              data-test="logs-search-bar-date-time-dropdown"
-              @on:date-change="updateDateTime"
-            />
-          </div>
-
-          <div class="text-xs w-full mt-1 text-text-label">
-            {{ t("common.query") + " *" }}
-          </div>
-          <div
-            class="relative w-full"
+        data-test="test-function-query-title-section"
+        name="function"
+        v-model:is-expanded="expandState.query"
+        :label="t('common.query')"
+      >
+        <template #left>
+          <OIcon
+            v-if="!!sqlQueryErrorMsg"
+            name="info-outline"
+            class="text-status-error-text mx-1 cursor-pointer"
+            size="sm"
           >
-            <query-editor
-              data-test="vrl-function-test-sql-editor"
-              ref="queryEditorRef"
-              editor-id="test-function-query-input-editor"
-              class="w-full min-h-40"
-              v-model:query="inputQuery"
-              language="sql"
-              :keywords="effectiveKeywords"
-              :suggestions="effectiveSuggestions"
-              @focus="onQueryEditorFocus"
-              @blur="onQueryEditorBlur"
-            />
-            <div
-              v-if="!inputQuery && queryEditorPlaceholderFlag"
-              class="query-editor-placeholder-overlay absolute top-0 left-0 right-0 bottom-0 flex items-start p-[0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-1 select-none"
+            <OTooltip side="right" align="center" :side-offset="10" :content="sqlQueryErrorMsg" />
+          </OIcon>
+        </template>
+        <template #right>
+          <OButton
+            variant="primary"
+            size="sm-action"
+            :disabled="!selectedStream.name || !inputQuery || loading.events"
+            @click="getResults"
+          >
+            <OIcon name="search" size="sm" class="mr-1" />
+            {{ t("search.runQuery") }}
+          </OButton>
+        </template>
+      </FullViewContainer>
+      <div
+        class="bg-surface-base flex w-full flex-wrap items-center gap-x-3 py-2"
+        v-show="expandState.query"
+        data-test="test-function-query-editor-section"
+      >
+        <div class="function-stream-select-input w-25">
+          <div class="text-text-label text-xs">
+            {{ t("alerts.streamType") + " *" }}
+          </div>
+
+          <OSelect
+            v-model="selectedStream.type"
+            :options="streamTypes"
+            labelKey="label"
+            valueKey="value"
+            @update:model-value="updateStreams()"
+            style="width: 100px"
+          />
+        </div>
+        <div class="function-stream-select-input w-75">
+          <div class="text-text-label text-xs">
+            {{ t("alerts.stream_name") + " *" }}
+          </div>
+          <OSelect
+            v-model="selectedStream.name"
+            :options="filteredStreams"
+            :loading="isFetchingStreams"
+            :placeholder="t('pipeline.selectStream')"
+            searchable
+            style="min-width: 120px"
+            @search="filterStreams"
+            @update:model-value="updateQuery"
+          />
+        </div>
+        <div class="functions-duration-input w-82.5">
+          <div class="text-text-label text-xs">
+            {{ t("common.duration") + " *" }}
+          </div>
+
+          <DateTime
+            :label="t('alerts.startTime')"
+            class="w-full py-1"
+            auto-apply
+            :default-type="dateTime.type"
+            :default-absolute-time="{
+              startTime: dateTime.startTime,
+              endTime: dateTime.endTime,
+            }"
+            :default-relative-time="dateTime.relativeTimePeriod"
+            data-test="logs-search-bar-date-time-dropdown"
+            @on:date-change="updateDateTime"
+          />
+        </div>
+
+        <div class="text-text-label mt-1 w-full text-xs">
+          {{ t("common.query") + " *" }}
+        </div>
+        <div class="relative w-full">
+          <QueryEditor
+            data-test="vrl-function-test-sql-editor"
+            ref="queryEditorRef"
+            editor-id="test-function-query-input-editor"
+            class="min-h-40 w-full"
+            v-model:query="inputQuery"
+            language="sql"
+            :keywords="effectiveKeywords"
+            :suggestions="effectiveSuggestions"
+            @focus="onQueryEditorFocus"
+            @blur="onQueryEditorBlur"
+          />
+          <div
+            v-if="!inputQuery && queryEditorPlaceholderFlag"
+            class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start p-[0.1875rem_0.5rem_0_2.15rem] select-none"
+          >
+            <span
+              class="query-editor-placeholder-typewriter text-text-placeholder overflow-hidden font-mono [line-height:1.3125rem] text-ellipsis whitespace-nowrap text-[var(--text-sm)]"
+              >{{ queryEditorPlaceholder }}</span
             >
-              <span class="query-editor-placeholder-typewriter font-mono text-[var(--text-sm)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden text-ellipsis">{{ queryEditorPlaceholder }}</span>
-            </div>
-            <div
-              class="text-status-error-text p-1 invalid-sql-error min-h-5.5"
+          </div>
+          <div class="text-status-error-text invalid-sql-error min-h-5.5 p-1">
+            <span v-show="!!sqlQueryErrorMsg" class="text-compact">
+              {{ t("function.errorLabel") }} {{ sqlQueryErrorMsg }}</span
             >
-              <span v-show="!!sqlQueryErrorMsg" class="text-compact">
-                {{ t('function.errorLabel') }} {{ sqlQueryErrorMsg }}</span
-              >
-            </div>
           </div>
         </div>
+      </div>
     </div>
   </div>
   <div>
@@ -141,7 +129,7 @@
         <template #left>
           <div
             v-if="loading.events"
-            class="font-bold flex items-center text-text-secondary ml-2 text-compact"
+            class="text-text-secondary text-compact ml-2 flex items-center font-bold"
           >
             <OSpinner size="xs" />
             <div class="relative top-0.5">
@@ -154,35 +142,35 @@
             class="text-status-error-text mx-1 cursor-pointer"
             size="sm"
           >
-            <OTooltip
-              side="right"
-              align="center"
-              :side-offset="10"
-              :content="eventsErrorMsg"
-            />
+            <OTooltip side="right" align="center" :side-offset="10" :content="eventsErrorMsg" />
           </OIcon>
         </template>
         <template #right>
-           <!-- o2 ai context add button in the test function -->
-           <O2AIContextAddBtn
+          <!-- o2 ai context add button in the test function -->
+          <O2AIContextAddBtn
             @send-to-ai-chat="sendToAiChat(JSON.stringify(inputEvents))"
             imageHeight="24px"
             imageWidth="24px"
-            :class="'px-2 mr-4'"
-            style="width: 32px !important; height: 32px !important; min-width: 32px !important; min-height: 32px !important;"
-           />
-          </template>
+            :class="'mr-4 px-2'"
+            style="
+              width: 32px !important;
+              height: 32px !important;
+              min-width: 32px !important;
+              min-height: 32px !important;
+            "
+          />
+        </template>
       </FullViewContainer>
       <div
         v-show="expandState.events"
         class="relative"
         data-test="test-function-input-editor-section"
       >
-        <query-editor
+        <QueryEditor
           data-test="vrl-function-test-events-editor"
           ref="eventsEditorRef"
           editor-id="test-function-events-input-editor"
-          class="test-function-input-editor w-full min-h-40"
+          class="test-function-input-editor min-h-40 w-full"
           :style="{ height: `calc((100vh - (260px + ${heightOffset}px)) / 2)` }"
           v-model:query="inputEvents"
           language="json"
@@ -200,7 +188,7 @@
         <template #left>
           <div
             v-if="loading.output"
-            class="text-sm font-medium font-bold flex items-center text-text-secondary ml-2 text-compact"
+            class="text-text-secondary text-compact ml-2 flex items-center text-sm font-bold font-medium"
           >
             <OSpinner size="xs" />
             <div class="relative top-0.5">
@@ -231,22 +219,18 @@
       >
         <div
           v-if="!outputEvents"
-          class="absolute z-10 flex flex-col justify-center items-center w-full h-full opacity-90"
+          class="absolute z-10 flex h-full w-full flex-col items-center justify-center opacity-90"
         >
-          <OIcon
-            name="lightbulb"
-            size="xl"
-            class="text-status-warning-text"
-          />
-          <div class="text-sm text-text-secondary">
+          <OIcon name="lightbulb" size="xl" class="text-status-warning-text" />
+          <div class="text-text-secondary text-sm">
             {{ outputMessage }}
           </div>
         </div>
-        <query-editor
+        <QueryEditor
           data-test="vrl-function-test-events-output-editor"
           ref="outputEventsEditorRef"
           editor-id="test-function-events-output-editor"
-          class="test-function-output-editor w-full min-h-40"
+          class="test-function-output-editor min-h-40 w-full"
           :style="{ height: `calc((100vh - (260px + ${heightOffset}px)) / 2)` }"
           v-model:query="outputEvents"
           language="json"
@@ -277,10 +261,7 @@ import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { debounce } from "lodash-es";
 import useQuery from "@/composables/useQuery";
-import {
-  rangesFromServerError,
-  type SqlErrorRange,
-} from "@/utils/query/sqlDiagnostics";
+import { rangesFromServerError, type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import searchService from "@/services/search";
 import { useStore } from "vuex";
 import { getConsumableRelativeTime } from "@/utils/date";
@@ -311,11 +292,9 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(["function-error","sendToAiChat"]);
+const emit = defineEmits(["function-error", "sendToAiChat"]);
 
-const QueryEditor = defineAsyncComponent(
-  () => import("@/components/CodeQueryEditor.vue"),
-);
+const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
 const inputQuery = ref<string>("");
 const inputEvents = ref<string>("");
@@ -330,13 +309,16 @@ const queryEditorRef = ref<InstanceType<typeof QueryEditor>>();
 // Server-error highlight ranges, forwarded to the SQL editor by the composable.
 const sqlErrorRanges = ref<SqlErrorRange[]>([]);
 
-const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
-  useSqlEditorDiagnostics({
-    queryEditorRef,
-    sqlMode: computed(() => true),
-    query: inputQuery,
-    externalErrors: sqlErrorRanges,
-  });
+const {
+  onFocus: _sqlOnFocus,
+  onBlur: _sqlOnBlur,
+  onQueryChange: _sqlOnQueryChange,
+} = useSqlEditorDiagnostics({
+  queryEditorRef,
+  sqlMode: computed(() => true),
+  query: inputQuery,
+  externalErrors: sqlErrorRanges,
+});
 
 const onQueryEditorFocus = () => {
   queryEditorPlaceholderFlag.value = false;
@@ -426,7 +408,6 @@ const { placeholder: queryEditorPlaceholder } = useQueryPlaceholder(
 
 const sqlQueryErrorMsg = ref<string>("");
 
-
 const streams = ref([]);
 
 onBeforeMount(async () => {
@@ -473,9 +454,7 @@ const filterStreams = (val: string) => {
 const filterColumns = (options: any[], val: string) => {
   if (val === "") return [...options];
   const value = val.toLowerCase();
-  return options.filter(
-    (column: any) => column.toLowerCase().indexOf(value) > -1,
-  );
+  return options.filter((column: any) => column.toLowerCase().indexOf(value) > -1);
 };
 
 const updateQuery = () => {
@@ -513,10 +492,11 @@ watch(
     }
     try {
       const stream = await getStream(name, selectedStream.value.type, true);
-      streamFields.value = stream?.schema?.map((f: any) => ({
-        ...f,
-        dataType: f.type,
-      })) || [];
+      streamFields.value =
+        stream?.schema?.map((f: any) => ({
+          ...f,
+          dataType: f.type,
+        })) || [];
       updateFieldKeywords(streamFields.value);
     } catch {
       // ignore — field suggestions are best-effort
@@ -528,11 +508,9 @@ watch(
 watch(inputQuery, (value) => {
   _sqlOnQueryChange();
   autoCompleteData.value.query = value;
-  autoCompleteData.value.cursorIndex =
-    queryEditorRef.value?.getCursorIndex() ?? -1;
+  autoCompleteData.value.cursorIndex = queryEditorRef.value?.getCursorIndex() ?? -1;
   // Ref may be unmounted; fall back to a no-op to match popup.open's non-optional type.
-  autoCompleteData.value.popup.open =
-    queryEditorRef.value?.triggerAutoComplete ?? (() => {});
+  autoCompleteData.value.popup.open = queryEditorRef.value?.triggerAutoComplete ?? (() => {});
   autoCompleteData.value.org = store.state.selectedOrganization.identifier;
   autoCompleteData.value.streamType = selectedStream.value.type;
   autoCompleteData.value.streamName = selectedStream.value.name;
@@ -593,11 +571,7 @@ const getResults = async () => {
       expandState.value.stream = false;
       expandState.value.query = false;
       expandState.value.events = true;
-      inputEvents.value = JSON.stringify(
-        JSON.parse(JSON.stringify(res.data.hits)),
-        null,
-        2,
-      );
+      inputEvents.value = JSON.stringify(JSON.parse(JSON.stringify(res.data.hits)), null, 2);
       sqlQueryErrorMsg.value = "";
       sqlErrorRanges.value = [];
     })
@@ -656,18 +630,12 @@ const processTestResults = async (results: any) => {
   // error showed nowhere but a hover tooltip while the editor displayed the
   // untransformed events, which reads as success. Deduped: every event usually
   // trips the same throw.
-  const rowErrors = [
-    ...new Set(rows.map((row: any) => row?.message?.trim()).filter(Boolean)),
-  ];
+  const rowErrors = [...new Set(rows.map((row: any) => row?.message?.trim()).filter(Boolean))];
   emit("function-error", rowErrors.join("\n"));
 
   const processedEvents = rows.map((event: any) => event.event || event.events);
 
-  outputEvents.value = JSON.stringify(
-    JSON.parse(JSON.stringify(processedEvents)),
-    null,
-    2,
-  );
+  outputEvents.value = JSON.stringify(JSON.parse(JSON.stringify(processedEvents)), null, 2);
 
   await nextTick();
   setTimeout(() => {
@@ -785,8 +753,8 @@ function getLineRanges(object: any) {
 
 function highlightSpecificEvent() {
   try {
-    const errorEvents = JSON.parse(originalOutputEvents.value).filter(
-      (event: any) => event.message?.trim(),
+    const errorEvents = JSON.parse(originalOutputEvents.value).filter((event: any) =>
+      event.message?.trim(),
     );
     const errorEventRanges: any[] = [];
 
@@ -816,7 +784,7 @@ const sendToAiChat = (value: any) => {
 defineExpose({
   testFunction,
   sendToAiChat,
-  store
+  store,
 });
 </script>
 

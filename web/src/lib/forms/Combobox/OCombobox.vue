@@ -14,15 +14,7 @@ import {
   ComboboxRoot,
   ComboboxViewport,
 } from "reka-ui";
-import {
-  computed,
-  nextTick,
-  ref,
-  useAttrs,
-  useId,
-  useSlots,
-  watch,
-} from "vue";
+import { computed, nextTick, ref, useAttrs, useId, useSlots, watch } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useI18n } from "vue-i18n";
 
@@ -93,9 +85,7 @@ const filteredOptions = computed<ComboboxOption[]>(() => {
   }
 
   const lower = needle.toLowerCase();
-  return (props.items ?? []).filter((opt) =>
-    opt.label.toLowerCase().includes(lower),
-  );
+  return (props.items ?? []).filter((opt) => opt.label.toLowerCase().includes(lower));
 });
 
 // ── Imperative reset ────────────────────────────────────────────────────────
@@ -177,14 +167,10 @@ const heightClass = computed(() => {
 });
 
 // ── Error ────────────────────────────────────────────────────────────────────
-const effectiveError = computed(
-  () => props.errorMessage || (props.error ? " " : null) || null,
-);
+const effectiveError = computed(() => props.errorMessage || (props.error ? " " : null) || null);
 const hasError = computed(() => !!effectiveError.value);
 
-const hasLabel = computed(
-  () => Boolean(slots.label) || props.label !== undefined,
-);
+const hasLabel = computed(() => Boolean(slots.label) || props.label !== undefined);
 const hasInsideLabel = computed(
   () => props.labelPosition === "inside" && (Boolean(slots.label) || Boolean(props.label)),
 );
@@ -194,7 +180,7 @@ const hasInsideLabel = computed(
   <div
     ref="rootEl"
     v-bind="wrapperAttrs"
-    class="flex flex-col gap-1 w-full"
+    class="flex w-full flex-col gap-1"
     :data-test="parentDataTest"
   >
     <!-- Label (outside) -->
@@ -202,18 +188,22 @@ const hasInsideLabel = computed(
       v-if="(hasLabel || $slots.tooltip) && labelPosition !== 'inside'"
       :for="inputId"
       :class="[
-        'o-input-label text-compact leading-tight flex items-center gap-1',
-        disabled ? 'font-normal text-input-label-text-disabled' : 'font-medium text-input-label-text',
+        'o-input-label text-compact flex items-center gap-1 leading-tight',
+        disabled
+          ? 'text-input-label-text-disabled font-normal'
+          : 'text-input-label-text font-medium',
       ]"
     >
-      <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true" class="select-none">*</span>
+      <slot name="label">{{ label }}</slot
+      ><span v-if="required" aria-hidden="true" class="select-none">*</span>
       <OIcon
         v-if="$slots.tooltip"
         name="info-outline"
         size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
         class="cursor-help"
-      ><slot name="tooltip" /></OIcon>
+        ><slot name="tooltip"
+      /></OIcon>
     </label>
 
     <ComboboxRoot
@@ -224,13 +214,14 @@ const hasInsideLabel = computed(
       :disabled="disabled"
       @update:model-value="onSelect"
     >
-      <ComboboxAnchor class="relative flex items-center w-full">
+      <ComboboxAnchor class="relative flex w-full items-center">
         <!-- Inside label -->
         <span
           v-if="hasInsideLabel"
-          class="absolute top-1 start-3 text-3xs leading-none text-input-placeholder select-none pointer-events-none z-10"
+          class="text-3xs text-input-placeholder pointer-events-none absolute start-3 top-1 z-10 leading-none select-none"
         >
-          <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true">&nbsp;*</span>
+          <slot name="label">{{ label }}</slot
+          ><span v-if="required" aria-hidden="true">&nbsp;*</span>
         </span>
         <ComboboxInput
           :id="inputId"
@@ -240,15 +231,15 @@ const hasInsideLabel = computed(
           :tabindex="inputTabindex"
           auto-complete="off"
           :class="[
-            'w-full rounded-default border ps-3 pe-3',
+            'rounded-default w-full border ps-3 pe-3',
             'bg-input-bg text-input-text',
             'placeholder:text-input-placeholder',
-            'outline-none transition-[border-color,box-shadow] duration-150',
+            'transition-[border-color,box-shadow] duration-150 outline-none',
             hasError
               ? 'border-input-border-error'
               : 'border-input-border hover:border-input-border-hover',
-            'focus:border-input-border-focus focus:ring-2 focus:ring-input-focus-ring',
-            'disabled:bg-input-disabled-bg disabled:cursor-not-allowed disabled:text-input-disabled-text',
+            'focus:border-input-border-focus focus:ring-input-focus-ring focus:ring-2',
+            'disabled:bg-input-disabled-bg disabled:text-input-disabled-text disabled:cursor-not-allowed',
             heightClass,
           ]"
           :data-test="parentDataTest ? `${parentDataTest}-input` : undefined"
@@ -262,7 +253,7 @@ const hasInsideLabel = computed(
           position="popper"
           :side-offset="4"
           :class="[
-            'z-10001 min-w-(--reka-combobox-trigger-width) max-w-(--reka-combobox-trigger-width) w-(--reka-combobox-trigger-width)',
+            'z-10001 w-(--reka-combobox-trigger-width) max-w-(--reka-combobox-trigger-width) min-w-(--reka-combobox-trigger-width)',
             'max-h-60 overflow-hidden',
             'rounded-default border shadow-lg',
             'bg-select-content-bg border-select-content-border',
@@ -277,10 +268,8 @@ const hasInsideLabel = computed(
           ]"
         >
           <ComboboxViewport class="max-h-56 overflow-y-auto">
-            <ComboboxEmpty
-              class="py-2 px-3 text-sm text-select-placeholder text-center"
-            >
-              {{ t('components.combobox.noOptionsFound') }}
+            <ComboboxEmpty class="text-select-placeholder px-3 py-2 text-center text-sm">
+              {{ t("components.combobox.noOptionsFound") }}
             </ComboboxEmpty>
 
             <ComboboxItem
@@ -290,10 +279,10 @@ const hasInsideLabel = computed(
               :data-test-value="option.value"
               :data-test-label="option.label"
               :class="[
-                'relative flex items-start gap-2 w-full',
-                'ps-3 pe-8 py-1.5 text-sm',
+                'relative flex w-full items-start gap-2',
+                'py-1.5 ps-3 pe-8 text-sm',
                 'text-select-item-text rounded-default',
-                'cursor-pointer select-none outline-none',
+                'cursor-pointer outline-none select-none',
                 'transition-colors duration-100',
                 'data-highlighted:bg-select-item-hover-bg',
                 'data-[state=checked]:bg-select-item-selected-bg data-[state=checked]:text-select-item-selected-text',
@@ -301,9 +290,11 @@ const hasInsideLabel = computed(
               ]"
               :data-test="parentDataTest ? `${parentDataTest}-option` : undefined"
             >
-              <span class="flex-1 wrap-break-word whitespace-normal min-w-0">{{ option.label }}</span>
+              <span class="min-w-0 flex-1 wrap-break-word whitespace-normal">{{
+                option.label
+              }}</span>
               <ComboboxItemIndicator
-                class="absolute end-2 top-1/2 -translate-y-1/2 flex items-center justify-center size-3.5"
+                class="absolute end-2 top-1/2 flex size-3.5 -translate-y-1/2 items-center justify-center"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -328,16 +319,13 @@ const hasInsideLabel = computed(
     <!-- Error message -->
     <span
       v-if="effectiveError && effectiveError.trim()"
-      class="text-xs text-input-error-text leading-none"
+      class="text-input-error-text text-xs leading-none"
       role="alert"
     >
       {{ effectiveError }}
     </span>
     <!-- Help text -->
-    <span
-      v-else-if="helpText"
-      class="text-xs text-input-help-text leading-none"
-    >
+    <span v-else-if="helpText" class="text-input-help-text text-xs leading-none">
       {{ helpText }}
     </span>
   </div>

@@ -16,78 +16,77 @@
       @submit="saveOrgSettings"
       v-slot="{ isSubmitting }"
     >
-    <div
-      data-test="add-role-rolename-input-btn"
-      class="trace-id-field-name o2-input mb-2 w-100"
-    >
-      <OFormInput
-        data-test="settings-org-trace-id-input"
-        name="traceIdFieldName"
-        :label="t('settings.traceIdFieldName')"
-        required
-        class="py-3 showLabelOnTop"
-        :help-text="t('settings.organizationSettings.fieldNameHelp')"
-      />
-    </div>
+      <div data-test="add-role-rolename-input-btn" class="trace-id-field-name o2-input mb-2 w-100">
+        <OFormInput
+          data-test="settings-org-trace-id-input"
+          name="traceIdFieldName"
+          :label="t('settings.traceIdFieldName')"
+          required
+          class="showLabelOnTop py-3"
+          :help-text="t('settings.organizationSettings.fieldNameHelp')"
+        />
+      </div>
 
-    <div
-      data-test="add-role-rolename-input-btn"
-      class="span-id-field-name o2-input w-100"
-    >
-      <OFormInput
-        data-test="settings-org-span-id-input"
-        name="spanIdFieldName"
-        :label="t('settings.spanIdFieldName')"
-        required
-        class="py-3 showLabelOnTop"
-        :help-text="t('settings.organizationSettings.fieldNameHelp')"
-      />
-    </div>
+      <div data-test="add-role-rolename-input-btn" class="span-id-field-name o2-input w-100">
+        <OFormInput
+          data-test="settings-org-span-id-input"
+          name="spanIdFieldName"
+          :label="t('settings.spanIdFieldName')"
+          required
+          class="showLabelOnTop py-3"
+          :help-text="t('settings.organizationSettings.fieldNameHelp')"
+        />
+      </div>
 
-    <div v-if="config.isCloud !== 'true'" data-test="add-toggle-ingestion" class="span-id-field-name o2-input w-100">
-      <OFormSwitch
-        data-test="add-toggle-ingestion-btn"
-        name="toggleIngestionLogs"
-        :label="t('settings.toggleIngestionLogsLabel')"
-        class="mt-2"
-      />
-    </div>
+      <div
+        v-if="config.isCloud !== 'true'"
+        data-test="add-toggle-ingestion"
+        class="span-id-field-name o2-input w-100"
+      >
+        <OFormSwitch
+          data-test="add-toggle-ingestion-btn"
+          name="toggleIngestionLogs"
+          :label="t('settings.toggleIngestionLogsLabel')"
+          class="mt-2"
+        />
+      </div>
 
-    <div data-test="add-toggle-usage-stream" class="o2-input">
-      <OFormSwitch
-        data-test="add-toggle-usage-stream-btn"
-        name="usageStreamEnabled"
-        :label="t('settings.usageStreamEnabledLabel')"
-        class="mt-2"
-      />
-    </div>
+      <div data-test="add-toggle-usage-stream" class="o2-input">
+        <OFormSwitch
+          data-test="add-toggle-usage-stream-btn"
+          name="usageStreamEnabled"
+          :label="t('settings.usageStreamEnabledLabel')"
+          class="mt-2"
+        />
+      </div>
 
-    <!-- Cross-Linking Configuration -->
-    <template v-if="store.state.zoConfig?.enable_cross_linking">
-      <OSeparator class="mt-6 mb-4" />
-      <CrossLinkManager
-        v-model="crossLinks"
-        :title="t('crossLinks.orgConfigTitle')"
-        :subtitle="t('crossLinks.orgConfigSubtitle')"
-        @change="formDirty = true"
-      />
-    </template>
+      <!-- Cross-Linking Configuration -->
+      <template v-if="store.state.zoConfig?.enable_cross_linking">
+        <OSeparator class="mt-6 mb-4" />
+        <CrossLinkManager
+          v-model="crossLinks"
+          :title="t('crossLinks.orgConfigTitle')"
+          :subtitle="t('crossLinks.orgConfigSubtitle')"
+          @change="formDirty = true"
+        />
+      </template>
 
-    <div class="flex gap-2 mt-3">
-      <!-- <OButton
+      <div class="mt-3 flex gap-2">
+        <!-- <OButton
         data-test="add-alert-cancel-btn"
         variant="outline"
         size="sm-action"
         @click="$emit('cancel:hideform')"
       >{{ t('alerts.cancel') }}</OButton> -->
-      <OButton
-        data-test="add-alert-submit-btn"
-        variant="primary"
-        size="sm-action"
-        type="submit"
-        :loading="isSubmitting"
-      >{{ t('alerts.save') }}</OButton>
-    </div>
+        <OButton
+          data-test="add-alert-submit-btn"
+          variant="primary"
+          size="sm-action"
+          type="submit"
+          :loading="isSubmitting"
+          >{{ t("alerts.save") }}</OButton
+        >
+      </div>
     </OForm>
   </div>
 </template>
@@ -102,7 +101,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import config from "@/aws-exports";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
@@ -119,9 +118,7 @@ const organizationSettingsSchema = makeOrganizationSettingsSchema(t);
 
 // CrossLinkManager has no OForm* equivalent (composite) — kept as local state
 // and merged at submit (the documented exception).
-const crossLinks = ref(
-  store.state?.organizationData?.organizationSettings?.cross_links || [],
-);
+const crossLinks = ref(store.state?.organizationData?.organizationSettings?.cross_links || []);
 const formDirty = ref(false);
 
 // Dynamic defaults (edit-prefill from the store) → a typed computed. The trace/
@@ -177,12 +174,12 @@ const saveOrgSettings = async (value: OrganizationSettingsForm) => {
     formDirty.value = false;
 
     toast({
-      message: t('settings.organizationSettings.settingsUpdated'),
+      message: t("settings.organizationSettings.settingsUpdated"),
       variant: "success",
     });
   } catch (e: any) {
     toast({
-      message: e?.message || t('settings.organizationSettings.settingsSaveError'),
+      message: e?.message || t("settings.organizationSettings.settingsSaveError"),
       variant: "error",
     });
   }

@@ -33,13 +33,25 @@ const docURLFastAPI = languagesDocURLs["fastapi"];
   <IngestionContent>
     <CopyContent :content="content" />
     <div>
-      <div class="font-medium">{{ t('ingestion.checkFurtherDocumentationAt') }}</div>
-      <ol class="list-decimal pl-5 mt-1">
+      <div class="font-medium">{{ t("ingestion.checkFurtherDocumentationAt") }}</div>
+      <ol class="mt-1 list-decimal pl-5">
         <li class="py-0.5">
-          <a :href="docURL" target="_blank" rel="noopener noreferrer" class="text-text-link hover:text-text-link-hover underline">{{ t('ingestion.python') }}</a>
+          <a
+            :href="docURL"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-text-link hover:text-text-link-hover underline"
+            >{{ t("ingestion.python") }}</a
+          >
         </li>
         <li class="py-0.5">
-          <a :href="docURLFastAPI" target="_blank" rel="noopener noreferrer" class="text-text-link hover:text-text-link-hover underline">{{ t('ingestion.fastapi') }}</a>
+          <a
+            :href="docURLFastAPI"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-text-link hover:text-text-link-hover underline"
+            >{{ t("ingestion.fastapi") }}</a
+          >
         </li>
       </ol>
     </div>

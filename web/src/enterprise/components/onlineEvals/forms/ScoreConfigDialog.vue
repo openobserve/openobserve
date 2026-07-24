@@ -19,10 +19,10 @@
     <OForm id="score-config-form" :form="form">
       <div
         v-if="mode === 'edit'"
-        class="flex gap-2.5 items-start px-3 py-2.5 bg-[color-mix(in_srgb,var(--color-status-info-text)_14%,transparent)] border border-[color-mix(in_srgb,var(--color-status-info-text)_20%,transparent)] rounded-default text-xs leading-normal text-text-body mb-4"
+        class="rounded-default text-text-body mb-4 flex items-start gap-2.5 border border-[color-mix(in_srgb,var(--color-status-info-text)_20%,transparent)] bg-[color-mix(in_srgb,var(--color-status-info-text)_14%,transparent)] px-3 py-2.5 text-xs leading-normal"
       >
-        <OIcon name="info" size="xs" class="shrink-0 mt-px text-status-info-text" />
-        <div class="flex flex-col gap-0.5 min-w-0">
+        <OIcon name="info" size="xs" class="text-status-info-text mt-px shrink-0" />
+        <div class="flex min-w-0 flex-col gap-0.5">
           <i18n-t
             :keypath="`onlineEvals.scoreConfig.editInfoBannerEmphasis.${formValues.dataType}`"
             tag="span"
@@ -32,7 +32,9 @@
               <strong class="font-bold">{{ nextVersionLabel }}</strong>
             </template>
           </i18n-t>
-          <em class="italic font-normal text-text-secondary">{{ t("onlineEvals.scoreConfig.editInfoBannerDetail") }}</em>
+          <em class="text-text-secondary font-normal italic">{{
+            t("onlineEvals.scoreConfig.editInfoBannerDetail")
+          }}</em>
         </div>
       </div>
 
@@ -66,7 +68,9 @@
 
       <!-- Data type -->
       <div class="mb-2.5">
-        <label class="o-input-label text-compact font-medium leading-tight text-input-label-text flex items-center mb-1">
+        <label
+          class="o-input-label text-compact text-input-label-text mb-1 flex items-center leading-tight font-medium"
+        >
           {{ t("onlineEvals.scoreConfig.dataTypeLabel")
           }}<span v-if="mode === 'create'" class="select-none" aria-hidden="true">&nbsp;*</span>
         </label>
@@ -88,7 +92,7 @@
           <div
             v-for="type in DATA_TYPES"
             :key="type"
-            class="sc-dtype-radio flex-1 min-w-0 border rounded-default transition-[border-color,background] duration-120"
+            class="sc-dtype-radio rounded-default min-w-0 flex-1 border transition-[border-color,background] duration-120"
             :class="[
               formValues.dataType === type
                 ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_5%,var(--color-card-bg))]'
@@ -105,8 +109,12 @@
               :data-test="`score-config-datatype-${type}`"
             >
               <template #label>
-                <span class="text-compact font-bold text-text-heading">{{ t(`onlineEvals.scoreConfig.dataTypes.${type}`) }}</span>
-                <span class="text-2xs font-normal text-text-secondary mt-0.75 leading-[1.4]">{{ t(`onlineEvals.scoreConfig.dataTypeHelp.${type}`) }}</span>
+                <span class="text-compact text-text-heading font-bold">{{
+                  t(`onlineEvals.scoreConfig.dataTypes.${type}`)
+                }}</span>
+                <span class="text-2xs text-text-secondary mt-0.75 leading-[1.4] font-normal">{{
+                  t(`onlineEvals.scoreConfig.dataTypeHelp.${type}`)
+                }}</span>
               </template>
             </ORadio>
           </div>
@@ -115,11 +123,15 @@
 
       <!-- Numeric range -->
       <div v-if="formValues.dataType === 'numeric'" class="mb-2.5">
-        <label class="o-input-label text-compact font-medium leading-tight text-input-label-text flex items-center mb-1">
+        <label
+          class="o-input-label text-compact text-input-label-text mb-1 flex items-center leading-tight font-medium"
+        >
           {{ t("onlineEvals.scoreConfig.numericRangeLabel") }}
         </label>
         <div class="flex items-center gap-2.5">
-          <span class="text-text-secondary text-2xs">{{ t("onlineEvals.scoreConfig.minLabel") }}</span>
+          <span class="text-text-secondary text-2xs">{{
+            t("onlineEvals.scoreConfig.minLabel")
+          }}</span>
           <OFormInput
             name="min"
             type="number"
@@ -127,7 +139,9 @@
             field-width="xs"
             data-test="score-config-min-input"
           />
-          <span class="text-text-secondary text-2xs">{{ t("onlineEvals.scoreConfig.maxLabel") }}</span>
+          <span class="text-text-secondary text-2xs">{{
+            t("onlineEvals.scoreConfig.maxLabel")
+          }}</span>
           <OFormInput
             name="max"
             type="number"
@@ -140,7 +154,9 @@
 
       <!-- Categories -->
       <div v-if="formValues.dataType === 'categorical'" class="mb-2.5">
-        <label class="o-input-label text-compact font-medium leading-tight text-input-label-text flex items-center mb-1">
+        <label
+          class="o-input-label text-compact text-input-label-text mb-1 flex items-center leading-tight font-medium"
+        >
           {{ t("onlineEvals.scoreConfig.categoriesLabel") }}
         </label>
         <!-- Categories are a `string[]` OForm field — OFormTagInput binds it by
@@ -155,9 +171,9 @@
       <!-- Boolean info banner -->
       <div
         v-if="formValues.dataType === 'boolean'"
-        class="flex gap-2.5 items-start px-3 py-2.5 bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] border border-dialog-header-border rounded-default text-xs leading-normal text-text-body mb-4"
+        class="border-dialog-header-border rounded-default text-text-body mb-4 flex items-start gap-2.5 border bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] px-3 py-2.5 text-xs leading-normal"
       >
-        <OIcon name="info" size="xs" class="shrink-0 mt-px text-text-secondary" />
+        <OIcon name="info" size="xs" class="text-text-secondary mt-px shrink-0" />
         <span>
           {{ t("onlineEvals.scoreConfig.booleanInfo", { trueLabel: "true", falseLabel: "false" }) }}
         </span>
@@ -165,11 +181,14 @@
 
       <!-- Healthy threshold -->
       <div
-        class="mt-1 pt-3 px-3.5 pb-2.5 border border-dialog-header-border rounded-default bg-[color-mix(in_srgb,var(--color-primary-600)_2.5%,var(--color-card-bg))]"
+        class="border-dialog-header-border rounded-default mt-1 border bg-[color-mix(in_srgb,var(--color-primary-600)_2.5%,var(--color-card-bg))] px-3.5 pt-3 pb-2.5"
       >
-        <div class="flex items-center gap-2.5 mb-3">
+        <div class="mb-3 flex items-center gap-2.5">
           <span class="inline-flex items-center gap-1">
-            <span class="o-input-label text-compact font-medium leading-tight text-input-label-text">{{ t("onlineEvals.scoreConfig.healthyThresholdTitle") }}</span>
+            <span
+              class="o-input-label text-compact text-input-label-text leading-tight font-medium"
+              >{{ t("onlineEvals.scoreConfig.healthyThresholdTitle") }}</span
+            >
             <OIcon name="info-outline" size="sm" class="text-text-secondary">
               <OTooltip
                 :content="t('onlineEvals.scoreConfig.healthyThresholdIntro')"
@@ -182,11 +201,13 @@
 
         <!-- Numeric threshold -->
         <template v-if="formValues.dataType === 'numeric'">
-          <div class="text-xs font-medium text-text-secondary mb-2">{{ t("onlineEvals.scoreConfig.healthyWhenValueIs") }}</div>
+          <div class="text-text-secondary mb-2 text-xs font-medium">
+            {{ t("onlineEvals.scoreConfig.healthyWhenValueIs") }}
+          </div>
           <!-- Narrow drawers (<51.25rem): stack so the label + input don't crush. -->
           <div class="flex flex-col gap-2.5 min-[51.25rem]:flex-row">
             <label
-              class="flex-1 min-w-0 grid grid-cols-[1.125rem_1.25rem_minmax(0,1fr)_5rem] items-center gap-2 px-3 py-1.5 border rounded-default cursor-pointer transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
+              class="rounded-default grid min-w-0 flex-1 cursor-pointer grid-cols-[1.125rem_1.25rem_minmax(0,1fr)_5rem] items-center gap-2 border px-3 py-1.5 transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
               :class="
                 formValues.healthyDirection === 'gte'
                   ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
@@ -200,8 +221,12 @@
                 :checked="formValues.healthyDirection === 'gte'"
                 @change="form.setFieldValue('healthyDirection', 'gte')"
               />
-              <span class="font-mono text-lg font-bold text-text-body text-center">{{ t("onlineEvals.scoreConfig.gteSymbol") }}</span>
-              <span class="text-compact text-text-body">{{ t("onlineEvals.scoreConfig.gteLabel") }}</span>
+              <span class="text-text-body text-center font-mono text-lg font-bold">{{
+                t("onlineEvals.scoreConfig.gteSymbol")
+              }}</span>
+              <span class="text-compact text-text-body">{{
+                t("onlineEvals.scoreConfig.gteLabel")
+              }}</span>
               <OFormInput
                 name="healthyGteValue"
                 type="number"
@@ -213,7 +238,7 @@
               />
             </label>
             <label
-              class="flex-1 min-w-0 grid grid-cols-[1.125rem_1.25rem_minmax(0,1fr)_5rem] items-center gap-2 px-3 py-1.5 border rounded-default cursor-pointer transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
+              class="rounded-default grid min-w-0 flex-1 cursor-pointer grid-cols-[1.125rem_1.25rem_minmax(0,1fr)_5rem] items-center gap-2 border px-3 py-1.5 transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
               :class="
                 formValues.healthyDirection === 'lte'
                   ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
@@ -227,8 +252,12 @@
                 :checked="formValues.healthyDirection === 'lte'"
                 @change="form.setFieldValue('healthyDirection', 'lte')"
               />
-              <span class="font-mono text-lg font-bold text-text-body text-center">{{ t("onlineEvals.scoreConfig.lteSymbol") }}</span>
-              <span class="text-compact text-text-body">{{ t("onlineEvals.scoreConfig.lteLabel") }}</span>
+              <span class="text-text-body text-center font-mono text-lg font-bold">{{
+                t("onlineEvals.scoreConfig.lteSymbol")
+              }}</span>
+              <span class="text-compact text-text-body">{{
+                t("onlineEvals.scoreConfig.lteLabel")
+              }}</span>
               <OFormInput
                 name="healthyLteValue"
                 type="number"
@@ -244,15 +273,24 @@
 
         <!-- Categorical threshold -->
         <template v-else-if="formValues.dataType === 'categorical'">
-          <div class="text-xs font-medium text-text-secondary mb-2">{{ t("onlineEvals.scoreConfig.healthyCategories") }}</div>
-          <div v-if="formValues.categories.length === 0" class="text-2xs italic text-text-secondary px-3 py-2.5 border border-dashed border-dialog-header-border rounded-default bg-card-bg">
-            {{ t("onlineEvals.scoreConfig.addCategoryPlaceholder") }}{{ t("onlineEvals.scoreConfig.ellipsis") }}
+          <div class="text-text-secondary mb-2 text-xs font-medium">
+            {{ t("onlineEvals.scoreConfig.healthyCategories") }}
           </div>
-          <div v-else class="flex flex-col gap-0.5 border border-dialog-header-border rounded-default bg-card-bg p-1">
+          <div
+            v-if="formValues.categories.length === 0"
+            class="text-2xs text-text-secondary border-dialog-header-border rounded-default bg-card-bg border border-dashed px-3 py-2.5 italic"
+          >
+            {{ t("onlineEvals.scoreConfig.addCategoryPlaceholder")
+            }}{{ t("onlineEvals.scoreConfig.ellipsis") }}
+          </div>
+          <div
+            v-else
+            class="border-dialog-header-border rounded-default bg-card-bg flex flex-col gap-0.5 border p-1"
+          >
             <label
               v-for="cat in formValues.categories"
               :key="cat"
-              class="flex items-center gap-2.5 px-2.5 py-1.75 rounded-default cursor-pointer transition-[background] duration-120 hover:bg-[color-mix(in_srgb,var(--color-text-heading)_6%,transparent)]"
+              class="rounded-default flex cursor-pointer items-center gap-2.5 px-2.5 py-1.75 transition-[background] duration-120 hover:bg-[color-mix(in_srgb,var(--color-text-heading)_6%,transparent)]"
               :class="
                 formValues.healthyCategories.includes(cat)
                   ? 'bg-[color-mix(in_srgb,color-mix(in_srgb,var(--color-status-success-text)_14%,transparent)_35%,transparent)]'
@@ -268,19 +306,21 @@
               <span class="font-mono">{{ cat }}</span>
             </label>
           </div>
-          <div class="flex items-center gap-1.5 mt-2 text-2xs text-text-secondary">
-            <OIcon name="info" size="xs" class="shrink-0 text-status-info-text" />
+          <div class="text-2xs text-text-secondary mt-2 flex items-center gap-1.5">
+            <OIcon name="info" size="xs" class="text-status-info-text shrink-0" />
             <span>{{ t("onlineEvals.scoreConfig.healthyCategoriesHint") }}</span>
           </div>
         </template>
 
         <!-- Boolean threshold -->
         <template v-else>
-          <div class="text-xs font-medium text-text-secondary mb-2">{{ t("onlineEvals.scoreConfig.healthyValue") }}</div>
+          <div class="text-text-secondary mb-2 text-xs font-medium">
+            {{ t("onlineEvals.scoreConfig.healthyValue") }}
+          </div>
           <!-- Narrow drawers (<51.25rem): stack so the label + hint don't crush. -->
           <div class="flex flex-col gap-2.5 min-[51.25rem]:flex-row">
             <label
-              class="flex-1 min-w-0 grid grid-cols-[1rem_1fr] items-start gap-2.5 px-3 py-1.75 border rounded-default cursor-pointer transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
+              class="rounded-default grid min-w-0 flex-1 cursor-pointer grid-cols-[1rem_1fr] items-start gap-2.5 border px-3 py-1.75 transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
               :class="
                 formValues.healthyBool === true
                   ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
@@ -295,12 +335,16 @@
                 @change="form.setFieldValue('healthyBool', true)"
               />
               <div>
-                <div class="text-text-body font-mono">{{ t("onlineEvals.scoreConfig.trueIsHealthy") }}</div>
-                <div class="text-2xs text-text-secondary mt-0.5 leading-[1.4]">{{ t("onlineEvals.scoreConfig.trueIsHealthyHint") }}</div>
+                <div class="text-text-body font-mono">
+                  {{ t("onlineEvals.scoreConfig.trueIsHealthy") }}
+                </div>
+                <div class="text-2xs text-text-secondary mt-0.5 leading-[1.4]">
+                  {{ t("onlineEvals.scoreConfig.trueIsHealthyHint") }}
+                </div>
               </div>
             </label>
             <label
-              class="flex-1 min-w-0 grid grid-cols-[1rem_1fr] items-start gap-2.5 px-3 py-1.75 border rounded-default cursor-pointer transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
+              class="rounded-default grid min-w-0 flex-1 cursor-pointer grid-cols-[1rem_1fr] items-start gap-2.5 border px-3 py-1.75 transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
               :class="
                 formValues.healthyBool === false
                   ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
@@ -315,15 +359,21 @@
                 @change="form.setFieldValue('healthyBool', false)"
               />
               <div>
-                <div class="text-text-body font-mono">{{ t("onlineEvals.scoreConfig.falseIsHealthy") }}</div>
-                <div class="text-2xs text-text-secondary mt-0.5 leading-[1.4]">{{ t("onlineEvals.scoreConfig.falseIsHealthyHint") }}</div>
+                <div class="text-text-body font-mono">
+                  {{ t("onlineEvals.scoreConfig.falseIsHealthy") }}
+                </div>
+                <div class="text-2xs text-text-secondary mt-0.5 leading-[1.4]">
+                  {{ t("onlineEvals.scoreConfig.falseIsHealthyHint") }}
+                </div>
               </div>
             </label>
           </div>
         </template>
 
-        <div class="flex items-start gap-1.5 mt-2.5 pt-2 border-t border-dashed border-dialog-header-border text-2xs text-text-secondary leading-normal">
-          <OIcon name="info" size="xs" class="shrink-0 mt-0.5 text-text-secondary" />
+        <div
+          class="border-dialog-header-border text-2xs text-text-secondary mt-2.5 flex items-start gap-1.5 border-t border-dashed pt-2 leading-normal"
+        >
+          <OIcon name="info" size="xs" class="text-text-secondary mt-0.5 shrink-0" />
           <span>{{ t("onlineEvals.scoreConfig.thresholdEmptyHint") }}</span>
         </div>
       </div>
@@ -353,10 +403,7 @@ import onlineEvalsService, {
 } from "@/services/online-evals.service";
 import { dataTypeOf, entityId, valueOf } from "../utils/evalEntity";
 import { showError } from "../utils/evalFormat";
-import {
-  makeScoreConfigSchema,
-  type ScoreConfigForm,
-} from "./ScoreConfigDialog.schema";
+import { makeScoreConfigSchema, type ScoreConfigForm } from "./ScoreConfigDialog.schema";
 
 const props = defineProps<{
   orgId: string;
@@ -382,9 +429,7 @@ function handleOpenChange(value: boolean) {
 
 // Plain-text drawer title. Edit mode shows just the (immutable) config name.
 const drawerTitle = computed(() =>
-  props.mode === "edit" && props.row
-    ? props.row.name
-    : t("onlineEvals.scoreConfig.createTitle"),
+  props.mode === "edit" && props.row ? props.row.name : t("onlineEvals.scoreConfig.createTitle"),
 );
 
 // Data-type radio options.
@@ -468,8 +513,10 @@ function initForm(row: ScoreConfig | null): ScoreConfigForm {
     max: typeof range.max === "number" ? range.max : 1,
     categories: Array.isArray(row.categories) ? [...row.categories] : [],
     healthyDirection: ht.direction === "lte" ? "lte" : "gte",
-    healthyGteValue: ht.direction === "gte" && ht.value !== undefined ? Number(ht.value) : undefined,
-    healthyLteValue: ht.direction === "lte" && ht.value !== undefined ? Number(ht.value) : undefined,
+    healthyGteValue:
+      ht.direction === "gte" && ht.value !== undefined ? Number(ht.value) : undefined,
+    healthyLteValue:
+      ht.direction === "lte" && ht.value !== undefined ? Number(ht.value) : undefined,
     healthyCategories: Array.isArray(ht.healthy_categories)
       ? [...ht.healthy_categories]
       : Array.isArray(ht.healthyCategories)
@@ -502,7 +549,10 @@ watch(
 function toggleHealthyCategory(cat: string) {
   const cur = formValues.value.healthyCategories;
   if (cur.includes(cat)) {
-    form.setFieldValue("healthyCategories", cur.filter((c) => c !== cat));
+    form.setFieldValue(
+      "healthyCategories",
+      cur.filter((c) => c !== cat),
+    );
   } else {
     form.setFieldValue("healthyCategories", [...cur, cat]);
   }

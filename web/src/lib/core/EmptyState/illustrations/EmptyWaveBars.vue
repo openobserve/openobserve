@@ -32,7 +32,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ellipse cx="104" cy="84" rx="86" ry="50" fill="var(--color-primary-500)" opacity="0.06" />
 
     <!-- baseline -->
-    <line x1="56" y1="116" x2="152" y2="116" stroke="var(--color-border-strong)" stroke-width="1.5" stroke-linecap="round" opacity="0.7" />
+    <line
+      x1="56"
+      y1="116"
+      x2="152"
+      y2="116"
+      stroke="var(--color-border-strong)"
+      stroke-width="1.5"
+      stroke-linecap="round"
+      opacity="0.7"
+    />
 
     <!-- oscillating bars -->
     <g>
@@ -46,8 +55,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         rx="3"
         :fill="bar.fill"
       >
-        <animate v-if="animated" attributeName="height" :values="bar.heights" :dur="bar.dur" repeatCount="indefinite" :begin="bar.begin" calcMode="spline" :keySplines="splines" keyTimes="0;0.5;1" />
-        <animate v-if="animated" attributeName="y" :values="bar.ys" :dur="bar.dur" repeatCount="indefinite" :begin="bar.begin" calcMode="spline" :keySplines="splines" keyTimes="0;0.5;1" />
+        <animate
+          v-if="animated"
+          attributeName="height"
+          :values="bar.heights"
+          :dur="bar.dur"
+          repeatCount="indefinite"
+          :begin="bar.begin"
+          calcMode="spline"
+          :keySplines="splines"
+          keyTimes="0;0.5;1"
+        />
+        <animate
+          v-if="animated"
+          attributeName="y"
+          :values="bar.ys"
+          :dur="bar.dur"
+          repeatCount="indefinite"
+          :begin="bar.begin"
+          calcMode="spline"
+          :keySplines="splines"
+          keyTimes="0;0.5;1"
+        />
       </rect>
     </g>
   </svg>
@@ -58,10 +87,7 @@ import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
 
-withDefaults(
-  defineProps<{ width?: number; animated?: boolean }>(),
-  { width: 208, animated: true },
-);
+withDefaults(defineProps<{ width?: number; animated?: boolean }>(), { width: 208, animated: true });
 
 const BASE = 116;
 const splines = "0.4 0 0.2 1;0.4 0 0.2 1";

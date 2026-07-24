@@ -15,9 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="rca-analysis-container" class="flex flex-col flex-1 overflow-hidden">
+  <div data-test="rca-analysis-container" class="flex flex-1 flex-col overflow-hidden">
     <!-- Trigger button when no analysis exists and not loading and not in-flight -->
-    <div v-if="!hasExistingRca && !rcaLoading && !analysisInFlight" data-test="rca-trigger-section" class="mb-2 flex-shrink-0">
+    <div
+      v-if="!hasExistingRca && !rcaLoading && !analysisInFlight"
+      data-test="rca-trigger-section"
+      class="mb-2 flex-shrink-0"
+    >
       <OButton
         data-test="trigger-rca-btn"
         variant="outline"
@@ -25,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disabled="rcaLoading"
         @click="$emit('trigger-rca')"
       >
-        {{ t('alerts.analyzeIncident') }}
+        {{ t("alerts.analyzeIncident") }}
       </OButton>
     </div>
 
@@ -33,19 +37,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="analysisInFlight || rcaLoading"
       data-test="rca-inflight-container"
-      class="flex items-center gap-3 rounded-default px-4 py-3 mb-2 flex-shrink-0 bg-status-info-bg border border-banner-info-border"
+      class="rounded-default bg-status-info-bg border-banner-info-border mb-2 flex flex-shrink-0 items-center gap-3 border px-4 py-3"
     >
       <OSpinner variant="dots" size="xs" />
       <div>
-        <p
-          class="text-sm font-medium mb-0 text-status-info-text"
-        >
-          {{ hasExistingRca ? 'AI SRE Agent is seeing what changed since the last analysis…' : 'AI SRE Agent is analyzing this incident, please wait…' }}
+        <p class="text-status-info-text mb-0 text-sm font-medium">
+          {{
+            hasExistingRca
+              ? "AI SRE Agent is seeing what changed since the last analysis…"
+              : "AI SRE Agent is analyzing this incident, please wait…"
+          }}
         </p>
-        <p
-          class="text-xs mt-0.5 mb-0 text-status-info-text opacity-70"
-        >
-          {{ hasExistingRca ? 'The report will be updated once the analysis is complete.' : 'The report will appear here once the analysis is complete.' }}
+        <p class="text-status-info-text mt-0.5 mb-0 text-xs opacity-70">
+          {{
+            hasExistingRca
+              ? "The report will be updated once the analysis is complete."
+              : "The report will appear here once the analysis is complete."
+          }}
         </p>
       </div>
     </div>
@@ -54,20 +62,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="rcaLoading && rcaStreamContent"
       data-test="rca-stream-container"
-      class="rca-container rounded-default p-3 flex-1 overflow-auto border bg-surface-base border-border-default"
+      class="rca-container rounded-default bg-surface-base border-border-default flex-1 overflow-auto border p-3"
     >
       <div
         data-test="rca-stream-content"
-        class="text-sm whitespace-pre-wrap rca-content"
+        class="rca-content text-sm whitespace-pre-wrap"
         v-html="sanitize(formattedRcaContent)"
       />
     </div>
 
     <!-- Existing analysis content -->
-    <div v-else-if="hasExistingRca && !rcaLoading" data-test="rca-existing-container" class="rca-container rounded-default p-3 flex-1 overflow-auto border bg-surface-base border-border-default">
+    <div
+      v-else-if="hasExistingRca && !rcaLoading"
+      data-test="rca-existing-container"
+      class="rca-container rounded-default bg-surface-base border-border-default flex-1 overflow-auto border p-3"
+    >
       <div
         data-test="rca-existing-content"
-        class="text-sm whitespace-pre-wrap rca-content"
+        class="rca-content text-sm whitespace-pre-wrap"
         v-html="sanitize(formattedRcaContent)"
       />
     </div>
@@ -110,7 +122,7 @@ export default defineComponent({
       default: false,
     },
   },
-  emits: ['trigger-rca'],
+  emits: ["trigger-rca"],
   setup() {
     const { t } = useI18n();
     return { t };
@@ -216,7 +228,7 @@ export default defineComponent({
     padding-left: 1rem;
 
     &::before {
-      content: '»';
+      content: "»";
       position: absolute;
       left: 0rem;
       top: 50%;
@@ -275,7 +287,11 @@ export default defineComponent({
     border: 1px solid var(--rca-border-secondary);
 
     thead {
-      background: linear-gradient(to bottom, var(--rca-bg-secondary) 0%, var(--rca-bg-secondary) 100%);
+      background: linear-gradient(
+        to bottom,
+        var(--rca-bg-secondary) 0%,
+        var(--rca-bg-secondary) 100%
+      );
       border-bottom: 0.125rem solid var(--rca-border-primary);
     }
 

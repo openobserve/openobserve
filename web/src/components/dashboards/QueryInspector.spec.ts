@@ -36,7 +36,6 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
 
-
 // ── ODialog / OButton stubs ──────────────────────────────────────────────────
 // Stub preserves the slot content (so child rendering can be asserted) and
 // re-emits the events that the component listens for: update:open.
@@ -754,7 +753,7 @@ describe("QueryInspector", () => {
 
       // Mock RegExp constructor to throw, simulating a regex error in the highlight path
       const OriginalRegExp = global.RegExp;
-      const spy = vi.spyOn(global, 'RegExp').mockImplementationOnce(() => {
+      const spy = vi.spyOn(global, "RegExp").mockImplementationOnce(() => {
         throw new Error("Regex error");
       });
 
@@ -1060,7 +1059,8 @@ describe("QueryInspector", () => {
     });
 
     it("should handle very long query strings", async () => {
-      const longQuery = "SELECT * FROM logs WHERE " + "condition AND ".repeat(100) + "final_condition";
+      const longQuery =
+        "SELECT * FROM logs WHERE " + "condition AND ".repeat(100) + "final_condition";
 
       wrapper = createWrapper({
         metaData: {
@@ -1211,9 +1211,7 @@ describe("QueryInspector", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      const searchInput = wrapper.find(
-        '[data-test="query-inspector-search"] input',
-      );
+      const searchInput = wrapper.find('[data-test="query-inspector-search"] input');
       expect(searchInput.exists()).toBe(true);
 
       // Simulate user typing into the search input

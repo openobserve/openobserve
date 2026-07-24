@@ -15,27 +15,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="toc-container" class="px-2 pt-4 pb-2 flex flex-col h-full overflow-hidden">
+  <div data-test="toc-container" class="flex h-full flex-col overflow-hidden px-2 pt-4 pb-2">
     <div
       data-test="toc-section-container"
-      class="overflow-hidden flex flex-col flex-1 border border-card-glass-border rounded-default"
+      class="border-card-glass-border rounded-default flex flex-1 flex-col overflow-hidden border"
     >
       <!-- Header -->
       <div
         data-test="toc-header"
-        class="px-3 py-2 flex items-center gap-2 border-b flex-shrink-0 border-border-default !bg-[var(--color-theme-table-header-bg)]"
+        class="border-border-default flex flex-shrink-0 items-center gap-2 border-b !bg-[var(--color-theme-table-header-bg)] px-3 py-2"
       >
-        <OIcon data-test="toc-header-icon" name="format-list-bulleted" size="sm" class="opacity-80" />
-        <span data-test="toc-header-title" class="text-xs font-semibold text-text-body">
-          {{ t('alerts.incidents.tableOfContents') }}
+        <OIcon
+          data-test="toc-header-icon"
+          name="format-list-bulleted"
+          size="sm"
+          class="opacity-80"
+        />
+        <span data-test="toc-header-title" class="text-text-body text-xs font-semibold">
+          {{ t("alerts.incidents.tableOfContents") }}
         </span>
       </div>
 
       <!-- Content -->
-      <div data-test="toc-content" class="p-3 flex-1 overflow-auto">
+      <div data-test="toc-content" class="flex-1 overflow-auto p-3">
         <!-- Table of Contents -->
-        <div v-if="tableOfContents.length === 0" data-test="toc-empty-state" class="text-xs italic text-text-secondary">
-          {{ t('alerts.incidents.noSectionsAvailable') }}
+        <div
+          v-if="tableOfContents.length === 0"
+          data-test="toc-empty-state"
+          class="text-text-secondary text-xs italic"
+        >
+          {{ t("alerts.incidents.noSectionsAvailable") }}
         </div>
         <div v-else class="space-y-1">
           <!-- TOC Items -->
@@ -44,21 +53,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Level 1 Item -->
               <div
                 :data-test="`toc-level1-content-${item.id}`"
-                class="flex items-center gap-2 px-2 py-1.5 rounded-default transition-colors text-text-heading"
+                class="rounded-default text-text-heading flex items-center gap-2 px-2 py-1.5 transition-colors"
               >
                 <!-- Icon on the left -->
                 <OIcon
                   :data-test="`toc-level1-icon-${item.id}`"
                   :name="item.children.length > 0 ? 'folder' : 'article'"
                   size="sm"
-                  class="opacity-60 flex-shrink-0"
+                  class="flex-shrink-0 opacity-60"
                 />
                 <!-- Text in the middle - clickable to scroll -->
                 <span
                   :data-test="`toc-level1-text-${item.id}`"
                   @click="$emit('scroll-to-section', item.id)"
-                  class="text-xs font-medium truncate flex-1 cursor-pointer hover:text-text-link-hover"
-                >{{ item.text }}</span>
+                  class="hover:text-text-link-hover flex-1 cursor-pointer truncate text-xs font-medium"
+                  >{{ item.text }}</span
+                >
                 <!-- Expand button on the right (only for items with children) -->
                 <OButton
                   v-if="item.children.length > 0"
@@ -68,33 +78,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="$emit('toggle-section', item, $event)"
                   class="flex-shrink-0"
                 >
-                  <OIcon :name="expandedSections[item.id] ? 'expand-more' : 'chevron-right'" size="sm" />
-                  <OTooltip :content="expandedSections[item.id] ? 'Collapse' : 'Expand'" side="top" />
+                  <OIcon
+                    :name="expandedSections[item.id] ? 'expand-more' : 'chevron-right'"
+                    size="sm"
+                  />
+                  <OTooltip
+                    :content="expandedSections[item.id] ? 'Collapse' : 'Expand'"
+                    side="top"
+                  />
                 </OButton>
               </div>
 
               <!-- Level 2 Children -->
-              <div v-if="expandedSections[item.id] && item.children.length > 0" :data-test="`toc-level2-container-${item.id}`" class="ml-4 space-y-1 mt-1">
+              <div
+                v-if="expandedSections[item.id] && item.children.length > 0"
+                :data-test="`toc-level2-container-${item.id}`"
+                class="mt-1 ml-4 space-y-1"
+              >
                 <template v-for="child in item.children" :key="child.id">
                   <div :data-test="`toc-level2-item-${child.id}`">
                     <!-- Level 2 Item -->
                     <div
                       :data-test="`toc-level2-content-${child.id}`"
-                      class="flex items-center gap-2 px-2 py-1 rounded-default transition-colors text-text-body"
+                      class="rounded-default text-text-body flex items-center gap-2 px-2 py-1 transition-colors"
                     >
                       <!-- Icon on the left -->
                       <OIcon
                         :data-test="`toc-level2-icon-${child.id}`"
                         name="label"
                         size="xs"
-                        class="opacity-60 flex-shrink-0"
+                        class="flex-shrink-0 opacity-60"
                       />
                       <!-- Text in the middle - clickable to scroll -->
                       <span
                         :data-test="`toc-level2-text-${child.id}`"
                         @click="$emit('scroll-to-section', child.id)"
-                        class="text-xs truncate flex-1 cursor-pointer hover:text-text-link-hover"
-                      >{{ child.text }}</span>
+                        class="hover:text-text-link-hover flex-1 cursor-pointer truncate text-xs"
+                        >{{ child.text }}</span
+                      >
                       <!-- Expand button on the right (only for items with children) -->
                       <OButton
                         v-if="child.children.length > 0"
@@ -104,22 +125,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @click="$emit('toggle-section', child, $event)"
                         class="flex-shrink-0"
                       >
-                        <OIcon :name="expandedSections[child.id] ? 'expand-more' : 'chevron-right'" size="sm" />
-                        <OTooltip :content="expandedSections[child.id] ? 'Collapse' : 'Expand'" side="top" />
+                        <OIcon
+                          :name="expandedSections[child.id] ? 'expand-more' : 'chevron-right'"
+                          size="sm"
+                        />
+                        <OTooltip
+                          :content="expandedSections[child.id] ? 'Collapse' : 'Expand'"
+                          side="top"
+                        />
                       </OButton>
                     </div>
 
                     <!-- Level 3 Children -->
-                    <div v-if="expandedSections[child.id] && child.children.length > 0" :data-test="`toc-level3-container-${child.id}`" class="ml-4 space-y-1 mt-1">
+                    <div
+                      v-if="expandedSections[child.id] && child.children.length > 0"
+                      :data-test="`toc-level3-container-${child.id}`"
+                      class="mt-1 ml-4 space-y-1"
+                    >
                       <div
                         v-for="grandchild in child.children"
                         :key="grandchild.id"
                         :data-test="`toc-level3-item-${grandchild.id}`"
                         @click="$emit('scroll-to-section', grandchild.id)"
-                        class="flex items-center gap-2 px-2 py-1 rounded-default cursor-pointer transition-colors text-text-secondary hover:bg-surface-subtle-hover"
+                        class="rounded-default text-text-secondary hover:bg-surface-subtle-hover flex cursor-pointer items-center gap-2 px-2 py-1 transition-colors"
                       >
-                        <OIcon :data-test="`toc-level3-icon-${grandchild.id}`" name="fiber-manual-record" size="xs" class="opacity-60" />
-                        <span :data-test="`toc-level3-text-${grandchild.id}`" class="text-2xs truncate">{{ grandchild.text }}</span>
+                        <OIcon
+                          :data-test="`toc-level3-icon-${grandchild.id}`"
+                          name="fiber-manual-record"
+                          size="xs"
+                          class="opacity-60"
+                        />
+                        <span
+                          :data-test="`toc-level3-text-${grandchild.id}`"
+                          class="text-2xs truncate"
+                          >{{ grandchild.text }}</span
+                        >
                       </div>
                     </div>
                   </div>
@@ -150,10 +190,7 @@ interface TocItem {
 
 export default defineComponent({
   name: "IncidentTableOfContents",
-  components: { OButton,
-    OIcon,
-    OTooltip,
-},
+  components: { OButton, OIcon, OTooltip },
   props: {
     tableOfContents: {
       type: Array as PropType<TocItem[]>,
@@ -168,7 +205,7 @@ export default defineComponent({
       required: true,
     },
   },
-  emits: ['scroll-to-section', 'toggle-section'],
+  emits: ["scroll-to-section", "toggle-section"],
   setup() {
     const { t } = useI18n();
     return { t };

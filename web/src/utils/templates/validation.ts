@@ -39,7 +39,7 @@ export function validateTemplateBody(body: string): {
     if (/^\{[a-zA-Z0-9_.:]+\}$/.test(testBody)) {
       return {
         valid: false,
-        error: "A single placeholder cannot be the entire JSON body"
+        error: "A single placeholder cannot be the entire JSON body",
       };
     }
 
@@ -67,12 +67,12 @@ export function validateTemplateBody(body: string): {
 
     return {
       valid: true,
-      transformed: testBody
+      transformed: testBody,
     };
   } catch (error) {
     return {
       valid: false,
-      error: error instanceof Error ? error.message : "Invalid JSON format"
+      error: error instanceof Error ? error.message : "Invalid JSON format",
     };
   }
 }
@@ -81,7 +81,7 @@ export function validateTemplateBody(body: string): {
  * Get a user-friendly error message for template validation
  */
 export function getTemplateValidationErrorMessage(): string {
-  return "Please enter valid JSON in template body. Placeholders like {value} for numbers and \"{name}\" for strings are supported.";
+  return 'Please enter valid JSON in template body. Placeholders like {value} for numbers and "{name}" for strings are supported.';
 }
 
 /**
@@ -89,30 +89,30 @@ export function getTemplateValidationErrorMessage(): string {
  */
 export const PLACEHOLDER_SYNTAX_DOCS = {
   numeric: {
-    syntax: '{placeholder}',
+    syntax: "{placeholder}",
     example: '{"count": {total}}',
-    description: 'Use bare placeholders for numeric values'
+    description: "Use bare placeholders for numeric values",
   },
   string: {
     syntax: '"{placeholder}"',
     example: '{"name": "{username}"}',
-    description: 'Use quoted placeholders for string values'
+    description: "Use quoted placeholders for string values",
   },
   special: {
-    syntax: '{placeholder:value}',
+    syntax: "{placeholder:value}",
     example: '{"limit": {rows:10}}',
-    description: 'Colon syntax supported for special cases'
+    description: "Colon syntax supported for special cases",
   },
   arrays: {
-    syntax: '[{item}, ...]',
-    example: '[{item1}, {item2}]',
-    description: 'Placeholders can be used in arrays'
+    syntax: "[{item}, ...]",
+    example: "[{item1}, {item2}]",
+    description: "Placeholders can be used in arrays",
   },
   nested: {
     syntax: '{"outer": {"inner": {value}}}',
     example: '{"data": {"metrics": {count}}}',
-    description: 'Placeholders work in nested structures'
-  }
+    description: "Placeholders work in nested structures",
+  },
 };
 
 /**
@@ -120,16 +120,16 @@ export const PLACEHOLDER_SYNTAX_DOCS = {
  */
 export const TEMPLATE_EXAMPLES = [
   {
-    name: 'Simple Alert',
+    name: "Simple Alert",
     template: `{
   "alert": "{alert_name}",
   "value": {alert_value},
   "threshold": {threshold}
 }`,
-    description: 'Basic alert with mixed placeholder types'
+    description: "Basic alert with mixed placeholder types",
   },
   {
-    name: 'Metrics Array',
+    name: "Metrics Array",
     template: `[
   {
     "__name__": "metric_name",
@@ -138,10 +138,10 @@ export const TEMPLATE_EXAMPLES = [
     "value": {value}
   }
 ]`,
-    description: 'Array of metrics with placeholders'
+    description: "Array of metrics with placeholders",
   },
   {
-    name: 'Complex Nested',
+    name: "Complex Nested",
     template: `{
   "alerts": [
     {
@@ -154,6 +154,6 @@ export const TEMPLATE_EXAMPLES = [
     }
   ]
 }`,
-    description: 'Complex nested structure with multiple placeholders'
-  }
+    description: "Complex nested structure with multiple placeholders",
+  },
 ];

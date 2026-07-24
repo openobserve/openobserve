@@ -67,12 +67,8 @@ export function useLogsHighlighter() {
     },
   );
 
-  const {
-    processTextWithHighlights,
-    extractKeywords,
-    splitTextByKeywords,
-    isFTSColumn,
-  } = useTextHighlighter();
+  const { processTextWithHighlights, extractKeywords, splitTextByKeywords, isFTSColumn } =
+    useTextHighlighter();
 
   /**
    * Process hits array in chunks to avoid blocking the main thread
@@ -141,9 +137,7 @@ export function useLogsHighlighter() {
               columns[columnIndex].id === "source" ||
               isFTSColumn(
                 columns[columnIndex].id,
-                columns[columnIndex].id === "source"
-                  ? hit
-                  : hit[columns[columnIndex].id],
+                columns[columnIndex].id === "source" ? hit : hit[columns[columnIndex].id],
                 selectedStreamFtsKeys,
               )
             ),
@@ -255,8 +249,7 @@ export function useLogsHighlighter() {
       if (keys.length === 0) return 2; // "{}" or "[]"
 
       // For very large objects (50+ fields), sample more aggressively
-      const sampleSize =
-        keys.length > 50 ? Math.min(10, keys.length) : Math.min(5, keys.length);
+      const sampleSize = keys.length > 50 ? Math.min(10, keys.length) : Math.min(5, keys.length);
       let totalSize = 0;
 
       // Sample values to estimate
@@ -301,10 +294,7 @@ export function useLogsHighlighter() {
   const truncateLargeContent = (data: any, maxSize: number = 50000): string => {
     if (typeof data === "string") {
       if (data.length > maxSize) {
-        return (
-          data.substring(0, maxSize) +
-          `... [truncated, original size: ${data.length} chars]`
-        );
+        return data.substring(0, maxSize) + `... [truncated, original size: ${data.length} chars]`;
       }
       return data;
     }
@@ -370,12 +360,7 @@ export function useLogsHighlighter() {
 
     // Handle single string values with semantic colorization and highlighting
     if (typeof data === "string") {
-      return processTextWithHighlights(
-        data,
-        effectiveQueryString,
-        currentColors.value,
-        showQuotes,
-      );
+      return processTextWithHighlights(data, effectiveQueryString, currentColors.value, showQuotes);
     }
 
     // Handle primitive data types
@@ -426,12 +411,7 @@ export function useLogsHighlighter() {
     // Handle complex objects with full JSON colorization
     //this is for objects and arrays if any
     try {
-      return colorizeObjectWithClasses(
-        data,
-        showBraces,
-        showQuotes,
-        effectiveQueryString,
-      );
+      return colorizeObjectWithClasses(data, showBraces, showQuotes, effectiveQueryString);
     } catch (error) {
       return escapeHtml(JSON.stringify(data));
     }
@@ -476,8 +456,7 @@ export function useLogsHighlighter() {
     if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return "email";
 
     // HTTP methods
-    if (/^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)$/i.test(trimmed))
-      return "http-method";
+    if (/^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)$/i.test(trimmed)) return "http-method";
 
     // HTTP Status codes - only match valid status codes
     // 1xx: Informational (100-103)
@@ -493,11 +472,7 @@ export function useLogsHighlighter() {
       return "status-code";
 
     // UUIDs
-    if (
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        trimmed,
-      )
-    )
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed))
       return "uuid";
 
     // File paths
@@ -563,12 +538,7 @@ export function useLogsHighlighter() {
     showQuotes: boolean = false,
   ): string {
     const semanticType = detectSemanticType(text);
-    return createStyledSpanWithClasses(
-      text,
-      semanticType,
-      queryString,
-      showQuotes,
-    );
+    return createStyledSpanWithClasses(text, semanticType, queryString, showQuotes);
   }
 
   /**
@@ -628,28 +598,12 @@ export function useLogsHighlighter() {
 
       // VALUES: Colored based on type + highlighted if matches search
       if (value === null) {
-        parts.push(
-          createStyledSpanWithClasses("null", "null", queryString, false),
-        );
+        parts.push(createStyledSpanWithClasses("null", "null", queryString, false));
       } else if (typeof value === "boolean") {
-        parts.push(
-          createStyledSpanWithClasses(
-            String(value),
-            "boolean",
-            queryString,
-            false,
-          ),
-        );
+        parts.push(createStyledSpanWithClasses(String(value), "boolean", queryString, false));
       } else if (typeof value === "number") {
         const numType = String(value).length >= 13 ? "timestamp" : "number";
-        parts.push(
-          createStyledSpanWithClasses(
-            String(value),
-            numType,
-            queryString,
-            false,
-          ),
-        );
+        parts.push(createStyledSpanWithClasses(String(value), numType, queryString, false));
       } else if (typeof value === "string") {
         // STRING VALUES: Detect semantic type and use appropriate class
         if (isLogLineWithMixedContent(value)) {
@@ -664,36 +618,17 @@ export function useLogsHighlighter() {
         } else {
           // Regular string processing with semantic detection
           parts.push(
-            processTextWithHighlights(
-              value,
-              queryString,
-              currentColors.value,
-              showQuotes,
-            ),
+            processTextWithHighlights(value, queryString, currentColors.value, showQuotes),
           );
         }
       } else if (typeof value === "object") {
         // NESTED OBJECTS/ARRAYS: Convert to JSON string and treat as object value
         const objStr = JSON.stringify(value);
-        parts.push(
-          createStyledSpanWithClasses(
-            objStr,
-            "object-value",
-            queryString,
-            showQuotes,
-          ),
-        );
+        parts.push(createStyledSpanWithClasses(objStr, "object-value", queryString, showQuotes));
       } else {
         // FALLBACK: Any other type (functions, symbols, etc.)
         const strValue = String(value);
-        parts.push(
-          createStyledSpanWithClasses(
-            strValue,
-            "default",
-            queryString,
-            showQuotes,
-          ),
-        );
+        parts.push(createStyledSpanWithClasses(strValue, "default", queryString, showQuotes));
       }
 
       // Add comma separator (except for last item): ","
@@ -760,12 +695,7 @@ export function useLogsHighlighter() {
 
     // Handle single string values with semantic colorization and highlighting
     if (typeof data === "string") {
-      return processTextWithHighlights(
-        data,
-        queryString,
-        currentColors,
-        showQuotes,
-      );
+      return processTextWithHighlights(data, queryString, currentColors, showQuotes);
     }
 
     // Handle primitive data types
@@ -775,53 +705,22 @@ export function useLogsHighlighter() {
       if (typeof data === "number") {
         // Detect timestamp-like numbers
         if (dataStr.length >= 13) {
-          return createStyledSpan(
-            dataStr,
-            currentColors.timestamp,
-            queryString,
-            false,
-          );
+          return createStyledSpan(dataStr, currentColors.timestamp, queryString, false);
         } else {
-          return createStyledSpan(
-            dataStr,
-            currentColors.numberValue,
-            queryString,
-            false,
-          );
+          return createStyledSpan(dataStr, currentColors.numberValue, queryString, false);
         }
       } else if (typeof data === "boolean") {
-        return createStyledSpan(
-          String(data),
-          currentColors.booleanValue,
-          queryString,
-          false,
-        );
+        return createStyledSpan(String(data), currentColors.booleanValue, queryString, false);
       } else if (data === null) {
-        return createStyledSpan(
-          "null",
-          currentColors.nullValue,
-          queryString,
-          false,
-        );
+        return createStyledSpan("null", currentColors.nullValue, queryString, false);
       } else {
-        return processTextWithHighlights(
-          dataStr,
-          queryString,
-          currentColors,
-          showQuotes,
-        );
+        return processTextWithHighlights(dataStr, queryString, currentColors, showQuotes);
       }
     }
 
     // Handle complex objects with full JSON colorization
     try {
-      return colorizeObject(
-        data,
-        currentColors,
-        showBraces,
-        showQuotes,
-        queryString,
-      );
+      return colorizeObject(data, currentColors, showBraces, showQuotes, queryString);
     } catch (error) {
       return escapeHtml(JSON.stringify(data));
     }
@@ -846,15 +745,7 @@ export function useLogsHighlighter() {
 
     // For non-objects, use regular colorization
     if (typeof data !== "object") {
-      return colorizeJson(
-        data,
-        isDarkTheme,
-        showBraces,
-        showQuotes,
-        queryString,
-        false,
-        true,
-      );
+      return colorizeJson(data, isDarkTheme, showBraces, showQuotes, queryString, false, true);
     }
 
     const currentColors = getThemeColors(isDarkTheme);
@@ -877,14 +768,12 @@ export function useLogsHighlighter() {
         let processedValue = value;
         if (typeof value === "string" && value.length > 100000) {
           processedValue =
-            value.substring(0, 100000) +
-            `... [field truncated, ${value.length} chars]`;
+            value.substring(0, 100000) + `... [field truncated, ${value.length} chars]`;
         } else if (typeof value === "object" && value !== null) {
           const valueStr = JSON.stringify(value);
           if (valueStr.length > 100000) {
             processedValue =
-              valueStr.substring(0, 100000) +
-              `... [field truncated, ${valueStr.length} chars]`;
+              valueStr.substring(0, 100000) + `... [field truncated, ${valueStr.length} chars]`;
           }
         }
 

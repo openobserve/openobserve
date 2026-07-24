@@ -36,121 +36,111 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :location-names="locationNames"
     @update-status="emit('update-status', $event)"
   />
-  <OPageLayout
-    v-else
-    class="run-detail"
-    data-test="synthetics-run-detail"
-    bleed
-  >
+  <OPageLayout v-else class="run-detail" data-test="synthetics-run-detail" bleed>
     <!-- ════════ HEADER ════════ -->
     <template #header v-if="!drawerMode">
-    <OPageHeader
-      class=""
-      :subtitle="currentRun.timestamp"
-      :back="{
-        label: t('synthetics.results.monitors'),
-        to: { name: 'synthetic-monitor-results', params: { id: monitorId } },
-        dataTest: 'synthetics-run-detail-back-btn',
-      }"
-    >
-      <template #title>
-        <span data-test="synthetics-run-detail-title">{{ displayMonitorName }}</span>
-      </template>
-      <template #title-trail>
-        <OBadge
-          :variant="statusBadgeVariant"
-          size="sm"
-          :icon="statusIcon"
-          data-test="synthetics-run-detail-status-badge"
-        >
-          {{ statusLabel }}
-        </OBadge>
-        <OBadge
-          v-if="currentRun.url"
-          variant="default"
-          size="sm"
-          icon="link"
-          class="truncate max-w-50"
-          data-test="synthetics-run-detail-url-badge"
-        >
-          {{ currentRun.url }}
-        </OBadge>
-        <div class="flex ml-1">
+      <OPageHeader
+        class=""
+        :subtitle="currentRun.timestamp"
+        :back="{
+          label: t('synthetics.results.monitors'),
+          to: { name: 'synthetic-monitor-results', params: { id: monitorId } },
+          dataTest: 'synthetics-run-detail-back-btn',
+        }"
+      >
+        <template #title>
+          <span data-test="synthetics-run-detail-title">{{ displayMonitorName }}</span>
+        </template>
+        <template #title-trail>
+          <OBadge
+            :variant="statusBadgeVariant"
+            size="sm"
+            :icon="statusIcon"
+            data-test="synthetics-run-detail-status-badge"
+          >
+            {{ statusLabel }}
+          </OBadge>
+          <OBadge
+            v-if="currentRun.url"
+            variant="default"
+            size="sm"
+            icon="link"
+            class="max-w-50 truncate"
+            data-test="synthetics-run-detail-url-badge"
+          >
+            {{ currentRun.url }}
+          </OBadge>
+          <div class="ml-1 flex">
+            <OButton
+              variant="ghost"
+              size="icon-xs"
+              icon-left="chevron-left"
+              :disabled="true"
+              data-test="synthetics-run-detail-prev-btn"
+            />
+            <OButton
+              variant="ghost"
+              size="icon-xs"
+              icon-left="chevron-right"
+              :disabled="true"
+              data-test="synthetics-run-detail-next-btn"
+            />
+          </div>
+        </template>
+        <template #actions>
           <OButton
-            variant="ghost"
-            size="icon-xs"
-            icon-left="chevron-left"
-            :disabled="true"
-            data-test="synthetics-run-detail-prev-btn"
-          />
+            variant="outline"
+            size="sm"
+            icon-left="open-in-new"
+            data-test="synthetics-run-detail-trace-btn"
+          >
+            {{ t("synthetics.runDetail.openTrace") }}
+          </OButton>
           <OButton
-            variant="ghost"
-            size="icon-xs"
-            icon-left="chevron-right"
-            :disabled="true"
-            data-test="synthetics-run-detail-next-btn"
-          />
-        </div>
-      </template>
-      <template #actions>
-        <OButton
-          variant="outline"
-          size="sm"
-          icon-left="open-in-new"
-          data-test="synthetics-run-detail-trace-btn"
-        >
-          {{ t('synthetics.runDetail.openTrace') }}
-        </OButton>
-        <OButton
-          variant="outline"
-          size="sm"
-          icon-left="replay"
-          data-test="synthetics-run-detail-rerun-btn"
-        >
-          {{ t('synthetics.journey.reRun') }}
-        </OButton>
-      </template>
-    </OPageHeader>
+            variant="outline"
+            size="sm"
+            icon-left="replay"
+            data-test="synthetics-run-detail-rerun-btn"
+          >
+            {{ t("synthetics.journey.reRun") }}
+          </OButton>
+        </template>
+      </OPageHeader>
     </template>
 
     <!-- ════════ SUB TABS ════════ -->
-    <OTabs
-      v-model="activeTab"
-      class="shrink-0 px-page-edge border-b border-border-default"
-    >
+    <OTabs v-model="activeTab" class="px-page-edge border-border-default shrink-0 border-b">
       <OTab name="summary" data-test="synthetics-run-detail-tab-summary">
         <span class="flex items-center gap-1.5">
           <OIcon name="article" size="sm" />
-          {{ t('synthetics.runDetail.tabSummary') }}
+          {{ t("synthetics.runDetail.tabSummary") }}
         </span>
       </OTab>
       <OTab name="logs" data-test="synthetics-run-detail-tab-logs">
         <span class="flex items-center gap-1.5">
           <OIcon name="search" size="sm" />
-          {{ t('synthetics.runDetail.tabLogs') }}
+          {{ t("synthetics.runDetail.tabLogs") }}
         </span>
       </OTab>
       <OTab name="traces" data-test="synthetics-run-detail-tab-traces">
         <span class="flex items-center gap-1.5">
           <OIcon name="account-tree" size="sm" />
-          {{ t('synthetics.runDetail.tabTraces') }}
+          {{ t("synthetics.runDetail.tabTraces") }}
         </span>
       </OTab>
       <OTab name="rum" data-test="synthetics-run-detail-tab-rum">
         <span class="flex items-center gap-1.5">
           <OIcon name="devices" size="sm" />
-          {{ t('synthetics.runDetail.tabRum') }}
+          {{ t("synthetics.runDetail.tabRum") }}
         </span>
       </OTab>
     </OTabs>
 
-    <div class="flex-1 min-h-0">
+    <div class="min-h-0 flex-1">
       <OTabPanels v-model="activeTab" grow scroll="y" class="h-full min-h-0">
         <!-- ════════════ SUMMARY ════════════ -->
         <OTabPanel name="summary" data-test="synthetics-run-detail-summary-tab">
-          <div
-            class="py-3.5 pb-7 flex flex-col"
-          >
+          <div class="flex flex-col py-3.5 pb-7">
             <!-- Info chips skeleton -->
             <template v-if="loading">
               <div
@@ -160,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="i in 5"
                   :key="i"
-                  class="card-container rounded-default flex flex-row items-center px-3.5 py-2.5 gap-1.5 bg-surface-base border border-border-default"
+                  class="card-container rounded-default bg-surface-base border-border-default flex flex-row items-center gap-1.5 border px-3.5 py-2.5"
                 >
                   <OSkeleton type="circle" class="h-4 w-4 shrink-0" />
                   <OSkeleton type="text" class="h-4 w-20" />
@@ -169,14 +159,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <!-- Info chips -->
             <template v-else>
-              <div
-                class="grid grid-cols-5 gap-2.5 px-2"
-                data-test="synthetics-run-detail-info-bar"
-              >
+              <div class="grid grid-cols-5 gap-2.5 px-2" data-test="synthetics-run-detail-info-bar">
                 <div
                   v-for="chip in infoChips"
                   :key="chip.label"
-                  class="card-container rounded-default flex flex-row items-center px-3.5 py-2.5 gap-1.5 bg-surface-base border border-border-default"
+                  class="card-container rounded-default bg-surface-base border-border-default flex flex-row items-center gap-1.5 border px-3.5 py-2.5"
                 >
                   <OIcon
                     v-if="chip.icon"
@@ -186,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :class="chip.colorClass ? chip.colorClass : ''"
                   />
                   <span
-                    class="text-sm leading-none truncate"
+                    class="truncate text-sm leading-none"
                     :class="chip.colorClass || 'text-text-body'"
                   >
                     {{ chip.value }}
@@ -197,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Steps skeleton -->
             <template v-if="loading">
-              <OCard class="p-0 gap-0">
+              <OCard class="gap-0 p-0">
                 <OCardSection role="header" class="gap-2">
                   <OSkeleton type="text" class="h-4 w-14" />
                 </OCardSection>
@@ -206,9 +193,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     v-for="i in 4"
                     :key="i"
-                    class="flex items-center gap-2 rounded-default border border-border-default p-2"
+                    class="rounded-default border-border-default flex items-center gap-2 border p-2"
                   >
-                    <OSkeleton type="rect" class="h-12 w-18 shrink-0 rounded-default" />
+                    <OSkeleton type="rect" class="rounded-default h-12 w-18 shrink-0" />
                     <OSkeleton type="circle" class="h-6 w-6 shrink-0" />
                     <OSkeleton type="text" class="h-4 flex-1" />
                     <OSkeleton type="text" class="h-4 w-16 shrink-0" />
@@ -219,19 +206,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Lambda execution error (no steps) -->
             <div
               v-else-if="isErrorRun"
-              class="bg-[var(--color-badge-error-soft-bg)] border border-badge-error-ol-border/30 rounded-default overflow-hidden m-2"
+              class="border-badge-error-ol-border/30 rounded-default m-2 overflow-hidden border bg-[var(--color-badge-error-soft-bg)]"
               role="alert"
               data-test="synthetics-run-detail-steps-error-banner"
             >
               <div class="flex items-start gap-2 p-3">
-                <OIcon
-                  name="error"
-                  class="text-status-error-text shrink-0"
-                  size="md"
-                />
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-center gap-2 flex-wrap">
-                    <span class="text-sm font-bold text-status-error-text">
+                <OIcon name="error" class="text-status-error-text shrink-0" size="md" />
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="text-status-error-text text-sm font-bold">
                       {{ currentRun.errorType }}
                     </span>
                   </div>
@@ -251,15 +234,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :class="{ 'rotate-180': stackOpen }"
                       />
                     </template>
-                    <span class="text-2xs font-semibold text-status-error-text">
-                      {{ t('synthetics.runDetail.viewFullError') }}
+                    <span class="text-2xs text-status-error-text font-semibold">
+                      {{ t("synthetics.runDetail.viewFullError") }}
                     </span>
                   </OButton>
                   <pre
                     v-if="stackOpen && currentRun.errorStack"
-                    class="mt-2 text-2xs leading-[1.6] text-text-body bg-code-bg rounded-default p-[10px_12px] overflow-auto whitespace-pre-wrap font-mono"
+                    class="text-2xs text-text-body bg-code-bg rounded-default mt-2 overflow-auto p-[10px_12px] font-mono leading-[1.6] whitespace-pre-wrap"
                     data-test="synthetics-run-detail-error-stack"
-                  >{{ currentRun.errorStack }}</pre>
+                    >{{ currentRun.errorStack }}</pre
+                  >
                 </div>
               </div>
             </div>
@@ -267,46 +251,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- ══ Split: Replay Player (left) + Steps Timeline (right) ══ -->
             <div v-else-if="steps.length > 0" class="flex items-start">
               <!-- ── Left: Session Replay Player ── -->
-              <OCard
-                v-if="currentRun.hasReplay"
-                class="p-0 gap-0 w-[30%] min-w-[30rem]"
-              >
+              <OCard v-if="currentRun.hasReplay" class="w-[30%] min-w-[30rem] gap-0 p-0">
                 <OCardSection role="header" class="gap-2">
-                  <OIcon
-                    name="smart_display"
-                    size="sm"
-                    class="text-accent"
-                  />
-                  <span class="font-bold text-sm text-text-heading"
-                    >{{ t('synthetics.runDetail.sessionReplay') }}</span
-                  >
+                  <OIcon name="smart_display" size="sm" class="text-accent" />
+                  <span class="text-text-heading text-sm font-bold">{{
+                    t("synthetics.runDetail.sessionReplay")
+                  }}</span>
                   <span class="flex-1" />
-                  <span class="font-mono text-2xs text-text-secondary">
-                    {{ t('synthetics.runDetail.stepOf', { selected: selectedStep?.id, total: steps.length }) }}
+                  <span class="text-2xs text-text-secondary font-mono">
+                    {{
+                      t("synthetics.runDetail.stepOf", {
+                        selected: selectedStep?.id,
+                        total: steps.length,
+                      })
+                    }}
                   </span>
                 </OCardSection>
                 <OSeparator />
 
-                <div class="h-95 flex flex-col">
-                  <div class="flex-1 min-h-0">
-                    <VideoPlayer
-                      :events="[]"
-                      :segments="[]"
-                      :is-loading="false"
-                    />
+                <div class="flex h-95 flex-col">
+                  <div class="min-h-0 flex-1">
+                    <VideoPlayer :events="[]" :segments="[]" :is-loading="false" />
                   </div>
                 </div>
               </OCard>
 
               <!-- ── Right: Execution Timeline ── -->
-              <div class="flex-1 min-w-0 flex flex-col">
+              <div class="flex min-w-0 flex-1 flex-col">
                 <div class="flex items-center gap-2 px-3 py-4">
-                  <h4 class="font-bold text-sm text-text-heading m-0">{{ t('synthetics.journey.steps') }}</h4>
+                  <h4 class="text-text-heading m-0 text-sm font-bold">
+                    {{ t("synthetics.journey.steps") }}
+                  </h4>
                   <OBadge variant="default" size="sm">{{ steps.length }}</OBadge>
                   <span class="flex-1" />
                 </div>
 
-                <div class="flex-1 min-h-0 overflow-auto pb-2">
+                <div class="min-h-0 flex-1 overflow-auto pb-2">
                   <!-- JourneySteps in results mode -->
                   <JourneySteps
                     :data="stepsWithTotal"
@@ -325,95 +305,144 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-if="row.screenshotKey"
                         :src="screenshotUrl(row.screenshotKey)"
                         :alt="t('synthetics.runDetail.screenshotAlt')"
-                        class="w-full h-full object-cover"
+                        class="h-full w-full object-cover"
                       />
-                      <OIcon
-                        v-else
-                        name="image"
-                        size="xs"
-                        class="text-text-secondary"
-                      />
+                      <OIcon v-else name="image" size="xs" class="text-text-secondary" />
                     </template>
 
                     <!-- Expanded content: screenshot + metadata + error -->
                     <template #expansion="{ row }">
                       <div class="flex gap-4 p-3">
                         <div class="w-[40%] shrink-0">
-                          <div class="rounded-default border border-border-default overflow-hidden">
+                          <div class="rounded-default border-border-default overflow-hidden border">
                             <div
-                              class="aspect-[16/10] flex items-center justify-center overflow-hidden"
-                              :class="row.status === 'fail' ? 'bg-status-error-bg' : 'bg-surface-subtle'"
+                              class="flex aspect-[16/10] items-center justify-center overflow-hidden"
+                              :class="
+                                row.status === 'fail' ? 'bg-status-error-bg' : 'bg-surface-subtle'
+                              "
                             >
-                              <div
-                                v-if="row.screenshotKey"
-                                class="relative w-full h-full group"
-                              >
+                              <div v-if="row.screenshotKey" class="group relative h-full w-full">
                                 <OButton
                                   variant="ghost"
                                   size="sm"
-                                  class="w-full h-full! p-0! rounded-none! border-0!"
+                                  class="h-full! w-full rounded-none! border-0! p-0!"
                                   data-test="synthetics-run-detail-step-screenshot-thumb"
                                   @click="openLightbox(row.id)"
                                 >
                                   <img
                                     :src="screenshotUrl(row.screenshotKey)"
                                     :alt="t('synthetics.runDetail.screenshotAlt')"
-                                    class="w-full h-full object-contain transition-opacity group-hover:opacity-90"
+                                    class="h-full w-full object-contain transition-opacity group-hover:opacity-90"
                                   />
                                 </OButton>
                                 <div
-                                  class="absolute top-2 right-2 flex items-center justify-center w-7 h-7 rounded-default bg-surface-base/80 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+                                  class="rounded-default bg-surface-base/80 pointer-events-none absolute top-2 right-2 flex h-7 w-7 items-center justify-center opacity-0 transition-opacity group-hover:opacity-100"
                                   aria-hidden="true"
                                 >
                                   <OIcon name="fullscreen" size="sm" class="text-text-body" />
                                 </div>
                               </div>
                               <template v-else>
-                                <OIcon name="image" :class="row.status === 'fail' ? 'text-status-error-text' : 'text-text-secondary'" size="lg" />
-                                <span class="text-xs font-semibold" :class="row.status === 'fail' ? 'text-status-error-text' : 'text-text-secondary'">
-                                  {{ row.status === 'fail' ? t('synthetics.runDetail.failureScreenshot') : t('synthetics.runDetail.screenshotPlaceholder') }}
+                                <OIcon
+                                  name="image"
+                                  :class="
+                                    row.status === 'fail'
+                                      ? 'text-status-error-text'
+                                      : 'text-text-secondary'
+                                  "
+                                  size="lg"
+                                />
+                                <span
+                                  class="text-xs font-semibold"
+                                  :class="
+                                    row.status === 'fail'
+                                      ? 'text-status-error-text'
+                                      : 'text-text-secondary'
+                                  "
+                                >
+                                  {{
+                                    row.status === "fail"
+                                      ? t("synthetics.runDetail.failureScreenshot")
+                                      : t("synthetics.runDetail.screenshotPlaceholder")
+                                  }}
                                 </span>
                               </template>
                             </div>
                           </div>
                         </div>
 
-                        <div class="flex-1 flex flex-col gap-4">
+                        <div class="flex flex-1 flex-col gap-4">
                           <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
-                            <dt class="text-sm font-semibold text-text-secondary capitalize tracking-wide">{{ t('synthetics.runDetail.detailAction') }}</dt>
+                            <dt
+                              class="text-text-secondary text-sm font-semibold tracking-wide capitalize"
+                            >
+                              {{ t("synthetics.runDetail.detailAction") }}
+                            </dt>
                             <dd class="text-text-secondary">{{ row.action }}</dd>
-                            <dt class="text-sm font-semibold text-text-secondary capitalize tracking-wide">{{ t('synthetics.runDetail.detailSelector') }}</dt>
+                            <dt
+                              class="text-text-secondary text-sm font-semibold tracking-wide capitalize"
+                            >
+                              {{ t("synthetics.runDetail.detailSelector") }}
+                            </dt>
                             <dd class="text-text-secondary">{{ row.detail }}</dd>
-                            <dt class="text-sm font-semibold text-text-secondary capitalize tracking-wide">{{ t('synthetics.runDetail.detailUrl') }}</dt>
-                            <dd class="truncate text-text-secondary">{{ row.url || currentRun.url }}</dd>
-                            <dt class="text-sm font-semibold text-text-secondary capitalize tracking-wide">{{ t('synthetics.results.duration') }}</dt>
+                            <dt
+                              class="text-text-secondary text-sm font-semibold tracking-wide capitalize"
+                            >
+                              {{ t("synthetics.runDetail.detailUrl") }}
+                            </dt>
+                            <dd class="text-text-secondary truncate">
+                              {{ row.url || currentRun.url }}
+                            </dd>
+                            <dt
+                              class="text-text-secondary text-sm font-semibold tracking-wide capitalize"
+                            >
+                              {{ t("synthetics.results.duration") }}
+                            </dt>
                             <dd class="text-text-secondary">{{ row.durStr }}</dd>
                           </dl>
 
                           <div
                             v-if="row.status === 'fail' && row.error"
-                            class="rounded-default border border-badge-error-ol-border/30 overflow-hidden"
+                            class="rounded-default border-badge-error-ol-border/30 overflow-hidden border"
                             :data-test="`synthetics-run-detail-step-error-card-${row.id}`"
                           >
-                            <div class="flex items-center gap-2 px-3 py-2 bg-[var(--color-badge-error-soft-bg)]">
-                              <OIcon name="error" size="sm" class="text-status-error-text" aria-hidden="true" />
-                              <span class="text-xs font-semibold text-text-heading flex-1">{{ t('synthetics.results.error') }}</span>
+                            <div
+                              class="flex items-center gap-2 bg-[var(--color-badge-error-soft-bg)] px-3 py-2"
+                            >
+                              <OIcon
+                                name="error"
+                                size="sm"
+                                class="text-status-error-text"
+                                aria-hidden="true"
+                              />
+                              <span class="text-text-heading flex-1 text-xs font-semibold">{{
+                                t("synthetics.results.error")
+                              }}</span>
                             </div>
                             <div class="px-3 py-3">
                               <pre
-                                class="text-xs text-text-body m-0 whitespace-pre-wrap font-mono leading-relaxed"
-                                :class="{ 'max-h-24 overflow-hidden': !expandedStepErrors.has(row.id) && (row.error?.length ?? 0) > 200 }"
-                              >{{ row.error }}</pre>
-                              <div class="flex items-center gap-2 mt-1.5">
+                                class="text-text-body m-0 font-mono text-xs leading-relaxed whitespace-pre-wrap"
+                                :class="{
+                                  'max-h-24 overflow-hidden':
+                                    !expandedStepErrors.has(row.id) &&
+                                    (row.error?.length ?? 0) > 200,
+                                }"
+                                >{{ row.error }}</pre
+                              >
+                              <div class="mt-1.5 flex items-center gap-2">
                                 <OButton
                                   v-if="(row.error?.length ?? 0) > 200"
                                   variant="ghost"
                                   size="xs"
-                                  class="text-xs font-semibold text-text-link"
+                                  class="text-text-link text-xs font-semibold"
                                   data-test="synthetics-run-detail-toggle-step-error-btn"
                                   @click="toggleStepError(row.id)"
                                 >
-                                  {{ expandedStepErrors.has(row.id) ? t('synthetics.runDetail.showLess') : t('synthetics.runDetail.showFullError') }}
+                                  {{
+                                    expandedStepErrors.has(row.id)
+                                      ? t("synthetics.runDetail.showLess")
+                                      : t("synthetics.runDetail.showFullError")
+                                  }}
                                 </OButton>
                                 <OButton
                                   variant="ghost"
@@ -421,7 +450,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   data-test="synthetics-run-detail-step-view-error-btn"
                                   @click="openErrorFullscreen(row.id)"
                                 >
-                                  {{ t('synthetics.runDetail.viewFullErrorBtn') }}
+                                  {{ t("synthetics.runDetail.viewFullErrorBtn") }}
                                 </OButton>
                               </div>
                             </div>
@@ -438,17 +467,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- ════════════ LOGS (placeholder) ════════════ -->
         <OTabPanel name="logs">
-          <div class="h-full flex items-center justify-center">
+          <div class="flex h-full items-center justify-center">
             <OEmptyState
               preset="no-search-results"
               size="block"
               data-test="synthetics-run-detail-logs-empty"
             >
               <template #title>
-                <span>{{ t('synthetics.runDetail.noCorrelatedLogs') }}</span>
+                <span>{{ t("synthetics.runDetail.noCorrelatedLogs") }}</span>
               </template>
               <template #description>
-                <span>{{ t('synthetics.runDetail.noCorrelatedLogsDesc') }}</span>
+                <span>{{ t("synthetics.runDetail.noCorrelatedLogsDesc") }}</span>
               </template>
             </OEmptyState>
           </div>
@@ -456,17 +485,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- ════════════ TRACES (placeholder) ════════════ -->
         <OTabPanel name="traces">
-          <div class="h-full flex items-center justify-center">
+          <div class="flex h-full items-center justify-center">
             <OEmptyState
               preset="no-search-results"
               size="block"
               data-test="synthetics-run-detail-traces-empty"
             >
               <template #title>
-                <span>{{ t('synthetics.runDetail.noCorrelatedTraces') }}</span>
+                <span>{{ t("synthetics.runDetail.noCorrelatedTraces") }}</span>
               </template>
               <template #description>
-                <span>{{ t('synthetics.runDetail.noCorrelatedTracesDesc') }}</span>
+                <span>{{ t("synthetics.runDetail.noCorrelatedTracesDesc") }}</span>
               </template>
             </OEmptyState>
           </div>
@@ -474,17 +503,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- ════════════ RUM (placeholder) ════════════ -->
         <OTabPanel name="rum">
-          <div class="h-full flex items-center justify-center">
+          <div class="flex h-full items-center justify-center">
             <OEmptyState
               preset="no-search-results"
               size="block"
               data-test="synthetics-run-detail-rum-empty"
             >
               <template #title>
-                <span>{{ t('synthetics.runDetail.noCorrelatedRum') }}</span>
+                <span>{{ t("synthetics.runDetail.noCorrelatedRum") }}</span>
               </template>
               <template #description>
-                <span>{{ t('synthetics.runDetail.noCorrelatedRumDesc') }}</span>
+                <span>{{ t("synthetics.runDetail.noCorrelatedRumDesc") }}</span>
               </template>
             </OEmptyState>
           </div>
@@ -502,18 +531,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       v-if="lightboxStep"
-      class="flex items-center justify-center h-full p-6"
-      :class="
-        lightboxStep.status === 'fail'
-          ? 'bg-status-error-bg'
-          : 'bg-surface-subtle'
-      "
+      class="flex h-full items-center justify-center p-6"
+      :class="lightboxStep.status === 'fail' ? 'bg-status-error-bg' : 'bg-surface-subtle'"
     >
       <img
         v-if="lightboxStep.screenshotKey"
         :src="screenshotUrl(lightboxStep.screenshotKey)"
         :alt="t('synthetics.runDetail.screenshotAlt')"
-        class="max-w-full max-h-[85vh] object-contain"
+        class="max-h-[85vh] max-w-full object-contain"
       />
     </div>
   </ODialog>
@@ -525,29 +550,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="errorTitle"
     data-test="synthetics-run-detail-step-error-fullscreen"
   >
-    <div
-      v-if="errorStep"
-      class="flex flex-col h-full overflow-y-auto p-6"
-    >
-      <div class="rounded-default border border-badge-error-ol-border/30 overflow-hidden">
-        <div
-          class="flex items-center gap-2 px-4 py-2.5 bg-[var(--color-badge-error-soft-bg)]"
-        >
-          <OIcon
-            name="error"
-            size="sm"
-            class="text-status-error-text"
-            aria-hidden="true"
-          />
-          <span
-            class="text-sm font-semibold text-text-heading flex-1"
-            >{{ t('synthetics.results.error') }}</span
-          >
+    <div v-if="errorStep" class="flex h-full flex-col overflow-y-auto p-6">
+      <div class="rounded-default border-badge-error-ol-border/30 overflow-hidden border">
+        <div class="flex items-center gap-2 bg-[var(--color-badge-error-soft-bg)] px-4 py-2.5">
+          <OIcon name="error" size="sm" class="text-status-error-text" aria-hidden="true" />
+          <span class="text-text-heading flex-1 text-sm font-semibold">{{
+            t("synthetics.results.error")
+          }}</span>
         </div>
         <div class="px-4 py-3">
-          <pre
-            class="text-sm text-text-body m-0 whitespace-pre-wrap font-mono leading-relaxed"
-          >{{ errorStep.error }}</pre>
+          <pre class="text-text-body m-0 font-mono text-sm leading-relaxed whitespace-pre-wrap">{{
+            errorStep.error
+          }}</pre>
         </div>
       </div>
     </div>
@@ -638,7 +652,8 @@ function locationLabel(id: string): string {
 syntheticsService
   .getLocations(store.state.selectedOrganization.identifier)
   .then((res) => {
-    const locations: { id: string; label: string; region: string }[] = (res.data as any).locations ?? [];
+    const locations: { id: string; label: string; region: string }[] =
+      (res.data as any).locations ?? [];
     locationNames.value = Object.fromEntries(
       locations.map((loc) => [loc.id, locationDisplayLabel(loc.label, loc.region)]),
     );
@@ -653,9 +668,7 @@ const runIdParam = computed(() =>
   props.drawerMode ? props.overrideRunId : String(route.params.runId ?? ""),
 );
 const executionIdParam = computed(() =>
-  props.drawerMode
-    ? props.overrideExecutionId
-    : String(route.params.executionId ?? ""),
+  props.drawerMode ? props.overrideExecutionId : String(route.params.executionId ?? ""),
 );
 // The check's folder (name), carried on the results-page route as ?folder=.
 // Passed to per-check API calls so RBAC can resolve folder-scoped grants.
@@ -733,11 +746,7 @@ function buildSteps(detail: SyntheticRunDetail | null): StepRow[] {
       id: idx + 1,
       stepId: ex.step_id,
       action: recorded?.action ?? "step",
-      name:
-        recorded?.name ||
-        recorded?.selector ||
-        recorded?.url ||
-        ex.step_id.slice(0, 8),
+      name: recorded?.name || recorded?.selector || recorded?.url || ex.step_id.slice(0, 8),
       detail: recorded?.selector ?? recorded?.url ?? ex.step_id,
       url: recorded?.url ?? "",
       duration: ex.duration_ms,
@@ -745,9 +754,7 @@ function buildSteps(detail: SyntheticRunDetail | null): StepRow[] {
       icon: recorded ? actionIcon(recorded.action) : "radio_button_checked",
       statusIcon: isFail ? "cancel" : "check-circle",
       durStr: fmtDur(ex.duration_ms),
-      durColor: isFail
-        ? "var(--color-status-error-text)"
-        : "var(--color-text-secondary)",
+      durColor: isFail ? "var(--color-status-error-text)" : "var(--color-text-secondary)",
       error: ex.error,
       screenshotKey: ex.screenshot_key,
     };
@@ -805,10 +812,9 @@ const artifactUrls = ref<Record<string, string>>({});
 async function presignRunArtifacts() {
   const detail = synthetics.runDetail.value;
   if (!detail) return;
-  const keys = [
-    ...detail.lastAttemptSteps.map((s) => s.screenshot_key),
-    detail.traceKey,
-  ].filter((k): k is string => !!k);
+  const keys = [...detail.lastAttemptSteps.map((s) => s.screenshot_key), detail.traceKey].filter(
+    (k): k is string => !!k,
+  );
   if (!keys.length) return;
   const orgId = store.state.selectedOrganization.identifier;
   try {
@@ -887,11 +893,7 @@ function toDisplayRun(detail: SyntheticRunDetail | null): DisplayRun {
   return {
     id: detail.runId,
     monitorName: detail.monitorName,
-    status: isFail
-      ? ("fail" as const)
-      : isError
-        ? ("error" as const)
-        : ("pass" as const),
+    status: isFail ? ("fail" as const) : isError ? ("error" as const) : ("pass" as const),
     duration: detail.durationMs,
     browser: capitalizeEngine(detail.browserEngine),
     device: detail.device,
@@ -901,11 +903,11 @@ function toDisplayRun(detail: SyntheticRunDetail | null): DisplayRun {
     hasReplay: false,
     ...(hasIssue
       ? {
-          errorType: detail.error ? detail.error.split(":")[0] : t('synthetics.results.error'),
+          errorType: detail.error ? detail.error.split(":")[0] : t("synthetics.results.error"),
           errorReason: detail.error || "",
           errorStack: detail.error || "",
           failedStepLabel: detail.failedStep
-            ? t('synthetics.runDetail.failedAtStep', { step: detail.failedStep })
+            ? t("synthetics.runDetail.failedAtStep", { step: detail.failedStep })
             : undefined,
           failedStepId: 1,
         }
@@ -926,7 +928,7 @@ function handleUpdateExpanded(ids: string[]) {
 }
 
 function stepDotState(row: any): StepDotState | undefined {
-  return row.status === 'fail' ? 'fail' : 'pass';
+  return row.status === "fail" ? "fail" : "pass";
 }
 
 /** Steps enriched with total duration for progress bar calculation. */
@@ -955,7 +957,7 @@ const lightboxStep = computed(() => {
 
 const lightboxTitle = computed(() => {
   const s = lightboxStep.value;
-  return s ? t('synthetics.runDetail.lightboxTitle', { id: s.id, action: s.action }) : "";
+  return s ? t("synthetics.runDetail.lightboxTitle", { id: s.id, action: s.action }) : "";
 });
 
 function openLightbox(id: number) {
@@ -979,7 +981,7 @@ const errorStep = computed(() => {
 
 const errorTitle = computed(() => {
   const s = errorStep.value;
-  return s ? t('synthetics.runDetail.errorFullscreenTitle', { id: s.id, action: s.action }) : "";
+  return s ? t("synthetics.runDetail.errorFullscreenTitle", { id: s.id, action: s.action }) : "";
 });
 
 function openErrorFullscreen(id: number) {
@@ -989,21 +991,18 @@ function openErrorFullscreen(id: number) {
 // Computed: current run from composable data
 const loading = computed(() => synthetics.loading.value);
 const currentRun = computed<DisplayRun>(() => {
-  return synthetics.runDetail.value
-    ? toDisplayRun(synthetics.runDetail.value)
-    : toDisplayRun(null);
+  return synthetics.runDetail.value ? toDisplayRun(synthetics.runDetail.value) : toDisplayRun(null);
 });
 
 const isFailed = computed(
-  () =>
-    currentRun.value.status === "fail" || currentRun.value.status === "error",
+  () => currentRun.value.status === "fail" || currentRun.value.status === "error",
 );
 
 const isErrorRun = computed(() => currentRun.value.status === "error");
 
 // ── Display monitor name — prefers explicit prop, falls back to SQL result ──
-const displayMonitorName = computed(() =>
-  props.overrideMonitorName || currentRun.value.monitorName,
+const displayMonitorName = computed(
+  () => props.overrideMonitorName || currentRun.value.monitorName,
 );
 
 const steps = computed<StepRow[]>(() => {
@@ -1030,7 +1029,7 @@ const failedStepInfo = computed(() => {
   if (!step) return null;
   return {
     step,
-    summary: step.error ? step.error.split('\n')[0] : '',
+    summary: step.error ? step.error.split("\n")[0] : "",
   };
 });
 
@@ -1039,7 +1038,7 @@ watch(steps, (newSteps) => {
   const next = new Set(expandedStepIds.value);
   let changed = false;
   for (const st of newSteps) {
-    if (st.status === 'fail' && !next.has(String(st.id))) {
+    if (st.status === "fail" && !next.has(String(st.id))) {
       next.add(String(st.id));
       changed = true;
     }
@@ -1047,7 +1046,7 @@ watch(steps, (newSteps) => {
   if (changed) expandedStepIds.value = next;
 
   // Scroll to the first failed step after layout settles
-  const failedStep = newSteps.find((st) => st.status === 'fail');
+  const failedStep = newSteps.find((st) => st.status === "fail");
   if (failedStep) {
     nextTick(() => {
       requestAnimationFrame(() => {
@@ -1055,7 +1054,7 @@ watch(steps, (newSteps) => {
           const el = document.querySelector(
             `[data-test="synthetics-run-detail-step-row-${failedStep.id}"]`,
           );
-          el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          el?.scrollIntoView({ behavior: "smooth", block: "nearest" });
         });
       });
     });
@@ -1069,14 +1068,18 @@ const statusIcon = computed(() =>
   isErrorRun.value ? "error" : isFailed.value ? "cancel" : "check-circle",
 );
 const statusLabel = computed(() =>
-  isErrorRun.value ? t('synthetics.results.error') : isFailed.value ? t('synthetics.results.failed') : t('synthetics.results.passed'),
+  isErrorRun.value
+    ? t("synthetics.results.error")
+    : isFailed.value
+      ? t("synthetics.results.failed")
+      : t("synthetics.results.passed"),
 );
 
 const statusChip = computed(() => {
   if (isErrorRun.value) {
     return {
-      label: t('synthetics.results.status'),
-      value: t('synthetics.results.error'),
+      label: t("synthetics.results.status"),
+      value: t("synthetics.results.error"),
       icon: "error",
       colorClass: "text-status-error-text",
     };
@@ -1084,15 +1087,17 @@ const statusChip = computed(() => {
   if (currentRun.value.status === "fail") {
     const stepNum = failedStepInfo.value?.step?.id;
     return {
-      label: t('synthetics.results.status'),
-      value: stepNum ? t('synthetics.runDetail.failedAtStep', { step: stepNum }) : t('synthetics.results.failed'),
+      label: t("synthetics.results.status"),
+      value: stepNum
+        ? t("synthetics.runDetail.failedAtStep", { step: stepNum })
+        : t("synthetics.results.failed"),
       icon: "cancel",
       colorClass: "text-status-error-text",
     };
   }
   return {
-    label: t('synthetics.results.status'),
-    value: t('synthetics.results.passed'),
+    label: t("synthetics.results.status"),
+    value: t("synthetics.results.passed"),
     icon: "check-circle",
     colorClass: "text-status-success-text",
   };
@@ -1107,19 +1112,23 @@ interface InfoChip {
 
 const infoChips = computed<InfoChip[]>(() => [
   statusChip.value,
-  { label: t('synthetics.results.duration'), value: fmtDur(currentRun.value.duration), icon: "schedule" },
   {
-    label: t('synthetics.results.steps.browser'),
+    label: t("synthetics.results.duration"),
+    value: fmtDur(currentRun.value.duration),
+    icon: "schedule",
+  },
+  {
+    label: t("synthetics.results.steps.browser"),
     value: currentRun.value.browser,
     icon: browserIcon(currentRun.value.browser),
   },
   {
-    label: t('synthetics.results.device'),
+    label: t("synthetics.results.device"),
     value: currentRun.value.device,
     icon: deviceIcon(currentRun.value.device),
   },
   {
-    label: t('synthetics.results.location'),
+    label: t("synthetics.results.location"),
     value: locationLabel(currentRun.value.location),
     icon: locationIcon(currentRun.value.location),
   },
@@ -1135,7 +1144,11 @@ watch(
     emit("update-status", {
       variant: isErr ? "error-soft" : isF ? "error" : "success",
       icon: isErr ? "error" : isF ? "cancel" : "check-circle",
-      label: isErr ? t('synthetics.results.error') : isF ? t('synthetics.results.failed') : t('synthetics.results.passed'),
+      label: isErr
+        ? t("synthetics.results.error")
+        : isF
+          ? t("synthetics.results.failed")
+          : t("synthetics.results.passed"),
       url: currentRun.value.url,
       timestamp: currentRun.value.timestamp,
     });

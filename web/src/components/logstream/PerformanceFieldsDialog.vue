@@ -15,18 +15,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog data-test="performance-fields-dialog" :open="modelValue" @update:open="(v) => $emit('update:modelValue', v)" persistent size="md" :title="t('logStream.performanceFieldsDialog.title')"
+  <ODialog
+    data-test="performance-fields-dialog"
+    :open="modelValue"
+    @update:open="(v) => $emit('update:modelValue', v)"
+    persistent
+    size="md"
+    :title="t('logStream.performanceFieldsDialog.title')"
     :secondary-button-label="t('logStream.performanceFieldsDialog.skipButton')"
     :primary-button-label="t('logStream.performanceFieldsDialog.addFieldsButton')"
     @click:secondary="$emit('skip')"
     @click:primary="$emit('add-fields')"
   >
     <div v-if="fieldsByType.fts.length > 0" class="mb-2">
-      <div class="text-xs font-medium mb-1">
-        {{ t('logStream.performanceFieldsDialog.ftsCount', { count: fieldsByType.fts.length }) }}
+      <div class="mb-1 text-xs font-medium">
+        {{ t("logStream.performanceFieldsDialog.ftsCount", { count: fieldsByType.fts.length }) }}
       </div>
       <div
-        class="p-2 max-h-50 overflow-y-auto border rounded-default border-border-default bg-surface-subtle"
+        class="rounded-default border-border-default bg-surface-subtle max-h-50 overflow-y-auto border p-2"
       >
         <OTag
           v-for="field in fieldsByType.fts"
@@ -40,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <button
               type="button"
               :aria-label="`Remove ${field.name}`"
-              class="inline-flex items-center justify-center cursor-pointer hover:opacity-70"
+              class="inline-flex cursor-pointer items-center justify-center hover:opacity-70"
               @click="$emit('remove-field', 'fts', field.name)"
             >
               <OIcon name="close" size="xs" />
@@ -51,11 +57,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div v-if="fieldsByType.secondaryIndex.length > 0">
-      <div class="text-xs font-medium mb-1">
-        {{ t('logStream.performanceFieldsDialog.secondaryIndexCount', { count: fieldsByType.secondaryIndex.length }) }}
+      <div class="mb-1 text-xs font-medium">
+        {{
+          t("logStream.performanceFieldsDialog.secondaryIndexCount", {
+            count: fieldsByType.secondaryIndex.length,
+          })
+        }}
       </div>
       <div
-        class="p-2 max-h-50 overflow-y-auto border rounded-default border-border-default bg-surface-subtle"
+        class="rounded-default border-border-default bg-surface-subtle max-h-50 overflow-y-auto border p-2"
       >
         <OTag
           v-for="field in fieldsByType.secondaryIndex"
@@ -69,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <button
               type="button"
               :aria-label="`Remove ${field.name}`"
-              class="inline-flex items-center justify-center cursor-pointer hover:opacity-70"
+              class="inline-flex cursor-pointer items-center justify-center hover:opacity-70"
               @click="$emit('remove-field', 'secondaryIndex', field.name)"
             >
               <OIcon name="close" size="xs" />
@@ -114,9 +124,7 @@ export default defineComponent({
     const fieldsByType = computed(() => {
       return {
         fts: props.missingFields.filter((f) => f.type === "Full Text Search"),
-        secondaryIndex: props.missingFields.filter(
-          (f) => f.type === "Secondary Index"
-        ),
+        secondaryIndex: props.missingFields.filter((f) => f.type === "Secondary Index"),
       };
     });
 
@@ -127,4 +135,3 @@ export default defineComponent({
   },
 });
 </script>
-

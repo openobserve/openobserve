@@ -38,9 +38,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- browser frame -->
     <rect
-      x="47" y="22" width="144" height="114" rx="8"
+      x="47"
+      y="22"
+      width="144"
+      height="114"
+      rx="8"
       fill="var(--color-surface-subtle)"
-      stroke="var(--color-primary-400)" stroke-width="2.5"
+      stroke="var(--color-primary-400)"
+      stroke-width="2.5"
     />
     <!-- header bar — two rects keep the bottom corners square -->
     <rect x="47" y="22" width="144" height="22" rx="8" fill="var(--color-primary-400)" />
@@ -86,10 +91,7 @@ import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
 
-withDefaults(
-  defineProps<{ width?: number; animated?: boolean }>(),
-  { width: 260, animated: true },
-);
+withDefaults(defineProps<{ width?: number; animated?: boolean }>(), { width: 260, animated: true });
 </script>
 
 <style scoped>
@@ -100,9 +102,18 @@ withDefaults(
   animation: es-path-show 3.5s ease-in-out infinite;
 }
 @keyframes es-path-show {
-  0%, 4%   { opacity: 0; }
-  20%, 78% { opacity: 1; }
-  88%, 100% { opacity: 0; }
+  0%,
+  4% {
+    opacity: 0;
+  }
+  20%,
+  78% {
+    opacity: 1;
+  }
+  88%,
+  100% {
+    opacity: 0;
+  }
 }
 
 /* ── Cursor travels along the path ───────────────────────────────────────── */
@@ -113,10 +124,24 @@ withDefaults(
   animation: es-cursor-travel 3.5s ease-in-out infinite;
 }
 @keyframes es-cursor-travel {
-  0%, 6%   { offset-distance: 0%;   opacity: 0; }
-  12%      { opacity: 1; }
-  38%, 78% { offset-distance: 100%; opacity: 1; }
-  86%, 100% { offset-distance: 100%; opacity: 0; }
+  0%,
+  6% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  38%,
+  78% {
+    offset-distance: 100%;
+    opacity: 1;
+  }
+  86%,
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
 }
 
 /* ── Badge pops in ────────────────────────────────────────────────────────── */
@@ -126,10 +151,25 @@ withDefaults(
   animation: es-pop 3.5s ease-in-out infinite;
 }
 @keyframes es-pop {
-  0%, 42%  { transform: scale(0); opacity: 0; }
-  50%      { transform: scale(1.1); opacity: 1; }
-  56%, 78% { transform: scale(1);   opacity: 1; }
-  88%, 100% { transform: scale(0); opacity: 0; }
+  0%,
+  42% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+  56%,
+  78% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  88%,
+  100% {
+    transform: scale(0);
+    opacity: 0;
+  }
 }
 
 /* ── Check draws within badge ─────────────────────────────────────────────── */
@@ -138,21 +178,60 @@ withDefaults(
   animation: es-check-draw 3.5s ease-in-out infinite;
 }
 @keyframes es-check-draw {
-  0%, 48%  { stroke-dashoffset: 40; }
-  62%, 78% { stroke-dashoffset: 0;  }
-  88%, 100% { stroke-dashoffset: 40; }
+  0%,
+  48% {
+    stroke-dashoffset: 40;
+  }
+  62%,
+  78% {
+    stroke-dashoffset: 0;
+  }
+  88%,
+  100% {
+    stroke-dashoffset: 40;
+  }
 }
 
 /* ── Static / reduced-motion — show end-state immediately ────────────────── */
-.es-static .es-path  { animation: none; opacity: 1; }
-.es-static .es-cursor { animation: none; offset-distance: 100%; opacity: 1; }
-.es-static .es-badge  { animation: none; transform: scale(1); opacity: 1; transform-box: fill-box; transform-origin: center; }
-.es-static .es-check  { animation: none; stroke-dashoffset: 0; }
+.es-static .es-path {
+  animation: none;
+  opacity: 1;
+}
+.es-static .es-cursor {
+  animation: none;
+  offset-distance: 100%;
+  opacity: 1;
+}
+.es-static .es-badge {
+  animation: none;
+  transform: scale(1);
+  opacity: 1;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.es-static .es-check {
+  animation: none;
+  stroke-dashoffset: 0;
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .es-path  { animation: none; opacity: 1; }
-  .es-cursor { animation: none; offset-distance: 100%; opacity: 1; }
-  .es-badge  { animation: none; transform: scale(1); opacity: 1; }
-  .es-check  { animation: none; stroke-dashoffset: 0; }
+  .es-path {
+    animation: none;
+    opacity: 1;
+  }
+  .es-cursor {
+    animation: none;
+    offset-distance: 100%;
+    opacity: 1;
+  }
+  .es-badge {
+    animation: none;
+    transform: scale(1);
+    opacity: 1;
+  }
+  .es-check {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
 }
 </style>

@@ -39,14 +39,7 @@ beforeEach(() => {
 
 describe("Quality score SQL", () => {
   it("builds the entire table from _llm_scores with canonical reasoning", () => {
-    const sql = buildQualityRunsSql(
-      numericConfig,
-      "agent_id = 'agent-1'",
-      "trace",
-      "all",
-      3,
-      20,
-    );
+    const sql = buildQualityRunsSql(numericConfig, "agent_id = 'agent-1'", "trace", "all", 3, 20);
 
     expect(sql).toContain('FROM "_llm_scores"');
     expect(sql).toContain("PARTITION BY _evaluation_key");
@@ -68,31 +61,18 @@ describe("Quality score SQL", () => {
   });
 
   it("applies the healthy condition for the unhealthy server page", () => {
-    const sql = buildQualityRunsSql(
-      numericConfig,
-      null,
-      "all",
-      "unhealthy",
-      1,
-      10,
-    );
+    const sql = buildQualityRunsSql(numericConfig, null, "all", "unhealthy", 1, 10);
     const countsSql = buildQualityRunsCountSql(numericConfig, null, "all");
 
     expect(sql).toContain("value_numeric < 0.8");
-    expect(countsSql).toContain(
-      "COUNT(CASE WHEN value_numeric < 0.8 THEN 1 END)",
-    );
+    expect(countsSql).toContain("COUNT(CASE WHEN value_numeric < 0.8 THEN 1 END)");
     expect(countsSql).toContain("COUNT(*) AS all_count");
     expect(countsSql).toContain("PARTITION BY _evaluation_key");
     expect(countsSql).toContain("WHERE _latest_score_rank = 1");
   });
 
   it("builds a targeted evaluator-span lookup without joining the runs table", () => {
-    const sql = buildEvaluatorSpanLookupSql(
-      "trace-'one",
-      "task-'one",
-      "score-'one",
-    );
+    const sql = buildEvaluatorSpanLookupSql("trace-'one", "task-'one", "score-'one");
 
     expect(sql).toContain('FROM "_evaluator"');
     expect(sql).toContain("trace-''one");
@@ -230,8 +210,7 @@ describe("useQualityRuns", () => {
     await refresh();
 
     expect(mockExecuteQueryOnce).toHaveBeenCalledTimes(2);
-    for (const [sql, startUs, endUs, pageType] of mockExecuteQueryOnce.mock
-      .calls) {
+    for (const [sql, startUs, endUs, pageType] of mockExecuteQueryOnce.mock.calls) {
       expect(sql).toContain('FROM "_llm_scores"');
       expect(sql).not.toContain("_evaluator");
       expect(sql).not.toContain("attributes_response");

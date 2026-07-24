@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="relative rounded-default overflow-hidden copy-content-block bg-surface-subtle">
+  <div class="rounded-default copy-content-block bg-surface-subtle relative overflow-hidden">
     <div class="absolute top-2 right-2 z-10">
       <OButton
         data-test="rum-copy-btn"
@@ -27,7 +27,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTooltip :content="t('common.copy')" side="top" />
       </OButton>
     </div>
-    <pre data-test="rum-content-text" class="text-sm whitespace-pre-wrap wrap-break-word m-0 p-3 pr-10 leading-5">{{ computedContent }}</pre>
+    <pre
+      data-test="rum-content-text"
+      class="m-0 p-3 pr-10 text-sm leading-5 wrap-break-word whitespace-pre-wrap"
+      >{{ computedContent }}</pre
+    >
   </div>
 </template>
 
@@ -44,10 +48,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 export default defineComponent({
   name: "CopyContent",
-  components: { OButton,
-    OIcon,
-    OTooltip,
-},
+  components: { OButton, OIcon, OTooltip },
   props: {
     content: {
       type: String,
@@ -69,7 +70,7 @@ export default defineComponent({
       email.value = store.state.userInfo.email;
       passcode.value = store.state.organizationData.organizationPasscode;
       basicPasscode.value = b64EncodeStandard(
-        `${email.value}:${store.state.organizationData.organizationPasscode}`
+        `${email.value}:${store.state.organizationData.organizationPasscode}`,
       );
       if (isMask) {
         return data

@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       multiple
       :error="error"
       :collapsible-groups="workflowsEnabled"
-      class="min-w-[11.25rem] max-w-[18.75rem]"
+      class="max-w-[18.75rem] min-w-[11.25rem]"
       data-test="alert-destinations-select"
       @update:model-value="onUpdate"
     >
@@ -122,8 +122,7 @@ const WF = "wf:";
 // exactly that. These lists are read inside computeds during render, so ONE bad
 // entry used to throw and blank the whole alert form. Drop bad entries instead: a
 // missing option is a missing row, never a broken page.
-const isFilled = <T,>(v: T | null | undefined): v is T =>
-  v !== null && v !== undefined && v !== "";
+const isFilled = <T,>(v: T | null | undefined): v is T => v !== null && v !== undefined && v !== "";
 
 // The selection as one tagged array, derived from the two backend fields.
 const propsCombined = computed<string[]>(() => [
@@ -184,16 +183,10 @@ const options = computed(() => {
 const onUpdate = (vals: unknown) => {
   // Strings only — `v.startsWith` below would throw on a null the control ever
   // handed back, taking the form down on a click rather than on load.
-  const arr = (Array.isArray(vals) ? vals : []).filter(
-    (v): v is string => typeof v === "string",
-  );
+  const arr = (Array.isArray(vals) ? vals : []).filter((v): v is string => typeof v === "string");
   model.value = arr;
-  const dests = arr
-    .filter((v) => v.startsWith(DEST))
-    .map((v) => v.slice(DEST.length));
-  const wfs = arr
-    .filter((v) => v.startsWith(WF))
-    .map((v) => v.slice(WF.length));
+  const dests = arr.filter((v) => v.startsWith(DEST)).map((v) => v.slice(DEST.length));
+  const wfs = arr.filter((v) => v.startsWith(WF)).map((v) => v.slice(WF.length));
   emit("update:destinations", dests);
   emit("update:workflows", wfs);
 };

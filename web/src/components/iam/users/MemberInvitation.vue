@@ -29,11 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-slot="{ isSubmitting }"
       >
         <div class="relative">
-          <OFormInput
-            name="email"
-            :placeholder="t('user.inviteByEmail')"
-            class="w-56"
-          />
+          <OFormInput name="email" :placeholder="t('user.inviteByEmail')" class="w-56" />
           <OTooltip :content="t('user.inviteByEmail')" side="top" max-width="16rem" />
         </div>
         <OFormSelect
@@ -43,14 +39,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           valueKey="value"
           style="width: 120px"
         />
-        <OButton
-          variant="primary"
-          size="xs"
-          class="!h-8"
-          type="submit"
-          :loading="isSubmitting"
-        >
-          {{ t('user.sendInvite') }}
+        <OButton variant="primary" size="xs" class="!h-8" type="submit" :loading="isSubmitting">
+          {{ t("user.sendInvite") }}
         </OButton>
       </OForm>
     </div>
@@ -120,7 +110,9 @@ export default defineComponent({
         if (data.data.invalid_members != null) {
           toast({
             variant: "error",
-            message: t('iam.memberInvitation.errorWhileInvitation', { members: data.data.invalid_members.toString() }),
+            message: t("iam.memberInvitation.errorWhileInvitation", {
+              members: data.data.invalid_members.toString(),
+            }),
             timeout: 15000,
           });
         } else {

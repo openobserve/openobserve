@@ -18,11 +18,10 @@ import { mount } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 import AlertInsightsContextMenu from "@/components/alerts/AlertInsightsContextMenu.vue";
 
 const alertNamePanelId = "Panel_Alert_Frequency";
-const nonAlertPanelId  = "Panel_Volume_Chart";
+const nonAlertPanelId = "Panel_Volume_Chart";
 
 const defaultProps = {
   x: 100,

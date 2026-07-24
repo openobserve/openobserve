@@ -20,10 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <IngestionDocLink
       href="https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-metric-streams-setup-datalake.html"
     >
-      {{ t('ingestion.cloudwatchMetrics.docLinkText') }}</IngestionDocLink
+      {{ t("ingestion.cloudwatchMetrics.docLinkText") }}</IngestionDocLink
     >
     <div class="italic">
-      {{ t('ingestion.cloudwatchMetrics.outputNote') }}
+      {{ t("ingestion.cloudwatchMetrics.outputNote") }}
     </div>
   </IngestionContent>
 </template>

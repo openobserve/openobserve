@@ -20,7 +20,6 @@ import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import shortURLService from "@/services/short_url";
 
-
 // Mock copyToClipboard
 vi.mock("@/utils/clipboard", () => ({
   copyToClipboard: vi.fn(() => Promise.resolve(true)),
@@ -35,7 +34,7 @@ vi.mock("@/services/short_url", () => ({
       Promise.resolve({
         status: 200,
         data: { short_url: "https://short.url/abc123" },
-      })
+      }),
     ),
   },
 }));
@@ -72,7 +71,8 @@ describe("ShareButton", () => {
             linkCopiedSuccessfully: "Link copied successfully",
             errorCopyingLink: "Error copying link",
             errorShorteningLink: "Error shortening link",
-            webUrlNotConfigured: "Share URL is disabled until ZO_WEB_URL is configured by your administrator.",
+            webUrlNotConfigured:
+              "Share URL is disabled until ZO_WEB_URL is configured by your administrator.",
           },
         },
       },
@@ -95,9 +95,9 @@ describe("ShareButton", () => {
         stubs: {
           OButton: {
             template: '<button :data-test="dataTest"><slot /></button>',
-            props: ['dataTest', 'class', 'size', 'loading', 'disable', 'icon'],
+            props: ["dataTest", "class", "size", "loading", "disable", "icon"],
           },
-          OTooltip: { template: '<div><slot /></div>' },
+          OTooltip: { template: "<div><slot /></div>" },
         },
       },
     });
@@ -115,9 +115,9 @@ describe("ShareButton", () => {
         stubs: {
           OButton: {
             template: '<button :disable="disable"><slot /></button>',
-            props: ['dataTest', 'class', 'size', 'loading', 'disable', 'icon'],
+            props: ["dataTest", "class", "size", "loading", "disable", "icon"],
           },
-          OTooltip: { template: '<div><slot /></div>' },
+          OTooltip: { template: "<div><slot /></div>" },
         },
       },
     });
@@ -129,7 +129,8 @@ describe("ShareButton", () => {
   it("should copy URL to clipboard on click (Chrome)", async () => {
     // Mock non-Safari browser
     Object.defineProperty(window.navigator, "userAgent", {
-      value: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+      value:
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
       configurable: true,
     });
 
@@ -150,11 +151,11 @@ describe("ShareButton", () => {
         plugins: [store, i18n],
         stubs: {
           OButton: {
-            template: '<button @click="$emit(\'click\')"><slot /></button>',
-            props: ['dataTest', 'class', 'size', 'loading', 'disable', 'icon'],
-            emits: ['click'],
+            template: "<button @click=\"$emit('click')\"><slot /></button>",
+            props: ["dataTest", "class", "size", "loading", "disable", "icon"],
+            emits: ["click"],
           },
-          OTooltip: { template: '<div><slot /></div>' },
+          OTooltip: { template: "<div><slot /></div>" },
         },
       },
     });
@@ -173,7 +174,8 @@ describe("ShareButton", () => {
   it("should emit copy:success event when copy succeeds (Chrome)", async () => {
     // Mock non-Safari browser
     Object.defineProperty(window.navigator, "userAgent", {
-      value: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+      value:
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
       configurable: true,
     });
 
@@ -195,11 +197,11 @@ describe("ShareButton", () => {
         plugins: [store, i18n],
         stubs: {
           OButton: {
-            template: '<button @click="$emit(\'click\')"><slot /></button>',
-            props: ['dataTest', 'class', 'size', 'loading', 'disable', 'icon'],
-            emits: ['click'],
+            template: "<button @click=\"$emit('click')\"><slot /></button>",
+            props: ["dataTest", "class", "size", "loading", "disable", "icon"],
+            emits: ["click"],
           },
-          OTooltip: { template: '<div><slot /></div>' },
+          OTooltip: { template: "<div><slot /></div>" },
         },
       },
     });
@@ -225,8 +227,8 @@ describe("ShareButton", () => {
         plugins: [store, i18n],
         stubs: {
           OButton: {
-            template: '<button><slot /></button>',
-            props: ['dataTest', 'class', 'size', 'loading', 'disable', 'icon'],
+            template: "<button><slot /></button>",
+            props: ["dataTest", "class", "size", "loading", "disable", "icon"],
           },
           OTooltip: {
             template: '<div class="tooltip">{{ $slots.default?.()[0]?.children }}</div>',
@@ -248,7 +250,7 @@ describe("ShareButton", () => {
       global: {
         plugins: [store, i18n],
         stubs: {
-          OTooltip: { template: '<div><slot /></div>' },
+          OTooltip: { template: "<div><slot /></div>" },
         },
       },
     });
@@ -267,10 +269,10 @@ describe("ShareButton", () => {
         plugins: [store, i18n],
         stubs: {
           OButton: {
-            template: '<button><slot /></button>',
-            props: ['dataTest', 'class', 'size', 'loading', 'disable', 'icon'],
+            template: "<button><slot /></button>",
+            props: ["dataTest", "class", "size", "loading", "disable", "icon"],
           },
-          OTooltip: { template: '<div><slot /></div>' },
+          OTooltip: { template: "<div><slot /></div>" },
         },
       },
     });
@@ -289,9 +291,9 @@ describe("ShareButton", () => {
         stubs: {
           OButton: {
             template: '<button :disable="disable"><slot /></button>',
-            props: ['dataTest', 'class', 'size', 'loading', 'disable', 'icon'],
+            props: ["dataTest", "class", "size", "loading", "disable", "icon"],
           },
-          OTooltip: { template: '<div><slot /></div>' },
+          OTooltip: { template: "<div><slot /></div>" },
         },
       },
     });
@@ -328,9 +330,9 @@ describe("ShareButton", () => {
         stubs: {
           OButton: {
             template: '<button :disable="disable"><slot /></button>',
-            props: ['dataTest', 'class', 'size', 'loading', 'disable', 'icon'],
+            props: ["dataTest", "class", "size", "loading", "disable", "icon"],
           },
-          OTooltip: { template: '<div><slot /></div>' },
+          OTooltip: { template: "<div><slot /></div>" },
         },
       },
     });

@@ -15,179 +15,184 @@
     </OButton>
   </div>
   <Teleport to="body">
-  <div
-    class="user-guide fixed z-9999 w-125 max-h-75 p-2.5 overflow-y-auto pointer-events-auto border border-border-default rounded-default bg-surface-base [&_ul]:m-0 [&_li]:m-0 [&_p]:m-0 [&_div]:m-0 [scrollbar-width:thin] [scrollbar-color:color-mix(in_srgb,var(--color-grey-950)_25%,transparent)_color-mix(in_srgb,var(--color-grey-950)_5%,transparent)]"
-    v-show="showUserGuide"
-    @mouseleave="showUserGuide = false"
-    ref="userGuideDivRef"
-  >
-    <p>
-      {{ t("dashboard.drilldownUserGuide.intro") }}
-    </p>
-
-    <div class="font-bold">
-      {{ t("dashboard.drilldownUserGuide.useCurrentDashboardVariable") }}
-    </div>
-    <p>{{ t("dashboard.drilldownUserGuide.referenceVariableFormat") }}</p>
-    <ul>
-      <li>
-        <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
-        <span class="bg-highlight-bg px-1.25">${variable_name}</span>
-        <br />
-        {{ t("dashboard.drilldownUserGuide.variableExample") }}
-        <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
-        <span class="bg-highlight-bg px-1.25">${test}</span>)
-      </li>
-    </ul>
-
-    <br />
-
-    <div class="font-bold">{{ t("dashboard.drilldownUserGuide.useCurrentQuery") }}</div>
-    <p>{{ t("dashboard.drilldownUserGuide.referenceCurrentQueryFormat") }}</p>
-    <ul>
-      <li>
-        <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
-        <span class="bg-highlight-bg px-1.25">${query}</span>
-      </li>
-      <li>
-        <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
-        <span class="bg-highlight-bg px-1.25">${query_encoded}</span>
-      </li>
-    </ul>
-    <br />
-
-    <div class="font-bold">
-      {{ t("dashboard.drilldownUserGuide.useCurrentSelectedTimePeriod") }}
-    </div>
-    <p>
-      {{ t("dashboard.drilldownUserGuide.referenceTimePeriodFormat") }}
-    </p>
-    <ul>
-      <li>
-        <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
-        <span class="bg-highlight-bg px-1.25">${start_time}</span>
-      </li>
-      <li>
-        <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
-        <span class="bg-highlight-bg px-1.25">${end_time}</span>
-      </li>
-    </ul>
-    {{ t("dashboard.drilldownUserGuide.forExample") }}
-    <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal URL query-string example, not translatable -->
-    <span class="bg-highlight-bg px-1.25">from=${start_time}&to=${end_time}</span>
-    <br />
-    <span class="font-bold">{{ t("dashboard.drilldownUserGuide.note") }}</span>
-    <span>{{ t("dashboard.drilldownUserGuide.relativeTimeNote") }}
-      <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
-      <span class="bg-highlight-bg px-1.25">start_time</span> {{ t("dashboard.drilldownUserGuide.and") }}
-      <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
-      <span class="bg-highlight-bg px-1.25">end_time</span>.</span
+    <div
+      class="user-guide border-border-default rounded-default bg-surface-base pointer-events-auto fixed z-9999 max-h-75 w-125 overflow-y-auto border p-2.5 [scrollbar-color:color-mix(in_srgb,var(--color-grey-950)_25%,transparent)_color-mix(in_srgb,var(--color-grey-950)_5%,transparent)] [scrollbar-width:thin] [&_div]:m-0 [&_li]:m-0 [&_p]:m-0 [&_ul]:m-0"
+      v-show="showUserGuide"
+      @mouseleave="showUserGuide = false"
+      ref="userGuideDivRef"
     >
-    <br />
-    <br />
-    <div class="font-bold">
-      {{ t("dashboard.drilldownUserGuide.useSeriesNameAndValue") }}
-    </div>
-    <p>{{ t("dashboard.drilldownUserGuide.referenceChartDataFormat") }}</p>
+      <p>
+        {{ t("dashboard.drilldownUserGuide.intro") }}
+      </p>
 
-    <ul>
-      <li>
-        <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
-        <span class="bg-highlight-bg px-1.25">${series.__name}</span>
-        {{ t("dashboard.drilldownUserGuide.seriesNameDesc") }}
-      </li>
-      <li>
-        <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
-        <span class="bg-highlight-bg px-1.25">${series.__value}</span>
-        {{ t("dashboard.drilldownUserGuide.seriesValueDesc") }}
-      </li>
-      <li>
-        <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
-        <span class="bg-highlight-bg px-1.25">${series.__axisValue}</span>
-        {{ t("dashboard.drilldownUserGuide.seriesAxisValueDesc") }}
-      </li>
-    </ul>
-
-    <br />
-
-    <div class="font-bold">
-      {{ t("dashboard.drilldownUserGuide.forTableChartDrilldown") }}
-    </div>
-    <p>
-      {{ t("dashboard.drilldownUserGuide.referenceRowFieldIndex") }}
-    </p>
-    <ul>
-      <li>
-        <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal code syntax example for field access, not translatable -->
-        <span class="bg-highlight-bg px-1.25">${row.field["field_label"]} or ${row.field.field_label}</span
-        >
-        <br />
-        {{ t("dashboard.drilldownUserGuide.rowFieldExample") }}
-        <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
-        <span class="bg-highlight-bg px-1.25">${row.field.test} </span> {{ t("dashboard.drilldownUserGuide.or") }}
-        <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
-        <span class="bg-highlight-bg px-1.25">${row.field["test"]}</span>)
-      </li>
-      <li>
-        <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
-        <span class="bg-highlight-bg px-1.25">${row.index}</span>
-      </li>
-    </ul>
-
-    <br />
-
-    <div class="font-bold">
-      {{ t("dashboard.drilldownUserGuide.forPieDonutChartDrilldown") }}
-    </div>
-    <p>{{ t("dashboard.drilldownUserGuide.referenceSeriesValue") }}</p>
-    <ul>
-      <li>
-        <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
-        <span class="bg-highlight-bg px-1.25">${series.__name}</span>
-      </li>
-      <li>
-        <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
-        <span class="bg-highlight-bg px-1.25">${series.__value}</span>
-      </li>
-    </ul>
-
-    <br />
-
-    <div class="font-bold">
-      {{ t("dashboard.drilldownUserGuide.forSankeyChartDrilldown") }}
-    </div>
-    <p>
-      {{ t("dashboard.drilldownUserGuide.referenceSankey") }}
-    </p>
-    <ul>
-      <li class="font-bold">{{ t("dashboard.drilldownUserGuide.edge") }}</li>
+      <div class="font-bold">
+        {{ t("dashboard.drilldownUserGuide.useCurrentDashboardVariable") }}
+      </div>
+      <p>{{ t("dashboard.drilldownUserGuide.referenceVariableFormat") }}</p>
       <ul>
         <li>
           <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
-          <span class="bg-highlight-bg px-1.25">${edge.__source}</span>
-        </li>
-        <li>
+          <span class="bg-highlight-bg px-1.25">${variable_name}</span>
+          <br />
+          {{ t("dashboard.drilldownUserGuide.variableExample") }}
           <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
-          <span class="bg-highlight-bg px-1.25">${edge.__target}</span>
-        </li>
-        <li>
-          <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
-          <span class="bg-highlight-bg px-1.25">${edge.__value}</span>
+          <span class="bg-highlight-bg px-1.25">${test}</span>)
         </li>
       </ul>
-      <li class="font-bold">{{ t("dashboard.drilldownUserGuide.node") }}</li>
+
+      <br />
+
+      <div class="font-bold">{{ t("dashboard.drilldownUserGuide.useCurrentQuery") }}</div>
+      <p>{{ t("dashboard.drilldownUserGuide.referenceCurrentQueryFormat") }}</p>
       <ul>
         <li>
           <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
-          <span class="bg-highlight-bg px-1.25">${node.__name}</span>
+          <span class="bg-highlight-bg px-1.25">${query}</span>
         </li>
         <li>
           <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
-          <span class="bg-highlight-bg px-1.25">${node.__value}</span>
+          <span class="bg-highlight-bg px-1.25">${query_encoded}</span>
         </li>
       </ul>
-    </ul>
-  </div>
+      <br />
+
+      <div class="font-bold">
+        {{ t("dashboard.drilldownUserGuide.useCurrentSelectedTimePeriod") }}
+      </div>
+      <p>
+        {{ t("dashboard.drilldownUserGuide.referenceTimePeriodFormat") }}
+      </p>
+      <ul>
+        <li>
+          <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
+          <span class="bg-highlight-bg px-1.25">${start_time}</span>
+        </li>
+        <li>
+          <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
+          <span class="bg-highlight-bg px-1.25">${end_time}</span>
+        </li>
+      </ul>
+      {{ t("dashboard.drilldownUserGuide.forExample") }}
+      <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal URL query-string example, not translatable -->
+      <span class="bg-highlight-bg px-1.25">from=${start_time}&to=${end_time}</span>
+      <br />
+      <span class="font-bold">{{ t("dashboard.drilldownUserGuide.note") }}</span>
+      <span
+        >{{ t("dashboard.drilldownUserGuide.relativeTimeNote") }}
+        <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
+        <span class="bg-highlight-bg px-1.25">start_time</span>
+        {{ t("dashboard.drilldownUserGuide.and") }}
+        <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
+        <span class="bg-highlight-bg px-1.25">end_time</span>.</span
+      >
+      <br />
+      <br />
+      <div class="font-bold">
+        {{ t("dashboard.drilldownUserGuide.useSeriesNameAndValue") }}
+      </div>
+      <p>{{ t("dashboard.drilldownUserGuide.referenceChartDataFormat") }}</p>
+
+      <ul>
+        <li>
+          <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
+          <span class="bg-highlight-bg px-1.25">${series.__name}</span>
+          {{ t("dashboard.drilldownUserGuide.seriesNameDesc") }}
+        </li>
+        <li>
+          <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
+          <span class="bg-highlight-bg px-1.25">${series.__value}</span>
+          {{ t("dashboard.drilldownUserGuide.seriesValueDesc") }}
+        </li>
+        <li>
+          <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
+          <span class="bg-highlight-bg px-1.25">${series.__axisValue}</span>
+          {{ t("dashboard.drilldownUserGuide.seriesAxisValueDesc") }}
+        </li>
+      </ul>
+
+      <br />
+
+      <div class="font-bold">
+        {{ t("dashboard.drilldownUserGuide.forTableChartDrilldown") }}
+      </div>
+      <p>
+        {{ t("dashboard.drilldownUserGuide.referenceRowFieldIndex") }}
+      </p>
+      <ul>
+        <li>
+          <!-- eslint-disable vue/no-bare-strings-in-template -- literal code syntax example for field access, not translatable -->
+          <span class="bg-highlight-bg px-1.25"
+            >${row.field["field_label"]} or ${row.field.field_label}</span
+          >
+          <!-- eslint-enable vue/no-bare-strings-in-template -->
+          <br />
+          {{ t("dashboard.drilldownUserGuide.rowFieldExample") }}
+          <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
+          <span class="bg-highlight-bg px-1.25">${row.field.test} </span>
+          {{ t("dashboard.drilldownUserGuide.or") }}
+          <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
+          <span class="bg-highlight-bg px-1.25">${row.field["test"]}</span>)
+        </li>
+        <li>
+          <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
+          <span class="bg-highlight-bg px-1.25">${row.index}</span>
+        </li>
+      </ul>
+
+      <br />
+
+      <div class="font-bold">
+        {{ t("dashboard.drilldownUserGuide.forPieDonutChartDrilldown") }}
+      </div>
+      <p>{{ t("dashboard.drilldownUserGuide.referenceSeriesValue") }}</p>
+      <ul>
+        <li>
+          <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
+          <span class="bg-highlight-bg px-1.25">${series.__name}</span>
+        </li>
+        <li>
+          <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
+          <span class="bg-highlight-bg px-1.25">${series.__value}</span>
+        </li>
+      </ul>
+
+      <br />
+
+      <div class="font-bold">
+        {{ t("dashboard.drilldownUserGuide.forSankeyChartDrilldown") }}
+      </div>
+      <p>
+        {{ t("dashboard.drilldownUserGuide.referenceSankey") }}
+      </p>
+      <ul>
+        <li class="font-bold">{{ t("dashboard.drilldownUserGuide.edge") }}</li>
+        <ul>
+          <li>
+            <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
+            <span class="bg-highlight-bg px-1.25">${edge.__source}</span>
+          </li>
+          <li>
+            <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
+            <span class="bg-highlight-bg px-1.25">${edge.__target}</span>
+          </li>
+          <li>
+            <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
+            <span class="bg-highlight-bg px-1.25">${edge.__value}</span>
+          </li>
+        </ul>
+        <li class="font-bold">{{ t("dashboard.drilldownUserGuide.node") }}</li>
+        <ul>
+          <li>
+            <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
+            <span class="bg-highlight-bg px-1.25">${node.__name}</span>
+          </li>
+          <li>
+            <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal template variable name shown as example, not translatable -->
+            <span class="bg-highlight-bg px-1.25">${node.__value}</span>
+          </li>
+        </ul>
+      </ul>
+    </div>
   </Teleport>
 </template>
 

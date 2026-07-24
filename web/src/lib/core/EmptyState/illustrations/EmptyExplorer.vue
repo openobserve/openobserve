@@ -40,7 +40,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </g>
 
     <!-- ground shadow (breathes with the float) -->
-    <ellipse class="es-shadow" cx="180" cy="252" rx="104" ry="13" fill="var(--color-primary-900)" opacity="0.14" />
+    <ellipse
+      class="es-shadow"
+      cx="180"
+      cy="252"
+      rx="104"
+      ry="13"
+      fill="var(--color-primary-900)"
+      opacity="0.14"
+    />
 
     <!-- signpost -->
     <g>
@@ -48,10 +56,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <rect x="70" y="120" width="3" height="134" fill="var(--color-illustration-wood)" />
       <!-- left arrow -->
       <path d="M86 142 H44 L32 152 L44 162 H86 Z" fill="var(--color-primary-500)" />
-      <rect x="80" y="146" width="14" height="3" rx="1.5" fill="var(--color-white)" opacity="0.55" />
+      <rect
+        x="80"
+        y="146"
+        width="14"
+        height="3"
+        rx="1.5"
+        fill="var(--color-white)"
+        opacity="0.55"
+      />
       <!-- right arrow -->
       <path d="M60 170 H104 L116 180 L104 190 H60 Z" fill="var(--color-primary-400)" />
-      <rect x="64" y="178" width="20" height="3" rx="1.5" fill="var(--color-white)" opacity="0.55" />
+      <rect
+        x="64"
+        y="178"
+        width="20"
+        height="3"
+        rx="1.5"
+        fill="var(--color-white)"
+        opacity="0.55"
+      />
       <!-- left arrow (small) -->
       <path d="M86 198 H50 L40 207 L50 216 H86 Z" fill="var(--color-primary-300)" />
     </g>
@@ -60,10 +84,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <g class="es-char">
       <!-- back leg -->
       <path d="M182 176 L196 176 L192 246 L181 246 Z" fill="var(--color-grey-800)" />
-      <path d="M178 244 Q178 251 187 251 L198 251 Q201 250 199 245 L192 244 Z" fill="var(--color-grey-900)" />
+      <path
+        d="M178 244 Q178 251 187 251 L198 251 Q201 250 199 245 L192 244 Z"
+        fill="var(--color-grey-900)"
+      />
       <!-- front leg -->
       <path d="M198 176 L213 176 L210 246 L200 246 Z" fill="var(--color-grey-700)" />
-      <path d="M198 244 Q198 251 207 251 L219 251 Q222 250 220 245 L210 244 Z" fill="var(--color-grey-900)" />
+      <path
+        d="M198 244 Q198 251 207 251 L219 251 Q222 250 220 245 L210 244 Z"
+        fill="var(--color-grey-900)"
+      />
 
       <!-- torso / hoodie -->
       <path
@@ -71,20 +101,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         fill="var(--color-primary-500)"
       />
       <!-- hoodie shade -->
-      <path d="M201 146 Q216 147 214 154 L217 176 Q218 181 211 181 L201 181 Z" fill="var(--color-primary-600)" opacity="0.55" />
+      <path
+        d="M201 146 Q216 147 214 154 L217 176 Q218 181 211 181 L201 181 Z"
+        fill="var(--color-primary-600)"
+        opacity="0.55"
+      />
       <!-- hoodie pocket -->
-      <path d="M188 166 H206 Q205 174 197 174 Q189 174 188 166 Z" fill="var(--color-primary-600)" opacity="0.5" />
+      <path
+        d="M188 166 H206 Q205 174 197 174 Q189 174 188 166 Z"
+        fill="var(--color-primary-600)"
+        opacity="0.5"
+      />
 
       <!-- lower arm holding tablet -->
-      <path d="M180 154 Q170 166 176 184 Q179 190 186 187 L192 180 Q186 168 190 156 Z" fill="var(--color-primary-500)" />
+      <path
+        d="M180 154 Q170 166 176 184 Q179 190 186 187 L192 180 Q186 168 190 156 Z"
+        fill="var(--color-primary-500)"
+      />
       <!-- tablet -->
       <g transform="rotate(-12 188 188)">
-        <rect x="168" y="176" width="40" height="28" rx="4" fill="var(--color-surface-base)" stroke="var(--color-border-strong)" stroke-width="2" />
-        <polyline points="174,194 182,188 188,191 196,183 202,187" fill="none" stroke="var(--color-primary-400)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-        <line x1="172" y1="199" x2="204" y2="199" stroke="var(--color-border-default)" stroke-width="1.5" />
+        <rect
+          x="168"
+          y="176"
+          width="40"
+          height="28"
+          rx="4"
+          fill="var(--color-surface-base)"
+          stroke="var(--color-border-strong)"
+          stroke-width="2"
+        />
+        <polyline
+          points="174,194 182,188 188,191 196,183 202,187"
+          fill="none"
+          stroke="var(--color-primary-400)"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+        <line
+          x1="172"
+          y1="199"
+          x2="204"
+          y2="199"
+          stroke="var(--color-border-default)"
+          stroke-width="1.5"
+        />
       </g>
       <!-- tablet hand -->
-      <ellipse cx="183" cy="186" rx="5.5" ry="4.5" fill="var(--color-illustration-tan)" transform="rotate(-12 183 186)" />
+      <ellipse
+        cx="183"
+        cy="186"
+        rx="5.5"
+        ry="4.5"
+        fill="var(--color-illustration-tan)"
+        transform="rotate(-12 183 186)"
+      />
 
       <!-- head (3/4 facing the bubble) — subtle "thinking" tilt -->
       <g class="es-head">
@@ -94,22 +165,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- ear -->
         <circle cx="210" cy="116" r="3.5" fill="var(--color-illustration-tan)" />
         <!-- hair -->
-        <path d="M182 110 Q179 90 200 88 Q221 89 219 110 Q219 100 210 98 Q214 104 213 110 Q205 100 195 102 Q188 103 185 112 Q183 108 182 110 Z" fill="var(--color-illustration-umber)" />
-        <path d="M181 110 Q179 96 188 90 Q183 99 186 108 Z" fill="var(--color-illustration-cocoa)" />
+        <path
+          d="M182 110 Q179 90 200 88 Q221 89 219 110 Q219 100 210 98 Q214 104 213 110 Q205 100 195 102 Q188 103 185 112 Q183 108 182 110 Z"
+          fill="var(--color-illustration-umber)"
+        />
+        <path
+          d="M181 110 Q179 96 188 90 Q183 99 186 108 Z"
+          fill="var(--color-illustration-cocoa)"
+        />
         <!-- face: brow (raised/puzzled), eye, mouth -->
-        <path d="M186 108 Q190 105 194 107" stroke="var(--color-illustration-cocoa)" stroke-width="1.8" stroke-linecap="round" fill="none" />
+        <path
+          d="M186 108 Q190 105 194 107"
+          stroke="var(--color-illustration-cocoa)"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          fill="none"
+        />
         <circle cx="190" cy="113" r="2" fill="var(--color-illustration-espresso)" />
-        <path d="M187 124 Q191 126 195 123" stroke="var(--color-illustration-clay)" stroke-width="1.8" stroke-linecap="round" fill="none" />
+        <path
+          d="M187 124 Q191 126 195 123"
+          stroke="var(--color-illustration-clay)"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          fill="none"
+        />
       </g>
 
       <!-- raised arm — actually scratches the head (rubs back and forth) -->
       <g class="es-scratch">
-        <path d="M206 150 Q224 146 230 124 Q232 116 226 114 Q220 113 218 121 Q214 138 200 144 Z" fill="var(--color-primary-500)" />
+        <path
+          d="M206 150 Q224 146 230 124 Q232 116 226 114 Q220 113 218 121 Q214 138 200 144 Z"
+          fill="var(--color-primary-500)"
+        />
         <!-- sleeve shade -->
-        <path d="M226 114 Q232 116 230 124 Q227 134 222 140 L219 132 Q224 124 222 116 Z" fill="var(--color-primary-600)" opacity="0.5" />
+        <path
+          d="M226 114 Q232 116 230 124 Q227 134 222 140 L219 132 Q224 124 222 116 Z"
+          fill="var(--color-primary-600)"
+          opacity="0.5"
+        />
         <!-- scratching hand + fingers -->
         <ellipse cx="224" cy="111" rx="6.5" ry="6" fill="var(--color-illustration-sand)" />
-        <path d="M219 108 Q221 104 223 108 M223 107 Q225 103 227 107 M227 108 Q229 105 230 109" stroke="var(--color-illustration-tan)" stroke-width="1.4" stroke-linecap="round" fill="none" />
+        <path
+          d="M219 108 Q221 104 223 108 M223 107 Q225 103 227 107 M227 108 Q229 105 230 109"
+          stroke="var(--color-illustration-tan)"
+          stroke-width="1.4"
+          stroke-linecap="round"
+          fill="none"
+        />
       </g>
     </g>
 
@@ -117,7 +219,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <circle class="es-dot es-dot-a" cx="298" cy="150" r="5" fill="var(--color-primary-400)" />
     <circle class="es-dot es-dot-b" cx="120" cy="92" r="4" fill="var(--color-primary-300)" />
     <g class="es-dot es-dot-c" transform="translate(140 72)">
-      <path d="M0 -7 L1.6 -1.6 L7 0 L1.6 1.6 L0 7 L-1.6 1.6 L-7 0 L-1.6 -1.6 Z" fill="var(--color-primary-400)" />
+      <path
+        d="M0 -7 L1.6 -1.6 L7 0 L1.6 1.6 L0 7 L-1.6 1.6 L-7 0 L-1.6 -1.6 Z"
+        fill="var(--color-primary-400)"
+      />
     </g>
   </svg>
 </template>
@@ -127,10 +232,7 @@ import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
 
-withDefaults(
-  defineProps<{ width?: number; animated?: boolean }>(),
-  { width: 300, animated: true },
-);
+withDefaults(defineProps<{ width?: number; animated?: boolean }>(), { width: 300, animated: true });
 </script>
 
 <style scoped>

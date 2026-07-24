@@ -72,8 +72,8 @@ const renderedSections = computed(() =>
     <div class="o2-card-inner min-w-0">
       <!-- Header chrome -->
       <header class="mb-5">
-        <div class="flex items-center gap-2 flex-wrap">
-          <h2 class="text-xl font-semibold m-0 leading-tight">
+        <div class="flex flex-wrap items-center gap-2">
+          <h2 class="m-0 text-xl leading-tight font-semibold">
             {{ metadata.displayName }}
           </h2>
           <OTag v-if="metadata.category" type="integrationMeta" value="category">
@@ -83,10 +83,7 @@ const renderedSections = computed(() =>
             {{ metadata.runtime }}
           </OTag>
         </div>
-        <p
-          v-if="metadata.tagline"
-          class="text-sm opacity-60 mt-1.5 mb-0"
-        >
+        <p v-if="metadata.tagline" class="mt-1.5 mb-0 text-sm opacity-60">
           {{ metadata.tagline }}
         </p>
       </header>
@@ -101,16 +98,12 @@ const renderedSections = computed(() =>
       />
 
       <!-- Sections (all open — install guides read top to bottom) -->
-      <section
-        v-for="section in renderedSections"
-        :key="section.title"
-        class="o2-section min-w-0"
-      >
+      <section v-for="section in renderedSections" :key="section.title" class="o2-section min-w-0">
         <h3 class="o2-section-title">{{ section.title }}</h3>
         <template v-for="(seg, j) in section.segments" :key="j">
           <div
             v-if="seg.type === 'html'"
-            class="o2-card-md prose prose-sm max-w-none min-w-0 dark:prose-invert"
+            class="o2-card-md prose prose-sm dark:prose-invert max-w-none min-w-0"
             v-html="seg.html"
           ></div>
           <OCodeBlock v-else :code="seg.code" :lang="seg.lang" data-test="ai-md-code" />
@@ -119,17 +112,17 @@ const renderedSections = computed(() =>
 
       <!-- Documentation link — identical markup to the legacy ingestion cards
            (AIIntegrationDetail.vue) so it looks the same across all sections. -->
-      <div v-if="docUrl" class="font-bold pt-6 pb-2">
-        {{ t('ingestion.docLinkClick') }}
+      <div v-if="docUrl" class="pt-6 pb-2 font-bold">
+        {{ t("ingestion.docLinkClick") }}
         <a
           :href="safeHttpUrl(docUrl)"
           target="_blank"
           rel="noopener noreferrer"
           class="text-text-link hover:text-text-link-hover"
           style="text-decoration: underline"
-          >{{ t('ingestion.docLinkHere') }}</a
+          >{{ t("ingestion.docLinkHere") }}</a
         >
-        {{ t('ingestion.docLinkDefaultText') }}
+        {{ t("ingestion.docLinkDefaultText") }}
       </div>
     </div>
   </div>

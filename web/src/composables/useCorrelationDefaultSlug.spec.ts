@@ -49,9 +49,15 @@ const localStorageMock = (() => {
   let store: Record<string, string> = {};
   return {
     getItem: vi.fn((key: string) => store[key] ?? null),
-    setItem: vi.fn((key: string, value: string) => { store[key] = value; }),
-    removeItem: vi.fn((key: string) => { delete store[key]; }),
-    clear: () => { store = {}; },
+    setItem: vi.fn((key: string, value: string) => {
+      store[key] = value;
+    }),
+    removeItem: vi.fn((key: string) => {
+      delete store[key];
+    }),
+    clear: () => {
+      store = {};
+    },
   };
 })();
 
@@ -85,10 +91,10 @@ describe("extractCorrelationFilters", () => {
   });
 
   it("extracts multiple tracked fields", () => {
-    const result = extractCorrelationFilters(
-      "host = 'web-01' AND region = 'us-east'",
-      ["host", "region"],
-    );
+    const result = extractCorrelationFilters("host = 'web-01' AND region = 'us-east'", [
+      "host",
+      "region",
+    ]);
     expect(result).toEqual([
       { field: "host", value: "web-01" },
       { field: "region", value: "us-east" },
@@ -96,18 +102,14 @@ describe("extractCorrelationFilters", () => {
   });
 
   it("strips SQL WHERE prefix before parsing", () => {
-    const result = extractCorrelationFilters(
-      "SELECT * FROM \"logs\" WHERE host = 'web-01'",
-      ["host"],
-    );
+    const result = extractCorrelationFilters("SELECT * FROM \"logs\" WHERE host = 'web-01'", [
+      "host",
+    ]);
     expect(result).toEqual([{ field: "host", value: "web-01" }]);
   });
 
   it("updates existing field when it appears twice (last value wins)", () => {
-    const result = extractCorrelationFilters(
-      "host = 'web-01' AND host = 'web-02'",
-      ["host"],
-    );
+    const result = extractCorrelationFilters("host = 'web-01' AND host = 'web-02'", ["host"]);
     expect(result).toHaveLength(1);
     expect(result[0].value).toBe("web-02");
   });
@@ -245,7 +247,9 @@ describe("useCorrelationFilters", () => {
       streamName: () => "mystream",
       streamSchemaFields: () => [{ name: "host" }],
       getQuery: () => query,
-      setQuery: vi.fn((q: string) => { query = q; }),
+      setQuery: vi.fn((q: string) => {
+        query = q;
+      }),
       ...overrides,
     };
   };

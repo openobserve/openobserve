@@ -17,28 +17,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <OPageLayout
-      :title="t('iam.basicUsers')"
-      :subtitle="t('user.subtitle')"
-      icon="person" bleed>
-      <template #actions>
-        <member-invitation
-          v-if="config.isCloud == 'true'"
-          :key="currentUserRole"
-          v-model:currentrole="currentUserRole"
-          @invite-sent="handleInviteSent"
-        />
-        <OButton
-          v-else
-          variant="primary"
-          size="sm"
-          @click="addRoutePush({})"
-          data-test="add-basic-user"
-        >
-          {{ t('user.add') }}
-        </OButton>
-      </template>
-    <div class="w-full flex-1 min-h-0 overflow-hidden">
+  <OPageLayout :title="t('iam.basicUsers')" :subtitle="t('user.subtitle')" icon="person" bleed>
+    <template #actions>
+      <MemberInvitation
+        v-if="config.isCloud == 'true'"
+        :key="currentUserRole"
+        v-model:currentrole="currentUserRole"
+        @invite-sent="handleInviteSent"
+      />
+      <OButton
+        v-else
+        variant="primary"
+        size="sm"
+        @click="addRoutePush({})"
+        data-test="add-basic-user"
+      >
+        {{ t("user.add") }}
+      </OButton>
+    </template>
+    <div class="min-h-0 w-full flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <OTable
           :key="tableKey"
@@ -66,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:selected-ids="handleSelectedIdsUpdate"
         >
           <template #toolbar>
-            <div class="flex items-center gap-2 w-full">
+            <div class="flex w-full items-center gap-2">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('user.search')"
@@ -84,7 +81,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="user-list-refresh-btn"
               @click="refreshUsers"
             >
-              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="iamUsersRefresh" />
+              <OTooltip
+                side="bottom"
+                :content="t('common.refresh')"
+                shortcut-id="iamUsersRefresh"
+              />
             </OButton>
           </template>
           <template #empty>
@@ -92,10 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="hero"
               preset="no-users"
               :filtered="!!filterQuery"
-              @action="
-                (id) =>
-                  id === 'clear-filters' ? (filterQuery = '') : addRoutePush({})
-              "
+              @action="(id) => (id === 'clear-filters' ? (filterQuery = '') : addRoutePush({}))"
             />
           </template>
 
@@ -110,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-roles="{ row }">
             <div class="flex flex-wrap items-center gap-1">
               <OTag
-                v-for="(roleName, idx) in (row.roles || [])"
+                v-for="(roleName, idx) in row.roles || []"
                 :key="`${roleName}-${idx}`"
                 :type="isBuiltinRole(roleName) ? 'userRole' : undefined"
                 :value="roleName"
@@ -126,11 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 type="userRole"
                 :value="String(row.role || '').replace(/\s*\(Invited\)\s*$/i, '')"
               />
-              <OTag
-                v-if="row.status === 'pending'"
-                type="userStatus"
-                value="invited"
-              />
+              <OTag v-if="row.status === 'pending'" type="userStatus" value="invited" />
             </span>
           </template>
 
@@ -170,7 +164,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
           <template #bottom>
-            <span class="text-xs font-normal">{{ rows.length }} {{ isEnterpriseOrCloud ? (t('iam.organizationMembers') || t('iam.user.organizationMembers')) : t('iam.basicUsers') }}</span>
+            <span class="text-xs font-normal"
+              >{{ rows.length }}
+              {{
+                isEnterpriseOrCloud
+                  ? t("iam.organizationMembers") || t("iam.user.organizationMembers")
+                  : t("iam.basicUsers")
+              }}</span
+            >
             <OButton
               v-if="selectedUsers.length > 0"
               data-test="users-list-delete-users-btn"
@@ -180,21 +181,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="bulkDeleteLoading"
               @click="openBulkDeleteDialog"
             >
-              {{ t('iam.user.delete') }}
+              {{ t("iam.user.delete") }}
             </OButton>
           </template>
         </OTable>
-        </div>
+      </div>
     </div>
 
-    <update-user-role
+    <UpdateUserRole
       v-if="config.isCloud == 'false'"
       v-model:open="showUpdateUserDialog"
       v-model="selectedUser"
       @updated="updateMember"
     />
 
-    <add-user
+    <AddUser
       v-model:open="showAddUserDialog"
       v-model="selectedUser"
       :isUpdated="isUpdated"
@@ -205,7 +206,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @updated="addMember"
     />
 
-    <ODialog data-test="user-delete-dialog"
+    <ODialog
+      data-test="user-delete-dialog"
       v-model:open="confirmDelete"
       size="sm"
       :title="t('user.confirmDeleteHead')"
@@ -214,10 +216,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="confirmDelete = false"
       @click:primary="deleteUser"
     >
-      <p>{{ t('user.confirmDeleteMsg') }}</p>
+      <p>{{ t("user.confirmDeleteMsg") }}</p>
     </ODialog>
 
-    <ODialog data-test="user-revoke-dialog"
+    <ODialog
+      data-test="user-revoke-dialog"
       v-model:open="confirmRevoke"
       size="xs"
       :title="t('user.revokeInvitationTitle')"
@@ -226,10 +229,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="confirmRevoke = false"
       @click:primary="revokeInvite"
     >
-      <p>{{ t('user.revokeInvitationMsg', { email: revokeInviteEmail }) }}</p>
+      <p>{{ t("user.revokeInvitationMsg", { email: revokeInviteEmail }) }}</p>
     </ODialog>
 
-    <ODialog data-test="user-bulk-delete-dialog"
+    <ODialog
+      data-test="user-bulk-delete-dialog"
       v-model:open="confirmBulkDelete"
       size="sm"
       :title="t('user.deleteUsersTitle')"
@@ -238,13 +242,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="confirmBulkDelete = false"
       @click:primary="bulkDeleteUsers"
     >
-      <p>{{ t('user.deleteUsersMsg', { count: selectedUsers.length }) }}</p>
+      <p>{{ t("user.deleteUsersMsg", { count: selectedUsers.length }) }}</p>
     </ODialog>
   </OPageLayout>
 </template>
 
 <script lang="ts">
-
 import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -263,11 +266,7 @@ import AddUser from "@/components/iam/users/AddUser.vue";
 import organizationsService from "@/services/organizations";
 import segment from "@/services/segment_analytics";
 import MemberInvitation from "@/components/iam/users/MemberInvitation.vue";
-import {
-  getImageURL,
-  verifyOrganizationStatus,
-  maskText,
-} from "@/utils/zincutils";
+import { getImageURL, verifyOrganizationStatus, maskText } from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -297,11 +296,7 @@ export default defineComponent({
     OEmptyState,
     OSearchInput,
   },
-  emits: [
-    "updated:fields",
-    "deleted:fields",
-    "updated:dates",
-  ],
+  emits: ["updated:fields", "deleted:fields", "updated:dates"],
   setup() {
     const store = useStore();
     const router = useRouter();
@@ -347,12 +342,12 @@ export default defineComponent({
       await getCustomRoles();
 
       // if (config.isCloud == "true") {
-        // columns.value.push({
-        //   name: "status",
-        //   field: "status",
-        //   label: t("user.status"),
-        //   align: "left",
-        // });
+      // columns.value.push({
+      //   name: "status",
+      //   field: "status",
+      //   label: t("user.status"),
+      //   align: "left",
+      // });
       // }
 
       // if (
@@ -377,15 +372,12 @@ export default defineComponent({
       // leave the user on the list view, not pop a dialog on load.
       const query = router.currentRoute.value.query;
       if (query.action === "update" && query.email) {
-        const match = usersState.users.find(
-          (m: any) => m.email === query.email,
-        );
+        const match = usersState.users.find((m: any) => m.email === query.email);
         if (match) addUser({ row: match }, true);
       }
     });
 
-    const isEnterpriseOrCloud =
-      config.isEnterprise === "true" || config.isCloud === "true";
+    const isEnterpriseOrCloud = config.isEnterprise === "true" || config.isCloud === "true";
 
     const columns = computed<OTableColumnDef[]>(() => {
       const cols: OTableColumnDef[] = [
@@ -473,8 +465,7 @@ export default defineComponent({
       "editor",
       "serviceaccount",
     ]);
-    const isBuiltinRole = (r: string) =>
-      BUILTIN_ROLES.has(String(r ?? "").toLowerCase());
+    const isBuiltinRole = (r: string) => BUILTIN_ROLES.has(String(r ?? "").toLowerCase());
     const userEmail: any = ref("");
     const options = ref<{ label: string; value: string }[]>([]);
     const customRoles = ref<string[]>([]);
@@ -497,17 +488,13 @@ export default defineComponent({
     const getCustomRoles = async (options: { silent?: boolean } = {}) => {
       if (config.isEnterprise !== "true" && config.isCloud !== "true") return;
       try {
-        const res = await getCustomRolesApi(
-          store.state.selectedOrganization.identifier,
-        );
+        const res = await getCustomRolesApi(store.state.selectedOrganization.identifier);
         customRoles.value = Array.isArray(res.data) ? res.data : [];
       } catch (err: any) {
         if (!options.silent && err?.response?.status !== 403) {
           toast({
             variant: "error",
-            message:
-              err?.response?.data?.message ||
-              t('iam.user.failedToLoadCustomRoles'),
+            message: err?.response?.data?.message || t("iam.user.failedToLoadCustomRoles"),
           });
         }
       }
@@ -516,15 +503,15 @@ export default defineComponent({
     const getInvitedMembers = () => {
       const dismiss = toast({
         variant: "loading",
-        message: t('iam.user.pleaseWaitLoadingUsers'),
-              timeout: 0,
-});
+        message: t("iam.user.pleaseWaitLoadingUsers"),
+        timeout: 0,
+      });
 
       return new Promise((resolve, reject) => {
         usersService
           .invitedUsers(store.state.selectedOrganization.identifier)
           .then((res) => {
-            if(res.status == 200) {
+            if (res.status == 200) {
               dismiss();
               resolve(res.data);
             } else {
@@ -537,15 +524,15 @@ export default defineComponent({
             reject([]);
           });
       });
-    }
+    };
 
     const loading = ref(false);
     const getOrgMembers = () => {
       const dismiss = toast({
         variant: "loading",
-        message: t('iam.user.pleaseWaitLoadingUsers'),
-              timeout: 0,
-});
+        message: t("iam.user.pleaseWaitLoadingUsers"),
+        timeout: 0,
+      });
 
       loading.value = true;
       return new Promise((resolve, reject) => {
@@ -566,7 +553,10 @@ export default defineComponent({
                 isCurrentUserInternal.value = !data.is_external;
               }
 
-              if (data.email?.toLowerCase() == router.currentRoute.value.query.email?.toString().toLowerCase()) {
+              if (
+                data.email?.toLowerCase() ==
+                router.currentRoute.value.query.email?.toString().toLowerCase()
+              ) {
                 addUser({ row: data }, true);
               }
 
@@ -578,17 +568,12 @@ export default defineComponent({
                 data.roles.forEach((r: any) => r && rolesSet.add(String(r)));
               }
               if (Array.isArray(data?.custom_roles)) {
-                data.custom_roles.forEach(
-                  (r: any) => r && rolesSet.add(String(r)),
-                );
+                data.custom_roles.forEach((r: any) => r && rolesSet.add(String(r)));
               }
               if (Array.isArray(data?.assigned_roles)) {
-                data.assigned_roles.forEach(
-                  (r: any) => r && rolesSet.add(String(r)),
-                );
+                data.assigned_roles.forEach((r: any) => r && rolesSet.add(String(r)));
               }
               const rolesArr: string[] = Array.from(rolesSet).filter(Boolean);
-
 
               return {
                 email: maskText(data.email),
@@ -606,13 +591,12 @@ export default defineComponent({
                     ? toCamelCase(data.role) + " (Invited)"
                     : toCamelCase(data.role),
                 roles: rolesArr,
-                auth_type: data?.auth_type
-                  ? data.auth_type
-                  : data?.is_external
-                    ? "SSO"
-                    : "Native",
+                auth_type: data?.auth_type ? data.auth_type : data?.is_external ? "SSO" : "Native",
                 is_external: !!data?.is_external,
-                enableEdit: store.state.userInfo.email?.toLowerCase() == data.email?.toLowerCase() ? true : false,
+                enableEdit:
+                  store.state.userInfo.email?.toLowerCase() == data.email?.toLowerCase()
+                    ? true
+                    : false,
                 enableChangeRole: false,
                 enableDelete: config.isCloud == "true" ? true : false,
                 status: data?.status,
@@ -645,16 +629,11 @@ export default defineComponent({
                   const roleMap: Record<string, any> = resp?.data || {};
                   usersState.users.forEach((u: any) => {
                     if (u.status === "pending") return;
-                    const fetched: string[] = Array.isArray(
-                      roleMap[u.rawEmail],
-                    )
+                    const fetched: string[] = Array.isArray(roleMap[u.rawEmail])
                       ? roleMap[u.rawEmail].filter(Boolean).map(String)
                       : [];
                     if (fetched.length) {
-                      const merged = new Set<string>([
-                        ...(u.roles || []),
-                        ...fetched,
-                      ]);
+                      const merged = new Set<string>([...(u.roles || []), ...fetched]);
                       u.roles = Array.from(merged);
                     }
                   });
@@ -672,7 +651,9 @@ export default defineComponent({
             dismiss();
             toast({
               variant: "error",
-              message: t('iam.user.failedToLoadUsers', { error: err?.response?.data?.message || err?.message || t('iam.user.unknownError') }),
+              message: t("iam.user.failedToLoadUsers", {
+                error: err?.response?.data?.message || err?.message || t("iam.user.unknownError"),
+              }),
               timeout: 5000,
             });
             reject(false);
@@ -739,9 +720,7 @@ export default defineComponent({
       }
       // Cloud: cannot edit self (same as delete behavior)
       if (config.isCloud == "true") {
-        return (
-          store.state.userInfo.email.toLowerCase() !== user.email.toLowerCase()
-        );
+        return store.state.userInfo.email.toLowerCase() !== user.email.toLowerCase();
       }
       // Allow editing for all other users
       return true;
@@ -765,32 +744,27 @@ export default defineComponent({
     };
 
     const shouldAllowDelete = (user: any) => {
-
       if (isEnterprise.value) {
-      //for cloud
-      //should allow delete for all users when it is root and also when the row user is not root
-      //should allow delete for all users when it is admin and also when the row user is not logged in user / not root
-        if(config.isCloud == 'true'){
+        //for cloud
+        //should allow delete for all users when it is root and also when the row user is not root
+        //should allow delete for all users when it is admin and also when the row user is not logged in user / not root
+        if (config.isCloud == "true") {
           return (
             user.role?.toLowerCase() !== "root" &&
-            (currentUserRole.value == "root" ||
-              currentUserRole.value == "admin") &&
-              store.state.userInfo.email.toLowerCase() !== user.email.toLowerCase()
-
+            (currentUserRole.value == "root" || currentUserRole.value == "admin") &&
+            store.state.userInfo.email.toLowerCase() !== user.email.toLowerCase()
           );
         }
         return (
           isCurrentUserInternal.value &&
           !user.isExternal &&
           user.role?.toLowerCase() !== "root" &&
-          (currentUserRole.value == "root" ||
-            currentUserRole.value == "admin") &&
+          (currentUserRole.value == "root" || currentUserRole.value == "admin") &&
           !user.isLoggedinUser
         );
       } else {
         return (
-          (currentUserRole.value == "admin" ||
-            currentUserRole.value == "root") &&
+          (currentUserRole.value == "admin" || currentUserRole.value == "root") &&
           !user.isLoggedinUser &&
           user.role?.toLowerCase() !== "root"
         );
@@ -806,8 +780,7 @@ export default defineComponent({
 
     const addUser = (props: any, is_updated: boolean) => {
       isUpdated.value = is_updated;
-      selectedUser.value.organization =
-        store.state.selectedOrganization.identifier;
+      selectedUser.value.organization = store.state.selectedOrganization.identifier;
 
       if (props.row != undefined) {
         // The row already stores the canonical role VALUE, so AddUser's role
@@ -907,7 +880,7 @@ export default defineComponent({
           await getOrgMembers();
         } catch (error) {
           toast({
-            message: t('iam.user.failedToRefreshUserList'),
+            message: t("iam.user.failedToRefreshUserList"),
             variant: "error",
           });
         }
@@ -939,7 +912,7 @@ export default defineComponent({
         updateUserActions();
         if (operationType == "created") {
           toast({
-            message: t('iam.user.userAddedSuccess'),
+            message: t("iam.user.userAddedSuccess"),
             variant: "success",
           });
           // if (
@@ -968,7 +941,7 @@ export default defineComponent({
           // }
         } else {
           toast({
-            message: t('iam.user.userUpdatedSuccess'),
+            message: t("iam.user.userUpdatedSuccess"),
             variant: "success",
           });
           // usersState.users.forEach((member: any, key: number) => {
@@ -1001,7 +974,7 @@ export default defineComponent({
         .then(async (res: any) => {
           if (res.data.code == 200) {
             toast({
-              message: t('iam.user.userDeletedSuccess'),
+              message: t("iam.user.userDeletedSuccess"),
               variant: "success",
             });
             await getOrgMembers();
@@ -1011,7 +984,7 @@ export default defineComponent({
         .catch((err: any) => {
           if (err.response.status != 403) {
             toast({
-              message: t('iam.user.errorDeletingUser'),
+              message: t("iam.user.errorDeletingUser"),
               variant: "error",
             });
           }
@@ -1028,7 +1001,7 @@ export default defineComponent({
       confirmRevoke.value = false;
       const dismiss = toast({
         variant: "loading",
-        message: t('iam.user.pleaseWait'),
+        message: t("iam.user.pleaseWait"),
         timeout: 0,
       });
 
@@ -1037,7 +1010,7 @@ export default defineComponent({
         .then(async () => {
           dismiss();
           toast({
-            message: t('iam.user.invitationRevokedSuccess'),
+            message: t("iam.user.invitationRevokedSuccess"),
             variant: "success",
           });
           await getOrgMembers();
@@ -1053,7 +1026,7 @@ export default defineComponent({
         .catch((err: any) => {
           dismiss();
           toast({
-            message: err?.response?.data?.message || t('iam.user.errorRevokingInvitation'),
+            message: err?.response?.data?.message || t("iam.user.errorRevokingInvitation"),
             variant: "error",
           });
         });
@@ -1073,25 +1046,27 @@ export default defineComponent({
       const userEmails = selectedUsers.value.map((user: any) => user.email);
 
       try {
-        const res = await usersService.bulkDelete(
-          store.state.selectedOrganization.identifier,
-          { ids: userEmails }
-        );
+        const res = await usersService.bulkDelete(store.state.selectedOrganization.identifier, {
+          ids: userEmails,
+        });
         const { successful, unsuccessful } = res.data;
 
         if (successful.length > 0 && unsuccessful.length === 0) {
           toast({
-            message: t('iam.user.deletedUsersSuccess', { count: successful.length }),
+            message: t("iam.user.deletedUsersSuccess", { count: successful.length }),
             variant: "success",
           });
         } else if (successful.length > 0 && unsuccessful.length > 0) {
           toast({
-            message: t('iam.user.deletedUsersPartial', { count: successful.length, failed: unsuccessful.length }),
+            message: t("iam.user.deletedUsersPartial", {
+              count: successful.length,
+              failed: unsuccessful.length,
+            }),
             variant: "warning",
           });
         } else if (unsuccessful.length > 0) {
           toast({
-            message: t('iam.user.failedToDeleteUsers', { count: unsuccessful.length }),
+            message: t("iam.user.failedToDeleteUsers", { count: unsuccessful.length }),
             variant: "error",
           });
         }
@@ -1103,7 +1078,8 @@ export default defineComponent({
       } catch (err: any) {
         if (err.response?.status != 403 || err?.status != 403) {
           toast({
-            message: err.response?.data?.message || err?.message || t('iam.user.errorDeletingUsers'),
+            message:
+              err.response?.data?.message || err?.message || t("iam.user.errorDeletingUsers"),
             variant: "error",
           });
         }
@@ -1115,7 +1091,7 @@ export default defineComponent({
     const updateUserRole = (row: any) => {
       const dismiss = toast({
         variant: "loading",
-        message: t('iam.user.pleaseWait'),
+        message: t("iam.user.pleaseWait"),
         timeout: 0,
       });
 
@@ -1131,7 +1107,7 @@ export default defineComponent({
         )
         .then((res: { data: any }) => {
           if (res.data.error_members != null) {
-            const message = t('iam.user.errorUpdatingOrgMember');
+            const message = t("iam.user.errorUpdatingOrgMember");
             toast({
               variant: "error",
               message: message,
@@ -1140,7 +1116,7 @@ export default defineComponent({
           } else {
             toast({
               variant: "success",
-              message: t('iam.user.orgMemberUpdatedSuccess'),
+              message: t("iam.user.orgMemberUpdatedSuccess"),
             });
           }
           dismiss();
@@ -1159,15 +1135,11 @@ export default defineComponent({
       });
     };
 
-    const selectedUserIds = computed(() =>
-      selectedUsers.value.map((u: any) => u.email),
-    );
+    const selectedUserIds = computed(() => selectedUsers.value.map((u: any) => u.email));
 
     const handleSelectedIdsUpdate = (ids: string[]) => {
       const usersMap = new Map(
-        usersState.users
-          .filter((u: any) => u.enableDelete)
-          .map((u: any) => [u.email, u]),
+        usersState.users.filter((u: any) => u.enableDelete).map((u: any) => [u.email, u]),
       );
       selectedUsers.value = ids.map((id) => usersMap.get(id)).filter(Boolean);
     };
@@ -1176,21 +1148,23 @@ export default defineComponent({
     watch(selectedUsers, (newSelectedUsers) => {
       const onlyEnabledSelected = newSelectedUsers.filter((user: any) => user.enableDelete);
       if (onlyEnabledSelected.length !== newSelectedUsers.length) {
-
         selectedUsers.value = onlyEnabledSelected;
       }
     });
-
 
     // ── Keyboard shortcuts ────────────────────────────────────────────────
     useShortcuts([
       {
         id: "iamUsersAdd",
-        handler: () => { if (!isInputFocused()) addRoutePush({}); },
+        handler: () => {
+          if (!isInputFocused()) addRoutePush({});
+        },
       },
       {
         id: "iamUsersRefresh",
-        handler: () => { if (!isInputFocused()) refreshUsers(); },
+        handler: () => {
+          if (!isInputFocused()) refreshUsers();
+        },
       },
       {
         id: "iamUsersFocusSearch",

@@ -16,27 +16,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="rounded-default">
-    <div
-      class="text-center w-full"
-      style="font-size: var(--text-3xl); margin: 40px 0px"
-    >
-      {{ t('billing.memberSubscription.title') }}
+    <div class="w-full text-center" style="font-size: var(--text-3xl); margin: 40px 0px">
+      {{ t("billing.memberSubscription.title") }}
     </div>
     <div v-if="status == 'processing'">{{ message }}</div>
-    <div
-      v-else-if="status == 'error' && error == ''"
-      class="text-center"
-    >
-      {{ t('billing.memberSubscription.errorProcessing') }}<br /><br />
+    <div v-else-if="status == 'error' && error == ''" class="text-center">
+      {{ t("billing.memberSubscription.errorProcessing") }}<br /><br />
     </div>
 
     <SanitizedHtmlRenderer
       v-else-if="status == 'error' && error !== ''"
       :htmlContent="error"
-      class="text-base leading-7.5 w-[70%] mx-auto text-left"
+      class="mx-auto w-[70%] text-left text-base leading-7.5"
     />
 
-    <div v-else>{{ t('billing.memberSubscription.thankYou') }}</div>
+    <div v-else>{{ t("billing.memberSubscription.thankYou") }}</div>
 
     <!-- <div
       v-if="status == 'error' && error !== ''"
@@ -124,4 +118,3 @@ export default defineComponent({
   },
 });
 </script>
-

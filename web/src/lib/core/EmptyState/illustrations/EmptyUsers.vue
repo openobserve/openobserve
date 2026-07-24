@@ -33,7 +33,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <circle cx="120" cy="86" r="58" fill="var(--color-primary-500)" opacity="0.05" />
     <ellipse cx="120" cy="150" rx="64" ry="9" fill="var(--color-primary-900)" opacity="0.1" />
     <g fill="var(--color-border-default)" opacity="0.5">
-      <circle cx="32" cy="50" r="2" /><circle cx="208" cy="120" r="2" /><circle cx="204" cy="46" r="1.6" />
+      <circle cx="32" cy="50" r="2" />
+      <circle cx="208" cy="120" r="2" />
+      <circle cx="204" cy="46" r="1.6" />
     </g>
 
     <!-- faint existing members -->
@@ -48,14 +50,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- dashed "add member" slot (center, hero) -->
     <g>
-      <circle cx="120" cy="76" r="16" fill="var(--color-surface-base)" stroke="var(--color-primary-400)" stroke-width="2" stroke-dasharray="5 5" />
-      <path d="M98 126 Q98 100 120 98 Q142 100 142 126 Z" fill="var(--color-surface-base)" stroke="var(--color-primary-400)" stroke-width="2" stroke-dasharray="5 5" />
+      <circle
+        cx="120"
+        cy="76"
+        r="16"
+        fill="var(--color-surface-base)"
+        stroke="var(--color-primary-400)"
+        stroke-width="2"
+        stroke-dasharray="5 5"
+      />
+      <path
+        d="M98 126 Q98 100 120 98 Q142 100 142 126 Z"
+        fill="var(--color-surface-base)"
+        stroke="var(--color-primary-400)"
+        stroke-width="2"
+        stroke-dasharray="5 5"
+      />
     </g>
     <!-- decorative + mark (static, outlined — reads as an ornament, not a button) -->
     <g opacity="0.55">
-      <circle cx="142" cy="64" r="9" fill="none" stroke="var(--color-primary-400)" stroke-width="1.75" stroke-dasharray="3 3" />
-      <line x1="142" y1="60" x2="142" y2="68" stroke="var(--color-primary-400)" stroke-width="1.75" stroke-linecap="round" />
-      <line x1="138" y1="64" x2="146" y2="64" stroke="var(--color-primary-400)" stroke-width="1.75" stroke-linecap="round" />
+      <circle
+        cx="142"
+        cy="64"
+        r="9"
+        fill="none"
+        stroke="var(--color-primary-400)"
+        stroke-width="1.75"
+        stroke-dasharray="3 3"
+      />
+      <line
+        x1="142"
+        y1="60"
+        x2="142"
+        y2="68"
+        stroke="var(--color-primary-400)"
+        stroke-width="1.75"
+        stroke-linecap="round"
+      />
+      <line
+        x1="138"
+        y1="64"
+        x2="146"
+        y2="64"
+        stroke="var(--color-primary-400)"
+        stroke-width="1.75"
+        stroke-linecap="round"
+      />
     </g>
   </svg>
 </template>
@@ -65,8 +105,5 @@ import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
 
-withDefaults(
-  defineProps<{ width?: number; animated?: boolean }>(),
-  { width: 260, animated: true },
-);
+withDefaults(defineProps<{ width?: number; animated?: boolean }>(), { width: 260, animated: true });
 </script>

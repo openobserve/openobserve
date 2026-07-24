@@ -15,10 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    v-html="DOMPurify.sanitize(htmlContent)"
-    data-test="sanitized-html-renderer"
-  ></div>
+  <div v-html="DOMPurify.sanitize(htmlContent)" data-test="sanitized-html-renderer"></div>
 </template>
 
 <script lang="ts">

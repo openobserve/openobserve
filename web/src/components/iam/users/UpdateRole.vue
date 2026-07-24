@@ -15,7 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog data-test="update-role-dialog"
+  <ODialog
+    data-test="update-role-dialog"
     :open="open"
     size="sm"
     :title="t('user.editUser')"
@@ -33,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OFormInput
           name="first_name"
           :label="t('user.name')"
-          class="py-3 showLabelOnTop"
+          class="showLabelOnTop py-3"
           readonly
         />
 
@@ -42,11 +43,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('user.role')"
           :options="roleOptions"
           required
-          class="pt-3 pb-2 showLabelOnTop"
+          class="showLabelOnTop pt-3 pb-2"
           data-test="iam-update-role-select"
         />
 
-        <div class="flex justify-center mt-4 gap-2">
+        <div class="mt-4 flex justify-center gap-2">
           <OButton
             @click="$emit('update:open', false)"
             variant="outline"
@@ -54,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="isSubmitting"
             data-test="iam-update-role-cancel-btn"
           >
-            {{ t('user.cancel') }}
+            {{ t("user.cancel") }}
           </OButton>
           <OButton
             variant="primary"
@@ -63,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :loading="isSubmitting"
             data-test="iam-update-role-save-btn"
           >
-            {{ t('user.save') }}
+            {{ t("user.save") }}
           </OButton>
         </div>
       </OForm>
@@ -118,10 +119,12 @@ export default defineComponent({
     // EDIT-prefill: the OForm owns role/first_name; this typed computed seeds them
     // from the externally-provided modelValue each time the dialog body mounts.
     // org_member_id/email stay non-form data (read from modelValue at submit).
-    const updateRoleDefaults = computed((): UpdateRoleForm => ({
-      role: props.modelValue?.role ?? "",
-      first_name: props.modelValue?.first_name ?? "",
-    }));
+    const updateRoleDefaults = computed(
+      (): UpdateRoleForm => ({
+        role: props.modelValue?.role ?? "",
+        first_name: props.modelValue?.first_name ?? "",
+      }),
+    );
 
     // Options-API: the schema (and the defaults computed) MUST be returned from
     // setup() — a bare module import is out of the template's scope, so :schema
@@ -167,9 +170,7 @@ export default defineComponent({
       } catch (err: any) {
         toast({
           variant: "error",
-          message:
-            err?.response?.data?.message ||
-            this.t("iam.updateRole.errorUpdatingMember"),
+          message: err?.response?.data?.message || this.t("iam.updateRole.errorUpdatingMember"),
         });
       }
     },

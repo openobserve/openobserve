@@ -31,7 +31,7 @@ vi.mock("@/services/pipelines", () => ({
             { name: "test-pipeline-2", pipeline_id: "pid2" },
           ],
         },
-      })
+      }),
     ),
   },
 }));
@@ -55,14 +55,13 @@ vi.mock("@/services/http", () => ({
           ],
           total: 1,
         },
-      })
+      }),
     ),
     post: vi.fn(() => Promise.resolve({ data: {} })),
     put: vi.fn(() => Promise.resolve({ data: {} })),
     delete: vi.fn(() => Promise.resolve({ data: {} })),
   })),
 }));
-
 
 describe("PipelineHistory.vue", () => {
   let store: any;
@@ -96,7 +95,7 @@ describe("PipelineHistory.vue", () => {
             template: '<div data-test="no-data-stub">No Data</div>',
           },
           Teleport: {
-            template: '<div><slot /></div>',
+            template: "<div><slot /></div>",
           },
         },
       },
@@ -229,7 +228,6 @@ describe("PipelineHistory.vue", () => {
     });
   });
 
-
   describe("table columns", () => {
     it("should have correct column definitions", () => {
       const wrapper = mountComponent();
@@ -305,6 +303,5 @@ describe("PipelineHistory.vue", () => {
       // Verify loading is false after data is fetched
       expect(vm.loading).toBe(false);
     });
-
   });
 });

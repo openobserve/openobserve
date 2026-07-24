@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <section
-    class="grid grid-cols-2 lg:grid-cols-5 gap-2 p-2"
+    class="grid grid-cols-2 gap-2 p-2 lg:grid-cols-5"
     data-test="rum-sessions-metrics-strip"
     :aria-label="t('rum.sessionMetricsAria')"
   >
@@ -24,21 +24,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-for="card in cards"
       :key="card.key"
       type="button"
-      class="metric-card flex flex-col items-start gap-0.5 text-left rounded-default border p-3 transition-colors bg-card-glass-bg enabled:cursor-pointer enabled:hover:border-accent disabled:cursor-default"
-      :class="
-        card.key === activeCard
-          ? 'border-accent'
-          : 'border-border-default'
-      "
+      class="metric-card rounded-default bg-card-glass-bg enabled:hover:border-accent flex flex-col items-start gap-0.5 border p-3 text-left transition-colors enabled:cursor-pointer disabled:cursor-default"
+      :class="card.key === activeCard ? 'border-accent' : 'border-border-default'"
       :aria-pressed="card.key === activeCard"
       :disabled="!card.selectable"
       :data-test="`rum-sessions-metric-${card.key}-card`"
       @click="card.selectable && emit('select', card.key)"
     >
-      <span
-        class="text-xs font-medium uppercase tracking-wide text-text-label"
-        >{{ card.label }}</span
-      >
+      <span class="text-text-label text-xs font-medium tracking-wide uppercase">{{
+        card.label
+      }}</span>
       <span class="flex items-baseline gap-1.5">
         <span
           class="text-2xl font-semibold tabular-nums"
@@ -46,15 +41,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`rum-sessions-metric-${card.key}-value`"
           >{{ card.value }}</span
         >
-        <span
-          v-if="card.rate"
-          class="text-sm text-text-secondary tabular-nums"
+        <span v-if="card.rate" class="text-text-secondary text-sm tabular-nums"
           >· {{ card.rate }}</span
         >
       </span>
-      <small :class="card.captionClass || 'text-text-secondary'">{{
-        card.caption
-      }}</small>
+      <small :class="card.captionClass || 'text-text-secondary'">{{ card.caption }}</small>
     </button>
   </section>
 </template>
@@ -64,12 +55,7 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { durationFormatter } from "@/utils/zincutils";
 
-export type SessionsMetricCardKey =
-  | "sessions"
-  | "errors"
-  | "frustrated"
-  | "duration"
-  | "bounced";
+export type SessionsMetricCardKey = "sessions" | "errors" | "frustrated" | "duration" | "bounced";
 
 const props = defineProps<{
   total: number;
@@ -107,20 +93,14 @@ const formatMs = (ms: number) => {
 // so its denominator can differ from the window-accurate `total`.
 const bounceRate = computed(() => {
   const base = props.bounceBase ?? props.total;
-  return base > 0
-    ? `${((props.bouncedSessions / base) * 100).toFixed(1)}%`
-    : "0%";
+  return base > 0 ? `${((props.bouncedSessions / base) * 100).toFixed(1)}%` : "0%";
 });
 
 const signed = (value: number, suffix = "") =>
   `${value > 0 ? "+" : ""}${value.toFixed(suffix === "%" ? 1 : 0)}${suffix}`;
 
 /** Delta caption vs the previous window; null delta → fallback caption. */
-const deltaCaption = (
-  delta: number | null | undefined,
-  fallback: string,
-  suffix = "",
-) => {
+const deltaCaption = (delta: number | null | undefined, fallback: string, suffix = "") => {
   if (delta === null || delta === undefined || delta === 0)
     return { caption: fallback, captionClass: "" };
   return {
@@ -149,10 +129,7 @@ const cards = computed(() => [
     key: "errors" as const,
     label: t("rum.withErrors"),
     value: props.errorSessions.toLocaleString(),
-    valueClass:
-      props.errorSessions > 0
-        ? "text-severity-error-color"
-        : "text-text-body",
+    valueClass: props.errorSessions > 0 ? "text-severity-error-color" : "text-text-body",
     rate: rate(props.errorSessions),
     ...deltaCaption(props.errorsDelta, t("rum.sessionsWithErrors")),
     selectable: true,
@@ -161,10 +138,7 @@ const cards = computed(() => [
     key: "frustrated" as const,
     label: t("rum.frustrated"),
     value: props.frustratedSessions.toLocaleString(),
-    valueClass:
-      props.frustratedSessions > 0
-        ? "text-severity-warning-color"
-        : "text-text-body",
+    valueClass: props.frustratedSessions > 0 ? "text-severity-warning-color" : "text-text-body",
     rate: rate(props.frustratedSessions),
     ...deltaCaption(props.frustratedDelta, t("rum.rageDeadClicks")),
     selectable: true,
@@ -194,4 +168,3 @@ const cards = computed(() => [
   },
 ]);
 </script>
-

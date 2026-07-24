@@ -117,10 +117,7 @@ export function sampleSpectral(t: number): string {
  * @param steps - number of colour stops to emit
  * @param exponent - colour-scale exponent to bake into the stop positions
  */
-export function buildSpectralColorStops(
-  steps: number,
-  exponent: number,
-): string[] {
+export function buildSpectralColorStops(steps: number, exponent: number): string[] {
   const count = Math.max(2, Math.floor(steps));
   const colors: string[] = [];
 
@@ -140,8 +137,7 @@ export function buildSpectralColorStops(
 const SAMPLES_PER_CLASS = 4;
 
 /** (11 classes - 1) boundaries x 4 samples, plus the closing stop. */
-export const SPECTRAL_HEATMAP_STOP_COUNT =
-  (SPECTRAL_STOPS.length - 1) * SAMPLES_PER_CLASS + 1;
+export const SPECTRAL_HEATMAP_STOP_COUNT = (SPECTRAL_STOPS.length - 1) * SAMPLES_PER_CLASS + 1;
 
 /**
  * Compresses the low end of the scale, so that the difference between a cell

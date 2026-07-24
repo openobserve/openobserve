@@ -13,35 +13,37 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="pinned-dashboard-tab h-full flex flex-col min-h-0">
+  <div class="pinned-dashboard-tab flex h-full min-h-0 flex-col">
     <!-- Skeleton mirrors the loaded layout (toolbar + panels grid) so the
          transition to real content is stable, instead of flat full-width bars. -->
-    <div v-if="isLoading" class="flex flex-col h-full min-h-0">
+    <div v-if="isLoading" class="flex h-full min-h-0 flex-col">
       <div
-        class="flex justify-end items-center gap-2 px-4 py-2 shrink-0 border-b border-border-default"
+        class="border-border-default flex shrink-0 items-center justify-end gap-2 border-b px-4 py-2"
       >
         <div class="w-48"><OSkeleton class="h-8" /></div>
         <div class="w-24"><OSkeleton class="h-8" /></div>
         <div class="w-8"><OSkeleton class="h-8" /></div>
       </div>
-      <div class="flex-1 min-h-0 overflow-hidden p-4">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
+      <div class="min-h-0 flex-1 overflow-hidden p-4">
+        <div class="grid h-full grid-cols-1 gap-4 md:grid-cols-2">
           <div
             v-for="i in 4"
             :key="i"
-            class="flex flex-col gap-3 rounded-default border border-border-default p-4 min-h-40"
+            class="rounded-default border-border-default flex min-h-40 flex-col gap-3 border p-4"
           >
             <div class="flex items-center justify-between">
               <div class="w-40"><OSkeleton class="h-4" /></div>
               <div class="w-4"><OSkeleton class="h-4" /></div>
             </div>
-            <OSkeleton class="flex-1 min-h-24" />
+            <OSkeleton class="min-h-24 flex-1" />
           </div>
         </div>
       </div>
     </div>
     <template v-else-if="dashboardData">
-      <div class="flex justify-end items-center gap-2 px-4 py-2 shrink-0 border-b border-border-default">
+      <div
+        class="border-border-default flex shrink-0 items-center justify-end gap-2 border-b px-4 py-2"
+      >
         <DateTimePickerDashboard
           v-if="selectedDate"
           ref="dateTimePicker"
@@ -67,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="t('common.refresh')" />
         </OButton>
       </div>
-      <div class="flex-1 min-h-0 overflow-auto">
+      <div class="min-h-0 flex-1 overflow-auto">
         <RenderDashboardCharts
           ref="renderRef"
           :view-only="true"
@@ -201,11 +203,7 @@ const load = async () => {
     // conversion to the current tabs[].panels shape, and ensures variables.
     // The raw service returns {version, v5:{...}} whose top level has no `tabs`,
     // which made RenderDashboardCharts render "No panels here yet".
-    const dashboard = await getDashboard(
-      store,
-      props.dashboardId,
-      props.folderId,
-    );
+    const dashboard = await getDashboard(store, props.dashboardId, props.folderId);
 
     // getDashboard returns {} (not a throw) for a missing/deleted dashboard.
     if (!dashboard || typeof dashboard !== "object" || !dashboard.title) {

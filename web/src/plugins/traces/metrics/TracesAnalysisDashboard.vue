@@ -15,7 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer data-test="traces-analysis-dashboard-drawer"
+  <ODrawer
+    data-test="traces-analysis-dashboard-drawer"
     bleed
     v-model:open="isOpen"
     :width="80"
@@ -25,49 +26,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header-left>
       <OIcon name="timeline" size="md" />
       <!-- Time Range Display: Inline chips -->
-      <div
-        class="flex items-center gap-2 flex-wrap ml-2"
-      >
+      <div class="ml-2 flex flex-wrap items-center gap-2">
         <!-- Baseline Chip -->
         <div
-          class="time-range-chip baseline-chip flex items-center gap-1 px-2 py-1.5 rounded-default text-sm"
+          class="time-range-chip baseline-chip rounded-default flex items-center gap-1 px-2 py-1.5 text-sm"
           :style="{ '--chip-color': chipColors.baseline }"
         >
-          <span class="uppercase tracking-wide opacity-70"
-            >{{ t('traces.tracesAnalysisDashboard.baseline') }}</span
-          >
-          <span class="whitespace-nowrap text-2xs">{{
-            formatSmartTimestamp(
-              baselineTimeRange.startTime,
-              baselineTimeRange.endTime,
-            ).start
+          <span class="tracking-wide uppercase opacity-70">{{
+            t("traces.tracesAnalysisDashboard.baseline")
           }}</span>
-          <span class="opacity-60 text-3xs">{{ t('latencyInsights.arrowSeparator') }}</span>
-          <span class="whitespace-nowrap text-2xs">{{
-            formatSmartTimestamp(
-              baselineTimeRange.startTime,
-              baselineTimeRange.endTime,
-            ).end
+          <span class="text-2xs whitespace-nowrap">{{
+            formatSmartTimestamp(baselineTimeRange.startTime, baselineTimeRange.endTime).start
+          }}</span>
+          <span class="text-3xs opacity-60">{{ t("latencyInsights.arrowSeparator") }}</span>
+          <span class="text-2xs whitespace-nowrap">{{
+            formatSmartTimestamp(baselineTimeRange.startTime, baselineTimeRange.endTime).end
           }}</span>
         </div>
 
         <!-- Selected Chip -->
         <div
           v-if="hasSelectedTimeRange"
-          class="time-range-chip selected-chip flex items-center gap-1 px-2 py-1.5 rounded-default text-sm"
+          class="time-range-chip selected-chip rounded-default flex items-center gap-1 px-2 py-1.5 text-sm"
           :style="{ '--chip-color': chipColors.selected }"
         >
-          <span class="uppercase tracking-wide opacity-70"
-            >{{ t('traces.tracesAnalysisDashboard.selected') }}</span
-          >
-          <span class="whitespace-nowrap text-2xs">{{
+          <span class="tracking-wide uppercase opacity-70">{{
+            t("traces.tracesAnalysisDashboard.selected")
+          }}</span>
+          <span class="text-2xs whitespace-nowrap">{{
             formatSmartTimestamp(
               selectedTimeRangeDisplay!.startTime,
               selectedTimeRangeDisplay!.endTime,
             ).start
           }}</span>
-          <span class="opacity-70 text-3xs">{{ t('latencyInsights.arrowSeparator') }}</span>
-          <span class="whitespace-nowrap text-2xs">{{
+          <span class="text-3xs opacity-70">{{ t("latencyInsights.arrowSeparator") }}</span>
+          <span class="text-2xs whitespace-nowrap">{{
             formatSmartTimestamp(
               selectedTimeRangeDisplay!.startTime,
               selectedTimeRangeDisplay!.endTime,
@@ -76,10 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Additional filter info -->
-        <span
-          v-if="filterMetadata"
-          class="opacity-60 text-3xs ml-1"
-        >
+        <span v-if="filterMetadata" class="text-3xs ml-1 opacity-60">
           {{ filterMetadata }}
         </span>
 
@@ -97,220 +87,209 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
 
-      <!-- Tabs (only shown if multiple analysis types available) -->
-      <OTabs
-        v-if="showTabs"
-        v-model="activeAnalysisType"
-        dense
-        class="px-page-edge border-b border-solid border-card-glass-border text-text-secondary! insights-dashboard-tabs"
-        align="left"
+    <!-- Tabs (only shown if multiple analysis types available) -->
+    <OTabs
+      v-if="showTabs"
+      v-model="activeAnalysisType"
+      dense
+      class="px-page-edge border-card-glass-border text-text-secondary! insights-dashboard-tabs border-b border-solid"
+      align="left"
+    >
+      <OTab
+        v-for="tab in availableTabs"
+        :key="tab.name"
+        :name="tab.name"
+        :label="tab.label"
+        :icon="tab.icon"
+        :data-test="`traces-analysis-dashboard-${tab.name}-tab`"
+        class="min-h-12"
+      />
+    </OTabs>
+
+    <!-- Dashboard Content with Sidebar -->
+    <div class="analysis-content bg-surface-subtle flex min-h-0 flex-1 overflow-hidden pt-2">
+      <!-- Collapsed dimension sidebar bar (shown when hidden) -->
+      <div
+        v-if="!showDimensionSelector"
+        class="bg-surface-panel! flex h-full w-12.5 shrink-0 cursor-pointer flex-col items-center justify-start gap-1.5 overflow-y-auto pt-2"
+        data-test="dimension-selector-collapsed-bar"
+        @click="toggleDimensionSelector"
       >
-        <OTab
-          v-for="tab in availableTabs"
-          :key="tab.name"
-          :name="tab.name"
-          :label="tab.label"
-          :icon="tab.icon"
-          :data-test="`traces-analysis-dashboard-${tab.name}-tab`"
-          class="min-h-12"
-        />
-      </OTabs>
-
-      <!-- Dashboard Content with Sidebar -->
-      <div class="analysis-content flex-1 pt-2 overflow-hidden flex min-h-0 bg-surface-subtle">
-        <!-- Collapsed dimension sidebar bar (shown when hidden) -->
-        <div
-          v-if="!showDimensionSelector"
-          class="bg-surface-panel! shrink-0 cursor-pointer flex flex-col items-center justify-start pt-2 gap-1.5 w-12.5 h-full overflow-y-auto"
-          data-test="dimension-selector-collapsed-bar"
-          @click="toggleDimensionSelector"
-        >
-          <OIcon name="expand-all" size="sm" class="rotate-90 mt-2.5 text-xl" />
-          <div class="[writing-mode:vertical-rl] [text-orientation:mixed] font-bold text-xs">{{ t('traces.tracesAnalysisDashboard.dimensions') }}</div>
+        <OIcon name="expand-all" size="sm" class="mt-2.5 rotate-90 text-xl" />
+        <div class="text-xs font-bold [text-orientation:mixed] [writing-mode:vertical-rl]">
+          {{ t("traces.tracesAnalysisDashboard.dimensions") }}
         </div>
+      </div>
 
-        <OSplitter
-          v-model="splitterModel"
-          :limits="splitterLimits"
-          :style="{ width: showDimensionSelector ? '100%' : 'calc(100% - 50px)', height: '100%' }"
-          class="analysis-splitter-smooth [transition:all_0.3s_ease]"
-          @update:model-value="onSplitterUpdate"
-        >
-          <!-- LEFT: Dimension Selector Sidebar -->
-          <template #before>
-            <div class="relative-position h-full">
-              <div
-                v-if="showDimensionSelector"
-                class="dimension-sidebar bg-card-glass-bg h-full flex flex-col"
-                data-test="dimension-selector-sidebar"
-              >
-                <!-- Sidebar Header with collapse button -->
-                <div
-                  class="px-3 py-2 flex items-center justify-between shrink-0 border-b border-solid border-card-glass-border"
-                >
-                  <span class="font-semibold text-sm">{{ t('traces.tracesAnalysisDashboard.dimensions') }}</span>
-                  <OButton
-                    variant="outline"
-                    size="icon-xs-sq"
-                    class="rotate-90"
-                    icon-left="unfold-less"
-                    :title="t('traces.tracesAnalysisDashboard.collapseDimensions')"
-                    data-test="dimension-selector-collapse-btn"
-                    @click="toggleDimensionSelector"
-                  />
-                </div>
-                <!-- Search Input -->
-                <div
-                  class="p-2.5 border-solid border-card-glass-border"
-                >
-                  <OSearchInput
-                    v-model="dimensionSearchText"
-                    :placeholder="t('search.searchDimension')"
-                    clearable
-                    class="w-full"
-                    data-test="dimension-search-input"
-                  />
-                </div>
-
-                <!-- Dimension List -->
-                <div
-                  class="dimension-list-container flex-1 overflow-y-auto px-[0.325rem]"
-                >
-                  <ul v-if="filteredDimensions.length > 0" class="flex flex-col">
-                    <li
-                      v-for="dimension in filteredDimensions"
-                      :key="dimension.value"
-                      class="dimension-list-item flex items-center gap-2 px-3 py-1 border-none! hover:bg-interactive-hover-bg"
-                    >
-                      <div class="flex items-center shrink-0">
-                        <OCheckbox
-                          :model-value="
-                            selectedDimensions.includes(dimension.value)
-                          "
-                          @update:model-value="toggleDimension(dimension.value)"
-                          size="xs"
-                          :data-test="`dimension-checkbox-${dimension.value}`"
-                        />
-                      </div>
-                      <div class="flex flex-col flex-1 min-w-0">
-                        <span
-                          class="dimension-label truncate cursor-pointer text-text-secondary! text-sm [line-height:1.25rem]"
-                        >
-                          {{ dimension.label }}
-                          <OTooltip
-                            side="top"
-                            align="center"
-                            :side-offset="8"
-                            :delay="500"
-                            max-width="300px"
-                            :content="dimension.label"
-                          />
-                        </span>
-                      </div>
-                    </li>
-                  </ul>
-
-                  <!-- No results message -->
-                  <div v-else class="p-4 text-center text-text-muted">
-                    {{ t("search.noResult") }}
-                  </div>
-                </div>
-
-                <!-- Selected Count Footer -->
-                <div
-                  class="p-3 border-t border-solid border-card-glass-border text-xs font-normal"
-                >
-                  {{ selectedDimensions.length }}
-                  {{ t("latencyInsights.dimensionsSelected") }}
-                </div>
-              </div>
-            </div>
-          </template>
-
-          <template #separator>
+      <OSplitter
+        v-model="splitterModel"
+        :limits="splitterLimits"
+        :style="{ width: showDimensionSelector ? '100%' : 'calc(100% - 50px)', height: '100%' }"
+        class="analysis-splitter-smooth [transition:all_0.3s_ease]"
+        @update:model-value="onSplitterUpdate"
+      >
+        <!-- LEFT: Dimension Selector Sidebar -->
+        <template #before>
+          <div class="relative-position h-full">
             <div
-              class="w-1 h-full bg-transparent transition-colors duration-300 hover:bg-[var(--color-orange-500)]"
-            ></div>
-          </template>
-
-          <!-- RIGHT: Dashboard Charts -->
-          <template #after>
-            <div class="h-full">
+              v-if="showDimensionSelector"
+              class="dimension-sidebar bg-card-glass-bg flex h-full flex-col"
+              data-test="dimension-selector-sidebar"
+            >
+              <!-- Sidebar Header with collapse button -->
               <div
-                class="h-full w-full relative-position overflow-auto"
+                class="border-card-glass-border flex shrink-0 items-center justify-between border-b border-solid px-3 py-2"
               >
-                <!-- Loading State -->
-                <div
-                  v-if="loading"
-                  class="flex flex-col items-center justify-center h-full py-20"
-                >
-                  <OSpinner
-                    size="lg"
-                    class="mb-4"
-                    data-test="traces-analysis-dashboard-loading-indicator"
-                  />
-                  <div class="text-base">
-                    {{ t("latencyInsights.analyzingDimensions") }}
-                  </div>
-                  <div class="text-xs text-text-secondary mt-2">
-                    {{
-                      t("latencyInsights.computingDistributions", {
-                        count: selectedDimensions.length,
-                      })
-                    }}
-                  </div>
-                </div>
-
-                <!-- Error State -->
-                <div
-                  v-else-if="error"
-                  data-test="traces-analysis-dashboard-error"
-                  class="flex flex-col items-center justify-center h-full py-20"
-                >
-                  <OIcon
-                    name="error-outline"
-                    class="mb-4" style="width: 3.75rem; height: 3.75rem;" />
-                  <div class="text-base mb-2">
-                    {{ t("latencyInsights.failedToLoad") }}
-                  </div>
-                  <div class="text-sm text-text-secondary">{{ error }}</div>
-                  <OButton
-                    variant="outline"
-                    size="sm-action"
-                    class="mt-4"
-                    data-test="traces-analysis-dashboard-retry-btn"
-                    @click="loadAnalysis"
-                  >
-                    {{ t('latencyInsights.retryButton') }}
-                  </OButton>
-                </div>
-
-                <!-- Dashboard -->
-                <RenderDashboardCharts
-                  v-else-if="dashboardData"
-                  :key="`${activeAnalysisType}-${dashboardRenderKey}`"
-                  ref="dashboardChartsRef"
-                  :dashboardData="dashboardData"
-                  :currentTimeObj="currentTimeObj"
-                  :viewOnly="false"
-                  :allowAlertCreation="false"
-                  :simplifiedPanelView="true"
-                  :searchType="props.streamType === 'logs' ? 'insights' : 'dashboards'"
-                  @variablesManagerReady="onVariablesManagerReady"
-                  @onDeletePanel="handlePanelDelete"
-                  class="p-[0.4rem] trace-analysis-dashboards"
+                <span class="text-sm font-semibold">{{
+                  t("traces.tracesAnalysisDashboard.dimensions")
+                }}</span>
+                <OButton
+                  variant="outline"
+                  size="icon-xs-sq"
+                  class="rotate-90"
+                  icon-left="unfold-less"
+                  :title="t('traces.tracesAnalysisDashboard.collapseDimensions')"
+                  data-test="dimension-selector-collapse-btn"
+                  @click="toggleDimensionSelector"
                 />
               </div>
+              <!-- Search Input -->
+              <div class="border-card-glass-border border-solid p-2.5">
+                <OSearchInput
+                  v-model="dimensionSearchText"
+                  :placeholder="t('search.searchDimension')"
+                  clearable
+                  class="w-full"
+                  data-test="dimension-search-input"
+                />
+              </div>
+
+              <!-- Dimension List -->
+              <div class="dimension-list-container flex-1 overflow-y-auto px-[0.325rem]">
+                <ul v-if="filteredDimensions.length > 0" class="flex flex-col">
+                  <li
+                    v-for="dimension in filteredDimensions"
+                    :key="dimension.value"
+                    class="dimension-list-item hover:bg-interactive-hover-bg flex items-center gap-2 border-none! px-3 py-1"
+                  >
+                    <div class="flex shrink-0 items-center">
+                      <OCheckbox
+                        :model-value="selectedDimensions.includes(dimension.value)"
+                        @update:model-value="toggleDimension(dimension.value)"
+                        size="xs"
+                        :data-test="`dimension-checkbox-${dimension.value}`"
+                      />
+                    </div>
+                    <div class="flex min-w-0 flex-1 flex-col">
+                      <span
+                        class="dimension-label text-text-secondary! cursor-pointer truncate text-sm [line-height:1.25rem]"
+                      >
+                        {{ dimension.label }}
+                        <OTooltip
+                          side="top"
+                          align="center"
+                          :side-offset="8"
+                          :delay="500"
+                          max-width="300px"
+                          :content="dimension.label"
+                        />
+                      </span>
+                    </div>
+                  </li>
+                </ul>
+
+                <!-- No results message -->
+                <div v-else class="text-text-muted p-4 text-center">
+                  {{ t("search.noResult") }}
+                </div>
+              </div>
+
+              <!-- Selected Count Footer -->
+              <div class="border-card-glass-border border-t border-solid p-3 text-xs font-normal">
+                {{ selectedDimensions.length }}
+                {{ t("latencyInsights.dimensionsSelected") }}
+              </div>
             </div>
-          </template>
-        </OSplitter>
-      </div>
+          </div>
+        </template>
+
+        <template #separator>
+          <div
+            class="h-full w-1 bg-transparent transition-colors duration-300 hover:bg-[var(--color-orange-500)]"
+          ></div>
+        </template>
+
+        <!-- RIGHT: Dashboard Charts -->
+        <template #after>
+          <div class="h-full">
+            <div class="relative-position h-full w-full overflow-auto">
+              <!-- Loading State -->
+              <div v-if="loading" class="flex h-full flex-col items-center justify-center py-20">
+                <OSpinner
+                  size="lg"
+                  class="mb-4"
+                  data-test="traces-analysis-dashboard-loading-indicator"
+                />
+                <div class="text-base">
+                  {{ t("latencyInsights.analyzingDimensions") }}
+                </div>
+                <div class="text-text-secondary mt-2 text-xs">
+                  {{
+                    t("latencyInsights.computingDistributions", {
+                      count: selectedDimensions.length,
+                    })
+                  }}
+                </div>
+              </div>
+
+              <!-- Error State -->
+              <div
+                v-else-if="error"
+                data-test="traces-analysis-dashboard-error"
+                class="flex h-full flex-col items-center justify-center py-20"
+              >
+                <OIcon name="error-outline" class="mb-4" style="width: 3.75rem; height: 3.75rem" />
+                <div class="mb-2 text-base">
+                  {{ t("latencyInsights.failedToLoad") }}
+                </div>
+                <div class="text-text-secondary text-sm">{{ error }}</div>
+                <OButton
+                  variant="outline"
+                  size="sm-action"
+                  class="mt-4"
+                  data-test="traces-analysis-dashboard-retry-btn"
+                  @click="loadAnalysis"
+                >
+                  {{ t("latencyInsights.retryButton") }}
+                </OButton>
+              </div>
+
+              <!-- Dashboard -->
+              <RenderDashboardCharts
+                v-else-if="dashboardData"
+                :key="`${activeAnalysisType}-${dashboardRenderKey}`"
+                ref="dashboardChartsRef"
+                :dashboardData="dashboardData"
+                :currentTimeObj="currentTimeObj"
+                :viewOnly="false"
+                :allowAlertCreation="false"
+                :simplifiedPanelView="true"
+                :searchType="props.streamType === 'logs' ? 'insights' : 'dashboards'"
+                @variablesManagerReady="onVariablesManagerReady"
+                @onDeletePanel="handlePanelDelete"
+                class="trace-analysis-dashboards p-[0.4rem]"
+              />
+            </div>
+          </div>
+        </template>
+      </OSplitter>
+    </div>
   </ODrawer>
 </template>
 
 <script lang="ts" setup>
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
-import OTab from '@/lib/navigation/Tabs/OTab.vue'
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -414,10 +393,10 @@ const isOpen = ref(true);
 
 // Computed title for the drawer header based on analysis type
 const drawerTitle = computed(() => {
-  if (props.analysisType === 'duration') return t('latencyInsights.title');
-  if (props.analysisType === 'volume') return t('volumeInsights.title');
-  if (props.analysisType === 'error') return t('errorInsights.title');
-  return '';
+  if (props.analysisType === "duration") return t("latencyInsights.title");
+  if (props.analysisType === "volume") return t("volumeInsights.title");
+  if (props.analysisType === "error") return t("errorInsights.title");
+  return "";
 });
 const dashboardData = ref<any>(null);
 const dashboardChartsRef = ref<any>(null);
@@ -443,8 +422,7 @@ const showRefreshButton = computed(() => {
   if (manager?.hasUncommittedChanges !== undefined) {
     // Access the value if it's a ref, otherwise use directly
     const hasChanges =
-      typeof manager.hasUncommittedChanges === "object" &&
-      "value" in manager.hasUncommittedChanges
+      typeof manager.hasUncommittedChanges === "object" && "value" in manager.hasUncommittedChanges
         ? manager.hasUncommittedChanges.value
         : manager.hasUncommittedChanges;
     return hasChanges;
@@ -454,9 +432,7 @@ const showRefreshButton = computed(() => {
 });
 
 // Active tab management
-const activeAnalysisType = ref<"duration" | "volume" | "error">(
-  props.analysisType,
-);
+const activeAnalysisType = ref<"duration" | "volume" | "error">(props.analysisType);
 
 // Tab configuration
 const availableTabs = computed(() => {
@@ -503,11 +479,7 @@ const getInitialDimensions = () => {
   }));
 
   // For LOGS: Use sample-based analysis if we have log data
-  if (
-    streamType === "logs" &&
-    props.logSamples &&
-    props.logSamples.length >= 10
-  ) {
+  if (streamType === "logs" && props.logSamples && props.logSamples.length >= 10) {
     return selectDimensionsFromData(props.logSamples, schemaFields, 6);
   }
 
@@ -540,9 +512,7 @@ const filteredDimensions = computed(() => {
   // Filter by search text if provided
   if (dimensionSearchText.value?.trim()) {
     const searchLower = dimensionSearchText.value.toLowerCase();
-    dimensions = dimensions.filter((dim) =>
-      dim.label.toLowerCase().includes(searchLower),
-    );
+    dimensions = dimensions.filter((dim) => dim.label.toLowerCase().includes(searchLower));
   }
 
   // Sort: selected dimensions first, then unselected
@@ -581,9 +551,7 @@ const toggleDimension = (dimensionValue: string) => {
       return;
     }
     // Remove dimension - create new array to trigger reactivity
-    selectedDimensions.value = selectedDimensions.value.filter(
-      (d) => d !== dimensionValue,
-    );
+    selectedDimensions.value = selectedDimensions.value.filter((d) => d !== dimensionValue);
   } else {
     // Add dimension - create new array to trigger reactivity
     selectedDimensions.value = [...selectedDimensions.value, dimensionValue];
@@ -595,9 +563,7 @@ const handlePanelDelete = (panelId: string) => {
   if (!dashboardData.value?.tabs?.[0]?.panels) return;
 
   // Find the panel by ID
-  const panel = dashboardData.value.tabs[0].panels.find(
-    (p: any) => p.id === panelId,
-  );
+  const panel = dashboardData.value.tabs[0].panels.find((p: any) => p.id === panelId);
 
   if (panel?.title) {
     // Panel title is the dimension name - remove it from selectedDimensions
@@ -617,8 +583,7 @@ const toggleDimensionSelector = () => {
   } else {
     // Expanding: restore previous position, but use 25% if it was too small (< 10) or not set
     const savedPosition = lastSplitterPosition.value;
-    splitterModel.value =
-      savedPosition && savedPosition >= 10 ? savedPosition : 25;
+    splitterModel.value = savedPosition && savedPosition >= 10 ? savedPosition : 25;
     showDimensionSelector.value = true;
   }
 
@@ -678,17 +643,9 @@ const filterMetadata = computed(() => {
     !props.durationFilter.timeStart
   ) {
     return `${t("latencyInsights.durationLabel")} ${formatTimeWithSuffix(props.durationFilter.start)} - ${formatTimeWithSuffix(props.durationFilter.end)}`;
-  } else if (
-    props.analysisType === "volume" &&
-    props.rateFilter &&
-    !props.rateFilter.timeStart
-  ) {
-    return `${t("volumeInsights.rateLabel")} ${props.rateFilter.start} - ${props.rateFilter.end} ${t('traces.tracesAnalysisDashboard.tracesPerInterval')}`;
-  } else if (
-    props.analysisType === "error" &&
-    props.errorFilter &&
-    !props.errorFilter.timeStart
-  ) {
+  } else if (props.analysisType === "volume" && props.rateFilter && !props.rateFilter.timeStart) {
+    return `${t("volumeInsights.rateLabel")} ${props.rateFilter.start} - ${props.rateFilter.end} ${t("traces.tracesAnalysisDashboard.tracesPerInterval")}`;
+  } else if (props.analysisType === "error" && props.errorFilter && !props.errorFilter.timeStart) {
     return `${t("errorInsights.errorsGreaterThan")} ${props.errorFilter.start}`;
   }
   return null;
@@ -729,10 +686,7 @@ const loadAnalysis = async () => {
         startTime: props.rateFilter.timeStart,
         endTime: props.rateFilter.timeEnd,
       };
-    } else if (
-      props.durationFilter?.timeStart &&
-      props.durationFilter?.timeEnd
-    ) {
+    } else if (props.durationFilter?.timeStart && props.durationFilter?.timeEnd) {
       selectedTimeRange = {
         startTime: props.durationFilter.timeStart,
         endTime: props.durationFilter.timeEnd,
@@ -769,11 +723,7 @@ const loadAnalysis = async () => {
     }));
 
     // Generate dashboard JSON with UNION queries
-    const dashboard = generateDashboard(
-      mockAnalyses,
-      config,
-      store.state.theme,
-    );
+    const dashboard = generateDashboard(mockAnalyses, config, store.state.theme);
 
     dashboardData.value = dashboard;
     dashboardRenderKey.value++; // Increment to force re-render on full reload
@@ -828,10 +778,7 @@ const onClose = () => {
 };
 
 // Smart timestamp formatter - shows date only once if same day
-const formatSmartTimestamp = (
-  startMicroseconds: number,
-  endMicroseconds: number,
-) => {
+const formatSmartTimestamp = (startMicroseconds: number, endMicroseconds: number) => {
   const startDate = new Date(startMicroseconds / 1000);
   const endDate = new Date(endMicroseconds / 1000);
 
@@ -923,10 +870,7 @@ const addDimensionPanels = async (addedDimensions: string[]) => {
         startTime: props.rateFilter.timeStart,
         endTime: props.rateFilter.timeEnd,
       };
-    } else if (
-      props.durationFilter?.timeStart &&
-      props.durationFilter?.timeEnd
-    ) {
+    } else if (props.durationFilter?.timeStart && props.durationFilter?.timeEnd) {
       selectedTimeRange = {
         startTime: props.durationFilter.timeStart,
         endTime: props.durationFilter.timeEnd,
@@ -960,8 +904,7 @@ const addDimensionPanels = async (addedDimensions: string[]) => {
     }));
 
     // Generate new panels using the same logic as generateDashboard
-    const newPanels = generateDashboard(mockAnalyses, config, store.state.theme)
-      .tabs[0].panels;
+    const newPanels = generateDashboard(mockAnalyses, config, store.state.theme).tabs[0].panels;
 
     // Update layout positions for new panels to appear after existing ones
     const timestamp = Date.now();
@@ -1028,12 +971,8 @@ watch(
       return;
     }
 
-    const addedDimensions = newDimensions.filter(
-      (d) => !oldDimensions.includes(d),
-    );
-    const removedDimensions = oldDimensions.filter(
-      (d) => !newDimensions.includes(d),
-    );
+    const addedDimensions = newDimensions.filter((d) => !oldDimensions.includes(d));
+    const removedDimensions = oldDimensions.filter((d) => !newDimensions.includes(d));
 
     if (isOpen.value && newDimensions.length > 0) {
       if (removedDimensions.length > 0) {

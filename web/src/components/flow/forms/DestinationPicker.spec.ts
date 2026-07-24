@@ -37,7 +37,8 @@ const OSwitchStub = {
   name: "OSwitch",
   props: ["modelValue", "label"],
   emits: ["update:modelValue"],
-  template: '<button class="o-switch" @click="$emit(\'update:modelValue\', !modelValue)">{{ label }}</button>',
+  template:
+    '<button class="o-switch" @click="$emit(\'update:modelValue\', !modelValue)">{{ label }}</button>',
 };
 
 function createWrapper(props: Record<string, any> = {}) {
@@ -77,9 +78,7 @@ describe("DestinationPicker", () => {
   it("fetches pipeline-module destinations on mount", async () => {
     createWrapper();
     await flushPromises();
-    expect(mockList).toHaveBeenCalledWith(
-      expect.objectContaining({ module: "pipeline" }),
-    );
+    expect(mockList).toHaveBeenCalledWith(expect.objectContaining({ module: "pipeline" }));
   });
 
   it("exposes the fetched destinations as options", async () => {
@@ -112,9 +111,7 @@ describe("DestinationPicker", () => {
     const wrapper = createWrapper();
     await flushPromises();
     await expect((wrapper.vm as any).submit()).resolves.toBeNull();
-    expect(mockToast).not.toHaveBeenCalledWith(
-      expect.objectContaining({ variant: "warning" }),
-    );
+    expect(mockToast).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
   });
 
   it("submit resolves { org_id, destination_name } when selected", async () => {
@@ -162,9 +159,7 @@ describe("DestinationPicker", () => {
     mockList.mockRejectedValueOnce({ response: { status: 500 } });
     const wrapper = createWrapper();
     await flushPromises();
-    expect(mockToast).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: "error" }),
-    );
+    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
     expect((wrapper.vm as any).destinationOptions).toEqual([]);
   });
 
@@ -188,9 +183,7 @@ describe("DestinationPicker", () => {
     const opts = (wrapper.vm as any).destinationOptions;
     expect(url70.length).toBe(70);
     expect(opts.find((o: any) => o.value === "exact").subLabel).toBe(url70);
-    expect(opts.find((o: any) => o.value === "short").subLabel).toBe(
-      "http://s.example.com",
-    );
+    expect(opts.find((o: any) => o.value === "short").subLabel).toBe("http://s.example.com");
   });
 
   it("on @created: selects the new destination, leaves create mode, refetches", async () => {
@@ -200,10 +193,7 @@ describe("DestinationPicker", () => {
     expect((wrapper.vm as any).createNewDestination).toBe(true);
     mockList.mockClear();
 
-    wrapper.findComponent({ name: "CreateDestinationForm" }).vm.$emit(
-      "created",
-      "sink-a",
-    );
+    wrapper.findComponent({ name: "CreateDestinationForm" }).vm.$emit("created", "sink-a");
     await flushPromises();
 
     expect((wrapper.vm as any).createNewDestination).toBe(false); // back to select

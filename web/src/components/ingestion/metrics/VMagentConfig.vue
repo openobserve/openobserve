@@ -17,22 +17,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <IngestionContent>
     <div class="flex flex-col gap-2">
-      <div class="text-base font-semibold">{{ t('ingestion.vmagent.singleTargetTitle') }}</div>
+      <div class="text-base font-semibold">{{ t("ingestion.vmagent.singleTargetTitle") }}</div>
       <CopyContent :content="singleTargetContent" />
     </div>
 
     <div class="flex flex-col gap-2">
-      <div class="text-base font-semibold">{{ t('ingestion.vmagent.fanoutTitle') }}</div>
+      <div class="text-base font-semibold">{{ t("ingestion.vmagent.fanoutTitle") }}</div>
       <CopyContent :content="fanoutContent" />
       <div class="italic">
-        {{ t('ingestion.vmagent.tipPrefix') }}
+        {{ t("ingestion.vmagent.tipPrefix") }}
         <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- CLI flag name must stay identical in every language -->
-        <code>-remoteWrite.url</code> {{ t('ingestion.vmagent.tipSuffix') }}
+        <code>-remoteWrite.url</code> {{ t("ingestion.vmagent.tipSuffix") }}
       </div>
     </div>
 
     <IngestionDocLink href="https://docs.victoriametrics.com/vmagent/">
-      {{ t('ingestion.vmagent.docLinkText') }}
+      {{ t("ingestion.vmagent.docLinkText") }}
     </IngestionDocLink>
   </IngestionContent>
 </template>
@@ -95,4 +95,3 @@ export default defineComponent({
   },
 });
 </script>
-

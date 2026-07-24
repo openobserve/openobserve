@@ -55,23 +55,17 @@ describe("useTextHighlighter", () => {
     });
 
     it("should extract keywords from fuzzy_match_all queries", () => {
-      const result = textHighlighter.extractKeywords(
-        "fuzzy_match_all('warning', 1)",
-      );
+      const result = textHighlighter.extractKeywords("fuzzy_match_all('warning', 1)");
       expect(result).toEqual(["warning"]);
     });
 
     it("should handle double quotes", () => {
-      const result = textHighlighter.extractKeywords(
-        'match_all("error message")',
-      );
+      const result = textHighlighter.extractKeywords('match_all("error message")');
       expect(result).toEqual(["error message"]);
     });
 
     it("should handle single quotes", () => {
-      const result = textHighlighter.extractKeywords(
-        "match_all('error message')",
-      );
+      const result = textHighlighter.extractKeywords("match_all('error message')");
       expect(result).toEqual(["error message"]);
     });
 
@@ -92,9 +86,7 @@ describe("useTextHighlighter", () => {
     });
 
     it("should trim extracted keywords", () => {
-      const result = textHighlighter.extractKeywords(
-        "match_all('  error message  ')",
-      );
+      const result = textHighlighter.extractKeywords("match_all('  error message  ')");
       expect(result).toEqual(["error message"]);
     });
 
@@ -112,9 +104,7 @@ describe("useTextHighlighter", () => {
 
   describe("splitTextByKeywords", () => {
     it("should split text by single keyword", () => {
-      const result = textHighlighter.splitTextByKeywords("error in system", [
-        "error",
-      ]);
+      const result = textHighlighter.splitTextByKeywords("error in system", ["error"]);
       expect(result).toEqual([
         { text: "error", isHighlighted: true },
         { text: " in system", isHighlighted: false },
@@ -122,10 +112,10 @@ describe("useTextHighlighter", () => {
     });
 
     it("should split text by multiple keywords", () => {
-      const result = textHighlighter.splitTextByKeywords(
-        "error and warning messages",
-        ["error", "warning"],
-      );
+      const result = textHighlighter.splitTextByKeywords("error and warning messages", [
+        "error",
+        "warning",
+      ]);
       expect(result).toEqual([
         { text: "error", isHighlighted: true },
         { text: " and ", isHighlighted: false },
@@ -135,9 +125,7 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle case-insensitive matching", () => {
-      const result = textHighlighter.splitTextByKeywords("ERROR in system", [
-        "error",
-      ]);
+      const result = textHighlighter.splitTextByKeywords("ERROR in system", ["error"]);
       expect(result).toEqual([
         { text: "ERROR", isHighlighted: true },
         { text: " in system", isHighlighted: false },
@@ -155,10 +143,7 @@ describe("useTextHighlighter", () => {
     });
 
     it("should escape special regex characters in keywords", () => {
-      const result = textHighlighter.splitTextByKeywords(
-        "test.[regex]+ chars",
-        ["[regex]+"],
-      );
+      const result = textHighlighter.splitTextByKeywords("test.[regex]+ chars", ["[regex]+"]);
       expect(result).toEqual([
         { text: "test.", isHighlighted: false },
         { text: "[regex]+", isHighlighted: true },
@@ -167,10 +152,7 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle overlapping keywords", () => {
-      const result = textHighlighter.splitTextByKeywords("test testing", [
-        "test",
-        "testing",
-      ]);
+      const result = textHighlighter.splitTextByKeywords("test testing", ["test", "testing"]);
       expect(result[0].text).toBe("test");
       expect(result[0].isHighlighted).toBe(true);
     });
@@ -179,9 +161,7 @@ describe("useTextHighlighter", () => {
   describe("escapeHtml", () => {
     it("should escape HTML entities", () => {
       const result = escapeHtml('<script>alert("xss")</script>');
-      expect(result).toBe(
-        "&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;",
-      );
+      expect(result).toBe("&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;");
     });
 
     it("should escape ampersands", () => {
@@ -246,28 +226,19 @@ describe("useTextHighlighter", () => {
   describe("semantic type detection", () => {
     it("should detect IP addresses", () => {
       const colors = { ip: "#D97706", stringValue: "#047857" };
-      const result = textHighlighter.getSingleSemanticColor(
-        "192.168.1.1",
-        colors,
-      );
+      const result = textHighlighter.getSingleSemanticColor("192.168.1.1", colors);
       expect(result).toBe("#D97706");
     });
 
     it("should detect URLs", () => {
       const colors = { url: "#1D4ED8", stringValue: "#047857" };
-      const result = textHighlighter.getSingleSemanticColor(
-        "https://example.com",
-        colors,
-      );
+      const result = textHighlighter.getSingleSemanticColor("https://example.com", colors);
       expect(result).toBe("#1D4ED8");
     });
 
     it("should detect email addresses", () => {
       const colors = { email: "#9333EA", stringValue: "#047857" };
-      const result = textHighlighter.getSingleSemanticColor(
-        "user@example.com",
-        colors,
-      );
+      const result = textHighlighter.getSingleSemanticColor("user@example.com", colors);
       expect(result).toBe("#9333EA");
     });
 
@@ -280,37 +251,25 @@ describe("useTextHighlighter", () => {
 
     it("should detect file paths", () => {
       const colors = { path: "#4338CA", stringValue: "#047857" };
-      const result = textHighlighter.getSingleSemanticColor(
-        "/var/log/system.log",
-        colors,
-      );
+      const result = textHighlighter.getSingleSemanticColor("/var/log/system.log", colors);
       expect(result).toBe("#4338CA");
     });
 
     it("should detect Windows file paths", () => {
       const colors = { path: "#4338CA", stringValue: "#047857" };
-      const result = textHighlighter.getSingleSemanticColor(
-        "C:\\Windows\\System32",
-        colors,
-      );
+      const result = textHighlighter.getSingleSemanticColor("C:\\Windows\\System32", colors);
       expect(result).toBe("#4338CA");
     });
 
     it("should fall back to string value for unrecognized patterns", () => {
       const colors = { stringValue: "#047857" };
-      const result = textHighlighter.getSingleSemanticColor(
-        "regular text",
-        colors,
-      );
+      const result = textHighlighter.getSingleSemanticColor("regular text", colors);
       expect(result).toBe("#047857");
     });
 
     it("should handle quoted values", () => {
       const colors = { ip: "#D97706", stringValue: "#047857" };
-      const result = textHighlighter.getSingleSemanticColor(
-        '"192.168.1.1"',
-        colors,
-      );
+      const result = textHighlighter.getSingleSemanticColor('"192.168.1.1"', colors);
       expect(result).toBe("#D97706");
     });
 
@@ -319,149 +278,71 @@ describe("useTextHighlighter", () => {
       const colors = { numberValue: "#f57c00", stringValue: "#047857" };
 
       // Valid 1xx codes
-      expect(textHighlighter.getSingleSemanticColor("100", colors)).toBe(
-        "#f57c00",
-      );
-      expect(textHighlighter.getSingleSemanticColor("101", colors)).toBe(
-        "#f57c00",
-      );
-      expect(textHighlighter.getSingleSemanticColor("103", colors)).toBe(
-        "#f57c00",
-      );
+      expect(textHighlighter.getSingleSemanticColor("100", colors)).toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("101", colors)).toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("103", colors)).toBe("#f57c00");
 
       // Valid 2xx codes
-      expect(textHighlighter.getSingleSemanticColor("200", colors)).toBe(
-        "#f57c00",
-      );
-      expect(textHighlighter.getSingleSemanticColor("201", colors)).toBe(
-        "#f57c00",
-      );
-      expect(textHighlighter.getSingleSemanticColor("204", colors)).toBe(
-        "#f57c00",
-      );
-      expect(textHighlighter.getSingleSemanticColor("226", colors)).toBe(
-        "#f57c00",
-      );
+      expect(textHighlighter.getSingleSemanticColor("200", colors)).toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("201", colors)).toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("204", colors)).toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("226", colors)).toBe("#f57c00");
 
       // Valid 3xx codes
-      expect(textHighlighter.getSingleSemanticColor("301", colors)).toBe(
-        "#f57c00",
-      );
-      expect(textHighlighter.getSingleSemanticColor("302", colors)).toBe(
-        "#f57c00",
-      );
-      expect(textHighlighter.getSingleSemanticColor("304", colors)).toBe(
-        "#f57c00",
-      );
+      expect(textHighlighter.getSingleSemanticColor("301", colors)).toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("302", colors)).toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("304", colors)).toBe("#f57c00");
 
       // Valid 4xx codes
-      expect(textHighlighter.getSingleSemanticColor("400", colors)).toBe(
-        "#f57c00",
-      );
-      expect(textHighlighter.getSingleSemanticColor("401", colors)).toBe(
-        "#f57c00",
-      );
-      expect(textHighlighter.getSingleSemanticColor("404", colors)).toBe(
-        "#f57c00",
-      );
-      expect(textHighlighter.getSingleSemanticColor("429", colors)).toBe(
-        "#f57c00",
-      );
-      expect(textHighlighter.getSingleSemanticColor("451", colors)).toBe(
-        "#f57c00",
-      );
+      expect(textHighlighter.getSingleSemanticColor("400", colors)).toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("401", colors)).toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("404", colors)).toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("429", colors)).toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("451", colors)).toBe("#f57c00");
 
       // Valid 5xx codes
-      expect(textHighlighter.getSingleSemanticColor("500", colors)).toBe(
-        "#f57c00",
-      );
-      expect(textHighlighter.getSingleSemanticColor("502", colors)).toBe(
-        "#f57c00",
-      );
-      expect(textHighlighter.getSingleSemanticColor("503", colors)).toBe(
-        "#f57c00",
-      );
-      expect(textHighlighter.getSingleSemanticColor("511", colors)).toBe(
-        "#f57c00",
-      );
+      expect(textHighlighter.getSingleSemanticColor("500", colors)).toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("502", colors)).toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("503", colors)).toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("511", colors)).toBe("#f57c00");
     });
 
     it("should NOT detect invalid 3-digit numbers as status codes", () => {
       // Note: status_code maps to colors.numberValue in getColorForType
       const colors = { numberValue: "#f57c00", stringValue: "#047857" };
 
-      expect(textHighlighter.getSingleSemanticColor("147", colors)).not.toBe(
-        "#f57c00",
-      );
-      expect(textHighlighter.getSingleSemanticColor("189", colors)).not.toBe(
-        "#f57c00",
-      );
-      expect(textHighlighter.getSingleSemanticColor("256", colors)).not.toBe(
-        "#f57c00",
-      );
+      expect(textHighlighter.getSingleSemanticColor("147", colors)).not.toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("189", colors)).not.toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("256", colors)).not.toBe("#f57c00");
 
       // Invalid 1xx codes (only 100-103 are valid)
-      expect(textHighlighter.getSingleSemanticColor("104", colors)).not.toBe(
-        "#f57c00",
-      );
-      expect(textHighlighter.getSingleSemanticColor("199", colors)).not.toBe(
-        "#f57c00",
-      );
+      expect(textHighlighter.getSingleSemanticColor("104", colors)).not.toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("199", colors)).not.toBe("#f57c00");
 
       // Invalid 2xx codes
-      expect(textHighlighter.getSingleSemanticColor("209", colors)).not.toBe(
-        "#f57c00",
-      );
-      expect(textHighlighter.getSingleSemanticColor("227", colors)).not.toBe(
-        "#f57c00",
-      );
-      expect(textHighlighter.getSingleSemanticColor("299", colors)).not.toBe(
-        "#f57c00",
-      );
+      expect(textHighlighter.getSingleSemanticColor("209", colors)).not.toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("227", colors)).not.toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("299", colors)).not.toBe("#f57c00");
 
       // Invalid 3xx codes
-      expect(textHighlighter.getSingleSemanticColor("309", colors)).not.toBe(
-        "#f57c00",
-      );
-      expect(textHighlighter.getSingleSemanticColor("399", colors)).not.toBe(
-        "#f57c00",
-      );
+      expect(textHighlighter.getSingleSemanticColor("309", colors)).not.toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("399", colors)).not.toBe("#f57c00");
 
       // Invalid 4xx codes
-      expect(textHighlighter.getSingleSemanticColor("432", colors)).not.toBe(
-        "#f57c00",
-      );
-      expect(textHighlighter.getSingleSemanticColor("450", colors)).not.toBe(
-        "#f57c00",
-      );
-      expect(textHighlighter.getSingleSemanticColor("452", colors)).not.toBe(
-        "#f57c00",
-      );
-      expect(textHighlighter.getSingleSemanticColor("499", colors)).not.toBe(
-        "#f57c00",
-      );
+      expect(textHighlighter.getSingleSemanticColor("432", colors)).not.toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("450", colors)).not.toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("452", colors)).not.toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("499", colors)).not.toBe("#f57c00");
 
       // Invalid 5xx codes
-      expect(textHighlighter.getSingleSemanticColor("512", colors)).not.toBe(
-        "#f57c00",
-      );
-      expect(textHighlighter.getSingleSemanticColor("599", colors)).not.toBe(
-        "#f57c00",
-      );
+      expect(textHighlighter.getSingleSemanticColor("512", colors)).not.toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("599", colors)).not.toBe("#f57c00");
 
       // Completely out of range
-      expect(textHighlighter.getSingleSemanticColor("600", colors)).not.toBe(
-        "#f57c00",
-      );
-      expect(textHighlighter.getSingleSemanticColor("999", colors)).not.toBe(
-        "#f57c00",
-      );
-      expect(textHighlighter.getSingleSemanticColor("000", colors)).not.toBe(
-        "#f57c00",
-      );
-      expect(textHighlighter.getSingleSemanticColor("099", colors)).not.toBe(
-        "#f57c00",
-      );
+      expect(textHighlighter.getSingleSemanticColor("600", colors)).not.toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("999", colors)).not.toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("000", colors)).not.toBe("#f57c00");
+      expect(textHighlighter.getSingleSemanticColor("099", colors)).not.toBe("#f57c00");
     });
 
     it("should correctly detect status codes in context (address example)", () => {
@@ -471,11 +352,7 @@ describe("useTextHighlighter", () => {
       };
 
       // Test the actual bug case: "147 test address" should not highlight 147 as status code
-      const result = textHighlighter.processTextWithHighlights(
-        "147 test address",
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights("147 test address", "", mockColors);
 
       // Should NOT contain status_code styling for 147
       // 147 is not a valid HTTP status code
@@ -496,21 +373,13 @@ describe("useTextHighlighter", () => {
 
     it("should not detect non-FTS columns", () => {
       const selectedStreamFtsKeys = ["message", "content"];
-      const result = textHighlighter.isFTSColumn(
-        "timestamp",
-        "2023-01-01",
-        selectedStreamFtsKeys,
-      );
+      const result = textHighlighter.isFTSColumn("timestamp", "2023-01-01", selectedStreamFtsKeys);
       expect(result).toBe(false);
     });
 
     it("should exclude source column", () => {
       const selectedStreamFtsKeys = ["source"];
-      const result = textHighlighter.isFTSColumn(
-        "source",
-        "some source",
-        selectedStreamFtsKeys,
-      );
+      const result = textHighlighter.isFTSColumn("source", "some source", selectedStreamFtsKeys);
       expect(result).toBe(false);
     });
 
@@ -526,36 +395,20 @@ describe("useTextHighlighter", () => {
 
     it("should handle non-string values", () => {
       const selectedStreamFtsKeys = ["count"];
-      const result = textHighlighter.isFTSColumn(
-        "count",
-        42,
-        selectedStreamFtsKeys,
-      );
+      const result = textHighlighter.isFTSColumn("count", 42, selectedStreamFtsKeys);
       expect(result).toBe(false);
     });
 
     it("should handle empty string values", () => {
       const selectedStreamFtsKeys = ["message"];
-      const result = textHighlighter.isFTSColumn(
-        "message",
-        "",
-        selectedStreamFtsKeys,
-      );
+      const result = textHighlighter.isFTSColumn("message", "", selectedStreamFtsKeys);
       expect(result).toBe(false);
     });
 
     it("should handle null/undefined values", () => {
       const selectedStreamFtsKeys = ["message"];
-      expect(
-        textHighlighter.isFTSColumn("message", null, selectedStreamFtsKeys),
-      ).toBe(false);
-      expect(
-        textHighlighter.isFTSColumn(
-          "message",
-          undefined,
-          selectedStreamFtsKeys,
-        ),
-      ).toBe(false);
+      expect(textHighlighter.isFTSColumn("message", null, selectedStreamFtsKeys)).toBe(false);
+      expect(textHighlighter.isFTSColumn("message", undefined, selectedStreamFtsKeys)).toBe(false);
     });
   });
 
@@ -578,11 +431,7 @@ describe("useTextHighlighter", () => {
     });
 
     it("should process text without highlighting", () => {
-      const result = textHighlighter.processTextWithHighlights(
-        "normal text",
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights("normal text", "", mockColors);
       expect(result).toContain("log-string");
       // New behavior: text is tokenized into separate spans
       expect(result).toContain("normal");
@@ -590,11 +439,7 @@ describe("useTextHighlighter", () => {
     });
 
     it("should apply semantic coloring", () => {
-      const result = textHighlighter.processTextWithHighlights(
-        "192.168.1.1",
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights("192.168.1.1", "", mockColors);
       expect(result).toContain("log-ip");
       expect(result).toContain("192.168.1.1");
     });
@@ -610,41 +455,24 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle null/undefined input", () => {
-      expect(
-        textHighlighter.processTextWithHighlights(null, "", mockColors),
-      ).toBe("");
-      expect(
-        textHighlighter.processTextWithHighlights(undefined, "", mockColors),
-      ).toBe("");
+      expect(textHighlighter.processTextWithHighlights(null, "", mockColors)).toBe("");
+      expect(textHighlighter.processTextWithHighlights(undefined, "", mockColors)).toBe("");
     });
 
     it("should handle non-string input", () => {
-      const result = textHighlighter.processTextWithHighlights(
-        42,
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights(42, "", mockColors);
       expect(result).toContain("42");
     });
 
     it("should handle empty text", () => {
-      const result = textHighlighter.processTextWithHighlights(
-        "",
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights("", "", mockColors);
       // Empty text returns empty string (no tokens to process)
       expect(result).toBe("");
     });
 
     it("should handle complex text with multiple semantic types", () => {
-      const text =
-        "User user@example.com from 192.168.1.1 visited https://example.com";
-      const result = textHighlighter.processTextWithHighlights(
-        text,
-        "",
-        mockColors,
-      );
+      const text = "User user@example.com from 192.168.1.1 visited https://example.com";
+      const result = textHighlighter.processTextWithHighlights(text, "", mockColors);
       expect(result).toContain("user@example.com");
       expect(result).toContain("192.168.1.1");
       expect(result).toContain("https://example.com");
@@ -654,21 +482,17 @@ describe("useTextHighlighter", () => {
   describe("edge cases and error handling", () => {
     it("should handle very long text", () => {
       const longText = "a".repeat(10000);
-      const result = textHighlighter.processTextWithHighlights(
-        longText,
-        "match_all('a')",
-        { stringValue: "#000" },
-      );
+      const result = textHighlighter.processTextWithHighlights(longText, "match_all('a')", {
+        stringValue: "#000",
+      });
       expect(result).toContain("a");
     });
 
     it("should handle special characters in text", () => {
       const specialText = "!@#$%^&*()_+-={}[]|\\:;\"'<>?,./";
-      const result = textHighlighter.processTextWithHighlights(
-        specialText,
-        "",
-        { stringValue: "#000" },
-      );
+      const result = textHighlighter.processTextWithHighlights(specialText, "", {
+        stringValue: "#000",
+      });
       expect(result).toContain("&amp;"); // HTML escaped
       expect(result).toContain("&lt;"); // HTML escaped
       expect(result).toContain("&gt;"); // HTML escaped
@@ -711,11 +535,7 @@ describe("useTextHighlighter", () => {
     it("should preserve last character with unclosed bracket - ANSI escape sequence", () => {
       // Real-world example: ANSI escape codes with unclosed brackets
       const text = "src/plugins/logs/QueryEditor.spec.ts[2m";
-      const result = textHighlighter.processTextWithHighlights(
-        text,
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights(text, "", mockColors);
       // CRITICAL: The 's' from '.ts' must not be lost
       expect(result).toContain("QueryEditor.spec.ts");
       expect(result).toContain(".ts");
@@ -723,11 +543,7 @@ describe("useTextHighlighter", () => {
 
     it("should preserve last character with unclosed bracket - file path", () => {
       const text = "src/views/About.spec.ts[2m | test";
-      const result = textHighlighter.processTextWithHighlights(
-        text,
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights(text, "", mockColors);
       // The 's' from '.ts' must be preserved
       expect(result).toContain("About.spec.ts");
       expect(result).toContain(".ts");
@@ -735,11 +551,7 @@ describe("useTextHighlighter", () => {
 
     it("should handle unclosed single quote at end", () => {
       const text = "hello world 'unclosed";
-      const result = textHighlighter.processTextWithHighlights(
-        text,
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights(text, "", mockColors);
       // All characters should be preserved
       expect(result).toContain("hello");
       expect(result).toContain("world");
@@ -749,11 +561,7 @@ describe("useTextHighlighter", () => {
 
     it("should handle unclosed double quote at end", () => {
       const text = 'hello world "unclosed';
-      const result = textHighlighter.processTextWithHighlights(
-        text,
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights(text, "", mockColors);
       // All characters should be preserved
       expect(result).toContain("hello");
       expect(result).toContain("world");
@@ -763,11 +571,7 @@ describe("useTextHighlighter", () => {
 
     it("should handle text ending with bracket but no closing", () => {
       const text = "test[incomplete";
-      const result = textHighlighter.processTextWithHighlights(
-        text,
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights(text, "", mockColors);
       expect(result).toContain("test");
       expect(result).toContain("incomplete");
       // The 'e' at the end must be preserved
@@ -776,22 +580,14 @@ describe("useTextHighlighter", () => {
 
     it("should preserve trailing whitespace before unclosed bracket", () => {
       const text = "test  [unclosed";
-      const result = textHighlighter.processTextWithHighlights(
-        text,
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights(text, "", mockColors);
       expect(result).toContain("test");
       expect(result).toContain("unclosed");
     });
 
     it("should handle multiple unclosed brackets", () => {
       const text = "test[first[second";
-      const result = textHighlighter.processTextWithHighlights(
-        text,
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights(text, "", mockColors);
       expect(result).toContain("test");
       expect(result).toContain("first");
       expect(result).toContain("second");
@@ -806,11 +602,7 @@ describe("useTextHighlighter", () => {
     it("should handle ANSI color codes without losing characters", () => {
       // Simulated ANSI: \u001b[90mstderr\u001b[2m | file.ts
       const text = "[90mstderr[2m | src/views/About.spec.ts[2m";
-      const result = textHighlighter.processTextWithHighlights(
-        text,
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights(text, "", mockColors);
       // Must preserve 'stderr' and '.ts'
       expect(result).toContain("stderr");
       expect(result).toContain("About.spec.ts");
@@ -819,24 +611,15 @@ describe("useTextHighlighter", () => {
 
     it("should handle nested brackets with mixed content", () => {
       const text = "test [22m[2m content end";
-      const result = textHighlighter.processTextWithHighlights(
-        text,
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights(text, "", mockColors);
       expect(result).toContain("test");
       expect(result).toContain("content");
       expect(result).toContain("end");
     });
 
     it("should preserve all characters in complex log line", () => {
-      const text =
-        "[90mstderr[2m | src/plugins/logs/QueryEditor.spec.ts[2m > [22m[2mshould mount";
-      const result = textHighlighter.processTextWithHighlights(
-        text,
-        "",
-        mockColors,
-      );
+      const text = "[90mstderr[2m | src/plugins/logs/QueryEditor.spec.ts[2m > [22m[2mshould mount";
+      const result = textHighlighter.processTextWithHighlights(text, "", mockColors);
       // Critical characters to preserve
       expect(result).toContain("QueryEditor.spec.ts");
       expect(result).toContain("should");
@@ -849,11 +632,7 @@ describe("useTextHighlighter", () => {
 
     it("should preserve leading whitespace before bracket", () => {
       const text = "test  [content]";
-      const result = textHighlighter.processTextWithHighlights(
-        text,
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights(text, "", mockColors);
       // Should have 2 spaces between test and bracket
       expect(result).toContain("test");
       expect(result).toContain("content");
@@ -861,55 +640,35 @@ describe("useTextHighlighter", () => {
 
     it("should preserve trailing whitespace after content before bracket", () => {
       const text = "test  [content";
-      const result = textHighlighter.processTextWithHighlights(
-        text,
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights(text, "", mockColors);
       expect(result).toContain("test");
       expect(result).toContain("content");
     });
 
     it("should preserve leading whitespace before quote", () => {
       const text = 'test  "quoted"';
-      const result = textHighlighter.processTextWithHighlights(
-        text,
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights(text, "", mockColors);
       expect(result).toContain("test");
       expect(result).toContain("quoted");
     });
 
     it("should preserve multiple spaces between tokens", () => {
       const text = "word1    word2";
-      const result = textHighlighter.processTextWithHighlights(
-        text,
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights(text, "", mockColors);
       expect(result).toContain("word1");
       expect(result).toContain("word2");
     });
 
     it("should handle text with only whitespace", () => {
       const text = "   ";
-      const result = textHighlighter.processTextWithHighlights(
-        text,
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights(text, "", mockColors);
       // Should return something (whitespace tokens)
       expect(result).toBeDefined();
     });
 
     it("should preserve whitespace at start and end", () => {
       const text = "  test content  ";
-      const result = textHighlighter.processTextWithHighlights(
-        text,
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights(text, "", mockColors);
       expect(result).toContain("test");
       expect(result).toContain("content");
     });
@@ -920,66 +679,42 @@ describe("useTextHighlighter", () => {
 
     it("should handle closed bracket followed by text", () => {
       const text = "[content] after";
-      const result = textHighlighter.processTextWithHighlights(
-        text,
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights(text, "", mockColors);
       expect(result).toContain("content");
       expect(result).toContain("after");
     });
 
     it("should handle empty brackets", () => {
       const text = "test [] end";
-      const result = textHighlighter.processTextWithHighlights(
-        text,
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights(text, "", mockColors);
       expect(result).toContain("test");
       expect(result).toContain("end");
     });
 
     it("should handle bracket at start of string", () => {
       const text = "[start content";
-      const result = textHighlighter.processTextWithHighlights(
-        text,
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights(text, "", mockColors);
       expect(result).toContain("start");
       expect(result).toContain("content");
     });
 
     it("should handle bracket at end of string", () => {
       const text = "content ends[";
-      const result = textHighlighter.processTextWithHighlights(
-        text,
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights(text, "", mockColors);
       expect(result).toContain("content");
       expect(result).toContain("ends");
     });
 
     it("should handle quote at start of string", () => {
       const text = '"start content';
-      const result = textHighlighter.processTextWithHighlights(
-        text,
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights(text, "", mockColors);
       expect(result).toContain("start");
       expect(result).toContain("content");
     });
 
     it("should handle apostrophe in contractions", () => {
       const text = "it's don't can't";
-      const result = textHighlighter.processTextWithHighlights(
-        text,
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights(text, "", mockColors);
       expect(result).toContain("it's");
       expect(result).toContain("don't");
       expect(result).toContain("can't");
@@ -987,22 +722,14 @@ describe("useTextHighlighter", () => {
 
     it("should handle single character before bracket", () => {
       const text = "a[content";
-      const result = textHighlighter.processTextWithHighlights(
-        text,
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights(text, "", mockColors);
       expect(result).toContain("a");
       expect(result).toContain("content");
     });
 
     it("should handle alternating brackets and quotes", () => {
       const text = '[test] "quote" [more] end';
-      const result = textHighlighter.processTextWithHighlights(
-        text,
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights(text, "", mockColors);
       expect(result).toContain("test");
       expect(result).toContain("quote");
       expect(result).toContain("more");
@@ -1052,11 +779,7 @@ describe("useTextHighlighter", () => {
     it("should handle Kubernetes pod logs with timestamps", () => {
       const k8sLog =
         "2024-01-15T10:30:45.123Z [INFO] kubernetes.io/pod/my-app-58d7b8c9f4-xz9jk: Started container";
-      const result = textHighlighter.processTextWithHighlights(
-        k8sLog,
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights(k8sLog, "", mockColors);
       expect(result).toContain("2024-01-15T10:30:45.123Z");
       expect(result).toContain("INFO");
       expect(result).toContain("kubernetes.io/pod/my-app-58d7b8c9f4-xz9jk");
@@ -1067,11 +790,7 @@ describe("useTextHighlighter", () => {
     it("should handle HTTP access logs with multiple IPs", () => {
       const accessLog =
         '192.168.1.1 - - [15/Jan/2024:10:30:45 +0000] "GET /api/v1/users HTTP/1.1" 200 1234 "https://example.com" "Mozilla/5.0"';
-      const result = textHighlighter.processTextWithHighlights(
-        accessLog,
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights(accessLog, "", mockColors);
       expect(result).toContain("192.168.1.1");
       expect(result).toContain("GET");
       expect(result).toContain("/api/v1/users");
@@ -1130,11 +849,7 @@ describe("useTextHighlighter", () => {
     it("should handle logs with mixed URLs and IPs", () => {
       const mixedLog =
         "Request from 10.0.0.15 to https://api.example.com/v1/data forwarded to 172.16.0.10";
-      const result = textHighlighter.processTextWithHighlights(
-        mixedLog,
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights(mixedLog, "", mockColors);
       expect(result).toContain("10.0.0.15");
       expect(result).toContain("https://api.example.com/v1/data");
       expect(result).toContain("172.16.0.10");
@@ -1143,8 +858,7 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle AWS Lambda logs with request IDs", () => {
-      const lambdaLog =
-        "START RequestId: 8f9e4573-e55e-4d53-8f9e-4573e55e4d53 Version: $LATEST";
+      const lambdaLog = "START RequestId: 8f9e4573-e55e-4d53-8f9e-4573e55e4d53 Version: $LATEST";
       const result = textHighlighter.processTextWithHighlights(
         lambdaLog,
         "match_all('START')",
@@ -1176,15 +890,10 @@ describe("useTextHighlighter", () => {
     it("should handle logs with timestamps in different formats", () => {
       const timestampLog1 = "2024-01-15 10:30:45.123 INFO Application started";
       const timestampLog2 = "[15/Jan/2024:10:30:45 +0000] Request completed";
-      const timestampLog3 =
-        "Jan 15 10:30:45 server1 sshd[12345]: Connection established";
+      const timestampLog3 = "Jan 15 10:30:45 server1 sshd[12345]: Connection established";
 
       [timestampLog1, timestampLog2, timestampLog3].forEach((log) => {
-        const result = textHighlighter.processTextWithHighlights(
-          log,
-          "",
-          mockColors,
-        );
+        const result = textHighlighter.processTextWithHighlights(log, "", mockColors);
         expect(result).toBeDefined();
         expect(result.length).toBeGreaterThan(0);
       });
@@ -1193,11 +902,7 @@ describe("useTextHighlighter", () => {
     it("should handle logs with special characters and symbols", () => {
       const symbolLog =
         "User@123 accessed /api/v1/users?filter=active&sort=desc with token: abc-123_XYZ.456";
-      const result = textHighlighter.processTextWithHighlights(
-        symbolLog,
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights(symbolLog, "", mockColors);
       expect(result).toContain("User@123");
       expect(result).toContain("/api/v1/users");
       expect(result).toContain("filter=active");
@@ -1205,13 +910,8 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle logs with percentage and measurement values", () => {
-      const metricsLog =
-        "CPU: 85.3%, Memory: 4.2GB/8GB, Disk: 123.45MB free, Network: 1.5Mbps";
-      const result = textHighlighter.processTextWithHighlights(
-        metricsLog,
-        "",
-        mockColors,
-      );
+      const metricsLog = "CPU: 85.3%, Memory: 4.2GB/8GB, Disk: 123.45MB free, Network: 1.5Mbps";
+      const result = textHighlighter.processTextWithHighlights(metricsLog, "", mockColors);
       expect(result).toContain("CPU");
       expect(result).toContain("85.3%");
       expect(result).toContain("4.2GB/8GB");
@@ -1221,11 +921,7 @@ describe("useTextHighlighter", () => {
 
     it("should handle logs with MAC addresses", () => {
       const macLog = "Device 00:1B:44:11:3A:B7 connected from 192.168.1.50";
-      const result = textHighlighter.processTextWithHighlights(
-        macLog,
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights(macLog, "", mockColors);
       expect(result).toContain("Device");
       expect(result).toContain("00:1B:44:11:3A:B7");
       expect(result).toContain("192.168.1.50");
@@ -1233,13 +929,8 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle logs with IPv6 addresses", () => {
-      const ipv6Log =
-        "Connection from 2001:0db8:85a3:0000:0000:8a2e:0370:7334 to server";
-      const result = textHighlighter.processTextWithHighlights(
-        ipv6Log,
-        "",
-        mockColors,
-      );
+      const ipv6Log = "Connection from 2001:0db8:85a3:0000:0000:8a2e:0370:7334 to server";
+      const result = textHighlighter.processTextWithHighlights(ipv6Log, "", mockColors);
       expect(result).toContain("Connection");
       expect(result).toContain("2001:0db8:85a3:0000:0000:8a2e:0370:7334");
       expect(result).toContain("server");
@@ -1261,8 +952,7 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle logs with Git commit hashes", () => {
-      const gitLog =
-        "Deployed commit 3a5f7b9c2e1d4f6a8b0c9e7d5f3a1b2c4e6f8a0b from branch main";
+      const gitLog = "Deployed commit 3a5f7b9c2e1d4f6a8b0c9e7d5f3a1b2c4e6f8a0b from branch main";
       const result = textHighlighter.processTextWithHighlights(
         gitLog,
         "match_all('Deployed')",
@@ -1278,26 +968,15 @@ describe("useTextHighlighter", () => {
     it("should handle logs with base64 encoded data", () => {
       const base64Log =
         "Token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0 expired";
-      const result = textHighlighter.processTextWithHighlights(
-        base64Log,
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights(base64Log, "", mockColors);
       expect(result).toContain("Token");
-      expect(result).toContain(
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0",
-      );
+      expect(result).toContain("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0");
       expect(result).toContain("expired");
     });
 
     it("should handle logs with curly brace objects", () => {
-      const braceLog =
-        "Config loaded: {host: 'localhost', port: 3000, debug: true}";
-      const result = textHighlighter.processTextWithHighlights(
-        braceLog,
-        "",
-        mockColors,
-      );
+      const braceLog = "Config loaded: {host: 'localhost', port: 3000, debug: true}";
+      const result = textHighlighter.processTextWithHighlights(braceLog, "", mockColors);
       expect(result).toContain("Config");
       expect(result).toContain("host");
       expect(result).toContain("localhost");
@@ -1306,8 +985,7 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle logs with parentheses in function calls", () => {
-      const funcLog =
-        "Calling processData(userId=123, options={retry: true}) at 10:30:45";
+      const funcLog = "Calling processData(userId=123, options={retry: true}) at 10:30:45";
       const result = textHighlighter.processTextWithHighlights(
         funcLog,
         "match_all('processData')",
@@ -1321,8 +999,7 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle logs with tabs and multiple spaces", () => {
-      const tabLog =
-        "Level:\tERROR    Timestamp:\t2024-01-15    Message:\tConnection failed";
+      const tabLog = "Level:\tERROR    Timestamp:\t2024-01-15    Message:\tConnection failed";
       const result = textHighlighter.processTextWithHighlights(
         tabLog,
         "match_all('ERROR')",
@@ -1350,13 +1027,8 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle logs with escaped characters", () => {
-      const escapedLog =
-        'Message: "User said: \\"Hello World\\"\\n\\tNext line"';
-      const result = textHighlighter.processTextWithHighlights(
-        escapedLog,
-        "",
-        mockColors,
-      );
+      const escapedLog = 'Message: "User said: \\"Hello World\\"\\n\\tNext line"';
+      const result = textHighlighter.processTextWithHighlights(escapedLog, "", mockColors);
       expect(result).toContain("Message");
       expect(result).toContain("User");
       expect(result).toContain("said");
@@ -1365,8 +1037,7 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle logs with GraphQL queries", () => {
-      const graphqlLog =
-        'Query: { user(id: "123") { name email posts { title } } }';
+      const graphqlLog = 'Query: { user(id: "123") { name email posts { title } } }';
       const result = textHighlighter.processTextWithHighlights(
         graphqlLog,
         "match_all('user')",
@@ -1381,13 +1052,8 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle logs with version numbers", () => {
-      const versionLog =
-        "Application v2.13.5-beta.3 started on Node.js v18.12.0";
-      const result = textHighlighter.processTextWithHighlights(
-        versionLog,
-        "",
-        mockColors,
-      );
+      const versionLog = "Application v2.13.5-beta.3 started on Node.js v18.12.0";
+      const result = textHighlighter.processTextWithHighlights(versionLog, "", mockColors);
       expect(result).toContain("Application");
       expect(result).toContain("v2.13.5-beta.3");
       expect(result).toContain("Node.js");
@@ -1396,11 +1062,7 @@ describe("useTextHighlighter", () => {
 
     it("should handle logs with currency and monetary values", () => {
       const moneyLog = "Transaction: $1,234.56 USD, €987.65 EUR, £543.21 GBP";
-      const result = textHighlighter.processTextWithHighlights(
-        moneyLog,
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights(moneyLog, "", mockColors);
       expect(result).toContain("Transaction");
       expect(result).toContain("$1,234.56");
       expect(result).toContain("€987.65");
@@ -1442,11 +1104,7 @@ describe("useTextHighlighter", () => {
 
     it("should handle empty log lines between content", () => {
       const emptyLineLog = "Line 1\n\nLine 3\n\n\nLine 6";
-      const result = textHighlighter.processTextWithHighlights(
-        emptyLineLog,
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights(emptyLineLog, "", mockColors);
       expect(result).toContain("Line");
       expect(result).toContain("1");
       expect(result).toContain("3");
@@ -1469,11 +1127,7 @@ describe("useTextHighlighter", () => {
 
     it("should handle logs with scientific notation", () => {
       const sciLog = "Value: 1.23e-10, Large: 5.67e+15, Normal: 3.14159";
-      const result = textHighlighter.processTextWithHighlights(
-        sciLog,
-        "",
-        mockColors,
-      );
+      const result = textHighlighter.processTextWithHighlights(sciLog, "", mockColors);
       expect(result).toContain("Value");
       expect(result).toContain("1.23e-10");
       expect(result).toContain("5.67e+15");
@@ -1481,8 +1135,7 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle logs with boolean values", () => {
-      const boolLog =
-        "Config: enabled=true, debug=false, verbose=TRUE, quiet=FALSE";
+      const boolLog = "Config: enabled=true, debug=false, verbose=TRUE, quiet=FALSE";
       const result = textHighlighter.processTextWithHighlights(
         boolLog,
         "match_all('true')",
@@ -1496,8 +1149,7 @@ describe("useTextHighlighter", () => {
     });
 
     it("should handle extremely long single-line logs", () => {
-      const longLog =
-        "Event: " + "data".repeat(500) + " processed successfully";
+      const longLog = "Event: " + "data".repeat(500) + " processed successfully";
       const result = textHighlighter.processTextWithHighlights(
         longLog,
         "match_all('Event')",

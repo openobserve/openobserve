@@ -53,7 +53,7 @@ describe("NightingaleConfig.vue", () => {
 
   it("generates OpenObserve remote write endpoint", () => {
     expect(wrapper.vm.content).toContain(
-      "https://test.example.com:5080/api/test-org/prometheus/api/v1/write"
+      "https://test.example.com:5080/api/test-org/prometheus/api/v1/write",
     );
   });
 
@@ -65,4 +65,3 @@ describe("NightingaleConfig.vue", () => {
     expect(wrapper.vm.content).toContain("BasicAuthPass =");
   });
 });
-

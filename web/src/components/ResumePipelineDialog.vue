@@ -26,32 +26,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="onCancel"
     @click:primary="onConfirm"
   >
-
-    <div class="flex flex-col gap-1.75 w-78">
+    <div class="flex w-78 flex-col gap-1.75">
       <ORadioGroup v-model="resumeFromStart">
-        <ORadio
-          class="items-center"
-          :value="false">
+        <ORadio class="items-center" :value="false">
           <template #label>
             <div class="resume-radio-label">
-              <div class="resume-radio-main-text text-compact leading-4.5 font-normal">{{ t('confirmDialog.continueFromWherePaused') }}</div>
-              <div v-if="lastPausedAt" class="resume-radio-sub-text text-xs leading-4.5 font-normal h-4.5">
+              <div class="resume-radio-main-text text-compact leading-4.5 font-normal">
+                {{ t("confirmDialog.continueFromWherePaused") }}
+              </div>
+              <div
+                v-if="lastPausedAt"
+                class="resume-radio-sub-text h-4.5 text-xs leading-4.5 font-normal"
+              >
                 {{ convertUnixToDateFormat(lastPausedAt) }}.
               </div>
             </div>
           </template>
         </ORadio>
-        <ORadio
-          :value="true"
-          style="height: 18px;"
-        >
+        <ORadio :value="true" style="height: 18px">
           <template #label>
-            <span class="text-compact leading-4.5 font-normal">{{ t('confirmDialog.startFromNow') }}</span>
+            <span class="text-compact leading-4.5 font-normal">{{
+              t("confirmDialog.startFromNow")
+            }}</span>
           </template>
         </ORadio>
       </ORadioGroup>
     </div>
-
   </ODialog>
 </template>
 
@@ -96,10 +96,12 @@ export default defineComponent({
     const resumeFromStart = ref(props.shouldStartfromNow);
     watch(
       () => props.shouldStartfromNow,
-      (val) => { resumeFromStart.value = val; }
+      (val) => {
+        resumeFromStart.value = val;
+      },
     );
     watch(resumeFromStart, (val) => {
-      emit('update:shouldStartfromNow', val);
+      emit("update:shouldStartfromNow", val);
     });
 
     return {

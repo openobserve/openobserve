@@ -4,6 +4,7 @@ import typescript from "@typescript-eslint/eslint-plugin";
 import typescriptParser from "@typescript-eslint/parser";
 import vueParser from "vue-eslint-parser";
 import prettier from "eslint-plugin-prettier";
+import vuePrettierSkipFormatting from "@vue/eslint-config-prettier/skip-formatting";
 import cypress from "eslint-plugin-cypress";
 import vueI18n from "@intlify/eslint-plugin-vue-i18n";
 import fs from "fs";
@@ -80,19 +81,53 @@ const noLegacyO2Tokens = {
 // The a11y/native entries reproduce the built-in rule's defaults (we replace, not
 // extend, its attribute map). Component props are evidence-based (scan of web/src).
 const TEXT_ATTRS = [
-  "title", "aria-label", "aria-placeholder", "aria-roledescription", "aria-valuetext", "alt",
-  "label", "sub-label", "sublabel", "placeholder", "hint", "tooltip", "message",
-  "content", "help-text", "caption", "description", "subtitle", "header",
-  "empty-label", "error-message", "button-label", "primary-button-label",
-  "secondary-button-label", "confirm-text", "cancel-text",
+  "title",
+  "aria-label",
+  "aria-placeholder",
+  "aria-roledescription",
+  "aria-valuetext",
+  "alt",
+  "label",
+  "sub-label",
+  "sublabel",
+  "placeholder",
+  "hint",
+  "tooltip",
+  "message",
+  "content",
+  "help-text",
+  "caption",
+  "description",
+  "subtitle",
+  "header",
+  "empty-label",
+  "error-message",
+  "button-label",
+  "primary-button-label",
+  "secondary-button-label",
+  "confirm-text",
+  "cancel-text",
   // Additional O2/app text props, discovered by scanning web/src for every
   // `:prop="t(...)"` — a prop a dev already wraps in t() is by definition
   // translatable text, so its STATIC / bound-literal form must be guarded too.
   // Re-run that scan when adding text-carrying props and keep this in sync.
-  "sub-title", "footer-title", "dirty-title", "action-label", "ok-label", "firing-label",
-  "neutral-button-label", "filter-label", "empty-message", "no-match-text",
-  "search-placeholder", "ai-placeholder", "ai-tooltip", "disable-ai-reason",
-  "full-time-prefix", "legend-healthy", "legend-avg",
+  "sub-title",
+  "footer-title",
+  "dirty-title",
+  "action-label",
+  "ok-label",
+  "firing-label",
+  "neutral-button-label",
+  "filter-label",
+  "empty-message",
+  "no-match-text",
+  "search-placeholder",
+  "ai-placeholder",
+  "ai-tooltip",
+  "disable-ai-reason",
+  "full-time-prefix",
+  "legend-healthy",
+  "legend-avg",
 ];
 const TEXT_ATTR_SET = new Set(TEXT_ATTRS);
 
@@ -104,24 +139,59 @@ const NON_TRANSLATABLE = [
   // Units / symbols — language-agnostic, appended to numbers or used as bare glyphs.
   // (The rule strips these, so a token only passes when it is the WHOLE text — e.g.
   // "settings" is NOT allowed by "s", only a bare "s" node is.)
-  "px", "s", "ms", "×", "→", "$", "fx",
+  "px",
+  "s",
+  "ms",
+  "×",
+  "→",
+  "≠",
+  "$",
+  "fx",
   // Decorative glyphs / emoji — visual only, no language content.
-  "●", "🕑", "$_",
+  "●",
+  "🕑",
+  "$_",
   // Specific literal tokens shown to the user as documentation / code.
-  "1000",         // hardcoded record-limit value
-  "./.env",       // relative config-file path shown in setup steps
-  "trace.zip",    // fixed download-artifact filename
-  "{rows}",       // literal template-variable token shown as documentation
+  "1000", // hardcoded record-limit value
+  "./.env", // relative config-file path shown in setup steps
+  "trace.zip", // fixed download-artifact filename
+  "{rows}", // literal template-variable token shown as documentation
   "{field_name}", // literal template-variable placeholder token shown as documentation
-  "{{ input }}",  // documented template syntax rendered inside a <code> block
+  "{{ input }}", // documented template syntax rendered inside a <code> block
 ];
 const NON_TRANSLATABLE_SET = new Set(NON_TRANSLATABLE);
 
 // The built-in rule's DEFAULT allowlist (punctuation it always ignores). Supplying an
 // `allowlist` REPLACES this default, so we spread it back in alongside NON_TRANSLATABLE.
 const BARE_STRING_DEFAULT_ALLOWLIST = [
-  "(", ")", ",", ".", "&", "+", "-", "=", "*", "/", "#", "%", "!", "?", ":", "[", "]",
-  "{", "}", "<", ">", "·", "•", "‐", "–", "—", "−", "|",
+  "(",
+  ")",
+  ",",
+  ".",
+  "&",
+  "+",
+  "-",
+  "=",
+  "*",
+  "/",
+  "#",
+  "%",
+  "!",
+  "?",
+  ":",
+  "[",
+  "]",
+  "{",
+  "}",
+  "<",
+  ">",
+  "·",
+  "•",
+  "‐",
+  "–",
+  "—",
+  "−",
+  "|",
 ];
 
 // Bans hardcoded text left directly in a <template> that the built-in
@@ -135,7 +205,12 @@ const BARE_STRING_DEFAULT_ALLOWLIST = [
 // literals are caught — composed expressions (:label="'a'+b", ternaries, `${x} y`)
 // remain a separate, not-yet-enforced gap. Non-<template> files are a no-op.
 noLegacyO2Tokens.rules["no-bare-bound-text-props"] = {
-  meta: { type: "problem", docs: { description: "Ban hardcoded text in bound text props, v-text/v-html, and {{ }} literals" } },
+  meta: {
+    type: "problem",
+    docs: {
+      description: "Ban hardcoded text in bound text props, v-text/v-html, and {{ }} literals",
+    },
+  },
   create(context) {
     const sourceCode = context.sourceCode ?? context.getSourceCode();
     const ps = sourceCode.parserServices ?? context.parserServices;
@@ -238,7 +313,7 @@ export default [
       vue,
       "@typescript-eslint": typescript,
       prettier,
-      "local": noLegacyO2Tokens,
+      local: noLegacyO2Tokens,
       "@intlify/vue-i18n": vueI18n,
     },
     // i18n key resolution points at the English source of truth ONLY. The other
@@ -265,9 +340,40 @@ export default [
       // just native title/alt/placeholder, are covered. Bound props (:label="'x'")
       // are caught by the local rule below. (@intlify's own `no-raw-text` is NOT
       // used — it flags ~1800 literals/punctuation and is too noisy to gate.)
-      "vue/no-bare-strings-in-template": ["error", { attributes: { "/.+/": TEXT_ATTRS }, allowlist: [...BARE_STRING_DEFAULT_ALLOWLIST, ...NON_TRANSLATABLE] }],
+      "vue/no-bare-strings-in-template": [
+        "error",
+        {
+          attributes: { "/.+/": TEXT_ATTRS },
+          allowlist: [...BARE_STRING_DEFAULT_ALLOWLIST, ...NON_TRANSLATABLE],
+        },
+      ],
       // The bound-prop half of the same rule (see TEXT_ATTRS above).
       "local/no-bare-bound-text-props": "error",
+      //
+      // Catches components used in <template> but never imported/registered
+      // (e.g. <date-time> instead of <DateTime>) — this class of bug is
+      // invisible to vue-tsc (unresolved tags aren't a template type error
+      // without vueCompilerOptions.strictTemplates) and wasn't caught before.
+      // Ignore patterns cover framework-global components (vue-router,
+      // vue-i18n, and Vue's own built-ins) that have no local import.
+      "vue/no-undef-components": [
+        "error",
+        {
+          ignorePatterns: [
+            "router-view",
+            "router-link",
+            "i18n-t",
+            "i18n-d",
+            "i18n-n",
+            "transition",
+            "transition-group",
+            "keep-alive",
+            "component",
+            "slot",
+            "teleport",
+          ],
+        },
+      ],
 
       // Dark-mode schema (O2_TOKEN_MIGRATION_PLAN §3.R.3) — warn now, error at Phase G.
       // The two sanctioned seams (useTheme.ts / chartTheme.ts) turn this off below.
@@ -298,6 +404,12 @@ export default [
       "prettier/prettier": "off",
       "vue/max-attributes-per-line": "off",
       "vue/multi-word-component-names": "off",
+      // Always use PascalCase for component tags in templates (auto-fixable).
+      "vue/component-name-in-template-casing": [
+        "error",
+        "PascalCase",
+        { registeredComponentsOnly: true, ignores: [] },
+      ],
       //
       // Zero current violations → locked straight to "error".
       "no-shadow-restricted-names": "error",
@@ -353,7 +465,6 @@ export default [
       "vue/no-mutating-props": "error",
       "vue/no-unused-components": "error",
       "vue/no-unused-vars": "error",
-
     },
   },
   {
@@ -396,4 +507,8 @@ export default [
       ...cypress.configs.recommended.rules,
     },
   },
+  // Must be last: disables core/TS/Vue stylistic rules that could conflict
+  // with Prettier's formatting decisions. Formatting is owned by `format:check`,
+  // not this lint gate — see "prettier/prettier": "off" above.
+  vuePrettierSkipFormatting,
 ];

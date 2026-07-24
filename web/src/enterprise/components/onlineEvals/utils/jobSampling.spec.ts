@@ -1,11 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { describe, expect, it } from "vitest";
-import {
-  parseSamplingRate,
-  samplingRateForForm,
-  samplingRatePercent,
-} from "./jobSampling";
+import { parseSamplingRate, samplingRateForForm, samplingRatePercent } from "./jobSampling";
 
 describe("job sampling", () => {
   it("formats scalar and legacy object rates for editing", () => {
@@ -33,12 +29,9 @@ describe("job sampling", () => {
     expect(samplingRatePercent(1 / 3)).toBe(33.3);
   });
 
-  it.each(["", "   ", "0", "-0.1", "1.01", "abc"])(
-    "has no percentage preview for %s",
-    (value) => {
-      expect(samplingRatePercent(value)).toBeNull();
-    },
-  );
+  it.each(["", "   ", "0", "-0.1", "1.01", "abc"])("has no percentage preview for %s", (value) => {
+    expect(samplingRatePercent(value)).toBeNull();
+  });
 
   it.each(["", "-0.1", "1.01", "true", "null", '{"rate":0.1}'])(
     "rejects invalid rate %s",

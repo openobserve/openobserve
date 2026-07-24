@@ -19,9 +19,12 @@ import proPlan from "@/enterprise/components/billings/proPlan.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 const mockProFeatures = [
-  { name: "Logs, Metrics, Traces, RUM, Session Replay, Error tracking", price: "", is_parent: true },
+  {
+    name: "Logs, Metrics, Traces, RUM, Session Replay, Error tracking",
+    price: "",
+    is_parent: true,
+  },
   { name: "Ingestion", price: "$0.50 per GB", is_parent: false },
   { name: "Query", price: "$0.01 per GB", is_parent: false },
   { name: "Pipelines", price: "", is_parent: true },
@@ -54,7 +57,7 @@ describe("proPlan.vue", () => {
         plugins: [i18n],
         provide: { store },
         stubs: {
-          "OIcon": true,
+          OIcon: true,
         },
       },
     });
@@ -126,9 +129,7 @@ describe("proPlan.vue", () => {
 
     it("first feature: Logs, Metrics, Traces header (parent, no price)", () => {
       const f = wrapper.vm.features[0];
-      expect(f.name).toBe(
-        "Logs, Metrics, Traces, RUM, Session Replay, Error tracking"
-      );
+      expect(f.name).toBe("Logs, Metrics, Traces, RUM, Session Replay, Error tracking");
       expect(f.price).toBe("");
       expect(f.is_parent).toBe(true);
     });

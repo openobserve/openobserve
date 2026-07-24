@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="bg-card-glass-bg w-[100vw] h-[100vh]">
+  <div class="bg-card-glass-bg h-[100vh] w-[100vw]">
     <div style="max-width: 400px; padding-top: 100px" class="mx-auto p-3">
       <div
         class="flex justify-center text-center"
@@ -33,10 +33,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
             store.state.zoConfig?.custom_logo_text != ''
           "
-          class="text-xl font-semibold font-bold p-0 cursor-pointer mr-2 w-full"
+          class="mr-2 w-full cursor-pointer p-0 text-xl font-bold font-semibold"
           >{{ store.state.zoConfig.custom_logo_text }}</span
         >
-        <span class="w-full flex justify-center">
+        <span class="flex w-full justify-center">
           <img
             v-if="
               store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
@@ -49,11 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <img
           v-if="store.state.zoConfig.custom_hide_self_logo == false"
           class="appLogo h-auto"
-          :style="
-            store.state.zoConfig.custom_logo_text != ''
-              ? 'width: 150px;'
-              : 'width: 250px;'
-          "
+          :style="store.state.zoConfig.custom_logo_text != '' ? 'width: 150px;' : 'width: 250px;'"
           :src="
             isDark
               ? getImageURL('images/common/openobserve_latest_dark_2.svg')
@@ -61,14 +57,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         />
       </div>
-      <div class="flex justify-center mb-4" v-else>
+      <div class="mb-4 flex justify-center" v-else>
         <img
           class="appLogo h-auto"
-          :style="
-            store.state.zoConfig.custom_logo_text != ''
-              ? 'width: 150px;'
-              : 'width: 250px;'
-          "
+          :style="store.state.zoConfig.custom_logo_text != '' ? 'width: 150px;' : 'width: 250px;'"
           :src="
             isDark
               ? getImageURL('images/common/openobserve_latest_dark_2.svg')
@@ -79,14 +71,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div v-if="autoRedirectDexLogin">
         <p>
-          {{ t('login.redirectingToSsoMessage') }}
-          <a href="#" @click="loginWithSSo" class="cursor-pointer underline">{{ t('login.clickHere') }}</a>.
+          {{ t("login.redirectingToSsoMessage") }}
+          <a href="#" @click="loginWithSSo" class="cursor-pointer underline">{{
+            t("login.clickHere")
+          }}</a
+          >.
         </p>
       </div>
 
       <div v-else>
-        <div style="font-size: var(--text-xl)" class="w-full text-center pb-3">
-          {{ t('login.login') }}
+        <div style="font-size: var(--text-xl)" class="w-full pb-3 text-center">
+          {{ t("login.login") }}
         </div>
 
         <div v-if="showSSO" class="flex justify-center">
@@ -97,26 +92,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="width: 400px"
             @click="loginWithSSo"
           >
-            <div
-              class="flex items-center justify-center w-full text-center relative"
-            >
+            <div class="relative flex w-full items-center justify-center text-center">
               <img
                 class="absolute"
                 style="width: 30px; left: 16px"
                 :src="getImageURL('images/common/sso.svg')"
               />
-              <span class="text-center"> {{ t('login.loginWithSso') }}</span>
+              <span class="text-center"> {{ t("login.loginWithSso") }}</span>
             </div>
           </OButton>
         </div>
 
         <div v-if="showSSO && showInternalLogin" class="py-3 text-center">
           <a
-            class="cursor-pointer py-3 hover:text-text-secondary"
+            class="hover:text-text-secondary cursor-pointer py-3"
             style="text-decoration: underline"
             data-test="login-as-internal-user"
             @click="loginAsInternalUser = !loginAsInternalUser"
-            >{{ t('login.loginAsInternalUser') }}</a
+            >{{ t("login.loginAsInternalUser") }}</a
           >
         </div>
 
@@ -159,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               type="submit"
               :loading="submitting"
             >
-              {{ t('login.login') }}
+              {{ t("login.login") }}
             </OButton>
           </OForm>
         </div>
@@ -188,9 +181,9 @@ import { redirectUser } from "@/utils/common";
 import { computed } from "vue";
 import { useTheme } from "@/composables/useTheme";
 import config from "@/aws-exports";
-import OButton from '@/lib/core/Button/OButton.vue';
-import OForm from '@/lib/forms/Form/OForm.vue';
-import OFormInput from '@/lib/forms/Input/OFormInput.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import { openobserveRum } from "@openobserve/browser-rum";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -225,11 +218,7 @@ export default defineComponent({
     const loginSchema = makeLoginSchema(t);
 
     onBeforeMount(() => {
-
-      if (
-        config.isCloud == "true" &&
-        router.currentRoute.value.path != "/cb"
-      ) {
+      if (config.isCloud == "true" && router.currentRoute.value.path != "/cb") {
         autoRedirectDexLogin.value = true;
         loginWithSSo();
       }
@@ -290,16 +279,12 @@ export default defineComponent({
                   given_name: nameValue,
                   auth_time: Math.floor(Date.now() / 1000),
                   name: nameValue,
-                  exp: Math.floor(
-                    (new Date().getTime() + 1000 * 60 * 60 * 24 * 30) / 1000,
-                  ),
+                  exp: Math.floor((new Date().getTime() + 1000 * 60 * 60 * 24 * 30) / 1000),
                   family_name: "",
                   email: nameValue,
                   role: res.data.role,
                 };
-                const encodedUserInfo: any = b64EncodeStandard(
-                  JSON.stringify(userInfo),
-                );
+                const encodedUserInfo: any = b64EncodeStandard(JSON.stringify(userInfo));
                 //set user info into localstorage & store
                 useLocalUserInfo(encodedUserInfo);
                 store.dispatch("setUserInfo", encodedUserInfo);
@@ -307,7 +292,7 @@ export default defineComponent({
                 useLocalCurrentUser(JSON.stringify(userInfo));
                 store.dispatch("setCurrentUser", userInfo);
 
-                if(store.state.zoConfig?.rum?.enabled) {
+                if (store.state.zoConfig?.rum?.enabled) {
                   // Set user information first
                   openobserveRum.setUser({
                     name: userInfo.given_name + " " + userInfo.family_name,
@@ -318,8 +303,7 @@ export default defineComponent({
                 }
 
                 //check for redirect URI and redirect user to that page
-                const redirectURI =
-                  window.sessionStorage.getItem("redirectURI");
+                const redirectURI = window.sessionStorage.getItem("redirectURI");
                 window.sessionStorage.removeItem("redirectURI");
 
                 //check organization information stored in localstorage along with email
@@ -365,18 +349,14 @@ export default defineComponent({
                             user_email: store.state.userInfo.email,
                             ingest_threshold: data.ingest_threshold,
                             search_threshold: data.search_threshold,
-                            subscription_type:
-                              Object.prototype.hasOwnProperty.call(
-                                data,
-                                "CustomerBillingObj",
-                              )
-                                ? data.CustomerBillingObj.subscription_type
-                                : "",
-                            status: data.status,
-                            note: Object.prototype.hasOwnProperty.call(
+                            subscription_type: Object.prototype.hasOwnProperty.call(
                               data,
                               "CustomerBillingObj",
                             )
+                              ? data.CustomerBillingObj.subscription_type
+                              : "",
+                            status: data.status,
+                            note: Object.prototype.hasOwnProperty.call(data, "CustomerBillingObj")
                               ? data.CustomerBillingObj.note
                               : "",
                           };
@@ -384,19 +364,13 @@ export default defineComponent({
                           if (
                             (Object.keys(selectedOrg.value).length == 0 &&
                               (data.type == "default" || data.id == "1") &&
-                              store.state.userInfo.email ==
-                                data.UserObj.email) ||
+                              store.state.userInfo.email == data.UserObj.email) ||
                             res.data.data.length == 1
                           ) {
                             localOrgFlag = true;
-                            selectedOrg.value = localOrg.value
-                              ? localOrg.value
-                              : optiondata;
+                            selectedOrg.value = localOrg.value ? localOrg.value : optiondata;
                             useLocalOrganization(selectedOrg.value);
-                            store.dispatch(
-                              "setSelectedOrganization",
-                              selectedOrg.value,
-                            );
+                            store.dispatch("setSelectedOrganization", selectedOrg.value);
                           }
 
                           if (data.type == "default") {
@@ -410,14 +384,11 @@ export default defineComponent({
                       if (localOrgFlag == false) {
                         selectedOrg.value = tempDefaultOrg;
                         useLocalOrganization(tempDefaultOrg);
-                        store.dispatch(
-                          "setSelectedOrganization",
-                          tempDefaultOrg,
-                        );
+                        store.dispatch("setSelectedOrganization", tempDefaultOrg);
                       }
                     });
                 }
-                  redirectUser(redirectURI);
+                redirectUser(redirectURI);
               } else {
                 //if user is not authorized, show error message and reset form.
                 submitting.value = false;

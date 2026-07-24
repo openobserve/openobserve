@@ -15,26 +15,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="dedup-summary-cards" class="dedup-summary-cards grid grid-cols-4 gap-4 mb-4">
+  <div data-test="dedup-summary-cards" class="dedup-summary-cards mb-4 grid grid-cols-4 gap-4">
     <!-- Card 1: Total Alerts -->
-    <OCard data-test="total-alerts-card" class="border border-border-default transition-all duration-200 hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
+    <OCard
+      data-test="total-alerts-card"
+      class="border-border-default border transition-all duration-200 hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
+    >
       <OCardSection class="p-4">
-        <div data-test="total-alerts-value" class="text-2xl font-semibold">{{ summary.total_alerts }}</div>
-        <div data-test="total-alerts-label" class="text-sm text-text-secondary">{{ t('alerts.totalAlerts') }}</div>
+        <div data-test="total-alerts-value" class="text-2xl font-semibold">
+          {{ summary.total_alerts }}
+        </div>
+        <div data-test="total-alerts-label" class="text-text-secondary text-sm">
+          {{ t("alerts.totalAlerts") }}
+        </div>
       </OCardSection>
     </OCard>
 
     <!-- Card 2: Alerts with Dedup -->
-    <OCard data-test="alerts-with-dedup-card" class="border border-border-default transition-all duration-200 hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
+    <OCard
+      data-test="alerts-with-dedup-card"
+      class="border-border-default border transition-all duration-200 hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
+    >
       <OCardSection class="p-4">
         <div class="flex items-center gap-2">
-          <div data-test="alerts-with-dedup-value" class="text-2xl font-semibold">{{ summary.alerts_with_dedup }}</div>
+          <div data-test="alerts-with-dedup-value" class="text-2xl font-semibold">
+            {{ summary.alerts_with_dedup }}
+          </div>
           <OIcon data-test="dedup-filter-icon" name="filter-alt" size="sm" />
         </div>
-        <div data-test="alerts-with-dedup-label" class="text-sm text-text-secondary flex items-center gap-1">
-          {{ t('alerts.usingDeduplication') }}
+        <div
+          data-test="alerts-with-dedup-label"
+          class="text-text-secondary flex items-center gap-1 text-sm"
+        >
+          {{ t("alerts.usingDeduplication") }}
           <OIcon data-test="dedup-info-icon" name="info-outline" size="xs" class="cursor-pointer" />
-            <OTooltip :content="t('alerts.deduplicationConfiguredTooltip')" />
+          <OTooltip :content="t('alerts.deduplicationConfiguredTooltip')" />
         </div>
       </OCardSection>
     </OCard>
@@ -42,46 +57,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Card 3: Suppression Rate -->
     <OCard
       data-test="suppression-rate-card"
-      class="border border-border-default transition-all duration-200 hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
+      class="border-border-default border transition-all duration-200 hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
       :class="{
         'bg-status-success-bg': summary.suppression_rate > 0.5,
-        'bg-status-warning-bg': summary.suppression_rate > 0 && summary.suppression_rate <= 0.5
+        'bg-status-warning-bg': summary.suppression_rate > 0 && summary.suppression_rate <= 0.5,
       }"
     >
       <OCardSection class="p-4">
-        <div data-test="suppression-rate-value" class="text-2xl font-semibold" :class="{
-          'text-status-success-text': summary.suppression_rate > 0.5,
-          'text-status-warning-text': summary.suppression_rate > 0 && summary.suppression_rate <= 0.5
-        }">
+        <div
+          data-test="suppression-rate-value"
+          class="text-2xl font-semibold"
+          :class="{
+            'text-status-success-text': summary.suppression_rate > 0.5,
+            'text-status-warning-text':
+              summary.suppression_rate > 0 && summary.suppression_rate <= 0.5,
+          }"
+        >
           {{ formatPercentage(summary.suppression_rate) }}
         </div>
-        <div data-test="suppression-rate-label" class="text-sm text-text-secondary flex items-center gap-1">
-          {{ t('alerts.suppressionRate24h') }}
-          <OIcon data-test="suppression-info-icon" name="info-outline" size="xs" class="cursor-pointer" />
-            <OTooltip>
-              <template #content>
-                {{ summary.suppressions_total }} {{ t('alerts.suppressed') }}
-                {{ summary.suppressions_total + summary.passed_total }} {{ t('alerts.total') }}
-                <div class="mt-1">
-                  {{ t('alerts.passedLabel') }} {{ summary.passed_total }}
-                </div>
-              </template>
-            </OTooltip>
+        <div
+          data-test="suppression-rate-label"
+          class="text-text-secondary flex items-center gap-1 text-sm"
+        >
+          {{ t("alerts.suppressionRate24h") }}
+          <OIcon
+            data-test="suppression-info-icon"
+            name="info-outline"
+            size="xs"
+            class="cursor-pointer"
+          />
+          <OTooltip>
+            <template #content>
+              {{ summary.suppressions_total }} {{ t("alerts.suppressed") }}
+              {{ summary.suppressions_total + summary.passed_total }} {{ t("alerts.total") }}
+              <div class="mt-1">{{ t("alerts.passedLabel") }} {{ summary.passed_total }}</div>
+            </template>
+          </OTooltip>
         </div>
       </OCardSection>
     </OCard>
 
     <!-- Card 4: Pending Batches -->
-    <OCard data-test="pending-batches-card" class="border border-border-default transition-all duration-200 hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
+    <OCard
+      data-test="pending-batches-card"
+      class="border-border-default border transition-all duration-200 hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
+    >
       <OCardSection class="p-4">
         <div class="flex items-center gap-2">
-          <div data-test="pending-batches-value" class="text-2xl font-semibold">{{ summary.pending_batches }}</div>
+          <div data-test="pending-batches-value" class="text-2xl font-semibold">
+            {{ summary.pending_batches }}
+          </div>
           <OIcon data-test="pending-batches-icon" name="group-work" size="sm" />
         </div>
-        <div data-test="pending-batches-label" class="text-sm text-text-secondary flex items-center gap-1">
-          {{ t('alerts.pendingBatches') }}
-          <OIcon data-test="pending-batches-info-icon" name="info-outline" size="xs" class="cursor-pointer" />
-            <OTooltip :content="t('alerts.pendingBatchesTooltip')" />
+        <div
+          data-test="pending-batches-label"
+          class="text-text-secondary flex items-center gap-1 text-sm"
+        >
+          {{ t("alerts.pendingBatches") }}
+          <OIcon
+            data-test="pending-batches-info-icon"
+            name="info-outline"
+            size="xs"
+            class="cursor-pointer"
+          />
+          <OTooltip :content="t('alerts.pendingBatchesTooltip')" />
         </div>
       </OCardSection>
     </OCard>
@@ -89,9 +128,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { useStore } from 'vuex';
-import alertsService from '@/services/alerts';
+import { ref, onMounted } from "vue";
+import { useStore } from "vuex";
+import alertsService from "@/services/alerts";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
@@ -133,17 +172,17 @@ async function fetchSummary() {
       summary.value = response.data;
     }
   } catch (error) {
-    console.error('Failed to fetch dedup summary:', error);
+    console.error("Failed to fetch dedup summary:", error);
   }
 }
 
 function formatPercentage(rate: number): string {
-  if (rate === 0) return '0%';
+  if (rate === 0) return "0%";
   return `${(rate * 100).toFixed(1)}%`;
 }
 
 // Expose fetch method for parent to refresh
 defineExpose({
-  fetchSummary
+  fetchSummary,
 });
 </script>

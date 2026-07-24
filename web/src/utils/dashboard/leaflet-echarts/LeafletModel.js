@@ -1,8 +1,8 @@
-import { ComponentModel } from 'echarts/core';
-import { v2Equal } from './helper';
+import { ComponentModel } from "echarts/core";
+import { v2Equal } from "./helper";
 
 const LeafletModel = {
-  type: 'lmap',
+  type: "lmap",
 
   setLeaflet(lmap) {
     this.__lmap = lmap;
@@ -25,13 +25,13 @@ const LeafletModel = {
   },
 
   setEChartsLayerVisibility(visible) {
-    this.__echartsLayer.style.display = visible ? 'block' : 'none';
+    this.__echartsLayer.style.display = visible ? "block" : "none";
   },
 
   // FIXME: NOT SUPPORT <= IE 10
   setEChartsLayerInteractive(interactive) {
     this.option.echartsLayerInteractive = !!interactive;
-    this.__echartsLayer.style.pointerEvents = interactive ? 'auto' : 'none';
+    this.__echartsLayer.style.pointerEvents = interactive ? "auto" : "none";
   },
 
   setCenterAndZoom(center, zoom) {
@@ -51,8 +51,8 @@ const LeafletModel = {
     // extension specific options
     echartsLayerInteractive: true,
     renderOnMoving: true,
-    largeMode: false
-  }
+    largeMode: false,
+  },
 };
 
 export default ComponentModel.extend(LeafletModel);

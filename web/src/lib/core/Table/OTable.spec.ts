@@ -4,7 +4,6 @@ import { describe, it, expect, beforeEach, afterEach, beforeAll, vi } from "vite
 import { mount, VueWrapper, flushPromises, config } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 
-
 // Set up i18n so OTable sub-components (loading, error, etc.) can use useI18n()
 const i18n = createI18n({
   legacy: false,
@@ -112,9 +111,7 @@ describe("OTable", () => {
     });
 
     it("renders the pagination footer", () => {
-      expect(
-        wrapper.find('[data-test="o2-table-pagination-bottom"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-pagination-bottom"]').exists()).toBe(true);
     });
 
     it("shows only the first page of rows", () => {
@@ -129,18 +126,12 @@ describe("OTable", () => {
     });
 
     it("has page size select", () => {
-      expect(
-        wrapper.find('[data-test="o2-table-page-size-select"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-page-size-select"]').exists()).toBe(true);
     });
 
     it("has prev/next buttons", () => {
-      expect(
-        wrapper.find('[data-test="o2-table-prev-page-btn"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="o2-table-next-page-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-prev-page-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-next-page-btn"]').exists()).toBe(true);
     });
   });
 
@@ -196,9 +187,7 @@ describe("OTable", () => {
         },
       });
       // The ID column is sortable, so it should have sort trigger
-      expect(
-        wrapper.find('[data-test="o2-table-th-sort-trigger"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-th-sort-trigger"]').exists()).toBe(true);
     });
 
     it("displays sort icons on sortable columns when sortBy is provided", () => {
@@ -212,9 +201,7 @@ describe("OTable", () => {
         },
       });
       // Should have active sort icon on the sorted column
-      const activeIcon = wrapper.find(
-        '[data-test="o2-table-sort-icon-active"]',
-      );
+      const activeIcon = wrapper.find('[data-test="o2-table-sort-icon-active"]');
       expect(activeIcon.exists()).toBe(true);
       // The active icon must expose its direction for e2e sort assertions.
       expect(activeIcon.attributes("data-test-sort-direction")).toBe("asc");
@@ -233,9 +220,7 @@ describe("OTable", () => {
         },
       });
       expect(
-        asc
-          .find('[data-test="o2-table-sort-icon-active"]')
-          .attributes("data-test-sort-direction"),
+        asc.find('[data-test="o2-table-sort-icon-active"]').attributes("data-test-sort-direction"),
       ).toBe("asc");
 
       const desc = mount(OTable, {
@@ -248,9 +233,7 @@ describe("OTable", () => {
         },
       });
       expect(
-        desc
-          .find('[data-test="o2-table-sort-icon-active"]')
-          .attributes("data-test-sort-direction"),
+        desc.find('[data-test="o2-table-sort-icon-active"]').attributes("data-test-sort-direction"),
       ).toBe("desc");
 
       // An unsorted sortable column shows the inactive icon with direction none.
@@ -282,9 +265,7 @@ describe("OTable", () => {
           sortOrder: undefined,
         },
       });
-      const sortTrigger = wrapper.find(
-        '[data-test="o2-table-th-sort-trigger"]',
-      );
+      const sortTrigger = wrapper.find('[data-test="o2-table-th-sort-trigger"]');
       await sortTrigger.trigger("click");
       expect(wrapper.emitted("sort-change")).toBeTruthy();
       expect(wrapper.emitted("sort-change")?.[0][0]).toEqual({
@@ -303,9 +284,7 @@ describe("OTable", () => {
           sortOrder: "asc",
         },
       });
-      const sortTrigger = wrapper.find(
-        '[data-test="o2-table-th-sort-trigger"]',
-      );
+      const sortTrigger = wrapper.find('[data-test="o2-table-th-sort-trigger"]');
       await sortTrigger.trigger("click");
       expect(wrapper.emitted("sort-change")?.[0][0]).toEqual({
         column: "id",
@@ -325,9 +304,7 @@ describe("OTable", () => {
           selection: "multiple",
         },
       });
-      expect(
-        wrapper.find('[data-test="o2-table-select-cell"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-select-cell"]').exists()).toBe(true);
     });
 
     it("does not render checkbox column when selection is none", () => {
@@ -338,9 +315,7 @@ describe("OTable", () => {
           selection: "none",
         },
       });
-      expect(
-        wrapper.find('[data-test="o2-table-select-cell"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="o2-table-select-cell"]').exists()).toBe(false);
     });
 
     it("emits update:selectedIds when a row checkbox is toggled", async () => {
@@ -368,9 +343,7 @@ describe("OTable", () => {
           expansion: "single",
         },
       });
-      expect(
-        wrapper.find('[data-test="o2-table-expand-cell"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-expand-cell"]').exists()).toBe(true);
     });
 
     it("does not render expand button when expansion is none", () => {
@@ -381,9 +354,7 @@ describe("OTable", () => {
           expansion: "none",
         },
       });
-      expect(
-        wrapper.find('[data-test="o2-table-expand-cell"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="o2-table-expand-cell"]').exists()).toBe(false);
     });
   });
 
@@ -409,9 +380,7 @@ describe("OTable", () => {
           emptyMessage: "Nothing here",
         },
       });
-      expect(wrapper.find('[data-test="o2-table-empty"]').text()).toContain(
-        "Nothing here",
-      );
+      expect(wrapper.find('[data-test="o2-table-empty"]').text()).toContain("Nothing here");
     });
   });
 
@@ -427,9 +396,7 @@ describe("OTable", () => {
         },
       });
       // OTableLoading renders a skeleton tbody with data-test="o2-table-skeleton-body"
-      expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(true);
     });
 
     it("shows loading overlay when loading is true with existing rows", () => {
@@ -458,9 +425,7 @@ describe("OTable", () => {
         },
       });
       expect(wrapper.find('[data-test="o2-table-error"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="o2-table-error"]').text()).toContain(
-        "Failed to load data",
-      );
+      expect(wrapper.find('[data-test="o2-table-error"]').text()).toContain("Failed to load data");
     });
 
     it("shows error instead of empty when both error and empty data", () => {
@@ -509,9 +474,7 @@ describe("OTable", () => {
       const row = wrapper.find('[data-test="o2-table-row-0"]');
       await row.trigger("click");
       expect(wrapper.emitted("row-click")).toBeTruthy();
-      expect(wrapper.emitted("row-click")?.[0][0]).toEqual(
-        expect.objectContaining({ id: 1 }),
-      );
+      expect(wrapper.emitted("row-click")?.[0][0]).toEqual(expect.objectContaining({ id: 1 }));
     });
 
     it("emits row-dblclick when a row is double-clicked", async () => {
@@ -546,10 +509,7 @@ describe("OTable", () => {
       wrapper = mount(OTable, {
         props: {
           data: makeRows(1),
-          columns: [
-            ...makeColumns().slice(0, 1),
-            { id: "actions", header: "", isAction: true },
-          ],
+          columns: [...makeColumns().slice(0, 1), { id: "actions", header: "", isAction: true }],
         },
         slots: {
           "cell-actions": `<span data-test="custom-action">Edit</span>`,
@@ -587,9 +547,7 @@ describe("OTable", () => {
           pagination: "none",
         },
       });
-      expect(
-        wrapper.find('[data-test="o2-table-pagination-bottom"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="o2-table-pagination-bottom"]').exists()).toBe(false);
     });
   });
 
@@ -747,7 +705,6 @@ describe("OTable", () => {
     });
   });
 
-
   // ── Highlighting ────────────────────────────────────────────
 
   describe("highlighting", () => {
@@ -788,9 +745,7 @@ describe("OTable", () => {
           streaming: true,
         },
       });
-      expect(
-        wrapper.find('[data-test="o2-table-streaming-bar"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-streaming-bar"]').exists()).toBe(true);
     });
 
     it("does not show streaming indicator when not streaming", () => {
@@ -801,9 +756,7 @@ describe("OTable", () => {
           streaming: false,
         },
       });
-      expect(
-        wrapper.find('[data-test="o2-table-streaming-bar"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="o2-table-streaming-bar"]').exists()).toBe(false);
     });
   });
 
@@ -820,13 +773,10 @@ describe("OTable", () => {
           streaming: true,
         },
         slots: {
-          "loading-banner":
-            '<div data-test="custom-loading-banner">Refreshing...</div>',
+          "loading-banner": '<div data-test="custom-loading-banner">Refreshing...</div>',
         },
       });
-      expect(
-        wrapper.find('[data-test="custom-loading-banner"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="custom-loading-banner"]').exists()).toBe(true);
     });
   });
 
@@ -841,13 +791,10 @@ describe("OTable", () => {
           pagination: "client",
         },
         slots: {
-          bottom:
-            '<div data-test="custom-bottom">Bottom Content</div>',
+          bottom: '<div data-test="custom-bottom">Bottom Content</div>',
         },
       });
-      expect(
-        wrapper.find('[data-test="custom-bottom"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="custom-bottom"]').exists()).toBe(true);
     });
   });
 
@@ -915,8 +862,7 @@ describe("OTable", () => {
         props: {
           data: makeRows(3),
           columns: makeColumns(),
-          rowClass: (row: TestRow) =>
-            row.status === "Active" ? "row-active" : "row-inactive",
+          rowClass: (row: TestRow) => (row.status === "Active" ? "row-active" : "row-inactive"),
         },
       });
       const activeRow = wrapper.find('[data-test="o2-table-row-0"]');
@@ -930,8 +876,7 @@ describe("OTable", () => {
         props: {
           data: makeRows(3),
           columns: makeColumns(),
-          getRowStatusColor: (row: TestRow) =>
-            row.status === "Active" ? "#00ff00" : "#ff0000",
+          getRowStatusColor: (row: TestRow) => (row.status === "Active" ? "#00ff00" : "#ff0000"),
         },
       });
       expect(wrapper.find('[data-test="o2-table-root"]').exists()).toBe(true);
@@ -949,9 +894,7 @@ describe("OTable", () => {
           enableCellCopy: true,
         },
       });
-      expect(
-        wrapper.find('[data-test="o2-table-cell-copy-id"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-cell-copy-id"]').exists()).toBe(true);
     });
 
     it("does not show copy button when enableCellCopy is false", () => {
@@ -962,9 +905,7 @@ describe("OTable", () => {
           enableCellCopy: false,
         },
       });
-      expect(
-        wrapper.find('[data-test="o2-table-cell-copy-id"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="o2-table-cell-copy-id"]').exists()).toBe(false);
     });
   });
 
@@ -1003,9 +944,7 @@ describe("OTable", () => {
       wrapper = mount(OTable, {
         props: { data: makeRows(5), columns: cols },
       });
-      const footerCells = wrapper.findAll(
-        '[data-test^="o2-table-footer-cell-"]',
-      );
+      const footerCells = wrapper.findAll('[data-test^="o2-table-footer-cell-"]');
       expect(footerCells.length).toBeGreaterThan(0);
     });
 
@@ -1013,9 +952,7 @@ describe("OTable", () => {
       wrapper = mount(OTable, {
         props: { data: makeRows(5), columns: makeColumns() },
       });
-      expect(
-        wrapper.find('[data-test="o2-table-footer"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="o2-table-footer"]').exists()).toBe(false);
     });
   });
 
@@ -1060,12 +997,8 @@ describe("OTable", () => {
       });
 
       // Should render pivot header instead of standard header
-      expect(
-        wrapper.find('[data-test="o2-table-pivot-header"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="o2-table-header"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="o2-table-pivot-header"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-header"]').exists()).toBe(false);
     });
 
     it("renders standard header when pivotHeaderLevels is empty", () => {
@@ -1076,12 +1009,8 @@ describe("OTable", () => {
           pivotHeaderLevels: [],
         },
       });
-      expect(
-        wrapper.find('[data-test="o2-table-header"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="o2-table-pivot-header"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="o2-table-header"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-pivot-header"]').exists()).toBe(false);
     });
   });
 
@@ -1142,9 +1071,7 @@ describe("OTable", () => {
         },
       });
       // Should have expand cells
-      expect(
-        wrapper.find('[data-test="o2-table-expand-cell"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="o2-table-expand-cell"]').exists()).toBe(true);
     });
 
     it("expands and collapses tree rows", async () => {
@@ -1168,9 +1095,7 @@ describe("OTable", () => {
       });
 
       // Click expand button on first row
-      const expandBtn = wrapper.find(
-        '[data-test="o2-table-expand-0"]',
-      );
+      const expandBtn = wrapper.find('[data-test="o2-table-expand-0"]');
       expect(expandBtn.exists()).toBe(true);
       await expandBtn.trigger("click");
       expect(wrapper.emitted("update:expandedIds")).toBeTruthy();
@@ -1187,9 +1112,7 @@ describe("OTable", () => {
           columns: makeColumns(),
         },
       });
-      const scrollContainer = wrapper.find(
-        '[data-test="o2-table-scroll-container"]',
-      );
+      const scrollContainer = wrapper.find('[data-test="o2-table-scroll-container"]');
       expect(scrollContainer.exists()).toBe(true);
     });
   });
@@ -1220,9 +1143,7 @@ describe("OTable", () => {
         },
       });
       // OTableLoading skeleton renders inside the table with data-test="o2-table-skeleton-body"
-      expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="o2-table-skeleton-body"]').exists()).toBe(true);
     });
   });
 });

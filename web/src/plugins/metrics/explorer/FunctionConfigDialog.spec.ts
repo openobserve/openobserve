@@ -79,12 +79,10 @@ const counterDefaults = () =>
 
 /** A classic histogram: heatmap / percentiles / count-rate. */
 const histogramDefaults = () =>
-  getMetricDefaults(
-    "http_request_duration_seconds_bucket",
-    "histogram",
-    undefined,
-    { rateWindow: "4m", streamNames: new Set(["http_request_duration_seconds_count"]) },
-  );
+  getMetricDefaults("http_request_duration_seconds_bucket", "histogram", undefined, {
+    rateWindow: "4m",
+    streamNames: new Set(["http_request_duration_seconds_count"]),
+  });
 
 const counterCard = {
   name: "http_requests_total",
@@ -147,13 +145,10 @@ const createWrapper = (props: Record<string, any> = {}) =>
     attachTo: document.body,
   });
 
-const tile = (wrapper: any, id: string) =>
-  wrapper.find(`[data-test="metrics-fn-variant-${id}"]`);
+const tile = (wrapper: any, id: string) => wrapper.find(`[data-test="metrics-fn-variant-${id}"]`);
 
 const percentileBox = (wrapper: any, variantId: string, p: number) =>
-  wrapper.find(
-    `[data-test="metrics-fn-percentile-${variantId}-${p}"] button[role="checkbox"]`,
-  );
+  wrapper.find(`[data-test="metrics-fn-percentile-${variantId}-${p}"] button[role="checkbox"]`);
 
 describe("FunctionConfigDialog", () => {
   beforeEach(() => {
@@ -201,10 +196,7 @@ describe("FunctionConfigDialog", () => {
       await flushPromises();
 
       // heatmap (1) + percentiles (3) + count-rate (1)
-      const expected = defaults.variants.reduce(
-        (n: number, v: any) => n + v.queries.length,
-        0,
-      );
+      const expected = defaults.variants.reduce((n: number, v: any) => n + v.queries.length, 0);
       expect(runPreview).toHaveBeenCalledTimes(expected);
     });
 
@@ -296,13 +288,9 @@ describe("FunctionConfigDialog", () => {
       await last.trigger("click");
       await flushPromises();
 
-      expect(percentileBox(wrapper, "percentiles", 99).attributes("data-state")).toBe(
-        "checked",
-      );
+      expect(percentileBox(wrapper, "percentiles", 99).attributes("data-state")).toBe("checked");
       expect(
-        wrapper.find('[data-test="metrics-fn-chart-percentiles"]').attributes(
-          "data-series",
-        ),
+        wrapper.find('[data-test="metrics-fn-chart-percentiles"]').attributes("data-series"),
       ).toBe("1");
     });
 
@@ -314,12 +302,8 @@ describe("FunctionConfigDialog", () => {
       });
       await flushPromises();
 
-      expect(percentileBox(wrapper, "percentiles", 99).attributes("data-state")).toBe(
-        "checked",
-      );
-      expect(percentileBox(wrapper, "percentiles", 50).attributes("data-state")).toBe(
-        "unchecked",
-      );
+      expect(percentileBox(wrapper, "percentiles", 99).attributes("data-state")).toBe("checked");
+      expect(percentileBox(wrapper, "percentiles", 50).attributes("data-state")).toBe("unchecked");
     });
   });
 
@@ -332,9 +316,7 @@ describe("FunctionConfigDialog", () => {
       expect(apply.attributes("disabled")).toBeDefined();
 
       await tile(wrapper, "increase").trigger("click");
-      expect(
-        wrapper.find('[data-test="metrics-fn-apply"]').attributes("disabled"),
-      ).toBeUndefined();
+      expect(wrapper.find('[data-test="metrics-fn-apply"]').attributes("disabled")).toBeUndefined();
     });
 
     it("emits apply with the selected variant id", async () => {
@@ -390,9 +372,7 @@ describe("FunctionConfigDialog", () => {
     it("shows an error on ONLY the failing tile", async () => {
       const failing = counterDefaults().variants[1].queries[0].expr; // rate-avg
       const runPreview = vi.fn((expr: string) =>
-        expr === failing
-          ? Promise.reject(new Error("boom"))
-          : Promise.resolve(okResult()),
+        expr === failing ? Promise.reject(new Error("boom")) : Promise.resolve(okResult()),
       );
 
       const wrapper = createWrapper({ runPreview });
@@ -404,12 +384,8 @@ describe("FunctionConfigDialog", () => {
       expect(error.attributes("title")).toBe("boom");
 
       // Every other tile still charts.
-      expect(wrapper.find('[data-test="metrics-fn-chart-rate-sum"]').exists()).toBe(
-        true,
-      );
-      expect(wrapper.find('[data-test="metrics-fn-chart-increase"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="metrics-fn-chart-rate-sum"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="metrics-fn-chart-increase"]').exists()).toBe(true);
       expect(wrapper.findAll('[data-test^="metrics-fn-error-"]')).toHaveLength(1);
     });
 
@@ -417,33 +393,23 @@ describe("FunctionConfigDialog", () => {
       const failing = counterDefaults().variants[1].queries[0].expr;
       let fail = true;
       const runPreview = vi.fn((expr: string) =>
-        expr === failing && fail
-          ? Promise.reject(new Error("boom"))
-          : Promise.resolve(okResult()),
+        expr === failing && fail ? Promise.reject(new Error("boom")) : Promise.resolve(okResult()),
       );
 
       const wrapper = createWrapper({ runPreview });
       await flushPromises();
-      expect(wrapper.find('[data-test="metrics-fn-error-rate-avg"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="metrics-fn-error-rate-avg"]').exists()).toBe(true);
 
       fail = false;
       await wrapper.find('[data-test="metrics-fn-retry-rate-avg"]').trigger("click");
       await flushPromises();
 
-      expect(wrapper.find('[data-test="metrics-fn-error-rate-avg"]').exists()).toBe(
-        false,
-      );
-      expect(wrapper.find('[data-test="metrics-fn-chart-rate-avg"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="metrics-fn-error-rate-avg"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="metrics-fn-chart-rate-avg"]').exists()).toBe(true);
     });
 
     it("shows NO error when a preview is cancelled", async () => {
-      const runPreview = vi.fn(() =>
-        Promise.reject(new PreviewCancelledError("cancelled")),
-      );
+      const runPreview = vi.fn(() => Promise.reject(new PreviewCancelledError("cancelled")));
 
       const wrapper = createWrapper({ runPreview });
       await flushPromises();

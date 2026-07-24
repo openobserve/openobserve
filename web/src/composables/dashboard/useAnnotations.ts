@@ -20,15 +20,11 @@ export const useAnnotations = (
     }
 
     try {
-      const response = await annotationService.get_timed_annotations(
-        organization,
-        dashboardId,
-        {
-          panels: [panelId],
-          start_time,
-          end_time,
-        },
-      );
+      const response = await annotationService.get_timed_annotations(organization, dashboardId, {
+        panels: [panelId],
+        start_time,
+        end_time,
+      });
 
       return response.data;
     } catch (err: any) {

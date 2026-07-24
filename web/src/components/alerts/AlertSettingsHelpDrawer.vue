@@ -245,14 +245,8 @@ defineExpose({ applyTemplate, previewTemplate });
       <!-- Legend (shown only when a non-empty preview is actually on screen, so
            the colored swatches always have something to explain). Readable in
            both themes. -->
-      <div
-        v-if="showLegend"
-        data-test="help-legend"
-        class="help-legend"
-      >
-        <span class="help-legend__title">{{
-          t("alerts.alertSettings.helpLegendTitle")
-        }}</span>
+      <div v-if="showLegend" data-test="help-legend" class="help-legend">
+        <span class="help-legend__title">{{ t("alerts.alertSettings.helpLegendTitle") }}</span>
         <span class="help-legend__item">
           <span class="help-legend__swatch help-legend__swatch--live">{{ t("alerts.alertSettings.helpLegendLiveExample") }}</span>
           <span class="help-legend__sep">=</span>
@@ -302,10 +296,9 @@ defineExpose({ applyTemplate, previewTemplate });
             <pre
               v-if="currentSegments.length"
               class="preview-box"
-              ><template v-for="(s, i) in currentSegments" :key="i"
+            ><template v-for="(s, i) in currentSegments" :key="i"
                 ><span :class="segClass(s.kind)">{{ s.text }}</span></template
-              ></pre
-            >
+              ></pre>
             <p v-else class="help-empty">
               {{ t("alerts.alertSettings.helpCurrentBodyEmpty") }}
             </p>
@@ -334,10 +327,9 @@ defineExpose({ applyTemplate, previewTemplate });
                   v-if="d.segments.length"
                   data-test="help-destination-preview"
                   class="preview-box preview-box--nested"
-                  ><template v-for="(s, i) in d.segments" :key="i"
+                ><template v-for="(s, i) in d.segments" :key="i"
                     ><span :class="segClass(s.kind)">{{ s.text }}</span></template
-                  ></pre
-                >
+                  ></pre>
                 <p v-else class="help-empty help-empty--sm">
                   {{ t("alerts.alertSettings.helpDestinationNoTemplate") }}
                 </p>
@@ -364,10 +356,9 @@ defineExpose({ applyTemplate, previewTemplate });
             <pre
               v-if="previewSegments.length"
               class="preview-box"
-              ><template v-for="(s, i) in previewSegments" :key="i"
+            ><template v-for="(s, i) in previewSegments" :key="i"
                 ><span :class="segClass(s.kind)">{{ s.text }}</span></template
-              ></pre
-            >
+              ></pre>
             <p v-else class="help-empty">
               {{ t("alerts.alertSettings.helpCurrentBodyEmpty") }}
             </p>
@@ -443,9 +434,7 @@ defineExpose({ applyTemplate, previewTemplate });
           <p class="help-section__text help-section__text--mb">
             {{ t("alerts.alertSettings.helpVariablesExampleCaption") }}
           </p>
-          <pre class="preview-box">{{
-            t("alerts.alertSettings.helpVariablesExampleCode")
-          }}</pre>
+          <pre class="preview-box">{{ t("alerts.alertSettings.helpVariablesExampleCode") }}</pre>
           <span class="help-result-label">{{
             t("alerts.alertSettings.helpExampleResultLabel")
           }}</span>
@@ -466,10 +455,7 @@ defineExpose({ applyTemplate, previewTemplate });
             :aria-expanded="showBuiltIns"
             @click="showBuiltIns = !showBuiltIns"
           >
-            <OIcon
-              :name="showBuiltIns ? 'chevron-down' : 'chevron-right'"
-              size="sm"
-            />
+            <OIcon :name="showBuiltIns ? 'chevron-down' : 'chevron-right'" size="sm" />
             <span>{{ t("alerts.alertSettings.helpBuiltInHeading") }}</span>
           </button>
           <template v-if="showBuiltIns">
@@ -507,11 +493,7 @@ defineExpose({ applyTemplate, previewTemplate });
             </p>
           </template>
           <ul v-else class="help-var-list">
-            <li
-              v-for="cv in displayedVariables"
-              :key="cv.id"
-              class="help-var-row"
-            >
+            <li v-for="cv in displayedVariables" :key="cv.id" class="help-var-row">
               <span class="help-var-row__key">{{ "{" + cv.key + "}" }}</span>
               <span class="help-var-row__val">{{ cv.value }}</span>
             </li>
@@ -599,10 +581,9 @@ defineExpose({ applyTemplate, previewTemplate });
           <pre
             v-if="rowSegments.length"
             class="preview-box"
-            ><template v-for="(s, i) in rowSegments" :key="i"
+          ><template v-for="(s, i) in rowSegments" :key="i"
               ><span :class="segClass(s.kind)">{{ s.text }}</span></template
-            ></pre
-          >
+            ></pre>
           <p v-else class="help-empty" data-test="help-row-preview-empty">
             {{ t("alerts.alertSettings.helpRowTemplatePreviewEmpty") }}
           </p>

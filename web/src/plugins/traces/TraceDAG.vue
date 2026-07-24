@@ -15,22 +15,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="w-full h-full min-h-125">
-    <div v-if="isLoading" data-test="traces-trace-dag-loading-container" class="flex items-center justify-center flex-col p-6 h-125">
+  <div class="h-full min-h-125 w-full">
+    <div
+      v-if="isLoading"
+      data-test="traces-trace-dag-loading-container"
+      class="flex h-125 flex-col items-center justify-center p-6"
+    >
       <OSpinner size="lg" />
-      <div class="mt-3 text-sm text-text-secondary">{{ t("traces.loadingTraceDag") }}</div>
+      <div class="text-text-secondary mt-3 text-sm">{{ t("traces.loadingTraceDag") }}</div>
     </div>
 
     <div v-else-if="error" data-test="traces-trace-dag-error-message" class="p-3">
-      <OBanner variant="error" icon="error" :content="t('traces.traceDAG.failedToLoad', { error })" />
+      <OBanner
+        variant="error"
+        icon="error"
+        :content="t('traces.traceDAG.failedToLoad', { error })"
+      />
     </div>
 
-    <div v-else-if="!dagData || !dagData.nodes || dagData.nodes.length === 0" data-test="traces-trace-dag-empty-container" class="flex items-center justify-center flex-col p-6 h-125">
-      <OIcon name="info" style="width: 48px; height: 48px;" />
-      <div class="mt-3 text-text-muted">{{ t('traces.traceDAG.noData') }}</div>
+    <div
+      v-else-if="!dagData || !dagData.nodes || dagData.nodes.length === 0"
+      data-test="traces-trace-dag-empty-container"
+      class="flex h-125 flex-col items-center justify-center p-6"
+    >
+      <OIcon name="info" style="width: 48px; height: 48px" />
+      <div class="text-text-muted mt-3">{{ t("traces.traceDAG.noData") }}</div>
     </div>
 
-    <div v-else data-test="traces-trace-dag-wrapper" class="w-full h-full min-h-150 border border-border-default rounded-default relative">
+    <div
+      v-else
+      data-test="traces-trace-dag-wrapper"
+      class="border-border-default rounded-default relative h-full min-h-150 w-full border"
+    >
       <VueFlow
         :nodes="nodes"
         :edges="edges"
@@ -39,16 +55,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :max-zoom="3"
         fit-view-on-init
         :fit-view-options="{ padding: 0.3, minZoom: 0.3, maxZoom: 0.7 }"
-        class="trace-dag-flow w-full h-full bg-surface-panel!"
+        class="trace-dag-flow bg-surface-panel! h-full w-full"
       >
         <Background pattern-color="#aaa" :gap="16" />
         <Controls />
 
         <template #node-custom="{ data }">
-          <Handle v-if="data.hasIncoming" type="target" :position="Position.Top"
-            class="w-2 h-2 bg-info border-2 border-surface-base rounded-full shadow-[0_1px_3px_rgba(0,0,0,0.15)]" />
+          <Handle
+            v-if="data.hasIncoming"
+            type="target"
+            :position="Position.Top"
+            class="bg-info border-surface-base h-2 w-2 rounded-full border-2 shadow-[0_1px_3px_rgba(0,0,0,0.15)]"
+          />
           <div
-            class="p-[6px_12px] rounded-default bg-surface-base border-2 border-info min-w-20 max-w-45 min-h-7 shadow-[0_2px_6px_rgba(0,0,0,0.1)] transition-all duration-200 cursor-pointer text-center flex flex-col items-center justify-center hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)] hover:[transform:translateY(-2px)]"
+            class="rounded-default bg-surface-base border-info flex min-h-7 max-w-45 min-w-20 cursor-pointer flex-col items-center justify-center border-2 p-[6px_12px] text-center shadow-[0_2px_6px_rgba(0,0,0,0.1)] transition-all duration-200 hover:[transform:translateY(-2px)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
             :class="[
               {
                 'border-status-negative! bg-status-error-bg!': data.span_status === 'ERROR',
@@ -59,19 +79,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="handleNodeClick(data.span_id)"
           >
             <div
-              class="text-compact text-info font-semibold break-words max-w-40 leading-[1.3] whitespace-nowrap overflow-hidden text-ellipsis"
+              class="text-compact text-info max-w-40 overflow-hidden leading-[1.3] font-semibold break-words text-ellipsis whitespace-nowrap"
               :class="getObservationTypeTextClass(data.gen_ai_operation_name)"
-            >{{ data.operation_name }}</div>
+            >
+              {{ data.operation_name }}
+            </div>
             <OTag
               v-if="data.span_status === 'ERROR'"
               type="spanStatus"
               :value="data.span_status"
               :label="t('traces.errLabel')"
-              class="text-3xs h-3.5 mt-0.5 px-1"
+              class="text-3xs mt-0.5 h-3.5 px-1"
             />
           </div>
-          <Handle v-if="data.hasOutgoing" type="source" :position="Position.Bottom"
-            class="w-2 h-2 bg-info border-2 border-surface-base rounded-full shadow-[0_1px_3px_rgba(0,0,0,0.15)]" />
+          <Handle
+            v-if="data.hasOutgoing"
+            type="source"
+            :position="Position.Bottom"
+            class="bg-info border-surface-base h-2 w-2 rounded-full border-2 shadow-[0_1px_3px_rgba(0,0,0,0.15)]"
+          />
         </template>
       </VueFlow>
     </div>
@@ -129,7 +155,7 @@ export default defineComponent({
     OIcon,
     OTag,
     OBanner,
-},
+  },
   props: {
     traceId: {
       type: String,
@@ -302,7 +328,7 @@ export default defineComponent({
       });
 
       // Center the entire tree
-      const allX = Array.from(positions.values()).map(p => p.x);
+      const allX = Array.from(positions.values()).map((p) => p.x);
       const minX = Math.min(...allX);
       const maxX = Math.max(...allX);
       const offsetX = -(minX + maxX) / 2;
@@ -319,10 +345,10 @@ export default defineComponent({
       if (!dagData.value || !dagData.value.nodes) return [];
 
       // Create a set of valid node IDs
-      const validNodeIds = new Set(dagData.value.nodes.map(n => n.span_id));
+      const validNodeIds = new Set(dagData.value.nodes.map((n) => n.span_id));
 
       // Filter out edges that reference non-existent nodes
-      return dagData.value.edges.filter(edge => {
+      return dagData.value.edges.filter((edge) => {
         const isValid = validNodeIds.has(edge.from) && validNodeIds.has(edge.to);
         if (!isValid) {
           console.warn(`[TraceDAG] Skipping invalid edge: ${edge.from} → ${edge.to}`);
@@ -338,8 +364,8 @@ export default defineComponent({
       const positions = calculateLayout(dagData.value.nodes, validEdges.value);
 
       // Determine which nodes have incoming/outgoing edges
-      const nodesWithIncoming = new Set(validEdges.value.map(e => e.to));
-      const nodesWithOutgoing = new Set(validEdges.value.map(e => e.from));
+      const nodesWithIncoming = new Set(validEdges.value.map((e) => e.to));
+      const nodesWithOutgoing = new Set(validEdges.value.map((e) => e.from));
 
       return dagData.value.nodes.map((node) => ({
         id: node.span_id,
@@ -388,7 +414,8 @@ export default defineComponent({
         dagData.value = response.data;
       } catch (err: any) {
         console.error("[TraceDAG] Failed to fetch DAG:", err);
-        error.value = err.response?.data?.message || err.message || t("traces.traceDAG.unknownError");
+        error.value =
+          err.response?.data?.message || err.message || t("traces.traceDAG.unknownError");
       } finally {
         isLoading.value = false;
       }
@@ -404,8 +431,8 @@ export default defineComponent({
           !streamName ||
           startTime == null ||
           endTime == null ||
-          typeof startTime !== 'number' ||
-          typeof endTime !== 'number' ||
+          typeof startTime !== "number" ||
+          typeof endTime !== "number" ||
           startTime >= endTime
         ) {
           error.value = t("traces.traceDAG.invalidParameters");
@@ -415,7 +442,7 @@ export default defineComponent({
 
         fetchDAG();
       },
-      { immediate: true }
+      { immediate: true },
     );
 
     const handleNodeClick = (spanId: string) => {
@@ -449,49 +476,68 @@ export default defineComponent({
     // bg = base@12% over the surface. The base flips light/dark (see dark.css),
     // so no dark: variant is needed. Full literal classes so Tailwind compiles them.
     const llmNodeStyles: Record<string, string> = {
-      generation: 'border-[var(--color-dag-node-generation)] bg-[color-mix(in_srgb,var(--color-dag-node-generation)_12%,var(--color-surface-base))]',
-      embedding:  'border-[var(--color-dag-node-embedding)] bg-[color-mix(in_srgb,var(--color-dag-node-embedding)_12%,var(--color-surface-base))]',
-      agent:      'border-[var(--color-dag-node-agent)] bg-[color-mix(in_srgb,var(--color-dag-node-agent)_12%,var(--color-surface-base))]',
-      tool:       'border-[var(--color-dag-node-tool)] bg-[color-mix(in_srgb,var(--color-dag-node-tool)_12%,var(--color-surface-base))]',
-      chain:      'border-[var(--color-dag-node-chain)] bg-[color-mix(in_srgb,var(--color-dag-node-chain)_12%,var(--color-surface-base))]',
-      retriever:  'border-[var(--color-dag-node-retriever)] bg-[color-mix(in_srgb,var(--color-dag-node-retriever)_12%,var(--color-surface-base))]',
-      task:       'border-[var(--color-dag-node-task)] bg-[color-mix(in_srgb,var(--color-dag-node-task)_12%,var(--color-surface-base))]',
-      evaluator:  'border-[var(--color-dag-node-evaluator)] bg-[color-mix(in_srgb,var(--color-dag-node-evaluator)_12%,var(--color-surface-base))]',
-      workflow:   'border-[var(--color-dag-node-workflow)] bg-[color-mix(in_srgb,var(--color-dag-node-workflow)_12%,var(--color-surface-base))]',
-      rerank:     'border-[var(--color-dag-node-rerank)] bg-[color-mix(in_srgb,var(--color-dag-node-rerank)_12%,var(--color-surface-base))]',
-      guardrail:  'border-[var(--color-dag-node-guardrail)] bg-[color-mix(in_srgb,var(--color-dag-node-guardrail)_12%,var(--color-surface-base))]',
-      span:       'border-[var(--color-dag-node-default)] bg-[color-mix(in_srgb,var(--color-dag-node-default)_12%,var(--color-surface-base))]',
-      event:      'border-[var(--color-dag-node-event)] bg-[color-mix(in_srgb,var(--color-dag-node-event)_12%,var(--color-surface-base))]',
-      default:    'border-[var(--color-dag-node-default)] bg-[color-mix(in_srgb,var(--color-dag-node-default)_12%,var(--color-surface-base))]',
+      generation:
+        "border-[var(--color-dag-node-generation)] bg-[color-mix(in_srgb,var(--color-dag-node-generation)_12%,var(--color-surface-base))]",
+      embedding:
+        "border-[var(--color-dag-node-embedding)] bg-[color-mix(in_srgb,var(--color-dag-node-embedding)_12%,var(--color-surface-base))]",
+      agent:
+        "border-[var(--color-dag-node-agent)] bg-[color-mix(in_srgb,var(--color-dag-node-agent)_12%,var(--color-surface-base))]",
+      tool: "border-[var(--color-dag-node-tool)] bg-[color-mix(in_srgb,var(--color-dag-node-tool)_12%,var(--color-surface-base))]",
+      chain:
+        "border-[var(--color-dag-node-chain)] bg-[color-mix(in_srgb,var(--color-dag-node-chain)_12%,var(--color-surface-base))]",
+      retriever:
+        "border-[var(--color-dag-node-retriever)] bg-[color-mix(in_srgb,var(--color-dag-node-retriever)_12%,var(--color-surface-base))]",
+      task: "border-[var(--color-dag-node-task)] bg-[color-mix(in_srgb,var(--color-dag-node-task)_12%,var(--color-surface-base))]",
+      evaluator:
+        "border-[var(--color-dag-node-evaluator)] bg-[color-mix(in_srgb,var(--color-dag-node-evaluator)_12%,var(--color-surface-base))]",
+      workflow:
+        "border-[var(--color-dag-node-workflow)] bg-[color-mix(in_srgb,var(--color-dag-node-workflow)_12%,var(--color-surface-base))]",
+      rerank:
+        "border-[var(--color-dag-node-rerank)] bg-[color-mix(in_srgb,var(--color-dag-node-rerank)_12%,var(--color-surface-base))]",
+      guardrail:
+        "border-[var(--color-dag-node-guardrail)] bg-[color-mix(in_srgb,var(--color-dag-node-guardrail)_12%,var(--color-surface-base))]",
+      span: "border-[var(--color-dag-node-default)] bg-[color-mix(in_srgb,var(--color-dag-node-default)_12%,var(--color-surface-base))]",
+      event:
+        "border-[var(--color-dag-node-event)] bg-[color-mix(in_srgb,var(--color-dag-node-event)_12%,var(--color-surface-base))]",
+      default:
+        "border-[var(--color-dag-node-default)] bg-[color-mix(in_srgb,var(--color-dag-node-default)_12%,var(--color-surface-base))]",
     };
 
     // Text = base mixed 70/30 toward the primary text color, which flips light/dark,
     // so text darkens in light mode and lightens in dark mode from the one base.
     const llmTextStyles: Record<string, string> = {
-      generation: 'text-[color-mix(in_srgb,var(--color-dag-node-generation)_70%,var(--color-text-heading))]',
-      embedding:  'text-[color-mix(in_srgb,var(--color-dag-node-embedding)_70%,var(--color-text-heading))]',
-      agent:      'text-[color-mix(in_srgb,var(--color-dag-node-agent)_70%,var(--color-text-heading))]',
-      tool:       'text-[color-mix(in_srgb,var(--color-dag-node-tool)_70%,var(--color-text-heading))]',
-      chain:      'text-[color-mix(in_srgb,var(--color-dag-node-chain)_70%,var(--color-text-heading))]',
-      retriever:  'text-[color-mix(in_srgb,var(--color-dag-node-retriever)_70%,var(--color-text-heading))]',
-      task:       'text-[color-mix(in_srgb,var(--color-dag-node-task)_70%,var(--color-text-heading))]',
-      evaluator:  'text-[color-mix(in_srgb,var(--color-dag-node-evaluator)_70%,var(--color-text-heading))]',
-      workflow:   'text-[color-mix(in_srgb,var(--color-dag-node-workflow)_70%,var(--color-text-heading))]',
-      rerank:     'text-[color-mix(in_srgb,var(--color-dag-node-rerank)_70%,var(--color-text-heading))]',
-      guardrail:  'text-[color-mix(in_srgb,var(--color-dag-node-guardrail)_70%,var(--color-text-heading))]',
-      span:       'text-[color-mix(in_srgb,var(--color-dag-node-default)_70%,var(--color-text-heading))]',
-      event:      'text-[color-mix(in_srgb,var(--color-dag-node-event)_70%,var(--color-text-heading))]',
-      default:    'text-[color-mix(in_srgb,var(--color-dag-node-default)_70%,var(--color-text-heading))]',
+      generation:
+        "text-[color-mix(in_srgb,var(--color-dag-node-generation)_70%,var(--color-text-heading))]",
+      embedding:
+        "text-[color-mix(in_srgb,var(--color-dag-node-embedding)_70%,var(--color-text-heading))]",
+      agent: "text-[color-mix(in_srgb,var(--color-dag-node-agent)_70%,var(--color-text-heading))]",
+      tool: "text-[color-mix(in_srgb,var(--color-dag-node-tool)_70%,var(--color-text-heading))]",
+      chain: "text-[color-mix(in_srgb,var(--color-dag-node-chain)_70%,var(--color-text-heading))]",
+      retriever:
+        "text-[color-mix(in_srgb,var(--color-dag-node-retriever)_70%,var(--color-text-heading))]",
+      task: "text-[color-mix(in_srgb,var(--color-dag-node-task)_70%,var(--color-text-heading))]",
+      evaluator:
+        "text-[color-mix(in_srgb,var(--color-dag-node-evaluator)_70%,var(--color-text-heading))]",
+      workflow:
+        "text-[color-mix(in_srgb,var(--color-dag-node-workflow)_70%,var(--color-text-heading))]",
+      rerank:
+        "text-[color-mix(in_srgb,var(--color-dag-node-rerank)_70%,var(--color-text-heading))]",
+      guardrail:
+        "text-[color-mix(in_srgb,var(--color-dag-node-guardrail)_70%,var(--color-text-heading))]",
+      span: "text-[color-mix(in_srgb,var(--color-dag-node-default)_70%,var(--color-text-heading))]",
+      event: "text-[color-mix(in_srgb,var(--color-dag-node-event)_70%,var(--color-text-heading))]",
+      default:
+        "text-[color-mix(in_srgb,var(--color-dag-node-default)_70%,var(--color-text-heading))]",
     };
 
     const getObservationTypeClass = (type: string | null): string => {
-      if (!type) return '';
+      if (!type) return "";
       const cssSuffix = specToCssSuffix[type.toLowerCase()];
       return llmNodeStyles[cssSuffix] || llmNodeStyles.default;
     };
 
     const getObservationTypeTextClass = (type: string | null): string => {
-      if (!type) return '';
+      if (!type) return "";
       const cssSuffix = specToCssSuffix[type.toLowerCase()];
       return llmTextStyles[cssSuffix] || llmTextStyles.default;
     };
@@ -507,7 +553,7 @@ export default defineComponent({
             fitView({ padding: 0.3, duration: 300 });
           }, 50);
         });
-      }
+      },
     );
 
     return {

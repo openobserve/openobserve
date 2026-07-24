@@ -1,7 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <template>
-  <div class="flex flex-col w-full index-menu default-index-menu h-full!">
+  <div class="index-menu default-index-menu flex h-full! w-full flex-col">
     <div class="index-table h-full! w-full">
       <OFieldList
         ref="fieldListRef"
@@ -21,11 +21,11 @@
         <!-- Group header (only rendered for grouped/label rows) -->
         <template #group-header="{ row, groupName }">
           <div
-            class="field-group-header h-full w-[calc(100%+2*var(--spacing-page-edge))] shrink-0 -ml-page-edge px-page-edge flex justify-between items-center font-semibold text-xs leading-7 cursor-pointer bg-surface-subtle text-field-list-group-text"
+            class="field-group-header -ml-page-edge px-page-edge bg-surface-subtle text-field-list-group-text flex h-full w-[calc(100%+2*var(--spacing-page-edge))] shrink-0 cursor-pointer items-center justify-between text-xs leading-7 font-semibold"
             :data-test="`search-field-list-group-${row.group}-header`"
             @click="toggleGroup(row.group)"
           >
-            <div class="flex-1 min-w-0 truncate">
+            <div class="min-w-0 flex-1 truncate">
               {{ groupName }} ({{ groupFieldCount[row.group] ?? 0 }})
             </div>
             <OButton
@@ -45,9 +45,11 @@
         <!-- Field row: render field name with expand chevron + actions inside OFieldRow -->
         <template #field-row="{ row }">
           <OFieldRow>
-            <span class="field-type-container relative w-[0.55rem] h-4 mr-[0.3rem] ml-[0.2rem] shrink-0 flex items-center justify-center">
+            <span
+              class="field-type-container relative mr-[0.3rem] ml-[0.2rem] flex h-4 w-[0.55rem] shrink-0 items-center justify-center"
+            >
               <OIcon
-                class="field-expand-icon absolute inline-flex items-center justify-center shrink-0 w-4 text-text-muted"
+                class="field-expand-icon text-text-muted absolute inline-flex w-4 shrink-0 items-center justify-center"
                 :name="expandedRows[row.name] ? 'expand-more' : 'chevron-right'"
                 size="sm"
               />
@@ -78,7 +80,7 @@
 
         <!-- Expansion: FieldValuesPanel -->
         <template #expansion="{ row }">
-          <div class="pl-2 pr-1 py-1">
+          <div class="py-1 pr-1 pl-2">
             <FieldValuesPanel
               :field-name="row.name"
               :field-values="fieldValues[row.name]"
@@ -98,58 +100,55 @@
 
         <!-- Loading skeleton -->
         <template #loading>
-          <div
-            data-test="search-fieldlist-loading-skeleton"
-            class="w-full flex flex-col"
-          >
+          <div data-test="search-fieldlist-loading-skeleton" class="flex w-full flex-col">
             <!-- Group 1 header -->
-            <div class="h-7 flex items-center justify-between px-2">
-              <OSkeleton type="rect" class="h-3 w-24 rounded-default" />
-              <OSkeleton type="rect" class="h-3 w-3 rounded-default" />
+            <div class="flex h-7 items-center justify-between px-2">
+              <OSkeleton type="rect" class="rounded-default h-3 w-24" />
+              <OSkeleton type="rect" class="rounded-default h-3 w-3" />
             </div>
             <!-- Group 1 fields -->
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
+              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
+              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
               <OSkeleton type="text" class="w-3/4" />
             </div>
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
+              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
             <!-- Group 2 header -->
-            <div class="h-7 flex items-center justify-between px-2 mt-2">
-              <OSkeleton type="rect" class="h-3 w-16 rounded-default" />
-              <OSkeleton type="rect" class="h-3 w-3 rounded-default" />
+            <div class="mt-2 flex h-7 items-center justify-between px-2">
+              <OSkeleton type="rect" class="rounded-default h-3 w-16" />
+              <OSkeleton type="rect" class="rounded-default h-3 w-3" />
             </div>
             <!-- Group 2 fields -->
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
+              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
               <OSkeleton type="text" class="w-4/5" />
             </div>
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
+              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
               <OSkeleton type="text" class="w-2/3" />
             </div>
             <!-- Group 3 header -->
-            <div class="h-7 flex items-center justify-between px-2 mt-2">
-              <OSkeleton type="rect" class="h-3 w-32 rounded-default" />
-              <OSkeleton type="rect" class="h-3 w-3 rounded-default" />
+            <div class="mt-2 flex h-7 items-center justify-between px-2">
+              <OSkeleton type="rect" class="rounded-default h-3 w-32" />
+              <OSkeleton type="rect" class="rounded-default h-3 w-3" />
             </div>
             <!-- Group 3 fields -->
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
+              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
+              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
               <OSkeleton type="text" class="w-3/4" />
             </div>
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="w-3.5 h-3.5 rounded-default shrink-0" />
+              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
               <OSkeleton type="text" class="flex-1" />
             </div>
           </div>
@@ -157,7 +156,7 @@
 
         <!-- After list: pagination -->
         <template #after-list="bottomProps">
-          <div v-if="bottomProps.totalPages > 1" class="flex items-center gap-1 ml-auto">
+          <div v-if="bottomProps.totalPages > 1" class="ml-auto flex items-center gap-1">
             <OTooltip
               side="left"
               align="center"
@@ -169,20 +168,15 @@
               size="icon-panel"
               :disabled="bottomProps.isFirstPage"
               @click="bottomProps.firstPage"
-              class="py-1.5 px-1! m-0! min-w-6! w-6! min-h-5.5! h-5.5! rounded-default! overflow-visible!"
+              class="rounded-default! m-0! h-5.5! min-h-5.5! w-6! min-w-6! overflow-visible! px-1! py-1.5"
             >
               <OIcon name="fast-rewind" size="sm" />
             </OButton>
-            <template
-              v-for="page in visiblePagesForTotal(bottomProps)"
-              :key="page"
-            >
+            <template v-for="page in visiblePagesForTotal(bottomProps)" :key="page">
               <OButton
-                :variant="
-                  bottomProps.currentPage === page ? 'primary' : 'ghost'
-                "
+                :variant="bottomProps.currentPage === page ? 'primary' : 'ghost'"
                 size="icon-panel"
-                class="py-1.5 px-1! m-0! min-w-6! w-6! min-h-5.5! h-5.5! text-xs! font-medium leading-none text-text-body! rounded-default! overflow-visible!"
+                class="text-text-body! rounded-default! m-0! h-5.5! min-h-5.5! w-6! min-w-6! overflow-visible! px-1! py-1.5 text-xs! leading-none font-medium"
                 @click="setPage(page)"
                 >{{ page }}</OButton
               >
@@ -192,7 +186,7 @@
               size="icon-panel"
               :disabled="bottomProps.isLastPage"
               @click="bottomProps.lastPage"
-              class="py-1.5 px-1! m-0! min-w-6! w-6! min-h-5.5! h-5.5! rounded-default! overflow-visible!"
+              class="rounded-default! m-0! h-5.5! min-h-5.5! w-6! min-w-6! overflow-visible! px-1! py-1.5"
             >
               <OIcon name="fast-forward" size="sm" />
             </OButton>
@@ -283,13 +277,9 @@ const expandedIds = ref<string[]>([]);
 const currentPage = ref(1);
 const fieldListRef = ref<InstanceType<typeof OFieldList> | null>(null);
 
-const defaultValuesCount = computed(
-  () => store.state.zoConfig?.query_values_default_num || 10,
-);
+const defaultValuesCount = computed(() => store.state.zoConfig?.query_values_default_num || 10);
 
-const showFtsFieldValues = computed(
-  () => store.state.zoConfig?.showFtsFieldValues ?? false,
-);
+const showFtsFieldValues = computed(() => store.state.zoConfig?.showFtsFieldValues ?? false);
 
 // ─── Derive currently-filtered values from the active query ──────────
 // Mirrors logs IndexList.vue's activeIncludeFilterValues/activeExcludeFilterValues
@@ -307,9 +297,10 @@ const extractColName = (col: any): string | null => {
   return null;
 };
 
-function walkFilters(
-  query: string,
-): { include: Record<string, string[]>; exclude: Record<string, string[]> } {
+function walkFilters(query: string): {
+  include: Record<string, string[]>;
+  exclude: Record<string, string[]>;
+} {
   const include: Record<string, string[]> = {};
   const exclude: Record<string, string[]> = {};
   if (!query?.trim()) return { include, exclude };
@@ -318,11 +309,7 @@ function walkFilters(
     const parsed = fnParsedSQL(`select * from stream where ${query}`);
     if (!parsed?.where) return { include, exclude };
 
-    const push = (
-      target: Record<string, string[]>,
-      field: string,
-      value: string,
-    ) => {
+    const push = (target: Record<string, string[]>, field: string, value: string) => {
       if (!target[field]) target[field] = [];
       if (!target[field].includes(value)) target[field].push(value);
     };
@@ -390,9 +377,7 @@ onMounted(() => {
   }
 });
 
-const groupingActive = computed(
-  () => props.enableGrouping && semanticIndex.value !== null,
-);
+const groupingActive = computed(() => props.enableGrouping && semanticIndex.value !== null);
 
 // Map raw schema fields → FieldObj, bucket them, and annotate label rows so
 // OFieldList renders group headers (isGroup) vs field rows.
@@ -472,16 +457,13 @@ const {
 
 const currentSizePerField: Ref<Record<string, number>> = ref({});
 const currentKeyword: Ref<Record<string, string>> = ref({});
-const fieldValuesTimeRange: Ref<
-  Record<string, { start_time: number; end_time: number }>
-> = ref({});
+const fieldValuesTimeRange: Ref<Record<string, { start_time: number; end_time: number }>> = ref({});
 
 // ─── SQL helper ──────────────────────────────────────────────────────
 
 const buildSql = (streamName: string, whereClause?: string) =>
-  b64EncodeUnicode(
-    `SELECT * FROM "${streamName}"${whereClause ? ` WHERE ${whereClause}` : ""}`,
-  ) || "";
+  b64EncodeUnicode(`SELECT * FROM "${streamName}"${whereClause ? ` WHERE ${whereClause}` : ""}`) ||
+  "";
 
 // ─── Expansion handling ──────────────────────────────────────────────
 
@@ -591,9 +573,7 @@ function setPage(page: number) {
 // ─── FieldValuesPanel event handlers ─────────────────────────────────
 
 const handleSearchFieldValues = (fieldName: string, term: string) => {
-  const row: any = (props.fields as any[]).find(
-    (f: any) => f.name === fieldName,
-  );
+  const row: any = (props.fields as any[]).find((f: any) => f.name === fieldName);
   const resolvedStream = row?.stream_name || props.streamName;
   currentKeyword.value[fieldName] = term;
   currentSizePerField.value[fieldName] = defaultValuesCount.value;
@@ -619,18 +599,13 @@ const handleSearchFieldValues = (fieldName: string, term: string) => {
 };
 
 const handleLoadMoreValues = (fieldName: string) => {
-  const row: any = (props.fields as any[]).find(
-    (f: any) => f.name === fieldName,
-  );
+  const row: any = (props.fields as any[]).find((f: any) => f.name === fieldName);
   const resolvedStream = row?.stream_name || props.streamName;
   const newSize =
-    (currentSizePerField.value[fieldName] ?? defaultValuesCount.value) +
-    defaultValuesCount.value;
+    (currentSizePerField.value[fieldName] ?? defaultValuesCount.value) + defaultValuesCount.value;
   currentSizePerField.value[fieldName] = newSize;
   fieldValuesCurrentSize.value[fieldName] = newSize;
-  fieldValuesFinalizedValues.value[fieldName] = [
-    ...(fieldValues.value[fieldName]?.values || []),
-  ];
+  fieldValuesFinalizedValues.value[fieldName] = [...(fieldValues.value[fieldName]?.values || [])];
 
   const pinnedTime = fieldValuesTimeRange.value[fieldName];
   fetchFieldValues({
@@ -660,24 +635,14 @@ const buildExpression = (fieldName: string, v: string, action: string) =>
       ? `${fieldName}='${v}'`
       : `${fieldName}!='${v}'`;
 
-const handleAddSearchTerm = (
-  fieldName: string,
-  value: string,
-  action: string,
-) => {
+const handleAddSearchTerm = (fieldName: string, value: string, action: string) => {
   addSearchTerm(buildExpression(fieldName, value, action));
 };
 
-const handleAddMultipleSearchTerms = (
-  fieldName: string,
-  values: string[],
-  action: string,
-) => {
+const handleAddMultipleSearchTerms = (fieldName: string, values: string[], action: string) => {
   const joinOp = action === "include" ? " or " : " and ";
   const expressions = values.map((v) => buildExpression(fieldName, v, action));
-  addSearchTerm(
-    expressions.length > 1 ? `(${expressions.join(joinOp)})` : expressions[0],
-  );
+  addSearchTerm(expressions.length > 1 ? `(${expressions.join(joinOp)})` : expressions[0]);
 };
 
 const handleRemoveFieldFilter = (fieldName: string) => {
@@ -715,5 +680,4 @@ const copyContentValue = (value: string) => {
   padding-top: 0;
   padding-bottom: 0;
 }
-
 </style>

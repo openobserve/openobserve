@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #header-left>
       <span
-        class="font-semibold px-2 py-1 rounded-default inline-block text-badge-blue-soft-text bg-badge-blue-soft-bg"
+        class="rounded-default text-badge-blue-soft-text bg-badge-blue-soft-bg inline-block px-2 py-1 font-semibold"
       >
         {{ pipelineName }}
         <OTooltip v-if="pipelineName && pipelineName.length > 25" :content="pipelineName" />
@@ -35,64 +35,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <div class="mx-6 my-3">
-          <!-- Advanced Options + numeric ranges are form-owned. The time range is
+      <!-- Advanced Options + numeric ranges are form-owned. The time range is
                a form-owned field too (OFormDateTimeRange). `space-y-3` lives on the
                <form> (via OForm) so it spaces the sibling sections below — on the
                outer div it would no-op (the <form> is its only child). -->
-          <OForm id="create-backfill-form" :form="form" class="space-y-3">
-          <!-- Time Range Section (form-owned via OFormDateTimeRange). The label is
+      <OForm id="create-backfill-form" :form="form" class="space-y-3">
+        <!-- Time Range Section (form-owned via OFormDateTimeRange). The label is
                rendered inline beside the picker (flex row); OFormDateTimeRange's
                built-in label stacks above the control, so it's omitted here. -->
-          <div>
-            <div class="flex items-center gap-4">
-              <div class="text-sm font-medium whitespace-nowrap">
-                {{ t('pipeline.timeRange') }} <span class="text-status-error-text">*</span>
-              </div>
-              <OFormDateTimeRange
-                name="timerange"
-                disable-relative
-                min-date="1999/01/01"
-                auto-apply
-                data-test="time-range-picker"
-              />
+        <div>
+          <div class="flex items-center gap-4">
+            <div class="text-sm font-medium whitespace-nowrap">
+              {{ t("pipeline.timeRange") }} <span class="text-status-error-text">*</span>
             </div>
-            <div
-              v-if="timerangeError"
-              class="text-xs text-status-error-text mt-1"
-            >
-              {{ timerangeError }}
-            </div>
+            <OFormDateTimeRange
+              name="timerange"
+              disable-relative
+              min-date="1999/01/01"
+              auto-apply
+              data-test="time-range-picker"
+            />
           </div>
+          <div v-if="timerangeError" class="text-status-error-text mt-1 text-xs">
+            {{ timerangeError }}
+          </div>
+        </div>
 
-          <!-- Advanced Options -->
-          <div class="collapsible-section flex flex-col transition-all overflow-hidden bg-card-glass-bg rounded-default shadow-[0_0_5px_1px_var(--color-hover-shadow)] border border-card-glass-border" data-test="advanced-options-section">
-            <div
-              class="section-header flex items-center justify-between px-4 py-3 cursor-pointer shrink-0 border-b border-border-default transition-all rounded-t-default select-none hover:bg-interactive-hover-bg active:bg-interactive-hover-bg"
-              @click="showAdvanced = !showAdvanced"
-            >
-              <div class="flex items-center gap-2">
-                <OIcon name="settings" size="md" />
-                <span class="text-sm font-semibold">{{ t('pipeline.advancedOptions') }}</span>
-              </div>
-              <OButton
-                variant="ghost-muted"
-                size="icon-xs-sq"
-                :title="showAdvanced ? 'Collapse' : 'Expand'"
-                :icon-left="showAdvanced ? 'unfold-less' : 'unfold-more'"
-                @click.stop="showAdvanced = !showAdvanced"
-                class="opacity-50 transition-all duration-200 hover:opacity-100"
-              />
+        <!-- Advanced Options -->
+        <div
+          class="collapsible-section bg-card-glass-bg rounded-default border-card-glass-border flex flex-col overflow-hidden border shadow-[0_0_5px_1px_var(--color-hover-shadow)] transition-all"
+          data-test="advanced-options-section"
+        >
+          <div
+            class="section-header border-border-default rounded-t-default hover:bg-interactive-hover-bg active:bg-interactive-hover-bg flex shrink-0 cursor-pointer items-center justify-between border-b px-4 py-3 transition-all select-none"
+            @click="showAdvanced = !showAdvanced"
+          >
+            <div class="flex items-center gap-2">
+              <OIcon name="settings" size="md" />
+              <span class="text-sm font-semibold">{{ t("pipeline.advancedOptions") }}</span>
             </div>
-            <div v-show="showAdvanced" class="flex flex-col flex-1 overflow-hidden p-4">
-              <div class="space-y-4">
+            <OButton
+              variant="ghost-muted"
+              size="icon-xs-sq"
+              :title="showAdvanced ? 'Collapse' : 'Expand'"
+              :icon-left="showAdvanced ? 'unfold-less' : 'unfold-more'"
+              @click.stop="showAdvanced = !showAdvanced"
+              class="opacity-50 transition-all duration-200 hover:opacity-100"
+            />
+          </div>
+          <div v-show="showAdvanced" class="flex flex-1 flex-col overflow-hidden p-4">
+            <div class="space-y-4">
               <!-- Chunk Period -->
-              <div class="grid grid-cols-12 gap-4 items-start">
+              <div class="grid grid-cols-12 items-start gap-4">
                 <div class="col-span-5">
-                  <div class="text-sm font-medium mb-1">
-                    {{ t('pipeline.chunkPeriodMinutesLabel') }}
+                  <div class="mb-1 text-sm font-medium">
+                    {{ t("pipeline.chunkPeriodMinutesLabel") }}
                   </div>
-                  <div class="text-xs text-text-secondary">
-                    {{ t('pipeline.chunkPeriodDescription') }}
+                  <div class="text-text-secondary text-xs">
+                    {{ t("pipeline.chunkPeriodDescription") }}
                   </div>
                 </div>
                 <div class="col-span-7">
@@ -104,20 +104,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <template #icon-right>
                       <OIcon name="info-outline" size="sm" />
-                        <OTooltip :content="t('pipeline.defaultChunkPeriodTooltip', { minutes: scheduleFrequency || 60 })" />
+                      <OTooltip
+                        :content="
+                          t('pipeline.defaultChunkPeriodTooltip', {
+                            minutes: scheduleFrequency || 60,
+                          })
+                        "
+                      />
                     </template>
                   </OFormInput>
                 </div>
               </div>
 
               <!-- Delay Between Chunks -->
-              <div class="grid grid-cols-12 gap-4 items-start">
+              <div class="grid grid-cols-12 items-start gap-4">
                 <div class="col-span-5">
-                  <div class="text-sm font-medium mb-1">
-                    {{ t('pipeline.delayBetweenChunksLabel') }}
+                  <div class="mb-1 text-sm font-medium">
+                    {{ t("pipeline.delayBetweenChunksLabel") }}
                   </div>
-                  <div class="text-xs text-text-secondary">
-                    {{ t('pipeline.delayBetweenChunksDescription') }}
+                  <div class="text-text-secondary text-xs">
+                    {{ t("pipeline.delayBetweenChunksDescription") }}
                   </div>
                 </div>
                 <div class="col-span-7">
@@ -129,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <template #icon-right>
                       <OIcon name="info-outline" size="sm" />
-                        <OTooltip :content="t('pipeline.defaultDelayTooltip')" />
+                      <OTooltip :content="t('pipeline.defaultDelayTooltip')" />
                     </template>
                   </OFormInput>
                 </div>
@@ -145,56 +151,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <div
                   v-if="deleteBeforeBackfill"
-                  class="mt-3 p-4 rounded-default border bg-banner-warning-bg border-banner-warning-border"
+                  class="rounded-default bg-banner-warning-bg border-banner-warning-border mt-3 border p-4"
                 >
                   <div class="flex items-start gap-3">
-                    <OIcon name="warning" size="md" class="mt-0.5 text-banner-warning-text" />
+                    <OIcon name="warning" size="md" class="text-banner-warning-text mt-0.5" />
                     <div>
-                      <div class="font-semibold mb-2 text-banner-warning-text">{{ t('pipeline.irreversibleDeletionWarning') }}</div>
-                      <div class="text-xs mb-3 text-banner-warning-text">
-                        {{ t('pipeline.deleteBackfillWarningMessage') }}
+                      <div class="text-banner-warning-text mb-2 font-semibold">
+                        {{ t("pipeline.irreversibleDeletionWarning") }}
                       </div>
-                      <div class="font-semibold text-sm mb-1 text-banner-warning-text">{{ t('pipeline.timeAlignmentRequirements') }}</div>
-                      <ul class="text-xs ml-5 space-y-1 list-disc text-banner-warning-text">
-                        <li><strong>{{ t('common.logs') }}</strong> {{ t('pipeline.logsHourBoundaryNote') }}</li>
-                        <li><strong>{{ t('pipeline.metricsTracesLabel') }}</strong> {{ t('pipeline.dayBoundaryNote') }}</li>
+                      <div class="text-banner-warning-text mb-3 text-xs">
+                        {{ t("pipeline.deleteBackfillWarningMessage") }}
+                      </div>
+                      <div class="text-banner-warning-text mb-1 text-sm font-semibold">
+                        {{ t("pipeline.timeAlignmentRequirements") }}
+                      </div>
+                      <ul class="text-banner-warning-text ml-5 list-disc space-y-1 text-xs">
+                        <li>
+                          <strong>{{ t("common.logs") }}</strong>
+                          {{ t("pipeline.logsHourBoundaryNote") }}
+                        </li>
+                        <li>
+                          <strong>{{ t("pipeline.metricsTracesLabel") }}</strong>
+                          {{ t("pipeline.dayBoundaryNote") }}
+                        </li>
                       </ul>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-            </div>
           </div>
-
-          <!-- Estimated Info -->
-          <div
-            v-if="estimatedInfo"
-            class="p-3 rounded-default border bg-banner-info-bg border-banner-info-border"
-          >
-            <div class="text-banner-info-text">
-              <div class="flex items-center gap-2 font-medium mb-1">
-                <OIcon name="schedule" size="sm" />
-                <span>{{ t('pipeline.estimatedProcessingTime') }} {{ estimatedInfo.time }}</span>
-              </div>
-              <div v-if="estimatedInfo.chunks" class="text-xs ml-6">
-                {{ t('pipeline.estimatedChunks') }} {{ estimatedInfo.chunks }}
-              </div>
-            </div>
-          </div>
-
-          <!-- Error Message -->
-          <div v-if="errorMessage" class="text-status-error-text">
-            <OIcon name="error" size="sm" class="mr-2" />
-            {{ errorMessage }}
-          </div>
-          </OForm>
         </div>
 
-        </ODrawer>
+        <!-- Estimated Info -->
+        <div
+          v-if="estimatedInfo"
+          class="rounded-default bg-banner-info-bg border-banner-info-border border p-3"
+        >
+          <div class="text-banner-info-text">
+            <div class="mb-1 flex items-center gap-2 font-medium">
+              <OIcon name="schedule" size="sm" />
+              <span>{{ t("pipeline.estimatedProcessingTime") }} {{ estimatedInfo.time }}</span>
+            </div>
+            <div v-if="estimatedInfo.chunks" class="ml-6 text-xs">
+              {{ t("pipeline.estimatedChunks") }} {{ estimatedInfo.chunks }}
+            </div>
+          </div>
+        </div>
+
+        <!-- Error Message -->
+        <div v-if="errorMessage" class="text-status-error-text">
+          <OIcon name="error" size="sm" class="mr-2" />
+          {{ errorMessage }}
+        </div>
+      </OForm>
+    </div>
+  </ODrawer>
 
   <!-- Confirmation Dialog for Delete Before Backfill -->
-  <ODialog data-test="create-backfill-job-delete-confirmation-dialog" v-model:open="showDeleteConfirmation" persistent size="sm"
+  <ODialog
+    data-test="create-backfill-job-delete-confirmation-dialog"
+    v-model:open="showDeleteConfirmation"
+    persistent
+    size="sm"
     :title="t('pipeline.confirmDataDeletion')"
     :secondary-button-label="t('common.cancel')"
     :primary-button-label="t('pipeline.yesDeleteAndBackfill')"
@@ -204,12 +223,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="confirmDelete"
   >
     <p class="mb-4">
-      {{ t('pipeline.deleteBackfillConfirmMessage') }}
+      {{ t("pipeline.deleteBackfillConfirmMessage") }}
     </p>
-    <p class="font-semibold text-status-error-text">
-      {{ t('pipeline.actionCannotBeUndone') }}
+    <p class="text-status-error-text font-semibold">
+      {{ t("pipeline.actionCannotBeUndone") }}
     </p>
-    <p class="mt-4">{{ t('pipeline.areYouSureProceed') }}</p>
+    <p class="mt-4">{{ t("pipeline.areYouSureProceed") }}</p>
   </ODialog>
 </template>
 
@@ -265,12 +284,14 @@ const errorMessage = ref("");
 
 // Typed dynamic defaults for the form-owned fields. The time range is an
 // absolute range seeded empty (forces the picker to absolute mode).
-const backfillDefaults = computed((): BackfillForm => ({
-  timerange: { type: "absolute", from: undefined, to: undefined },
-  chunkPeriodMinutes: (props.scheduleFrequency || 60) as number | null,
-  delayBetweenChunks: null,
-  deleteBeforeBackfill: false,
-}));
+const backfillDefaults = computed(
+  (): BackfillForm => ({
+    timerange: { type: "absolute", from: undefined, to: undefined },
+    chunkPeriodMinutes: (props.scheduleFrequency || 60) as number | null,
+    delayBetweenChunks: null,
+    deleteBeforeBackfill: false,
+  }),
+);
 
 // Rule ③ OWNER pattern: this component OWNS <OForm> and needs the live values
 // (timerange/chunk/delay/deleteBeforeBackfill) for estimatedInfo + the delete
@@ -286,19 +307,13 @@ const form = useOForm<BackfillForm>({
 const timerange = form.useStore((s: any) => s.values.timerange);
 const formChunkPeriod = form.useStore((s: any) => s.values.chunkPeriodMinutes);
 const formDelay = form.useStore((s: any) => s.values.delayBetweenChunks);
-const deleteBeforeBackfill = form.useStore(
-  (s: any) => s.values.deleteBeforeBackfill,
-);
+const deleteBeforeBackfill = form.useStore((s: any) => s.values.deleteBeforeBackfill);
 
 // Surface the form-level `timerange` error (OFormDateTimeRange renders none) —
 // a reactive view of the SAME form, no mirror.
-const timerangeErrors = form.useStore(
-  (s: any) => s.fieldMeta?.timerange?.errors ?? [],
-);
+const timerangeErrors = form.useStore((s: any) => s.fieldMeta?.timerange?.errors ?? []);
 const timerangeError = computed(() =>
-  timerangeErrors.value.length
-    ? String(firstFieldError(timerangeErrors.value))
-    : "",
+  timerangeErrors.value.length ? String(firstFieldError(timerangeErrors.value)) : "",
 );
 
 // Calculate estimated processing info
@@ -315,15 +330,11 @@ const estimatedInfo = computed(() => {
 
   const chunk = formChunkPeriod.value;
   const chunkPeriod =
-    chunk === "" || chunk === null || chunk === undefined
-      ? 60
-      : Number(chunk) || 60;
+    chunk === "" || chunk === null || chunk === undefined ? 60 : Number(chunk) || 60;
   const chunks = Math.ceil(diffMinutes / chunkPeriod);
   const delay = formDelay.value;
   const delaySeconds =
-    delay === "" || delay === null || delay === undefined
-      ? 5
-      : Number(delay) || 5;
+    delay === "" || delay === null || delay === undefined ? 5 : Number(delay) || 5;
   const estimatedSeconds = chunks * delaySeconds;
 
   const hours = Math.floor(estimatedSeconds / 3600);
@@ -344,7 +355,7 @@ watch(
   () => props.pipelineId,
   () => {
     resetForm();
-  }
+  },
 );
 
 const resetForm = () => {
@@ -432,9 +443,7 @@ const createBackfillJobRequest = async (value: BackfillForm) => {
   } catch (error: any) {
     console.error("Error creating backfill job:", error);
     errorMessage.value =
-      error?.response?.data?.message ||
-      error?.message ||
-      "Failed to create backfill job";
+      error?.response?.data?.message || error?.message || "Failed to create backfill job";
 
     toast({
       variant: "error",

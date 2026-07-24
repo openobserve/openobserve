@@ -34,41 +34,119 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- depth: small sealed parcel + dotted field -->
     <g>
-      <path d="M168 130 L196 130 L192 150 L172 150 Z" fill="var(--color-surface-subtle)" stroke="var(--color-border-strong)" stroke-width="1.5" stroke-linejoin="round" />
-      <path d="M168 130 L182 134 L196 130" stroke="var(--color-border-default)" stroke-width="1.25" fill="none" />
-      <line x1="182" y1="134" x2="182" y2="150" stroke="var(--color-border-default)" stroke-width="1.25" />
+      <path
+        d="M168 130 L196 130 L192 150 L172 150 Z"
+        fill="var(--color-surface-subtle)"
+        stroke="var(--color-border-strong)"
+        stroke-width="1.5"
+        stroke-linejoin="round"
+      />
+      <path
+        d="M168 130 L182 134 L196 130"
+        stroke="var(--color-border-default)"
+        stroke-width="1.25"
+        fill="none"
+      />
+      <line
+        x1="182"
+        y1="134"
+        x2="182"
+        y2="150"
+        stroke="var(--color-border-default)"
+        stroke-width="1.25"
+      />
     </g>
     <g fill="var(--color-border-default)" opacity="0.5">
-      <circle cx="46" cy="50" r="2" /><circle cx="198" cy="56" r="2" /><circle cx="38" cy="108" r="1.6" /><circle cx="206" cy="100" r="1.6" /><circle cx="58" cy="34" r="1.6" />
+      <circle cx="46" cy="50" r="2" />
+      <circle cx="198" cy="56" r="2" />
+      <circle cx="38" cy="108" r="1.6" />
+      <circle cx="206" cy="100" r="1.6" />
+      <circle cx="58" cy="34" r="1.6" />
     </g>
 
     <!-- drifting fragment above the box — a plain outline, no +/add glyph so it
          can't be mistaken for a button -->
     <g opacity="0.7">
-      <rect x="100" y="34" width="40" height="34" rx="7" fill="none" stroke="var(--color-primary-400)" stroke-width="2" stroke-dasharray="5 5" />
-      <line x1="108" y1="46" x2="132" y2="46" stroke="var(--color-primary-300)" stroke-width="2" stroke-linecap="round" />
-      <line x1="108" y1="54" x2="126" y2="54" stroke="var(--color-primary-300)" stroke-width="2" stroke-linecap="round" />
+      <rect
+        x="100"
+        y="34"
+        width="40"
+        height="34"
+        rx="7"
+        fill="none"
+        stroke="var(--color-primary-400)"
+        stroke-width="2"
+        stroke-dasharray="5 5"
+      />
+      <line
+        x1="108"
+        y1="46"
+        x2="132"
+        y2="46"
+        stroke="var(--color-primary-300)"
+        stroke-width="2"
+        stroke-linecap="round"
+      />
+      <line
+        x1="108"
+        y1="54"
+        x2="126"
+        y2="54"
+        stroke="var(--color-primary-300)"
+        stroke-width="2"
+        stroke-linecap="round"
+      />
     </g>
 
     <!-- open box -->
     <g>
       <!-- back flaps -->
-      <path d="M86 92 L120 100 L96 80 L70 86 Z" fill="var(--color-surface-subtle)" stroke="var(--color-border-strong)" stroke-width="1.75" stroke-linejoin="round" />
-      <path d="M154 92 L120 100 L144 80 L170 86 Z" fill="var(--color-surface-subtle)" stroke="var(--color-border-strong)" stroke-width="1.75" stroke-linejoin="round" />
+      <path
+        d="M86 92 L120 100 L96 80 L70 86 Z"
+        fill="var(--color-surface-subtle)"
+        stroke="var(--color-border-strong)"
+        stroke-width="1.75"
+        stroke-linejoin="round"
+      />
+      <path
+        d="M154 92 L120 100 L144 80 L170 86 Z"
+        fill="var(--color-surface-subtle)"
+        stroke="var(--color-border-strong)"
+        stroke-width="1.75"
+        stroke-linejoin="round"
+      />
       <!-- box body -->
-      <path d="M84 96 L156 96 L148 146 L92 146 Z" fill="var(--color-surface-base)" stroke="var(--color-border-strong)" stroke-width="2" stroke-linejoin="round" />
+      <path
+        d="M84 96 L156 96 L148 146 L92 146 Z"
+        fill="var(--color-surface-base)"
+        stroke="var(--color-border-strong)"
+        stroke-width="2"
+        stroke-linejoin="round"
+      />
       <!-- opening (empty inside) -->
-      <path d="M84 96 L120 104 L156 96 L120 90 Z" fill="var(--color-surface-subtle)" stroke="var(--color-border-strong)" stroke-width="2" stroke-linejoin="round" />
+      <path
+        d="M84 96 L120 104 L156 96 L120 90 Z"
+        fill="var(--color-surface-subtle)"
+        stroke="var(--color-border-strong)"
+        stroke-width="2"
+        stroke-linejoin="round"
+      />
       <!-- front fold line -->
       <path d="M120 104 L120 146" stroke="var(--color-border-default)" stroke-width="1.25" />
     </g>
 
     <!-- sparkles -->
     <g class="es-spark es-spark-a" transform="translate(168 60)">
-      <path d="M0 -6 L1.4 -1.4 L6 0 L1.4 1.4 L0 6 L-1.4 1.4 L-6 0 L-1.4 -1.4 Z" fill="var(--color-primary-400)" />
+      <path
+        d="M0 -6 L1.4 -1.4 L6 0 L1.4 1.4 L0 6 L-1.4 1.4 L-6 0 L-1.4 -1.4 Z"
+        fill="var(--color-primary-400)"
+      />
     </g>
     <g class="es-spark es-spark-b" transform="translate(64 70)">
-      <path d="M0 -5 L1.2 -1.2 L5 0 L1.2 1.2 L0 5 L-1.2 1.2 L-5 0 L-1.2 -1.2 Z" fill="var(--color-primary-300)" />
+      <path
+        d="M0 -5 L1.2 -1.2 L5 0 L1.2 1.2 L0 5 L-1.2 1.2 L-5 0 L-1.2 -1.2 Z"
+        fill="var(--color-primary-300)"
+      />
     </g>
   </svg>
 </template>
@@ -78,10 +156,7 @@ import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
 
-withDefaults(
-  defineProps<{ width?: number; animated?: boolean }>(),
-  { width: 260, animated: true },
-);
+withDefaults(defineProps<{ width?: number; animated?: boolean }>(), { width: 260, animated: true });
 </script>
 
 <style scoped>

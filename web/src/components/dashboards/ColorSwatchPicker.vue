@@ -19,17 +19,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- None — checkerboard tint with a diagonal strike -->
     <button
       type="button"
-      class="relative inline-flex h-5 w-5 cursor-pointer items-center justify-center rounded-default border border-border-default p-0 transition-[transform,box-shadow,border-color] duration-100 hover:scale-[1.12] bg-[repeating-linear-gradient(45deg,color-mix(in_srgb,var(--color-grey-500)_12%,transparent),color-mix(in_srgb,var(--color-grey-500)_12%,transparent)_2px,transparent_2px,transparent_6px)]"
-      :class="!modelValue ? 'border-accent ring-2 ring-focus-ring' : ''"
+      class="rounded-default border-border-default relative inline-flex h-5 w-5 cursor-pointer items-center justify-center border bg-[repeating-linear-gradient(45deg,color-mix(in_srgb,var(--color-grey-500)_12%,transparent),color-mix(in_srgb,var(--color-grey-500)_12%,transparent)_2px,transparent_2px,transparent_6px)] p-0 transition-[transform,box-shadow,border-color] duration-100 hover:scale-[1.12]"
+      :class="!modelValue ? 'border-accent ring-focus-ring ring-2' : ''"
       :title="t('dashboard.colorNone')"
       :aria-label="t('dashboard.colorNone')"
       :aria-pressed="!modelValue"
       :data-test="dataTest ? `${dataTest}-none` : undefined"
       @click.stop="select(null)"
     >
-      <span
-        class="absolute inset-x-px top-1/2 h-px origin-center -rotate-45 bg-status-negative"
-      />
+      <span class="bg-status-negative absolute inset-x-px top-1/2 h-px origin-center -rotate-45" />
     </button>
 
     <!-- Curated swatches -->
@@ -37,8 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-for="c in swatches"
       :key="c"
       type="button"
-      class="relative inline-flex h-5 w-5 cursor-pointer items-center justify-center rounded-default border border-border-default p-0 transition-[transform,box-shadow,border-color] duration-100 hover:scale-[1.12]"
-      :class="isActive(c) ? 'border-accent ring-2 ring-focus-ring' : ''"
+      class="rounded-default border-border-default relative inline-flex h-5 w-5 cursor-pointer items-center justify-center border p-0 transition-[transform,box-shadow,border-color] duration-100 hover:scale-[1.12]"
+      :class="isActive(c) ? 'border-accent ring-focus-ring ring-2' : ''"
       :style="{ background: c }"
       :title="c"
       :aria-label="c"
@@ -55,17 +53,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Custom (native color input) — rainbow wheel until a colour is chosen -->
     <label
-      class="relative inline-flex h-5 w-5 cursor-pointer items-center justify-center rounded-default border border-border-default p-0 transition-[transform,box-shadow,border-color] duration-100 hover:scale-[1.12] bg-[conic-gradient(from_0deg,var(--color-error-500),var(--color-warning-400),var(--color-success-500),var(--color-blue-500),var(--color-purple-500),var(--color-error-500))]"
-      :class="isCustomActive ? 'border-accent ring-2 ring-focus-ring' : ''"
+      class="rounded-default border-border-default relative inline-flex h-5 w-5 cursor-pointer items-center justify-center border bg-[conic-gradient(from_0deg,var(--color-error-500),var(--color-warning-400),var(--color-success-500),var(--color-blue-500),var(--color-purple-500),var(--color-error-500))] p-0 transition-[transform,box-shadow,border-color] duration-100 hover:scale-[1.12]"
+      :class="isCustomActive ? 'border-accent ring-focus-ring ring-2' : ''"
       :style="customStyle"
       :title="t('dashboard.customColor')"
     >
-      <OIcon
-        v-if="!isCustomActive"
-        name="colorize"
-        size="xs"
-        class="opacity-70"
-      />
+      <OIcon v-if="!isCustomActive" name="colorize" size="xs" class="opacity-70" />
       <OIcon
         v-else
         name="check"
@@ -110,17 +103,13 @@ export default defineComponent({
     const isActive = (c: string) => normalized.value === c.toLowerCase();
 
     const isCustomActive = computed(
-      () =>
-        !!props.modelValue &&
-        !props.swatches.some((s) => s.toLowerCase() === normalized.value),
+      () => !!props.modelValue && !props.swatches.some((s) => s.toLowerCase() === normalized.value),
     );
 
     const select = (c: string | null) => emit("update:modelValue", c);
 
     const customStyle = computed<CSSProperties>(() =>
-      isCustomActive.value && props.modelValue
-        ? { background: props.modelValue }
-        : {},
+      isCustomActive.value && props.modelValue ? { background: props.modelValue } : {},
     );
 
     return {
@@ -135,4 +124,3 @@ export default defineComponent({
   },
 });
 </script>
-

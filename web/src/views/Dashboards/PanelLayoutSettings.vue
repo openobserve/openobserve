@@ -15,7 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog data-test="panel-layout-settings-drawer"
+  <ODialog
+    data-test="panel-layout-settings-drawer"
     :open="open"
     size="sm"
     :title="t('panel.layout')"
@@ -25,40 +26,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="$emit('update:open', $event)"
     @click:secondary="$emit('update:open', false)"
   >
-    <div
-    data-test="panel-layout-settings-content"
-    class="p-0 [min-height:inherit]"
-   
-    >
-    <div>
-      <div
-        data-test="panel-layout-settings-height"
-        class="o2-input"
-      >
-        <OForm id="panel-layout-settings-form" :form="form">
-          <OFormInput class="min-w-55"
-            name="h"
-            :label="t('dashboard.panelHeight')"
-            required
-            type="number"
-            data-test="panel-layout-settings-height-input"
-          />
-        </OForm>
+    <div data-test="panel-layout-settings-content" class="[min-height:inherit] p-0">
+      <div>
+        <div data-test="panel-layout-settings-height" class="o2-input">
+          <OForm id="panel-layout-settings-form" :form="form">
+            <OFormInput
+              class="min-w-55"
+              name="h"
+              :label="t('dashboard.panelHeight')"
+              required
+              type="number"
+              data-test="panel-layout-settings-height-input"
+            />
+          </OForm>
 
-        <div class="text-xs flex items-center gap-1 mt-1">
-          <span class="whitespace-nowrap">{{ t('dashboard.approximately') }} <strong>{{ getRowCount }}</strong> {{ t('dashboard.tableRowsWillBeDisplayed') }}</span>
-          <OIcon
-            name="info-outline"
-            class="cursor-pointer shrink-0"
-            size="xs"
-          />
+          <div class="mt-1 flex items-center gap-1 text-xs">
+            <span class="whitespace-nowrap"
+              >{{ t("dashboard.approximately") }} <strong>{{ getRowCount }}</strong>
+              {{ t("dashboard.tableRowsWillBeDisplayed") }}</span
+            >
+            <OIcon name="info-outline" class="shrink-0 cursor-pointer" size="xs" />
             <OTooltip :content="t('dashboard.unitPixelHint')" />
+          </div>
         </div>
-
-
       </div>
     </div>
-  </div>
   </ODialog>
 </template>
 
@@ -80,9 +72,7 @@ import {
 } from "./PanelLayoutSettings.schema";
 export default defineComponent({
   name: "PanelLayoutSettings",
-  components: { ODialog, OForm, OFormInput, OTooltip,
-    OIcon,
-},
+  components: { ODialog, OForm, OFormInput, OTooltip, OIcon },
   props: {
     layout: {
       type: Object,

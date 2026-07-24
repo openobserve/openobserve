@@ -37,6 +37,7 @@ pub async fn delete_stream(
         stream_type,
         del_related_feature_resources,
         cleanup_related_resources,
+        cleanup_enrichment_table_resources,
     )
     .await
 }
@@ -94,4 +95,17 @@ async fn cleanup_related_resources(
     }
 
     Ok(())
+}
+
+async fn cleanup_enrichment_table_resources(
+    org_id: String,
+    stream_name: String,
+    stream_type: StreamType,
+) {
+    enrichment_data::enrichment_table::cleanup_enrichment_table_resources(
+        &org_id,
+        &stream_name,
+        stream_type,
+    )
+    .await;
 }

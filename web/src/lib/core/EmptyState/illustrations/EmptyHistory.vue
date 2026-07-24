@@ -32,23 +32,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <circle cx="120" cy="88" r="58" fill="var(--color-primary-500)" opacity="0.05" />
     <ellipse cx="120" cy="152" rx="52" ry="8" fill="var(--color-primary-900)" opacity="0.1" />
     <g fill="var(--color-border-default)" opacity="0.5">
-      <circle cx="34" cy="52" r="2" /><circle cx="206" cy="118" r="2" /><circle cx="202" cy="48" r="1.6" />
+      <circle cx="34" cy="52" r="2" />
+      <circle cx="206" cy="118" r="2" />
+      <circle cx="202" cy="48" r="1.6" />
     </g>
 
     <!-- rewind arrow around the clock -->
     <g class="es-rewind">
-      <path d="M150 46 A48 48 0 1 1 120 40" stroke="var(--color-primary-400)" stroke-width="2.5" fill="none" stroke-linecap="round" />
+      <path
+        d="M150 46 A48 48 0 1 1 120 40"
+        stroke="var(--color-primary-400)"
+        stroke-width="2.5"
+        fill="none"
+        stroke-linecap="round"
+      />
       <path d="M120 40 l9 -5 -1 11 z" fill="var(--color-primary-500)" />
     </g>
 
     <!-- clock face -->
-    <circle cx="120" cy="88" r="36" fill="var(--color-surface-base)" stroke="var(--color-border-strong)" stroke-width="2.5" />
+    <circle
+      cx="120"
+      cy="88"
+      r="36"
+      fill="var(--color-surface-base)"
+      stroke="var(--color-border-strong)"
+      stroke-width="2.5"
+    />
     <g stroke="var(--color-border-strong)" stroke-width="2" stroke-linecap="round" opacity="0.6">
-      <line x1="120" y1="58" x2="120" y2="63" /><line x1="150" y1="88" x2="145" y2="88" /><line x1="120" y1="118" x2="120" y2="113" /><line x1="90" y1="88" x2="95" y2="88" />
+      <line x1="120" y1="58" x2="120" y2="63" />
+      <line x1="150" y1="88" x2="145" y2="88" />
+      <line x1="120" y1="118" x2="120" y2="113" />
+      <line x1="90" y1="88" x2="95" y2="88" />
     </g>
     <!-- hands -->
-    <line x1="120" y1="88" x2="120" y2="70" stroke="var(--color-text-heading)" stroke-width="3" stroke-linecap="round" opacity="0.75" />
-    <line class="es-hand" x1="120" y1="88" x2="138" y2="88" stroke="var(--color-primary-600)" stroke-width="2.5" stroke-linecap="round" />
+    <line
+      x1="120"
+      y1="88"
+      x2="120"
+      y2="70"
+      stroke="var(--color-text-heading)"
+      stroke-width="3"
+      stroke-linecap="round"
+      opacity="0.75"
+    />
+    <line
+      class="es-hand"
+      x1="120"
+      y1="88"
+      x2="138"
+      y2="88"
+      stroke="var(--color-primary-600)"
+      stroke-width="2.5"
+      stroke-linecap="round"
+    />
     <circle cx="120" cy="88" r="3.5" fill="var(--color-primary-600)" />
   </svg>
 </template>
@@ -58,10 +94,7 @@ import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
 
-withDefaults(
-  defineProps<{ width?: number; animated?: boolean }>(),
-  { width: 260, animated: true },
-);
+withDefaults(defineProps<{ width?: number; animated?: boolean }>(), { width: 260, animated: true });
 </script>
 
 <style scoped>

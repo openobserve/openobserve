@@ -34,14 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :aria-label="t('emptyState.illustrations.noMatchingResults')"
   >
     <!-- soft brand glow -->
-    <ellipse
-      cx="104"
-      cy="82"
-      rx="90"
-      ry="56"
-      fill="var(--color-primary-500)"
-      opacity="0.06"
-    />
+    <ellipse cx="104" cy="82" rx="90" ry="56" fill="var(--color-primary-500)" opacity="0.06" />
 
     <!-- result card -->
     <rect
@@ -56,23 +49,83 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- applied-filter chip + floating accents -->
-    <rect x="60" y="22" width="44" height="10" rx="5" fill="var(--color-surface-subtle)" stroke="var(--color-border-default)" stroke-width="1" />
+    <rect
+      x="60"
+      y="22"
+      width="44"
+      height="10"
+      rx="5"
+      fill="var(--color-surface-subtle)"
+      stroke="var(--color-border-default)"
+      stroke-width="1"
+    />
     <circle cx="68" cy="27" r="2" fill="var(--color-primary-400)" />
     <g fill="var(--color-border-default)" opacity="0.55">
-      <circle cx="24" cy="40" r="2" /><circle cx="186" cy="116" r="2" /><circle cx="28" cy="112" r="1.5" /><circle cx="182" cy="44" r="1.5" />
+      <circle cx="24" cy="40" r="2" />
+      <circle cx="186" cy="116" r="2" />
+      <circle cx="28" cy="112" r="1.5" />
+      <circle cx="182" cy="44" r="1.5" />
     </g>
 
     <!-- result rows: each fades out then back on a slow loop, as if the matches
          keep slipping away. Staggered so the list reads as "emptying". -->
     <g>
-      <rect x="60" y="52" width="88" height="8" rx="4" fill="var(--color-border-strong)" opacity="0.55">
-        <animate v-if="animated" attributeName="opacity" values="0.55;0.12;0.55" keyTimes="0;0.5;1" dur="3.2s" repeatCount="indefinite" begin="0s" />
+      <rect
+        x="60"
+        y="52"
+        width="88"
+        height="8"
+        rx="4"
+        fill="var(--color-border-strong)"
+        opacity="0.55"
+      >
+        <animate
+          v-if="animated"
+          attributeName="opacity"
+          values="0.55;0.12;0.55"
+          keyTimes="0;0.5;1"
+          dur="3.2s"
+          repeatCount="indefinite"
+          begin="0s"
+        />
       </rect>
-      <rect x="60" y="70" width="66" height="8" rx="4" fill="var(--color-border-strong)" opacity="0.4">
-        <animate v-if="animated" attributeName="opacity" values="0.4;0.1;0.4" keyTimes="0;0.5;1" dur="3.2s" repeatCount="indefinite" begin="0.3s" />
+      <rect
+        x="60"
+        y="70"
+        width="66"
+        height="8"
+        rx="4"
+        fill="var(--color-border-strong)"
+        opacity="0.4"
+      >
+        <animate
+          v-if="animated"
+          attributeName="opacity"
+          values="0.4;0.1;0.4"
+          keyTimes="0;0.5;1"
+          dur="3.2s"
+          repeatCount="indefinite"
+          begin="0.3s"
+        />
       </rect>
-      <rect x="60" y="88" width="78" height="8" rx="4" fill="var(--color-border-strong)" opacity="0.3">
-        <animate v-if="animated" attributeName="opacity" values="0.3;0.08;0.3" keyTimes="0;0.5;1" dur="3.2s" repeatCount="indefinite" begin="0.6s" />
+      <rect
+        x="60"
+        y="88"
+        width="78"
+        height="8"
+        rx="4"
+        fill="var(--color-border-strong)"
+        opacity="0.3"
+      >
+        <animate
+          v-if="animated"
+          attributeName="opacity"
+          values="0.3;0.08;0.3"
+          keyTimes="0;0.5;1"
+          dur="3.2s"
+          repeatCount="indefinite"
+          begin="0.6s"
+        />
       </rect>
     </g>
 
@@ -101,7 +154,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <!-- a small empty "·" inside the lens to reinforce "nothing found" -->
       <circle cx="132" cy="70" r="3" fill="var(--color-primary-400)">
-        <animate v-if="animated" attributeName="opacity" values="1;0.3;1" keyTimes="0;0.5;1" dur="2.4s" repeatCount="indefinite" />
+        <animate
+          v-if="animated"
+          attributeName="opacity"
+          values="1;0.3;1"
+          keyTimes="0;0.5;1"
+          dur="2.4s"
+          repeatCount="indefinite"
+        />
       </circle>
       <!-- handle -->
       <line

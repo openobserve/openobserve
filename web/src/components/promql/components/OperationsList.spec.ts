@@ -20,7 +20,6 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { PromqlStepId } from "@/components/promql/types";
 
-
 // ── Stubs ────────────────────────────────────────────────────────────────────
 
 const oDialogStub = {
@@ -122,16 +121,12 @@ describe("OperationsList", () => {
 
     it("should display layout name", () => {
       wrapper = createWrapper();
-      expect(
-        wrapper.find('[data-test="promql-operations-list-label"]').text(),
-      ).toBe("Operations");
+      expect(wrapper.find('[data-test="promql-operations-list-label"]').text()).toBe("Operations");
     });
 
     it("should render operation items", () => {
       wrapper = createWrapper();
-      const operations = wrapper.findAll(
-        '[data-test="promql-operations-item"]',
-      );
+      const operations = wrapper.findAll('[data-test="promql-operations-item"]');
       expect(operations.length).toBe(mockOperations.length);
     });
 
@@ -197,9 +192,7 @@ describe("OperationsList", () => {
       const operations = [...mockOperations];
       wrapper = createWrapper({ operations });
 
-      const removeButton = wrapper.find(
-        '[data-test="promql-operation-remove-0"]',
-      );
+      const removeButton = wrapper.find('[data-test="promql-operation-remove-0"]');
       await removeButton.trigger("click");
 
       // Check that update:operations event was emitted with removed operation
@@ -370,12 +363,8 @@ describe("OperationsList", () => {
 
       wrapper.vm.searchQuery = "rate";
 
-      const filtered = wrapper.vm.getFilteredOperationsForCategory(
-        "Rate & range",
-      );
-      expect(filtered.some((op: any) => op.id === PromqlStepId.Rate)).toBe(
-        true,
-      );
+      const filtered = wrapper.vm.getFilteredOperationsForCategory("Rate & range");
+      expect(filtered.some((op: any) => op.id === PromqlStepId.Rate)).toBe(true);
     });
 
     it("should show all operations when search is empty", () => {
@@ -383,9 +372,7 @@ describe("OperationsList", () => {
 
       wrapper.vm.searchQuery = "";
 
-      const filtered = wrapper.vm.getFilteredOperationsForCategory(
-        "Rate & range",
-      );
+      const filtered = wrapper.vm.getFilteredOperationsForCategory("Rate & range");
       expect(filtered.length).toBeGreaterThan(0);
     });
   });
@@ -436,9 +423,7 @@ describe("OperationsList", () => {
     it("should get operations for specific category", () => {
       wrapper = createWrapper();
 
-      const rangeOps = wrapper.vm.getFilteredOperationsForCategory(
-        "Rate & range",
-      );
+      const rangeOps = wrapper.vm.getFilteredOperationsForCategory("Rate & range");
       expect(rangeOps.length).toBeGreaterThan(0);
     });
   });
@@ -447,12 +432,7 @@ describe("OperationsList", () => {
     it("should access available labels from dashboard data", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.vm.availableLabels).toEqual([
-        "method",
-        "status",
-        "path",
-        "host",
-      ]);
+      expect(wrapper.vm.availableLabels).toEqual(["method", "status", "path", "host"]);
     });
 
     it("should handle empty available labels", () => {
@@ -515,15 +495,9 @@ describe("OperationsList", () => {
     it("should have proper data-test attributes", () => {
       wrapper = createWrapper();
 
-      expect(
-        wrapper.find('[data-test="promql-add-operation"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="promql-operation-0"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="promql-operation-remove-0"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="promql-add-operation"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="promql-operation-0"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="promql-operation-remove-0"]').exists()).toBe(true);
     });
 
     it("should have tooltips", () => {
@@ -539,9 +513,7 @@ describe("OperationsList", () => {
 
       const dragHandle = wrapper.find(".drag-handle");
       // QTooltip was replaced by OTooltip in the migration.
-      expect(dragHandle.findComponent({ name: "OTooltip" }).exists()).toBe(
-        true,
-      );
+      expect(dragHandle.findComponent({ name: "OTooltip" }).exists()).toBe(true);
     });
   });
 });

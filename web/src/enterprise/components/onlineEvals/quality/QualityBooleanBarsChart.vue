@@ -1,5 +1,5 @@
 <template>
-  <div ref="chartEl" class="w-full h-full min-h-30" data-test="quality-boolean-bars-chart" />
+  <div ref="chartEl" class="h-full min-h-30 w-full" data-test="quality-boolean-bars-chart" />
 </template>
 
 <script setup lang="ts">

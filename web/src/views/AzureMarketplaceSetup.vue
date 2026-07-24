@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="azure-marketplace-setup min-h-screen bg-surface-base">
-    <div class="flex relative-position px-3 pt-2">
+  <div class="azure-marketplace-setup bg-surface-base min-h-screen">
+    <div class="relative-position flex px-3 pt-2">
       <img
         data-test="azure-marketplace-setup-logo"
         class="h-10"
@@ -29,49 +29,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <div class="max-w-125 mx-auto pt-15 p-6">
+    <div class="mx-auto max-w-125 p-6 pt-15">
       <!-- No Token Error -->
       <div v-if="state === 'no_token'" class="text-center">
-        <OIcon name="warning" style="width: 80px; height: 80px;" />
-        <h5 class="mt-3">{{ t('billing.azureMarketplace.noTokenFound') }}</h5>
+        <OIcon name="warning" style="width: 80px; height: 80px" />
+        <h5 class="mt-3">{{ t("billing.azureMarketplace.noTokenFound") }}</h5>
         <p class="text-text-secondary">
-          {{ t('billing.azureMarketplace.noTokenDescription') }}
+          {{ t("billing.azureMarketplace.noTokenDescription") }}
         </p>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          class="mt-4"
-          @click="goToDashboard"
-        >{{ t('billing.azureMarketplace.goToDashboard') }}</OButton>
+        <OButton variant="primary" size="sm-action" class="mt-4" @click="goToDashboard">{{
+          t("billing.azureMarketplace.goToDashboard")
+        }}</OButton>
       </div>
 
       <!-- Error State -->
       <div v-else-if="state === 'error'" class="text-center">
-        <OIcon name="error" style="width: 80px; height: 80px;" />
+        <OIcon name="error" style="width: 80px; height: 80px" />
         <h5 class="mt-3">{{ errorMessage }}</h5>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          class="mt-4"
-          @click="resetAndRetry"
-        >{{ t('billing.azureMarketplace.tryAgain') }}</OButton>
+        <OButton variant="primary" size="sm-action" class="mt-4" @click="resetAndRetry">{{
+          t("billing.azureMarketplace.tryAgain")
+        }}</OButton>
       </div>
 
       <!-- Org Selection/Creation -->
       <div v-else-if="state === 'select_org'" class="text-center">
-        <OIcon name="cloud" style="width: 60px; height: 60px;" />
-        <h4 class="mt-3">{{ t('billing.azureMarketplace.completeSetup') }}</h4>
+        <OIcon name="cloud" style="width: 60px; height: 60px" />
+        <h4 class="mt-3">{{ t("billing.azureMarketplace.completeSetup") }}</h4>
         <p class="text-text-secondary mb-4">
-          {{ t('billing.azureMarketplace.linkSubscriptionDescription') }}
+          {{ t("billing.azureMarketplace.linkSubscriptionDescription") }}
         </p>
 
-        <div class="max-w-100 mx-auto">
+        <div class="mx-auto max-w-100">
           <!-- Create New Org -->
-          <OCard class="rounded-default transition-all duration-200 hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)] mb-4">
+          <OCard
+            class="rounded-default mb-4 transition-all duration-200 hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)]"
+          >
             <OCardSection role="body">
-              <div class="text-xl font-semibold">{{ t('billing.azureMarketplace.createNewOrg') }}</div>
+              <div class="text-xl font-semibold">
+                {{ t("billing.azureMarketplace.createNewOrg") }}
+              </div>
               <p class="text-text-secondary">
-                {{ t('billing.azureMarketplace.createNewOrgDescription') }}
+                {{ t("billing.azureMarketplace.createNewOrgDescription") }}
               </p>
               <OForm
                 id="azure-create-org-form"
@@ -94,7 +92,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="sm-action"
                   block
                   :loading="isSubmitting"
-                >{{ t('billing.azureMarketplace.createAndLink') }}</OButton>
+                  >{{ t("billing.azureMarketplace.createAndLink") }}</OButton
+                >
               </OForm>
             </OCardSection>
           </OCard>
@@ -105,9 +104,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="rounded-default transition-all duration-200 hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)]"
           >
             <OCardSection role="body">
-              <div class="text-xl font-semibold">{{ t('billing.azureMarketplace.linkToExisting') }}</div>
+              <div class="text-xl font-semibold">
+                {{ t("billing.azureMarketplace.linkToExisting") }}
+              </div>
               <p class="text-text-secondary">
-                {{ t('billing.azureMarketplace.linkBillingDescription') }}
+                {{ t("billing.azureMarketplace.linkBillingDescription") }}
               </p>
               <OForm
                 id="azure-link-org-form"
@@ -132,7 +133,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="sm-action"
                   block
                   :loading="isSubmitting"
-                >{{ t('billing.azureMarketplace.linkAzureBilling') }}</OButton>
+                  >{{ t("billing.azureMarketplace.linkAzureBilling") }}</OButton
+                >
               </OForm>
             </OCardSection>
           </OCard>
@@ -142,32 +144,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Processing State -->
       <div v-else-if="state === 'processing'" class="text-center">
         <OSpinner variant="dots" size="xl" />
-        <h5 class="mt-3">{{ t('billing.azureMarketplace.settingUp') }}</h5>
-        <p class="text-text-secondary">{{ t('billing.azureMarketplace.pleaseWait') }}</p>
+        <h5 class="mt-3">{{ t("billing.azureMarketplace.settingUp") }}</h5>
+        <p class="text-text-secondary">{{ t("billing.azureMarketplace.pleaseWait") }}</p>
       </div>
-
 
       <!-- Success State -->
       <div v-else-if="state === 'success'" class="text-center">
-        <OIcon name="check-circle" style="width: 80px; height: 80px;" />
-        <h4 class="mt-3">{{ t('billing.azureMarketplace.subscriptionActivated') }}</h4>
+        <OIcon name="check-circle" style="width: 80px; height: 80px" />
+        <h4 class="mt-3">{{ t("billing.azureMarketplace.subscriptionActivated") }}</h4>
         <p class="text-text-secondary">
-          {{ t('billing.azureMarketplace.activatedDescription') }}
+          {{ t("billing.azureMarketplace.activatedDescription") }}
         </p>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          class="mt-4"
-          @click="goToDashboard"
-        >{{ t('billing.azureMarketplace.goToDashboard') }}</OButton>
+        <OButton variant="primary" size="sm-action" class="mt-4" @click="goToDashboard">{{
+          t("billing.azureMarketplace.goToDashboard")
+        }}</OButton>
       </div>
 
       <!-- Payment Failed State -->
       <div v-else-if="state === 'payment_failed'" class="text-center">
-        <OIcon name="error" style="width: 80px; height: 80px;" />
-        <h5 class="mt-3">{{ t('billing.azureMarketplace.paymentFailed') }}</h5>
+        <OIcon name="error" style="width: 80px; height: 80px" />
+        <h5 class="mt-3">{{ t("billing.azureMarketplace.paymentFailed") }}</h5>
         <p class="text-text-secondary">
-          {{ t('billing.azureMarketplace.paymentFailedDescription') }}
+          {{ t("billing.azureMarketplace.paymentFailedDescription") }}
         </p>
         <OButton
           as="a"
@@ -175,7 +173,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="primary"
           size="sm-action"
           class="mt-4"
-        >{{ t('billing.azureMarketplace.contactSupport') }}</OButton>
+          >{{ t("billing.azureMarketplace.contactSupport") }}</OButton
+        >
       </div>
     </div>
   </div>
@@ -209,19 +208,11 @@ import {
 // NOTE: the old `toast` import was removed — the empty-selection guard is now
 // schema-driven (z.string().min(1)), not an imperative toast.
 
-type SetupState =
-  | "select_org"
-  | "no_token"
-  | "processing"
-  | "success"
-  | "payment_failed"
-  | "error";
+type SetupState = "select_org" | "no_token" | "processing" | "success" | "payment_failed" | "error";
 
 export default defineComponent({
   name: "AzureMarketplaceSetup",
-  components: { OButton, OSpinner, OForm, OFormInput, OFormSelect,
-    OIcon, OCard, OCardSection,
-},
+  components: { OButton, OSpinner, OForm, OFormInput, OFormSelect, OIcon, OCard, OCardSection },
   setup() {
     const store = useStore();
     const { isDark } = useTheme();
@@ -234,9 +225,7 @@ export default defineComponent({
 
     const state = ref<SetupState>("select_org");
     const errorMessage = ref("");
-    const eligibleOrganizations = ref<{ identifier: string; name: string }[]>(
-      []
-    );
+    const eligibleOrganizations = ref<{ identifier: string; name: string }[]>([]);
     const token = ref("");
     const activatedOrgId = ref("");
 
@@ -285,8 +274,7 @@ export default defineComponent({
       } catch (error: any) {
         console.error("Failed to create organization:", error);
         state.value = "error";
-        errorMessage.value =
-          error.response?.data?.message || "Failed to create organization";
+        errorMessage.value = error.response?.data?.message || "Failed to create organization";
       }
     };
 
@@ -294,18 +282,13 @@ export default defineComponent({
     const linkToExistingOrg = async (value: AzureLinkOrgForm) => {
       state.value = "processing";
 
-      const org = eligibleOrganizations.value.find(
-        (o) => o.identifier === value.selectedOrg,
-      );
+      const org = eligibleOrganizations.value.find((o) => o.identifier === value.selectedOrg);
       await linkSubscription(value.selectedOrg, org?.name ?? value.selectedOrg);
     };
 
     const linkSubscription = async (orgId: string, orgLabel: string) => {
       try {
-        await azureMarketplace.linkSubscription(
-          orgId,
-          token.value
-        );
+        await azureMarketplace.linkSubscription(orgId, token.value);
 
         // Clear the token from sessionStorage
         sessionStorage.removeItem("azure_marketplace_token");
@@ -313,17 +296,16 @@ export default defineComponent({
 
         // Update selected org in store
         const orgData = {
-            identifier: orgId,
-            label: orgLabel || orgId,
-            user_email: store.state.userInfo?.email,
+          identifier: orgId,
+          label: orgLabel || orgId,
+          user_email: store.state.userInfo?.email,
         };
         useLocalOrganization(orgData);
         store.dispatch("setSelectedOrganization", orgData);
       } catch (error: any) {
         console.error("Failed to link subscription:", error);
         state.value = "error";
-        errorMessage.value =
-          error.response?.data?.message || "Failed to link Azure subscription";
+        errorMessage.value = error.response?.data?.message || "Failed to link Azure subscription";
       }
     };
 
@@ -331,9 +313,7 @@ export default defineComponent({
       sessionStorage.removeItem("azure_marketplace_token");
       router.push({
         path: "/",
-        query: activatedOrgId.value
-          ? { org_identifier: activatedOrgId.value }
-          : undefined,
+        query: activatedOrgId.value ? { org_identifier: activatedOrgId.value } : undefined,
       });
     };
 

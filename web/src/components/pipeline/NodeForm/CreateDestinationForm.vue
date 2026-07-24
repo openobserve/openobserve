@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="create-destination-form">
     <OForm
       :form="form"
-      class="w-full pipeline-add-remote-destination-form"
+      class="pipeline-add-remote-destination-form w-full"
       v-slot="{ isSubmitting }"
     >
       <!-- Stepper for Create New Destination.
@@ -28,355 +28,350 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            footer below stays full-width so its top border lines up with the
            full-width page header (matching the other destination forms). -->
       <div class="w-full max-w-[50vw]">
-      <OStepper
-        v-model="step"
-        ref="stepper"
-        animated
-      >
-        <!-- Step 1: Choose Destination Type -->
-        <OStep
-          :name="1"
-          :title="t('alert_destinations.chooseTypeTitle')"
-          icon="edit"
-          :done="step > 1"
-          :navigable="step > 1"
-        >
-          <div class="text-sm font-medium mb-3">
-            {{ t('alert_destinations.selectDestinationType') }} <span class="text-status-error-text">*</span>
-          </div>
-          <div class="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3 mb-4">
-            <div
-              v-for="destType in destinationTypes"
-              :key="destType.value"
-              :data-test="`destination-type-card-${destType.value}`"
-              class="destination-type-card group relative flex flex-col items-center justify-center py-5 px-3 border-2 rounded-default cursor-pointer [transition:all_0.3s_ease] min-h-30 hover:-translate-y-0.5 hover:border-card-glass-border hover:shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-status-info-text)_15%,transparent)]"
-              :class="destinationType === destType.value
-                ? 'selected border-card-glass-border bg-status-info-bg shadow-[0_0.25rem_1rem_color-mix(in_srgb,var(--color-status-info-text)_20%,transparent)]'
-                : 'border-border-default bg-surface-base'"
-              @click="form.setFieldValue('destination_type', destType.value)"
-            >
-              <img
-                v-if="destType.image"
-                :src="destType.image"
-                :alt="destType.label"
-                class="w-12 h-12 mb-2 object-contain [transition:all_0.3s_ease]"
-              />
-              <OIcon
-                v-else
-                :name="destType.icon"
-                size="lg"
-                class="card-icon mb-2 text-icon-color [transition:color_0.3s_ease] group-[.selected]:text-card-glass-border"
-              />
-              <div class="card-label text-compact font-medium text-center leading-[1.3] mt-1 text-text-body group-[.selected]:text-text-body">{{ destType.label }}</div>
-              <div
-                v-if="destinationType === destType.value"
-                class="absolute top-1.5 right-1.5 w-5 h-5 rounded-full overflow-hidden bg-status-positive text-text-inverse flex items-center justify-center z-1"
-              >
-                <!-- eslint-disable-next-line vue/max-attributes-per-line -->
-                <OIcon name="check" size="xs" />
-              </div>
-            </div>
-          </div>
-        </OStep>
-
-        <!-- Step 2: Connection Details -->
-        <OStep
-          :name="2"
-          :title="t('alert_destinations.connectionStepTitle')"
-          icon="compare-arrows"
-          :done="step > 2"
-          :navigable="step > 2"
-        >
-          <div class="text-sm font-medium mb-4">
-            {{ t('alert_destinations.connectionDetailsTitle') }}
-          </div>
-
-          <div class="flex flex-col gap-4">
-            <!-- Name is the destination's identifier — it can't be changed once
-                 created, so lock it in edit mode. -->
-            <OFormInput
-              data-test="add-destination-name-input"
-              name="name"
-              :label="t('alerts.name')"
-              required
-              :readonly="isEditMode"
-              :disabled="isEditMode"
-              tabindex="0"
-            />
-
-            <OFormInput
-              data-test="add-destination-url-input"
-              name="url"
-              :label="t('alert_destinations.url')"
-              required
-              :help-text="t('alert_destinations.urlHelpText')"
-              tabindex="0"
-            />
-
-            <!-- OpenObserve Organization and Stream fields -->
-            <div
-              v-if="destinationType === 'openobserve'"
-              class="flex gap-4"
-            >
-              <div class="w-1/2">
-                <OFormInput
-                  data-test="add-destination-openobserve-org-input"
-                  name="org"
-                  :label="t('alert_destinations.organizationLabel')"
-                  required
-                  :placeholder="t('alert_destinations.defaultPlaceholder')"
-                  :help-text="t('alert_destinations.organizationHelpText')"
-                  tabindex="0"
-                />
-              </div>
-              <div class="w-1/2">
-                <OFormInput
-                  data-test="add-destination-openobserve-stream-input"
-                  name="stream"
-                  :label="t('alert_destinations.streamNameLabel')"
-                  required
-                  :placeholder="t('alert_destinations.defaultPlaceholder')"
-                  :help-text="t('alert_destinations.streamHelpText')"
-                  tabindex="0"
-                />
-              </div>
-            </div>
-
-            <OFormInput
-              data-test="add-destination-url-endpoint-input"
-              name="url_endpoint"
-              :label="t('alert_destinations.endpointPathLabel')"
-              :required="destinationType !== 'custom'"
-              :disabled="destinationType !== 'custom'"
-              :help-text="t('alert_destinations.endpointPathHelpText')"
-              tabindex="0"
-            />
-            <!-- Method field - only shown for Custom destination type -->
-            <OFormSelect
-              v-if="destinationType === 'custom'"
-              data-test="add-destination-method-select"
-              name="method"
-              :label="t('alert_destinations.method')"
-              required
-              :options="apiMethods"
-              tabindex="0"
-            />
-
-            <!-- Output Format field - disabled for all except Custom -->
-            <OFormSelect
-              data-test="add-destination-output-format-select"
-              name="output_format"
-              :label="t('alert_destinations.output_format')"
-              required
-              :options="outputFormats"
-              labelKey="label"
-              valueKey="value"
-              :disabled="destinationType !== 'custom'"
-              tabindex="0"
-            />
-
-            <!-- ESBulk Index Name field - only shown when output format is esbulk -->
-            <OFormInput
-              v-if="outputFormat === 'esbulk'"
-              data-test="add-destination-esbulk-index-input"
-              name="esbulk_index"
-              :label="t('alert_destinations.esBulkIndexNameLabel')"
-              required
-              :placeholder="t('alert_destinations.esBulkIndexNamePlaceholder')"
-              :help-text="t('alert_destinations.esBulkIndexHelpText')"
-              tabindex="0"
-            />
-
-            <!-- StringSeparated Separator field - only shown when output format is stringseparated -->
-            <OFormInput
-              v-if="outputFormat === 'stringseparated'"
-              data-test="add-destination-separator-input"
-              name="separator"
-              :label="t('alert_destinations.separator')"
-              required
-              :placeholder="t('alert_destinations.separator_placeholder')"
-              :help-text="t('alert_destinations.separator_hint')"
-              tabindex="0"
-            />
-          </div>
-
-          <!-- Destination-specific Metadata Section -->
-          <div v-if="showMetadataFields" class="flex flex-col gap-4 mt-4">
-            <div class="w-full text-sm font-bold text-input-label">
-              {{ t('alert_destinations.metadataConfigurationTitle') }}
-            </div>
-
-            <!-- Splunk Metadata Fields -->
-            <template v-if="destinationType === 'splunk'">
-              <OFormInput
-                data-test="add-destination-metadata-source-input"
-                name="metadata.source"
-                :label="t('alert_destinations.sourceLabel')"
-                :placeholder="t('alert_destinations.sourcePlaceholder')"
-                :help-text="t('alert_destinations.splunkSourceHelpText')"
-                tabindex="0"
-              />
-
-              <OFormInput
-                data-test="add-destination-metadata-sourcetype-input"
-                name="metadata.sourcetype"
-                :label="t('alert_destinations.sourceTypeLabel')"
-                :placeholder="t('alert_destinations.sourceTypePlaceholder')"
-                :help-text="t('alert_destinations.splunkSourceTypeHelpText')"
-                tabindex="0"
-              />
-
-              <OFormInput
-                data-test="add-destination-metadata-hostname-input"
-                name="metadata.hostname"
-                :label="t('alert_destinations.hostnameLabel')"
-                :placeholder="t('alert_destinations.hostnamePlaceholder')"
-                :help-text="t('alert_destinations.splunkHostnameHelpText')"
-                tabindex="0"
-              />
-            </template>
-
-            <!-- Datadog Metadata Fields -->
-            <template v-if="destinationType === 'datadog'">
-              <OFormInput
-                data-test="add-destination-metadata-ddsource-input"
-                name="metadata.ddsource"
-                :label="t('alert_destinations.ddSourceLabel')"
-                required
-                :placeholder="t('alert_destinations.ddSourcePlaceholder')"
-                :help-text="t('alert_destinations.ddSourceHelpText')"
-                tabindex="0"
-              />
-
-              <OFormInput
-                data-test="add-destination-metadata-ddtags-input"
-                name="metadata.ddtags"
-                :label="t('alert_destinations.ddTagsLabel')"
-                required
-                :placeholder="t('alert_destinations.ddTagsPlaceholder')"
-                :help-text="t('alert_destinations.ddTagsHelpText')"
-                tabindex="0"
-              />
-
-              <OFormInput
-                data-test="add-destination-metadata-service-input"
-                name="metadata.service"
-                :label="t('alert_destinations.serviceLabel')"
-                :placeholder="t('alert_destinations.servicePlaceholder')"
-                :help-text="t('alert_destinations.datadogServiceHelpText')"
-                tabindex="0"
-              />
-
-              <OFormInput
-                data-test="add-destination-metadata-hostname-input"
-                name="metadata.hostname"
-                :label="t('alert_destinations.hostnameLabel')"
-                :placeholder="t('alert_destinations.hostnamePlaceholder')"
-                :help-text="t('alert_destinations.datadogHostnameHelpText')"
-                tabindex="0"
-              />
-            </template>
-
-          </div>
-
-          <div class="flex flex-col gap-1 mt-4">
-            <div class="o-input-label text-compact font-medium leading-tight text-input-label-text flex items-center">
-              {{ t('alert_destinations.headers') }}
-            </div>
-            <div class="flex flex-col gap-2">
-            <div
-              v-for="(header, index) in apiHeaders"
-              :key="index"
-              class="flex gap-1"
-            >
-              <div class="w-5/12">
-                <OFormInput
-                  :data-test="`add-destination-header-${header['key']}-key-input`"
-                  :name="`headers[${index}].key`"
-                  :placeholder="t('alert_destinations.api_header')"
-                  tabindex="0"
-                />
-              </div>
-              <div class="w-5/12">
-                <OFormInput
-                  :data-test="`add-destination-header-${header['key']}-value-input`"
-                  :name="`headers[${index}].value`"
-                  :placeholder="t('alert_destinations.api_header_value')"
-                  tabindex="0"
-                />
-              </div>
-              <div class="w-1/6 headers-btns">
-                <OButton
-                  :data-test="`add-destination-header-${header['key']}-delete-btn`"
-                  variant="ghost-destructive"
-                  size="icon-xs-sq"
-                  :title="t('alert_templates.edit')"
-                  @click="deleteApiHeader(index)"
-                  icon-left="delete"
-                />
-                <OButton
-                  data-test="add-destination-add-header-btn"
-                  v-if="index === apiHeaders.length - 1"
-                  variant="ghost"
-                  size="icon-xs-sq"
-                  :title="t('alert_templates.edit')"
-                  @click="addApiHeader()"
-                  icon-left="add"
-                />
-              </div>
-            </div>
-            </div>
-          </div>
-
-          <div class="w-full mt-3 inline-flex">
-            <OFormSwitch
-              data-test="add-destination-skip-tls-verify-toggle"
-              name="skip_tls_verify"
-              :label="t('alert_destinations.skip_tls_verify')"
-            />
-          </div>
-
-          <!-- Connection Notes Card -->
-          <OCard
-            class="connection-notes-card rounded-default border border-banner-info-border mb-6 mt-4 bg-banner-info-bg!"
+        <OStepper v-model="step" ref="stepper" animated>
+          <!-- Step 1: Choose Destination Type -->
+          <OStep
+            :name="1"
+            :title="t('alert_destinations.chooseTypeTitle')"
+            icon="edit"
+            :done="step > 1"
+            :navigable="step > 1"
           >
-            <OCardSection role="body">
-              <div class="flex items-center mb-2">
-                <OIcon
-                  name="info"
-                  size="md"
-                  class="mr-2"
+            <div class="mb-3 text-sm font-medium">
+              {{ t("alert_destinations.selectDestinationType") }}
+              <span class="text-status-error-text">*</span>
+            </div>
+            <div class="mb-4 grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3">
+              <div
+                v-for="destType in destinationTypes"
+                :key="destType.value"
+                :data-test="`destination-type-card-${destType.value}`"
+                class="destination-type-card group rounded-default hover:border-card-glass-border relative flex min-h-30 cursor-pointer flex-col items-center justify-center border-2 px-3 py-5 [transition:all_0.3s_ease] hover:-translate-y-0.5 hover:shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-status-info-text)_15%,transparent)]"
+                :class="
+                  destinationType === destType.value
+                    ? 'selected border-card-glass-border bg-status-info-bg shadow-[0_0.25rem_1rem_color-mix(in_srgb,var(--color-status-info-text)_20%,transparent)]'
+                    : 'border-border-default bg-surface-base'
+                "
+                @click="form.setFieldValue('destination_type', destType.value)"
+              >
+                <img
+                  v-if="destType.image"
+                  :src="destType.image"
+                  :alt="destType.label"
+                  class="mb-2 h-12 w-12 object-contain [transition:all_0.3s_ease]"
                 />
-                <div class="text-sm font-medium">
-                  {{ connectionNotes.title }}
-                </div>
-              </div>
-              <div class="text-sm">
-                <ol class="leading-[1.8] pl-3 mb-0">
-                  <li
-                    v-for="(stepText, index) in connectionNotes.steps"
-                    :key="index"
-                    class="mb-2"
-                  >
-                    {{ stepText }}
-                  </li>
-                </ol>
+                <OIcon
+                  v-else
+                  :name="destType.icon"
+                  size="lg"
+                  class="card-icon text-icon-color group-[.selected]:text-card-glass-border mb-2 [transition:color_0.3s_ease]"
+                />
                 <div
-                  v-if="connectionNotes.example"
-                  class="mt-2 p-2 rounded-default text-compact bg-surface-base"
+                  class="card-label text-compact text-text-body group-[.selected]:text-text-body mt-1 text-center leading-[1.3] font-medium"
                 >
-                  <strong>{{ t('alert_destinations.exampleLabel') }}</strong>
-                  <code class="ml-1 bg-transparent p-0 font-mono text-text-link">{{ connectionNotes.example }}</code>
+                  {{ destType.label }}
+                </div>
+                <div
+                  v-if="destinationType === destType.value"
+                  class="bg-status-positive text-text-inverse absolute top-1.5 right-1.5 z-1 flex h-5 w-5 items-center justify-center overflow-hidden rounded-full"
+                >
+                  <!-- eslint-disable-next-line vue/max-attributes-per-line -->
+                  <OIcon name="check" size="xs" />
                 </div>
               </div>
-            </OCardSection>
-          </OCard>
-        </OStep>
-      </OStepper>
+            </div>
+          </OStep>
+
+          <!-- Step 2: Connection Details -->
+          <OStep
+            :name="2"
+            :title="t('alert_destinations.connectionStepTitle')"
+            icon="compare-arrows"
+            :done="step > 2"
+            :navigable="step > 2"
+          >
+            <div class="mb-4 text-sm font-medium">
+              {{ t("alert_destinations.connectionDetailsTitle") }}
+            </div>
+
+            <div class="flex flex-col gap-4">
+              <!-- Name is the destination's identifier — it can't be changed once
+                 created, so lock it in edit mode. -->
+              <OFormInput
+                data-test="add-destination-name-input"
+                name="name"
+                :label="t('alerts.name')"
+                required
+                :readonly="isEditMode"
+                :disabled="isEditMode"
+                tabindex="0"
+              />
+
+              <OFormInput
+                data-test="add-destination-url-input"
+                name="url"
+                :label="t('alert_destinations.url')"
+                required
+                :help-text="t('alert_destinations.urlHelpText')"
+                tabindex="0"
+              />
+
+              <!-- OpenObserve Organization and Stream fields -->
+              <div v-if="destinationType === 'openobserve'" class="flex gap-4">
+                <div class="w-1/2">
+                  <OFormInput
+                    data-test="add-destination-openobserve-org-input"
+                    name="org"
+                    :label="t('alert_destinations.organizationLabel')"
+                    required
+                    :placeholder="t('alert_destinations.defaultPlaceholder')"
+                    :help-text="t('alert_destinations.organizationHelpText')"
+                    tabindex="0"
+                  />
+                </div>
+                <div class="w-1/2">
+                  <OFormInput
+                    data-test="add-destination-openobserve-stream-input"
+                    name="stream"
+                    :label="t('alert_destinations.streamNameLabel')"
+                    required
+                    :placeholder="t('alert_destinations.defaultPlaceholder')"
+                    :help-text="t('alert_destinations.streamHelpText')"
+                    tabindex="0"
+                  />
+                </div>
+              </div>
+
+              <OFormInput
+                data-test="add-destination-url-endpoint-input"
+                name="url_endpoint"
+                :label="t('alert_destinations.endpointPathLabel')"
+                :required="destinationType !== 'custom'"
+                :disabled="destinationType !== 'custom'"
+                :help-text="t('alert_destinations.endpointPathHelpText')"
+                tabindex="0"
+              />
+              <!-- Method field - only shown for Custom destination type -->
+              <OFormSelect
+                v-if="destinationType === 'custom'"
+                data-test="add-destination-method-select"
+                name="method"
+                :label="t('alert_destinations.method')"
+                required
+                :options="apiMethods"
+                tabindex="0"
+              />
+
+              <!-- Output Format field - disabled for all except Custom -->
+              <OFormSelect
+                data-test="add-destination-output-format-select"
+                name="output_format"
+                :label="t('alert_destinations.output_format')"
+                required
+                :options="outputFormats"
+                labelKey="label"
+                valueKey="value"
+                :disabled="destinationType !== 'custom'"
+                tabindex="0"
+              />
+
+              <!-- ESBulk Index Name field - only shown when output format is esbulk -->
+              <OFormInput
+                v-if="outputFormat === 'esbulk'"
+                data-test="add-destination-esbulk-index-input"
+                name="esbulk_index"
+                :label="t('alert_destinations.esBulkIndexNameLabel')"
+                required
+                :placeholder="t('alert_destinations.esBulkIndexNamePlaceholder')"
+                :help-text="t('alert_destinations.esBulkIndexHelpText')"
+                tabindex="0"
+              />
+
+              <!-- StringSeparated Separator field - only shown when output format is stringseparated -->
+              <OFormInput
+                v-if="outputFormat === 'stringseparated'"
+                data-test="add-destination-separator-input"
+                name="separator"
+                :label="t('alert_destinations.separator')"
+                required
+                :placeholder="t('alert_destinations.separator_placeholder')"
+                :help-text="t('alert_destinations.separator_hint')"
+                tabindex="0"
+              />
+            </div>
+
+            <!-- Destination-specific Metadata Section -->
+            <div v-if="showMetadataFields" class="mt-4 flex flex-col gap-4">
+              <div class="text-input-label w-full text-sm font-bold">
+                {{ t("alert_destinations.metadataConfigurationTitle") }}
+              </div>
+
+              <!-- Splunk Metadata Fields -->
+              <template v-if="destinationType === 'splunk'">
+                <OFormInput
+                  data-test="add-destination-metadata-source-input"
+                  name="metadata.source"
+                  :label="t('alert_destinations.sourceLabel')"
+                  :placeholder="t('alert_destinations.sourcePlaceholder')"
+                  :help-text="t('alert_destinations.splunkSourceHelpText')"
+                  tabindex="0"
+                />
+
+                <OFormInput
+                  data-test="add-destination-metadata-sourcetype-input"
+                  name="metadata.sourcetype"
+                  :label="t('alert_destinations.sourceTypeLabel')"
+                  :placeholder="t('alert_destinations.sourceTypePlaceholder')"
+                  :help-text="t('alert_destinations.splunkSourceTypeHelpText')"
+                  tabindex="0"
+                />
+
+                <OFormInput
+                  data-test="add-destination-metadata-hostname-input"
+                  name="metadata.hostname"
+                  :label="t('alert_destinations.hostnameLabel')"
+                  :placeholder="t('alert_destinations.hostnamePlaceholder')"
+                  :help-text="t('alert_destinations.splunkHostnameHelpText')"
+                  tabindex="0"
+                />
+              </template>
+
+              <!-- Datadog Metadata Fields -->
+              <template v-if="destinationType === 'datadog'">
+                <OFormInput
+                  data-test="add-destination-metadata-ddsource-input"
+                  name="metadata.ddsource"
+                  :label="t('alert_destinations.ddSourceLabel')"
+                  required
+                  :placeholder="t('alert_destinations.ddSourcePlaceholder')"
+                  :help-text="t('alert_destinations.ddSourceHelpText')"
+                  tabindex="0"
+                />
+
+                <OFormInput
+                  data-test="add-destination-metadata-ddtags-input"
+                  name="metadata.ddtags"
+                  :label="t('alert_destinations.ddTagsLabel')"
+                  required
+                  :placeholder="t('alert_destinations.ddTagsPlaceholder')"
+                  :help-text="t('alert_destinations.ddTagsHelpText')"
+                  tabindex="0"
+                />
+
+                <OFormInput
+                  data-test="add-destination-metadata-service-input"
+                  name="metadata.service"
+                  :label="t('alert_destinations.serviceLabel')"
+                  :placeholder="t('alert_destinations.servicePlaceholder')"
+                  :help-text="t('alert_destinations.datadogServiceHelpText')"
+                  tabindex="0"
+                />
+
+                <OFormInput
+                  data-test="add-destination-metadata-hostname-input"
+                  name="metadata.hostname"
+                  :label="t('alert_destinations.hostnameLabel')"
+                  :placeholder="t('alert_destinations.hostnamePlaceholder')"
+                  :help-text="t('alert_destinations.datadogHostnameHelpText')"
+                  tabindex="0"
+                />
+              </template>
+            </div>
+
+            <div class="mt-4 flex flex-col gap-1">
+              <div
+                class="o-input-label text-compact text-input-label-text flex items-center leading-tight font-medium"
+              >
+                {{ t("alert_destinations.headers") }}
+              </div>
+              <div class="flex flex-col gap-2">
+                <div v-for="(header, index) in apiHeaders" :key="index" class="flex gap-1">
+                  <div class="w-5/12">
+                    <OFormInput
+                      :data-test="`add-destination-header-${header['key']}-key-input`"
+                      :name="`headers[${index}].key`"
+                      :placeholder="t('alert_destinations.api_header')"
+                      tabindex="0"
+                    />
+                  </div>
+                  <div class="w-5/12">
+                    <OFormInput
+                      :data-test="`add-destination-header-${header['key']}-value-input`"
+                      :name="`headers[${index}].value`"
+                      :placeholder="t('alert_destinations.api_header_value')"
+                      tabindex="0"
+                    />
+                  </div>
+                  <div class="headers-btns w-1/6">
+                    <OButton
+                      :data-test="`add-destination-header-${header['key']}-delete-btn`"
+                      variant="ghost-destructive"
+                      size="icon-xs-sq"
+                      :title="t('alert_templates.edit')"
+                      @click="deleteApiHeader(index)"
+                      icon-left="delete"
+                    />
+                    <OButton
+                      data-test="add-destination-add-header-btn"
+                      v-if="index === apiHeaders.length - 1"
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      :title="t('alert_templates.edit')"
+                      @click="addApiHeader()"
+                      icon-left="add"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-3 inline-flex w-full">
+              <OFormSwitch
+                data-test="add-destination-skip-tls-verify-toggle"
+                name="skip_tls_verify"
+                :label="t('alert_destinations.skip_tls_verify')"
+              />
+            </div>
+
+            <!-- Connection Notes Card -->
+            <OCard
+              class="connection-notes-card rounded-default border-banner-info-border bg-banner-info-bg! mt-4 mb-6 border"
+            >
+              <OCardSection role="body">
+                <div class="mb-2 flex items-center">
+                  <OIcon name="info" size="md" class="mr-2" />
+                  <div class="text-sm font-medium">
+                    {{ connectionNotes.title }}
+                  </div>
+                </div>
+                <div class="text-sm">
+                  <ol class="mb-0 pl-3 leading-[1.8]">
+                    <li
+                      v-for="(stepText, index) in connectionNotes.steps"
+                      :key="index"
+                      class="mb-2"
+                    >
+                      {{ stepText }}
+                    </li>
+                  </ol>
+                  <div
+                    v-if="connectionNotes.example"
+                    class="rounded-default text-compact bg-surface-base mt-2 p-2"
+                  >
+                    <strong>{{ t("alert_destinations.exampleLabel") }}</strong>
+                    <code class="text-text-link ml-1 bg-transparent p-0 font-mono">{{
+                      connectionNotes.example
+                    }}</code>
+                  </div>
+                </div>
+              </OCardSection>
+            </OCard>
+          </OStep>
+        </OStepper>
       </div>
 
       <!-- Form buttons -->
-      <div class="flex justify-start mb-3 pt-4 border-t border-border-default">
+      <div class="border-border-default mb-3 flex justify-start border-t pt-4">
         <div v-if="step === 1" class="flex gap-2">
           <OButton
             data-test="step1-cancel-btn"
@@ -384,7 +379,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm-action"
             @click="$emit('cancel')"
           >
-            {{ t('alerts.cancel') }}
+            {{ t("alerts.cancel") }}
           </OButton>
           <OButton
             data-test="step1-continue-btn"
@@ -393,7 +388,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="!canProceedStep1"
             @click="nextStep"
           >
-            {{ t('alerts.continue') }}
+            {{ t("alerts.continue") }}
           </OButton>
         </div>
         <div v-if="step > 1" class="flex gap-2">
@@ -404,7 +399,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="isSubmitting"
             @click="prevStep"
           >
-            {{ t('common.back') }}
+            {{ t("common.back") }}
           </OButton>
           <OButton
             data-test="add-destination-cancel-btn"
@@ -413,7 +408,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="isSubmitting"
             @click="$emit('cancel')"
           >
-            {{ t('alerts.cancel') }}
+            {{ t("alerts.cancel") }}
           </OButton>
           <OButton
             data-test="add-destination-submit-btn"
@@ -422,7 +417,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             type="submit"
             :loading="isSubmitting"
           >
-            {{ t('alerts.save') }}
+            {{ t("alerts.save") }}
           </OButton>
         </div>
       </div>
@@ -449,10 +444,7 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import {
-  makeDestinationSchema,
-  type DestinationForm,
-} from "./CreateDestinationForm.schema";
+import { makeDestinationSchema, type DestinationForm } from "./CreateDestinationForm.schema";
 
 // Props
 const props = defineProps<{
@@ -658,9 +650,7 @@ const openobserveStream = form.useStore((s: any) => s.values.stream);
 // `apiHeaders` is a reactive view of the form-owned `headers` array — drives the
 // template v-for + the exposed test surface. Reading via form.useStore tracks
 // every add/remove/edit (a bare `form.state.values` read would NOT re-render).
-const apiHeaders = form.useStore(
-  (s: any) => (s.values.headers ?? []) as HeaderRow[],
-);
+const apiHeaders = form.useStore((s: any) => (s.values.headers ?? []) as HeaderRow[]);
 
 // ── Cross-field side effect: defaulting on a REAL destination_type change ──────
 // Sets method/output_format/esbulk_index/url_endpoint + resets headers. Guard
@@ -748,10 +738,7 @@ const populateFormForEdit = (destination: any) => {
 
   // Handle output_format
   if (destination.output_format) {
-    if (
-      typeof destination.output_format === "object" &&
-      destination.output_format.esbulk
-    ) {
+    if (typeof destination.output_format === "object" && destination.output_format.esbulk) {
       record.output_format = "esbulk";
       record.esbulk_index = destination.output_format.esbulk.index || "default";
       record.separator = "";
@@ -760,8 +747,7 @@ const populateFormForEdit = (destination: any) => {
       destination.output_format.stringseparated
     ) {
       record.output_format = "stringseparated";
-      record.separator =
-        destination.output_format.stringseparated.separator || "";
+      record.separator = destination.output_format.stringseparated.separator || "";
       record.esbulk_index = "";
     } else if (typeof destination.output_format === "string") {
       record.output_format = destination.output_format;
@@ -775,10 +761,8 @@ const populateFormForEdit = (destination: any) => {
   }
 
   // Use destination_type_name from backend, fallback to destination_type or default
-  const destType =
-    destination.destination_type_name || destination.destination_type;
-  record.destination_type =
-    destType && destType.trim() !== "" ? destType : "openobserve";
+  const destType = destination.destination_type_name || destination.destination_type;
+  record.destination_type = destType && destType.trim() !== "" ? destType : "openobserve";
 
   // Split URL into hostname and endpoint for all destination types except custom
   const fullUrl = destination.url || "";
@@ -787,11 +771,7 @@ const populateFormForEdit = (destination: any) => {
       // Add protocol if missing for URL parsing, but only if it looks like a valid URL
       const hasProtocol = fullUrl.includes("://");
       const looksLikeUrl = fullUrl.includes(".") || fullUrl.includes(":");
-      const urlToParse = hasProtocol
-        ? fullUrl
-        : looksLikeUrl
-          ? `https://${fullUrl}`
-          : fullUrl;
+      const urlToParse = hasProtocol ? fullUrl : looksLikeUrl ? `https://${fullUrl}` : fullUrl;
 
       const url = new URL(urlToParse);
       // Base URL is protocol + hostname + port (if any) - always include protocol for consistency
@@ -802,11 +782,7 @@ const populateFormForEdit = (destination: any) => {
       record.url_endpoint = endpoint === "/" ? "" : endpoint;
     } catch (error) {
       // If URL parsing fails, try to split manually
-      console.warn(
-        "Failed to parse URL, attempting manual split:",
-        fullUrl,
-        error,
-      );
+      console.warn("Failed to parse URL, attempting manual split:", fullUrl, error);
       const firstSlashIndex = fullUrl.indexOf("/");
       if (firstSlashIndex > 0) {
         // Split at first slash
@@ -826,12 +802,10 @@ const populateFormForEdit = (destination: any) => {
 
   // Populate headers (form-owned dynamic array-field).
   if (destination.headers && typeof destination.headers === "object") {
-    record.headers = Object.entries(destination.headers).map(
-      ([key, value]) => ({
-        key,
-        value: value as string,
-      }),
-    );
+    record.headers = Object.entries(destination.headers).map(([key, value]) => ({
+      key,
+      value: value as string,
+    }));
   }
 
   // Populate metadata object (form-owned nested fields).
@@ -844,9 +818,7 @@ const populateFormForEdit = (destination: any) => {
   // Extract OpenObserve org and stream from endpoint if it's OpenObserve
   if (record.destination_type === "openobserve" && record.url_endpoint) {
     // Parse endpoint like /api/{org}/{stream}/_json
-    const match = record.url_endpoint.match(
-      /^\/api\/([^/]+)\/([^/]+)\/_json$/,
-    );
+    const match = record.url_endpoint.match(/^\/api\/([^/]+)\/([^/]+)\/_json$/);
     if (match) {
       record.org = match[1] || "default";
       record.stream = match[2] || "default";
@@ -895,11 +867,9 @@ const showMetadataFields = computed(() => {
 // write url_endpoint back onto the form — a single source of truth.
 watch([openobserveOrg, openobserveStream], ([org, stream]) => {
   if (destinationType.value === "openobserve") {
-    form.setFieldValue(
-      "url_endpoint",
-      `/api/${org || "default"}/${stream || "default"}/_json`,
-      { dontUpdateMeta: true },
-    );
+    form.setFieldValue("url_endpoint", `/api/${org || "default"}/${stream || "default"}/_json`, {
+      dontUpdateMeta: true,
+    });
   }
 });
 
@@ -935,16 +905,11 @@ const canProceedStep2 = computed(() => {
 
   if (destinationType.value === "elasticsearch") {
     // Validate esbulk_index is set
-    return !!(
-      outputFormat.value === "esbulk" && formEsbulkIndex.value?.trim()
-    );
+    return !!(outputFormat.value === "esbulk" && formEsbulkIndex.value?.trim());
   }
 
   if (destinationType.value === "datadog") {
-    return !!(
-      formMetadata.value?.ddsource?.trim() &&
-      formMetadata.value?.ddtags?.trim()
-    );
+    return !!(formMetadata.value?.ddsource?.trim() && formMetadata.value?.ddtags?.trim());
   }
 
   // Additional validation for StringSeparated format
@@ -1103,8 +1068,8 @@ const createDestination = (value?: DestinationForm) => {
   const dismiss = toast({
     variant: "loading",
     message: "Please wait...",
-      timeout: 0,
-});
+    timeout: 0,
+  });
   // Headers from the form (form-owned array-field). Only non-empty rows persist.
   const headerRows = (v.headers ?? []) as HeaderRow[];
   const headers: Headers = {};
@@ -1231,9 +1196,13 @@ const deleteApiHeader = (index: number) => {
   form.removeFieldValue("headers", index, { dontUpdateMeta: true });
   // Always keep at least one (blank) row so the add button stays reachable.
   if ((form.state.values.headers ?? []).length === 0) {
-    form.pushFieldValue("headers", { key: "", value: "" }, {
-      dontUpdateMeta: true,
-    });
+    form.pushFieldValue(
+      "headers",
+      { key: "", value: "" },
+      {
+        dontUpdateMeta: true,
+      },
+    );
   }
 };
 

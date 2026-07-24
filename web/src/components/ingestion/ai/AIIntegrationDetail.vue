@@ -70,10 +70,7 @@ const subs = computed<CardSubstitutions>(() => {
 // Rich, stepped setup card for integrations that have it (registry-driven, keyed
 // by content slug — e.g. "anthropic"). Falls back to the markdown card otherwise.
 const richContent = computed(() =>
-  getRichCardContent(
-    integration.value?.contentSlug ?? integration.value?.slug,
-    subs.value,
-  ),
+  getRichCardContent(integration.value?.contentSlug ?? integration.value?.slug, subs.value),
 );
 </script>
 
@@ -87,28 +84,24 @@ const richContent = computed(() =>
       :logo-url="integration.logo"
       :logo-url-dark="integration.logoDark"
     />
-    <AIIntegrationCard
-      v-else-if="cardContent"
-      :content="cardContent"
-      :doc-url="docURL"
-    />
+    <AIIntegrationCard v-else-if="cardContent" :content="cardContent" :doc-url="docURL" />
     <div v-else class="text-base">
       <CopyContent :content="aiContent" />
-      <div class="font-bold pt-6 pb-2">
-        {{ t('ingestion.ai.viewDocsPrefix') }}
+      <div class="pt-6 pb-2 font-bold">
+        {{ t("ingestion.ai.viewDocsPrefix") }}
         <a
           :href="safeHttpUrl(docURL)"
           target="_blank"
           rel="noopener noreferrer"
           class="text-text-link hover:text-text-link-hover"
           style="text-decoration: underline"
-          >{{ t('ingestion.ai.viewDocsLinkLabel') }}</a
+          >{{ t("ingestion.ai.viewDocsLinkLabel") }}</a
         >
-        {{ t('ingestion.ai.viewDocsSuffix') }}
+        {{ t("ingestion.ai.viewDocsSuffix") }}
       </div>
     </div>
   </div>
   <div v-else class="p-2">
-    <p>{{ t('ingestion.ai.selectIntegrationPrompt') }}</p>
+    <p>{{ t("ingestion.ai.selectIntegrationPrompt") }}</p>
   </div>
 </template>

@@ -26,9 +26,7 @@ describe("patchNsFieldsInJson", () => {
     it("should inject _start_time_ns shadow field for a 19-digit start_time value", () => {
       const input = `{"start_time":${NS_TS}}`;
       const result = patchNsFieldsInJson(input);
-      expect(result).toBe(
-        `{"start_time":${NS_TS},"_start_time_ns":"${NS_TS}"}`,
-      );
+      expect(result).toBe(`{"start_time":${NS_TS},"_start_time_ns":"${NS_TS}"}`);
     });
   });
 
@@ -90,8 +88,7 @@ describe("patchNsFieldsInJson", () => {
 
   describe("multiple spans in an array", () => {
     it("should patch all three span objects in a JSON array", () => {
-      const span = (ts: string) =>
-        `{"start_time":${ts},"end_time":${ts},"name":"op"}`;
+      const span = (ts: string) => `{"start_time":${ts},"end_time":${ts},"name":"op"}`;
       const ts1 = "1700000000000000001";
       const ts2 = "1700000000000000002";
       const ts3 = "1700000000000000003";
@@ -134,8 +131,7 @@ describe("patchNsFieldsInJson", () => {
       // Either they differ (proving rounding occurred) OR they happen to be
       // equal — either way, the shadow string is the reliable copy
       expect(typeof parsed._start_time_ns).toBe("string");
-      expect(parsedBigInt === originalBigInt || parsedBigInt !== originalBigInt)
-        .toBe(true); // always true — just ensures both branches compile
+      expect(parsedBigInt === originalBigInt || parsedBigInt !== originalBigInt).toBe(true); // always true — just ensures both branches compile
     });
 
     it("should keep the exact nanosecond digit string in _end_time_ns", () => {

@@ -17,7 +17,6 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import EdgeWithButton from "./EdgeWithButton.vue";
 
-
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
@@ -109,9 +108,7 @@ describe("EdgeWithButton.vue", () => {
 
     it("renders an EdgeLabelRenderer component", () => {
       wrapper = createWrapper();
-      expect(wrapper.findComponent({ name: "EdgeLabelRenderer" }).exists()).toBe(
-        true
-      );
+      expect(wrapper.findComponent({ name: "EdgeLabelRenderer" }).exists()).toBe(true);
     });
   });
 
@@ -174,8 +171,7 @@ describe("EdgeWithButton.vue", () => {
     it("does NOT define a data prop (unlike CustomEdge)", () => {
       // EdgeWithButton has a simpler API – no data or isInView props
       const componentDef = EdgeWithButton as any;
-      const propsDefinition =
-        componentDef.__vccOpts?.props ?? componentDef.props;
+      const propsDefinition = componentDef.__vccOpts?.props ?? componentDef.props;
       if (propsDefinition) {
         expect(propsDefinition).not.toHaveProperty("data");
         expect(propsDefinition).not.toHaveProperty("isInView");

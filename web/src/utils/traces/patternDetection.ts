@@ -17,45 +17,45 @@
  * Span instance for pattern detection
  */
 export interface SpanInstance {
-  spanId: string
-  duration: number
-  isError: boolean
-  timestamp: number
-  attributes: Record<string, any>
-  serviceName: string
-  operationName: string
+  spanId: string;
+  duration: number;
+  isError: boolean;
+  timestamp: number;
+  attributes: Record<string, any>;
+  serviceName: string;
+  operationName: string;
 }
 
 /**
  * Call pattern aggregated metrics
  */
 export interface CallPattern {
-  pathSignature: string  // "cache-service→database-service"
-  instances: SpanInstance[]
+  pathSignature: string; // "cache-service→database-service"
+  instances: SpanInstance[];
   metrics: {
-    count: number
-    avg: number
-    min: number
-    max: number
-    p75: number
-    p95: number
-    p99: number
-    totalDuration: number
-    errorRate: number
-    errorCount: number
-    traceTimePercent: number // % of total trace duration
-  }
-  spanIds: string[] // for drill-down capability
+    count: number;
+    avg: number;
+    min: number;
+    max: number;
+    p75: number;
+    p95: number;
+    p99: number;
+    totalDuration: number;
+    errorRate: number;
+    errorCount: number;
+    traceTimePercent: number; // % of total trace duration
+  };
+  spanIds: string[]; // for drill-down capability
 }
 
 /**
  * Call path extracted from trace
  */
 interface CallPath {
-  services: string[]
-  leafSpan: any  // The leaf span for this path
-  duration: number
-  isError: boolean
+  services: string[];
+  leafSpan: any; // The leaf span for this path
+  duration: number;
+  isError: boolean;
 }
 
 /**
@@ -64,17 +64,17 @@ interface CallPath {
  */
 export function buildPatternConsolidatedTree(traceTree: any[]): Map<string, CallPattern> {
   if (!traceTree || traceTree.length === 0) {
-    return new Map()
+    return new Map();
   }
 
-  const patterns = new Map<string, CallPattern>()
-  const allDurations: number[] = []
+  const patterns = new Map<string, CallPattern>();
+  const allDurations: number[] = [];
 
   // Calculate total trace duration for percentage calculations
-  let totalTraceDuration = 0
-  traceTree.forEach(rootSpan => {
-    totalTraceDuration = Math.max(totalTraceDuration, rootSpan.durationMs || 0)
-  })
+  let totalTraceDuration = 0;
+  traceTree.forEach((rootSpan) => {
+    totalTraceDuration = Math.max(totalTraceDuration, rootSpan.durationMs || 0);
+  });
 
   /**
    * Extract services and their relationships from trace tree.
@@ -83,25 +83,25 @@ export function buildPatternConsolidatedTree(traceTree: any[]): Map<string, Call
    */
   const extractServicesAndRelationships = (
     spans: any[],
-    parentService: string = '',
+    parentService: string = "",
     relationships: CallPath[] = [],
-    services: Map<string, { spans: any[], totalDuration: number, errorCount: number }> = new Map()
+    services: Map<string, { spans: any[]; totalDuration: number; errorCount: number }> = new Map(),
   ): void => {
-    spans.forEach(span => {
-      const serviceName = span.resolvedIdentity || span.serviceName || 'unknown'
-      const duration = span.durationMs || 0
-      const isError = isSpanError(span)
+    spans.forEach((span) => {
+      const serviceName = span.resolvedIdentity || span.serviceName || "unknown";
+      const duration = span.durationMs || 0;
+      const isError = isSpanError(span);
 
       // Track all services (including standalone ones)
       if (!services.has(serviceName)) {
-        services.set(serviceName, { spans: [], totalDuration: 0, errorCount: 0 })
+        services.set(serviceName, { spans: [], totalDuration: 0, errorCount: 0 });
       }
-      const serviceInfo = services.get(serviceName)!
-      serviceInfo.spans.push(span)
-      serviceInfo.totalDuration += duration
-      if (isError) serviceInfo.errorCount += 1
+      const serviceInfo = services.get(serviceName)!;
+      serviceInfo.spans.push(span);
+      serviceInfo.totalDuration += duration;
+      if (isError) serviceInfo.errorCount += 1;
 
-      allDurations.push(duration)
+      allDurations.push(duration);
 
       // If this span has a parent service and is a different service, record the relationship
       if (parentService && parentService !== serviceName) {
@@ -109,25 +109,28 @@ export function buildPatternConsolidatedTree(traceTree: any[]): Map<string, Call
           services: [parentService, serviceName],
           leafSpan: span,
           duration,
-          isError
-        })
+          isError,
+        });
       }
 
       // Recursively process child spans — mutates the same collectors in place
       if (span.spans && span.spans.length > 0) {
-        extractServicesAndRelationships(span.spans, serviceName, relationships, services)
+        extractServicesAndRelationships(span.spans, serviceName, relationships, services);
       }
-    })
-  }
+    });
+  };
 
   // Extract services and relationships from all root spans (single pass)
-  const allPaths: CallPath[] = []
-  const allServices = new Map<string, { spans: any[], totalDuration: number, errorCount: number }>()
-  extractServicesAndRelationships(traceTree, '', allPaths, allServices)
+  const allPaths: CallPath[] = [];
+  const allServices = new Map<
+    string,
+    { spans: any[]; totalDuration: number; errorCount: number }
+  >();
+  extractServicesAndRelationships(traceTree, "", allPaths, allServices);
 
   // Group paths by signature and aggregate metrics
-  allPaths.forEach(path => {
-    const signature = path.services.join('→')
+  allPaths.forEach((path) => {
+    const signature = path.services.join("→");
 
     if (!patterns.has(signature)) {
       patterns.set(signature, {
@@ -144,32 +147,32 @@ export function buildPatternConsolidatedTree(traceTree: any[]): Map<string, Call
           totalDuration: 0,
           errorRate: 0,
           errorCount: 0,
-          traceTimePercent: 0
+          traceTimePercent: 0,
         },
-        spanIds: []
-      })
+        spanIds: [],
+      });
     }
 
-    const pattern = patterns.get(signature)!
+    const pattern = patterns.get(signature)!;
 
     // Add span instance
     pattern.instances.push({
-      spanId: path.leafSpan.span_id || path.leafSpan.spanId || '',
+      spanId: path.leafSpan.span_id || path.leafSpan.spanId || "",
       duration: path.duration,
       isError: path.isError,
       timestamp: path.leafSpan.start_time || 0,
       attributes: path.leafSpan.attributes || {},
-      serviceName: path.leafSpan.serviceName || '',
-      operationName: path.leafSpan.operationName || path.leafSpan.operation_name || ''
-    })
+      serviceName: path.leafSpan.serviceName || "",
+      operationName: path.leafSpan.operationName || path.leafSpan.operation_name || "",
+    });
 
-    pattern.spanIds.push(path.leafSpan.span_id || path.leafSpan.spanId || '')
-  })
+    pattern.spanIds.push(path.leafSpan.span_id || path.leafSpan.spanId || "");
+  });
 
   // Calculate aggregated metrics for each pattern
-  patterns.forEach(pattern => {
-    const durations = pattern.instances.map(instance => instance.duration)
-    const errorCount = pattern.instances.filter(instance => instance.isError).length
+  patterns.forEach((pattern) => {
+    const durations = pattern.instances.map((instance) => instance.duration);
+    const errorCount = pattern.instances.filter((instance) => instance.isError).length;
 
     pattern.metrics = {
       count: pattern.instances.length,
@@ -182,30 +185,31 @@ export function buildPatternConsolidatedTree(traceTree: any[]): Map<string, Call
       totalDuration: durations.reduce((sum, d) => sum + d, 0),
       errorRate: pattern.instances.length > 0 ? (errorCount / pattern.instances.length) * 100 : 0,
       errorCount,
-      traceTimePercent: totalTraceDuration > 0 && durations.length > 0
-        ? (calculateAverage(durations) / totalTraceDuration) * 100
-        : 0
-    }
-  })
+      traceTimePercent:
+        totalTraceDuration > 0 && durations.length > 0
+          ? (calculateAverage(durations) / totalTraceDuration) * 100
+          : 0,
+    };
+  });
 
   // Create self-patterns for each service using its own span durations.
   // Relationship patterns (A→B) use the child span's duration, so root services
   // would incorrectly show child durations. Self-patterns fix this by capturing
   // each service's own span metrics directly from allServices.
   allServices.forEach((serviceInfo, serviceName) => {
-    const durations = serviceInfo.spans.map((s: any) => s.durationMs || 0)
-    const errorCount = serviceInfo.errorCount
+    const durations = serviceInfo.spans.map((s: any) => s.durationMs || 0);
+    const errorCount = serviceInfo.errorCount;
 
     patterns.set(serviceName, {
       pathSignature: serviceName,
       instances: serviceInfo.spans.map((span: any) => ({
-        spanId: span.span_id || span.spanId || '',
+        spanId: span.span_id || span.spanId || "",
         duration: span.durationMs || 0,
         isError: isSpanError(span),
         timestamp: span.start_time || 0,
         attributes: span.attributes || {},
         serviceName,
-        operationName: span.operationName || span.operation_name || ''
+        operationName: span.operationName || span.operation_name || "",
       })),
       metrics: {
         count: serviceInfo.spans.length,
@@ -216,19 +220,18 @@ export function buildPatternConsolidatedTree(traceTree: any[]): Map<string, Call
         p95: calculatePercentile(durations, 95),
         p99: calculatePercentile(durations, 99),
         totalDuration: durations.reduce((sum, d) => sum + d, 0),
-        errorRate: serviceInfo.spans.length > 0
-          ? (errorCount / serviceInfo.spans.length) * 100
-          : 0,
+        errorRate: serviceInfo.spans.length > 0 ? (errorCount / serviceInfo.spans.length) * 100 : 0,
         errorCount,
-        traceTimePercent: totalTraceDuration > 0 && durations.length > 0
-          ? (calculateAverage(durations) / totalTraceDuration) * 100
-          : 0
+        traceTimePercent:
+          totalTraceDuration > 0 && durations.length > 0
+            ? (calculateAverage(durations) / totalTraceDuration) * 100
+            : 0,
       },
-      spanIds: serviceInfo.spans.map((span: any) => span.span_id || span.spanId || '')
-    })
-  })
+      spanIds: serviceInfo.spans.map((span: any) => span.span_id || span.spanId || ""),
+    });
+  });
 
-  return patterns
+  return patterns;
 }
 
 /**
@@ -236,50 +239,48 @@ export function buildPatternConsolidatedTree(traceTree: any[]): Map<string, Call
  */
 function isSpanError(span: any): boolean {
   // Check span status (supports both snake_case from API and camelCase from formatted spans)
-  if (span.status_code === 2
-    || span.span_status === 'ERROR'
-    || span.spanStatus === 'ERROR') {
-    return true
+  if (span.status_code === 2 || span.span_status === "ERROR" || span.spanStatus === "ERROR") {
+    return true;
   }
 
   // Check for error in tags/attributes
-  const tags = span.tags || span.attributes || {}
-  if (tags.error === true || tags.error === 'true') {
-    return true
+  const tags = span.tags || span.attributes || {};
+  if (tags.error === true || tags.error === "true") {
+    return true;
   }
 
   // Check HTTP status codes in attributes
-  if (tags['http.status_code'] && tags['http.status_code'] >= 400) {
-    return true
+  if (tags["http.status_code"] && tags["http.status_code"] >= 400) {
+    return true;
   }
 
-  return false
+  return false;
 }
 
 /**
  * Calculate average of an array of numbers
  */
 function calculateAverage(values: number[]): number {
-  if (values.length === 0) return 0
-  return values.reduce((sum, val) => sum + val, 0) / values.length
+  if (values.length === 0) return 0;
+  return values.reduce((sum, val) => sum + val, 0) / values.length;
 }
 
 /**
  * Calculate percentile of an array of numbers
  */
 function calculatePercentile(values: number[], percentile: number): number {
-  if (values.length === 0) return 0
+  if (values.length === 0) return 0;
 
-  const sorted = [...values].sort((a, b) => a - b)
-  const index = (percentile / 100) * (sorted.length - 1)
+  const sorted = [...values].sort((a, b) => a - b);
+  const index = (percentile / 100) * (sorted.length - 1);
 
   if (Math.floor(index) === index) {
-    return sorted[index]
+    return sorted[index];
   } else {
-    const lower = sorted[Math.floor(index)]
-    const upper = sorted[Math.ceil(index)]
-    const weight = index - Math.floor(index)
-    return lower * (1 - weight) + upper * weight
+    const lower = sorted[Math.floor(index)];
+    const upper = sorted[Math.ceil(index)];
+    const weight = index - Math.floor(index);
+    return lower * (1 - weight) + upper * weight;
   }
 }
 
@@ -289,43 +290,43 @@ function calculatePercentile(values: number[], percentile: number): number {
 export function filterPatterns(
   patterns: Map<string, CallPattern>,
   filters: {
-    minDuration?: number
-    maxDuration?: number
-    minErrorRate?: number
-    maxErrorRate?: number
-    minCalls?: number
-    onlyErrors?: boolean
-  }
+    minDuration?: number;
+    maxDuration?: number;
+    minErrorRate?: number;
+    maxErrorRate?: number;
+    minCalls?: number;
+    onlyErrors?: boolean;
+  },
 ): Map<string, CallPattern> {
-  const filtered = new Map<string, CallPattern>()
+  const filtered = new Map<string, CallPattern>();
 
   patterns.forEach((pattern, signature) => {
-    let include = true
+    let include = true;
 
     // Apply filters
     if (filters.minDuration !== undefined && pattern.metrics.avg < filters.minDuration) {
-      include = false
+      include = false;
     }
     if (filters.maxDuration !== undefined && pattern.metrics.avg > filters.maxDuration) {
-      include = false
+      include = false;
     }
     if (filters.minErrorRate !== undefined && pattern.metrics.errorRate < filters.minErrorRate) {
-      include = false
+      include = false;
     }
     if (filters.maxErrorRate !== undefined && pattern.metrics.errorRate > filters.maxErrorRate) {
-      include = false
+      include = false;
     }
     if (filters.minCalls !== undefined && pattern.metrics.count < filters.minCalls) {
-      include = false
+      include = false;
     }
     if (filters.onlyErrors && pattern.metrics.errorRate === 0) {
-      include = false
+      include = false;
     }
 
     if (include) {
-      filtered.set(signature, pattern)
+      filtered.set(signature, pattern);
     }
-  })
+  });
 
-  return filtered
+  return filtered;
 }

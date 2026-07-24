@@ -30,14 +30,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <ellipse cx="120" cy="156" rx="66" ry="9" fill="var(--color-primary-900)" opacity="0.1" />
     <g fill="var(--color-border-default)" opacity="0.5">
-      <circle cx="26" cy="46" r="2" /><circle cx="214" cy="120" r="2" /><circle cx="210" cy="42" r="1.6" />
+      <circle cx="26" cy="46" r="2" />
+      <circle cx="214" cy="120" r="2" />
+      <circle cx="210" cy="42" r="1.6" />
     </g>
 
-    <rect x="42" y="30" width="156" height="118" rx="12" fill="var(--color-surface-base)" stroke="var(--color-border-strong)" stroke-width="2" />
+    <rect
+      x="42"
+      y="30"
+      width="156"
+      height="118"
+      rx="12"
+      fill="var(--color-surface-base)"
+      stroke="var(--color-border-strong)"
+      stroke-width="2"
+    />
     <!-- time axis -->
-    <line x1="54" y1="50" x2="186" y2="50" stroke="var(--color-border-default)" stroke-width="1.5" />
+    <line
+      x1="54"
+      y1="50"
+      x2="186"
+      y2="50"
+      stroke="var(--color-border-default)"
+      stroke-width="1.5"
+    />
     <g stroke="var(--color-border-default)" stroke-width="1.25">
-      <line x1="78" y1="48" x2="78" y2="52" /><line x1="110" y1="48" x2="110" y2="52" /><line x1="142" y1="48" x2="142" y2="52" /><line x1="174" y1="48" x2="174" y2="52" />
+      <line x1="78" y1="48" x2="78" y2="52" />
+      <line x1="110" y1="48" x2="110" y2="52" />
+      <line x1="142" y1="48" x2="142" y2="52" />
+      <line x1="174" y1="48" x2="174" y2="52" />
     </g>
 
     <!-- span waterfall -->
@@ -50,7 +71,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </g>
 
     <!-- sweeping scan line -->
-    <line class="es-scan" x1="60" y1="58" x2="60" y2="140" stroke="var(--color-primary-600)" stroke-width="1.75" opacity="0.7" />
+    <line
+      class="es-scan"
+      x1="60"
+      y1="58"
+      x2="60"
+      y2="140"
+      stroke="var(--color-primary-600)"
+      stroke-width="1.75"
+      opacity="0.7"
+    />
   </svg>
 </template>
 
@@ -59,10 +89,7 @@ import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
 
-withDefaults(
-  defineProps<{ width?: number; animated?: boolean }>(),
-  { width: 260, animated: true },
-);
+withDefaults(defineProps<{ width?: number; animated?: boolean }>(), { width: 260, animated: true });
 </script>
 
 <style scoped>

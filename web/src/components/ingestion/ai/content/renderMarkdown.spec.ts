@@ -17,11 +17,9 @@ describe("renderCardSegments", () => {
     );
     const code = segs.find((s) => s.type === "code");
     expect(code).toBeDefined();
-    expect(code?.type === "code" && code.code).toContain(
-      "--url=https://api.example.com",
-    );
+    expect(code?.type === "code" && code.code).toContain("--url=https://api.example.com");
     expect(code?.type === "code" && code.code).toContain("--org=myorg");
-    expect(code?.type === "code" && code.code).toContain('Basic dG9rZW4=');
+    expect(code?.type === "code" && code.code).toContain("Basic dG9rZW4=");
     expect(code?.type === "code" && code.lang).toBe("bash");
   });
 
@@ -32,20 +30,13 @@ describe("renderCardSegments", () => {
     );
     const prose = segs.find((s) => s.type === "html");
     expect(prose?.type === "html" && prose.html).toContain("{url}");
-    expect(prose?.type === "html" && prose.html).not.toContain(
-      "https://api.example.com",
-    );
+    expect(prose?.type === "html" && prose.html).not.toContain("https://api.example.com");
     const code = segs.find((s) => s.type === "code");
-    expect(code?.type === "code" && code.code).toContain(
-      "echo https://api.example.com",
-    );
+    expect(code?.type === "code" && code.code).toContain("echo https://api.example.com");
   });
 
   it("splits prose and code into ordered segments", () => {
-    const segs = renderCardSegments(
-      "text before\n\n```bash\necho hi\n```\n\ntext after",
-      SUBS,
-    );
+    const segs = renderCardSegments("text before\n\n```bash\necho hi\n```\n\ntext after", SUBS);
     expect(segs.map((s) => s.type)).toEqual(["html", "code", "html"]);
     expect(segs[0].type === "html" && segs[0].html).toContain("text before");
     expect(segs[2].type === "html" && segs[2].html).toContain("text after");
@@ -72,9 +63,7 @@ describe("renderCardSegments", () => {
 
 describe("safeHttpUrl", () => {
   it("allows http(s) and mailto URLs", () => {
-    expect(safeHttpUrl("https://openobserve.ai/docs")).toBe(
-      "https://openobserve.ai/docs",
-    );
+    expect(safeHttpUrl("https://openobserve.ai/docs")).toBe("https://openobserve.ai/docs");
     expect(safeHttpUrl("http://x.test")).toBe("http://x.test");
     expect(safeHttpUrl("mailto:a@b.com")).toBe("mailto:a@b.com");
   });

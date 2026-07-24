@@ -226,22 +226,15 @@ const createWrapper = (props = {}, options = {}) => {
             "secondaryButtonLoading",
             "neutralButtonLoading",
           ],
-          emits: [
-            "update:open",
-            "click:primary",
-            "click:secondary",
-            "click:neutral",
-          ],
+          emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
         },
         OColor: {
-          template:
-            '<div data-test-stub="o-color" :data-value="modelValue"></div>',
+          template: '<div data-test-stub="o-color" :data-value="modelValue"></div>',
           props: ["modelValue"],
           emits: ["update:modelValue"],
         },
         OSpinner: {
-          template:
-            '<div data-test-stub="o-spinner" :data-test="$attrs[\'data-test\']"></div>',
+          template: '<div data-test-stub="o-spinner" :data-test="$attrs[\'data-test\']"></div>',
           props: ["size"],
         },
         OTooltip: {
@@ -305,14 +298,10 @@ describe("General", () => {
   describe("Form inputs", () => {
     it("should keep the scrape interval and max series inputs (data-tests preserved)", () => {
       const wrapper = createWrapper();
-      expect(
-        wrapper.find('[data-test="general-settings-scrape-interval"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper
-          .find('[data-test="general-settings-max-series-per-query"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="general-settings-scrape-interval"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="general-settings-max-series-per-query"]').exists()).toBe(
+        true,
+      );
     });
   });
 
@@ -401,17 +390,13 @@ describe("General", () => {
         expect(wrapper.text()).toContain("Test Logo Text");
       } else {
         // Fallback: verify component has access to the custom text from store
-        expect(mockStore.state.zoConfig.custom_logo_text).toBe(
-          "Test Logo Text",
-        );
+        expect(mockStore.state.zoConfig.custom_logo_text).toBe("Test Logo Text");
       }
     });
 
     it("should enter edit mode when edit button is clicked", async () => {
       const wrapper = createWrapper();
-      const editButton = wrapper.find(
-        '[data-test="settings_ent_logo_custom_text_edit_btn"]',
-      );
+      const editButton = wrapper.find('[data-test="settings_ent_logo_custom_text_edit_btn"]');
 
       if (editButton.exists()) {
         await editButton.trigger("click");
@@ -428,9 +413,7 @@ describe("General", () => {
       Object.assign(wrapper.vm, { editingText: true });
       await nextTick();
 
-      const textInput = wrapper.find(
-        '[data-test="settings_ent_logo_custom_text"]',
-      );
+      const textInput = wrapper.find('[data-test="settings_ent_logo_custom_text"]');
       if (textInput.exists()) {
         expect(textInput.exists()).toBe(true);
       } else {
@@ -446,9 +429,7 @@ describe("General", () => {
         customText: "New Logo Text",
       });
 
-      const saveButton = wrapper.find(
-        '[data-test="settings_ent_logo_custom_text_save_btn"]',
-      );
+      const saveButton = wrapper.find('[data-test="settings_ent_logo_custom_text_save_btn"]');
       if (saveButton.exists()) {
         await saveButton.trigger("click");
       } else {
@@ -473,9 +454,7 @@ describe("General", () => {
         customText: longText,
       });
 
-      const saveButton = wrapper.find(
-        '[data-test="settings_ent_logo_custom_text_save_btn"]',
-      );
+      const saveButton = wrapper.find('[data-test="settings_ent_logo_custom_text_save_btn"]');
       if (saveButton.exists()) {
         await saveButton.trigger("click");
       } else {
@@ -553,9 +532,7 @@ describe("General", () => {
       mockStore.state.zoConfig.custom_logo_img = null;
       const wrapper = createWrapper();
 
-      const fileUpload = wrapper.find(
-        '[data-test="setting_ent_custom_logo_img_file_upload"]',
-      );
+      const fileUpload = wrapper.find('[data-test="setting_ent_custom_logo_img_file_upload"]');
       if (fileUpload.exists()) {
         expect(fileUpload.exists()).toBe(true);
       } else {
@@ -618,9 +595,7 @@ describe("General", () => {
 
     it("should show delete confirmation dialog", async () => {
       const wrapper = createWrapper();
-      const deleteButton = wrapper.find(
-        '[data-test="setting_ent_custom_logo_img_delete_btn"]',
-      );
+      const deleteButton = wrapper.find('[data-test="setting_ent_custom_logo_img_delete_btn"]');
 
       if (deleteButton.exists()) {
         await deleteButton.trigger("click");
@@ -719,10 +694,7 @@ describe("General", () => {
       await nextTick();
 
       expect(wrapper.vm.confirmDeleteImage).toBe(false);
-      expect(mockSettingsService.deleteLogo).toHaveBeenCalledWith(
-        "test-org",
-        "dark",
-      );
+      expect(mockSettingsService.deleteLogo).toHaveBeenCalledWith("test-org", "dark");
     });
   });
 
@@ -757,9 +729,7 @@ describe("General", () => {
       // Select the color-picker dialog by title (order-independent — other dialogs
       // like the delete-org confirmation also exist in the template).
       const dialogs = wrapper.findAll('[data-test-stub="o-dialog"]');
-      const colorDialog = dialogs.find(
-        (d) => d.attributes("data-title") === "Pick Custom Color",
-      );
+      const colorDialog = dialogs.find((d) => d.attributes("data-title") === "Pick Custom Color");
       const closeBtn = colorDialog.find('[data-test-stub="o-dialog-primary"]');
       await closeBtn.trigger("click");
       await nextTick();
@@ -782,9 +752,7 @@ describe("General", () => {
       const dialogs = wrapper.findAll('[data-test-stub="o-dialog"]');
       // Select by title (order-independent — the delete-org confirmation dialog also
       // exists and would otherwise be the last dialog in the template).
-      const colorDialog = dialogs.find(
-        (d) => d.attributes("data-title") === "Pick Custom Color",
-      );
+      const colorDialog = dialogs.find((d) => d.attributes("data-title") === "Pick Custom Color");
       expect(colorDialog.attributes("data-size")).toBe("xs");
       expect(colorDialog.attributes("data-primary-label")).toBe("Close");
     });
@@ -823,9 +791,7 @@ describe("General", () => {
       await nextTick();
 
       expect(form.vm.form.state.isValid).toBe(false);
-      expect(
-        mockOrganizations.post_organization_settings,
-      ).not.toHaveBeenCalled();
+      expect(mockOrganizations.post_organization_settings).not.toHaveBeenCalled();
     });
 
     it("blocks submit when scrape interval is negative", async () => {
@@ -837,9 +803,7 @@ describe("General", () => {
       await nextTick();
 
       expect(form.vm.form.state.isValid).toBe(false);
-      expect(
-        mockOrganizations.post_organization_settings,
-      ).not.toHaveBeenCalled();
+      expect(mockOrganizations.post_organization_settings).not.toHaveBeenCalled();
     });
 
     it("allows a scrape interval of 0", async () => {
@@ -850,9 +814,7 @@ describe("General", () => {
       await form.vm.form.handleSubmit();
       await nextTick();
 
-      expect(
-        mockOrganizations.post_organization_settings,
-      ).toHaveBeenCalled();
+      expect(mockOrganizations.post_organization_settings).toHaveBeenCalled();
     });
 
     it("blocks submit when max series per query is below 1000 (restored optional range rule)", async () => {
@@ -864,9 +826,7 @@ describe("General", () => {
       await nextTick();
 
       expect(form.vm.form.state.isValid).toBe(false);
-      expect(
-        mockOrganizations.post_organization_settings,
-      ).not.toHaveBeenCalled();
+      expect(mockOrganizations.post_organization_settings).not.toHaveBeenCalled();
     });
 
     it("blocks submit when max series per query is above 1000000", async () => {
@@ -878,9 +838,7 @@ describe("General", () => {
       await nextTick();
 
       expect(form.vm.form.state.isValid).toBe(false);
-      expect(
-        mockOrganizations.post_organization_settings,
-      ).not.toHaveBeenCalled();
+      expect(mockOrganizations.post_organization_settings).not.toHaveBeenCalled();
     });
 
     it("keeps max series per query OPTIONAL — empty value saves", async () => {
@@ -890,9 +848,7 @@ describe("General", () => {
       await form.vm.form.handleSubmit();
       await nextTick();
 
-      expect(
-        mockOrganizations.post_organization_settings,
-      ).toHaveBeenCalled();
+      expect(mockOrganizations.post_organization_settings).toHaveBeenCalled();
     });
 
     it("submits a valid in-range max series per query", async () => {
@@ -943,9 +899,7 @@ describe("General", () => {
   describe("Accessibility", () => {
     it("should render the scrape interval as a number input", () => {
       const wrapper = createWrapper();
-      const input = wrapper.find(
-        '[data-test="general-settings-scrape-interval"] input',
-      );
+      const input = wrapper.find('[data-test="general-settings-scrape-interval"] input');
       expect(input.exists()).toBe(true);
       expect(input.attributes("type")).toBe("number");
     });

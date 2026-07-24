@@ -128,17 +128,7 @@ async function callWithType(type: string) {
   vi.mocked(buildSQLContext).mockReturnValue(ctx as any);
 
   const panelSchema = { type, config: { trellis: { layout: null } } };
-  return convertSQLChartData(
-    panelSchema,
-    [],
-    store,
-    chartPanelRef,
-    null,
-    [],
-    metadata,
-    {},
-    [],
-  );
+  return convertSQLChartData(panelSchema, [], store, chartPanelRef, null, [], metadata, {}, []);
 }
 
 // ─── Tests ──────────────────────────────────────────────────────────────────

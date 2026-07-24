@@ -51,9 +51,7 @@ describe("tableConfigUtils", () => {
       expect(buildValueMappingCache([{ type: "value", value: "5" }])).toBeNull();
     });
     it("includes a mapping that has only a color", () => {
-      const cache = buildValueMappingCache([
-        { type: "value", value: "5", color: "#f00" },
-      ]);
+      const cache = buildValueMappingCache([{ type: "value", value: "5", color: "#f00" }]);
       expect(cache).not.toBeNull();
     });
   });
@@ -65,9 +63,7 @@ describe("tableConfigUtils", () => {
     });
 
     it("matches an exact value mapping (number ↔ string coercion)", () => {
-      const cache = buildValueMappingCache([
-        { type: "value", value: "5", text: "five" },
-      ]);
+      const cache = buildValueMappingCache([{ type: "value", value: "5", text: "five" }]);
       expect(lookupValueMapping(5, cache)).toBe("five"); // numeric cell
       expect(lookupValueMapping("5", cache)).toBe("five"); // string cell
       expect(lookupValueMapping(6, cache)).toBeNull();
@@ -78,8 +74,24 @@ describe("tableConfigUtils", () => {
       // mapping. Routing must use `type` — presence checks would mis-route "value"
       // mappings into the range branch and they would never match.
       const cache = buildValueMappingCache([
-        { type: "value", value: "1", from: "", to: "", pattern: "", color: "#aaaaaa", text: "No Logs" },
-        { type: "value", value: "22", from: "", to: "", pattern: "", color: "#e02f44", text: "High" },
+        {
+          type: "value",
+          value: "1",
+          from: "",
+          to: "",
+          pattern: "",
+          color: "#aaaaaa",
+          text: "No Logs",
+        },
+        {
+          type: "value",
+          value: "22",
+          from: "",
+          to: "",
+          pattern: "",
+          color: "#e02f44",
+          text: "High",
+        },
       ]);
       expect([...(cache?.keys() ?? [])]).toEqual(["1", "22"]);
       expect(lookupValueMapping(1, cache)).toBe("No Logs");
@@ -137,9 +149,7 @@ describe("tableConfigUtils", () => {
     });
 
     it("matches a numeric range, including a from of 0", () => {
-      const cache = buildValueMappingCache([
-        { type: "range", from: "0", to: "10", text: "low" },
-      ]);
+      const cache = buildValueMappingCache([{ type: "range", from: "0", to: "10", text: "low" }]);
       expect(lookupValueMapping(0, cache)).toBe("low");
       expect(lookupValueMapping(5, cache)).toBe("low");
       expect(lookupValueMapping("5", cache)).toBe("low"); // numeric string cell
@@ -147,17 +157,13 @@ describe("tableConfigUtils", () => {
     });
 
     it("matches a regex mapping", () => {
-      const cache = buildValueMappingCache([
-        { type: "regex", pattern: "^err", text: "error" },
-      ]);
+      const cache = buildValueMappingCache([{ type: "regex", pattern: "^err", text: "error" }]);
       expect(lookupValueMapping("err_500", cache)).toBe("error");
       expect(lookupValueMapping("ok", cache)).toBeNull();
     });
 
     it("recovers color via lookupValueMappingFull even when there is no text", () => {
-      const cache = buildValueMappingCache([
-        { type: "value", value: "5", color: "#ff0000" },
-      ]);
+      const cache = buildValueMappingCache([{ type: "value", value: "5", color: "#ff0000" }]);
       // colour-only mapping → no text
       expect(lookupValueMapping(5, cache)).toBeNull();
       // but the colour is recoverable
@@ -181,9 +187,7 @@ describe("tableConfigUtils", () => {
       expect(parseTimestampValue("", "UTC")).toBeNull();
     });
     it("returns an already-formatted timestamp string as-is", () => {
-      expect(parseTimestampValue("2026-06-10 14:54:30", "UTC")).toBe(
-        "2026-06-10 14:54:30",
-      );
+      expect(parseTimestampValue("2026-06-10 14:54:30", "UTC")).toBe("2026-06-10 14:54:30");
     });
   });
 
@@ -302,9 +306,7 @@ describe("tableConfigUtils", () => {
     });
 
     it("value mapping wins over numeric formatting", () => {
-      const cache = buildValueMappingCache([
-        { type: "value", value: "5", text: "five" },
-      ]);
+      const cache = buildValueMappingCache([{ type: "value", value: "5", text: "five" }]);
       expect(formatNumericValue(5, cache, "bytes", "", 2)).toBe("five");
     });
 

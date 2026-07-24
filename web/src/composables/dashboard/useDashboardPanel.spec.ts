@@ -143,9 +143,7 @@ describe("useDashboardPanel", () => {
     // New query is seeded synchronously with default builder fields so the tab
     // is ready the moment it activates (no async race with stream selection).
     expect(panel.dashboardPanelData.data.queries[1].fields.y).toHaveLength(1);
-    expect(panel.dashboardPanelData.data.queries[1].fields.y[0].functionName).toBe(
-      "count",
-    );
+    expect(panel.dashboardPanelData.data.queries[1].fields.y[0].functionName).toBe("count");
 
     panel.removeQuery(1);
     expect(panel.dashboardPanelData.data.queries).toHaveLength(1);
@@ -179,9 +177,7 @@ describe("useDashboardPanel", () => {
     panel.dashboardPanelData.meta.stream.selectedStreamFields = [{ name: "fallback" }];
     panel.dashboardPanelData.meta.stream.useUserDefinedSchemas = "user_defined_schema";
 
-    expect(panel.selectedStreamFieldsBasedOnUserDefinedSchema.value).toEqual([
-      { name: "field_1" },
-    ]);
+    expect(panel.selectedStreamFieldsBasedOnUserDefinedSchema.value).toEqual([{ name: "field_1" }]);
   });
 
   it("updates grouped fields for SQL mode with joins", async () => {
@@ -213,10 +209,7 @@ describe("useDashboardPanel", () => {
     await panel.fetchPromQLLabels("cpu_usage");
 
     expect(getPromSeriesMock).toHaveBeenCalledTimes(1);
-    expect(panel.dashboardPanelData.meta.promql.availableLabels).toEqual([
-      "pod",
-      "region",
-    ]);
+    expect(panel.dashboardPanelData.meta.promql.availableLabels).toEqual(["pod", "region"]);
     expect(panel.dashboardPanelData.meta.promql.labelValuesMap.get("pod")).toEqual([
       "pod-a",
       "pod-b",

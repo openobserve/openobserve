@@ -32,52 +32,169 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ellipse cx="104" cy="80" rx="92" ry="58" fill="var(--color-primary-500)" opacity="0.06" />
 
     <!-- sonar ripples from the core -->
-    <circle v-for="(b, i) in ['0s', '1.5s']" :key="'r' + i" cx="104" cy="80" r="14" fill="none" stroke="var(--color-primary-500)" stroke-width="1.5">
-      <animate v-if="animated" attributeName="r" values="14;64" dur="3s" :begin="b" repeatCount="indefinite" calcMode="spline" keySplines="0.2 0.6 0.3 1" />
-      <animate v-if="animated" attributeName="opacity" values="0.4;0" dur="3s" :begin="b" repeatCount="indefinite" />
+    <circle
+      v-for="(b, i) in ['0s', '1.5s']"
+      :key="'r' + i"
+      cx="104"
+      cy="80"
+      r="14"
+      fill="none"
+      stroke="var(--color-primary-500)"
+      stroke-width="1.5"
+    >
+      <animate
+        v-if="animated"
+        attributeName="r"
+        values="14;64"
+        dur="3s"
+        :begin="b"
+        repeatCount="indefinite"
+        calcMode="spline"
+        keySplines="0.2 0.6 0.3 1"
+      />
+      <animate
+        v-if="animated"
+        attributeName="opacity"
+        values="0.4;0"
+        dur="3s"
+        :begin="b"
+        repeatCount="indefinite"
+      />
     </circle>
 
     <!-- orbit guides -->
-    <circle cx="104" cy="80" r="32" stroke="var(--color-border-default)" stroke-width="1.25" stroke-dasharray="2 5" />
-    <circle cx="104" cy="80" r="50" stroke="var(--color-border-default)" stroke-width="1.25" stroke-dasharray="2 5" opacity="0.8" />
-    <circle cx="104" cy="80" r="66" stroke="var(--color-border-default)" stroke-width="1.25" stroke-dasharray="2 5" opacity="0.55" />
+    <circle
+      cx="104"
+      cy="80"
+      r="32"
+      stroke="var(--color-border-default)"
+      stroke-width="1.25"
+      stroke-dasharray="2 5"
+    />
+    <circle
+      cx="104"
+      cy="80"
+      r="50"
+      stroke="var(--color-border-default)"
+      stroke-width="1.25"
+      stroke-dasharray="2 5"
+      opacity="0.8"
+    />
+    <circle
+      cx="104"
+      cy="80"
+      r="66"
+      stroke="var(--color-border-default)"
+      stroke-width="1.25"
+      stroke-dasharray="2 5"
+      opacity="0.55"
+    />
 
     <!-- ring 1 (inner) — clockwise -->
     <g>
-      <animateTransform v-if="animated" attributeName="transform" type="rotate" values="0 104 80;360 104 80" dur="6s" repeatCount="indefinite" />
+      <animateTransform
+        v-if="animated"
+        attributeName="transform"
+        type="rotate"
+        values="0 104 80;360 104 80"
+        dur="6s"
+        repeatCount="indefinite"
+      />
       <circle cx="136" cy="80" r="6" fill="var(--color-primary-500)" />
       <circle cx="72" cy="80" r="3.5" fill="var(--color-primary-300)" />
     </g>
 
     <!-- ring 2 (middle) — counter-clockwise, carries a data chip -->
     <g>
-      <animateTransform v-if="animated" attributeName="transform" type="rotate" values="360 104 80;0 104 80" dur="9s" repeatCount="indefinite" />
+      <animateTransform
+        v-if="animated"
+        attributeName="transform"
+        type="rotate"
+        values="360 104 80;0 104 80"
+        dur="9s"
+        repeatCount="indefinite"
+      />
       <circle cx="154" cy="80" r="5" fill="var(--color-primary-400)" />
       <g transform="translate(54 80)">
-        <rect x="-9" y="-6" width="18" height="12" rx="3" fill="var(--color-surface-base)" stroke="var(--color-border-strong)" stroke-width="1.25" />
+        <rect
+          x="-9"
+          y="-6"
+          width="18"
+          height="12"
+          rx="3"
+          fill="var(--color-surface-base)"
+          stroke="var(--color-border-strong)"
+          stroke-width="1.25"
+        />
         <circle cx="-3" cy="0" r="1.8" fill="var(--color-primary-500)" />
-        <rect x="1" y="-1.5" width="6" height="3" rx="1.5" fill="var(--color-border-strong)" opacity="0.5" />
+        <rect
+          x="1"
+          y="-1.5"
+          width="6"
+          height="3"
+          rx="1.5"
+          fill="var(--color-border-strong)"
+          opacity="0.5"
+        />
       </g>
     </g>
 
     <!-- ring 3 (outer) — clockwise, slow -->
     <g>
-      <animateTransform v-if="animated" attributeName="transform" type="rotate" values="0 104 80;360 104 80" dur="14s" repeatCount="indefinite" />
+      <animateTransform
+        v-if="animated"
+        attributeName="transform"
+        type="rotate"
+        values="0 104 80;360 104 80"
+        dur="14s"
+        repeatCount="indefinite"
+      />
       <circle cx="170" cy="80" r="4" fill="var(--color-primary-300)" />
       <circle cx="38" cy="80" r="3" fill="var(--color-primary-400)" />
     </g>
 
     <!-- central node -->
-    <circle cx="104" cy="80" r="15" fill="var(--color-surface-base)" stroke="var(--color-border-strong)" stroke-width="1.5" />
+    <circle
+      cx="104"
+      cy="80"
+      r="15"
+      fill="var(--color-surface-base)"
+      stroke="var(--color-border-strong)"
+      stroke-width="1.5"
+    />
     <circle cx="104" cy="80" r="6" fill="var(--color-primary-600)">
-      <animate v-if="animated" attributeName="r" values="6;8;6" dur="2.4s" repeatCount="indefinite" />
+      <animate
+        v-if="animated"
+        attributeName="r"
+        values="6;8;6"
+        dur="2.4s"
+        repeatCount="indefinite"
+      />
     </circle>
 
     <!-- twinkling sparkles -->
     <g v-for="(s, i) in sparkles" :key="'s' + i" :transform="`translate(${s.x} ${s.y})`">
-      <path d="M0 -6 L1.5 -1.5 L6 0 L1.5 1.5 L0 6 L-1.5 1.5 L-6 0 L-1.5 -1.5 Z" fill="var(--color-primary-400)">
-        <animate v-if="animated" attributeName="opacity" values="0.2;1;0.2" :dur="s.dur" :begin="s.begin" repeatCount="indefinite" />
-        <animateTransform v-if="animated" attributeName="transform" type="scale" values="0.6;1.1;0.6" :dur="s.dur" :begin="s.begin" repeatCount="indefinite" />
+      <path
+        d="M0 -6 L1.5 -1.5 L6 0 L1.5 1.5 L0 6 L-1.5 1.5 L-6 0 L-1.5 -1.5 Z"
+        fill="var(--color-primary-400)"
+      >
+        <animate
+          v-if="animated"
+          attributeName="opacity"
+          values="0.2;1;0.2"
+          :dur="s.dur"
+          :begin="s.begin"
+          repeatCount="indefinite"
+        />
+        <animateTransform
+          v-if="animated"
+          attributeName="transform"
+          type="scale"
+          values="0.6;1.1;0.6"
+          :dur="s.dur"
+          :begin="s.begin"
+          repeatCount="indefinite"
+        />
       </path>
     </g>
   </svg>
@@ -88,10 +205,7 @@ import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
 
-withDefaults(
-  defineProps<{ width?: number; animated?: boolean }>(),
-  { width: 208, animated: true },
-);
+withDefaults(defineProps<{ width?: number; animated?: boolean }>(), { width: 208, animated: true });
 
 const sparkles = [
   { x: 40, y: 36, dur: "2.6s", begin: "0s" },

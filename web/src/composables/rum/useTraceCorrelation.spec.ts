@@ -73,10 +73,7 @@ function createMockBackendSpan(overrides: Record<string, any> = {}) {
 /**
  * Factory function to create mock search response
  */
-function createMockSearchResponse(
-  hits: any[] = [],
-  total: number = hits.length,
-) {
+function createMockSearchResponse(hits: any[] = [], total: number = hits.length) {
   return {
     data: {
       hits,
@@ -92,10 +89,7 @@ function createMockSearchResponse(
 /**
  * Helper to mock successful RUM and APM search calls
  */
-function mockSuccessfulSearch(
-  rumEvents: any[] = [],
-  backendSpans: any[] = [],
-) {
+function mockSuccessfulSearch(rumEvents: any[] = [], backendSpans: any[] = []) {
   vi.mocked(searchService.search)
     .mockResolvedValueOnce(createMockSearchResponse(rumEvents))
     .mockResolvedValueOnce(createMockSearchResponse(backendSpans));
@@ -105,9 +99,7 @@ function mockSuccessfulSearch(
  * Helper to mock failed search call
  */
 function mockFailedSearch(errorMessage: string = "Network error") {
-  vi.mocked(searchService.search).mockRejectedValueOnce(
-    new Error(errorMessage),
-  );
+  vi.mocked(searchService.search).mockRejectedValueOnce(new Error(errorMessage));
 }
 
 describe("useTraceCorrelation", () => {
@@ -170,9 +162,7 @@ describe("useTraceCorrelation", () => {
       // Mock search service to delay response
       const mockSearchFn = vi
         .fn()
-        .mockImplementation(
-          () => new Promise((resolve) => setTimeout(resolve, 100)),
-        );
+        .mockImplementation(() => new Promise((resolve) => setTimeout(resolve, 100)));
       vi.mocked(searchService.search).mockImplementation(mockSearchFn);
 
       const { isLoading, fetchCorrelation } = useTraceCorrelation(traceId);
@@ -255,8 +245,7 @@ describe("useTraceCorrelation", () => {
 
       mockSuccessfulSearch(mockRumEvents, mockBackendSpans);
 
-      const { correlationData, fetchCorrelation } =
-        useTraceCorrelation(traceId);
+      const { correlationData, fetchCorrelation } = useTraceCorrelation(traceId);
       await fetchCorrelation();
 
       expect(correlationData.value).not.toBeNull();
@@ -275,8 +264,7 @@ describe("useTraceCorrelation", () => {
         .mockResolvedValueOnce(createMockSearchResponse([rumEvent]))
         .mockRejectedValueOnce(new Error("Trace not found"));
 
-      const { correlationData, hasBackendTrace, fetchCorrelation } =
-        useTraceCorrelation(traceId);
+      const { correlationData, hasBackendTrace, fetchCorrelation } = useTraceCorrelation(traceId);
       await fetchCorrelation();
 
       expect(correlationData.value).not.toBeNull();
@@ -286,14 +274,11 @@ describe("useTraceCorrelation", () => {
 
     it("should handle complete fetch failure", async () => {
       const traceId = ref("test-trace-123");
-      const consoleErrorSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       mockFailedSearch("Network error");
 
-      const { correlationData, error, fetchCorrelation } =
-        useTraceCorrelation(traceId);
+      const { correlationData, error, fetchCorrelation } = useTraceCorrelation(traceId);
       await fetchCorrelation();
 
       expect(correlationData.value).toBeNull();
@@ -329,8 +314,7 @@ describe("useTraceCorrelation", () => {
 
       mockSuccessfulSearch(mockRumEvents, mockBackendSpans);
 
-      const { performanceData, fetchCorrelation } =
-        useTraceCorrelation(traceId);
+      const { performanceData, fetchCorrelation } = useTraceCorrelation(traceId);
       await fetchCorrelation();
 
       expect(performanceData.value).not.toBeNull();
@@ -351,8 +335,7 @@ describe("useTraceCorrelation", () => {
           data: { hits: [], total: 0 },
         } as any);
 
-      const { performanceData, fetchCorrelation } =
-        useTraceCorrelation(traceId);
+      const { performanceData, fetchCorrelation } = useTraceCorrelation(traceId);
       await fetchCorrelation();
 
       expect(performanceData.value).toBeNull();
@@ -377,8 +360,7 @@ describe("useTraceCorrelation", () => {
           data: { hits: [], total: 0 },
         } as any);
 
-      const { performanceData, fetchCorrelation } =
-        useTraceCorrelation(traceId);
+      const { performanceData, fetchCorrelation } = useTraceCorrelation(traceId);
       await fetchCorrelation();
 
       expect(performanceData.value?.total_duration_ms).toBe(0);
@@ -398,8 +380,7 @@ describe("useTraceCorrelation", () => {
           data: { hits: [{ span_id: "span-1" }], total: 1 },
         } as any);
 
-      const { hasBackendTrace, fetchCorrelation } =
-        useTraceCorrelation(traceId);
+      const { hasBackendTrace, fetchCorrelation } = useTraceCorrelation(traceId);
 
       expect(hasBackendTrace.value).toBe(false);
 
@@ -425,8 +406,7 @@ describe("useTraceCorrelation", () => {
           data: { hits: mockBackendSpans, total: 3 },
         } as any);
 
-      const { backendSpanCount, fetchCorrelation } =
-        useTraceCorrelation(traceId);
+      const { backendSpanCount, fetchCorrelation } = useTraceCorrelation(traceId);
 
       expect(backendSpanCount.value).toBe(0);
 
@@ -454,8 +434,7 @@ describe("useTraceCorrelation", () => {
           data: { hits: [{ span_id: "span-1" }], total: 1 },
         } as any);
 
-      const { hasBackendTrace, backendSpanCount, fetchCorrelation } =
-        useTraceCorrelation(traceId);
+      const { hasBackendTrace, backendSpanCount, fetchCorrelation } = useTraceCorrelation(traceId);
 
       await fetchCorrelation();
 
@@ -539,8 +518,7 @@ describe("useTraceCorrelation", () => {
           data: { hits: [{ span_id: "span-1" }], total: 1 },
         } as any);
 
-      const { hasBackendTrace, fetchCorrelation } =
-        useTraceCorrelation(traceId);
+      const { hasBackendTrace, fetchCorrelation } = useTraceCorrelation(traceId);
 
       await fetchCorrelation();
       expect(hasBackendTrace.value).toBe(false);
@@ -558,8 +536,7 @@ describe("useTraceCorrelation", () => {
         data: { hits: [], total: 0 },
       } as any);
 
-      const { correlationData, fetchCorrelation } =
-        useTraceCorrelation(traceId);
+      const { correlationData, fetchCorrelation } = useTraceCorrelation(traceId);
       await fetchCorrelation();
 
       expect(correlationData.value).not.toBeNull();
@@ -574,8 +551,7 @@ describe("useTraceCorrelation", () => {
         data: {},
       } as any);
 
-      const { correlationData, fetchCorrelation } =
-        useTraceCorrelation(traceId);
+      const { correlationData, fetchCorrelation } = useTraceCorrelation(traceId);
       await fetchCorrelation();
 
       expect(correlationData.value).not.toBeNull();
@@ -593,10 +569,7 @@ describe("useTraceCorrelation", () => {
         },
       ];
 
-      const mockBackendSpans = [
-        { span_id: "span-1", duration_ms: null },
-        { span_id: "span-2" },
-      ];
+      const mockBackendSpans = [{ span_id: "span-1", duration_ms: null }, { span_id: "span-2" }];
 
       vi.mocked(searchService.search)
         .mockResolvedValueOnce({
@@ -606,8 +579,7 @@ describe("useTraceCorrelation", () => {
           data: { hits: mockBackendSpans, total: 2 },
         } as any);
 
-      const { performanceData, fetchCorrelation } =
-        useTraceCorrelation(traceId);
+      const { performanceData, fetchCorrelation } = useTraceCorrelation(traceId);
       await fetchCorrelation();
 
       // Should handle null duration_ms gracefully (reduce treats null as 0)
@@ -734,8 +706,7 @@ describe("useTraceCorrelation", () => {
           endTime: 1_700_003_600_000_000,
         });
 
-        vi.mocked(searchService.search)
-          .mockResolvedValue({ data: { hits: [], total: 0 } } as any);
+        vi.mocked(searchService.search).mockResolvedValue({ data: { hits: [], total: 0 } } as any);
 
         const { fetchCorrelation } = useTraceCorrelation(traceId, timeRange);
         await fetchCorrelation();
@@ -746,8 +717,7 @@ describe("useTraceCorrelation", () => {
           endTime: 1_800_003_600_000_000,
         };
         vi.clearAllMocks();
-        vi.mocked(searchService.search)
-          .mockResolvedValue({ data: { hits: [], total: 0 } } as any);
+        vi.mocked(searchService.search).mockResolvedValue({ data: { hits: [], total: 0 } } as any);
 
         // Act
         await fetchCorrelation();

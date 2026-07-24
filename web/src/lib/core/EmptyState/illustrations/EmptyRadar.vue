@@ -35,24 +35,87 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <circle cx="104" cy="80" r="36" stroke="var(--color-border-default)" stroke-width="1.5" />
     <circle cx="104" cy="80" r="54" stroke="var(--color-border-default)" stroke-width="1.5" />
     <!-- crosshair -->
-    <line x1="50" y1="80" x2="158" y2="80" stroke="var(--color-border-default)" stroke-width="1" opacity="0.6" />
-    <line x1="104" y1="26" x2="104" y2="134" stroke="var(--color-border-default)" stroke-width="1" opacity="0.6" />
+    <line
+      x1="50"
+      y1="80"
+      x2="158"
+      y2="80"
+      stroke="var(--color-border-default)"
+      stroke-width="1"
+      opacity="0.6"
+    />
+    <line
+      x1="104"
+      y1="26"
+      x2="104"
+      y2="134"
+      stroke="var(--color-border-default)"
+      stroke-width="1"
+      opacity="0.6"
+    />
 
     <!-- rotating sweep -->
     <g>
-      <animateTransform v-if="animated" attributeName="transform" type="rotate" values="0 104 80;360 104 80" dur="3.6s" repeatCount="indefinite" />
-      <path d="M104 80 L158 80 A54 54 0 0 0 142 41.8 Z" fill="var(--color-primary-500)" opacity="0.18" />
-      <line x1="104" y1="80" x2="158" y2="80" stroke="var(--color-primary-500)" stroke-width="2.5" stroke-linecap="round" />
+      <animateTransform
+        v-if="animated"
+        attributeName="transform"
+        type="rotate"
+        values="0 104 80;360 104 80"
+        dur="3.6s"
+        repeatCount="indefinite"
+      />
+      <path
+        d="M104 80 L158 80 A54 54 0 0 0 142 41.8 Z"
+        fill="var(--color-primary-500)"
+        opacity="0.18"
+      />
+      <line
+        x1="104"
+        y1="80"
+        x2="158"
+        y2="80"
+        stroke="var(--color-primary-500)"
+        stroke-width="2.5"
+        stroke-linecap="round"
+      />
     </g>
 
     <!-- blips that ping -->
     <circle cx="134" cy="56" r="4" fill="var(--color-primary-600)">
-      <animate v-if="animated" attributeName="opacity" values="0;0;1;0" keyTimes="0;0.18;0.25;0.6" dur="3.6s" repeatCount="indefinite" />
-      <animate v-if="animated" attributeName="r" values="3;3;6;3" keyTimes="0;0.18;0.25;0.6" dur="3.6s" repeatCount="indefinite" />
+      <animate
+        v-if="animated"
+        attributeName="opacity"
+        values="0;0;1;0"
+        keyTimes="0;0.18;0.25;0.6"
+        dur="3.6s"
+        repeatCount="indefinite"
+      />
+      <animate
+        v-if="animated"
+        attributeName="r"
+        values="3;3;6;3"
+        keyTimes="0;0.18;0.25;0.6"
+        dur="3.6s"
+        repeatCount="indefinite"
+      />
     </circle>
     <circle cx="76" cy="104" r="4" fill="var(--color-primary-400)">
-      <animate v-if="animated" attributeName="opacity" values="0;0;1;0" keyTimes="0;0.62;0.7;1" dur="3.6s" repeatCount="indefinite" />
-      <animate v-if="animated" attributeName="r" values="3;3;6;3" keyTimes="0;0.62;0.7;1" dur="3.6s" repeatCount="indefinite" />
+      <animate
+        v-if="animated"
+        attributeName="opacity"
+        values="0;0;1;0"
+        keyTimes="0;0.62;0.7;1"
+        dur="3.6s"
+        repeatCount="indefinite"
+      />
+      <animate
+        v-if="animated"
+        attributeName="r"
+        values="3;3;6;3"
+        keyTimes="0;0.62;0.7;1"
+        dur="3.6s"
+        repeatCount="indefinite"
+      />
     </circle>
 
     <!-- center hub -->
@@ -65,8 +128,5 @@ import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
 
-withDefaults(
-  defineProps<{ width?: number; animated?: boolean }>(),
-  { width: 208, animated: true },
-);
+withDefaults(defineProps<{ width?: number; animated?: boolean }>(), { width: 208, animated: true });
 </script>

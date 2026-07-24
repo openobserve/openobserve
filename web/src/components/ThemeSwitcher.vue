@@ -15,9 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OButton variant="ghost" size="icon-toolbar" data-test="navbar-theme-toggle-btn" @click="toggleDarkMode">
+  <OButton
+    variant="ghost"
+    size="icon-toolbar"
+    data-test="navbar-theme-toggle-btn"
+    @click="toggleDarkMode"
+  >
     <Transition name="theme-icon" mode="out-in">
-      <OIcon :key="darkMode ? 'dark' : 'light'" :name="darkMode ? 'dark-mode' : 'light-mode'" size="sm" class="size-5!" />
+      <OIcon
+        :key="darkMode ? 'dark' : 'light'"
+        :name="darkMode ? 'dark-mode' : 'light-mode'"
+        size="sm"
+        class="size-5!"
+      />
     </Transition>
     <OTooltip side="top" align="center" :content="tooltipText" />
   </OButton>
@@ -75,7 +85,7 @@ export default defineComponent({
         if (darkMode.value !== shouldBeDark) {
           darkMode.value = shouldBeDark;
         }
-      }
+      },
     );
 
     const setTheme = (theme: any) => {
@@ -92,7 +102,7 @@ export default defineComponent({
       // match `theme` before setTheme runs, so the html-class toggle reads it
       // directly rather than re-deriving the boolean from the string arg.
       switchThemeMode(theme, () => {
-        document.documentElement.classList.toggle('dark', darkMode.value);
+        document.documentElement.classList.toggle("dark", darkMode.value);
         store.dispatch("appTheme", theme);
       });
     };
@@ -110,4 +120,3 @@ export default defineComponent({
   },
 });
 </script>
-

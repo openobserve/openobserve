@@ -23,10 +23,7 @@ import searchService from "@/services/search";
 import { useHistogram } from "@/composables/useLogs/useHistogram";
 import { logsErrorMessage } from "@/utils/common";
 
-import {
-  getFunctionErrorMessage,
-  generateTraceContext,
-} from "@/utils/zincutils";
+import { getFunctionErrorMessage, generateTraceContext } from "@/utils/zincutils";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
@@ -35,8 +32,7 @@ export const usePagination = () => {
   const store = useStore();
   const router = useRouter();
   const { t } = useI18n();
-  let { searchObj, searchObjDebug, searchAggData, notificationMsg } =
-    searchState();
+  let { searchObj, searchObjDebug, searchAggData, notificationMsg } = searchState();
 
   const { getHistogramTitle } = useHistogram();
   const {
@@ -129,17 +125,14 @@ export const usePagination = () => {
         (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null);
 
       if (searchObj.data.queryResults.histogram_interval) {
-        queryReq.query.histogram_interval =
-          searchObj.data.queryResults.histogram_interval;
+        queryReq.query.histogram_interval = searchObj.data.queryResults.histogram_interval;
       }
 
       const { traceparent, traceId } = generateTraceContext();
       addTraceId(traceId);
       //here we are deciding search because when we have jobID present (search schedule job ) then we need to call get_scheduled_search_result
       //else we will call search
-      const decideSearch = searchObj.meta.jobId
-        ? "get_scheduled_search_result"
-        : "search";
+      const decideSearch = searchObj.meta.jobId ? "get_scheduled_search_result" : "search";
       searchService[decideSearch](
         {
           org_identifier: searchObj.organizationIdentifier,
@@ -175,13 +168,9 @@ export const usePagination = () => {
             searchObj.data.datetime.type = "absolute";
             queryReq.query.start_time = res.data.new_start_time;
             queryReq.query.end_time = res.data.new_end_time;
-            searchObj.data.histogramQuery.query.start_time =
-              res.data.new_start_time;
-            searchObj.data.histogramQuery.query.end_time =
-              res.data.new_end_time;
-            if (
-              searchObj.data.queryResults.partitionDetail.partitions.length == 1
-            ) {
+            searchObj.data.histogramQuery.query.start_time = res.data.new_start_time;
+            searchObj.data.histogramQuery.query.end_time = res.data.new_end_time;
+            if (searchObj.data.queryResults.partitionDetail.partitions.length == 1) {
               searchObj.data.queryResults.partitionDetail.partitions[0].start_time =
                 res.data.new_start_time;
             }
@@ -206,14 +195,10 @@ export const usePagination = () => {
               item,
             ] of searchObj.data.queryResults.partitionDetail.partitions.entries()) {
               if (
-                searchObj.data.queryResults.partitionDetail.partitionTotal[
-                  index
-                ] == -1 &&
+                searchObj.data.queryResults.partitionDetail.partitionTotal[index] == -1 &&
                 queryReq.query.start_time == item[0]
               ) {
-                searchObj.data.queryResults.partitionDetail.partitionTotal[
-                  index
-                ] = res.data.total;
+                searchObj.data.queryResults.partitionDetail.partitionTotal[index] = res.data.total;
               }
             }
             //final outupt would look like this
@@ -239,10 +224,7 @@ export const usePagination = () => {
           }
           // if total records in partition is greater than recordsPerPage then we need to update pagination
           // setting up forceFlag to true to update pagination as we have check for pagination already created more than currentPage + 3 pages.
-          if (
-            searchObj.meta.jobId == "" &&
-            !(queryReq.query?.streaming_output || isAggregation)
-          ) {
+          if (searchObj.meta.jobId == "" && !(queryReq.query?.streaming_output || isAggregation)) {
             refreshPartitionPagination(regeratePaginationFlag);
           }
           // Scan-size and took time in histogram title
@@ -256,13 +238,11 @@ export const usePagination = () => {
           // Normal
 
           if (queryReq.query?.streaming_output) {
-            searchObj.data.queryResults.total =
-              searchObj.data.queryResults.hits.length;
+            searchObj.data.queryResults.total = searchObj.data.queryResults.hits.length;
             searchObj.data.queryResults.from = res.data.from;
             searchObj.data.queryResults.scan_size = isInitialRequest
               ? res.data.scan_size
-              : (searchObj.data.queryResults.scan_size || 0) +
-                res.data.scan_size;
+              : (searchObj.data.queryResults.scan_size || 0) + res.data.scan_size;
             searchObj.data.queryResults.took = isInitialRequest
               ? res.data.took
               : (searchObj.data.queryResults.took || 0) + res.data.took;
@@ -276,8 +256,7 @@ export const usePagination = () => {
               : (searchObj.data.queryResults.total || 0) + res.data.total;
             searchObj.data.queryResults.scan_size = isInitialRequest
               ? res.data.scan_size
-              : (searchObj.data.queryResults.scan_size || 0) +
-                res.data.scan_size;
+              : (searchObj.data.queryResults.scan_size || 0) + res.data.scan_size;
             searchObj.data.queryResults.took = isInitialRequest
               ? res.data.took
               : (searchObj.data.queryResults.took || 0) + res.data.took;
@@ -286,23 +265,16 @@ export const usePagination = () => {
               : (searchObj.data.queryResults["hits"] = res.data.hits);
             await processPostPaginationData();
             await fetchAllParitions(queryReq);
-          } else if (
-            res.data.from > 0 ||
-            searchObj.data.queryResults.subpage > 1
-          ) {
+          } else if (res.data.from > 0 || searchObj.data.queryResults.subpage > 1) {
             if (appendResult && !queryReq.query?.streaming_output) {
               searchObj.data.queryResults.from += res.data.from;
               searchObj.data.queryResults.scan_size += res.data.scan_size;
               searchObj.data.queryResults.took += res.data.took;
-              await chunkedAppend(
-                searchObj.data.queryResults.hits,
-                res.data.hits,
-              );
+              await chunkedAppend(searchObj.data.queryResults.hits, res.data.hits);
             } else {
               // Replace result
               if (queryReq.query?.streaming_output) {
-                searchObj.data.queryResults.total =
-                  searchObj.data.queryResults.hits.length;
+                searchObj.data.queryResults.total = searchObj.data.queryResults.hits.length;
                 searchObj.data.queryResults.from = res.data.from;
                 searchObj.data.queryResults.scan_size += res.data.scan_size;
                 searchObj.data.queryResults.took += res.data.took;
@@ -359,8 +331,7 @@ export const usePagination = () => {
           //here also we are getting the is_histogram_eligible flag from the BE
           //so that we can use it whenever we might not send the partition call from here also it will get updated
           //this is coming as a part of data api call which is search call
-          searchObj.data.queryResults.is_histogram_eligible =
-            res.data.is_histogram_eligible;
+          searchObj.data.queryResults.is_histogram_eligible = res.data.is_histogram_eligible;
           // check for pagination request for the partition and check for subpage if we have to pull data from multiple partitions
           // it will check for subpage and if subpage is present then it will send pagination request for next partition
           if (
@@ -370,8 +341,7 @@ export const usePagination = () => {
               searchObj.data.resultGrid.currentPage - 1
             ].length > searchObj.data.queryResults.subpage &&
             searchObj.data.queryResults.hits.length <
-              searchObj.meta.resultGrid.rowsPerPage *
-                searchObj.data.stream.selectedStream.length
+              searchObj.meta.resultGrid.rowsPerPage * searchObj.data.stream.selectedStream.length
           ) {
             queryReq.query.start_time =
               searchObj.data.queryResults.partitionDetail.paginations[
@@ -436,15 +406,12 @@ export const usePagination = () => {
 
           let trace_id = "";
           searchObj.data.errorMsg =
-            typeof err == "string" && err
-              ? err
-              : "Error while processing histogram request.";
+            typeof err == "string" && err ? err : "Error while processing histogram request.";
           if (err.response != undefined) {
             searchObj.data.errorMsg =
               err.response?.data?.error || err.response?.data?.message || "";
             if (Object.prototype.hasOwnProperty.call(err.response.data, "error_detail")) {
-              searchObj.data.errorDetail =
-                err.response?.data?.error_detail || "";
+              searchObj.data.errorDetail = err.response?.data?.error_detail || "";
             }
             if (Object.prototype.hasOwnProperty.call(err.response.data, "trace_id")) {
               trace_id = err.response.data?.trace_id;
@@ -456,9 +423,7 @@ export const usePagination = () => {
             }
           }
 
-          const customMessage = logsErrorMessage(
-            err?.response?.data?.code || "",
-          );
+          const customMessage = logsErrorMessage(err?.response?.data?.code || "");
           searchObj.data.errorCode = err?.response?.data?.code || "";
 
           if (customMessage != "") {
@@ -470,15 +435,12 @@ export const usePagination = () => {
           if (err?.request?.status >= 429 || err?.request?.status == 400) {
             notificationMsg.value = err?.response?.data?.message || "";
             searchObj.data.errorMsg = err?.response?.data?.message || "";
-            searchObj.data.errorDetail =
-              err?.response?.data?.error_detail || "";
+            searchObj.data.errorDetail = err?.response?.data?.error_detail || "";
           }
 
           if (trace_id) {
             searchObj.data.errorMsg +=
-              " <br><span class='text-subtitle1'>TraceID:" +
-              trace_id +
-              "</span>";
+              " <br><span class='text-subtitle1'>TraceID:" + trace_id + "</span>";
             notificationMsg.value += " TraceID:" + trace_id;
             trace_id = "";
           }
@@ -517,10 +479,7 @@ export const usePagination = () => {
       const partitionDetail = searchObj.data.queryResults.partitionDetail;
       let lastPartitionSize = 0;
       //we generally get the pagination upto 3 pages ahead of the current page
-      if (
-        partitionDetail.paginations.length <= currentPage + 3 ||
-        regenrateFlag
-      ) {
+      if (partitionDetail.paginations.length <= currentPage + 3 || regenrateFlag) {
         partitionDetail.paginations = [];
 
         let pageNumber = 0;
@@ -559,23 +518,16 @@ export const usePagination = () => {
         } else {
           // if streaming output is enabled, then we need to update the total as the last partition total, as the last partition total is the total of all the records in case of streaming output
           if (isStreamingOutput) {
-            if (
-              partitionDetail.partitionTotal[
-                partitionDetail.partitionTotal?.length - 1
-              ] > -1
-            )
+            if (partitionDetail.partitionTotal[partitionDetail.partitionTotal?.length - 1] > -1)
               searchObj.data.queryResults.total =
-                partitionDetail.partitionTotal[
-                  partitionDetail.partitionTotal.length - 1
-                ];
+                partitionDetail.partitionTotal[partitionDetail.partitionTotal.length - 1];
           } else {
             // if streaming output is disabled, then we need to update the total as the sum of all partition totals
-            searchObj.data.queryResults.total =
-              partitionDetail.partitionTotal.reduce(
-                (accumulator: number, currentValue: number) =>
-                  accumulator + Math.max(currentValue, 0),
-                0,
-              );
+            searchObj.data.queryResults.total = partitionDetail.partitionTotal.reduce(
+              (accumulator: number, currentValue: number) =>
+                accumulator + Math.max(currentValue, 0),
+              0,
+            );
           }
         }
         // partitionDetail.partitions.forEach((item: any, index: number) => {
@@ -592,9 +544,7 @@ export const usePagination = () => {
             partitionFrom = 0;
             for (let i = 0; i < totalPages; i++) {
               recordSize =
-                i === totalPages - 1
-                  ? total - partitionFrom || rowsPerPage
-                  : rowsPerPage;
+                i === totalPages - 1 ? total - partitionFrom || rowsPerPage : rowsPerPage;
               from = partitionFrom;
 
               if (total < recordSize) {
@@ -639,17 +589,11 @@ export const usePagination = () => {
 
               partitionFrom += recordSize;
 
-              if (
-                recordSize == rowsPerPage ||
-                lastPartitionSize + recordSize == rowsPerPage
-              ) {
+              if (recordSize == rowsPerPage || lastPartitionSize + recordSize == rowsPerPage) {
                 pageNumber++;
               }
 
-              if (
-                partitionDetail.paginations.length >
-                searchObj.data.resultGrid.currentPage + 10
-              ) {
+              if (partitionDetail.paginations.length > searchObj.data.resultGrid.currentPage + 10) {
                 return true;
               }
             }
@@ -688,10 +632,7 @@ export const usePagination = () => {
             }
           }
 
-          if (
-            partitionDetail.paginations.length >
-            searchObj.data.resultGrid.currentPage + 10
-          ) {
+          if (partitionDetail.paginations.length > searchObj.data.resultGrid.currentPage + 10) {
             return true;
           }
         }
@@ -714,14 +655,11 @@ export const usePagination = () => {
    * @returns The total number of pages for the partition
    */
   const getPartitionTotalPages = (total: number) => {
-    const lastPage =
-      searchObj.data.queryResults.partitionDetail.paginations?.length - 1;
+    const lastPage = searchObj.data.queryResults.partitionDetail.paginations?.length - 1;
 
     let lastPartitionSize = 0;
     let partitionTotal = 0;
-    for (const item of searchObj.data.queryResults.partitionDetail.paginations[
-      lastPage
-    ]) {
+    for (const item of searchObj.data.queryResults.partitionDetail.paginations[lastPage]) {
       lastPartitionSize += item.size;
     }
 

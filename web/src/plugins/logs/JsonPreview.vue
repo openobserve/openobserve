@@ -1,9 +1,9 @@
 <template>
   <div>
-    <div class="pb-1 flex justify-start px-3 copy-log-btn">
-      <app-tabs
+    <div class="copy-log-btn flex justify-start px-3 pb-1">
+      <AppTabs
         v-if="filteredTabs.length"
-        class="mb-1.5 mr-2 h-fit overflow-hidden border-t border-l border-r border-solid border-card-glass-border rounded-default"
+        class="border-card-glass-border rounded-default mr-2 mb-1.5 h-fit overflow-hidden border-t border-r border-l border-solid"
         data-test="logs-json-preview-tabs"
         :tabs="filteredTabs"
         v-model:active-tab="activeTab"
@@ -14,25 +14,26 @@
         :label="t('common.copyToClipboard')"
         size="xs"
         variant="outline"
-        class="mb-1.5 mr-2"
+        class="mr-2 mb-1.5"
         @click="copyLogToClipboard"
-      ><OIcon name="content-copy" size="xs" class="mr-1" />{{ t('common.copyToClipboard') }}</OButton>
-        <OButton
+        ><OIcon name="content-copy" size="xs" class="mr-1" />{{
+          t("common.copyToClipboard")
+        }}</OButton
+      >
+      <OButton
         v-if="showViewRelatedBtn"
         size="xs"
         variant="outline"
-        class="mb-1.5 mr-2"
+        class="mr-2 mb-1.5"
         @click="openCorrelation"
         data-test="log-correlation-btn"
       >
-        <OIcon name="link" size="xs" class="mr-1" />{{ t('search.viewRelated') }}
+        <OIcon name="link" size="xs" class="mr-1" />{{ t("search.viewRelated") }}
         <OTooltip :content="t('search.viewRelatedTooltip')" />
       </OButton>
       <div
-        v-if="
-          showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)
-        "
-        class="o2-input flex items-center logs-trace-selector"
+        v-if="showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)"
+        class="o2-input logs-trace-selector flex items-center"
       >
         <OSelect
           data-test="log-search-index-list-select-stream"
@@ -49,7 +50,8 @@
           size="sm-action"
           variant="outline"
           @click="redirectToTraces"
-        ><OIcon name="account-tree" size="sm" class="mr-1" />{{ t('search.viewTrace') }}</OButton>
+          ><OIcon name="account-tree" size="sm" class="mr-1" />{{ t("search.viewTrace") }}</OButton
+        >
       </div>
     </div>
     <div v-show="activeTab === 'unflattened'" class="pl-3">
@@ -58,7 +60,7 @@
         <!-- Editor sizing is inlined (not scoped CSS) so it doesn't leak onto
              every .monaco-editor app-wide. The focus-border is left off so this
              editor stays borderless like the others. -->
-        <code-query-editor
+        <CodeQueryEditor
           v-model:query="unflattendData"
           ref="queryEditorRef"
           :editor-id="`logs-json-preview-unflattened-json-editor-${previewId}`"
@@ -71,7 +73,7 @@
     <div v-show="activeTab !== 'unflattened'" class="pl-3">
       {
       <div
-        class="log_json_content whitespace-pre-wrap font-mono text-xs flex"
+        class="log_json_content flex font-mono text-xs whitespace-pre-wrap"
         v-for="(key, index) in Object.keys(value)"
         :key="key"
         :data-test="`log-detail-row-${key}`"
@@ -87,7 +89,7 @@
               data-test="log-details-include-exclude-field-btn"
               size="xs"
               variant="ghost"
-              class="ml-2 h-5! w-5! min-h-5! min-w-5! p-0! align-middle"
+              class="ml-2 h-5! min-h-5! w-5! min-w-5! p-0! align-middle"
               :aria-label="t('logs.jsonPreview.addIcon')"
             >
               <OIcon :name="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'" size="sm" />
@@ -150,7 +152,7 @@
             <template #icon-left>
               <img :src="getBtnLogo" width="14" height="14" alt="" />
             </template>
-            {{ t('logs.jsonPreview.sendToAiChat') }}
+            {{ t("logs.jsonPreview.sendToAiChat") }}
           </ODropdownItem>
           <ODropdownItem
             v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
@@ -164,10 +166,7 @@
           </ODropdownItem>
         </ODropdown>
 
-        <span
-          class="pl-1"
-          :data-test="`log-expand-detail-key-${key}`"
-        >
+        <span class="pl-1" :data-test="`log-expand-detail-key-${key}`">
           <span class="log-key">{{ key }}</span
           ><span class="log-separator">: </span
           ><span
@@ -187,7 +186,7 @@
       }
       <div
         v-if="showMenu"
-        class="context-menu shadow-lg rounded-default min-w-50 py-1 [font-size: var(--text-compact)] bg-surface-overlay border border-border-default text-text-body"
+        class="context-menu rounded-default [font-size: var(--text-compact)] bg-surface-overlay border-border-default text-text-body min-w-50 border py-1 shadow-lg"
         :style="{
           position: 'fixed',
           top: `${menuY}px`,
@@ -196,14 +195,14 @@
         }"
       >
         <div
-          class="py-1.5 px-3 flex items-center cursor-pointer [transition:background-color_0.2s] hover:bg-dropdown-item-hover-bg"
+          class="hover:bg-dropdown-item-hover-bg flex cursor-pointer items-center px-3 py-1.5 [transition:background-color_0.2s]"
           @click="copySelectedText"
         >
           <OIcon name="content-copy" size="sm" class="mr-2" />
-          {{ t('logs.jsonPreview.copy') }}
+          {{ t("logs.jsonPreview.copy") }}
         </div>
         <div
-          class="py-1.5 px-3 flex items-center cursor-pointer [transition:background-color_0.2s] hover:bg-dropdown-item-hover-bg"
+          class="hover:bg-dropdown-item-hover-bg flex cursor-pointer items-center px-3 py-1.5 [transition:background-color_0.2s]"
           @click="handleCreateRegex"
         >
           <img
@@ -212,11 +211,12 @@
             style="width: 14px; height: 14px"
             alt=""
           />
-          {{ t('logs.jsonPreview.createRegexPattern') }}
+          {{ t("logs.jsonPreview.createRegexPattern") }}
         </div>
       </div>
     </div>
-    <ODialog data-test="json-preview-regex-pattern-dialog"
+    <ODialog
+      data-test="json-preview-regex-pattern-dialog"
       v-if="config.isEnterprise == 'true'"
       v-model:open="typeOfRegexPattern"
       size="lg"
@@ -328,9 +328,7 @@ export default {
     ODropdown,
     ODropdownItem,
     ODropdownSeparator,
-    CodeQueryEditor: defineAsyncComponent(
-      () => import("@/components/CodeQueryEditor.vue"),
-    ),
+    CodeQueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
     OSpinner,
     OTooltip,
     OInput,
@@ -396,9 +394,7 @@ export default {
     const copyLogToClipboard = () => {
       emit(
         "copy",
-        activeTab.value === "unflattened"
-          ? JSON.parse(unflattendData.value)
-          : props.value,
+        activeTab.value === "unflattened" ? JSON.parse(unflattendData.value) : props.value,
       );
     };
     const addSearchTerm = (
@@ -445,30 +441,16 @@ export default {
       const results: Array<{ name: string; resolvedUrl: string }> = [];
 
       for (const link of stream_links) {
-        if (
-          link.fields?.some((f: any) => f.name === originalFieldName && f.alias)
-        ) {
-          const resolved = resolveCrossLinkUrl(
-            link.url,
-            originalFieldName,
-            fieldValue,
-          );
+        if (link.fields?.some((f: any) => f.name === originalFieldName && f.alias)) {
+          const resolved = resolveCrossLinkUrl(link.url, originalFieldName, fieldValue);
           results.push({ name: link.name, resolvedUrl: resolved });
         }
       }
 
       if (!streamCoveredFields.has(originalFieldName)) {
         for (const link of org_links) {
-          if (
-            link.fields?.some(
-              (f: any) => f.name === originalFieldName && f.alias,
-            )
-          ) {
-            const resolved = resolveCrossLinkUrl(
-              link.url,
-              originalFieldName,
-              fieldValue,
-            );
+          if (link.fields?.some((f: any) => f.name === originalFieldName && f.alias)) {
+            const resolved = resolveCrossLinkUrl(link.url, originalFieldName, fieldValue);
             results.push({ name: link.name, resolvedUrl: resolved });
           }
         }
@@ -488,10 +470,7 @@ export default {
 
       return urlTemplate
         .replace(/\$\{field\.__name\}/g, encodeURIComponent(String(fieldName)))
-        .replace(
-          /\$\{field\.__value\}/g,
-          encodeURIComponent(String(fieldValue ?? "")),
-        )
+        .replace(/\$\{field\.__value\}/g, encodeURIComponent(String(fieldValue ?? "")))
         .replace(/\$\{start_time\}/g, String(startTime))
         .replace(/\$\{end_time\}/g, String(endTime))
         .replace(/\$\{query\}/g, encodeURIComponent(query))
@@ -527,24 +506,16 @@ export default {
         // AND service_streams is enabled in config
         // AND hideViewRelated prop is not set (used by DetailTable drawer to hide the button)
         // Mode can be 'sidebar' (when opened from sidebar) or 'expanded' (when log row is expanded in table)
-        const isDetailView =
-          props.mode === "sidebar" || props.mode === "expanded";
-        const serviceStreamsEnabled =
-          store.state.zoConfig.service_streams_enabled !== false; // Default to true if not set
+        const isDetailView = props.mode === "sidebar" || props.mode === "expanded";
+        const serviceStreamsEnabled = store.state.zoConfig.service_streams_enabled !== false; // Default to true if not set
 
         if (isDetailView && serviceStreamsEnabled) {
           const available = await isCorrelationAvailable();
           showViewRelatedBtn.value =
-            available &&
-            isDetailView &&
-            serviceStreamsEnabled &&
-            !props.hideViewRelated;
+            available && isDetailView && serviceStreamsEnabled && !props.hideViewRelated;
         }
       } catch (err) {
-        console.error(
-          "[JsonPreview] Error checking correlation availability:",
-          err,
-        );
+        console.error("[JsonPreview] Error checking correlation availability:", err);
         showViewRelatedBtn.value = false;
       }
     });
@@ -555,9 +526,7 @@ export default {
         getStreams("traces", false)
           .then((res: any) => {
             tracesStreams.value = res.list.map((option: any) => option.name);
-            filteredTracesStreamOptions.value = JSON.parse(
-              JSON.stringify(tracesStreams.value),
-            );
+            filteredTracesStreamOptions.value = JSON.parse(JSON.stringify(tracesStreams.value));
 
             if (!searchObj.meta.selectedTraceStream.length)
               searchObj.meta.selectedTraceStream = tracesStreams.value[0];
@@ -574,19 +543,14 @@ export default {
 
     const setViewTraceBtn = () => {
       // Hide view traces button when service_streams_enabled is true
-      const serviceStreamsEnabled =
-        store.state.zoConfig.service_streams_enabled !== false;
+      const serviceStreamsEnabled = store.state.zoConfig.service_streams_enabled !== false;
 
       showViewTraceBtn.value =
         !store.state.hiddenMenus.has("traces") && // Check if traces menu is hidden
         !serviceStreamsEnabled && // Hide when service streams is enabled
-        props.value[
-          store.state.organizationData?.organizationSettings
-            ?.trace_id_field_name
-        ];
+        props.value[store.state.organizationData?.organizationSettings?.trace_id_field_name];
 
-      if (showViewTraceBtn.value && !filteredTracesStreamOptions.value.length)
-        getTracesStreams();
+      if (showViewTraceBtn.value && !filteredTracesStreamOptions.value.length) getTracesStreams();
     };
 
     onBeforeMount(() => {
@@ -624,9 +588,7 @@ export default {
           const wouldOverflow = e.clientX + menuWidth > windowWidth;
 
           // Position menu to the left if it would overflow, otherwise to the right
-          menuX.value = wouldOverflow
-            ? e.clientX - menuWidth - 5
-            : e.clientX + 15;
+          menuX.value = wouldOverflow ? e.clientX - menuWidth - 5 : e.clientX + 15;
           menuY.value = e.clientY + 15;
 
           showMenu.value = true;
@@ -690,20 +652,14 @@ export default {
           },
           "ui",
         );
-        const formattedData = JSON.stringify(
-          JSON.parse(res.data.hits[0]._original),
-          null,
-          2,
-        );
+        const formattedData = JSON.stringify(JSON.parse(res.data.hits[0]._original), null, 2);
         unflattendData.value = formattedData;
         //store the data in cache of searchObj
         searchObj.data.originalDataCache[cacheKey] = formattedData;
       } catch (err: any) {
         loading.value = false;
         toast({
-          message:
-            err.response?.data?.message ||
-            t('logs.jsonPreview.failedToGetOriginalData'),
+          message: err.response?.data?.message || t("logs.jsonPreview.failedToGetOriginalData"),
           variant: "error",
         });
       } finally {
@@ -713,9 +669,7 @@ export default {
 
     const updateMultiStreamFields = () => {
       searchObj.data.stream.selectedStreamFields.forEach((item: any) => {
-        if (
-          item.streams?.length == searchObj.data.stream.selectedStream.length
-        ) {
+        if (item.streams?.length == searchObj.data.stream.selectedStream.length) {
           multiStreamFields.value.push(item.name);
         }
       });
@@ -739,11 +693,9 @@ export default {
     );
 
     const filterStreamFn = (val: any = "") => {
-      filteredTracesStreamOptions.value = tracesStreams.value.filter(
-        (stream: any) => {
-          return stream.toLowerCase().indexOf(val.toLowerCase()) > -1;
-        },
-      );
+      filteredTracesStreamOptions.value = tracesStreams.value.filter((stream: any) => {
+        return stream.toLowerCase().indexOf(val.toLowerCase()) > -1;
+      });
     };
 
     const redirectToTraces = () => {
@@ -850,8 +802,8 @@ export default {
     const copySelectedText = () => {
       if (selectedText.value) {
         copyToClipboard(selectedText.value, {
-          successMessage: t('logs.jsonPreview.textCopiedToClipboard'),
-          errorMessage: t('logs.jsonPreview.failedToCopyText'),
+          successMessage: t("logs.jsonPreview.textCopiedToClipboard"),
+          errorMessage: t("logs.jsonPreview.failedToCopyText"),
           timeout: 1500,
         }).then((success) => {
           if (success) {
@@ -949,4 +901,3 @@ export default {
   },
 };
 </script>
-

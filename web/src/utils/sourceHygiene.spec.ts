@@ -48,8 +48,7 @@ describe("source hygiene", () => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const path = join(dir, entry.name);
       if (entry.isDirectory()) out.push(...walk(path));
-      else if (SOURCE_EXTENSIONS.some((ext) => entry.name.endsWith(ext)))
-        out.push(path);
+      else if (SOURCE_EXTENSIONS.some((ext) => entry.name.endsWith(ext))) out.push(path);
     }
     return out;
   };

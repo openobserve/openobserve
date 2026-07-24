@@ -23,8 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @mouseover="
       () => {
         // if hoveredSeriesState is not null then set panelId
-        if (hoveredSeriesState)
-          hoveredSeriesState.panelId = data?.extras?.panelId;
+        if (hoveredSeriesState) hoveredSeriesState.panelId = data?.extras?.panelId;
       }
     "
     @mouseleave="
@@ -55,8 +54,7 @@ function findNearestIndex(sortedArray: any, target: any) {
 
     if (
       nearestIndex === -1 ||
-      Math.abs(sortedArray[mid][0] - target) <
-        Math.abs(sortedArray[nearestIndex][0] - target)
+      Math.abs(sortedArray[mid][0] - target) < Math.abs(sortedArray[nearestIndex][0] - target)
     ) {
       nearestIndex = mid; // Update nearestIndex if current element is closer to the target
     }
@@ -271,12 +269,9 @@ export default defineComponent({
     }, DEBOUNCE_TIMEOUT);
 
     // Create a stable throttled function that persists between renders
-    const throttledSetHoveredSeriesIndex = throttle(
-      (arg1, arg2, arg3, arg4) => {
-        hoveredSeriesState?.value?.setIndex(arg1, arg2, arg3, arg4);
-      },
-      DEBOUNCE_TIMEOUT,
-    );
+    const throttledSetHoveredSeriesIndex = throttle((arg1, arg2, arg3, arg4) => {
+      hoveredSeriesState?.value?.setIndex(arg1, arg2, arg3, arg4);
+    }, DEBOUNCE_TIMEOUT);
 
     const mouseHoverEffectFn = (params: any) => {
       // if chart type is pie then set seriesName and seriesIndex from data and dataIndex
@@ -318,9 +313,7 @@ export default defineComponent({
 
     const legendSelectChangedFn = (params: any) => {
       // check if all series are selected (all will be false)
-      if (
-        Object.values(params.selected).every((value: any) => value === false)
-      ) {
+      if (Object.values(params.selected).every((value: any) => value === false)) {
         // set all series to true
         Object.keys(params.selected).forEach((name: any) => {
           params.selected[name] = true;
@@ -383,20 +376,15 @@ export default defineComponent({
       if (params.value !== undefined && params.value !== null) {
         // For array format [x, y], take y value
         if (Array.isArray(params.value)) {
-          dataPointValue =
-            params.value[1] !== undefined ? params.value[1] : params.value[0];
+          dataPointValue = params.value[1] !== undefined ? params.value[1] : params.value[0];
         } else {
           dataPointValue = params.value;
         }
       } else if (params.data !== undefined && params.data !== null) {
         // Alternative data format
         if (Array.isArray(params.data)) {
-          dataPointValue =
-            params.data[1] !== undefined ? params.data[1] : params.data[0];
-        } else if (
-          typeof params.data === "object" &&
-          params.data.value !== undefined
-        ) {
+          dataPointValue = params.data[1] !== undefined ? params.data[1] : params.data[0];
+        } else if (typeof params.data === "object" && params.data.value !== undefined) {
           dataPointValue = params.data.value;
         } else {
           dataPointValue = params.data;
@@ -450,30 +438,16 @@ export default defineComponent({
         }
 
         const rect = chartContainer.getBoundingClientRect();
-        const pixelPoint = [
-          event.clientX - rect.left,
-          event.clientY - rect.top,
-        ];
+        const pixelPoint = [event.clientX - rect.left, event.clientY - rect.top];
 
         // Convert pixel coordinates to data values using the chart's coordinate system
-        const pointInGrid = chart.convertFromPixel(
-          { gridIndex: 0 },
-          pixelPoint,
-        );
+        const pointInGrid = chart.convertFromPixel({ gridIndex: 0 }, pixelPoint);
 
-        if (
-          pointInGrid &&
-          Array.isArray(pointInGrid) &&
-          pointInGrid.length >= 2
-        ) {
+        if (pointInGrid && Array.isArray(pointInGrid) && pointInGrid.length >= 2) {
           const yAxisValue = pointInGrid[1]; // Y-axis value at cursor position
 
           // Emit domcontextmenu event for alert creation
-          if (
-            yAxisValue !== null &&
-            yAxisValue !== undefined &&
-            !isNaN(Number(yAxisValue))
-          ) {
+          if (yAxisValue !== null && yAxisValue !== undefined && !isNaN(Number(yAxisValue))) {
             emit("domcontextmenu", {
               x: event.clientX,
               y: event.clientY,
@@ -589,8 +563,7 @@ export default defineComponent({
         ) {
           // need to check index should not be greater than series length
           const hoveredSeriesIndex =
-            chart?.getOption()?.series.length >
-            hoveredSeriesState?.value?.seriesIndex
+            chart?.getOption()?.series.length > hoveredSeriesState?.value?.seriesIndex
               ? hoveredSeriesState?.value?.seriesIndex
               : 0;
           let hoveredSeriesDataIndex = hoveredSeriesState?.value?.dataIndex;
@@ -598,12 +571,9 @@ export default defineComponent({
           // if hovered series dataindex is not there
           // or check hovered time is not at the same index in the current chart (ie if at same index then not need to find nearest index)
           if (
-            !chart?.getOption()?.series[hoveredSeriesIndex]?.data[
-              hoveredSeriesDataIndex
-            ] ||
-            chart?.getOption()?.series[hoveredSeriesIndex]?.data[
-              hoveredSeriesDataIndex
-            ][0] != hoveredSeriesState.value?.hoveredTime
+            !chart?.getOption()?.series[hoveredSeriesIndex]?.data[hoveredSeriesDataIndex] ||
+            chart?.getOption()?.series[hoveredSeriesIndex]?.data[hoveredSeriesDataIndex][0] !=
+              hoveredSeriesState.value?.hoveredTime
           ) {
             hoveredSeriesDataIndex = findNearestIndex(
               chart?.getOption()?.series[hoveredSeriesIndex]?.data ?? [],
@@ -663,10 +633,8 @@ export default defineComponent({
         options.animation = false;
         try {
           // Use notMerge flag from data prop if available, otherwise default to true
-          const notMerge =
-            props.data?.notMerge !== undefined ? props.data.notMerge : true;
-          const lazyUpdate =
-            props.data?.lazyUpdate !== undefined ? props.data.lazyUpdate : true;
+          const notMerge = props.data?.notMerge !== undefined ? props.data.notMerge : true;
+          const lazyUpdate = props.data?.lazyUpdate !== undefined ? props.data.lazyUpdate : true;
           chart?.setOption(withChartFont(options), { lazyUpdate, notMerge });
           chart?.setOption({ animation: true }, { lazyUpdate: true });
         } catch (e: any) {
@@ -695,10 +663,7 @@ export default defineComponent({
           zeroSizeReinitObserver = null;
           return;
         }
-        if (
-          chartRef.value.clientWidth > 0 &&
-          chartRef.value.clientHeight > 0
-        ) {
+        if (chartRef.value.clientWidth > 0 && chartRef.value.clientHeight > 0) {
           zeroSizeReinitObserver?.disconnect();
           zeroSizeReinitObserver = null;
           const theme = isDark.value ? "dark" : "light";
@@ -731,10 +696,7 @@ export default defineComponent({
           chart = echarts.init(chartRef.value, theme, {
             renderer: props.renderType,
           });
-          if (
-            chartRef.value.clientWidth === 0 ||
-            chartRef.value.clientHeight === 0
-          ) {
+          if (chartRef.value.clientWidth === 0 || chartRef.value.clientHeight === 0) {
             reinitWhenSized();
           }
         }
@@ -910,7 +872,7 @@ export default defineComponent({
       handleNativeContextMenu,
       get chart() {
         return chart;
-      }
+      },
     };
   },
 });

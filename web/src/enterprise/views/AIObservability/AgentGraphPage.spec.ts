@@ -42,7 +42,6 @@ vi.mock("@/services/gen-ai-agent-mapping.service", () => ({
   },
 }));
 
-
 vi.mock("@/composables/useTraces", () => ({
   default: vi.fn(() => ({ searchObj: mockSearchObj })),
 }));
@@ -76,13 +75,7 @@ vi.mock("vue", async (importOriginal) => {
     defineAsyncComponent: () =>
       actual.defineComponent({
         name: "ServiceGraphStub",
-        props: [
-          "streamFilter",
-          "vizType",
-          "layoutType",
-          "hideStreamSelector",
-          "agentHighlight",
-        ],
+        props: ["streamFilter", "vizType", "layoutType", "hideStreamSelector", "agentHighlight"],
         template: `<div data-test="service-graph-stub" :data-stream="streamFilter" :data-viz="vizType" :data-layout="layoutType" />`,
       }),
   };

@@ -44,17 +44,12 @@ export default defineComponent({
     const route = useRoute();
     const downloadDashboard = async () => {
       // get the dashboard
-      const dashboard = await getDashboard(
-        store,
-        props.dashboardId,
-        route.query.folder,
-      );
+      const dashboard = await getDashboard(store, props.dashboardId, route.query.folder);
       dashboard.owner = "";
 
       // prepare json and download via a click
       const data =
-        "data:text/json;charset=utf-8," +
-        encodeURIComponent(JSON.stringify(dashboard, null, 2));
+        "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dashboard, null, 2));
       const htmlA = document.createElement("a");
       htmlA.setAttribute("href", data);
       const fileName = dashboard.title || "dashboard";
