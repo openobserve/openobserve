@@ -152,9 +152,18 @@ async function loadForEdit(id: string) {
   isLoadingEdit.value = true
   try {
     const org = store.state.selectedOrganization.identifier
-    const res = await syntheticsService.get(org, id)
+    const res = await syntheticsService.get(org, id, String(route.query.folder ?? ''))
     check.value = mapResponseToProtocolCheck(res.data as Record<string, unknown>)
-  } catch (err) {
+  } catch (err: any) {
+    // If the check doesn't exist in this org (e.g. user switched orgs while editing),
+    // redirect to the synthetics list with a message.
+    if (err?.response?.status === 404) {
+      forceLeave = true
+      router.push({ name: 'synthetics' })
+      toast({ variant: 'warning', message: t('synthetics.newCheck.notFoundInOrg') })
+      isLoadingEdit.value = false
+      return
+    }
     // Surface it — a silent catch here leaves a blank form that saves a
     // fresh check over the existing one.
     console.error('[synthetics] failed to load check for edit', err)
@@ -229,6 +238,13 @@ async function saveCheck() {
     router.push({ name: 'synthetics', query: { folder: check.value.folder } })
   } catch (err: any) {
     dismiss()
+    if (err?.response?.status === 404) {
+      forceLeave = true
+      router.push({ name: 'synthetics' })
+      toast({ variant: 'warning', message: t('synthetics.newCheck.notFoundInOrg') })
+      isSaving.value = false
+      return
+    }
     toast({
       variant: 'error',
       message: err?.response?.data?.message || err?.response?.data?.error || t('synthetics.newCheck.saveFailed'),

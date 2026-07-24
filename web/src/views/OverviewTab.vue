@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag type="countChip" value="warning">{{ incidentsTotal }}</OTag>
           <span v-if="incidentsTotal > incidents.length" class="ml-2 text-xs font-normal text-text-secondary align-middle">{{ t('overview.showingOf', { shown: incidents.length, total: incidentsTotal }) }}</span>
         </div>
-        <button class="text-xs font-medium text-primary-600 bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToIncidentList">{{ t('overview.viewAll') }} →</button>
+        <button class="text-xs font-medium text-text-link bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToIncidentList">{{ t('overview.viewAll') }} →</button>
       </div>
       <div class="flex flex-col border border-[0.0625em] border-border-default rounded-default overflow-hidden">
         <div
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             — viewing <strong class="font-semibold text-text-body">{{ selectedService.label ?? selectedService.id }}</strong>
           </span>
         </div>
-        <button class="text-xs font-medium text-primary-600 bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToServiceGraph">{{ t('overview.viewAll') }} →</button>
+        <button class="text-xs font-medium text-text-link bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToServiceGraph">{{ t('overview.viewAll') }} →</button>
       </div>
       <div class="relative">
         <!-- Left fade + floating scroll control (only present when scrollable) -->
@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="[
             serviceCardClass(svc),
             selectedService?.id === svc.id && servicePanelVisible
-              ? 'outline-solid outline-[0.125em] outline-primary-500 outline-offset-[-0.0625em] bg-[color-mix(in_srgb,var(--color-primary-500)_8%,var(--color-surface-base))] shadow-[0_0.125rem_0.5rem_color-mix(in_srgb,var(--color-primary-500)_22%,transparent)]'
+              ? 'outline-solid outline-[0.125em] outline-accent outline-offset-[-0.0625em] bg-[color-mix(in_srgb,var(--color-primary-500)_8%,var(--color-surface-base))] shadow-[0_0.125rem_0.5rem_color-mix(in_srgb,var(--color-primary-500)_22%,transparent)]'
               : 'hover:bg-table-row-hover-bg',
           ]"
           @click="openServicePanel(svc)"
@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="isEnterpriseOrCloud && selectedService">
       <div
         v-if="servicePanelVisible"
-        class="fixed inset-0 z-[99] bg-transparent"
+        class="fixed inset-0 z-99 bg-transparent"
         @click="closeServicePanel"
       />
       <ServiceGraphNodeSidePanel
@@ -232,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t('overview.activeAnomalies') }}
           <OTag type="countChip" value="warning">{{ anomalies.length }}</OTag>
         </div>
-        <button class="text-xs font-medium text-primary-600 bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToAnomalies">{{ t('overview.viewAll') }} →</button>
+        <button class="text-xs font-medium text-text-link bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToAnomalies">{{ t('overview.viewAll') }} →</button>
       </div>
       <div class="flex flex-col gap-1.5">
         <div
@@ -278,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t('overview.recentEvents') }}
           <OTag type="countChip" value="warning">{{ recentEvents.length }}</OTag>
         </div>
-        <button class="text-xs font-medium text-primary-600 bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToAlertList">{{ t('overview.viewAll') }} →</button>
+        <button class="text-xs font-medium text-text-link bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToAlertList">{{ t('overview.viewAll') }} →</button>
       </div>
       <div class="flex flex-col gap-0 border border-[0.0625em] border-border-default rounded-default overflow-hidden bg-surface-base">
         <div
@@ -314,37 +314,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #description>{{ t('overview.allClearDesc') }}</template>
       <template #actions>
         <!-- View alerts -->
-        <button v-if="showAlertsCard" type="button" class="focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)] group relative flex items-center gap-3 flex-1 basis-56 min-w-0 max-w-72 min-h-16 py-2.5 pr-3.5 pl-3 rounded-default border border-border-default bg-surface-base text-left cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md hover:border-primary-400 hover:bg-tabs-hover-bg" data-test="overview-empty-alerts-card" @click="goToAlertList">
-          <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default transition-[background-color,color] duration-150 bg-icon-chip-warning-bg text-icon-chip-warning-text group-hover:bg-primary-600 group-hover:text-text-inverse">
+        <button v-if="showAlertsCard" type="button" class="focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)] group relative flex items-center gap-3 flex-1 basis-56 min-w-0 max-w-72 min-h-16 py-2.5 pr-3.5 pl-3 rounded-default border border-border-default bg-surface-base text-left cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md hover:border-accent hover:bg-tabs-hover-bg" data-test="overview-empty-alerts-card" @click="goToAlertList">
+          <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default transition-[background-color,color] duration-150 bg-icon-chip-warning-bg text-icon-chip-warning-text group-hover:bg-accent group-hover:text-text-inverse">
             <OIcon name="notifications" size="md" />
           </span>
           <span class="flex-1 min-w-0 flex flex-col gap-0.5">
             <span class="text-(length:--text-sm) font-semibold text-text-heading truncate">{{ t('overview.emptyActionAlerts') }}</span>
             <span class="text-(length:--text-xs) text-text-secondary leading-[1.4]">{{ t('overview.emptyActionAlertsDesc') }}</span>
           </span>
-          <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-[transform,color] duration-150 group-hover:translate-x-0.5 group-hover:text-primary-600" />
+          <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-[transform,color] duration-150 group-hover:translate-x-0.5 group-hover:text-accent" />
         </button>
         <!-- Explore logs -->
-        <button v-if="showLogsCard" type="button" class="focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)] group relative flex items-center gap-3 flex-1 basis-56 min-w-0 max-w-72 min-h-16 py-2.5 pr-3.5 pl-3 rounded-default border border-border-default bg-surface-base text-left cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md hover:border-primary-400 hover:bg-tabs-hover-bg" data-test="overview-empty-logs-card" @click="goToLogs">
-          <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default transition-[background-color,color] duration-150 bg-status-info-bg text-status-info-text group-hover:bg-primary-600 group-hover:text-text-inverse">
+        <button v-if="showLogsCard" type="button" class="focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)] group relative flex items-center gap-3 flex-1 basis-56 min-w-0 max-w-72 min-h-16 py-2.5 pr-3.5 pl-3 rounded-default border border-border-default bg-surface-base text-left cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md hover:border-accent hover:bg-tabs-hover-bg" data-test="overview-empty-logs-card" @click="goToLogs">
+          <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default transition-[background-color,color] duration-150 bg-status-info-bg text-status-info-text group-hover:bg-accent group-hover:text-text-inverse">
             <OIcon name="search" size="md" />
           </span>
           <span class="flex-1 min-w-0 flex flex-col gap-0.5">
             <span class="text-(length:--text-sm) font-semibold text-text-heading truncate">{{ t('overview.emptyActionLogs') }}</span>
             <span class="text-(length:--text-xs) text-text-secondary leading-[1.4]">{{ t('overview.emptyActionLogsDesc') }}</span>
           </span>
-          <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-[transform,color] duration-150 group-hover:translate-x-0.5 group-hover:text-primary-600" />
+          <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-[transform,color] duration-150 group-hover:translate-x-0.5 group-hover:text-accent" />
         </button>
         <!-- Explore traces -->
-        <button v-if="showTracesCard" type="button" class="focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)] group relative flex items-center gap-3 flex-1 basis-56 min-w-0 max-w-72 min-h-16 py-2.5 pr-3.5 pl-3 rounded-default border border-border-default bg-surface-base text-left cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md hover:border-primary-400 hover:bg-tabs-hover-bg" data-test="overview-empty-traces-card" @click="goToTraces">
-          <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default transition-[background-color,color] duration-150 bg-status-info-bg text-status-info-text group-hover:bg-primary-600 group-hover:text-text-inverse">
+        <button v-if="showTracesCard" type="button" class="focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)] group relative flex items-center gap-3 flex-1 basis-56 min-w-0 max-w-72 min-h-16 py-2.5 pr-3.5 pl-3 rounded-default border border-border-default bg-surface-base text-left cursor-pointer transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md hover:border-accent hover:bg-tabs-hover-bg" data-test="overview-empty-traces-card" @click="goToTraces">
+          <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default transition-[background-color,color] duration-150 bg-status-info-bg text-status-info-text group-hover:bg-accent group-hover:text-text-inverse">
             <OIcon name="account-tree" size="md" />
           </span>
           <span class="flex-1 min-w-0 flex flex-col gap-0.5">
             <span class="text-(length:--text-sm) font-semibold text-text-heading truncate">{{ t('overview.emptyActionTraces') }}</span>
             <span class="text-(length:--text-xs) text-text-secondary leading-[1.4]">{{ t('overview.emptyActionTracesDesc') }}</span>
           </span>
-          <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-[transform,color] duration-150 group-hover:translate-x-0.5 group-hover:text-primary-600" />
+          <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-[transform,color] duration-150 group-hover:translate-x-0.5 group-hover:text-accent" />
         </button>
       </template>
     </OEmptyState>

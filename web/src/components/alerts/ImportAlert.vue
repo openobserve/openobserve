@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-else class="text-center text-sm font-semibold text-text-heading py-3 shrink-0">Output Messages</div>
       <OSeparator class="mt-1 shrink-0" />
-      <div class="error-report-container flex-1 min-h-0">
+      <div class="error-report-container flex-1 min-h-0 overflow-auto resize-none">
         <!-- Alert Errors Section -->
         <div class="p-2.5 mb-2.5" v-if="alertErrorsToDisplay.length > 0">
           <div class="error-list">

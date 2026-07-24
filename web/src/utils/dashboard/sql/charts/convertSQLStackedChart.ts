@@ -16,6 +16,7 @@
 import { formatUnitValue, getUnitValue } from "../../convertDataIntoUnitValue";
 import { calculateDynamicNameGap } from "../../chartDimensionUtils";
 import { type SQLContext } from "../shared/types";
+import { chartColor } from "../../../chartTheme";
 
 /**
  * Applies chart-specific options for: stacked
@@ -37,7 +38,7 @@ export function applyStackedChart(ctx: SQLContext): void {
   options.xAxis = options.xAxis.slice(0, 1);
   options.tooltip.axisPointer.label = {
     show: true,
-    backgroundColor: store.state.theme === "dark" ? "#333" : "",
+    backgroundColor: chartColor("--color-chart-crosshair-bg"),
     label: {
       fontsize: 12,
       precision: panelSchema.config?.decimals,

@@ -420,10 +420,20 @@ export class PipelinesPage {
         // DESTRUCTIVE — no page.reload() (a reload trips the editor's
         // onBeforeRouteLeave unsaved-changes guard and stalls downstream tests).
         const railToggle = this.page.locator('[data-test="pipeline-node-sidebar-collapse-btn"]');
+        // Poll for the mount signal across 3 attempts. Each attempt must ACTUALLY wait, so use
+        // waitFor (which blocks up to `timeout`) — locator.isVisible({timeout}) does NOT wait,
+        // it returns the current state immediately, which collapsed the intended ~45s of
+        // resilience down to the final 15s and flaked under concurrent cloud load (VueFlow
+        // mount lags). If an attempt times out and we're still on the list page (the add click
+        // was dropped before navigation), re-click; otherwise keep waiting on the next attempt.
         for (let attempt = 1; attempt <= 3; attempt++) {
-            if (await railToggle.isVisible({ timeout: 15000 }).catch(() => false)) break;
-            if (await this.addPipelineButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-                await this.addPipelineButton.click().catch(() => {});
+            try {
+                await railToggle.waitFor({ state: 'visible', timeout: 15000 });
+                break;
+            } catch {
+                if (await this.addPipelineButton.isVisible().catch(() => false)) {
+                    await this.addPipelineButton.click().catch(() => {});
+                }
             }
         }
         await railToggle.waitFor({ state: 'visible', timeout: 15000 });

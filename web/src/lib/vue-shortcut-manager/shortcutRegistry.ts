@@ -249,8 +249,11 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.metrics",
     scope: "metrics",
     shortcuts: [
-      { id: "metricsRunQuery", keyForWindows: "ctrl+enter", keyForMac: "meta+enter", descriptionKey: "shortcuts.actions.metricsRunQuery" },
-      { id: "metricsRefresh",  key: "r",                                              descriptionKey: "shortcuts.actions.metricsRefresh" },
+      { id: "metricsRunQuery",       keyForWindows: "ctrl+enter",   keyForMac: "meta+enter",   descriptionKey: "shortcuts.actions.metricsRunQuery" },
+      { id: "metricsRefresh",        key: "r",                                                 descriptionKey: "shortcuts.actions.metricsRefresh" },
+      { id: "metricsFocusQuery",     key: "/",                                                 descriptionKey: "shortcuts.actions.focusQuery" },
+      { id: "metricsAddToDashboard", key: "d",                                                 descriptionKey: "shortcuts.actions.metricsAddToDashboard" },
+      { id: "metricsCopyUrl",        key: "c",                                                 descriptionKey: "shortcuts.actions.metricsCopyUrl" },
     ],
   },
 

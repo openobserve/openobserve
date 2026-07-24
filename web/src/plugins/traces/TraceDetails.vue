@@ -1001,7 +1001,7 @@ const ThreadView = defineAsyncComponent(() => import("./ThreadView.vue"));
 
 /**
  * Tab definitions for the trace detail views. The order here is the *default*
- * order — Flame Graph leads because it is the default landing view. Users can
+ * order — Waterfall leads because it is the default landing view. Users can
  * drag tabs to reorder them (same interaction as the Home page tab bar) and
  * that order is persisted per-browser under LS_TRACE_TAB_ORDER_KEY.
  *
@@ -1009,8 +1009,8 @@ const ThreadView = defineAsyncComponent(() => import("./ThreadView.vue"));
  * others at the same nominal size.
  */
 const TRACE_TAB_DEFS = [
-  { value: "flame-graph", labelKey: "traces.flameGraph", icon: "flame", iconSize: "sm" },
   { value: "waterfall", labelKey: "traces.waterfall", icon: "align-left", iconSize: "sm" },
+  { value: "flame-graph", labelKey: "traces.flameGraph", icon: "flame", iconSize: "sm" },
   { value: "map", labelKey: "traces.traceGraph", icon: "account-tree", iconSize: "sm" },
   { value: "dag", labelKey: "traces.dag", icon: "git-branch", iconSize: "sm" },
   { value: "thread", labelKey: "traces.thread", icon: "chat", iconSize: "xs" },
@@ -1019,7 +1019,7 @@ const TRACE_TAB_DEFS = [
 type TraceTabValue = (typeof TRACE_TAB_DEFS)[number]["value"];
 
 /** The view a trace opens on when the user has no persisted preference. */
-const DEFAULT_TRACE_TAB: TraceTabValue = "flame-graph";
+const DEFAULT_TRACE_TAB: TraceTabValue = "waterfall";
 
 const LS_TRACE_TAB_ORDER_KEY = "o2_trace_tab_order";
 const LS_TRACE_ACTIVE_TAB_KEY = "o2_trace_active_tab";

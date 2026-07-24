@@ -46,6 +46,7 @@ use infra::{
     storage,
 };
 use ingester::WAL_PARQUET_METADATA;
+use schema::generate_schema_for_defined_schema_fields;
 use search::datafusion::{
     exec::TableBuilder,
     merge::{self, MergeParquetResult},
@@ -68,10 +69,7 @@ use {
     tokio::sync::mpsc,
 };
 
-use crate::{
-    common::infra::wal,
-    service::{schema::generate_schema_for_defined_schema_fields, tantivy::create_tantivy_index},
-};
+use crate::{common::infra::wal, service::tantivy::create_tantivy_index};
 
 static PROCESSING_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
 
@@ -564,7 +562,7 @@ async fn move_files(
         };
 
         // trigger an incremental merge of the current hour once enough files have piled up
-        openobserve_core::compact::incremental::incr_pending_file(
+        compaction::incremental::incr_pending_file(
             &org_id,
             stream_type,
             &stream_name,

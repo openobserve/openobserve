@@ -19,6 +19,8 @@ use std::{
     time::Instant,
 };
 
+#[cfg(feature = "cloud")]
+use ::stream::get_stream;
 use arrow_schema::{DataType, Field};
 use bulk::SCHEMA_CONFORMANCE_FAILED;
 use config::{
@@ -41,16 +43,14 @@ use infra::{
     errors::{Error, Result},
     schema::{SchemaCache, get_partition_time_level},
 };
+use ingestion_common::IngestionStatus;
+use schema::{check_for_schema, stream_schema_exists};
 
-#[cfg(feature = "cloud")]
-use crate::stream::get_stream;
 use crate::{
     alerts::alert::AlertExt,
     common::meta::stream::SchemaRecords,
     ingestion::{TriggerAlertData, evaluate_trigger, get_write_partition_key, write_file},
-    ingestion_types::IngestionStatus,
     metadata::{MetadataItem, MetadataType, distinct_values::DvItem, write},
-    schema::{check_for_schema, stream_schema_exists},
 };
 
 pub mod bulk;

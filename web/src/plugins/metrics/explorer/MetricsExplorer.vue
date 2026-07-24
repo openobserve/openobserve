@@ -111,6 +111,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="() => onRefresh()"
         >
           {{ t("metrics.explorer.refresh") }}
+          <OTooltip
+            :content="t('metrics.explorer.refresh')"
+            shortcut-id="metricsRefresh"
+          />
         </OButton>
         <ShareButton
           v-if="shareUrl"
@@ -118,6 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="outline"
           size="icon-toolbar"
           data-test="metrics-explorer-share-btn"
+          shortcut-id="metricsCopyUrl"
         />
       </div>
     </div>
@@ -399,6 +404,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   count: grid.favorites.value.length,
                 })
               "
+              shortcut-id="metricsAddToDashboard"
             />
           </OButton>
         </div>
@@ -631,6 +637,8 @@ import {
 } from "@/utils/dashboard/urlTimeParams";
 import type { MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
 import segment from "@/services/segment_analytics";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 /**
  * Card min width; drives the responsive column count.
@@ -1739,6 +1747,64 @@ export default defineComponent({
         grid.loadStreams(true);
       },
     );
+
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    // Registered here (not just in the editor Index.vue) because `/metrics`
+    // mounts THIS explorer — the editor lives at `/metrics/editor`. Keys and
+    // scope come from the "metrics" group in shortcutRegistry.ts.
+    useShortcuts([
+      {
+        // ⌘/Ctrl+Enter — run the query. In Visualize this re-runs the chart;
+        // in Explore/Workspace it refreshes the grid (there is no single query).
+        id: "metricsRunQuery",
+        handler: () => onRefresh({ manual: true }),
+      },
+      {
+        id: "metricsRefresh",
+        handler: () => {
+          if (isInputFocused()) return;
+          onRefresh({ manual: true });
+        },
+      },
+      {
+        id: "metricsFocusQuery",
+        handler: () => {
+          // Grid modes: the metric search box. Visualize: the PromQL editor.
+          const el = document.querySelector<HTMLElement>(
+            '[data-test="metrics-explorer-search"] input, [data-test="metrics-explorer-search"] textarea, [data-test="dashboard-panel-query-editor"] textarea, [data-test="dashboard-panel-query-editor"] .monaco-editor textarea',
+          );
+          el?.focus();
+        },
+      },
+      {
+        id: "metricsAddToDashboard",
+        handler: () => {
+          if (isInputFocused()) return;
+          // Visualize: add the single chart you built (validates first, then
+          // opens the add-to-dashboard dialog). Explore/Workspace: convert the
+          // pinned favourites into panels. In Explore with no favourites there
+          // is nothing to add, so this is a no-op — same as the toolbar, which
+          // shows the convert button only in Workspace with favourites.
+          if (mode.value === "visualize") {
+            visualizeRef.value?.onAddToDashboard?.();
+          } else {
+            openConvertToDashboard();
+          }
+        },
+      },
+      {
+        id: "metricsCopyUrl",
+        handler: () => {
+          if (isInputFocused()) return;
+          // Reuse ShareButton's short-URL + clipboard + toast flow.
+          document
+            .querySelector<HTMLElement>(
+              '[data-test="metrics-explorer-share-btn"]',
+            )
+            ?.click();
+        },
+      },
+    ]);
 
     return {
       t,
