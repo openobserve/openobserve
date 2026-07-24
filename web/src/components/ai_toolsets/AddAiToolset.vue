@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("aiToolset.mcpConfig") }}
             </div>
             <div class="o2-input mb-4">
-              <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- example URL format, not translatable content -->
+              <!-- eslint-disable vue/no-bare-strings-in-template -- example URL format, not translatable content -->
               <OFormInput
                 placeholder="https://api.example.com/mcp/"
                 data-test="ai-toolset-mcp-url"
@@ -85,6 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 required
                 class="showLabelOnTop w-full"
               />
+              <!-- eslint-enable vue/no-bare-strings-in-template -->
             </div>
             <div class="o2-input mb-4">
               <OFormInput
@@ -151,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div class="o2-input mb-4">
-              <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- example CLI command name, not translatable content -->
+              <!-- eslint-disable vue/no-bare-strings-in-template -- example CLI command name, not translatable content -->
               <OFormInput
                 placeholder="kubectl"
                 data-test="ai-toolset-cli-command"
@@ -160,9 +161,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 required
                 class="showLabelOnTop w-full"
               />
+              <!-- eslint-enable vue/no-bare-strings-in-template -->
             </div>
             <div class="o2-input mb-4">
-              <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- example CLI subcommand names, not translatable content -->
+              <!-- eslint-disable vue/no-bare-strings-in-template -- example CLI subcommand names, not translatable content -->
               <OFormInput
                 placeholder="get, describe, logs"
                 name="cli.allowed_subcommands_raw"
@@ -170,6 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :helpText="t('aiToolset.subcommandsHint')"
                 class="showLabelOnTop w-full"
               />
+              <!-- eslint-enable vue/no-bare-strings-in-template -->
             </div>
             <div class="mb-4 flex gap-4">
               <div class="o2-input flex-1">
