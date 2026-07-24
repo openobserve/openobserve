@@ -1106,20 +1106,22 @@ defineExpose({
       >
         <table
           :class="[
-            // Non-delegated horizontal-scroll tables (dashboard pivot) add w-full
-            // so the table fills the container when its columns are narrower than
-            // the viewport (otherwise it shrinks to content and leaves a gap on
-            // the right); min-w-max still lets it grow + scroll when wider.
-            // EXCEPTION: with a sticky (right-pinned) total column, w-full stretches
-            // the table but the fixed-width total column can't absorb the slack, so
-            // the extra space opens as a gap BEFORE the pinned total (it looks like
-            // it floats mid-table). There, use min-w-max only so the total sits
-            // flush against the data. Delegated-scroll grids (logs/traces) keep
-            // min-w-max too.
+            // Non-delegated horizontal-scroll pivot adds w-full so the table fills
+            // the container when narrower than the viewport; min-w-max lets it grow
+            // and scroll when wider. With a sticky total column, use an explicit
+            // content width (w-max) instead: the table lives in a flex-col scroll
+            // container, and with only a min-width the flex container can size it so
+            // the sticky containing block no longer matches the scrollable content,
+            // making the body total cells release after a few columns while the
+            // header stays put. w-max pins the table to its content width, keeping
+            // the sticky column stable and flush with the data. Delegated grids keep
+            // min-w-max.
             props.horizontalScroll
-              ? isDelegatedScroll || props.stickyColTotals
+              ? isDelegatedScroll
                 ? 'min-w-max'
-                : 'w-full min-w-max'
+                : props.stickyColTotals
+                  ? 'w-max'
+                  : 'w-full min-w-max'
               : useComputedWidth && frozen
                 ? ''
                 : 'w-full',
