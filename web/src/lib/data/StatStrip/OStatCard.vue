@@ -149,7 +149,7 @@ const trendClass = computed(() =>
       </div>
       <span
         v-if="icon || slots.icon"
-        class="w-8 h-8 shrink-0 grid place-items-center rounded-full"
+        class="w-8 h-8 shrink-0 grid place-items-center rounded-default"
         :class="tc.chip"
       >
         <slot name="icon">

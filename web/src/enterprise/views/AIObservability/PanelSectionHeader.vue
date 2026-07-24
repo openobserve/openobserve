@@ -27,8 +27,8 @@ const props = defineProps<{
 }>();
 
 // Soft tone chip — same rounded-square treatment as the OPageHeader module tile,
-// one size down (w-7 vs w-9.5), and identical to the detail drawer's header chip
-// so tile → section header → drawer read as one thing.
+// a touch smaller (w-8.5 vs the page header's w-9.5), and identical to the detail
+// drawer's header chip so tile → section header → drawer read as one thing.
 const iconWrap = computed(() => {
   switch (props.tone) {
     case "warning":
