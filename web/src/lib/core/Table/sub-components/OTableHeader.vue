@@ -224,7 +224,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         :key="'pivot-rh-' + (col.name ?? col.id)"
         :rowspan="pivotHeaderLevels.length"
         :data-test="`o2-table-pivot-th-${col.name ?? col.id}`"
-        class="text-secondary bg-table-header-bg cursor-pointer px-2 text-left text-xs font-medium"
+        class="text-secondary bg-table-header-bg border-table-header-border cursor-pointer border-b px-2 text-left text-xs font-medium"
         :style="getPivotRowColStyle(col.name ?? col.id)"
         @click="handleSort(col.name ?? col.id)"
       >
@@ -260,10 +260,20 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
             ? 'pivot-value-header text-secondary text-xs font-medium'
             : 'pivot-group-header text-secondary text-center text-xs font-medium',
           {
+            // Bottom divider on the cells that sit on the header's bottom edge
+            // (the leaf value row + the row-spanning total header) so the pivot
+            // header has the same header/data separator the standard header
+            // gets from its <thead> border-b — which doesn't paint in the
+            // border-separate mode pivots force (QA #2239). Uses the directional
+            // border-b color so it doesn't clash with the border-l color below
+            // on cells that carry both.
+            'border-b-table-header-border border-b': level.isLeaf || cell._isTotalHeader,
+          },
+          {
             // Same divider token as the body cells (border-table-row-divider)
             // so vertical group dividers match header-to-body and align with the
             // horizontal row dividers.
-            'border-table-row-divider border-l':
+            'border-l-table-row-divider border-l':
               cell.hasBorder && !(stickyColTotals && cell._isTotalHeader),
           },
           {
