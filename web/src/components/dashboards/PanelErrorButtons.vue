@@ -102,7 +102,7 @@
       data-test="panel-last-refreshed-at"
     >
       <span class="lastRefreshedAtIcon mr-0.5 text-[smaller]">
-        🕑
+        {{ "🕑" }}
         <OTooltip side="bottom" align="end">
           <template #content
             >{{ t("dashboard.panelErrorButtons.lastRefreshed")

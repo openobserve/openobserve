@@ -354,7 +354,7 @@ function toggleExpanded() {
                 ? t("synthetics.journey.hideStackTrace")
                 : t("synthetics.journey.showStackTrace")
             }}
-            stack trace
+            {{ t("synthetics.journey.stackTraceLabel") }}
           </OButton>
           <OButton
             v-if="showStackTrace"
@@ -438,7 +438,7 @@ function toggleExpanded() {
           <OInput
             v-model="selectorComputed"
             :label="t('synthetics.journey.selectorLabel')"
-            placeholder="#my-button or .class-name"
+            :placeholder="t('synthetics.journey.selectorPlaceholder')"
             class="flex-1"
             data-test="synthetics-journey-step-selector-input"
           />

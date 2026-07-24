@@ -71,13 +71,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div v-if="autoRedirectDexLogin">
         <p>
-          Redirecting to SSO login page. If you are not redirected, please
-          <a href="#" @click="loginWithSSo" class="cursor-pointer underline">click here</a>.
+          {{ t("login.redirectingToSsoMessage") }}
+          <a href="#" @click="loginWithSSo" class="cursor-pointer underline">{{
+            t("login.clickHere")
+          }}</a
+          >.
         </p>
       </div>
 
       <div v-else>
-        <div style="font-size: var(--text-xl)" class="w-full pb-3 text-center">Login</div>
+        <div style="font-size: var(--text-xl)" class="w-full pb-3 text-center">
+          {{ t("login.login") }}
+        </div>
 
         <div v-if="showSSO" class="flex justify-center">
           <OButton
@@ -93,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="width: 30px; left: 16px"
                 :src="getImageURL('images/common/sso.svg')"
               />
-              <span class="text-center"> Login with SSO</span>
+              <span class="text-center"> {{ t("login.loginWithSso") }}</span>
             </div>
           </OButton>
         </div>
@@ -104,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="text-decoration: underline"
             data-test="login-as-internal-user"
             @click="loginAsInternalUser = !loginAsInternalUser"
-            >Login as internal user</a
+            >{{ t("login.loginAsInternalUser") }}</a
           >
         </div>
 

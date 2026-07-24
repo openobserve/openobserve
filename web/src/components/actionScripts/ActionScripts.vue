@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         bleed
         :title="t('actions.header')"
         icon="code"
-        :subtitle="'Custom automation and scripting'"
+        :subtitle="t('actions.pageSubtitle')"
       >
         <!-- Row 1: standard header — title + actions only. Search moved into the
              table's own toolbar below. -->
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               unit="us"
               mode="absolute"
               :timezone="store.state.timezone"
-              empty-label="Never"
+              :empty-label="t('alerts.never')"
             />
           </template>
           <template #cell-last_successful_at="{ row }">
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               unit="us"
               mode="absolute"
               :timezone="store.state.timezone"
-              empty-label="Never"
+              :empty-label="t('alerts.never')"
             />
           </template>
           <template #cell-status="{ row }">
@@ -154,7 +154,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="sm"
                   :loading="bulkDeleteLoading"
                   @click="openBulkDeleteDialog"
-                  ><OIcon name="delete" size="sm" /><span class="ml-1.5">Delete</span></OButton
+                  ><OIcon name="delete" size="sm" /><span class="ml-1.5">{{
+                    t("common.delete")
+                  }}</span></OButton
                 >
               </div>
             </div>
@@ -173,14 +175,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <ConfirmDialog
-      title="Delete Action"
-      message="Are you sure you want to delete Action?"
+      :title="t('alerts.deleteActionTitle')"
+      :message="t('alerts.deleteActionMessage')"
       @update:ok="deleteAlert"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
     />
     <ConfirmDialog
-      title="Bulk Delete Action Scripts"
+      :title="t('alerts.bulkDeleteActionScriptsTitle')"
       :message="`Are you sure you want to delete ${selectedActionScripts.length} action script(s)?`"
       @update:ok="bulkDeleteActionScripts"
       @update:cancel="confirmBulkDelete = false"
@@ -204,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="add-action-back-btn"
           class="flex cursor-pointer items-center justify-center"
           style="border: 1.5px solid; border-radius: 50%; width: 22px; height: 22px"
-          title="Go Back"
+          :title="t('common.goBack')"
           @click="showForm = false"
         >
           <OIcon name="arrow-back-ios-new" size="xs" />
@@ -214,12 +216,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OInput
           data-test="to-be-clone-action-name"
           v-model="toBeCloneAlertName"
-          label="Alert Name"
+          :label="t('alerts.alertName')"
         />
         <OSelect
           data-test="to-be-clone-stream-type"
           v-model="toBeClonestreamType"
-          label="Stream Type"
+          :label="t('alerts.streamType')"
           :options="streamTypes"
           @update:model-value="updateStreams()"
         />
@@ -228,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="toBeClonestreamName"
           :loading="isFetchingStreams"
           :disabled="!toBeClonestreamType"
-          label="Stream Name"
+          :label="t('alerts.stream_name')"
           :options="streamNames"
           @update:model-value="updateStreamName"
         />

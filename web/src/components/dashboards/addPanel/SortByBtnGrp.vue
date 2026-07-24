@@ -1,5 +1,5 @@
 <template>
-  Sort By:
+  {{ t("dashboard.sortBy") }}
   <OButtonGroup data-test="dashboard-sort-by-btn-group">
     <OButton
       :active="!fieldObj.sortBy"
@@ -40,6 +40,7 @@ import DescSort from "@/components/icons/DescSort.vue";
 import { inject } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useI18n } from "vue-i18n";
 
 export default defineComponent({
   name: "SortByBtnGrp",
@@ -51,6 +52,7 @@ export default defineComponent({
     },
   },
   setup(props) {
+    const { t } = useI18n();
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
     const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
 
@@ -62,6 +64,7 @@ export default defineComponent({
     };
 
     return {
+      t,
       dashboardPanelData,
       updateSortOption,
     };

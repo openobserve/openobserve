@@ -56,9 +56,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div v-if="!field.state.value" class="flex flex-col items-center justify-center">
             <OIcon name="backup" size="xl" class="mb-3" />
-            <div class="text-text-secondary mb-2 text-xl font-semibold">Drop your file here</div>
-            <div class="text-text-secondary mb-3 text-sm">or click to browse</div>
-            <div class="text-text-secondary text-xs">.zip files only</div>
+            <div class="text-text-secondary mb-2 text-xl font-semibold">
+              {{ t("rum.dropFileHere") }}
+            </div>
+            <div class="text-text-secondary mb-3 text-sm">{{ t("rum.orClickToBrowse") }}</div>
+            <div class="text-text-secondary text-xs">{{ t("rum.zipFilesOnly") }}</div>
           </div>
 
           <div v-else class="file-info">
@@ -100,6 +102,9 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 const props = withDefaults(defineProps<{ name?: string }>(), { name: "file" });
 

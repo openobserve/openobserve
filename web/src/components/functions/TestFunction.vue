@@ -69,7 +69,7 @@
           </div>
 
           <DateTime
-            label="Start Time"
+            :label="t('alerts.startTime')"
             class="w-full py-1"
             auto-apply
             :default-type="dateTime.type"
@@ -110,7 +110,7 @@
           </div>
           <div class="text-status-error-text invalid-sql-error min-h-5.5 p-1">
             <span v-show="!!sqlQueryErrorMsg" class="text-compact">
-              Error: {{ sqlQueryErrorMsg }}</span
+              {{ t("function.errorLabel") }} {{ sqlQueryErrorMsg }}</span
             >
           </div>
         </div>

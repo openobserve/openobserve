@@ -234,7 +234,8 @@
                 {{ resultTotal }} {{ t("search_scheduler_job.results") }}
               </div>
               <div class="mr-2 ml-auto">
-                {{ t("search_scheduler_job.max_limit") }} : <b>1000</b>
+                {{ t("search_scheduler_job.max_limit") }} :
+                <b>1000</b>
               </div>
             </div>
           </template>

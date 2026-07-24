@@ -273,7 +273,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ (currentPage - 1) * displayPageSize + 1 }}–{{
               Math.min(currentPage * displayPageSize, searchResults.length)
             }}
-            of {{ searchResults.length }}
+            {{ t("search.of") }} {{ searchResults.length }}
           </span>
           <OPagination
             :model-value="currentPage"

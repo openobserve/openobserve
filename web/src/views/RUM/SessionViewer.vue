@@ -62,7 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span
             class="text-severity-warning-color font-semibold"
             data-test="frustration-summary-text"
-            >{{ frustrationCount }} Frustration{{ frustrationCount > 1 ? "s" : "" }}</span
+            >{{ frustrationCount }} {{ t("rum.frustration")
+            }}{{ frustrationCount > 1 ? "s" : "" }}</span
           >
         </div>
       </div>

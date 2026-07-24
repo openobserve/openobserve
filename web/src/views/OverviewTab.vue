@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-text-link cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100"
           @click="goToIncidentList"
         >
-          {{ t("overview.viewAll") }} →
+          {{ t("overview.viewAll") }} {{ "→" }}
         </button>
       </div>
       <div
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }}</span>
             <span class="text-text-secondary text-xs">·</span>
             <span class="text-text-secondary text-xs font-normal"
-              >{{ inc.alert_count }} alerts</span
+              >{{ inc.alert_count }} {{ t("overview.alertsSuffix") }}</span
             >
           </div>
           <span class="invisible shrink-0 whitespace-nowrap group-hover:visible">
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="servicePanelVisible && selectedService"
             class="text-text-secondary ml-1 text-xs font-normal"
           >
-            — viewing
+            {{ t("overview.viewingLabel") }}
             <strong class="text-text-body font-semibold">{{
               selectedService.label ?? selectedService.id
             }}</strong>
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-text-link cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100"
           @click="goToServiceGraph"
         >
-          {{ t("overview.viewAll") }} →
+          {{ t("overview.viewAll") }} {{ "→" }}
         </button>
       </div>
       <div class="relative">
@@ -307,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-text-link cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100"
           @click="goToAnomalies"
         >
-          {{ t("overview.viewAll") }} →
+          {{ t("overview.viewAll") }} {{ "→" }}
         </button>
       </div>
       <div class="flex flex-col gap-1.5">
@@ -358,7 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-text-link cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100"
           @click="goToAlertList"
         >
-          {{ t("overview.viewAll") }} →
+          {{ t("overview.viewAll") }} {{ "→" }}
         </button>
       </div>
       <div
@@ -381,7 +381,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             value="error"
             class="shrink-0"
             :title="`Failed ${ev.failCount} times in this window`"
-            >×{{ ev.failCount }}</OTag
+            >{{ t("overview.timesSymbol") }}{{ ev.failCount }}</OTag
           >
           <span class="text-text-secondary shrink-0 text-xs whitespace-nowrap">{{
             ev.timeAgo

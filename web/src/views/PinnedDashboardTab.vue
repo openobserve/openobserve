@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="pinned-dashboard-refresh-btn"
           @click="refreshData"
         >
-          <OTooltip content="Refresh" />
+          <OTooltip :content="t('common.refresh')" />
         </OButton>
       </div>
       <div class="min-h-0 flex-1 overflow-auto">
@@ -95,6 +95,9 @@ import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 const props = defineProps<{ dashboardId: string; folderId: string }>();
 const emit = defineEmits<{

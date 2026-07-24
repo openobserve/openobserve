@@ -432,7 +432,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     }}</span>
                     <span
                       class="text-3xs rounded-default bg-badge-purple-soft-bg border-badge-purple-ol-border text-badge-purple-ol-text border px-1.75 py-px font-bold tracking-[0.04em]"
-                      >SQL + VRL</span
+                      >{{ t("alerts.queryEditor.sqlVrlBadge") }}</span
                     >
                   </div>
                   <!-- Running indicator -->

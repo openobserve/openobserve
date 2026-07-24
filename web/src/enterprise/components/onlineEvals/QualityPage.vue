@@ -32,7 +32,11 @@
     </div>
 
     <QualityKpiSkeleton v-if="showKpiSkeleton" :count="visibleKpis.length" class="px-page-edge" />
-    <KpiCardRow v-else class="quality-page__kpis px-page-edge" aria-label="Tier 1 KPIs">
+    <KpiCardRow
+      v-else
+      class="quality-page__kpis px-page-edge"
+      :aria-label="t('onlineEvals.quality.kpisAriaLabel')"
+    >
       <QualityKpiCard
         v-for="kpi in visibleKpis"
         :key="kpi.id"
@@ -84,7 +88,7 @@
           v-if="selectedConfig?.version"
           class="qpd-version text-2xs text-text-secondary ml-1.5 [font-variant-numeric:tabular-nums]"
           data-test="quality-detail-version-badge"
-          >v{{ selectedConfig.version }}</span
+          >{{ t("onlineEvals.versionPrefix") }}{{ selectedConfig.version }}</span
         >
       </template>
 

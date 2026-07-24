@@ -33,15 +33,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             font-size="56"
             class="fill-accent font-[inherit] font-bold"
           >
-            404
+            {{ "404" }}
           </text>
         </svg>
       </div>
 
-      <h1 class="text-text-heading m-0 mb-3 text-2xl font-semibold">Page not found</h1>
+      <h1 class="text-text-heading m-0 mb-3 text-2xl font-semibold">
+        {{ t("common.pageNotFound") }}
+      </h1>
 
       <p class="text-text-secondary m-0 mb-8 text-sm leading-normal">
-        The page you're looking for doesn't exist or has been moved.
+        {{ t("common.pageNotFoundDescription") }}
       </p>
 
       <div class="mb-8 flex gap-3">

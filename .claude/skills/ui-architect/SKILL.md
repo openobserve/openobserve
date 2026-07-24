@@ -144,6 +144,53 @@ read it once, it is the backbone of everything below.
    keys added to `web/src/locales/languages/en-US.json` (other locales follow from
    there — never hand-edit them).
 
+   > **Three ESLint rules in `eslint.config.js` enforce this (all ERROR — they fail
+   > `lint:ci`), and you see every one as you type (editor squiggles) + in
+   > `npm run lint`:**
+   > - **`@intlify/vue-i18n/no-missing-keys`** — a `t('some.key')` whose key is
+   >   absent from `en-US.json` (it would render the literal `some.key` at runtime).
+   >   When you add a `t('x.y')`, add `x.y` to `en-US.json` in the *same* change.
+   >   Keys resolve against **en-US only** (the other locales are generated).
+   >   Dynamically-built keys (`t(varName)`) are ignored — the rule only checks literals.
+   > - **`vue/no-bare-strings-in-template`** — a hardcoded string in a `<template>`,
+   >   covering both **text nodes** (`<div>Save</div>`) and **static text props**
+   >   (`<OButton label="Save" />`).
+   > - **`local/no-bare-bound-text-props`** (custom, in `eslint.config.js`) — hardcoded
+   >   text the two rules above can't see: a **bound literal** prop (`:label="'Save'"`),
+   >   a **v-text / v-html literal** (`v-text="'Save'"`), or a **mustache literal**
+   >   (`{{ 'Save' }}`). So you can't dodge the check by adding a `:`, a `v-text`, or
+   >   `{{ }}`. Only *bare* literals are caught — composed expressions (concatenation
+   >   like `'a' + b`, ternaries, or `${…}` template interpolation) are a separate,
+   >   not-yet-enforced gap.
+   >
+   > **The component-prop standard:** because the app is built from O2 components (not
+   > raw HTML), user-facing text usually arrives through a *prop* — `label`,
+   > `placeholder`, `hint`, `tooltip`, `message`, `content`, `help-text`,
+   > `*-button-label`, … The exact set lives in **one place**, the `TEXT_ATTRS` array
+   > in `eslint.config.js`, and feeds both the static and bound rules. **When you add
+   > a component prop that carries user-facing text, add its name to `TEXT_ATTRS`** —
+   > that is how the linter learns a new prop needs translating. Correct usage is
+   > always `:prop="t('key')"` (or `<Comp>{{ t('key') }}</Comp>` for slots); a
+   > variable binding (`:label="row.name"`) and punctuation/number/emoji-only literals
+   > pass. **Non-translatable tokens** (code / units / symbols) — handle in this order:
+   > (1) a letter-free glyph/number passes automatically **only in a bound / mustache /
+   > v-text position** (`{{ '×' }}`, `:label="'1'"`, `v-text="'●'"`) — the bound rule
+   > ignores letter-free literals. **In a plain text node or static attr it is still
+   > flagged** (the built-in rule flags any char outside its allowlist, so a bare `5` or
+   > `●` in `<span>…</span>` fails) — move it into `{{ … }}` or use (2); (2) a
+   > **recurring** universal token — a unit (`px`, `ms`), a symbol (`×`, `→`, `$`, `fx`),
+   > a decorative glyph/emoji (`●`, `🕑`), or a specific literal token (`{rows}`,
+   > `./.env`, `1000`) — goes in the shared **`NON_TRANSLATABLE`** list in
+   > `eslint.config.js`: one curated,
+   > commented place read by BOTH rules, so no per-use comment is needed; (3) a whole
+   > code-example file (SQL/PromQL syntax guide) is exempted by path; (4) only a genuine
+   > one-off code token that can't move, isn't universal, and lives in a **mixed** file
+   > (real UI + a few example tokens) falls back to an inline
+   > `<!-- eslint-disable-next-line <rule> -->` — for a **text node**, a
+   > `<!-- eslint-disable <rule> -->` … `<!-- eslint-enable <rule> -->` block instead,
+   > since `disable-next-line` reports at the comment's line and misses text nodes.
+   > Prefer (2) for anything that repeats; **never** exempt real UI text.
+
 ## Structural decisions
 
 *What* to reach for and *where the code lives* — the recurring calls that
@@ -276,9 +323,15 @@ considering the UI done:
       `--color-*` equivalent.
 - [ ] Any new color/size needed was **registered as a `--color-*` token** (light
       `:root` + `@theme inline` + dark under `.dark`) before use.
-- [ ] No hardcoded user-facing text — every label, title, placeholder, message,
-      and validation string uses `t()` with keys added to
-      `web/src/locales/languages/en-US.json`.
+- [ ] No hardcoded user-facing text **and** no `t()` key missing from the locale
+      file — every label, title, placeholder, message, and validation string (whether
+      a text node, a static prop `label="…"`, a bound prop `:label="'…'"`, a
+      `{{ '…' }}` mustache, or `v-text`) uses
+      `t()` with the key added to `web/src/locales/languages/en-US.json` in the same
+      change. Enforced by three ESLint rules, all **error** (`no-missing-keys`,
+      `vue/no-bare-strings-in-template`, `local/no-bare-bound-text-props`) — a clean
+      `cd web && npm run lint`. New text-carrying component prop → add it to
+      `TEXT_ATTRS` in `eslint.config.js`.
 - [ ] `data-test` on every interactive and key output element, pattern
       `<module>-<filename>-<descriptor>` (see the project FE rules).
 - [ ] New component uses `<script setup lang="ts">`, no `// @ts-nocheck`.

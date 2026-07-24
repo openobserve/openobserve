@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="dialogOpen"
     size="sm"
     seamless
-    title="Theme"
+    :title="t('components.predefinedThemes.title')"
   >
     <template #header-right>
       <OButton
@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="resetToDefaultTheme"
       >
         <template #icon-left><OIcon name="refresh" size="xs" /></template>
-        Reset
+        {{ t("common.reset") }}
       </OButton>
     </template>
 
@@ -47,14 +47,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           value="light"
           icon-left="light-mode"
           class="flex-1"
-          >Light</OToggleGroupItem
+          >{{ t("components.predefinedThemes.light") }}</OToggleGroupItem
         >
         <OToggleGroupItem
           data-test="predefined-themes-tab-dark"
           value="dark"
           icon-left="dark-mode"
           class="flex-1"
-          >Dark</OToggleGroupItem
+          >{{ t("components.predefinedThemes.dark") }}</OToggleGroupItem
         >
       </OToggleGroup>
     </OCardSection>
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : 'border-card-glass-border bg-card-glass-bg hover:border-accent hover:bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-glass-bg))]'
             "
             :aria-pressed="isCustomThemeApplied(mode)"
-            aria-label="Pick a custom theme color"
+            :aria-label="t('components.predefinedThemes.customThemeColorAriaLabel')"
             @click="openColorPicker(mode)"
           >
             <span
@@ -125,7 +125,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </span>
             <span class="ml-2 min-w-0 flex-1 text-left">
-              <span class="block truncate text-sm font-medium">Custom Color</span>
+              <span class="block truncate text-sm font-medium">{{
+                t("components.predefinedThemes.customColor")
+              }}</span>
               <span class="text-text-secondary block truncate text-xs">
                 {{
                   isCustomThemeApplied(mode)
@@ -152,9 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSeparator class="mb-2" />
       <div class="text-text-secondary flex items-start gap-1 text-xs italic">
         <OIcon name="info-outline" size="xs" class="mt-0.5" />
-        <span
-          >Saved to this device only — themes don't sync across different browsers or devices.</span
-        >
+        <span>{{ t("components.predefinedThemes.themeSyncNote") }}</span>
       </div>
     </OCardSection>
 
@@ -163,9 +163,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="predefined-themes-color-picker-dialog"
       v-model:open="showColorPicker"
       size="sm"
-      title="Pick Custom Color"
-      primary-button-label="Apply"
-      neutral-button-label="Cancel"
+      :title="t('components.predefinedThemes.pickCustomColorTitle')"
+      :primary-button-label="t('common.apply')"
+      :neutral-button-label="t('common.cancel')"
       @click:primary="confirmCustomColor"
       @click:neutral="showColorPicker = false"
     >
@@ -202,7 +202,9 @@ import {
   type ThemeModeColors,
 } from "@/constants/themes";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useI18n } from "vue-i18n";
 
+const { t } = useI18n();
 const store = useStore();
 const { isDark } = useTheme();
 const { isOpen } = usePredefinedThemes();

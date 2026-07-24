@@ -459,7 +459,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span
                             class="text-text-secondary text-right text-xs font-semibold tabular-nums"
                           >
-                            ${{ trace.cost.toFixed(4) }}
+                            {{ t("traces.sessionDetail.currencySymbol")
+                            }}{{ trace.cost.toFixed(4) }}
                           </span>
                           <OProgressBar :value="ratio(trace.cost, maxTurnCost)" size="xs" />
                         </div>
@@ -588,9 +589,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >
                             <span>{{ formatTime(trace.startTimeMicros) }}</span>
                             <span>· {{ formatDuration(trace.durationNanos) }}</span>
-                            <span>· ${{ trace.cost.toFixed(4) }}</span>
                             <span
-                              >· {{ formatTokens(trace.inputTokens) }} →
+                              >· {{ t("traces.sessionDetail.currencySymbol")
+                              }}{{ trace.cost.toFixed(4) }}</span
+                            >
+                            <span
+                              >· {{ formatTokens(trace.inputTokens) }}
+                              {{ t("traces.sessionDetail.tokensArrow") }}
                               {{ formatTokens(trace.outputTokens) }}</span
                             >
                             <span v-if="turnDetail(trace.traceId)">
@@ -802,7 +807,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </span>
                       <span class="flex min-w-[3.25rem] flex-col items-end">
                         <span class="text-2xs text-text-secondary font-semibold tabular-nums">
-                          ${{ row.cost.toFixed(4) }}
+                          {{ t("traces.sessionDetail.currencySymbol") }}{{ row.cost.toFixed(4) }}
                         </span>
                         <span
                           v-if="detail && detail.cost > 0"

@@ -36,7 +36,7 @@
             @click="handleConfirm"
             @focus="handleYesFocus"
             @blur="handleYesBlur"
-            >Allow</OButton
+            >{{ t("aiAssistant.confirmDialog.allow") }}</OButton
           >
           <OButton
             ref="alwaysButtonRef"
@@ -52,7 +52,7 @@
             @click="handleAlwaysConfirm"
             @focus="handleAlwaysFocus"
             @blur="handleAlwaysBlur"
-            >Always Allow</OButton
+            >{{ t("aiAssistant.confirmDialog.alwaysAllow") }}</OButton
           >
           <OButton
             ref="noButtonRef"
@@ -68,7 +68,7 @@
             @click="handleCancel"
             @focus="handleNoFocus"
             @blur="handleNoBlur"
-            >No</OButton
+            >{{ t("aiAssistant.confirmDialog.no") }}</OButton
           >
         </template>
 
@@ -114,6 +114,7 @@
 
 <script setup lang="ts">
 import { ref, watch, nextTick, computed, onMounted, onUnmounted } from "vue";
+import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
@@ -129,6 +130,8 @@ interface Props {
   confirmLabel?: string;
   cancelLabel?: string;
 }
+
+const { t } = useI18n();
 
 const props = withDefaults(defineProps<Props>(), {
   confirmLabel: "Yes",

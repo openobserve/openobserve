@@ -87,7 +87,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="thread-tool-body__section">
             <div class="thread-tool-body__label">
               {{ t("traces.threadToolCalls.result") }}
-              <span v-if="tool.span_status === 'ERROR'" class="text-error-600"> · ERROR </span>
+              <span v-if="tool.span_status === 'ERROR'" class="text-error-600">
+                · {{ t("traces.error") }}
+              </span>
             </div>
             <pre class="thread-tool-body__pre">{{
               formatToolPayload(getOutputRaw(tool)) ||

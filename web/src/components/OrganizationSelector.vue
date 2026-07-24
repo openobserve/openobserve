@@ -247,7 +247,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
             v-model="searchQuery"
             clearable
             :debounce="1"
-            placeholder="Search by name or ID"
+            :placeholder="t('organization.searchByNameOrId')"
             @keydown="onSearchKeydown"
           />
         </div>
@@ -327,7 +327,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
           data-test="organization-menu-no-data"
           class="text-compact text-text-secondary w-full py-7 text-center"
         >
-          No organizations found
+          {{ t("organization.noOrganizationsFound") }}
         </div>
       </div>
     </ODropdown>

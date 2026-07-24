@@ -411,8 +411,10 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionDef
                 t("synthetics.protocolRun.timeline")
               }}</span>
               <span class="text-xs">
-                {{ t("synthetics.protocolRun.scheduled") }} {{ fmtTs(run.scheduledTs) }} →
-                {{ t("synthetics.protocolRun.started") }} {{ fmtTs(run.startedTs) }} →
+                {{ t("synthetics.protocolRun.scheduled") }} {{ fmtTs(run.scheduledTs) }}
+                {{ t("synthetics.protocolRun.timelineArrow") }}
+                {{ t("synthetics.protocolRun.started") }} {{ fmtTs(run.startedTs) }}
+                {{ t("synthetics.protocolRun.timelineArrow") }}
                 {{ t("synthetics.protocolRun.completed") }} {{ fmtTs(run.completedTs) }}
               </span>
             </div>

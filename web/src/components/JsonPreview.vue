@@ -34,7 +34,7 @@
             size="xs"
             variant="ghost"
             class="ml-2 h-5! min-h-5! w-5! min-w-5! p-0! align-middle"
-            aria-label="Add icon"
+            :aria-label="t('common.addIcon')"
           >
             <OIcon :name="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'" size="sm" />
           </OButton>

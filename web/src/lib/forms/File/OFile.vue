@@ -5,6 +5,9 @@ import type { FileProps, FileEmits, FileSlots, FileValue } from "./OFile.types";
 import { computed, ref, useAttrs, useId } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -281,7 +284,7 @@ const wrapperClasses = computed(() => [
             v-if="!disabled"
             type="button"
             tabindex="-1"
-            aria-label="Remove file"
+            :aria-label="t('components.file.removeFile')"
             :data-test="`o-file-chip-${i}-remove-btn`"
             class="text-file-chip-remove flex items-center hover:opacity-80"
             @click.stop="removeFile(i, $event)"
@@ -305,7 +308,7 @@ const wrapperClasses = computed(() => [
         v-if="files.length > 0 && !disabled"
         type="button"
         tabindex="-1"
-        aria-label="Clear all"
+        :aria-label="t('components.file.clearAll')"
         class="text-file-icon flex shrink-0 items-center hover:opacity-80"
         @click.stop="handleClear($event)"
       >

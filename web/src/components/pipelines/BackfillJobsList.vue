@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSelect
         v-model="filters.status"
         :options="allStatusOptions"
-        placeholder="Status"
+        :placeholder="t('common.status')"
         clearable
         searchable
         class="w-37.5"
@@ -37,14 +37,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :options="allPipelineOptions"
         labelKey="label"
         valueKey="value"
-        placeholder="Pipeline"
+        :placeholder="t('pipeline.pipelineLabel')"
         clearable
         searchable
         class="w-62.5"
         data-test="pipeline-filter"
       />
       <OButton variant="outline" size="sm" @click="clearFilters" data-test="clear-filters-btn">
-        Clear Filters
+        {{ t("pipeline.clearFilters") }}
       </OButton>
       <OTableColumnToggle
         :columns="columns"
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="refresh-btn"
         icon-left="refresh"
       >
-        <OTooltip content="Refresh" side="top" />
+        <OTooltip :content="t('common.refresh')" side="top" />
       </OButton>
     </Teleport>
 
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Bottom footer -->
           <template #bottom="{ totalRows }">
             <div class="mr-4 flex items-center py-2 text-xs font-normal">
-              {{ totalRows }} Backfill Job{{ totalRows === 1 ? "" : "s" }}
+              {{ totalRows }} {{ t("pipeline.backfillJobLabel") }}{{ totalRows === 1 ? "" : "s" }}
             </div>
           </template>
 
@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="text-text-body w-24 shrink-0 pr-2 text-xs whitespace-nowrap">
                 <template v-if="row.chunks_total">
                   {{ row.chunks_completed || 0 }}/{{ row.chunks_total }}
-                  chunks
+                  {{ t("pipeline.chunksUnit") }}
                 </template>
               </div>
             </div>
@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :value="row.created_at"
               unit="us"
               :timezone="store.state.timezone"
-              empty-label="N/A"
+              :empty-label="t('pipeline.notAvailable')"
             />
           </template>
 
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               unit="us"
               mode="absolute"
               :timezone="store.state.timezone"
-              empty-label="Never"
+              :empty-label="t('pipeline.never')"
             />
           </template>
 
@@ -177,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="pause-job-btn"
                 icon-left="pause"
               >
-                <OTooltip content="Job" />
+                <OTooltip :content="t('pipeline.jobTooltipLabel')" />
               </OButton>
               <OButton
                 v-if="canResumeJob(row)"
@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="resume-job-btn"
                 icon-left="play-arrow"
               >
-                <OTooltip content="Resume Job" />
+                <OTooltip :content="t('pipeline.resumeJob')" />
               </OButton>
               <OButton
                 v-if="canEditJob(row.status)"
@@ -197,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="edit-job-btn"
                 icon-left="edit"
               >
-                <OTooltip content="Edit Job" />
+                <OTooltip :content="t('pipeline.editJob')" />
               </OButton>
               <OButton
                 variant="ghost"
@@ -206,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="view-job-btn"
                 icon-left="visibility"
               >
-                <OTooltip content="View Details" />
+                <OTooltip :content="t('pipeline.viewDetails')" />
               </OButton>
               <OButton
                 v-if="canDeleteJob(row.status)"
@@ -216,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="delete-job-btn"
                 icon-left="delete"
               >
-                <OTooltip content="Delete Job" />
+                <OTooltip :content="t('pipeline.deleteJobTooltip')" />
               </OButton>
               <OButton
                 v-if="row.error"
@@ -254,8 +254,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="backfill-jobs-list-error-dialog"
       v-model:open="errorDialogVisible"
       size="md"
-      title="Backfill Job Error"
-      primary-button-label="Close"
+      :title="t('pipeline.backfillJobErrorTitle')"
+      :primary-button-label="t('common.close')"
       @update:open="(v) => !v && closeErrorDialog()"
       @click:primary="
         errorDialogVisible = false;
@@ -268,21 +268,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div v-if="errorDialogData">
         <div class="mb-3">
-          <div class="text-text-label text-xs">Job ID</div>
+          <div class="text-text-label text-xs">{{ t("pipeline.jobIdLabel") }}</div>
           <div class="text-sm font-medium">
             {{ errorDialogData.job_id }}
           </div>
         </div>
 
         <div class="mb-3">
-          <div class="text-text-label text-xs">Pipeline</div>
+          <div class="text-text-label text-xs">{{ t("pipeline.pipelineLabel") }}</div>
           <div class="text-sm">
             {{ errorDialogData.pipeline_name || errorDialogData.pipeline_id }}
           </div>
         </div>
 
         <div>
-          <div class="text-text-label mb-2 text-xs">Error Message</div>
+          <div class="text-text-label mb-2 text-xs">{{ t("pipeline.errorMessageLabel") }}</div>
           <div
             class="rounded-default bg-banner-error-soft-bg border-l-status-negative text-compact text-banner-error-soft-text border-l-[3px] p-3 font-mono leading-[1.6] wrap-break-word whitespace-pre-wrap"
           >
@@ -325,8 +325,10 @@ import ConfirmDialog from "../ConfirmDialog.vue";
 import { timestampToTimezoneDate } from "../../utils/zincutils";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useI18n } from "vue-i18n";
 
 const store = useStore();
+const { t } = useI18n();
 
 // Refs
 const qTableRef = ref();

@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Custom SQL mode -->
         <div v-if="queryMode === 'custom_sql'" class="mb-4! flex items-start pb-0!">
           <div class="flex items-center font-semibold" style="width: 190px; height: 36px">
-            SQL <span class="text-status-error-text ml-1">*</span>
+            {{ t("alerts.alertDetails.sql") }} <span class="text-status-error-text ml-1">*</span>
           </div>
           <div style="width: calc(100% - 190px)">
             <div
@@ -142,12 +142,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #column>
                   <code>{{ store.state.zoConfig.timestamp_column || "_timestamp" }}</code>
                 </template>
+                <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- "time_bucket" is a literal SQL column alias name, not translatable UI copy -->
                 <template #timeBucket><code>time_bucket</code></template>
               </i18n-t>
             </div>
             <div class="mt-1 text-xs" :class="'text-text-secondary'">
               <i18n-t keypath="alerts.anomaly.sqlColumnsHint" tag="span">
+                <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- "time_bucket" is a literal SQL column alias name, not translatable UI copy -->
                 <template #timeBucket><code>time_bucket</code></template>
+                <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- "value" is a literal SQL column alias name, not translatable UI copy -->
                 <template #valueColumn><code>value</code></template>
               </i18n-t>
             </div>

@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <OTooltip
             v-if="unstableDimensionKeys.has(key)"
-            content="Unstable dimension - changes on pod restart. Default: All values."
+            :content="t('correlation.unstableDimensionNote')"
             side="top"
           />
         </div>
@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               @click.stop="selectAllInGroup(group.id)"
                               :disabled="getGroupSelectionState(group.id) === 'all'"
                             >
-                              All
+                              {{ t("correlation.all") }}
                             </OButton>
                             <OButton
                               variant="ghost"
@@ -204,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               @click.stop="deselectAllInGroup(group.id)"
                               :disabled="getGroupSelectionState(group.id) === 'none'"
                             >
-                              None
+                              {{ t("common.none") }}
                             </OButton>
                           </div>
                         </div>
@@ -244,7 +244,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Footer: selected count -->
                 <div class="border-card-glass-border border-t border-solid p-3 text-xs font-normal">
-                  {{ selectedMetricStreams.length }} of {{ uniqueMetricStreams.length }} selected
+                  {{
+                    t("correlation.streamsSelectedCount", {
+                      selected: selectedMetricStreams.length,
+                      total: uniqueMetricStreams.length,
+                    })
+                  }}
                 </div>
               </div>
             </template>
@@ -646,7 +651,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @click.stop="selectAllInGroup(group.id)"
                             :disabled="getGroupSelectionState(group.id) === 'all'"
                           >
-                            All
+                            {{ t("correlation.all") }}
                           </OButton>
                           <OButton
                             variant="ghost"
@@ -654,7 +659,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @click.stop="deselectAllInGroup(group.id)"
                             :disabled="getGroupSelectionState(group.id) === 'none'"
                           >
-                            None
+                            {{ t("common.none") }}
                           </OButton>
                         </div>
                       </div>
@@ -694,7 +699,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Footer: selected count -->
               <div class="border-card-glass-border border-t border-solid p-3 text-xs font-normal">
-                {{ selectedMetricStreams.length }} of {{ uniqueMetricStreams.length }} selected
+                {{
+                  t("correlation.streamsSelectedCount", {
+                    selected: selectedMetricStreams.length,
+                    total: uniqueMetricStreams.length,
+                  })
+                }}
               </div>
             </div>
           </template>
@@ -986,7 +996,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="selectAllInGroup(group.id)"
                   :disabled="getGroupSelectionState(group.id) === 'all'"
                 >
-                  All
+                  {{ t("correlation.all") }}
                 </OButton>
                 <OButton
                   variant="ghost"
@@ -994,7 +1004,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="deselectAllInGroup(group.id)"
                   :disabled="getGroupSelectionState(group.id) === 'none'"
                 >
-                  None
+                  {{ t("common.none") }}
                 </OButton>
               </div>
             </div>

@@ -37,7 +37,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template #empty>
         <div data-test="no-triggers-message" class="py-8 text-center">
-          <span class="text-text-secondary text-sm"> No triggers loaded </span>
+          <span class="text-text-secondary text-sm">
+            {{ t("alerts.noTriggersLoaded") }}
+          </span>
         </div>
       </template>
 
@@ -166,6 +168,7 @@ export default defineComponent({
     };
 
     return {
+      t,
       columns,
       formatTimestamp,
       getReasonTooltip,

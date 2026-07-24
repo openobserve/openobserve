@@ -51,7 +51,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="text-compact min-w-0 flex-1 leading-tight">
                 <template v-if="serviceNameDetected">
                   {{ t("settings.serviceIdentitySetup.serviceNameDetectedFrom") }}
-                  <span class="text-primary font-bold">Service</span>
+                  <span class="text-primary font-bold">{{
+                    t("settings.correlation.service")
+                  }}</span>
                   {{ t("settings.serviceIdentitySetup.fieldAlias") }}
                   <span class="text-xs opacity-60"
                     >({{ detectedServiceFields.length + unseenServiceFields.length }})</span

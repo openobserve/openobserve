@@ -646,7 +646,7 @@ function onClearResults() {
           <div class="flex items-start gap-4 p-4">
             <span
               class="bg-accent text-text-inverse flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold"
-              >1</span
+              >{{ "1" }}</span
             >
             <div class="min-w-0 flex-1">
               <h4 class="text-text-heading m-0 mb-1 text-sm font-semibold">
@@ -667,7 +667,7 @@ function onClearResults() {
                   ? 'text-text-inverse bg-[var(--color-status-success-text)]!'
                   : 'bg-accent text-text-inverse'
               "
-              >2</span
+              >{{ "2" }}</span
             >
             <div class="flex min-w-0 flex-1 justify-between">
               <div class="flex flex-col items-start">
@@ -702,7 +702,7 @@ function onClearResults() {
                     ? 'bg-accent text-text-inverse'
                     : 'bg-surface-subtle text-text-muted'
               "
-              >3</span
+              >{{ "3" }}</span
             >
             <div class="min-w-0 flex-1">
               <h4 class="text-text-heading m-0 mb-1 text-sm font-semibold">

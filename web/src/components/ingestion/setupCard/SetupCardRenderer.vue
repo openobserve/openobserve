@@ -48,6 +48,7 @@ import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import { safeHttpUrl } from "./subs";
 import type { CardSubstitutions, RichCardContent, RichCardStep, StepChipKind } from "./types";
 import { useStreamDetect, prefersReducedMotion } from "./useStreamDetect";
+import { useI18n } from "vue-i18n";
 
 const props = defineProps<{
   /** The integration's rich content (already token-substituted). */
@@ -69,6 +70,7 @@ const store = useStore();
 const router = useRouter();
 const { getStreams } = useStreams();
 const { isDark } = useTheme();
+const { t } = useI18n();
 
 // The detected stream type drives the status copy + the "View …" destination.
 // traces / logs land in their explorers; metrics (which fan out into many
@@ -459,7 +461,7 @@ function fireConfetti() {
             content.provider.runtime
           }}</OTag>
           <OTag v-if="content.provider.setupTime" type="setupCardMeta" value="setuptime"
-            >{{ content.provider.setupTime }} setup</OTag
+            >{{ content.provider.setupTime }} {{ t("ingestion.setupCard.setup") }}</OTag
           >
           <template v-if="content.provider.metaBadges">
             <OTag
@@ -594,7 +596,7 @@ function fireConfetti() {
                   @click="downloadEnv"
                 >
                   <OIcon name="download" size="sm" />
-                  <OTooltip content="Download .env" side="top" />
+                  <OTooltip :content="t('ingestion.setupCard.downloadEnvTooltip')" side="top" />
                 </OButton>
               </template>
             </OCodeBlock>
@@ -643,13 +645,16 @@ function fireConfetti() {
               <div class="statusbar mt-3" :class="detect.state.value" data-test="ai-c-statusbar">
                 <span class="sb-dot" />
                 <span v-if="detect.idle.value" class="sb-txt"
-                  >Not Tested Yet<span class="sb-sub"
-                    >start ingesting, then test for {{ dataNoun }}</span
+                  >{{ t("ingestion.setupCard.notTestedYet")
+                  }}<span class="sb-sub"
+                    >{{ t("ingestion.setupCard.startIngestingTestFor") }} {{ dataNoun }}</span
                   ></span
                 >
                 <span v-else-if="detect.checking.value" class="sb-txt"
-                  >Checking for {{ dataNoun }}…<span class="sb-sub"
-                    >on {{ watchedStream }}</span
+                  >{{ t("ingestion.setupCard.checkingFor") }} {{ dataNoun
+                  }}{{ t("ingestion.setupCard.ellipsis")
+                  }}<span class="sb-sub"
+                    >{{ t("ingestion.setupCard.on") }} {{ watchedStream }}</span
                   ></span
                 >
                 <span v-else-if="detect.connected.value" class="sb-txt"
@@ -662,8 +667,11 @@ function fireConfetti() {
                   ></span
                 >
                 <span v-else class="sb-txt sb-warn"
-                  >No {{ dataNoun }} Found Yet<span class="sb-sub"
-                    >nothing on {{ watchedStream }} — run your app and test again</span
+                  >{{ t("ingestion.setupCard.no") }} {{ dataNoun }}
+                  {{ t("ingestion.setupCard.foundYet")
+                  }}<span class="sb-sub"
+                    >{{ t("ingestion.setupCard.nothingOn") }} {{ watchedStream }}
+                    {{ t("ingestion.setupCard.runAppAndTestAgain") }}</span
                   ></span
                 >
 
@@ -675,7 +683,7 @@ function fireConfetti() {
                   data-test="ai-c-test"
                   @click="detect.check()"
                 >
-                  Test
+                  {{ t("common.test") }}
                 </OButton>
                 <OButton
                   v-else-if="detect.checking.value"
@@ -684,7 +692,7 @@ function fireConfetti() {
                   :loading="true"
                   data-test="ai-c-checking"
                 >
-                  Checking…
+                  {{ t("ingestion.setupCard.checking") }}
                 </OButton>
                 <OButton
                   v-else-if="detect.connected.value"
@@ -704,13 +712,13 @@ function fireConfetti() {
                   data-test="ai-c-recheck"
                   @click="detect.check()"
                 >
-                  Test Again
+                  {{ t("ingestion.setupCard.testAgain") }}
                 </OButton>
               </div>
 
               <div v-if="showFixHint" class="fixbox mt-3">
                 <div class="fixbox-h">
-                  <OIcon name="warning" size="sm" /> Most Likely Fix —
+                  <OIcon name="warning" size="sm" /> {{ t("ingestion.setupCard.mostLikelyFix") }}
                   {{ extras.fixTitle || "Instrument Before Importing The Client" }}
                 </div>
                 <p class="fixbox-p">
@@ -732,7 +740,7 @@ function fireConfetti() {
                     data-test="ai-c-fix-recheck"
                     @click="detect.check()"
                   >
-                    I Fixed It — Test Again
+                    {{ t("ingestion.setupCard.iFixedItTestAgain") }}
                   </OButton>
                   <OButton
                     v-if="extras.troubleshooting?.length"
@@ -741,7 +749,7 @@ function fireConfetti() {
                     data-test="ai-c-see-troubleshooting"
                     @click="openTroubleshooting()"
                   >
-                    See All Troubleshooting
+                    {{ t("ingestion.setupCard.seeAllTroubleshooting") }}
                   </OButton>
                 </div>
               </div>
@@ -792,13 +800,13 @@ function fireConfetti() {
 
         <OCollapsible
           v-if="hasInstallerAccordion"
-          label="What The Installer Does"
+          :label="t('ingestion.setupCard.whatTheInstallerDoes')"
           icon="layers"
           class="acc-item"
         >
           <div class="acc-body">
             <template v-if="extras.installs?.length">
-              Installs via pip and verifies imports:
+              {{ t("ingestion.setupCard.installsViaPip") }}
               <div class="pill-list mt-2">
                 <OTag v-for="p in extras.installs" :key="p" type="fieldTag" value="softsm">{{
                   p
@@ -806,7 +814,10 @@ function fireConfetti() {
               </div>
             </template>
             <template v-if="extras.envVars?.length">
-              <div class="mt-3">Writes these keys to <code>./.env</code> (idempotent):</div>
+              <div class="mt-3">
+                {{ t("ingestion.setupCard.writesTheseKeysTo") }} <code>./.env</code>
+                {{ t("ingestion.setupCard.idempotentSuffix") }}
+              </div>
               <div class="pill-list mt-2">
                 <OTag v-for="p in extras.envVars" :key="p" type="fieldTag" value="softsm">{{
                   p
@@ -820,7 +831,7 @@ function fireConfetti() {
           v-if="extras.troubleshooting?.length"
           ref="troubleshootingRef"
           v-model="troubleshootingOpen"
-          label="Troubleshooting"
+          :label="t('ingestion.setupCard.troubleshooting')"
           icon="help-outline"
           class="acc-item"
         >
@@ -857,9 +868,10 @@ function fireConfetti() {
 
       <!-- Footer -->
       <div class="pv-foot">
-        <OIcon name="open-in-new" size="sm" /> Full integration docs:&nbsp;
+        <OIcon name="open-in-new" size="sm" />
+        {{ t("ingestion.setupCard.fullIntegrationDocs") }}&nbsp;
         <a :href="safeHttpUrl(content.docUrl)" target="_blank" rel="noopener noreferrer"
-          >{{ content.provider.name }} →</a
+          >{{ content.provider.name }} {{ t("ingestion.setupCard.arrow") }}</a
         >
         <!-- Secondary guides (e.g. GCP's Google Workspace page) — real anchors,
              beside the primary doc link rather than buried in an accordion. -->
@@ -870,14 +882,14 @@ function fireConfetti() {
             target="_blank"
             rel="noopener noreferrer"
             :data-test="`ai-doc-link-${l.label.toLowerCase().replace(/\s+/g, '-')}`"
-            >{{ l.label }} →</a
+            >{{ l.label }} {{ t("ingestion.setupCard.arrow") }}</a
           >
         </template>
         <span v-if="content.slackUrl" class="ml-auto"
-          >Stuck?
-          <a :href="safeHttpUrl(content.slackUrl)" target="_blank" rel="noopener noreferrer"
-            >Ask on Slack</a
-          ></span
+          >{{ t("ingestion.setupCard.stuck") }}
+          <a :href="safeHttpUrl(content.slackUrl)" target="_blank" rel="noopener noreferrer">{{
+            t("ingestion.setupCard.askOnSlack")
+          }}</a></span
         >
       </div>
     </div>

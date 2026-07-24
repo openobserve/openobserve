@@ -121,9 +121,9 @@
                   }}</span>
                   <div class="ml-4 flex shrink-0 items-center gap-1">
                     <template v-for="(part, idx) in formatKey(entry.display)" :key="idx">
-                      <span v-if="part === 'then'" class="text-3xs text-text-secondary mx-0.5"
-                        >then</span
-                      >
+                      <span v-if="part === 'then'" class="text-3xs text-text-secondary mx-0.5">{{
+                        t("shortcuts.then")
+                      }}</span>
                       <kbd
                         v-else
                         class="bg-surface-base border-border-default rounded-default text-2xs text-text-secondary inline-flex h-6 min-w-6 items-center justify-center border px-1.5 font-mono font-medium whitespace-nowrap shadow-[0_1px_0_0_var(--color-border-default)]"
@@ -178,9 +178,9 @@
                   }}</span>
                   <div class="ml-4 flex shrink-0 items-center gap-1">
                     <template v-for="(part, idx) in formatKey(entry.display)" :key="idx">
-                      <span v-if="part === 'then'" class="text-3xs text-text-secondary mx-0.5"
-                        >then</span
-                      >
+                      <span v-if="part === 'then'" class="text-3xs text-text-secondary mx-0.5">{{
+                        t("shortcuts.then")
+                      }}</span>
                       <kbd
                         v-else
                         class="bg-surface-base border-border-default rounded-default text-2xs text-text-secondary inline-flex h-6 min-w-6 items-center justify-center border px-1.5 font-mono font-medium whitespace-nowrap shadow-[0_1px_0_0_var(--color-border-default)]"
@@ -202,7 +202,7 @@
         <div class="flex flex-wrap items-center gap-1.5">
           <kbd
             class="bg-surface-base border-border-default rounded-default text-2xs inline-flex h-5 items-center justify-center border px-1.5 font-mono shadow-[0_1px_0_0_var(--color-border-default)]"
-            >Esc</kbd
+            >{{ t("shortcuts.escKey") }}</kbd
           >
           <span>{{ t("shortcuts.footerClose") }}</span>
           <span class="opacity-40">·</span>

@@ -13,7 +13,7 @@
       <!-- Step 1: deploy -->
       <div class="flex flex-col gap-2">
         <div class="flex items-center gap-2">
-          <OTag variant="primary-soft" size="sm" shape="pill">1</OTag>
+          <OTag variant="primary-soft" size="sm" shape="pill">{{ "1" }}</OTag>
           <span class="text-text-heading font-medium">
             {{ t("synthetics.privateLocations.setup.step1Title") }}
           </span>
@@ -98,7 +98,7 @@
       <!-- Step 2: wait for the agent to register -->
       <div class="flex flex-col gap-2">
         <div class="flex items-center gap-2">
-          <OTag variant="primary-soft" size="sm" shape="pill">2</OTag>
+          <OTag variant="primary-soft" size="sm" shape="pill">{{ "2" }}</OTag>
           <span class="text-text-heading font-medium">
             {{ t("synthetics.privateLocations.setup.step2Title") }}
           </span>
@@ -111,7 +111,7 @@
       <!-- Step 3: assign in checks -->
       <div class="flex flex-col gap-2">
         <div class="flex items-center gap-2">
-          <OTag variant="primary-soft" size="sm" shape="pill">3</OTag>
+          <OTag variant="primary-soft" size="sm" shape="pill">{{ "3" }}</OTag>
           <span class="text-text-heading font-medium">
             {{ t("synthetics.privateLocations.setup.step3Title") }}
           </span>

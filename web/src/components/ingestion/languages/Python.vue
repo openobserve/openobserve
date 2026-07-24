@@ -18,6 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import CopyContent from "@/components/CopyContent.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import useIngestion from "@/composables/useIngestion";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 const name = "python";
 const { languagesContent, languagesDocURLs } = useIngestion();
 const content = languagesContent.replace("[STREAM_NAME]", name.replace(" ", "_").toLowerCase());
@@ -30,7 +33,7 @@ const docURLFastAPI = languagesDocURLs["fastapi"];
   <IngestionContent>
     <CopyContent :content="content" />
     <div>
-      <div class="font-medium">Check further documentation at:</div>
+      <div class="font-medium">{{ t("ingestion.checkFurtherDocumentationAt") }}</div>
       <ol class="mt-1 list-decimal pl-5">
         <li class="py-0.5">
           <a
@@ -38,7 +41,7 @@ const docURLFastAPI = languagesDocURLs["fastapi"];
             target="_blank"
             rel="noopener noreferrer"
             class="text-text-link hover:text-text-link-hover underline"
-            >Python</a
+            >{{ t("ingestion.python") }}</a
           >
         </li>
         <li class="py-0.5">
@@ -47,7 +50,7 @@ const docURLFastAPI = languagesDocURLs["fastapi"];
             target="_blank"
             rel="noopener noreferrer"
             class="text-text-link hover:text-text-link-hover underline"
-            >FastAPI</a
+            >{{ t("ingestion.fastapi") }}</a
           >
         </li>
       </ol>

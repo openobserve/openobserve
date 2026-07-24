@@ -298,7 +298,7 @@ const startTime = computed({
           </div>
           <OInput
             v-model="cron"
-            placeholder="0 */5 * * * *"
+            :placeholder="'0 */5 * * * *'"
             class="w-83!"
             data-test="synthetics-check-schedule-cron-input"
           />

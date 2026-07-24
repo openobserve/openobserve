@@ -21,14 +21,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="(v) => $emit('update:modelValue', v)"
     persistent
     size="md"
-    title="Index Fields Detected"
-    secondary-button-label="Skip"
-    primary-button-label="Add Fields"
+    :title="t('logStream.performanceFieldsDialog.title')"
+    :secondary-button-label="t('logStream.performanceFieldsDialog.skipButton')"
+    :primary-button-label="t('logStream.performanceFieldsDialog.addFieldsButton')"
     @click:secondary="$emit('skip')"
     @click:primary="$emit('add-fields')"
   >
     <div v-if="fieldsByType.fts.length > 0" class="mb-2">
-      <div class="mb-1 text-xs font-medium">Full Text Search ({{ fieldsByType.fts.length }})</div>
+      <div class="mb-1 text-xs font-medium">
+        {{ t("logStream.performanceFieldsDialog.ftsCount", { count: fieldsByType.fts.length }) }}
+      </div>
       <div
         class="rounded-default border-border-default bg-surface-subtle max-h-50 overflow-y-auto border p-2"
       >
@@ -56,7 +58,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div v-if="fieldsByType.secondaryIndex.length > 0">
       <div class="mb-1 text-xs font-medium">
-        Secondary Index ({{ fieldsByType.secondaryIndex.length }})
+        {{
+          t("logStream.performanceFieldsDialog.secondaryIndexCount", {
+            count: fieldsByType.secondaryIndex.length,
+          })
+        }}
       </div>
       <div
         class="rounded-default border-border-default bg-surface-subtle max-h-50 overflow-y-auto border p-2"
@@ -87,6 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, computed, PropType } from "vue";
+import { useI18n } from "vue-i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -112,6 +119,7 @@ export default defineComponent({
   },
   emits: ["update:modelValue", "add-fields", "skip", "remove-field"],
   setup(props) {
+    const { t } = useI18n();
     // Computed property to group missing fields by type
     const fieldsByType = computed(() => {
       return {
@@ -121,6 +129,7 @@ export default defineComponent({
     });
 
     return {
+      t,
       fieldsByType,
     };
   },

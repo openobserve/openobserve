@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon"
             @click.stop="addFolder"
             data-test="dashboard-new-folder-btn"
-            title="Add Folder"
+            :title="t('common.addFolder')"
           >
             <OIcon name="add" size="sm" />
           </OButton>

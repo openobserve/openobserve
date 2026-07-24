@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import type { SpinnerProps } from "./OSpinner.types";
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 const props = withDefaults(defineProps<SpinnerProps>(), {
   variant: "ring",
@@ -37,7 +40,7 @@ const containerClasses = computed(() => [
     v-if="variant === 'ring'"
     :class="containerClasses"
     role="status"
-    aria-label="Loading"
+    :aria-label="t('components.spinner.loading')"
     aria-live="polite"
   >
     <svg
@@ -65,7 +68,7 @@ const containerClasses = computed(() => [
     v-else
     :class="['inline-flex shrink-0 items-center justify-center gap-1', sizeClasses[size ?? 'md']]"
     role="status"
-    aria-label="Loading"
+    :aria-label="t('components.spinner.loading')"
     aria-live="polite"
   >
     <span

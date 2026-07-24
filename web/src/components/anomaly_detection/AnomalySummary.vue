@@ -26,7 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="summary-text m-0 tracking-[0.03em] whitespace-pre-line"
         v-html="summaryText"
       />
-      <p v-else class="m-0 italic opacity-60">Fill in the setup step to see a summary.</p>
+      <p v-else class="m-0 italic opacity-60">
+        {{ t("alerts.anomaly.fillInSetupStepToSeeSummary") }}
+      </p>
     </div>
 
     <div v-show="showScrollToBottom" class="pointer-events-none absolute right-5 bottom-5 z-1000">
@@ -38,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="scrollToBottom"
       >
         <OIcon name="arrow-downward" size="sm" />
-        <OTooltip content="Scroll to bottom" side="top" align="center" />
+        <OTooltip :content="t('alerts.anomaly.scrollToBottom')" side="top" align="center" />
       </OButton>
     </div>
   </div>
@@ -50,6 +52,9 @@ import { generateAnomalySummary } from "@/utils/alerts/anomalySummaryGenerator";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   config: any;

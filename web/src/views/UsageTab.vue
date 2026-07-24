@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Resources rail -->
         <aside
           class="rounded-default bg-card-glass-bg border-card-glass-border flex min-h-0 flex-col overflow-y-auto border p-4"
-          aria-label="Resources"
+          :aria-label="t('common.resources')"
         >
           <!-- Resources — owned assets with live counts. Each row is gated to the
                same route the left nav uses, so it hides when access is missing. -->
@@ -402,7 +402,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Alerts -->
         <section
           class="rounded-default bg-card-glass-bg border-card-glass-border flex min-h-0 flex-col border p-4"
-          aria-label="Alerts overview section"
+          :aria-label="t('home.alertsOverviewSection')"
         >
           <div class="flex items-center justify-between gap-2">
             <span class="text-text-heading flex items-center gap-2 text-sm font-semibold">
@@ -468,7 +468,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Pipelines -->
         <section
           class="rounded-default bg-card-glass-bg border-card-glass-border flex min-h-0 flex-col border p-4"
-          aria-label="Pipelines overview section"
+          :aria-label="t('home.pipelinesOverviewSection')"
         >
           <div class="flex items-center justify-between gap-2">
             <span class="text-text-heading flex items-center gap-2 text-sm font-semibold">

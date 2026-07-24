@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('alert_destinations.header')"
       title-data-test="alert-destinations-list-title"
       icon="location-on"
-      subtitle="Where triggered alerts are delivered"
+      :subtitle="t('alert_destinations.subtitle')"
     >
       <template #actions>
         <OToggleGroup
@@ -211,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-row-action="export"
                 variant="ghost"
                 size="icon-sm"
-                title="Export Destination"
+                :title="t('alert_destinations.exportDestination')"
                 @click.stop="exportDestination(row)"
               >
                 <OIcon name="download" size="sm" />
@@ -259,15 +259,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <ConfirmDialog
-      title="Delete Destination"
-      message="Are you sure you want to delete destination?"
+      :title="t('alert_destinations.deleteDestinationTitle')"
+      :message="t('alert_destinations.deleteDestinationMessage')"
       @update:ok="deleteDestination"
       @update:cancel="cancelDeleteDestination"
       v-model="confirmDelete.visible"
     />
 
     <ConfirmDialog
-      title="Delete Destinations"
+      :title="t('alert_destinations.deleteDestinationsTitle')"
       :message="`Are you sure you want to delete ${selectedDestinations.length} destination(s)?`"
       @update:ok="bulkDeleteDestinations"
       @update:cancel="confirmBulkDelete = false"

@@ -212,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #icon-left>
                     <OIcon size="sm" name="refresh" />
                   </template>
-                  Create Backfill
+                  {{ t("pipeline_list.createBackfill") }}
                 </ODropdownItem>
                 <ODropdownSeparator v-if="row.last_error" />
                 <ODropdownItem
@@ -224,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon size="sm" name="error" />
                   </template>
                   <div class="flex flex-col">
-                    <div>View Error</div>
+                    <div>{{ t("pipeline_list.viewError") }}</div>
                     <div class="text-text-secondary text-xs">
                       {{ new Date(row.last_error.last_error_timestamp / 1000).toLocaleString() }}
                     </div>
@@ -311,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="openBulkDeleteDialog"
                   icon-left="delete"
                 >
-                  Delete
+                  {{ t("common.delete") }}
                 </OButton>
               </div>
             </div>

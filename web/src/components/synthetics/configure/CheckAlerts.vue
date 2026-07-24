@@ -115,7 +115,7 @@ const silenceMinutes = computed({
           v-model="failureThreshold"
           type="number"
           class="w-25!"
-          placeholder="1"
+          :placeholder="'1'"
           data-test="synthetics-check-alerts-threshold-input"
         />
         <span class="text-text-body text-sm whitespace-nowrap">{{

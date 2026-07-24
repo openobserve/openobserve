@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="text-text-heading text-left text-(length:--text-sm) leading-(--leading-base) font-semibold tracking-normal"
                 >
-                  Action Scripts
+                  {{ t("billing.actionScripts") }}
                 </div>
                 <div class="opacity-80">
                   <img :src="actionScriptIcon" />
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               class="text-text-body flex items-end text-left text-(length:--text-2xl) leading-(--leading-xl) font-semibold tracking-normal"
             >
-              2
+              {{ "2" }}
             </div>
           </div>
         </div>
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="text-text-heading text-left text-(length:--text-sm) leading-(--leading-base) font-semibold tracking-normal"
                 >
-                  Error Tracking
+                  {{ t("billing.errorTracking") }}
                 </div>
                 <div class="opacity-80">
                   <img :src="errorTrackingIcon" />
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               class="text-text-body flex items-end text-left text-(length:--text-2xl) leading-(--leading-xl) font-semibold tracking-normal"
             >
-              300
+              {{ "300" }}
             </div>
           </div>
         </div>
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="text-text-heading text-left text-(length:--text-sm) leading-(--leading-base) font-semibold tracking-normal"
                   data-test="billings-usage-tile-title"
                 >
-                  RUM Session
+                  {{ t("billing.rumSession") }}
                 </div>
                 <div class="opacity-80">
                   <img :src="rumSessionIcon" />
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               class="text-text-body flex items-end text-left text-(length:--text-2xl) leading-(--leading-xl) font-semibold tracking-normal"
             >
-              20
+              {{ "20" }}
             </div>
           </div>
         </div>
@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="usageCost[tile.key]"
             class="text-text-secondary text-(length:--text-xs) font-medium"
           >
-            ${{ usageCost[tile.key] }}
+            {{ "$" + usageCost[tile.key] }}
           </div>
         </div>
       </div>

@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <BaseImport
     ref="baseImportRef"
-    title="Import Template"
+    :title="t('alert_templates.importTemplateTitle')"
     test-prefix="template"
     :is-importing="isTemplateImporting"
     container-class=""
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ templateErrorsToDisplay.length > 0 ? "Error Validations" : "Output Messages" }}
         </div>
         <div v-else class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold">
-          Output Messages
+          {{ t("alert_templates.outputMessages") }}
         </div>
         <OSeparator class="mt-1 shrink-0" />
         <div class="min-h-0 w-full min-w-100 flex-1 [resize:none] overflow-auto">
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             updateTemplateName(val, index);
                           }
                         "
-                        :label="'Template Name *'"
+                        :label="t('alert_templates.importNameLabel')"
                         class="showLabelOnTop"
                         tabindex="0"
                       />
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             updateTemplateBody(val, index);
                           }
                         "
-                        :label="'Template Body *'"
+                        :label="t('alert_templates.importBodyLabel')"
                         class="showLabelOnTop"
                         tabindex="0"
                       />
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           }
                         "
                         :options="destinationTypes"
-                        :label="'Template Type *'"
+                        :label="t('alert_templates.importTypeLabel')"
                         class="showLabelOnTop no-case py-2"
                       />
                     </div>
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             updateTemplateTitle(val, index);
                           }
                         "
-                        :label="'Template Title *'"
+                        :label="t('alert_templates.importTitleLabel')"
                         class="showLabelOnTop"
                         tabindex="0"
                       />
@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-primary mb-2.5 text-base uppercase"
               data-test="template-import-creation-title"
             >
-              Template Creation
+              {{ t("alert_templates.templateCreationTitle") }}
             </div>
             <div
               class="error-list"

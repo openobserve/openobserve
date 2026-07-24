@@ -25,6 +25,9 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useScrollShadow } from "@/lib/overlay/useScrollShadow";
 import { FORM_SUBMIT_STATE_KEY } from "@/lib/forms/Form/OForm.types";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -422,7 +425,7 @@ watch(internalOpen, (open) => {
           <DialogClose v-if="showClose" as-child>
             <button
               type="button"
-              aria-label="Close drawer"
+              :aria-label="t('components.drawer.closeDrawer')"
               data-test="o-drawer-close-btn"
               @mousedown.prevent
               :class="[

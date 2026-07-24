@@ -237,10 +237,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <OTooltip side="right" max-width="300px">
                               <template #content>
                                 <span class="text-sm">
-                                  Based upon the condition of trigger the pipeline will get trigger
-                                  <br />
-                                  e.g. if the trigger value is &gt;100 and the query returns a value
-                                  of 101 then the pipeline will trigger.
+                                  {{ t("pipeline.triggerConditionInfoLine1") }} <br />
+                                  {{ t("pipeline.triggerConditionInfoLine2") }}
                                 </span>
                               </template>
                             </OTooltip>
@@ -346,9 +344,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <OTooltip side="right" max-width="300px">
                               <template #content>
                                 <span style="font-size: var(--text-sm)"
-                                  >The threshold above/below which the alert will trigger. <br />
-                                  e.g. if the threshold is >100 and the query returns a value of 101
-                                  then the alert will trigger.</span
+                                  >{{ t("pipeline.thresholdInfoLine1") }} <br />
+                                  {{ t("pipeline.thresholdInfoLine2") }}</span
                                 >
                               </template>
                             </OTooltip>
@@ -478,7 +475,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <OTooltip side="right" max-width="300px">
                               <template #content>
                                 <span class="text-sm">
-                                  Configure the option to enable a cron expression.
+                                  {{ t("pipeline.cronToggleInfo") }}
                                 </span>
                               </template>
                             </OTooltip>
@@ -499,22 +496,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <OTooltip side="right">
                               <template #content>
                                 <span class="text-sm" v-if="triggerData.frequency_type == 'minutes'"
-                                  >How often the task should be executed.<br />
-                                  e.g., 2 minutes means that the task will run every 2 minutes and
-                                  will be processed based on the other parameters provided.</span
+                                  >{{ t("pipeline.frequencyMinutesInfoLine1") }}<br />
+                                  {{ t("pipeline.frequencyMinutesInfoLine2") }}</span
                                 >
                                 <span class="text-sm" v-else>
-                                  Pattern: * * * * * * means every second.
+                                  {{ t("pipeline.cronPatternInfo") }}
                                   <br />
-                                  Format: [Second (optional) 0-59] [Minute 0-59] [Hour 0-23] [Day of
-                                  Month 1-31, 'L'] [Month 1-12] [Day of Week 0-7 or '1L-7L', 0 and 7
-                                  for Sunday].
+                                  {{ t("pipeline.cronFormatInfo") }}
                                   <br />
-                                  Use '*' to represent any value, 'L' for the last day/weekday.
+                                  {{ t("pipeline.cronWildcardInfo") }}
                                   <br />
-                                  Example: 0 0 12 * * ? - Triggers at 12:00 PM daily. It specifies
-                                  second, minute, hour, day of month, month, and day of week,
-                                  respectively.</span
+                                  {{ t("pipeline.cronExampleInfo") }}</span
                                 >
                               </template>
                             </OTooltip>
@@ -529,7 +521,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             >
                               <OTooltip
                                 side="right"
-                                content="Warning: The displayed timezone is approximate. Verify and select the correct timezone manually."
+                                :content="t('alerts.alertSettings.timezoneWarning')"
                               />
                             </OIcon>
                           </template>
@@ -605,10 +597,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <OTooltip side="right" max-width="300px">
                               <template #content>
                                 <span class="text-sm">
-                                  Period for which the query should run.<br />
-                                  e.g. 10 minutes means that whenever the query will run it will use
-                                  the last 10 minutes of data. If the query runs at 4:00 PM then it
-                                  will use the data from 3:50 PM to 4:00 PM.
+                                  {{ t("pipeline.periodInfoLine1") }}<br />
+                                  {{ t("pipeline.periodInfoLine2") }}
                                 </span>
                               </template>
                             </OTooltip>
@@ -658,7 +648,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             data-test="scheduled-pipeline-period-warning-text"
                             class="text-accent py-0.5 text-xs leading-3"
                           >
-                            Note: The period should be the same as frequency.
+                            {{ t("pipeline.periodShouldMatchFrequency") }}
                           </div>
                         </div>
                       </div>
@@ -672,9 +662,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <OTooltip side="right" max-width="300px">
                               <template #content>
                                 <span class="text-sm"
-                                  >Delay for which the pipeline is scheduled to run.<br />
-                                  e.g. 10 minutes delay means that the pipeline will run 10 minutes
-                                  after its scheduled time.</span
+                                  >{{ t("pipeline.delayInfoLine1") }}<br />
+                                  {{ t("pipeline.delayInfoLine2") }}</span
                                 >
                               </template>
                             </OTooltip>

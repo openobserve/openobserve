@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="text-2xs whitespace-nowrap">{{
             formatSmartTimestamp(baselineTimeRange.startTime, baselineTimeRange.endTime).start
           }}</span>
-          <span class="text-3xs opacity-60">→</span>
+          <span class="text-3xs opacity-60">{{ t("latencyInsights.arrowSeparator") }}</span>
           <span class="text-2xs whitespace-nowrap">{{
             formatSmartTimestamp(baselineTimeRange.startTime, baselineTimeRange.endTime).end
           }}</span>
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               selectedTimeRangeDisplay!.endTime,
             ).start
           }}</span>
-          <span class="text-3xs opacity-70">→</span>
+          <span class="text-3xs opacity-70">{{ t("latencyInsights.arrowSeparator") }}</span>
           <span class="text-2xs whitespace-nowrap">{{
             formatSmartTimestamp(
               selectedTimeRangeDisplay!.startTime,

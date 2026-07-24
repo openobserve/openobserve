@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <h3
                   class="text-text-heading m-0 text-(length:--text-sm) font-(--font-semibold) tracking-[0.01em]"
                 >
-                  SQL Query
+                  {{ t("search.sqlQuery") }}
                 </h3>
               </div>
             </header>

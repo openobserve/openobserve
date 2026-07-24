@@ -45,7 +45,7 @@ const retryDelayMs = computed({
           v-model="retries"
           type="number"
           class="w-25!"
-          placeholder="0"
+          :placeholder="'0'"
           data-test="synthetics-check-retries-count-input"
         />
         <span class="text-text-body text-sm whitespace-nowrap">{{
@@ -60,7 +60,7 @@ const retryDelayMs = computed({
           v-model="retryDelayMs"
           type="number"
           class="w-25!"
-          placeholder="0"
+          :placeholder="'0'"
           data-test="synthetics-check-retries-delay-input"
         />
         <span class="text-text-body text-sm whitespace-nowrap">{{

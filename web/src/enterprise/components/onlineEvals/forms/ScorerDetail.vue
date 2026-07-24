@@ -125,7 +125,9 @@
               <dt>{{ t("onlineEvals.scorer.detail.scorerTypeLabel") }}</dt>
               <dd class="flex flex-wrap items-center gap-1.5">
                 <OTag type="scorerType" :value="scorerType" />
-                <OTag type="fieldTag" value="soft">v{{ row.version }}</OTag>
+                <OTag type="fieldTag" value="soft"
+                  >{{ t("onlineEvals.versionPrefix") }}{{ row.version }}</OTag
+                >
               </dd>
 
               <template v-if="scorerType === 'llm_judge'">
@@ -159,7 +161,9 @@
             <div v-if="producesConfig" class="sd-produces" data-test="scorer-detail-produces">
               <OIcon name="rule" size="xs" />
               <span class="sd-produces__name">{{ producesConfig.name }}</span>
-              <span class="sd-produces__version">v{{ producesConfig.version }}</span>
+              <span class="sd-produces__version"
+                >{{ t("onlineEvals.versionPrefix") }}{{ producesConfig.version }}</span
+              >
               <span class="sd-produces__sep">·</span>
               <span class="sd-produces__type">{{ dataTypeOf(producesConfig) }}</span>
             </div>
@@ -229,7 +233,9 @@
             <ul class="sd-versions">
               <li class="sd-versions__item sd-versions__item--active">
                 <div class="sd-versions__head">
-                  <span class="sd-versions__label">v{{ row.version }}</span>
+                  <span class="sd-versions__label"
+                    >{{ t("onlineEvals.versionPrefix") }}{{ row.version }}</span
+                  >
                   <OTag type="activeVersionFlag" value="active" />
                 </div>
                 <div v-if="updatedAt" class="sd-versions__meta">

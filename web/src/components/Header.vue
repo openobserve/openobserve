@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'images/common/openobserve_latest_light_2.svg',
                 )
               "
-              alt="OpenObserve"
+              :alt="t('about.name')"
             />
           </a>
         </div>
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'images/common/openobserve_latest_light_2.svg',
               )
             "
-            alt="OpenObserve"
+            :alt="t('about.name')"
           />
         </a>
       </div>
@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="m-1"
           @click="router.replace('/billings/plans')"
         >
-          Upgrade to PRO Plan
+          {{ t("menu.upgradeToProPlan") }}
         </OButton>
       </div>
 

@@ -18,9 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODrawer
     v-model:open="show"
     :width="47"
-    title="Create Backfill Job for"
-    secondary-button-label="Cancel"
-    primary-button-label="Create Backfill Job"
+    :title="t('pipeline.createBackfillJobTitle')"
+    :secondary-button-label="t('common.cancel')"
+    :primary-button-label="t('pipeline.createBackfillJob')"
     form-id="create-backfill-form"
     @click:secondary="onCancel"
     data-test="create-backfill-job-dialog"
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div>
           <div class="flex items-center gap-4">
             <div class="text-sm font-medium whitespace-nowrap">
-              Time Range <span class="text-status-error-text">*</span>
+              {{ t("pipeline.timeRange") }} <span class="text-status-error-text">*</span>
             </div>
             <OFormDateTimeRange
               name="timerange"
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="flex items-center gap-2">
               <OIcon name="settings" size="md" />
-              <span class="text-sm font-semibold">Advanced Options</span>
+              <span class="text-sm font-semibold">{{ t("pipeline.advancedOptions") }}</span>
             </div>
             <OButton
               variant="ghost-muted"
@@ -88,8 +88,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Chunk Period -->
               <div class="grid grid-cols-12 items-start gap-4">
                 <div class="col-span-5">
-                  <div class="mb-1 text-sm font-medium">Chunk Period (minutes)</div>
-                  <div class="text-text-secondary text-xs">Size of each processing chunk</div>
+                  <div class="mb-1 text-sm font-medium">
+                    {{ t("pipeline.chunkPeriodMinutesLabel") }}
+                  </div>
+                  <div class="text-text-secondary text-xs">
+                    {{ t("pipeline.chunkPeriodDescription") }}
+                  </div>
                 </div>
                 <div class="col-span-7">
                   <OFormInput
@@ -100,7 +104,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <template #icon-right>
                       <OIcon name="info-outline" size="sm" />
-                      <OTooltip content="Default: {{ scheduleFrequency || 60 }} minutes" />
+                      <OTooltip
+                        :content="
+                          t('pipeline.defaultChunkPeriodTooltip', {
+                            minutes: scheduleFrequency || 60,
+                          })
+                        "
+                      />
                     </template>
                   </OFormInput>
                 </div>
@@ -109,19 +119,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Delay Between Chunks -->
               <div class="grid grid-cols-12 items-start gap-4">
                 <div class="col-span-5">
-                  <div class="mb-1 text-sm font-medium">Delay Between Chunks (seconds)</div>
-                  <div class="text-text-secondary text-xs">Wait time between processing chunks</div>
+                  <div class="mb-1 text-sm font-medium">
+                    {{ t("pipeline.delayBetweenChunksLabel") }}
+                  </div>
+                  <div class="text-text-secondary text-xs">
+                    {{ t("pipeline.delayBetweenChunksDescription") }}
+                  </div>
                 </div>
                 <div class="col-span-7">
                   <OFormInput
                     name="delayBetweenChunks"
                     type="number"
-                    placeholder="5"
+                    :placeholder="t('pipeline.defaultDelaySecondsPlaceholder')"
                     data-test="delay-between-chunks-input"
                   >
                     <template #icon-right>
                       <OIcon name="info-outline" size="sm" />
-                      <OTooltip content="Default: 5 seconds" />
+                      <OTooltip :content="t('pipeline.defaultDelayTooltip')" />
                     </template>
                   </OFormInput>
                 </div>
@@ -131,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="pt-2">
                 <OFormCheckbox
                   name="deleteBeforeBackfill"
-                  label="Delete existing data before backfill"
+                  :label="t('pipeline.deleteDataBeforeBackfill')"
                   data-test="delete-before-backfill-checkbox"
                   class="font-medium"
                 />
@@ -143,24 +157,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon name="warning" size="md" class="text-banner-warning-text mt-0.5" />
                     <div>
                       <div class="text-banner-warning-text mb-2 font-semibold">
-                        Warning: Irreversible Data Deletion
+                        {{ t("pipeline.irreversibleDeletionWarning") }}
                       </div>
                       <div class="text-banner-warning-text mb-3 text-xs">
-                        This will permanently delete all data in the destination stream for the
-                        specified time range before running the backfill. This action cannot be
-                        undone.
+                        {{ t("pipeline.deleteBackfillWarningMessage") }}
                       </div>
                       <div class="text-banner-warning-text mb-1 text-sm font-semibold">
-                        Time Alignment Requirements (UTC):
+                        {{ t("pipeline.timeAlignmentRequirements") }}
                       </div>
                       <ul class="text-banner-warning-text ml-5 list-disc space-y-1 text-xs">
                         <li>
-                          <strong>Logs</strong> streams: Times must align to hour boundaries in UTC
-                          (e.g., 10:00:00, not 10:15:00)
+                          <strong>{{ t("common.logs") }}</strong>
+                          {{ t("pipeline.logsHourBoundaryNote") }}
                         </li>
                         <li>
-                          <strong>Metrics/Traces</strong> streams: Times must align to day
-                          boundaries in UTC (e.g., 00:00:00)
+                          <strong>{{ t("pipeline.metricsTracesLabel") }}</strong>
+                          {{ t("pipeline.dayBoundaryNote") }}
                         </li>
                       </ul>
                     </div>
@@ -179,10 +191,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-banner-info-text">
             <div class="mb-1 flex items-center gap-2 font-medium">
               <OIcon name="schedule" size="sm" />
-              <span>Estimated Processing Time: {{ estimatedInfo.time }}</span>
+              <span>{{ t("pipeline.estimatedProcessingTime") }} {{ estimatedInfo.time }}</span>
             </div>
             <div v-if="estimatedInfo.chunks" class="ml-6 text-xs">
-              Estimated Chunks: {{ estimatedInfo.chunks }}
+              {{ t("pipeline.estimatedChunks") }} {{ estimatedInfo.chunks }}
             </div>
           </div>
         </div>
@@ -202,22 +214,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="showDeleteConfirmation"
     persistent
     size="sm"
-    title="Confirm Data Deletion"
-    secondary-button-label="Cancel"
-    primary-button-label="Yes, Delete and Backfill"
+    :title="t('pipeline.confirmDataDeletion')"
+    :secondary-button-label="t('common.cancel')"
+    :primary-button-label="t('pipeline.yesDeleteAndBackfill')"
     primary-button-variant="destructive"
     :primary-button-loading="loading"
     @click:secondary="showDeleteConfirmation = false"
     @click:primary="confirmDelete"
   >
     <p class="mb-4">
-      You have selected to delete existing data before backfill. This will permanently delete all
-      data in the destination stream for the specified time range.
+      {{ t("pipeline.deleteBackfillConfirmMessage") }}
     </p>
     <p class="text-status-error-text font-semibold">
-      This action CANNOT be undone or cancelled once the job is created.
+      {{ t("pipeline.actionCannotBeUndone") }}
     </p>
-    <p class="mt-4">Are you sure you want to proceed?</p>
+    <p class="mt-4">{{ t("pipeline.areYouSureProceed") }}</p>
   </ODialog>
 </template>
 

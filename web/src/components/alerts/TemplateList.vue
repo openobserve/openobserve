@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!showImportTemplate && !showTemplateEditor"
       :title="t('alert_templates.header')"
       icon="description"
-      :subtitle="'Reusable alert message templates'"
+      :subtitle="t('settings.templatesDesc')"
     >
       <template #actions>
         <OToggleGroup
@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #cell-actions="{ row }">
             <OButton
-              title="Export Template"
+              :title="t('alert_templates.exportTemplate')"
               class="ml-1"
               variant="ghost"
               size="icon-sm"
@@ -209,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template v-if="selectedTemplates.length > 0" #bottom>
             <span class="text-text-secondary text-xs">
-              {{ selectedTemplates.length }} selected
+              {{ selectedTemplates.length }} {{ t("alert_templates.selected") }}
             </span>
             <OButton
               data-test="template-list-delete-templates-btn"
@@ -219,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="bulkDeleteLoading"
               @click="openBulkDeleteDialog"
             >
-              Delete
+              {{ t("common.delete") }}
             </OButton>
           </template>
         </OTable>
@@ -238,15 +238,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <ConfirmDialog
-      title="Delete Template"
-      message="Are you sure you want to delete template?"
+      :title="t('alert_templates.deleteTemplateTitle')"
+      :message="t('alert_templates.deleteTemplateMessage')"
       @update:ok="deleteTemplate"
       @update:cancel="cancelDeleteTemplate"
       v-model="confirmDelete.visible"
     />
 
     <ConfirmDialog
-      title="Delete Templates"
+      :title="t('alert_templates.deleteTemplatesTitle')"
       :message="`Are you sure you want to delete ${selectedTemplates.length} template(s)?`"
       @update:ok="bulkDeleteTemplates"
       @update:cancel="confirmBulkDelete = false"

@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OIcon :name="!showErrors ? 'arrow-right' : 'arrow-drop-down'" size="sm" class="mr-1" />
         <span class="text-status-error-text text-sm font-semibold">
-          Errors ({{ props.errors.errors.length }})
+          {{ t("dashboard.dashboardErrors.errorsCount", { count: props.errors.errors.length }) }}
         </span>
       </div>
     </div>

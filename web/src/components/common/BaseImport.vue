@@ -176,11 +176,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Default output section - only shown if slot not used -->
                 <slot name="output-content">
                   <div class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold">
-                    Output Messages
+                    {{ t("dashboard.outputMessages") }}
                   </div>
                   <OSeparator class="mt-1 shrink-0" />
                   <div class="error-report-container min-h-0 flex-1 resize-none overflow-auto">
-                    <div class="text-text-muted p-3 text-center">No messages to display</div>
+                    <div class="text-text-muted p-3 text-center">
+                      {{ t("dashboard.noMessagesToDisplay") }}
+                    </div>
                   </div>
                 </slot>
               </slot>

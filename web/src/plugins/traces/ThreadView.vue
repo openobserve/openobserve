@@ -136,6 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="text-text-muted flex flex-1 items-center justify-center text-sm"
     >
       {{ t("traces.threadView.noLlmTurns") }}
+      <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- code sample: GenAI semantic-convention attribute name/value, must not be translated -->
       <code>gen_ai.operation.name = chat</code>.
     </div>
     <div v-else class="thread-scroll-body bg-surface-base flex-1 overflow-auto px-4 py-3">
@@ -182,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="group.historicalUserCount > 0"
           class="thread-prior rounded-default border-border-default text-text-muted mb-2 flex items-center gap-2 border border-dashed px-3 py-[0.4rem] text-xs"
         >
-          <span>↶</span>
+          <span>{{ t("traces.threadView.historicalIcon") }}</span>
           <span>
             {{
               group.historicalUserCount === 1

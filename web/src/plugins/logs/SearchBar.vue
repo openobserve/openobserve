@@ -1379,7 +1379,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :hide-nl-toggle="false"
                       :has-expand-button="true"
                       :disable-ai="isVrlEditorDisabled"
-                      :disable-ai-reason="isVrlEditorDisabled ? t('search.vrlOnlyForTable') : ''"
+                      :disable-ai-reason="
+                        isVrlEditorDisabled ? t('search.vrlOnlyForTableWarning') : ''
+                      "
                       :ai-placeholder="t('search.askAIFunctionPlaceholder')"
                       :ai-tooltip="t('search.enterFunctionPrompt')"
                       :read-only="isVrlEditorDisabled"

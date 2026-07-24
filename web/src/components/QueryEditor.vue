@@ -18,7 +18,7 @@
     >
       <!-- Show streaming status with spinner + stop button -->
       <template v-if="isGenerating">
-        <img :src="nlpIcon" alt="AI" class="h-5 w-5 shrink-0" />
+        <img :src="nlpIcon" :alt="t('search.aiIconAlt')" class="h-5 w-5 shrink-0" />
         <OSpinner variant="dots" size="xs" />
         <span class="flex-1 truncate text-sm">{{
           streamingText || aiStatusText || t("search.analyzingQuery")
@@ -44,7 +44,7 @@
           @keydown.enter="handleAIInputEnter"
         >
           <template #icon-left>
-            <img :src="nlpIcon" alt="AI" class="h-5 w-5" />
+            <img :src="nlpIcon" :alt="t('search.aiIconAlt')" class="h-5 w-5" />
           </template>
         </OInput>
         <!-- Send Button -->
@@ -123,7 +123,7 @@
       >
         <img
           :src="nlpIcon"
-          alt="AI Mode"
+          :alt="t('search.aiModeIconAlt')"
           class="h-4.5 w-4.5 transition-transform duration-[600ms] ease-[ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert"
         />
         <OTooltip

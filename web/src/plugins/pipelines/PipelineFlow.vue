@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="text-status-warning-text border-status-warning-text rounded-default mr-3 flex items-center border px-2"
     >
       <OIcon name="info" class="mr-1" size="sm" />
-      Unsaved changes detected. Click "Save" to preserve your updates.
+      {{ t("pipeline.unsavedChangesDetected") }}
     </div>
 
     <!-- Edge deletion help notification -->
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="edge-help-notification bg-surface-base text-text-body rounded-default border-border-default absolute top-5 left-1/2 z-1000 flex -translate-x-1/2 items-center border px-4 py-2.5 text-sm shadow-[0_4px_20px_rgba(0,0,0,0.15)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
     >
       <OIcon name="info" class="mr-1" size="sm" />
-      Press Backspace/Delete to remove the edge
+      {{ t("pipeline.edgeDeleteHint") }}
     </div>
   </div>
 
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         transition: 'background-color 0.2s ease',
       }"
     >
-      <p v-if="isDragOver">Drop here</p>
+      <p v-if="isDragOver">{{ t("pipeline.dropHere") }}</p>
     </DropzoneBackground>
     <template #node-input="{ id, data }">
       <CustomNode :id="id" :data="data" io_type="input" />

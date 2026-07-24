@@ -6,7 +6,7 @@
           data-test="attribute-value-cell-dropdown-btn"
           size="icon-xs"
           variant="ghost"
-          aria-label="Add icon"
+          :aria-label="t('components.attributeValueCell.addIcon')"
         >
           <OIcon :name="isDropdownOpen ? 'expand-less' : 'expand-more'" size="xs" />
         </OButton>
@@ -21,6 +21,7 @@
 
 <script lang="ts">
 import { computed, ref, useSlots } from "vue";
+import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -47,11 +48,13 @@ export default {
     const slots = useSlots();
     const hasDropdownSlot = computed(() => !!slots["dropdown"]);
     const isDropdownOpen = ref(false);
+    const { t } = useI18n();
 
     return {
       hasDropdownSlot,
       getImageURL,
       isDropdownOpen,
+      t,
     };
   },
 };

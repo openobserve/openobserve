@@ -22,13 +22,15 @@ the Free Software Foundation, either version 3 of the License, or
     >
       <OIcon name="error-outline" class="mb-2" style="width: 3em; height: 3em" />
       <div class="text-status-error-text">{{ loadError }}</div>
-      <OButton variant="primary" size="sm" class="mt-4" @click="loadCatalog"> Retry </OButton>
+      <OButton variant="primary" size="sm" class="mt-4" @click="loadCatalog">
+        {{ t("common.retry") }}
+      </OButton>
     </div>
 
     <div v-else class="flex min-h-0 flex-1 flex-col">
       <OSearchInput
         v-model="searchQuery"
-        placeholder="Search Score Configs..."
+        :placeholder="t('onlineEvals.scoreConfigLibrary.searchPlaceholder')"
         clearable
         class="mb-4"
         data-test="score-config-library-search"
@@ -46,7 +48,7 @@ the Free Software Foundation, either version 3 of the License, or
           }}</span>
         </div>
         <span class="text-text-secondary text-xs">
-          {{ filteredEntries.length }} score config(s)
+          {{ filteredEntries.length }} {{ t("onlineEvals.scoreConfigLibrary.scoreConfigsLabel") }}
         </span>
       </div>
 
@@ -109,6 +111,9 @@ import {
   type CatalogScoreConfig,
 } from "@/services/online-evals-catalog.service";
 import { showError } from "./utils/evalFormat";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   orgId: string;

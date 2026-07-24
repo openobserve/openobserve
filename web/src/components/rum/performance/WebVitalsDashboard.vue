@@ -25,12 +25,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OIcon name="info" size="sm" class="mr-1" />
         {{ t("rum.learnWebVitalsLabel") }}
+        <!-- eslint-disable vue/no-bare-strings-in-template -- URL used verbatim as tooltip, not translatable UI text -->
         <a
-          href="https://web.dev/articles/vitals"
           title="https://web.dev/articles/vitals"
+          href="https://web.dev/articles/vitals"
           class="text-badge-indigo-soft-text ml-1"
           target="_blank"
         >
+          <!-- eslint-enable vue/no-bare-strings-in-template -->
           {{ t("rum.clickHereLabel") }}
         </a>
       </div>
@@ -51,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div>
         <OSpinner size="md" class="mx-auto block" />
-        <div class="w-full text-center">Loading Dashboard</div>
+        <div class="w-full text-center">{{ t("rum.loadingDashboard") }}</div>
       </div>
     </div>
   </div>

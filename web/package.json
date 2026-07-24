@@ -104,6 +104,7 @@
     "@iconify-json/mdi": "^1.2.3",
     "@iconify-json/octicon": "^1.2.25",
     "@iconify-json/si": "^1.2.17",
+    "@intlify/eslint-plugin-vue-i18n": "^4.5.1",
     "@rushstack/eslint-patch": "^1.15.0",
     "@tailwindcss/postcss": "^4.1.18",
     "@tailwindcss/typography": "^0.5.19",

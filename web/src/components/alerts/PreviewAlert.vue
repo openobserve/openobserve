@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex h-full flex-col items-center justify-center gap-2"
       >
         <OIcon name="edit" size="xl" class="opacity-20" />
-        <span class="text-sm opacity-40">Write a query to see preview</span>
+        <span class="text-sm opacity-40">{{ t("alerts.writeQueryToSeePreview") }}</span>
       </div>
       <PanelSchemaRenderer
         ref="panelRendererRef"
@@ -234,7 +234,7 @@ const evaluationStatus = ref<{
   wouldTrigger: boolean;
   reason: string;
 } | null>(null);
-useI18n();
+const { t } = useI18n();
 
 const store = useStore();
 

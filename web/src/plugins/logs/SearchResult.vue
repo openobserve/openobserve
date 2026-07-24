@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ patternChips.patterns }} {{ t("logs.searchResult.patterns") }}</OTag
               >
               <OTag type="logsResultChip" value="info" data-test="logs-result-pattern-time-chip"
-                >{{ patternChips.time }} ms</OTag
+                >{{ patternChips.time }} {{ t("logs.searchResult.msUnit") }}</OTag
               >
             </template>
             <span v-else class="min-w-0 truncate">{{ patternSummaryText }}</span>

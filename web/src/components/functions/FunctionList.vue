@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   size="icon-sm"
                   icon-left="account-tree"
-                  :title="'Associated Pipelines'"
+                  :title="t('function.associatedPipelines')"
                   data-row-action="view"
                   @click="getAssociatedPipelines({ row })"
                 />
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="openBulkDeleteDialog"
                   icon-left="delete"
                 >
-                  Delete
+                  {{ t("common.delete") }}
                 </OButton>
               </div>
             </template>
@@ -179,15 +179,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
     <ConfirmDialog
-      title="Delete Transform"
-      message="Are you sure you want to delete transform?"
+      :title="t('function.deleteTransformDialogTitle')"
+      :message="t('function.deleteTransformConfirmMessage')"
       @update:ok="deleteFn"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
     />
 
     <ConfirmDialog
-      title="Delete Functions"
+      :title="t('function.deleteFunctionsDialogTitle')"
       :message="`Are you sure you want to delete ${selectedFunctions.length} function(s)?`"
       @update:ok="bulkDeleteFunctions"
       @update:cancel="confirmBulkDelete = false"
@@ -216,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-else>
         <div class="text-center text-xl font-semibold">
-          No pipelines associated with this function
+          {{ t("function.noPipelinesAssociated") }}
         </div>
       </div>
     </ODialog>

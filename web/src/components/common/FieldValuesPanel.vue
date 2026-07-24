@@ -41,16 +41,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="selection-count text-3! text-3xs text-accent font-medium"
           data-test="field-values-panel-selection-count"
         >
-          {{ selectedValues.length }} selected
+          {{ selectedValues.length }} {{ t("search.selectedLabel") }}
         </span>
-        <span v-else class="selection-hint text-3! text-3xs text-text-secondary"
-          >Select to filter</span
-        >
+        <span v-else class="selection-hint text-3! text-3xs text-text-secondary">{{
+          t("search.selectToFilter")
+        }}</span>
         <OButton
           v-if="selectedValues.length > 0"
           variant="ghost"
           size="icon"
-          title="Clear selection"
+          :title="t('search.clearSelection')"
           class="selection-clear-btn"
           @click="clearSelection"
           data-test="field-values-panel-clear-selection-btn"
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-chip"
           class="filter-mode-btn rounded-none! [transition:background_0.15s,color_0.15s]"
           :disabled="filterMode !== 'include' && isModeToggleDisabled"
-          title="Include mode (=)"
+          :title="t('search.includeModeHint')"
           @click="setFilterMode('include')"
           data-test="field-values-panel-include-mode-btn"
         >
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-chip"
           class="filter-mode-btn rounded-none! [transition:background_0.15s,color_0.15s]"
           :disabled="filterMode !== 'exclude' && isModeToggleDisabled"
-          title="Exclude mode (≠)"
+          :title="t('search.excludeModeHint')"
           @click="setFilterMode('exclude')"
           data-test="field-values-panel-exclude-mode-btn"
         >
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              panel's grey surface just reads as a white block. -->
         <OInnerLoading
           :showing="!!fieldValues?.isLoading && !displayValues.length"
-          label="Fetching values..."
+          :label="t('search.fetchingValues')"
           size="xs"
           :scrim="false"
           data-test="field-values-panel-loading-indicator"
@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="text-o2-text-secondary pb-1 pl-3 text-xs italic"
         data-test="field-values-panel-no-count-msg"
       >
-        No data in range — values from active filter
+        {{ t("search.noDataInRangeHint") }}
       </div>
 
       <!-- Field values list -->
@@ -193,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`log-search-subfield-load-more-${fieldName}`"
       >
         <OSpinner variant="dots" v-if="isLoadingMore" size="xs" />
-        <span v-else>View more values</span>
+        <span v-else>{{ t("search.viewMoreValues") }}</span>
       </button>
     </div>
   </div>

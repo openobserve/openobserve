@@ -63,7 +63,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #expansion>
         <div v-show="loadingFunctions" class="py-1 pl-3" style="height: 60px">
-          <OInnerLoading :showing="loadingFunctions" label="Fetching functions..." size="sm" />
+          <OInnerLoading
+            :showing="loadingFunctions"
+            :label="t('logStream.fetchingFunctions')"
+            size="sm"
+          />
         </div>
         <div v-show="!loadingFunctions">
           <OTable
@@ -88,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="mb-1 ml-3"
                   @click="addFunctionInProgress = true"
                 >
-                  Associate Function
+                  {{ t("logStream.associateFunction") }}
                 </OButton>
               </div>
             </template>
@@ -140,7 +144,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #empty>
-              <div v-if="!addFunctionInProgress" class="w-full text-center">No functions found</div>
+              <div v-if="!addFunctionInProgress" class="w-full text-center">
+                {{ t("logStream.noFunctionsFound") }}
+              </div>
             </template>
           </OTable>
         </div>

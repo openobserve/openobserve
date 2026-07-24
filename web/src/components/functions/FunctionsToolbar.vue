@@ -59,7 +59,8 @@
                      side-by-side. A single flex-col child keeps title over body. -->
                 <div class="flex flex-col">
                   <div class="mb-1 font-semibold">
-                    {{ transTypeValue === "1" ? t("function.javascript") : t("function.vrl") }} Tip:
+                    {{ transTypeValue === "1" ? t("function.javascript") : t("function.vrl") }}
+                    {{ t("function.tipLabel") }}
                   </div>
                   <div>
                     {{

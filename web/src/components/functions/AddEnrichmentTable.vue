@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Append/Replace Mode Toggle (only when updating URL-based tables) -->
           <div v-if="isUpdating && formData.source === 'url'" class="flex flex-col gap-2">
-            <div class="text-text-label font-bold">Update Mode</div>
+            <div class="text-text-label font-bold">{{ t("function.updateModeLabel") }}</div>
             <OFormOptionGroup
               name="updateMode"
               data-test="add-enrichment-table-update-mode"
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex flex-col gap-2"
           >
             <div class="text-text-label text-compact font-bold">
-              Existing URLs ({{ formData.urlJobs.length }})
+              {{ t("function.existingUrlsCount", { count: formData.urlJobs.length }) }}
             </div>
             <div
               class="rounded-default border-card-glass-border bg-surface-panel flex flex-col gap-1 border p-2"
@@ -149,25 +149,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }"
           >
             <template v-if="formData.updateMode === 'reload'">
-              <strong>Reload Mode:</strong> Re-process all existing URLs from scratch. Use this when
-              the CSV file content at the URLs has been updated but the URLs themselves haven't
-              changed.
+              <strong>{{ t("function.reloadModeLabel") }}</strong>
+              {{ t("function.reloadModeDescription") }}
             </template>
             <template v-else-if="formData.updateMode === 'append'">
-              <strong>Append Mode:</strong> Add a new URL to existing ones. Data from all URLs will
-              be combined.
+              <strong>{{ t("function.appendModeLabel") }}</strong>
+              {{ t("function.appendModeDescription") }}
               <div class="text-status-warning-text mt-2">
-                <strong>Important:</strong> The new CSV file must have the same columns as the
-                existing data. The enrichment table schema cannot be changed.
+                <strong>{{ t("function.importantLabel") }}</strong>
+                {{ t("function.appendModeWarning") }}
               </div>
             </template>
             <template v-else-if="formData.updateMode === 'replace_failed'">
-              <strong>Replace Failed URL:</strong> Replace only the failed URL with a new one. All
-              successful URLs and their data will be kept. Use this to fix typos or broken URLs.
+              <strong>{{ t("function.replaceFailedUrlLabel") }}</strong>
+              {{ t("function.replaceFailedUrlDescription") }}
             </template>
             <template v-else-if="formData.updateMode === 'replace'">
-              <strong>Replace Mode:</strong> Delete all existing URLs and data, then use only the
-              new URL you provide below.
+              <strong>{{ t("function.replaceModeLabel") }}</strong>
+              {{ t("function.replaceModeDescription") }}
             </template>
           </div>
 
@@ -185,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="
               formData.updateMode === 'append' ? 'New CSV File URL' : 'Replacement CSV File URL'
             "
-            placeholder="https://example.com/data.csv"
+            :placeholder="t('function.csvUrlPlaceholder')"
             :help-text="
               formData.updateMode === 'append'
                 ? 'Enter a new URL to add to this enrichment table'
@@ -198,9 +197,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!isUpdating && formData.source === 'url'"
             name="url"
             data-test="add-enrichment-table-url"
-            label="CSV File URL"
-            placeholder="https://example.com/data.csv"
-            help-text="Must be a publicly accessible CSV file"
+            :label="t('function.csvFileUrlLabel')"
+            :placeholder="t('function.csvUrlPlaceholder')"
+            :help-text="t('function.csvUrlHelpText')"
           />
 
           <pre

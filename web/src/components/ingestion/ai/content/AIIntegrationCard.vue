@@ -24,6 +24,9 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import { parseCard } from "./parseCard";
 import { renderCardSegments, safeHttpUrl, type CardSubstitutions } from "./renderMarkdown";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   /** Raw `data-source-ui.md` content for this integration. */
@@ -110,16 +113,16 @@ const renderedSections = computed(() =>
       <!-- Documentation link — identical markup to the legacy ingestion cards
            (AIIntegrationDetail.vue) so it looks the same across all sections. -->
       <div v-if="docUrl" class="pt-6 pb-2 font-bold">
-        Click
+        {{ t("ingestion.docLinkClick") }}
         <a
           :href="safeHttpUrl(docUrl)"
           target="_blank"
           rel="noopener noreferrer"
           class="text-text-link hover:text-text-link-hover"
           style="text-decoration: underline"
-          >here</a
+          >{{ t("ingestion.docLinkHere") }}</a
         >
-        to check further documentation.
+        {{ t("ingestion.docLinkDefaultText") }}
       </div>
     </div>
   </div>

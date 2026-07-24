@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disabled="rcaLoading"
         @click="$emit('trigger-rca')"
       >
-        Analyze Incident
+        {{ t("alerts.analyzeIncident") }}
       </OButton>
     </div>
 
@@ -88,6 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent } from "vue";
+import { useI18n } from "vue-i18n";
 import DOMPurify from "dompurify";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -122,6 +123,10 @@ export default defineComponent({
     },
   },
   emits: ["trigger-rca"],
+  setup() {
+    const { t } = useI18n();
+    return { t };
+  },
   methods: {
     sanitize(html: string): string {
       return DOMPurify.sanitize(html);

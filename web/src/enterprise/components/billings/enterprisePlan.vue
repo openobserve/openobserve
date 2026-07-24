@@ -45,9 +45,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="text-status-error-text mb-2 flex items-center"
       >
         <OIcon name="warning" size="sm" class="mr-2" />
-        <span class="text-text-body text-base leading-[1.375rem]"
-          >Failed to load pricing details. Please refresh the page.</span
-        >
+        <span class="text-text-body text-base leading-[1.375rem]">{{
+          t("billing.pricingErrorMessage")
+        }}</span>
       </div>
       <div
         v-for="(feature, index) in features"

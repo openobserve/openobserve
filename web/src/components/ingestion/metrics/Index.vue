@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           },
         }"
         :icon="'img:' + getImageURL('images/ingestion/prometheus.svg')"
-        label="Prometheus"
+        :label="t('ingestion.metrics.prometheus')"
       />
       <ORouteTab
         name="vmagent"
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           },
         }"
         :icon="'img:' + getImageURL('images/ingestion/vmagent.svg')"
-        label="vmagent"
+        :label="t('ingestion.metrics.vmagent')"
       />
       <ORouteTab
         name="nightingale"
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           },
         }"
         :icon="'img:' + getImageURL('images/ingestion/nightingale.svg')"
-        label="Nightingale"
+        :label="t('ingestion.metrics.nightingale')"
       />
       <ORouteTab
         name="otelCollector"
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           },
         }"
         :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
-        label="OTEL Collector"
+        :label="t('ingestion.metrics.otelCollector')"
       />
       <ORouteTab
         name="telegraf"
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           },
         }"
         :icon="'img:' + getImageURL('images/ingestion/telegraf.png')"
-        label="Telegraf"
+        :label="t('ingestion.metrics.telegraf')"
       />
       <ORouteTab
         name="cloudwatchMetrics"
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           },
         }"
         :icon="'img:' + getImageURL('images/ingestion/cloud_watch.svg')"
-        label="AWS CloudWatch Metrics"
+        :label="t('ingestion.metrics.awsCloudwatchMetrics')"
       />
     </template>
 

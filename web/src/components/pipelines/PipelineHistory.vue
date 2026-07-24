@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         clearable
       >
         <template #empty>
-          <span>No pipelines found</span>
+          <span>{{ t("pipeline.noPipelinesFound") }}</span>
         </template>
       </OSelect>
       <OTableColumnToggle
@@ -222,8 +222,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="pipeline-history-details-dialog"
       v-model:open="detailsDialog"
       size="lg"
-      title="Pipeline Execution Details"
-      primary-button-label="Close"
+      :title="t('pipeline.executionDetailsTitle')"
+      :primary-button-label="t('common.close')"
       @click:primary="detailsDialog = false"
     >
       <div class="scroll" style="max-height: 70vh" v-if="selectedRow">
@@ -232,13 +232,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="py-1">
             <div class="flex gap-3">
               <div class="w-1/2">
-                <div class="text-text-label mb-1 text-xs">Pipeline Name</div>
+                <div class="text-text-label mb-1 text-xs">
+                  {{ t("pipeline.pipelineNameLabel") }}
+                </div>
                 <div class="text-sm font-medium">
                   {{ selectedRow.pipeline_name }}
                 </div>
               </div>
               <div class="w-1/2">
-                <div class="text-text-label mb-1 text-xs">Status</div>
+                <div class="text-text-label mb-1 text-xs">{{ t("common.status") }}</div>
                 <OTag type="queryStatus" :value="selectedRow.status" />
               </div>
             </div>
@@ -250,13 +252,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="py-1">
             <div class="flex gap-3">
               <div class="w-1/2">
-                <div class="text-text-label mb-1 text-xs">Timestamp</div>
+                <div class="text-text-label mb-1 text-xs">{{ t("pipeline.timestampLabel") }}</div>
                 <div class="text-sm">
                   {{ formatDate(selectedRow.timestamp) }}
                 </div>
               </div>
               <div class="w-1/2">
-                <div class="text-text-label mb-1 text-xs">Duration</div>
+                <div class="text-text-label mb-1 text-xs">{{ t("common.duration") }}</div>
                 <div class="text-sm">
                   {{ formatDuration(selectedRow.end_time - selectedRow.start_time) }}
                 </div>
@@ -270,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="py-1">
             <div class="flex gap-3">
               <div class="w-1/2">
-                <div class="text-text-label mb-1 text-xs">Type</div>
+                <div class="text-text-label mb-1 text-xs">{{ t("common.type") }}</div>
                 <div class="text-sm">
                   <OIcon
                     :name="selectedRow.is_realtime ? 'speed' : 'schedule'"
@@ -281,7 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div class="w-1/2">
-                <div class="text-text-label mb-1 text-xs">Silenced</div>
+                <div class="text-text-label mb-1 text-xs">{{ t("pipeline.silencedLabel") }}</div>
                 <div class="text-sm">
                   <OIcon v-if="selectedRow.is_silenced" name="volume-off" size="xs" class="mr-1" />
                   <OIcon v-else name="volume-up" size="xs" class="mr-1" />
@@ -305,26 +307,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="py-1">
               <div class="flex gap-3">
                 <div v-if="selectedRow.evaluation_took_in_secs" class="w-1/3">
-                  <div class="text-text-label mb-1 text-xs">Evaluation Time</div>
+                  <div class="text-text-label mb-1 text-xs">
+                    {{ t("pipeline.evaluationTimeLabel") }}
+                  </div>
                   <div class="text-sm">{{ selectedRow.evaluation_took_in_secs.toFixed(2) }}s</div>
                 </div>
                 <div v-if="selectedRow.query_took" class="w-1/3">
-                  <div class="text-text-label mb-1 text-xs">Query Time</div>
+                  <div class="text-text-label mb-1 text-xs">{{ t("pipeline.queryTimeLabel") }}</div>
                   <div class="text-sm">{{ (selectedRow.query_took / 1000).toFixed(2) }}ms</div>
                 </div>
                 <div v-if="selectedRow.retries > 0" class="w-1/3">
-                  <div class="text-text-label mb-1 text-xs">Retries</div>
+                  <div class="text-text-label mb-1 text-xs">{{ t("pipeline.retriesLabel") }}</div>
                   <div class="text-sm">{{ selectedRow.retries }}</div>
                 </div>
                 <div v-if="selectedRow.delay_in_secs" class="w-1/3">
-                  <div class="text-text-label mb-1 text-xs">Delay</div>
+                  <div class="text-text-label mb-1 text-xs">{{ t("pipeline.delay") }}</div>
                   <div class="text-sm">{{ selectedRow.delay_in_secs }}s</div>
                 </div>
                 <div
                   v-if="selectedRow.is_partial !== null && selectedRow.is_partial !== undefined"
                   class="w-1/3"
                 >
-                  <div class="text-text-label mb-1 text-xs">Result Status</div>
+                  <div class="text-text-label mb-1 text-xs">
+                    {{ t("pipeline.resultStatusLabel") }}
+                  </div>
                   <div class="text-sm">
                     <OIcon
                       :name="selectedRow.is_partial ? 'warning' : 'check-circle'"
@@ -345,7 +351,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-if="selectedRow.source_node">
             <OSeparator class="my-2" />
             <div class="py-1">
-              <div class="text-text-label mb-1 text-xs">Source Node</div>
+              <div class="text-text-label mb-1 text-xs">{{ t("pipeline.sourceNodeLabel") }}</div>
               <div class="text-compact font-mono text-sm">
                 {{ selectedRow.source_node }}
               </div>
@@ -358,7 +364,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="py-1">
               <div class="text-text-label mb-1 text-xs">
                 <OIcon name="error" size="xs" class="mr-1" />
-                Error Details
+                {{ t("pipeline.errorDetailsLabel") }}
               </div>
               <div
                 class="rounded-default border-status-negative/30 bg-status-error-bg mt-2 border border-solid p-2"
@@ -382,7 +388,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="py-1">
               <div class="text-text-label mb-1 text-xs">
                 <OIcon name="check-circle" size="xs" class="mr-1" />
-                Response
+                {{ t("pipeline.responseLabel") }}
               </div>
               <div
                 class="rounded-default border-status-positive/30 bg-status-success-bg mt-2 border border-solid p-2"
@@ -414,7 +420,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ? `Last error: ${new Date(errorMessage.last_error_timestamp / 1000).toLocaleString()}`
           : undefined
       "
-      primary-button-label="Close"
+      :primary-button-label="t('common.close')"
       @update:open="(v) => !v && closeErrorDialog()"
       @click:primary="closeErrorDialog"
     >
@@ -423,7 +429,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <div class="mb-4">
         <div class="text-compact mb-2 font-semibold tracking-[0.02em] opacity-80">
-          Error Summary
+          {{ t("pipeline.errorSummaryLabel") }}
         </div>
         <div
           class="rounded-default text-compact bg-banner-error-soft-bg border-banner-error-soft-border text-banner-error-soft-text border p-4 font-mono leading-[1.6] wrap-break-word whitespace-pre-wrap"

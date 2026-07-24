@@ -10,9 +10,9 @@
           getLicenseExpiryMessage()
         }}</span>
         <br />
-        <span data-test="license-period-subtitle" class="text-base leading-5.5 font-normal"
-          >Please update your license by contacting your administrator.</span
-        >
+        <span data-test="license-period-subtitle" class="text-base leading-5.5 font-normal">{{
+          t("billing.licenseExpiryContactAdmin")
+        }}</span>
       </div>
     </div>
   </div>
@@ -21,6 +21,7 @@
 <script lang="ts">
 import { computed, defineComponent } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import config from "@/aws-exports";
 
 export default defineComponent({
@@ -28,6 +29,7 @@ export default defineComponent({
   emits: ["updateLicense"],
   setup() {
     const store = useStore();
+    const { t } = useI18n();
     const showLicenseExpiryWarning = computed(() => {
       if (!store.state.zoConfig.license_expiry) return false;
       const now = Date.now();
@@ -52,6 +54,7 @@ export default defineComponent({
       }
     };
     return {
+      t,
       getLicenseExpiryMessage,
       showLicenseExpiryWarning,
       config,

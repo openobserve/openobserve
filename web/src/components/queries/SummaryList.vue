@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #toolbar>
       <div class="flex-1 text-xs font-bold" data-test="summary-list-last-refresh">
-        Last Data Refresh Time: {{ lastRefreshed }}
+        {{ t("queries.lastDataRefreshTime") }} {{ lastRefreshed }}
       </div>
     </template>
     <template #toolbar-trailing>

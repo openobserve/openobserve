@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-if="isMetaOrg"
     :title="t('queries.runningQueries')"
     icon="query-stats"
-    :subtitle="'Inspect and cancel running queries'"
+    :subtitle="t('settings.queryManagementDesc')"
     bleed
   >
     <!-- Filters live in the sub-nav band directly above the table. -->
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-else class="o2-select-input o2-input w-62.5">
           <OSelect
             v-model="filterQuery"
-            placeholder="Select option"
+            :placeholder="t('queries.selectOption')"
             :options="otherFieldOptions"
             labelKey="label"
             valueKey="value"

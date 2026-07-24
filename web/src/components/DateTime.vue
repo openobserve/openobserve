@@ -219,12 +219,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <td
                         class="label o-input-label text-compact text-input-label-text w-1/2 pr-1.5 leading-tight font-medium"
                       >
-                        Start time
+                        {{ t("common.startTime") }}
                       </td>
                       <td
                         class="label o-input-label text-compact text-input-label-text w-1/2 pl-1.5 leading-tight font-medium"
                       >
-                        End time
+                        {{ t("common.endTime") }}
                       </td>
                     </tr>
                     <tr>

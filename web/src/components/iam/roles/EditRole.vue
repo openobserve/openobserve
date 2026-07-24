@@ -200,6 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div>
                     {{ t("iam.editRole.jsonConfigHelp") }}
                   </div>
+                  <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal JSON code sample, not translatable text -->
                   <pre style="font-size: var(--text-xs)">
 {
   "object": "MainResource:ChildResource",
@@ -209,6 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div>
                     <span class="font-bold">{{ t("iam.editRole.childResource") }}</span> <br />
                     {{ t("iam.editRole.specificInstanceOr") }}
+                    <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- literal field identifier from the JSON example above, not translatable text -->
                     <span class="font-bold">organizationID</span>
                     {{ t("iam.editRole.forAllInstances") }}
                   </div>

@@ -30,7 +30,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="alert-context-menu-above"
       >
         <OIcon name="arrow-upward" size="sm" class="mr-2" />
-        <span class="select-none">Create Alert with threshold above {{ formattedValue }}</span>
+        <span class="select-none">{{
+          t("dashboard.alertContextMenu.thresholdAbove", { value: formattedValue })
+        }}</span>
       </div>
       <div
         class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
@@ -38,7 +40,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="alert-context-menu-below"
       >
         <OIcon name="arrow-downward" size="sm" class="mr-2" />
-        <span class="select-none">Create Alert with threshold below {{ formattedValue }}</span>
+        <span class="select-none">{{
+          t("dashboard.alertContextMenu.thresholdBelow", { value: formattedValue })
+        }}</span>
       </div>
     </div>
   </teleport>
@@ -47,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed, watch, onBeforeUnmount } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useI18n } from "vue-i18n";
 
 export default defineComponent({
   name: "AlertContextMenu",
@@ -73,6 +78,7 @@ export default defineComponent({
   },
   emits: ["select", "close"],
   setup(props, { emit }) {
+    const { t } = useI18n();
     const menuRef = ref<HTMLElement | null>(null);
 
     const formattedValue = computed(() => {
@@ -129,6 +135,7 @@ export default defineComponent({
     });
 
     return {
+      t,
       menuRef,
       formattedValue,
       menuStyle,

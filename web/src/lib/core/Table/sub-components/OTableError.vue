@@ -2,6 +2,9 @@
 
 <script setup lang="ts">
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 defineProps<{
   message?: string | null;
@@ -26,7 +29,7 @@ defineSlots<{
             class="rounded-default bg-white/20 px-3 py-1 text-sm transition-colors hover:bg-white/30"
             @click="$emit('retry')"
           >
-            Retry
+            {{ t("common.retry") }}
           </button>
         </template>
       </OBanner>

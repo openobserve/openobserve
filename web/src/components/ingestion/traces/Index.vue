@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           },
         }"
         :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
-        label="OpenTelemetry"
+        :label="t('ingestion.openTelemetryTabLabel')"
       />
       <ORouteTab
         name="ingestTracesFromOtel"
@@ -38,14 +38,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           },
         }"
         :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
-        label="OTEL Collector"
+        :label="t('ingestion.otelCollectorTabLabel')"
       />
     </template>
 
     <div class="h-full w-full">
       <div class="bg-card-glass-bg h-full overflow-y-auto pt-0.5">
         <router-view
-          title="Metrics"
+          :title="t('ingestion.metricsLabel')"
           :currOrgIdentifier="currOrgIdentifier"
           :currUserEmail="currentUserEmail"
           @copy-to-clipboard-fn="copyToClipboardFn"

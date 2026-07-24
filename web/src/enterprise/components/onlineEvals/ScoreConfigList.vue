@@ -106,7 +106,7 @@
         </template>
 
         <template #cell-version="{ row }">
-          <span class="tabular-nums">v{{ row.version }}</span>
+          <span class="tabular-nums">{{ t("onlineEvals.versionPrefix") }}{{ row.version }}</span>
         </template>
 
         <template #cell-usedBy="{ row }">

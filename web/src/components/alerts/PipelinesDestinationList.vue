@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!showDestinationEditor"
       :title="t('pipeline_destinations.header')"
       icon="person-pin-circle"
-      :subtitle="'External targets for pipeline output'"
+      :subtitle="t('settings.pipelineDestinationsDesc')"
     >
       <template #actions>
         <OButton
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template v-if="selectedDestinations.length > 0" #bottom>
             <span class="text-text-secondary text-xs font-medium">
-              {{ selectedDestinations.length }} selected
+              {{ selectedDestinations.length }} {{ t("alert_destinations.selected") }}
             </span>
             <OButton
               data-test="pipeline-destination-list-delete-destinations-btn"
@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="bulkDeleteLoading"
               @click="openBulkDeleteDialog"
             >
-              Delete
+              {{ t("common.delete") }}
             </OButton>
           </template>
         </OTable>
@@ -154,15 +154,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <ConfirmDialog
-      title="Delete Destination"
-      message="Are you sure you want to delete destination?"
+      :title="t('alert_destinations.deleteDestinationTitle')"
+      :message="t('alert_destinations.deleteDestinationMessage')"
       @update:ok="deleteDestination"
       @update:cancel="cancelDeleteDestination"
       v-model="confirmDelete.visible"
     />
 
     <ConfirmDialog
-      title="Delete Destinations"
+      :title="t('alert_destinations.deleteDestinationsTitle')"
       :message="`Are you sure you want to delete ${selectedDestinations.length} destination(s)?`"
       @update:ok="bulkDeleteDestinations"
       @update:cancel="confirmBulkDelete = false"

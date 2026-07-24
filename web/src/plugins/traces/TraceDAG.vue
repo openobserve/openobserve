@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="data.span_status === 'ERROR'"
               type="spanStatus"
               :value="data.span_status"
-              label="ERR"
+              :label="t('traces.errLabel')"
               class="text-3xs mt-0.5 h-3.5 px-1"
             />
           </div>

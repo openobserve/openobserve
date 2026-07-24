@@ -40,7 +40,7 @@ limitations under the License. -->
             {{ result.statusCode }}
           </OTag>
           <span v-if="result.responseTime" class="text-text-secondary font-mono">
-            {{ result.responseTime }}ms
+            {{ result.responseTime }}{{ t("alerts.ms") }}
           </span>
         </div>
       </div>
@@ -73,7 +73,7 @@ limitations under the License. -->
             {{ result.statusCode }}
           </OTag>
           <span v-if="result.responseTime" class="text-text-secondary font-mono">
-            {{ result.responseTime }}ms
+            {{ result.responseTime }}{{ t("alerts.ms") }}
           </span>
         </div>
 

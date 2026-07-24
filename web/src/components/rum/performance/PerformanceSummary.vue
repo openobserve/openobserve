@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="mx-auto block"
           data-test="performance-summary-loading-indicator"
         />
-        <div class="w-full text-center">Loading Dashboard</div>
+        <div class="w-full text-center">{{ t("rum.loadingDashboard") }}</div>
       </div>
     </div>
   </div>

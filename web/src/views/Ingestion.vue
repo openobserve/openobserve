@@ -176,8 +176,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <ConfirmDialog
-      title="Reset RUM Token"
-      message="Are you sure you want to update rum token for this organization?"
+      :title="t('ingestion.resetRUMTokenLabel')"
+      :message="t('ingestion.updateRUMTokenMessage')"
       @update:ok="updateRUMToken"
       @update:cancel="confirmRUMUpdate = false"
       v-model="confirmRUMUpdate"

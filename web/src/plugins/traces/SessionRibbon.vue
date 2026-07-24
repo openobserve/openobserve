@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span>{{ maxLabel }}</span>
           <span>{{ midLabel }}</span>
-          <span>0</span>
+          <span>{{ t("traces.sessionDetail.axisZeroLabel") }}</span>
         </div>
 
         <div

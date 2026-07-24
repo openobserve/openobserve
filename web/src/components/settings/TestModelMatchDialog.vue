@@ -229,7 +229,7 @@
                 >
                   <span class="text-2xs font-mono font-semibold">{{ row.key }}</span>
                   <span class="text-right font-semibold tabular-nums"
-                    >${{ formatRate(row.rate) }}</span
+                    >{{ t("modelPricing.currencySymbol") }}{{ formatRate(row.rate) }}</span
                   >
                 </div>
               </div>

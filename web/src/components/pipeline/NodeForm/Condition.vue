@@ -22,8 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :width="45"
     :show-close="false"
     data-test="add-condition-drawer"
-    primary-button-label="Save"
-    secondary-button-label="Cancel"
+    :primary-button-label="t('common.save')"
+    :secondary-button-label="t('common.cancel')"
     secondary-button-variant="outline"
     :neutral-button-label="pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined"
     neutral-button-variant="outline-destructive"
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header-right>
       <button
         type="button"
-        aria-label="Close drawer"
+        :aria-label="t('pipeline.closeDrawer')"
         data-test="o-drawer-close-btn"
         @mousedown.prevent
         @click="openCancelDialog"
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="text-banner-warning-text text-sm"
                     data-test="add-condition-note-heading"
                   >
-                    Condition value Guidelines:
+                    {{ t("pipeline.conditionValueGuidelines") }}
                   </div>
                   <div
                     class="text-banner-warning-text flex flex-col gap-1 text-sm"
@@ -101,12 +101,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="text-status-warning-text mt-0.5 shrink-0"
                       />
                       <span>
-                        To check for an empty value, use
-                        <span class="highlight text-text-link font-bold">""</span>. Example:
+                        {{ t("pipeline.emptyValueGuideline") }}
+                        <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- code literal representing an empty string value, must stay identical in every language -->
+                        <span class="highlight text-text-link font-bold">""</span
+                        >{{ t("pipeline.exampleColon") }}
+                        <!-- eslint-disable vue/no-bare-strings-in-template -- SQL condition example, code must stay identical in every language -->
                         <span
                           class="code rounded-default bg-code-bg text-code-text px-1 py-px font-mono"
                           >app_name != ""</span
                         >
+                        <!-- eslint-enable vue/no-bare-strings-in-template -->
                       </span>
                     </div>
                     <div class="flex items-start gap-2">
@@ -116,12 +120,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="text-status-warning-text mt-0.5 shrink-0"
                       />
                       <span>
-                        To check for an Null value, use
-                        <span class="highlight text-text-link font-bold">null</span>. Example:
+                        {{ t("pipeline.nullValueGuideline") }}
+                        <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- code literal representing the null keyword, must stay identical in every language -->
+                        <span class="highlight text-text-link font-bold">null</span
+                        >{{ t("pipeline.exampleColon") }}
+                        <!-- eslint-disable vue/no-bare-strings-in-template -- SQL condition example, code must stay identical in every language -->
                         <span
                           class="code rounded-default bg-code-bg text-code-text px-1 py-px font-mono"
                           >app_name != null</span
                         >
+                        <!-- eslint-enable vue/no-bare-strings-in-template -->
                       </span>
                     </div>
                     <div class="flex items-start gap-2">
@@ -131,8 +139,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="text-status-warning-text mt-0.5 shrink-0"
                       />
                       <span>
-                        To add a custom column, type column name and press
-                        <span class="highlight text-text-link font-bold">Enter</span>.
+                        {{ t("pipeline.customColumnGuideline") }}
+                        <span class="highlight text-text-link font-bold">{{
+                          t("pipeline.enterKey")
+                        }}</span
+                        >.
                       </span>
                     </div>
                     <div class="flex items-start gap-2">
@@ -141,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="sm"
                         class="text-status-error-text mt-0.5 shrink-0"
                       />
-                      <span>If conditions are not met, the record will be dropped.</span>
+                      <span>{{ t("pipeline.conditionsNotMetWarning") }}</span>
                     </div>
                     <div class="flex items-start gap-2">
                       <OIcon
@@ -149,9 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="sm"
                         class="text-status-error-text mt-0.5 shrink-0"
                       />
-                      <span
-                        >If the record does not have the specified field, it will be dropped.</span
-                      >
+                      <span>{{ t("pipeline.missingFieldWarning") }}</span>
                     </div>
                   </div>
                 </div>

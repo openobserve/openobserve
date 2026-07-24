@@ -2,6 +2,9 @@
 import { computed, useAttrs } from "vue";
 import type { PaginationProps, PaginationEmits } from "./OPagination.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 defineOptions({ inheritAttrs: false });
 
@@ -56,7 +59,7 @@ const navigate = (page: number) => {
   <div
     role="navigation"
     class="inline-flex items-center gap-0.5 select-none"
-    aria-label="Pagination"
+    :aria-label="t('components.pagination.pagination')"
     v-bind="$attrs"
   >
     <!-- Previous page -->
@@ -69,7 +72,7 @@ const navigate = (page: number) => {
           : 'text-pagination-nav-text hover:bg-pagination-nav-hover-bg cursor-pointer',
       ]"
       :disabled="isFirst || disable"
-      aria-label="Previous page"
+      :aria-label="t('components.pagination.previousPage')"
       :data-test="parentDataTest ? `${parentDataTest}-prev` : undefined"
       @click="navigate(modelValue - 1)"
     >
@@ -110,7 +113,7 @@ const navigate = (page: number) => {
           : 'text-pagination-nav-text hover:bg-pagination-nav-hover-bg cursor-pointer',
       ]"
       :disabled="isLast || disable"
-      aria-label="Next page"
+      :aria-label="t('components.pagination.nextPage')"
       :data-test="parentDataTest ? `${parentDataTest}-next` : undefined"
       @click="navigate(modelValue + 1)"
     >

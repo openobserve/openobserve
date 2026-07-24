@@ -10,11 +10,11 @@
             <img
               class="-ml-px h-10"
               src="@/assets/images/common/openobserve_logo_light.svg"
-              alt="OpenObserve Logo"
+              :alt="t('login.openObserveLogoAlt')"
             />
           </span>
           <div class="text-text-inverse mt-1.25 text-2xl leading-8.25 font-semibold">
-            Try OpenObserve today for more efficient and performant observability.
+            {{ t("login.getStartedBannerMessage") }}
           </div>
         </div>
       </div>
@@ -26,9 +26,13 @@
     >
       <!-- Top Section: Logo and Heading -->
       <div class="mb-4 flex flex-col items-center">
-        <img class="h-16" src="@/assets/images/common/o2_logo.svg" alt="Get Started Banner" />
+        <img
+          class="h-16"
+          src="@/assets/images/common/o2_logo.svg"
+          :alt="t('login.getStartedBannerAlt')"
+        />
         <div class="text-text-heading text-center text-2xl font-semibold md:text-3xl">
-          One last thing before we begin
+          {{ t("login.getStartedHeading") }}
         </div>
       </div>
 
@@ -48,25 +52,30 @@
               name="hearAboutUs"
               data-test="onboarding-get-started-hear-about-us"
               class="o2-input w-full"
-              label="How did you hear about us?"
+              :label="t('login.hearAboutUsLabel')"
               required
-              placeholder="Eg. From a friend"
+              :placeholder="t('login.hearAboutUsPlaceholder')"
             />
             <OFormInput
               name="whereDoYouWork"
               data-test="onboarding-get-started-where-do-you-work"
               class="-mt-2 w-full"
-              label="Where do you work?"
+              :label="t('login.whereDoYouWorkLabel')"
               required
-              placeholder="Company Name"
+              :placeholder="t('login.whereDoYouWorkPlaceholder')"
             />
             <div class="w-full">
               <OFormCheckbox name="isAgree" data-test="onboarding-get-started-agree-checkbox">
                 <template #label>
                   <span class="text-sm">
-                    I have read and agree with the
-                    <a href="#" class="text-text-link hover:underline">Terms of use</a> and
-                    <a href="#" class="text-text-link hover:underline">Privacy policy*</a>
+                    {{ t("login.agreeToTermsPrefix") }}
+                    <a href="#" class="text-text-link hover:underline">{{
+                      t("login.termsOfUse")
+                    }}</a>
+                    {{ t("login.and") }}
+                    <a href="#" class="text-text-link hover:underline">{{
+                      t("login.privacyPolicyStar")
+                    }}</a>
                   </span>
                 </template>
               </OFormCheckbox>
@@ -81,7 +90,7 @@
                 :loading="isSubmitting"
                 type="submit"
               >
-                Start your 14-day Trial
+                {{ t("login.startTrialButton") }}
               </OButton>
             </div>
           </OForm>
@@ -90,7 +99,7 @@
 
       <!-- Footer -->
       <div class="text-text-secondary absolute bottom-5 mb-4 text-sm">
-        &copy; OpenObserve <span id="year">{{ new Date().getFullYear() }}</span>
+        {{ t("login.copyrightNotice") }} <span id="year">{{ new Date().getFullYear() }}</span>
       </div>
     </div>
   </div>
@@ -106,7 +115,9 @@ import { getStartedSchema, getStartedDefaults, type GetStartedForm } from "./Get
 import { useStore } from "vuex";
 import billings from "@/services/billings";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useI18n } from "vue-i18n";
 const store = useStore();
+const { t } = useI18n();
 const emit = defineEmits(["removeFirstTimeLogin"]);
 const formRef = ref(null);
 

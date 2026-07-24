@@ -1,11 +1,11 @@
 <template>
   <IngestionContent>
     <div class="flex flex-col gap-2">
-      <div class="text-base font-semibold">OTLP HTTP</div>
+      <div class="text-base font-semibold">{{ t("ingestion.otlpHttp") }}</div>
       <ContentCopy :content="getOtelHttpConfig" />
     </div>
     <div class="flex flex-col gap-2" v-if="config.isCloud == 'false'">
-      <div class="text-base font-semibold">OTLP gRPC</div>
+      <div class="text-base font-semibold">{{ t("ingestion.otlpGrpc") }}</div>
       <ContentCopy :content="getOtelGrpcConfig" />
     </div>
   </IngestionContent>
@@ -17,6 +17,9 @@ import ContentCopy from "@/components/CopyContent.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import { getEndPoint, getIngestionURL } from "../../../utils/zincutils";
 import config from "@/aws-exports";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 const props = defineProps({
   currOrgIdentifier: {

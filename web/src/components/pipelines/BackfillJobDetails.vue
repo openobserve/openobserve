@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODrawer
     v-model:open="show"
     :width="40"
-    title="Backfill Job Details"
+    :title="t('pipeline.backfillJobDetailsTitle')"
     data-test="backfill-job-details-dialog"
   >
     <div v-if="loading" class="flex justify-center p-4">
@@ -37,32 +37,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm-action"
           @click="confirmCancelJob"
           data-test="cancel-job-btn"
-          >Cancel Job</OButton
+          >{{ t("pipeline.cancelJob") }}</OButton
         >
       </div>
 
       <!-- Job Information -->
       <section class="flex flex-col gap-3">
-        <h3 class="text-base font-semibold">Job Information</h3>
+        <h3 class="text-base font-semibold">{{ t("pipeline.jobInformation") }}</h3>
         <div
           class="rounded-default border-card-border bg-card-bg grid grid-cols-2 gap-x-6 gap-y-3 border p-4"
         >
           <div>
-            <div class="text-text-label mb-1 text-xs">Job ID</div>
+            <div class="text-text-label mb-1 text-xs">{{ t("pipeline.jobId") }}</div>
             <div class="font-mono text-sm break-all">{{ job.job_id }}</div>
           </div>
           <div>
-            <div class="text-text-label mb-1 text-xs">Pipeline</div>
+            <div class="text-text-label mb-1 text-xs">{{ t("pipeline.pipelineLabel") }}</div>
             <div class="text-sm font-medium">{{ job.pipeline_name || job.pipeline_id }}</div>
           </div>
           <div>
-            <div class="text-text-label mb-1 text-xs">Time Range</div>
+            <div class="text-text-label mb-1 text-xs">{{ t("pipeline.timeRange") }}</div>
             <div class="text-sm">
               {{ formatTimestamp(job.start_time) }} – {{ formatTimestamp(job.end_time) }}
             </div>
           </div>
           <div>
-            <div class="text-text-label mb-1 text-xs">Created</div>
+            <div class="text-text-label mb-1 text-xs">{{ t("pipeline.created") }}</div>
             <div class="text-sm">{{ formatTimestampFull(job.created_at) }}</div>
           </div>
         </div>
@@ -70,11 +70,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Progress -->
       <section class="flex flex-col gap-3">
-        <h3 class="text-base font-semibold">Progress</h3>
+        <h3 class="text-base font-semibold">{{ t("pipeline.progressLabel") }}</h3>
         <div class="rounded-default border-card-border bg-card-bg flex flex-col gap-4 border p-4">
           <div>
             <div class="mb-2 flex items-center justify-between">
-              <div class="text-sm font-medium">Overall Progress</div>
+              <div class="text-sm font-medium">{{ t("pipeline.overallProgress") }}</div>
               <div class="text-xl font-semibold">{{ job.progress_percent }}%</div>
             </div>
             <OProgressBar :value="job.progress_percent / 100" variant="default" size="sm" />
@@ -82,19 +82,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="grid grid-cols-2 gap-x-6 gap-y-3">
             <div>
-              <div class="text-text-label mb-1 text-xs">Phase</div>
+              <div class="text-text-label mb-1 text-xs">{{ t("pipeline.phase") }}</div>
               <div class="text-sm">{{ getCurrentPhase }}</div>
             </div>
             <div v-if="job.chunks_total">
-              <div class="text-text-label mb-1 text-xs">Chunks</div>
+              <div class="text-text-label mb-1 text-xs">{{ t("pipeline.chunks") }}</div>
               <div class="text-sm">{{ job.chunks_completed || 0 }} / {{ job.chunks_total }}</div>
             </div>
             <div>
-              <div class="text-text-label mb-1 text-xs">Current Position</div>
+              <div class="text-text-label mb-1 text-xs">{{ t("pipeline.currentPosition") }}</div>
               <div class="text-sm">{{ formatTimestamp(job.current_position) }}</div>
             </div>
             <div v-if="estimatedCompletion">
-              <div class="text-text-label mb-1 text-xs">Estimated Completion</div>
+              <div class="text-text-label mb-1 text-xs">
+                {{ t("pipeline.estimatedCompletion") }}
+              </div>
               <div class="text-sm">{{ estimatedCompletion }}</div>
             </div>
           </div>
@@ -103,11 +105,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Deletion Details (if applicable) -->
       <section v-if="job.delete_before_backfill || job.deletion_status" class="flex flex-col gap-3">
-        <h3 class="text-base font-semibold">Deletion Details</h3>
+        <h3 class="text-base font-semibold">{{ t("pipeline.deletionDetails") }}</h3>
         <div class="rounded-default border-card-border bg-card-bg flex flex-col gap-3 border p-4">
           <div class="grid grid-cols-2 gap-x-6 gap-y-3">
             <div>
-              <div class="text-text-label mb-1 text-xs">Status</div>
+              <div class="text-text-label mb-1 text-xs">{{ t("common.status") }}</div>
               <OTag
                 type="deletionStatus"
                 :value="typeof job.deletion_status === 'object' ? 'failed' : job.deletion_status"
@@ -116,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div v-if="job.deletion_job_ids && job.deletion_job_ids.length > 0">
               <div class="text-text-label mb-1 text-xs">
-                Deletion Job IDs ({{ job.deletion_job_ids.length }})
+                {{ t("pipeline.deletionJobIds") }} ({{ job.deletion_job_ids.length }})
               </div>
               <div
                 v-for="(jobId, idx) in job.deletion_job_ids"
@@ -128,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div v-if="typeof job.deletion_status === 'object' && job.deletion_status.failed">
-            <div class="text-text-label mb-1 text-xs">Error</div>
+            <div class="text-text-label mb-1 text-xs">{{ t("common.error") }}</div>
             <div class="text-status-error-text text-sm">{{ job.deletion_status.failed }}</div>
           </div>
         </div>
@@ -136,13 +138,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Error Details (if present) -->
       <section v-if="job.error" class="flex flex-col gap-3">
-        <h3 class="text-base font-semibold">Error Details</h3>
+        <h3 class="text-base font-semibold">{{ t("pipeline.errorDetails") }}</h3>
         <div
           class="rounded-default border-banner-error-soft-border bg-banner-error-soft-bg flex items-start gap-3 border p-4"
         >
           <OIcon name="error" size="md" class="text-status-error-text mt-0.5 shrink-0" />
           <div class="min-w-0 flex-1">
-            <div class="text-text-label mb-1 text-xs">Error Message</div>
+            <div class="text-text-label mb-1 text-xs">{{ t("pipeline.errorMessage") }}</div>
             <div class="text-banner-error-soft-text text-sm break-words whitespace-pre-wrap">
               {{ job.error }}
             </div>
@@ -152,10 +154,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Timeline -->
       <section class="flex flex-col gap-3">
-        <h3 class="text-base font-semibold">Timeline</h3>
+        <h3 class="text-base font-semibold">{{ t("pipeline.timeline") }}</h3>
         <OTimeline>
           <OTimelineItem
-            title="Job Created"
+            :title="t('pipeline.jobCreated')"
             :subtitle="formatTimestampFull(job.created_at)"
             icon="add-circle"
           />
@@ -168,35 +170,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <OTimelineItem
             v-if="job.progress_percent > 20 || job.deletion_status === 'completed'"
-            title="Backfill Started"
+            :title="t('pipeline.backfillStarted')"
             :subtitle="getBackfillStartTime"
             icon="play-arrow"
           />
           <OTimelineItem
             v-if="job.status === 'running'"
             :title="`Processing Chunk ${job.chunks_completed || 0}/${job.chunks_total || 'N/A'}`"
-            subtitle="In Progress"
+            :subtitle="t('pipeline.inProgress')"
             icon="hourglass-empty"
             variant="info"
           />
           <OTimelineItem
             v-if="job.status === 'completed'"
-            title="Job Completed"
-            subtitle="All data processed successfully"
+            :title="t('pipeline.jobCompleted')"
+            :subtitle="t('pipeline.allDataProcessedSuccessfully')"
             icon="check-circle"
             variant="success"
           />
           <OTimelineItem
             v-if="job.status === 'failed'"
-            title="Job Failed"
-            subtitle="An error occurred during processing"
+            :title="t('pipeline.jobFailed')"
+            :subtitle="t('pipeline.errorOccurredDuringProcessing')"
             icon="error"
             variant="destructive"
           />
           <OTimelineItem
             v-if="job.status === 'canceled'"
-            title="Job Canceled"
-            subtitle="Job was canceled by user"
+            :title="t('pipeline.jobCanceled')"
+            :subtitle="t('pipeline.jobCanceledByUser')"
             icon="cancel"
             variant="muted"
           />
@@ -206,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div v-else class="flex flex-col items-center justify-center p-4">
       <OIcon name="error-outline" style="width: 64px; height: 64px" />
-      <div class="text-text-muted mt-3 text-xl font-semibold">Job not found</div>
+      <div class="text-text-muted mt-3 text-xl font-semibold">{{ t("pipeline.jobNotFound") }}</div>
     </div>
   </ODrawer>
 </template>
@@ -228,6 +230,7 @@ import type { TimelineItemVariant } from "@/lib/data/Timeline/OTimelineItem.type
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import { useI18n } from "vue-i18n";
 
 interface Props {
   modelValue: boolean;
@@ -244,6 +247,7 @@ const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
 const store = useStore();
+const { t } = useI18n();
 
 const { confirm } = useConfirmDialog();
 

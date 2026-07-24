@@ -16,6 +16,9 @@ import {
 } from "reka-ui";
 import { computed, nextTick, ref, useAttrs, useId, useSlots, watch } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -266,7 +269,7 @@ const hasInsideLabel = computed(
         >
           <ComboboxViewport class="max-h-56 overflow-y-auto">
             <ComboboxEmpty class="text-select-placeholder px-3 py-2 text-center text-sm">
-              No options found
+              {{ t("components.combobox.noOptionsFound") }}
             </ComboboxEmpty>
 
             <ComboboxItem

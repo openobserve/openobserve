@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- name="" satisfies the required prop; empty name renders only the slot -->
       <OIcon name="" size="md">
-        <img :src="aiIcon" alt="AI" class="h-4.5 w-4.5" />
+        <img :src="aiIcon" :alt="t('search.aiIconAlt')" class="h-4.5 w-4.5" />
       </OIcon>
       <OTooltip side="top" align="center">
         <template #content>{{

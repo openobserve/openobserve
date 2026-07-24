@@ -119,15 +119,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <OSeparator class="mr-2 -ml-2" />
           <div class="px-1 py-3">
+            <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- template placeholder variable names, must stay identical in every language -->
             <div>org_name, stream_type, stream_name</div>
+            <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- template placeholder variable names, must stay identical in every language -->
             <div>alert_name, alert_type</div>
+            <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- template placeholder variable names, must stay identical in every language -->
             <div>alert_period, alert_operator, alert_threshold</div>
+            <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- template placeholder variable names, must stay identical in every language -->
             <div>alert_count, alert_agg_value</div>
+            <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- template placeholder variable names, must stay identical in every language -->
             <div>alert_start_time, alert_end_time, alert_url</div>
+            <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- template placeholder variable names, must stay identical in every language -->
             <div>
               alert_trigger_time, alert_trigger_time_millis, alert_trigger_time_seconds,
               alert_trigger_time_str
             </div>
+            <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- "rows" is the literal template placeholder keyword, must stay identical in every language -->
             <div><b>rows</b> {{ t("alert_templates.variableRowsDescription") }}</div>
             <div>
               <b>{{ t("alert_templates.variableStreamFields") }}</b>

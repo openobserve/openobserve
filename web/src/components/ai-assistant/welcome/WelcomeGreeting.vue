@@ -30,7 +30,11 @@ const logoSrc = computed(() =>
           class="welcome-hero__logo-halo pointer-events-none absolute inset-[-18px] z-0 rounded-full bg-[radial-gradient(closest-side,rgba(123,97,255,0.35),rgba(245,158,11,0.12)_55%,transparent_70%)] blur-[14px]"
           aria-hidden="true"
         ></span>
-        <img :src="logoSrc" alt="O2 Assistant" class="welcome-hero__logo relative z-1 h-14 w-14" />
+        <img
+          :src="logoSrc"
+          :alt="t('aiAssistant.welcome.taglineHighlight')"
+          class="welcome-hero__logo relative z-1 h-14 w-14"
+        />
       </div>
 
       <div class="welcome-hero__heading-block flex items-center">
@@ -41,7 +45,7 @@ const logoSrc = computed(() =>
           <span
             class="welcome-hero__wave inline-block [transform-origin:70%_70%] text-2xl leading-none"
             aria-hidden="true"
-            >👋</span
+            >{{ t("aiAssistant.welcome.wave") }}</span
           >
         </div>
       </div>
@@ -63,12 +67,12 @@ const logoSrc = computed(() =>
         class="welcome-hero__code welcome-hero__code--vrl rounded-default text-lang-vrl-text bg-lang-vrl-bg px-1.5 py-px font-mono text-xs font-semibold tracking-[0.01em]"
         >{{ t("aiAssistant.welcome.taglineVrl") }}</span
       >
-      and
+      {{ t("common.and") }}
       <span
         class="welcome-hero__code welcome-hero__code--promql rounded-default text-lang-promql-text bg-lang-promql-bg px-1.5 py-px font-mono text-xs font-semibold tracking-[0.01em]"
         >{{ t("aiAssistant.welcome.taglinePromql") }}</span
       >
-      — {{ t("aiAssistant.welcome.taglineAnd") }}
+      {{ t("aiAssistant.welcome.taglineDash") }} {{ t("aiAssistant.welcome.taglineAnd") }}
     </div>
 
     <div

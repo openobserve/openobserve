@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #bottom="scope">
             <div class="flex w-full items-center justify-between py-2">
               <div class="flex w-full items-center text-xs font-normal">
-                {{ scope.totalRows }} Stream(s)
+                {{ scope.totalRows }} {{ t("logStream.streamsUnit") }}
                 <OButton
                   v-if="selectedIds.length > 0"
                   icon-left="delete"
@@ -323,7 +323,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-text-secondary flex w-full items-center gap-2 text-sm">
           <OCheckbox v-model="deleteAssociatedAlertsPipelines" />
           <span class="text-text-secondary text-xs font-medium">
-            Delete all Pipelines and Alerts associated with the selected streams
+            {{ t("logStream.deleteAssociatedAlertsPipelinesBatch") }}
           </span>
         </div>
       </div>

@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-else
                 @dblclick.stop.prevent="startEditQueryName(index, tab)"
                 class="cursor-pointer text-xs whitespace-nowrap select-none"
-                :title="'Double-click to rename'"
+                :title="t('dashboard.doubleClickToRename')"
                 :data-test="`dashboard-panel-query-tab-name-${index}`"
                 >{{ tab.tabName || "Query " + (Number(index) + 1) }}</span
               >

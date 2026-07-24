@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon-xs-sq"
         class="h-8! w-8!"
         :data-test="`${type}-folder-move-new-add`"
-        title="Add Folder"
+        :title="t('common.addFolder')"
         :disabled="disableDropdown"
         @mousedown.prevent
         @click="

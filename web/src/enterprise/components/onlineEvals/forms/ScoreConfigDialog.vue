@@ -221,7 +221,9 @@
                 :checked="formValues.healthyDirection === 'gte'"
                 @change="form.setFieldValue('healthyDirection', 'gte')"
               />
-              <span class="text-text-body text-center font-mono text-lg font-bold">≥</span>
+              <span class="text-text-body text-center font-mono text-lg font-bold">{{
+                t("onlineEvals.scoreConfig.gteSymbol")
+              }}</span>
               <span class="text-compact text-text-body">{{
                 t("onlineEvals.scoreConfig.gteLabel")
               }}</span>
@@ -250,7 +252,9 @@
                 :checked="formValues.healthyDirection === 'lte'"
                 @change="form.setFieldValue('healthyDirection', 'lte')"
               />
-              <span class="text-text-body text-center font-mono text-lg font-bold">≤</span>
+              <span class="text-text-body text-center font-mono text-lg font-bold">{{
+                t("onlineEvals.scoreConfig.lteSymbol")
+              }}</span>
               <span class="text-compact text-text-body">{{
                 t("onlineEvals.scoreConfig.lteLabel")
               }}</span>
@@ -276,7 +280,8 @@
             v-if="formValues.categories.length === 0"
             class="text-2xs text-text-secondary border-dialog-header-border rounded-default bg-card-bg border border-dashed px-3 py-2.5 italic"
           >
-            {{ t("onlineEvals.scoreConfig.addCategoryPlaceholder") }}…
+            {{ t("onlineEvals.scoreConfig.addCategoryPlaceholder")
+            }}{{ t("onlineEvals.scoreConfig.ellipsis") }}
           </div>
           <div
             v-else

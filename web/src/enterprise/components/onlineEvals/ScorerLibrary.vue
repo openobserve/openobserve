@@ -22,7 +22,9 @@ the Free Software Foundation, either version 3 of the License, or
     >
       <OIcon name="error-outline" class="mb-2" style="width: 3em; height: 3em" />
       <div class="text-status-error-text">{{ loadError }}</div>
-      <OButton variant="primary" size="sm" class="mt-4" @click="loadCatalog"> Retry </OButton>
+      <OButton variant="primary" size="sm" class="mt-4" @click="loadCatalog">
+        {{ t("common.retry") }}
+      </OButton>
     </div>
 
     <div
@@ -30,19 +32,19 @@ the Free Software Foundation, either version 3 of the License, or
       class="text-text-secondary flex flex-1 flex-col items-center justify-center p-8"
       data-test="scorer-library-no-providers"
     >
-      Create a Provider first before importing LLM Judge scorers.
+      {{ t("onlineEvals.scorerLibrary.noProvidersMessage") }}
     </div>
 
     <div v-else class="flex min-h-0 flex-1 flex-col">
       <div class="mb-4 flex items-end gap-3">
         <div class="flex w-60 shrink-0 items-center gap-2">
-          <label class="text-text-secondary text-xs font-semibold whitespace-nowrap"
-            >Provider</label
-          >
+          <label class="text-text-secondary text-xs font-semibold whitespace-nowrap">{{
+            t("onlineEvals.scorer.providerLabel")
+          }}</label>
           <OSelect
             v-model="selectedProviderId"
             :options="providerOptions"
-            placeholder="Select provider"
+            :placeholder="t('onlineEvals.scorer.providerPlaceholder')"
             size="md"
             class="w-full"
             data-test="scorer-library-provider-select"
@@ -50,7 +52,7 @@ the Free Software Foundation, either version 3 of the License, or
         </div>
         <OSearchInput
           v-model="searchQuery"
-          placeholder="Search Scorers..."
+          :placeholder="t('onlineEvals.scorerLibrary.searchPlaceholder')"
           clearable
           class="min-w-0 flex-1"
           data-test="scorer-library-search"
@@ -66,7 +68,9 @@ the Free Software Foundation, either version 3 of the License, or
           <OCheckbox :model-value="allVisibleSelected" @update:model-value="toggleSelectAll" />
           <span>{{ allVisibleSelected ? "Clear all" : "Select all" }}</span>
         </label>
-        <span class="text-text-secondary text-xs"> {{ filteredEntries.length }} scorer(s) </span>
+        <span class="text-text-secondary text-xs">
+          {{ filteredEntries.length }} {{ t("onlineEvals.scorerLibrary.scorerCountSuffix") }}
+        </span>
       </div>
 
       <div class="min-h-0 flex-1 overflow-y-auto">
@@ -118,6 +122,7 @@ the Free Software Foundation, either version 3 of the License, or
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -136,6 +141,8 @@ import {
 } from "@/services/online-evals-catalog.service";
 import { entityId } from "./utils/evalEntity";
 import { showError } from "./utils/evalFormat";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   orgId: string;

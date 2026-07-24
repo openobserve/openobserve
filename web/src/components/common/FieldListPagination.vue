@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-xs-sq"
           :disabled="isFirstPage"
           @click="$emit('first-page')"
-          aria-label="First page"
+          :aria-label="t('search.firstPage')"
         >
           <OIcon name="fast-rewind" size="xs" />
         </OButton>
@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-xs-sq"
           :disabled="isLastPage"
           @click="$emit('last-page')"
-          aria-label="Last page"
+          :aria-label="t('search.lastPage')"
         >
           <OIcon name="fast-forward" size="xs" />
         </OButton>

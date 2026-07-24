@@ -49,7 +49,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="hero-page__headline text-text-heading mb-4.5 text-4xl leading-tight font-bold tracking-tight"
             >
               {{ t("storage_settings.heroHeadline") }}
-              <span class="hero-page__brand-text text-theme-accent">OpenObserve.</span>
+              <span class="hero-page__brand-text text-theme-accent">{{
+                t("storage_settings.heroBrand")
+              }}</span>
             </div>
 
             <div class="hero-page__sub text-text-secondary mb-9 max-w-100 text-base leading-[1.7]">

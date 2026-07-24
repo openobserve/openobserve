@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div class="flex h-[calc(100%-40px)]!">
       <div class="border-border-default flex h-25 flex-col border-t">
-        <b>Query Editor:</b>
+        <b>{{ t("search.queryEditorLabel") }}</b>
         <CodeQueryEditor
           editor-id="logsStreamQueryEditor"
           ref="queryEditorRef"

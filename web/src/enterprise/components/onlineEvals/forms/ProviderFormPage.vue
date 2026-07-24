@@ -23,7 +23,7 @@
           <div class="border-dialog-header-border mb-3 flex items-center gap-2.5 border-b pb-2.5">
             <span
               class="text-text-secondary text-2xs inline-flex h-5.5 w-5.5 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] font-mono font-bold"
-              >01</span
+              >{{ t("onlineEvals.provider.sectionStep1") }}</span
             >
             <div class="text-text-heading m-0 text-sm font-semibold">
               {{ t("onlineEvals.provider.sectionTitle") }}
@@ -122,7 +122,7 @@
           <div class="border-dialog-header-border mb-3 flex items-center gap-2.5 border-b pb-2.5">
             <span
               class="text-text-secondary text-2xs inline-flex h-5.5 w-5.5 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] font-mono font-bold"
-              >02</span
+              >{{ t("onlineEvals.provider.sectionStep2") }}</span
             >
             <div class="text-text-heading m-0 text-sm font-semibold">
               {{ t("onlineEvals.provider.authSection") }}

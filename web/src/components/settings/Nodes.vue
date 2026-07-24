@@ -485,9 +485,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #cell-tcp="{ row }">
-              {{ row.tcp_conns }} (E:{{ row.tcp_conns_established }}, C:{{
-                row.tcp_conns_close_wait
-              }}, T:{{ row.tcp_conns_time_wait }})
+              {{ row.tcp_conns }}{{ t("nodes.tcpEstablishedPrefix") }}{{ row.tcp_conns_established
+              }}{{ t("nodes.tcpCloseWaitPrefix") }}{{ row.tcp_conns_close_wait
+              }}{{ t("nodes.tcpTimeWaitPrefix") }}{{ row.tcp_conns_time_wait }})
             </template>
 
             <template #cell-cpu="{ row }">

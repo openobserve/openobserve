@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @pointerdown.stop.prevent
               @click.stop.prevent="onCloseTab(tab.id)"
             >
-              &times;
+              {{ "×" }}
             </button>
             <OTooltip
               v-if="tab.id.startsWith('dash:')"

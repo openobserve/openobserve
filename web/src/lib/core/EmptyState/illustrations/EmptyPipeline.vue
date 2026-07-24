@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
     role="img"
-    aria-label="Create your first pipeline"
+    :aria-label="t('emptyState.noPipelines.title')"
     :class="['es-root', { 'es-static': !animated }]"
   >
     <ellipse cx="120" cy="150" rx="74" ry="9" fill="var(--color-primary-900)" opacity="0.1" />
@@ -138,6 +138,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
+
 withDefaults(defineProps<{ width?: number; animated?: boolean }>(), { width: 260, animated: true });
 </script>
 

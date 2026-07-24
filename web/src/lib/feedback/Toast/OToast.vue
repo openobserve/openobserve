@@ -21,6 +21,9 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { pauseTimer, resumeTimer, isPageVisible } from "./useToast";
 import { ToastRoot, ToastTitle, ToastDescription, ToastClose } from "reka-ui";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 defineOptions({ inheritAttrs: false });
 
@@ -254,7 +257,7 @@ onUnmounted(() => {
               class="size-3.5"
               aria-hidden="true"
             />
-            Affected Sections
+            {{ t("components.toast.affectedSections") }}
           </button>
           <ul v-if="detailsExpanded" class="mt-1.5 space-y-1.5" data-test="o-toast-details-list">
             <li
@@ -279,7 +282,7 @@ onUnmounted(() => {
           'rounded-default text-toast-fg-secondary hover:text-toast-fg focus-visible:ring-toast-info-border flex shrink-0 items-center p-0.5 focus-visible:ring-2 focus-visible:outline-none',
           title ? 'self-start' : 'self-center',
         ]"
-        aria-label="Dismiss notification"
+        :aria-label="t('components.toast.dismissNotification')"
       >
         <OIcon name="close" size="sm" class="size-4" aria-hidden="true" />
       </ToastClose>

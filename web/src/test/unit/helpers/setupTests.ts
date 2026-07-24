@@ -17,8 +17,14 @@
 import { beforeAll, afterEach, afterAll, vi } from "vitest";
 
 import { setupServer } from "msw/node";
+import { config } from "@vue/test-utils";
 
 import "../../__mocks__/index";
+
+// Install i18n globally so every component's useI18n() resolves in tests (mirrors
+// main.ts); without it useI18n() throws "Need to install with `app.use` function".
+import i18n from "@/locales";
+config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
 import { restHandlers } from "./handlers";
 

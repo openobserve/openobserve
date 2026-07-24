@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <IngestionContent>
     <CopyContent class="copy-content-container-cls" :content="content" />
     <IngestionDocLink href="https://github.com/ccfos/nightingale">
-      to learn how to ingest metrics using Nightingale
+      {{ t("ingestion.nightingaleDocLinkText") }}
     </IngestionDocLink>
   </IngestionContent>
 </template>
@@ -30,6 +30,7 @@ import { getEndPoint, getIngestionURL } from "../../../utils/zincutils";
 import CopyContent from "@/components/CopyContent.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
+import { useI18n } from "vue-i18n";
 
 export default defineComponent({
   name: "nightingale-config",
@@ -43,6 +44,7 @@ export default defineComponent({
   },
   components: { CopyContent, IngestionContent, IngestionDocLink },
   setup() {
+    const { t } = useI18n();
     const store = useStore();
     const endpoint: any = ref({
       url: "",
@@ -61,6 +63,7 @@ BasicAuthUser = "[EMAIL]"
 BasicAuthPass = "[PASSCODE]"`;
 
     return {
+      t,
       content,
     };
   },

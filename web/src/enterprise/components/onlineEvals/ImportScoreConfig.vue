@@ -54,7 +54,7 @@ the Free Software Foundation, either version 3 of the License, or
                     <OInput
                       :data-test="`score-config-import-name-input-${err.itemIndex}`"
                       v-model="nameFixers[err.itemIndex]"
-                      label="Name *"
+                      :label="t('onlineEvals.importNameRequired')"
                       @update:model-value="updateName(err.itemIndex, $event)"
                     />
                   </div>
@@ -70,7 +70,7 @@ the Free Software Foundation, either version 3 of the License, or
                     <OInput
                       :data-test="`score-config-import-rename-input-${err.itemIndex}`"
                       v-model="nameFixers[err.itemIndex]"
-                      label="New Name *"
+                      :label="t('onlineEvals.importNewNameRequired')"
                       @update:model-value="updateName(err.itemIndex, $event)"
                     />
                   </div>
@@ -87,7 +87,7 @@ the Free Software Foundation, either version 3 of the License, or
                       :data-test="`score-config-import-datatype-select-${err.itemIndex}`"
                       v-model="dataTypeFixers[err.itemIndex]"
                       :options="dataTypeOptions"
-                      label="Data Type *"
+                      :label="t('onlineEvals.importDataTypeRequired')"
                       @update:model-value="updateDataType(err.itemIndex, $event)"
                     />
                   </div>
@@ -103,14 +103,14 @@ the Free Software Foundation, either version 3 of the License, or
                     <OInput
                       :data-test="`score-config-import-min-input-${err.itemIndex}`"
                       v-model="numericRangeFixers[err.itemIndex].min"
-                      label="Min *"
+                      :label="t('onlineEvals.importMinRequired')"
                       type="number"
                       @update:model-value="updateNumericRange(err.itemIndex)"
                     />
                     <OInput
                       :data-test="`score-config-import-max-input-${err.itemIndex}`"
                       v-model="numericRangeFixers[err.itemIndex].max"
-                      label="Max *"
+                      :label="t('onlineEvals.importMaxRequired')"
                       type="number"
                       @update:model-value="updateNumericRange(err.itemIndex)"
                     />
@@ -127,8 +127,8 @@ the Free Software Foundation, either version 3 of the License, or
                     <OInput
                       :data-test="`score-config-import-categories-input-${err.itemIndex}`"
                       v-model="categoriesFixers[err.itemIndex]"
-                      label="Categories (comma-separated) *"
-                      placeholder="good, ok, bad"
+                      :label="t('onlineEvals.importCategoriesRequired')"
+                      :placeholder="t('onlineEvals.importCategoriesPlaceholder')"
                       @update:model-value="updateCategories(err.itemIndex, $event as string)"
                     />
                   </div>

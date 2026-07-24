@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
     role="img"
-    aria-label="No scheduled search jobs"
+    :aria-label="t('emptyState.noSearchJobs.title')"
     :class="['es-root', { 'es-static': !animated }]"
   >
     <circle cx="120" cy="84" r="64" fill="var(--color-primary-500)" opacity="0.05" />
@@ -100,6 +100,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
+
 withDefaults(defineProps<{ width?: number; animated?: boolean }>(), { width: 260, animated: true });
 </script>
 

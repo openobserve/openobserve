@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="copyToClipboardFn()"
       >
         <OIcon name="content-copy" size="sm" />
-        <OTooltip content="Copy" side="top" />
+        <OTooltip :content="t('common.copy')" side="top" />
       </OButton>
     </div>
     <pre

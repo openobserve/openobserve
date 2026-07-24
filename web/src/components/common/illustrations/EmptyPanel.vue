@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
     role="img"
-    aria-label="No panels yet"
+    :aria-label="t('emptyState.noPanelsYet')"
   >
     <!-- soft brand glow -->
     <ellipse cx="104" cy="84" rx="90" ry="56" fill="var(--color-primary-500)" opacity="0.06" />
@@ -137,3 +137,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </g>
   </svg>
 </template>
+
+<script setup lang="ts">
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
+</script>

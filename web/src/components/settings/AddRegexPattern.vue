@@ -96,13 +96,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="text-xs leading-4.5 font-normal">
                 {{ t("regex_patterns.unsupported_lookaround_note") }}
                 {{ t("regex_patterns.unsupported_lookaround_example") }}
+                <!-- eslint-disable vue/no-bare-strings-in-template -- regex pattern example, must stay literal in every locale -->
                 <code class="rounded-default bg-banner-info-border px-1 py-px font-mono text-xs"
                   >(?=openobserve)\w+</code
                 >
+                <!-- eslint-enable vue/no-bare-strings-in-template -->
                 <OIcon name="arrow-right-alt" size="xs" class="mx-1 inline-block align-middle" />
+                <!-- eslint-disable vue/no-bare-strings-in-template -- regex pattern example, must stay literal in every locale -->
                 <code class="rounded-default bg-banner-info-border px-1 py-px font-mono text-xs"
                   >openobserve\w*</code
                 >
+                <!-- eslint-enable vue/no-bare-strings-in-template -->
               </div>
             </OBanner>
             <div class="regex-pattern-input-container">

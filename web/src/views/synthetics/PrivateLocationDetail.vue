@@ -58,13 +58,13 @@
             <span class="text-text-muted text-xs">{{
               t("synthetics.privateLocations.table.checksPerMin")
             }}</span>
-            <span class="font-medium">~{{ detail.checks_per_min }}</span>
+            <span class="font-medium">{{ "~" + detail.checks_per_min }}</span>
           </div>
           <div v-if="detail.version" class="flex flex-col">
             <span class="text-text-muted text-xs">{{
               t("synthetics.privateLocations.detail.version")
             }}</span>
-            <span class="font-medium">v{{ detail.version }}</span>
+            <span class="font-medium">{{ "v" + detail.version }}</span>
           </div>
           <div class="flex flex-col">
             <span class="text-text-muted text-xs">{{

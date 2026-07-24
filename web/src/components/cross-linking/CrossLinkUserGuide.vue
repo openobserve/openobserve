@@ -3,7 +3,7 @@
     <template #trigger>
       <OButton variant="ghost" size="icon-sm" class="ml-2" data-test="cross-link-help-btn">
         <OIcon name="help" size="sm" class="size-4" />
-        <OTooltip content="User Guide" side="bottom" align="center" />
+        <OTooltip :content="t('crossLinks.userGuide')" side="bottom" align="center" />
       </OButton>
     </template>
 
@@ -16,15 +16,19 @@
       <p class="mt-1 mb-2">{{ t("crossLinks.guideFieldDesc") }}</p>
       <ul class="mt-1 mb-3 ml-5 p-0">
         <li class="my-1">
+          <!-- eslint-disable vue/no-bare-strings-in-template -- cross-link URL template variable syntax, must stay identical in every language -->
           <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-[0.85em]"
             >${field.__name}</span
           >
+          <!-- eslint-enable vue/no-bare-strings-in-template -->
           – {{ t("crossLinks.guideFieldName") }}
         </li>
         <li class="my-1">
+          <!-- eslint-disable vue/no-bare-strings-in-template -- cross-link URL template variable syntax, must stay identical in every language -->
           <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-[0.85em]"
             >${field.__value}</span
           >
+          <!-- eslint-enable vue/no-bare-strings-in-template -->
           – {{ t("crossLinks.guideFieldValue") }}
         </li>
       </ul>
@@ -33,47 +37,59 @@
       <p class="mt-1 mb-2">{{ t("crossLinks.guideTimeDesc") }}</p>
       <ul class="mt-1 mb-3 ml-5 p-0">
         <li class="my-1">
+          <!-- eslint-disable vue/no-bare-strings-in-template -- cross-link URL template variable syntax, must stay identical in every language -->
           <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-[0.85em]"
             >${start_time}</span
           >
+          <!-- eslint-enable vue/no-bare-strings-in-template -->
           – {{ t("crossLinks.guideStartTime") }}
         </li>
         <li class="my-1">
+          <!-- eslint-disable vue/no-bare-strings-in-template -- cross-link URL template variable syntax, must stay identical in every language -->
           <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-[0.85em]"
             >${end_time}</span
           >
+          <!-- eslint-enable vue/no-bare-strings-in-template -->
           – {{ t("crossLinks.guideEndTime") }}
         </li>
       </ul>
       <p class="mt-1 mb-2">
         {{ t("crossLinks.guideTimeExample") }}
+        <!-- eslint-disable vue/no-bare-strings-in-template -- cross-link URL template variable syntax, must stay identical in every language -->
         <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-[0.85em]"
           >from=${start_time}&amp;to=${end_time}</span
         >
+        <!-- eslint-enable vue/no-bare-strings-in-template -->
       </p>
 
       <div class="header mt-3 mb-1 font-semibold">{{ t("crossLinks.guideQueryHeader") }}</div>
       <p class="mt-1 mb-2">{{ t("crossLinks.guideQueryDesc") }}</p>
       <ul class="mt-1 mb-3 ml-5 p-0">
         <li class="my-1">
+          <!-- eslint-disable vue/no-bare-strings-in-template -- cross-link URL template variable syntax, must stay identical in every language -->
           <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-[0.85em]"
             >${query}</span
           >
+          <!-- eslint-enable vue/no-bare-strings-in-template -->
           – {{ t("crossLinks.guideQuery") }}
         </li>
         <li class="my-1">
+          <!-- eslint-disable vue/no-bare-strings-in-template -- cross-link URL template variable syntax, must stay identical in every language -->
           <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-[0.85em]"
             >${query_encoded}</span
           >
+          <!-- eslint-enable vue/no-bare-strings-in-template -->
           – {{ t("crossLinks.guideQueryEncoded") }}
         </li>
       </ul>
 
       <div class="header mt-3 mb-1 font-semibold">{{ t("crossLinks.guideExampleHeader") }}</div>
       <p class="mt-1 mb-2">
+        <!-- eslint-disable vue/no-bare-strings-in-template -- cross-link URL template variable syntax, must stay identical in every language -->
         <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-[0.85em]"
           >https://example.com/trace/${field.__value}?from=${start_time}&amp;to=${end_time}</span
         >
+        <!-- eslint-enable vue/no-bare-strings-in-template -->
       </p>
     </div>
   </ODropdown>

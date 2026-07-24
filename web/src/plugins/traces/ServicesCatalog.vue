@@ -75,7 +75,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span>{{ t("traces.servicesCatalog.status.critical") }}</span>
               <OTooltip>
                 <template #content>
-                  {{ t("traces.servicesCatalog.status.critical") }}: &gt; 10%
+                  {{ t("traces.servicesCatalog.status.critical") }}:
+                  {{ t("traces.servicesCatalog.status.criticalThreshold") }}
                   {{ t("traces.servicesCatalog.legend.title").toLowerCase() }}
                 </template>
               </OTooltip>
@@ -90,7 +91,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span>{{ t("traces.servicesCatalog.status.warning") }}</span>
               <OTooltip>
                 <template #content>
-                  {{ t("traces.servicesCatalog.status.warning") }}: 5 – 10%
+                  {{ t("traces.servicesCatalog.status.warning") }}:
+                  {{ t("traces.servicesCatalog.status.warningThreshold") }}
                   {{ t("traces.servicesCatalog.legend.title").toLowerCase() }}
                 </template>
               </OTooltip>
@@ -105,7 +107,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span>{{ t("traces.servicesCatalog.status.degraded") }}</span>
               <OTooltip>
                 <template #content>
-                  {{ t("traces.servicesCatalog.status.degraded") }}: 1 – 5%
+                  {{ t("traces.servicesCatalog.status.degraded") }}:
+                  {{ t("traces.servicesCatalog.status.degradedThreshold") }}
                   {{ t("traces.servicesCatalog.legend.title").toLowerCase() }}
                 </template>
               </OTooltip>

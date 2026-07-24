@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="getSource(row) === 'built_in'"
                 class="mr-1 inline-flex shrink-0 cursor-default"
               >
-                <img :src="ooLogo" class="h-4 w-4" alt="OpenObserve" />
+                <img :src="ooLogo" class="h-4 w-4" :alt="t('modelPricing.openObserveLogoAlt')" />
                 <OTooltip side="top" align="center" :content="t('modelPricing.sourceBuiltIn')" />
               </span>
               <span
@@ -376,7 +376,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="getSource(pricingDialogRow) === 'built_in'"
           class="inline-flex shrink-0 cursor-default"
         >
-          <img :src="ooLogo" class="h-4.5 w-4.5" alt="OpenObserve" />
+          <img :src="ooLogo" class="h-4.5 w-4.5" :alt="t('modelPricing.openObserveLogoAlt')" />
           <OTooltip side="top" align="center" :content="t('modelPricing.sourceBuiltIn')" />
         </span>
         <span

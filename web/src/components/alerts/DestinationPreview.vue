@@ -21,6 +21,7 @@ limitations under the License.
     data-test="destination-preview-dialog"
   >
     <div data-test="destination-preview-card" class="w-full">
+      <!-- eslint-disable vue/no-bare-strings-in-template -- simulated notification preview: mirrors the actual server-rendered (non-localized) alert message, so it is intentionally hardcoded, not translated -->
       <!-- Slack Preview -->
       <div
         v-if="type === 'slack'"
@@ -375,6 +376,7 @@ limitations under the License.
       </div>
     </div>
 
+    <!-- eslint-enable vue/no-bare-strings-in-template -->
     <template #footer>
       <div class="flex w-full items-center justify-center gap-2">
         <OButton
@@ -384,9 +386,11 @@ limitations under the License.
           @click="copyTemplate"
           icon-left="content-copy"
         >
-          Copy Template
+          {{ t("alerts.previewCopyTemplateBtn") }}
         </OButton>
-        <OButton variant="outline" size="sm-action" @click="isOpen = false"> Close </OButton>
+        <OButton variant="outline" size="sm-action" @click="isOpen = false">
+          {{ t("common.close") }}
+        </OButton>
       </div>
     </template>
   </ODialog>

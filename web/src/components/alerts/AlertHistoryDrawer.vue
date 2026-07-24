@@ -63,13 +63,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #icon-left>
               <OIcon name="history" size="sm" />
             </template>
-            History
+            {{ t("alert_list.alert_history") }}
           </OToggleGroupItem>
           <OToggleGroupItem value="condition" size="sm" data-test="alert-history-tab-condition">
             <template #icon-left>
               <OIcon name="code" size="sm" />
             </template>
-            Condition
+            {{ t("common.condition") }}
           </OToggleGroupItem>
         </OToggleGroup>
       </div>
@@ -161,7 +161,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @click="toggleFlappingGroup(row.timestamp)"
                       />
                       <span class="text-2xs text-text-secondary truncate">
-                        {{ row._children.length }} rows · {{ row._duration }}
+                        {{ row._children.length }} {{ t("alerts.alertDetails.rowsSeparator") }}
+                        {{ row._duration }}
                       </span>
                     </div>
                     <!-- Normal row -->
@@ -240,7 +241,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="'bg-surface-subtle border-border-default'"
                 >
                   <div class="flex items-center gap-1.5">
-                    <span class="text-2xs font-medium" :class="'text-text-secondary'"> SQL </span>
+                    <span class="text-2xs font-medium" :class="'text-text-secondary'">
+                      {{ t("alerts.alertDetails.sql") }}
+                    </span>
                   </div>
                   <OButton
                     v-if="anomalySql"

@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="open"
     data-test="resume-pipeline-dialog"
     size="sm"
-    title="Resume Pipeline Ingestion"
+    :title="t('pipeline_list.resume_pipeline_title')"
     :sub-title="lastPausedAt ? `Last paused: ${convertUnixToDateFormat(lastPausedAt)}` : undefined"
     :secondary-button-label="t('confirmDialog.cancel')"
     :primary-button-label="t('pipeline_list.run_pipeline')"
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #label>
             <div class="resume-radio-label">
               <div class="resume-radio-main-text text-compact leading-4.5 font-normal">
-                Continue from where it paused
+                {{ t("confirmDialog.continueFromWherePaused") }}
               </div>
               <div
                 v-if="lastPausedAt"
@@ -45,7 +45,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ORadio>
         <ORadio :value="true" style="height: 18px">
           <template #label>
-            <span class="text-compact leading-4.5 font-normal">Start from now.</span>
+            <span class="text-compact leading-4.5 font-normal">{{
+              t("confirmDialog.startFromNow")
+            }}</span>
           </template>
         </ORadio>
       </ORadioGroup>

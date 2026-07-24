@@ -142,14 +142,15 @@
                   {{ t("onlineEvals.job.detail.idleWindowLabel") }}
                 </dt>
                 <dd class="text-compact text-text-body m-0 wrap-break-word">
-                  {{ completionWindow.idleWindowSecs }}s
+                  {{ completionWindow.idleWindowSecs
+                  }}{{ t("onlineEvals.job.detail.secondsSuffix") }}
                 </dd>
 
                 <dt class="text-text-secondary text-xs font-semibold">
                   {{ t("onlineEvals.job.detail.maxAgeLabel") }}
                 </dt>
                 <dd class="text-compact text-text-body m-0 wrap-break-word">
-                  {{ completionWindow.maxAgeSecs }}s
+                  {{ completionWindow.maxAgeSecs }}{{ t("onlineEvals.job.detail.secondsSuffix") }}
                 </dd>
               </template>
             </dl>
@@ -243,7 +244,9 @@
                         type="scorerType"
                         :value="item.scorerType"
                       />
-                      <span class="text-2xs text-text-secondary">v{{ item.version }}</span>
+                      <span class="text-2xs text-text-secondary"
+                        >{{ t("onlineEvals.job.detail.versionPrefix") }}{{ item.version }}</span
+                      >
                     </div>
                     <div
                       v-if="item.scoreConfigName"
@@ -415,7 +418,9 @@
               <dt class="text-text-secondary text-xs font-semibold">
                 {{ t("onlineEvals.job.detail.versionLabel") }}
               </dt>
-              <dd class="text-compact text-text-body m-0 wrap-break-word">v{{ row.version }}</dd>
+              <dd class="text-compact text-text-body m-0 wrap-break-word">
+                {{ t("onlineEvals.job.detail.versionPrefix") }}{{ row.version }}
+              </dd>
               <dt v-if="pipelineId" class="text-text-secondary text-xs font-semibold">
                 {{ t("onlineEvals.job.detail.pipelineLabel") }}
               </dt>
