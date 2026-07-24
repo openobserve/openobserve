@@ -55,6 +55,9 @@ pub enum EvalJobError {
 
     #[error("ReconcilerError# {0}")]
     ReconcilerError(String),
+
+    #[error("TaskPublishError# {0}")]
+    TaskPublish(String),
 }
 
 /// Request body for manually evaluating an explicit target with a job's scorers.
@@ -347,7 +350,13 @@ pub async fn manual_evaluate(
             &job, target,
         )
         .await
-        .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
+        .map_err(|e| {
+            use o2_enterprise::enterprise::llm_evaluations::eval_jobs::manual::ManualEvaluationError;
+            match e {
+                ManualEvaluationError::InvalidTarget(msg) => EvalJobError::InvalidJob(msg),
+                ManualEvaluationError::Publish(msg) => EvalJobError::TaskPublish(msg),
+            }
+        })?;
 
     Ok(ManualEvalJobResponseBody {
         job_id: job.id,
