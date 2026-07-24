@@ -81,7 +81,6 @@ pub enum StreamSettingsError {
     StreamDeleting(String),
     BadRequest(String),
     NotFound(String),
-    Internal(anyhow::Error),
 }
 
 impl std::fmt::Display for StreamSettingsError {
@@ -90,19 +89,11 @@ impl std::fmt::Display for StreamSettingsError {
             Self::StreamDeleting(message) | Self::BadRequest(message) | Self::NotFound(message) => {
                 f.write_str(message)
             }
-            Self::Internal(error) => write!(f, "{error}"),
         }
     }
 }
 
-impl std::error::Error for StreamSettingsError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::Internal(error) => Some(error.as_ref()),
-            _ => None,
-        }
-    }
-}
+impl std::error::Error for StreamSettingsError {}
 
 pub struct SavedStreamSettings {
     pub settings: StreamSettings,
@@ -118,17 +109,13 @@ pub async fn save_stream_settings(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-    settings: StreamSettings,
+    mut settings: StreamSettings,
 ) -> std::result::Result<SavedStreamSettings, StreamSettingsError> {
-    if db::compact::retention::is_deleting_stream(org_id, stream_type, stream_name, None) {
-        return Err(StreamSettingsError::StreamDeleting(format!(
-            "stream [{stream_name}] is being deleted"
-        )));
-    }
+    validate_stream_settings(org_id, stream_name, stream_type, &mut settings)?;
     let schema = infra::schema::get(org_id, stream_name, stream_type)
         .await
         .map_err(|_| StreamSettingsError::NotFound("stream not found".to_string()))?;
-    save_stream_settings_with_schema(org_id, stream_name, stream_type, &schema, settings).await
+    persist_stream_settings(org_id, stream_name, stream_type, &schema, settings).await
 }
 
 async fn save_stream_settings_with_schema(
@@ -138,7 +125,18 @@ async fn save_stream_settings_with_schema(
     schema: &Schema,
     mut settings: StreamSettings,
 ) -> std::result::Result<SavedStreamSettings, StreamSettingsError> {
-    let cfg = get_config();
+    validate_stream_settings(org_id, stream_name, stream_type, &mut settings)?;
+    persist_stream_settings(org_id, stream_name, stream_type, schema, settings).await
+}
+
+/// Settings-level validation that does not need the stored schema. Runs before the schema fetch
+/// so invalid settings are rejected as bad-request even when the stream doesn't exist.
+fn validate_stream_settings(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    settings: &mut StreamSettings,
+) -> std::result::Result<(), StreamSettingsError> {
     if db::compact::retention::is_deleting_stream(org_id, stream_type, stream_name, None) {
         return Err(StreamSettingsError::StreamDeleting(format!(
             "stream [{stream_name}] is being deleted"
@@ -174,6 +172,17 @@ async fn save_stream_settings_with_schema(
         ));
     }
 
+    Ok(())
+}
+
+async fn persist_stream_settings(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    schema: &Schema,
+    mut settings: StreamSettings,
+) -> std::result::Result<SavedStreamSettings, StreamSettingsError> {
+    let cfg = get_config();
     let schema_fields = schema
         .fields()
         .iter()
@@ -322,20 +331,13 @@ async fn save_stream_settings_with_schema(
     }
 
     let mut metadata = schema.metadata.clone();
-    metadata.insert(
-        "settings".to_string(),
-        json::to_string(&settings).map_err(|error| {
-            StreamSettingsError::Internal(anyhow::Error::new(error).context(format!(
-                "serialize stream settings for {org_id}/{stream_type}/{stream_name}"
-            )))
-        })?,
-    );
+    metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
     if !metadata.contains_key("created_at") {
         metadata.insert("created_at".to_string(), now_micros().to_string());
     }
     db::schema::update_setting(org_id, stream_name, stream_type, metadata)
         .await
-        .map_err(StreamSettingsError::Internal)?;
+        .unwrap();
 
     Ok(SavedStreamSettings {
         settings,
@@ -746,30 +748,17 @@ pub async fn handle_diff_schema(
             Ok(saved) => {
                 stream_setting = saved.settings;
                 defined_schema_fields = stream_setting.defined_schema_fields.clone();
-                final_schema
-                    .metadata
-                    .insert("settings".to_string(), json::to_string(&stream_setting)?);
-                if !final_schema.metadata.contains_key("created_at") {
-                    final_schema
-                        .metadata
-                        .insert("created_at".to_string(), now_micros().to_string());
-                }
+                final_schema.metadata.insert(
+                    "settings".to_string(),
+                    json::to_string(&stream_setting).unwrap(),
+                );
             }
             Err(StreamSettingsError::StreamDeleting(message))
-            | Err(StreamSettingsError::BadRequest(message)) => {
+            | Err(StreamSettingsError::BadRequest(message))
+            | Err(StreamSettingsError::NotFound(message)) => {
                 log::warn!(
                     "skip auto UDS settings [{org_id}/{stream_type}/{stream_name}]: {message}"
                 );
-            }
-            Err(StreamSettingsError::NotFound(message)) => {
-                return Err(anyhow::anyhow!(
-                    "persist auto UDS settings [{org_id}/{stream_type}/{stream_name}]: {message}"
-                ));
-            }
-            Err(StreamSettingsError::Internal(error)) => {
-                return Err(error.context(format!(
-                    "persist auto UDS settings [{org_id}/{stream_type}/{stream_name}]"
-                )));
             }
         }
     }

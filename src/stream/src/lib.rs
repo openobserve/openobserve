@@ -397,9 +397,6 @@ pub async fn save_stream_settings(
         Err(schema::StreamSettingsError::NotFound(message)) => {
             return Ok(MetaHttpResponse::not_found(message));
         }
-        Err(schema::StreamSettingsError::Internal(error)) => {
-            return Err(Error::other(error.to_string()));
-        }
     };
     let settings = saved.settings;
 
