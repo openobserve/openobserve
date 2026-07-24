@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #cell-name="{ row }">
-          <div class="flex items-center flex-nowrap relative z-[2] min-h-6">
+          <div class="flex items-center flex-nowrap relative z-2 min-h-6">
             <span
               v-if="getSource(row) === 'built_in'"
               class="shrink-0 cursor-default inline-flex mr-1"

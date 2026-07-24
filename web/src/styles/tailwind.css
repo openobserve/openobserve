@@ -22,14 +22,6 @@
 
 @source "../**/*.{vue,js,ts}";
 
-/* Stacking utility for portaled floating surfaces. Tailwind v4 has no z-index
-   theme namespace (`z-*` only takes bare numbers or arbitrary values), so the
-   token is exposed as a real utility here rather than left as an arbitrary
-   z-index at each call site. Value lives in tokens/base.css — change it there. */
-@utility z-menu {
-  z-index: var(--z-menu);
-}
-
 /*
  * Light↔dark mode switch — soft curtain sweep (View Transitions API, started
  * by switchThemeMode in utils/theme.ts). The outgoing theme holds fully opaque
@@ -181,4 +173,3 @@ html.theme-switching *::after {
   from { opacity: 1; clip-path: inset(0 0 0 0 round 0.5rem); }
   to   { opacity: 0; clip-path: inset(100% 0 0 0 round 0.5rem); }
 }
-

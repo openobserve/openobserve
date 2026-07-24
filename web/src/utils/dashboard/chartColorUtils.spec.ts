@@ -32,65 +32,94 @@ vi.mock("@/utils/dashboard/colorPalette", () => ({
 
 describe("chartColorUtils", () => {
   describe("getContrastColor", () => {
-    it("returns white for empty background in light theme", () => {
-      expect(getContrastColor("", false)).toBe("#000000");
+    // Signature: getContrastColor(backgroundColor, defaultColor, threshold).
+    // No background -> the caller-provided default is returned verbatim.
+    // Otherwise -> luminance > threshold ? "#000000" : "#FFFFFF".
+    // Callers pass the theme's threshold (light ~0.5, dark ~0.8) from a CSS token.
+    const LIGHT_THRESHOLD = 0.5;
+    const DARK_THRESHOLD = 0.8;
+
+    it("returns the default color for empty background in light theme", () => {
+      expect(getContrastColor("", "#000000", LIGHT_THRESHOLD)).toBe("#000000");
     });
 
-    it("returns white for empty background in dark theme", () => {
-      expect(getContrastColor("", true)).toBe("#FFFFFF");
+    it("returns the default color for empty background in dark theme", () => {
+      expect(getContrastColor("", "#FFFFFF", DARK_THRESHOLD)).toBe("#FFFFFF");
     });
 
     it("returns black text for light hex background in light theme", () => {
       // #FFFFFF is white -> luminance ~1.0 > 0.5 => black text
-      expect(getContrastColor("#FFFFFF", false)).toBe("#000000");
+      expect(getContrastColor("#FFFFFF", "#FFFFFF", LIGHT_THRESHOLD)).toBe(
+        "#000000",
+      );
     });
 
     it("returns white text for dark hex background in light theme", () => {
       // #000000 is black -> luminance ~0 < 0.5 => white text
-      expect(getContrastColor("#000000", false)).toBe("#FFFFFF");
+      expect(getContrastColor("#000000", "#000000", LIGHT_THRESHOLD)).toBe(
+        "#FFFFFF",
+      );
     });
 
     it("returns white text for dark hex background in dark theme", () => {
       // #000000 luminance ~0 <= 0.8 => white text
-      expect(getContrastColor("#000000", true)).toBe("#FFFFFF");
+      expect(getContrastColor("#000000", "#FFFFFF", DARK_THRESHOLD)).toBe(
+        "#FFFFFF",
+      );
     });
 
     it("returns black text for very light hex background in dark theme", () => {
       // #FFFFFF luminance ~1.0 > 0.8 => black text
-      expect(getContrastColor("#FFFFFF", true)).toBe("#000000");
+      expect(getContrastColor("#FFFFFF", "#FFFFFF", DARK_THRESHOLD)).toBe(
+        "#000000",
+      );
     });
 
     it("handles rgb format", () => {
       // rgb(255,255,255) -> luminance ~1.0 > 0.5 => black
-      expect(getContrastColor("rgb(255,255,255)", false)).toBe("#000000");
+      expect(
+        getContrastColor("rgb(255,255,255)", "#FFFFFF", LIGHT_THRESHOLD),
+      ).toBe("#000000");
     });
 
     it("handles rgb format with dark color", () => {
       // rgb(0,0,0) -> luminance 0 <= 0.5 => white
-      expect(getContrastColor("rgb(0,0,0)", false)).toBe("#FFFFFF");
+      expect(getContrastColor("rgb(0,0,0)", "#000000", LIGHT_THRESHOLD)).toBe(
+        "#FFFFFF",
+      );
     });
 
     it("handles rgba format", () => {
       // rgba(255,255,255,0.5) -> luminance ~1.0 > 0.5 => black
-      expect(getContrastColor("rgba(255,255,255,0.5)", false)).toBe("#000000");
+      expect(
+        getContrastColor("rgba(255,255,255,0.5)", "#FFFFFF", LIGHT_THRESHOLD),
+      ).toBe("#000000");
     });
 
     it("handles rgb with spaces stripped", () => {
       // rgb(128,128,128) -> medium grey
-      const result = getContrastColor("rgb(128, 128, 128)", false);
+      const result = getContrastColor(
+        "rgb(128, 128, 128)",
+        "#FFFFFF",
+        LIGHT_THRESHOLD,
+      );
       expect(result).toMatch(/^#(000000|FFFFFF)$/);
     });
 
     it("returns fallback for unknown color format", () => {
       // Unknown format falls back to {r:255,g:255,b:255} (white)
       // luminance ~1.0 > 0.5 => black in light theme
-      expect(getContrastColor("invalidcolor", false)).toBe("#000000");
+      expect(getContrastColor("invalidcolor", "#FFFFFF", LIGHT_THRESHOLD)).toBe(
+        "#000000",
+      );
     });
 
     it("handles medium brightness background", () => {
       // #808080 grey: luminance = (0.299*128 + 0.587*128 + 0.114*128)/255 ≈ 0.502
       // light theme: > 0.5 => black
-      expect(getContrastColor("#808080", false)).toBe("#000000");
+      expect(getContrastColor("#808080", "#FFFFFF", LIGHT_THRESHOLD)).toBe(
+        "#000000",
+      );
     });
   });
 

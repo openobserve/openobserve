@@ -28,6 +28,7 @@ pub mod storage;
 pub mod table_provider;
 pub mod udaf;
 pub mod udf;
+pub mod vortex;
 
 #[derive(PartialEq, Debug)]
 pub enum MemoryPoolType {

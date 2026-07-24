@@ -49,11 +49,8 @@ use datafusion::{
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::WorkGroup;
-#[cfg(all(feature = "enterprise", feature = "vortex"))]
-use {
-    vortex::{VortexSessionDefault, io::session::RuntimeSessionExt, session::VortexSession},
-    vortex_datafusion::VortexFormat,
-};
+use vortex::{VortexSessionDefault, io::session::RuntimeSessionExt, session::VortexSession};
+use vortex_datafusion::VortexFormat;
 
 use super::{
     peak_memory_pool::PeakMemoryPool, planner::extension_planner::OpenobserveQueryPlanner,
@@ -461,29 +458,20 @@ impl TableBuilder {
 
         // Group files by format
         let mut parquet_files = Vec::new();
-        #[cfg(all(feature = "enterprise", feature = "vortex"))]
         let mut vortex_files = Vec::new();
 
         for file in files {
             match FileFormat::from_extension(&file.key) {
-                #[cfg(all(feature = "enterprise", feature = "vortex"))]
                 Some(FileFormat::Vortex) => vortex_files.push(file),
                 _ => parquet_files.push(file), // Default to parquet
             }
         }
 
-        #[cfg(all(feature = "enterprise", feature = "vortex"))]
         log::info!(
             "[trace_id: {}] parquet_files numbers: {}, vortex_files numbers: {}",
             session.id,
             parquet_files.len(),
             vortex_files.len()
-        );
-        #[cfg(not(all(feature = "enterprise", feature = "vortex")))]
-        log::info!(
-            "[trace_id: {}] parquet_files numbers: {}",
-            session.id,
-            parquet_files.len()
         );
 
         // Build table providers for each format
@@ -502,7 +490,6 @@ impl TableBuilder {
             tables.push(table);
         }
 
-        #[cfg(all(feature = "enterprise", feature = "vortex"))]
         if !vortex_files.is_empty() {
             let table = self
                 .build_table_for_format(
@@ -530,16 +517,9 @@ impl TableBuilder {
         // Configure listing options with the appropriate file format
         let file_format: Arc<dyn DataFusionFileFormat> = match format {
             FileFormat::Parquet => Arc::new(ParquetFormat::default()),
-            #[cfg(all(feature = "enterprise", feature = "vortex"))]
             FileFormat::Vortex => {
                 let vortex_session = VortexSession::default().with_tokio();
                 Arc::new(VortexFormat::new(vortex_session))
-            }
-            #[cfg(not(all(feature = "enterprise", feature = "vortex")))]
-            FileFormat::Vortex => {
-                return Err(DataFusionError::Execution(
-                    "Vortex file format requires enterprise and vortex features".to_string(),
-                ));
             }
         };
 

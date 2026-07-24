@@ -429,7 +429,7 @@ function onChildMouseenter(event: MouseEvent) {
             :data-test="`nav-group-item-${row.child.name}`"
             role="menuitem"
             :to="childTo(row.child)"
-            class="nav-group-item flex items-center gap-2.5 px-3 py-1.5 rounded-default text-sm [text-decoration:none]! cursor-pointer select-none outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-primary-500"
+            class="nav-group-item flex items-center gap-2.5 px-3 py-1.5 rounded-default text-sm [text-decoration:none]! cursor-pointer select-none outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-accent"
             :class="[
               flyoutTextClass,
               isChildActive(row.child)

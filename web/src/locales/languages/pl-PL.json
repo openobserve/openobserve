@@ -376,6 +376,12 @@
     "datetimeMessage": "* Możesz wybrać wiele dat",
     "datetimeRelative": "WZGLĘDNY",
     "datetimeAbsolute": "BEZWZGLĘDNY",
+    "dateRange": "Zakres dat",
+    "copyRange": "Kopiuj zakres czasu do schowka",
+    "pasteRange": "Wklej zakres czasu",
+    "dateRangeCopied": "Zakres dat skopiowany",
+    "dateRangePasted": "Zakres dat wklejony",
+    "dateRangePasteError": "Nie można przetworzyć zakresu dat",
     "relative": "Względny",
     "absolute": "Bezwzględny",
     "move": "Przenieś",
@@ -512,7 +518,6 @@
   },
   "flow": {
     "stepPicker": {
-      "title": "Dodaj krok",
       "search": "Szukaj kroków…",
       "noMatch": "Brak pasujących kroków"
     },
@@ -900,7 +905,7 @@
     "language": "Język",
     "actions": "Akcje",
     "keyboardShortcuts": "Skróty klawiaturowe",
-    "synthetic": "Syntetyczne"
+    "synthetic": "Syntetyki"
   },
   "rum": {
     "title": "Monitorowanie rzeczywistych użytkowników",
@@ -2217,7 +2222,7 @@
       "linkPartial": "Połączono z {ok} alertami, {failed} nie udało się",
       "linkError": "Nie udało się połączyć alertów."
     },
-    "canvasEmpty": "Dodaj wyzwalacz, aby rozpocząć budowanie przepływu pracy",
+    "chooseTrigger": "Wybierz wyzwalacz",
     "node": {
       "kindTrigger": "Wyzwalacz",
       "kindLogic": "Logika",
@@ -2229,8 +2234,6 @@
       "notConfigured": "Nie skonfigurowano jeszcze",
       "configComingSoon": "Konfiguracja {node} pojawi się w późniejszym kroku",
       "addNext": "Dodaj następny krok",
-      "stepDialogTitle": "Dodaj krok",
-      "paletteTitle": "Węzły",
       "sectionTransform": "Transformacja",
       "sectionDestination": "Miejsce docelowe",
       "paletteCollapse": "Zwiń",
@@ -2376,7 +2379,11 @@
     "deleteNodeTitle": "Usuń węzeł",
     "deleteNodeLlmEvalConfirm": "Czy na pewno chcesz usunąć ten węzeł oceny LLM?",
     "cancel": "Anuluj",
-    "dragDropNodesHere": "Przeciągnij i upuść węzły tutaj",
+    "collapseNodes": "Zwiń węzły",
+    "openNodes": "Otwórz węzły",
+    "chooseSource": "Wybierz źródło",
+    "sourceStreamDesc": "Przetwarzaj dane w czasie rzeczywistym podczas ich wprowadzania do strumienia",
+    "sourceQueryDesc": "Uruchom zapytanie według harmonogramu i przetwarzaj jego wyniki",
     "promqlOnlyForMetrics": "PromQL jest dostępny tylko dla typu strumienia metryk",
     "invalidCronExpression": "Nieprawidłowe wyrażenie cron",
     "cronRequired": "Wyrażenie cron jest wymagane",
@@ -3325,6 +3332,8 @@
     "seriesName": "Nazwa serii",
     "seriesValue": "Wartość serii",
     "axisValue": "Wartość osi",
+    "expandAllSections": "Rozwiń wszystkie sekcje",
+    "collapseAllSections": "Zwiń wszystkie sekcje",
     "configSectionGeneral": "Ogólne",
     "configSectionPromqlTable": "Tryb tabeli PromQL",
     "configSectionGeographic": "Konfiguracja geograficzna",
@@ -5654,6 +5663,7 @@
     "groupDestinationsTemplates": "Miejsca docelowe i szablony",
     "groupDataAI": "Dane i AI",
     "groupOperations": "Operacje",
+    "groupSynthetics": "Syntetyki",
     "groupAccount": "Konto",
     "generalDesc": "Motyw, domyślne zapytania i podstawowe preferencje",
     "orgDesc": "Parametry organizacji i identyfikatory",
@@ -6351,6 +6361,7 @@
     "description": "Opis",
     "cron": "Zadanie cron",
     "cronExpression": "Wyrażenie cron",
+    "cronFormatTooltip": "Wzór: * * * * * * oznacza każdą sekundę.\nFormat: [Sekunda (opcjonalnie) 0-59] [Minuta 0-59] [Godzina 0-23] [Dzień miesiąca 1-31, 'L'] [Miesiąc 1-12] [Dzień tygodnia 0-7 lub '1L-7L', 0 i 7 dla niedzieli].\nUżyj '*' dla dowolnej wartości, 'L' dla ostatniego dnia/dnia tygodnia.\nPrzykład: 0 0 12 * * ? - Uruchamia się codziennie o 12:00.",
     "timeRange": "Zakres czasu",
     "frequency": "Częstotliwość",
     "lastTriggeredAt": "Ostatnio uruchomiony",
@@ -7719,7 +7730,7 @@
       "sessions": "Przeglądaj i sprawdzaj sesje agenta krok po kroku",
       "agentGraph": "Zobacz, z czym wchodzą w interakcje twoje agenty — narzędzia, modele, usługi i magazyny danych",
       "agentBehavior": "Znajdź agentów zablokowanych w pętlach i błędy powodujące ich awarie",
-      "quality": "Oceniaj i śledź jakość odpowiedzi LLM",
+      "quality": "Śledź jakość ocen w zakresie span, trace i sesji",
       "evalJobs": "Uruchamiaj i monitoruj zadania oceny w swoich sesjach",
       "scorers": "Twórz i zarządzaj oceniającymi, którzy oceniają wyniki LLM",
       "scoreConfigs": "Skonfiguruj kryteria oceny używane w twoich ewaluacjach"
@@ -7727,7 +7738,11 @@
     "agentGraph": {
       "allAgents": "Wszyscy agenci",
       "stream": "Strumień",
-      "agent": "Agent"
+      "agent": "Agent",
+      "noAgentsTitle": "Nie znaleziono agentów",
+      "noAgentsDescription": "Nie znaleziono agentów w tym zakresie czasu. Spróbuj poszerzyć zakres czasu lub sprawdź, czy Twoje ślady zawierają atrybuty agenta gen_ai.",
+      "agentCountSingular": "agent",
+      "agentCountPlural": "agenci"
     },
     "kpi": {
       "totalCost": "Całkowity koszt",
@@ -7869,7 +7884,22 @@
     },
     "quality": {
       "scopeLabel": "Wszystkie wymiary jakości w tym obszarze roboczym",
+      "agentLabel": "Agent",
       "agentPlaceholder": "Wszyscy agenci",
+      "kpisAriaLabel": "KPI poziomu 1",
+      "dataTypes": {
+        "numericShort": "Liczba",
+        "categoricalShort": "Kat.",
+        "booleanShort": "Bool"
+      },
+      "scopes": {
+        "filterLabel": "Zakres oceny",
+        "filterHint": "Porównaj tę konfigurację oceny w różnych zakresach docelowych oceniania.",
+        "all": "Wszystkie",
+        "span": "Span",
+        "trace": "Trace",
+        "session": "Sesja"
+      },
       "timeRange": {
         "label": "Zakres czasu",
         "last1h": "Ostatnia 1 godzina",
@@ -7883,20 +7913,20 @@
       },
       "refresh": "Odśwież",
       "kpis": {
-        "evaluated": {
-          "title": "Ocenione spany",
+        "scoreResults": {
+          "title": "Wyniki oceny",
           "unit": "",
-          "hint": "Unikalne identyfikatory span w _llm_scores w oknie"
+          "hint": "Najnowsze wyniki ocen dla span, trace i sesji w oknie"
         },
         "evaluationCost": {
           "title": "Koszt oceny",
           "unit": "$",
           "hint": "Suma kosztu oceniającego LLM Judge w oknie"
         },
-        "jobSuccess": {
-          "title": "Sukces zadania",
+        "scorerSuccess": {
+          "title": "Sukces oceniającego",
           "unit": "%",
-          "hint": "Współczynnik sukcesu uruchomień zadania oceny online"
+          "hint": "Udane wywołania oceniającego jako procent wszystkich wywołań"
         },
         "scorerFailures": {
           "title": "Błędy oceniających",
@@ -7904,11 +7934,12 @@
           "hint": "Nieudane wywołania oceniających w oknie"
         },
         "latencyP95": {
-          "title": "Opóźnienie p95",
+          "title": "Opóźnienie oceniającego p95",
           "unit": "s",
-          "hint": "Opóźnienie p95 wywołania oceniającego"
+          "hint": "Opóźnienie wywołania oceniającego w 95. percentylu"
         },
         "vsPrev": "vs poprz",
+        "noPriorData": "brak wcześniejszych danych",
         "noData": "—"
       },
       "loading": "Ładowanie danych jakości…",
@@ -7917,7 +7948,9 @@
         "noData": "Brak ocen dla tej konfiguracji w tym oknie.",
         "empty": {
           "title": "Oczekiwanie na pierwsze oceny",
-          "description": "Żadne oceny nie trafiły do tej konfiguracji w wybranym zakresie czasu. Pojawią się tutaj automatycznie, gdy uruchomiony zostanie oceniający, który ich używa."
+          "titleScoped": "Brak wyników dla {scope} w tym oknie",
+          "description": "Żadne oceny nie trafiły do tej konfiguracji w wybranym zakresie czasu. Pojawią się tutaj automatycznie, gdy uruchomiony zostanie oceniający, który ich używa.",
+          "descriptionScoped": "Żadne wyniki dla {scope} nie trafiły dla tej konfiguracji w wybranym zakresie czasu. Wybierz inny zakres lub poszerz zakres czasu."
         },
         "drillTitle": "Przejdź do śladów",
         "trendTitle": "Trend",
@@ -7926,12 +7959,18 @@
         "compositionTitle": "Skład w czasie",
         "categoryDistributionTitle": "Rozkład kategorii",
         "passRateTitle": "Wskaźnik zaliczenia w czasie",
+        "healthyRateTitle": "Wskaźnik zdrowia w czasie",
+        "trueRateTitle": "Wskaźnik prawdy w czasie",
         "trueFalseTitle": "Prawda vs Fałsz",
         "legendAvg": "Śr",
         "legendP95": "p95",
         "legendThreshold": "próg {direction} {value}",
         "legendHealthy": "zdrowy",
         "legendUnhealthy": "niezdrowy",
+        "legendHealthyRate": "Wskaźnik zdrowia",
+        "legendTrueRate": "Wskaźnik prawdy",
+        "legendTrueCount": "prawda ({count})",
+        "legendFalseCount": "fałsz ({count})",
         "kpis": {
           "average": "Średnia",
           "p50": "P50",
@@ -7939,11 +7978,49 @@
           "p50p95": "P50 / P95",
           "unhealthy": "Niezdrowy",
           "healthy": "Zdrowy",
-          "coverage": "Pokrycie"
+          "trueRate": "Wskaźnik prawdy",
+          "falseRate": "Wskaźnik fałszu",
+          "coverage": "Pokrycie",
+          "targetsScored": "Ocenione cele"
+        },
+        "health": {
+          "title": "Stan zdrowia",
+          "noThreshold": "Nie skonfigurowano progu zdrowia. Wyniki nie mogą być jeszcze klasyfikowane jako zdrowe lub pogarszające się.",
+          "thresholdOnly": "Zdrowy, jeśli {threshold}",
+          "summary": "{percent}% poniżej progu · Zdrowy, jeśli {threshold}"
+        }
+      },
+      "runs": {
+        "title": "Oceny",
+        "hint": "Wyniki i uzasadnienie pochodzą z _llm_scores. Wybierz uruchomienie, aby otworzyć jego ślad oceniający w celu dalszego zbadania.",
+        "filterLabel": "Filtruj oceny",
+        "footerTitle": "Oceny",
+        "noThresholdHint": "Ustaw próg zdrowia w tej konfiguracji oceny, aby klasyfikować i wyróżniać niezdrowe wyniki.",
+        "noReasoning": "Nie zapisano uzasadnienia",
+        "unknownAgent": "Nieznany agent",
+        "unknownScope": "Nieznany zakres",
+        "queryError": "Nie można odświeżyć wyników oceny. Nadal wyświetlana jest ostatnia pomyślna strona.",
+        "empty": "Brak wyników oceny w tym przedziale czasowym.",
+        "emptyUnhealthy": "Brak niezdrowych wyników w tym przedziale czasowym.",
+        "filters": {
+          "all": "Wszystkie wyniki",
+          "unhealthy": "Niezdrowy"
+        },
+        "health": {
+          "healthy": "Zdrowy",
+          "unhealthy": "Niezdrowy"
+        },
+        "columns": {
+          "time": "Oceniono",
+          "result": "Wynik",
+          "reasoning": "Uzasadnienie",
+          "target": "Cel",
+          "agent": "Agent"
         }
       },
       "sidebar": {
         "allConfigs": "Wszystkie konfiguracje",
+        "scoreCount": "{count} wyników",
         "empty": "Żadne konfiguracje nie pasują do tego filtra."
       },
       "overview": {
@@ -7960,13 +8037,30 @@
         "waitingPrimaryCta": "Otwórz zadania oceny",
         "waitingRefreshCta": "Odśwież",
         "noThreshold": "brak progu",
+        "relativeTime": {
+          "daysAgo": "{day} dni temu",
+          "monthsAgo": "{month} mies. temu"
+        },
+        "status": {
+          "healthy": "Zdrowy",
+          "unhealthy": "Wymaga uwagi",
+          "noThreshold": "Próg nie ustawiony",
+          "noData": "Brak danych wyników"
+        },
+        "health": {
+          "thresholdSummary": "{percent}% poniżej · Zdrowy, jeśli {threshold}",
+          "noThresholdHint": "Ustaw zdrowy próg",
+          "noDataHint": "Brak wyników w tym oknie"
+        },
         "columns": {
+          "health": "Zdrowie",
           "scoreConfig": "Konfiguracja ocen",
           "type": "Typ",
+          "quality": "Jakość",
           "totalScores": "Łączna liczba ocen",
-          "coverage": "Pokrycie",
+          "scopeMix": "Mieszanka zakresów",
           "unhealthy": "Niezdrowy",
-          "trend": "Trend",
+          "volumeTrend": "Trend wolumenu",
           "threshold": "Zdrowy, jeśli",
           "updated": "Zaktualizowano"
         }
@@ -7994,11 +8088,10 @@
     "buttons": {
       "cancel": "Anuluj",
       "close": "Zamknij",
-      "create": "Utwórz",
       "remove": "Usuń",
       "save": "Zapisz",
       "saveAsDraft": "Zapisz jako szkic",
-      "createAndActivate": "Utwórz i aktywuj"
+      "createAndActivate": "Zapisz i aktywuj"
     },
     "scorerTypeDialog": {
       "title": "Utwórz nowego Scorer",
@@ -8082,8 +8175,7 @@
         "createdLabel": "Utworzono",
         "updatedLabel": "Zaktualizowano"
       },
-      "createTitle": "Utwórz konfigurację wyniku",
-      "editTitlePrefix": "Edytuj",
+      "createTitle": "Nowa konfiguracja wyników",
       "subtitle": "Wymiary miękkiego schematu wytwarzane przez Scorerów.",
       "eyebrow": "Konfiguracje wyników",
       "sectionTitle": "Konfiguracje wyników",
@@ -8092,8 +8184,6 @@
       "searchPlaceholder": "Konfiguracje wyszukiwania",
       "allTypes": "Wszystkie typy",
       "newButton": "Nowa konfiguracja wyników",
-      "saveButton": "Zapisz zmiany",
-      "createButton": "Utwórz",
       "columns": {
         "index": "#",
         "name": "Nazwa",
@@ -8298,14 +8388,13 @@
       "backTo": "Powrót do scorerów",
       "badgeRemote": "Zdalny",
       "badgeLlm": "LLM Judge",
-      "createTitleRemote": "Utwórz zdalny scorer",
-      "createTitleLlm": "Utwórz scorer LLM Judge",
-      "editTitleRemote": "Edytuj zdalny scorer",
-      "editTitleLlm": "Edytuj scorer LLM Judge",
+      "createTitleRemote": "Nowy zdalny oceniający",
+      "createTitleLlm": "Nowy oceniający LLM Judge",
+      "editTitleRemote": "Aktualizuj zdalnego oceniającego",
+      "editTitleLlm": "Aktualizuj oceniającego LLM Judge",
       "subtitleRemote": "Wywołaj punkt końcowy HTTP, który hostujesz. My przygotowujemy żądanie, ty zwracasz wynik.",
-      "subtitleLlm": "Model językowy ocenia każdy ślad za pomocą podanego przez ciebie promptu.",
+      "subtitleLlm": "Model językowy ocenia każdy cel oceny przy użyciu podanego przez Ciebie promptu.",
       "descriptionPlaceholder": "Krótkie podsumowanie tego, co mierzy ten scorer.",
-      "producesScoreHelp": "Jaki wymiar mierzy ten scorer?",
       "providerHelp": "Wybierz dostawcę LLM, którego używa ten sędzia. Zarządzaj dostawcami w {settingsLink}.",
       "providerHelpSettingsLink": "Ustawienia",
       "refreshProviders": "Odśwież dostawców",
@@ -8318,8 +8407,49 @@
       "rangeLabel": "Zakres:",
       "healthyLabel": "Zdrowy:",
       "typeLabel": "Typ:",
-      "promptVariablesLabel": "Zmienne:",
-      "promptHelp": "Skup się na logice oceny. Użyj {inputVar} i {outputVar} jako symboli zastępczych.",
+      "promptVariablesLabel": "Zmienne w tym prompcie:",
+      "promptVariableGuide": {
+        "title": "Dostępne zmienne promptu",
+        "description": "Te zmienne mogą być użyte w powyższym prompcie. Sposób ich wypełnienia zależy od tego, co ocenia zadanie Eval.",
+        "columns": {
+          "variable": "Zmienna promptu"
+        },
+        "scopes": {
+          "span": "Span",
+          "trace": "Trace",
+          "session": "Sesja"
+        },
+        "statuses": {
+          "jobMapped": "Mapowanie w zadaniu Eval",
+          "systemProvided": "Dostarczone przez system",
+          "requiresSelector": "Dostarczone przez system · wymaga selektora spanów",
+          "selectorRequired": "Wymagany selektor spanów",
+          "unavailable": "Niedostępne"
+        },
+        "variables": {
+          "inputOutput": {
+            "span": "Mapuj je na pola spanu zawierające dane wejściowe i wyjściowe.",
+            "trace": "Dane wejściowe i wyjściowe z głównego spanu śladu.",
+            "session": "Niedostępne — sesja nie ma pojedynczego wejścia ani wyjścia."
+          },
+          "statistics": {
+            "span": "Przypisz tę nazwę jak każdą inną zmienną oceniającą podczas oceny pojedynczego spanu.",
+            "trace": "Metryki śladu: liczba spanów, czas trwania, wywołania LLM i narzędzi, błędy, tokeny i koszt.",
+            "session": "Metryki sesji: liczba śladów i tur, czas trwania i błędy."
+          },
+          "spans": {
+            "span": "Przypisz tę nazwę jak każdą inną zmienną oceniającą podczas oceny pojedynczego spanu.",
+            "trace": "Filtrowany podzbiór spanów śladu, wybrany przez selektor spanów zadania ewaluacji.",
+            "session": "Niedostępne dla sesji."
+          },
+          "steps": {
+            "span": "Przypisz tę nazwę jak każdą inną zmienną oceniającą podczas oceny pojedynczego spanu.",
+            "trace": "Spany w kolejności czasowej; środek jest zwijany, gdy ślad jest bardzo długi.",
+            "session": "Ślady w kolejności czasowej, reprezentowane jako tury rozmowy."
+          }
+        },
+        "indexDescription": "{spansVar} i {stepsVar} przychodzą jako tablice JSON. Odwołuj się do całej zmiennej — dostęp indeksowany jak {indexedVar} nie jest obsługiwany."
+      },
       "identitySection": "Tożsamość",
       "judgeSection": "Konfiguracja sędziego",
       "endpointSection": "Punkt końcowy",
@@ -8337,10 +8467,9 @@
       "modelPlaceholder": "gpt-4o",
       "promptLabel": "Monit oceniający",
       "includeReasoningLabel": "Uwzględnij uzasadnienie",
-      "includeReasoningHint": "LLM wyjaśnia swoją ocenę. Przechowywane w score.metadata.reasoning.",
-      "extraFieldsLabel": "Dodatkowe pola metadanych",
-      "extraFieldsOptional": "Opcjonalne",
-      "extraFieldsHint": "Dodaj pola, które LLM powinien wypisać wraz z oceną. Przechowywane w score.metadata do późniejszej analizy.",
+      "includeReasoningHint": "Oceniający wyjaśnia, dlaczego przyznał tę ocenę, zapisaną z każdym wynikiem.",
+      "extraFieldsLabel": "Dodatkowe pola metadanych (opcjonalne)",
+      "extraFieldsHint": "Poproś oceniającego o zwrócenie dodatkowych wartości z każdą oceną — na przykład kategorii lub poziomu ufności.",
       "extraFields": {
         "colName": "Nazwa pola",
         "colType": "Typ",
@@ -8442,9 +8571,12 @@
         "eyebrow": "Zadanie oceny",
         "refresh": "Odśwież",
         "descriptionSection": "Opis",
-        "targetSection": "Cel",
+        "targetSection": "Cel ewaluacji",
         "streamLabel": "Strumień",
         "streamTypeLabel": "Typ strumienia",
+        "targetScopeLabel": "Oceniaj każdy",
+        "idleWindowLabel": "Okno bezczynności",
+        "maxAgeLabel": "Maksymalny wiek",
         "filterLabel": "Filtr",
         "filterEmpty": "Brak filtra — każdy span jest oceniany",
         "scorersSection": "Oceniacze",
@@ -8454,13 +8586,30 @@
         "scorerTypeRemote": "Zdalny",
         "producesPrefix": "Produkuje",
         "viewScorerHint": "Podgląd",
-        "inputMappingSection": "Mapowanie wejścia",
+        "inputMappingSection": "Zmienne promptu",
         "samplingSection": "Próbkowanie",
         "samplingModeLabel": "Tryb",
         "samplingValueLabel": "Wartość",
         "samplingAll": "Oceniaj każde dopasowanie",
         "samplingRate": "Losowa próbka według częstotliwości",
         "samplingCount": "Pierwsze N dopasowań",
+        "manualSection": "Ręczna ewaluacja",
+        "manualHelp": "Kolejkuj oceniające tego zadania dla jednego wyraźnego celu. Ręczne uruchomienia omijają automatyczne próbkowanie i zapisują powód w metadanych oceny.",
+        "manualTargetIdLabel": "ID celu",
+        "manualSpanIdLabel": "ID spanu",
+        "manualSpanIdPlaceholder": "span_id",
+        "manualTraceIdLabel": "ID śladu",
+        "manualTraceIdPlaceholder": "trace_id",
+        "manualSessionIdLabel": "ID sesji",
+        "manualSessionIdPlaceholder": "session_id",
+        "manualReasonLabel": "Powód",
+        "manualReasonPlaceholder": "Dlaczego ponownie uruchamiasz ten cel?",
+        "manualVariablesLabel": "Zmienne JSON",
+        "manualVariablesObjectError": "Zmienne muszą być obiektem JSON",
+        "manualTargetRequired": "ID celu jest wymagane",
+        "manualSubmit": "Uruchom ręczną ewaluację",
+        "manualSuccess": "Zakolejkowano {count} zadań ewaluacji",
+        "manualError": "Ręczna ewaluacja nie powiodła się",
         "metadataSection": "Metadane",
         "versionLabel": "Wersja",
         "pipelineLabel": "ID potoku",
@@ -8513,6 +8662,7 @@
         "name": "Nazwa",
         "status": "Status",
         "stream": "Strumień",
+        "targetScope": "Zakres",
         "scorers": "Oceniacze",
         "successRate": "Wskaźnik powodzenia",
         "created": "Utworzono",
@@ -8526,9 +8676,10 @@
         "chipSampling": "Kontrola próbkowania"
       },
       "descriptionPlaceholder": "Co monitoruje to zadanie?",
-      "samplingValueHelp": "JSON: rate to liczba 0-1, count to dodatnia liczba całkowita.",
-      "samplingValueAllHelp": "Nie dotyczy, gdy tryb to All — każde dopasowane zdarzenie będzie oceniane.",
-      "samplingHelp": "Zastosuj po filtrze. Kontroluje koszt — tylko dopasowane spany liczą się do wskaźnika.",
+      "samplingValueHelp": "Wprowadź wartość od 0 do 1.",
+      "samplingValuePreview": "Ocenia {percent}% dopasowanych celów.",
+      "samplingValueAllHelp": "Każdy dopasowany cel jest oceniany.",
+      "samplingHelp": "Uruchamiane po filtrowaniu, aby kontrolować koszty.",
       "presets": {
         "label": "Szybkie ustawienia wstępne",
         "rootSpans": "Tylko spany główne",
@@ -8536,25 +8687,49 @@
         "toolCalls": "Wywołania narzędzi"
       },
       "backTo": "Powrót do zadań oceny",
-      "createTitle": "Utwórz zadanie oceny online",
-      "editTitle": "Edytuj zadanie oceny online",
+      "createTitle": "Nowe zadanie ewaluacji",
+      "editTitle": "Aktualizuj zadanie ewaluacji",
       "stepper": {
         "target": "Cel",
         "scorers": "Oceniacze",
         "mapping": "Mapowanie",
         "sampling": "Próbkowanie"
       },
-      "targetSection": "Cel",
+      "detailsSection": "Szczegóły",
+      "targetSection": "Cel ewaluacji",
+      "filteringSection": "Filtrowanie",
       "scorersSection": "Oceniacze i mapowanie",
       "nameLabel": "Nazwa",
       "namePlaceholder": "Monitor wierności produkcyjnej",
-      "streamLabel": "Strumień wejściowy",
-      "streamPlaceholder": "Wybierz nazwę strumienia",
+      "streamLabel": "Strumień",
+      "streamPlaceholder": "Wybierz strumień",
       "streamTypeLabel": "Typ strumienia",
       "streamTypePlaceholder": "ślady",
+      "targetScopeLabel": "Oceniaj każdy",
+      "targetScopes": {
+        "span": "Span",
+        "trace": "Ślad",
+        "session": "Sesja"
+      },
+      "targetScopeHelp": {
+        "span": "Oceń każdy pasujący span niezależnie.",
+        "trace": "Oceń cały ślad po zamknięciu okna zakończenia.",
+        "session": "Oceń sesję pomiędzy śladami po zamknięciu okna zakończenia."
+      },
+      "completionSection": "Kryteria zakończenia",
+      "completionHelp": {
+        "trace": "Ślad jest oceniany, gdy tylko zostanie spełniony pierwszy z tych warunków.",
+        "session": "Sesja jest oceniana, gdy tylko zostanie spełniony pierwszy z tych warunków."
+      },
+      "idleWindowLabel": "Okno bezczynności (sekundy)",
+      "idleWindowHelp": "Oceniane po {duration} bez nowych spanów.",
+      "idleWindowHelpEmpty": "Oceniane, gdy nie pojawiają się nowe spany.",
+      "maxAgeLabel": "Maksymalny wiek (sekundy)",
+      "maxAgeHelp": "Oceniane {duration} po pierwszym spanie.",
+      "maxAgeHelpEmpty": "Oceniane przy stałym wieku, nawet jeśli spany wciąż nadchodzą.",
       "descriptionLabel": "Opis",
       "samplingModeLabel": "Tryb próbkowania",
-      "samplingValueLabel": "Wartość próbkowania JSON",
+      "samplingValueLabel": "Współczynnik próbkowania",
       "samplingModes": {
         "rate": "Wskaźnik",
         "all": "Wszystkie",
@@ -8562,7 +8737,11 @@
       },
       "scorerPicker": {
         "title": "Oceniacze",
-        "hint": "Wybierz jednego lub więcej oceniaczy do uruchomienia dla każdego dopasowanego spana.",
+        "hint": {
+          "span": "Wybierz jeden lub więcej skorerów do uruchomienia dla każdego pasującego spanu.",
+          "trace": "Wybierz jeden lub więcej skorerów do uruchomienia dla każdego kwalifikującego się śladu.",
+          "session": "Wybierz jeden lub więcej skorerów do uruchomienia dla każdej kwalifikującej się sesji."
+        },
         "meta": "{type} · v{version}",
         "placeholder": "Wybierz oceniaczy",
         "searchPlaceholder": "Szukaj oceniaczy…",
@@ -8570,21 +8749,113 @@
       },
       "filter": {
         "title": "Warunek filtrowania",
-        "hint": "Tylko spany spełniające ten warunek przechodzą do próbkowania i oceniania."
+        "hint": {
+          "span": "Tylko spany spełniające ten warunek wchodzą do próbkowania i oceny.",
+          "trace": "Ślad wchodzi do próbkowania i oceny, jeśli którykolwiek z jego spanów spełnia ten warunek.",
+          "session": "Sesja wchodzi do próbkowania i oceny, jeśli którykolwiek z jej spanów spełnia ten warunek."
+        }
+      },
+      "selector": {
+        "title": "Które spany (opcjonalnie)",
+        "hint": {
+          "trace": "Pozostaw puste, aby uwzględnić każdy span w śladzie."
+        }
+      },
+      "endSignal": {
+        "title": "Sygnał zakończenia (opcjonalnie)",
+        "hint": {
+          "trace": "Zdefiniuj warunek spanu, który natychmiast zamyka ślad, gdy jakikolwiek span go spełnia.",
+          "session": "Zdefiniuj warunek spanu, który natychmiast zamyka sesję, gdy jakikolwiek span go spełnia."
+        }
       },
       "inputMapping": {
-        "title": "Mapowanie wejściowe",
-        "hint": "Odwzoruj pola spanów na zmienne szablonu każdego oceniającego.",
+        "title": "Zmienne promptu",
+        "hint": {
+          "span": "Przypisz każdą zmienną do pola spanu, które dostarcza jej wartość.",
+          "trace": "Wartości śladu wypełniają się automatycznie. Przypisz wszystko inne do pola spanu.",
+          "session": "Wartości sesji wypełniają się automatycznie. Przypisz wszystko inne do pola spanu."
+        },
         "selectScorers": "Wybierz oceniających, aby skonfigurować ich mapowania.",
         "noVariables": "Ten oceniający nie ma zmiennych szablonu do mapowania.",
-        "variableCount": "{count} zmiennych"
+        "variableCount": "{count} zmiennych",
+        "systemProvided": {
+          "title": "{scope} Zmienne",
+          "description": "OpenObserve dostarcza te wartości z samego {scope}. Prompt skorera może ich użyć bezpośrednio — bez potrzeby mapowania.",
+          "badge": "Dostarczone przez system",
+          "selectorRequired": "Wymagany selektor spanów",
+          "columns": {
+            "variable": "Zmienna promptu",
+            "source": "Źródło",
+            "description": "Dostarczona wartość"
+          },
+          "variables": {
+            "input": {
+              "trace": "Wejście z głównego spanu śladu."
+            },
+            "output": {
+              "trace": "Wyjście z głównego spanu śladu."
+            },
+            "statistics": {
+              "trace": "Metryki śladu: liczba spanów, czas trwania, wywołania LLM i narzędzi, błędy, tokeny i koszt.",
+              "session": "Metryki sesji: liczba śladów i tur, czas trwania i błędy."
+            },
+            "spans": {
+              "trace": "Filtrowany podzbiór spanów, wybrany przez Selektor Spanów zadania."
+            },
+            "steps": {
+              "trace": "Spany w porządku czasowym; środek jest składany, gdy ślad jest bardzo długi.",
+              "session": "Ślady w porządku czasowym, reprezentowane jako tury rozmowy."
+            }
+          }
+        }
+      },
+      "spanSelector": {
+        "select": "Wybierz selektor spanów",
+        "bindingHelp": "Ślady mogą mieć setki spanów. Wybierz te, które ten skorer powinien przeanalizować.",
+        "createForScorer": "Utwórz dla skorera",
+        "createForScorerTitle": "Utwórz selektor spanów dla tego skorera",
+        "editorTitle": "Selektor spanów",
+        "name": "Nazwa selektora",
+        "schemaMode": "Pola do odczytu",
+        "defaultSchema": "Standardowe pola GenAI",
+        "customSchema": "Pola niestandardowe",
+        "defaultSchemaHelp": "Te osiem pól jest odczytywanych z każdego pasującego spanu. Brakujące wartości są puste.",
+        "fields": "Pola",
+        "fieldsHelp": "Tylko te pola są odczytywane — nic więcej nie jest wysyłane do sklatera.",
+        "maximumSpans": "Maksymalna liczba spanów",
+        "budget": "Ogranicza liczbę spanów wybranych z trace'a.",
+        "validation": {
+          "name": "Wpisz nazwę selektora.",
+          "duplicateName": "Nazwy selektorów muszą być unikalne w tym zadaniu.",
+          "filter": "Uzupełnij lub usuń niedokończony warunek filtra.",
+          "fields": "Wybierz co najmniej jedno pole dla niestandardowego schematu.",
+          "maximumSpans": "Maksymalna liczba spanów musi być dodatnią liczbą całkowitą.",
+          "budget": "Zbyt wiele spanów dla wybranych pól. Zmniejsz liczbę spanów lub odczytuj mniej pól.",
+          "binding": "Wybierz selektor spanów dla każdego sklatera."
+        }
       },
       "preview": {
-        "title": "Dopasowane spany",
-        "hint": "Po wybraniu strumienia i filtra, ten panel pokaże, ile spanów dopasuje twoje zadanie.",
-        "matchedSuffix": "dopasowanych spanów · ostatnie 24h",
+        "scopes": {
+          "span": {
+            "title": "Dopasowane spany",
+            "hint": "Po wybraniu strumienia i filtra ten panel pokaże, ile spanów dopasuje Twoje zadanie.",
+            "matchedSuffix": "dopasowane spany · ostatnie 24h",
+            "matchedLoading": "Liczenie dopasowanych spanów..."
+          },
+          "trace": {
+            "title": "Dopasowane trace'y",
+            "hint": "Po wybraniu strumienia i filtra ten panel pokaże, ile trace'y dopasuje Twoje zadanie.",
+            "matchedSuffix": "dopasowane trace'y · ostatnie 24h",
+            "matchedLoading": "Liczenie dopasowanych trace'ów..."
+          },
+          "session": {
+            "title": "Dopasowane sesje",
+            "hint": "Po wybraniu strumienia i filtra ten panel pokaże, ile sesji dopasuje Twoje zadanie.",
+            "matchedSuffix": "dopasowane sesje · ostatnie 24h",
+            "matchedLoading": "Liczenie dopasowanych sesji..."
+          }
+        },
         "matchedError": "Nie można załadować liczby dopasowań",
-        "matchedLoading": "Zliczanie dopasowanych spanów…",
         "matchedIncomplete": "Uzupełnij warunek filtrowania, aby zaktualizować liczbę.",
         "summaryTitle": "Podsumowanie",
         "summaryName": "Nazwa",
@@ -8601,6 +8872,7 @@
       "validation": {
         "nameRequired": "Nazwa zadania jest wymagana",
         "streamRequired": "Strumień jest wymagany",
+        "idleWindowMinimum": "Okno bezczynności musi wynosić co najmniej 45 sekund",
         "samplingValueRequired": "Wartość próbkowania jest wymagana"
       }
     }
@@ -8723,7 +8995,9 @@
     "cellActions": {
       "copy": "Kopiuj",
       "includeTerm": "Uwzględnij termin",
-      "excludeTerm": "Wyklucz termin"
+      "excludeTerm": "Wyklucz termin",
+      "sendValueToAi": "Wyślij wartość do AI",
+      "sendRowToAi": "Wyślij wiersz do AI"
     },
     "indexList": {
       "noMatchingFields": "Nie znaleziono pasujących pól",
@@ -9107,12 +9381,20 @@
       "stepJourney": "Podróż",
       "untitledCheck": "Kontrola bez tytułu",
       "variablesHint": "Obsługuje {variables} takie jak {baseUrl}.",
-      "setupStep2Title": "Włącz tryb incognito",
-      "setupIncognitoHint": "Otwórz chrome://extensions, kliknij {details}, a następnie włącz {setting}."
+      "setupStep2Title": "Kliknij ikonę OpenObserve Recorder na pasku narzędzi",
+      "setupIncognitoHint": "Otwórz chrome://extensions, kliknij {details}, a następnie włącz {setting}.",
+      "setupStep2Description": "Chrome nie może automatycznie połączyć się ze stronami otwartymi przed instalacją rozszerzenia. Kliknięcie ikony rozszerzenia wstrzykuje recorder do tej karty – jednorazowy krok.",
+      "setupIconActivateHint": "Kliknij {icon} na pasku narzędzi, aby aktywować recorder dla tej strony.",
+      "setupStep3Title": "Włącz tryb incognito",
+      "setupStep3IncognitoHint": "Otwórz chrome://extensions, kliknij {details}, a następnie włącz {setting}.",
+      "setupReady": "Połączono ✓",
+      "setupConnected": "Połączono ✓"
     },
     "dialog": {
       "bulkDeleteBody": "Czy na pewno chcesz usunąć {count} kontrolę(i)? Tej czynności nie można cofnąć.",
       "bulkDeleteTitle": "Usuń kontrole",
+      "deleteSingleBody": "Czy na pewno chcesz usunąć \"{name}\"? Tej czynności nie można cofnąć.",
+      "deleteSingleTitle": "Usuń sprawdzenie",
       "duplicateTitle": "Duplikuj kontrolę"
     },
     "empty": {
@@ -9212,11 +9494,88 @@
       "unknown": "Nieznany"
     },
     "locations": {
+      "addLocation": "Dodaj lokalizację",
+      "bottomHeader": "lokalizacje",
+      "bulkDeleteConfirmMessage": "Czy na pewno chcesz usunąć {count} lokalizacji?",
+      "bulkDeleteConfirmTitle": "Usuń lokalizacje",
+      "bulkDeleteFailed": "Nie udało się usunąć lokalizacji",
+      "bulkDeletePartial": "{success} z {total} lokalizacji usuniętych",
+      "bulkDeleteSuccess": "Usunięto {count} lokalizacji",
+      "cancel": "Anuluj",
       "comingSoon": "Więcej regionów i lokalizacji prywatnych — wkrótce",
+      "createClose": "Utwórz i zamknij",
+      "createFailed": "Nie udało się utworzyć lokalizacji",
+      "createSuccess": "Lokalizacja utworzona pomyślnie",
+      "createTitle": "Dodaj lokalizację",
+      "customProviderLabel": "Niestandardowy dostawca",
+      "customProviderPlaceholder": "Wpisz nazwę dostawcy",
+      "customProviderRequired": "Niestandardowa nazwa dostawcy jest wymagana",
+      "deleteConfirmMessage": "Czy na pewno chcesz usunąć tę lokalizację?",
+      "deleteConfirmTitle": "Usuń lokalizację",
+      "deleteFailed": "Nie udało się usunąć lokalizacji",
+      "deleteSuccess": "Lokalizacja została pomyślnie usunięta",
+      "description": "Zarządzaj publicznymi lokalizacjami sond do monitorowania syntetycznego",
+      "disable": "Wyłącz",
+      "disabledSuccess": "Lokalizacja wyłączona",
+      "disabling": "Wyłączanie…",
+      "editTitle": "Edytuj lokalizację",
       "empty": "Brak dostępnych lokalizacji",
+      "enable": "Włącz",
+      "enabled": "Włączona",
+      "enabledSuccess": "Lokalizacja włączona",
+      "enabling": "Włączanie…",
+      "exportFailed": "Nie udało się wyeksportować lokalizacji",
+      "exportSuccess": "Lokalizacje zostały pomyślnie wyeksportowane",
+      "exportTitle": "Eksportuj",
+      "fetchFailed": "Nie udało się pobrać lokalizacji",
+      "bulkDisableFailed": "Nie udało się wyłączyć lokalizacji",
+      "bulkDisabledPartial": "{success} z {total} lokalizacji wyłączonych",
+      "bulkDisabledSuccess": "Wyłączono {count} lokalizacji",
+      "bulkEnableFailed": "Nie udało się włączyć lokalizacji",
+      "bulkEnabledPartial": "{success} z {total} lokalizacji włączonych",
+      "bulkEnabledSuccess": "Włączono {count} lokalizacji",
+      "importFailed": "Nie udało się zaimportować lokalizacji",
+      "importJsonLabel": "Dane JSON",
+      "importLabelRequired": "Etykieta jest wymagana dla elementu {index}",
+      "importPlaceholder": "Wklej tutaj tablicę JSON lokalizacji...",
+      "importProviderRequired": "Dostawca jest wymagany dla elementu {index}",
+      "importRegionRequired": "Region jest wymagany dla elementu {index}",
+      "importSuccess": "Pomyślnie zaimportowano {count} lokalizacji",
+      "importTitle": "Importuj",
+      "invalidJson": "Nieprawidłowy format JSON",
+      "label": "Etykieta",
+      "labelPlaceholder": "np. AWS US East (Wirginia Północna)",
+      "labelRequired": "Etykieta jest wymagana",
       "locationAwsEast": "AWS · us-east-1",
+      "locationId": "Identyfikator lokalizacji",
+      "noPreview": "Wprowadź poprawny JSON, aby wyświetlić podgląd lokalizacji",
+      "preview": "Podgląd",
+      "provider": "Dostawca",
+      "providerOther": "Inny",
+      "providerPlaceholder": "Wybierz dostawcę",
+      "providerRequired": "Dostawca jest wymagany",
+      "region": "Region",
+      "regionPlaceholder": "np. us-east-1",
+      "regionRequired": "Region jest wymagany",
+      "searchPlaceholder": "Szukaj lokalizacji…",
+      "selectedCount": "Wybrano {selected} z {total} lokalizacji",
       "subtitle": "Wybierz lokalizacje, z których uruchamiana jest podróż",
-      "title": "Lokalizacje"
+      "title": "Lokalizacje",
+      "privateBadge": "Prywatna",
+      "publicTitle": "Publiczna",
+      "privateTitle": "Lokalizacje prywatne",
+      "setupAgent": "Skonfiguruj prywatnego agenta",
+      "privateEmptyBody": "Uruchom to sprawdzenie z własnej sieci VPC lub lokalnej.",
+      "offlineWarning": "Brak aktywnego agenta — sprawdzenie nie zostanie uruchomione, dopóki agent nie powróci.",
+      "liveAgents": "{count} aktywnych agentów",
+      "liveAgentsNamed": "{count} aktywnych agentów ({names})",
+      "offlineSince": "Offline · ostatnio widziany {ago}",
+      "pendingAgent": "Oczekiwanie na rejestrację pierwszego agenta",
+      "toggleFailed": "Nie udało się przełączyć lokalizacji",
+      "updateClose": "Aktualizuj i zamknij",
+      "updateFailed": "Nie udało się zaktualizować lokalizacji",
+      "updateSuccess": "Lokalizacja zaktualizowana pomyślnie",
+      "uploadFile": "Prześlij plik JSON"
     },
     "newCheck": {
       "back": "Sprawdzenia",
@@ -9229,6 +9588,7 @@
       "httpDesc": "Sprawdź punkty końcowe, kody statusu i treści odpowiedzi",
       "leave": "Opuść",
       "loadEditFailed": "Nie udało się załadować sprawdzenia do edycji — formularz pokazuje wartości domyślne, nie zapisuj",
+      "notFoundInOrg": "To sprawdzenie nie istnieje w bieżącej organizacji.",
       "modalSubtitle": "Wybierz, co chcesz monitorować",
       "modalTitle": "Utwórz sprawdzenie",
       "pageTitle": "Nowe sprawdzenie {label}",
@@ -9251,7 +9611,7 @@
       "willBeCreatedIn": "Zostanie utworzony w"
     },
     "pageSubtitle": "Monitoruj proaktywnie czas dostępności, wydajność i podróże użytkowników z globalnych lokalizacji",
-    "pageTitle": "Sprawdzenia syntetyczne",
+    "pageTitle": "Syntetyki",
     "protocolConfig": {
       "http": {
         "addAssertion": "Dodaj asercję",
@@ -9348,6 +9708,7 @@
       "failed": "Nieudane",
       "failedRuns": "Nieudane uruchomienia",
       "jumpToLastRun": "Przejdź do ostatniego uruchomienia",
+      "jumpToLatestData": "Przejdź do najnowszych danych",
       "lastRun": "Ostatnie uruchomienie",
       "location": "Lokalizacja",
       "monitors": "Monitory",
@@ -9487,10 +9848,13 @@
       "tabSteps": "Kroki",
       "timelineAllFailed": "Wszystkie {count} nieudane",
       "timelineAllPassed": "Wszystkie {count} zakończone sukcesem",
+      "timelineAllWarning": "Wszystkie {count} ostrzeżenia",
       "timelineMixed": "{passed} zaliczone, {failed} niezaliczone z {total}",
       "timelineNow": "Teraz",
       "triggerManual": "Ręcznie",
       "triggerSchedule": "Harmonogram",
+      "warning": "Ostrzeżenie",
+      "warningRuns": "Przebiegi ostrzeżeń",
       "window24h": "Ostatnie 24 godziny",
       "window1h": "Ostatnia 1 godzina",
       "windowDays": "Ostatnie {days} dni",
@@ -9630,10 +9994,12 @@
     "tabs": {
       "all": "Wszystkie",
       "browser": "Przeglądarka",
+      "checks": "Sprawdzenia",
       "http": "HTTP",
       "ssh": "SSH",
       "tcp": "TCP",
-      "tls": "TLS"
+      "tls": "TLS",
+      "private": "Lokalizacje prywatne"
     },
     "timeline": {
       "failed": "Nieudane",
@@ -9672,7 +10038,79 @@
       "nameRequired": "Nazwa jest wymagana",
       "selectorRequired": "Selektor jest wymagany dla \"{step}\"",
       "urlInvalid": "Wprowadź prawidłowy URL zaczynający się od http:// lub https://",
-      "urlRequired": "Początkowy URL jest wymagany"
+      "urlRequired": "Początkowy URL jest wymagany",
+      "fixHighlightedFields": "Popraw zaznaczone pola przed zapisaniem"
+    },
+    "privateLocations": {
+      "searchPlaceholder": "Szukaj lokalizacji...",
+      "setupAgent": "Skonfiguruj agenta",
+      "copySetupCmd": "Polecenie konfiguracji",
+      "deleteTitle": "Usuń lokalizację",
+      "deleteBody": "Usunąć prywatną lokalizację \"{name}\"? Jej agenci przestaną otrzymywać zadania.",
+      "deleteBlocked": "Używana przez {count} sprawdzenia — najpierw je odłącz",
+      "status": {
+        "online": "Online",
+        "offline": "Offline",
+        "pending": "Oczekujący"
+      },
+      "table": {
+        "name": "Nazwa",
+        "region": "Region",
+        "agents": "Agenci",
+        "types": "Typy",
+        "checks": "Sprawdzenia",
+        "checksPerMin": "C/min",
+        "lastSeen": "Ostatnio widziany"
+      },
+      "empty": {
+        "title": "Brak prywatnych lokalizacji",
+        "description": "Wdróż agenta w swojej sieci z ustawionym AGENT_LOCATION — lokalizacja rejestruje się sama i pojawia tutaj automatycznie. Brak ręcznej konfiguracji w interfejsie.",
+        "action": "Skonfiguruj agenta"
+      },
+      "toast": {
+        "deleted": "Lokalizacja usunięta",
+        "deleteFailed": "Nie udało się usunąć lokalizacji",
+        "copied": "Polecenie konfiguracji skopiowane",
+        "copyFailed": "Nie udało się skopiować do schowka",
+        "locationRequired": "Wprowadź nazwę lokalizacji przed skopiowaniem polecenia instalacji."
+      },
+      "setup": {
+        "title": "Skonfiguruj prywatnego agenta",
+        "step1Title": "Wdróż agenta",
+        "step1Body": "Uruchom kontener na dowolnym komputerze w sieci — Docker, Kubernetes lub natywny plik binarny. AGENT_LOCATION nazywa lokalizację; użyj tej samej nazwy na każdym agencie, który ma ją obsługiwać.",
+        "step2Title": "Obserwuj, jak pojawia się lokalizacja",
+        "step2Body": "Przy pierwszej rejestracji wiersz lokalizacji jest tworzony automatycznie i przechodzi w stan Online — nic nie trzeba dodawać w interfejsie. Kolejni agenci z tym samym AGENT_LOCATION dołączają do tej samej lokalizacji.",
+        "step3Title": "Przypisz do sprawdzeń",
+        "step3Body": "Wybierz tę lokalizację podczas tworzenia lub edycji dowolnego sprawdzenia. Sprawdzenia będą uruchamiane z Twojej własnej infrastruktury.",
+        "noToken": "Nie można załadować polecenia konfiguracji — sprawdź swoje uprawnienia i spróbuj ponownie.",
+        "browserNote": "Testy przeglądarkowe nie mogą być jeszcze uruchamiane z lokalizacji prywatnych — tylko kontrole protokołów (HTTP, TCP, TLS, SSH).",
+        "locationNameLabel": "Nazwa lokalizacji",
+        "locationNamePlaceholder": "Siedziba główna",
+        "tabDocker": "Docker",
+        "tabK8s": "Kubernetes",
+        "tabLinux": "Linux",
+        "tabWindows": "Windows",
+        "agentNameLabel": "Nazwa agenta (opcjonalnie)",
+        "agentNamePlaceholder": "automatycznie generowana z nazwy hosta",
+        "agentNameHint": "Pozostaw puste, aby agent sam nadał sobie nazwę na podstawie nazwy hosta — przydatne przy uruchamianiu wielu agentów w jednej lokalizacji."
+      },
+      "detail": {
+        "title": "Lokalizacja prywatna",
+        "back": "Lokalizacje prywatne",
+        "version": "Wersja",
+        "pool": "Pula",
+        "agentsTitle": "Agenci",
+        "agentsSubtitle": "Agenci samodzielnie rejestrują się z Twojej infrastruktury i są tutaj tylko do odczytu.",
+        "agentName": "Agent",
+        "recoverAgent": "Odzyskaj tego agenta — skopiuj polecenie konfiguracji wstępnie wypełnione jego nazwą",
+        "noAgents": "Żaden agent nie zarejestrował się jeszcze dla tej lokalizacji.",
+        "checksTitle": "Kontrole uruchamiane z tej lokalizacji",
+        "checkName": "Nazwa",
+        "noChecks": "Żadne kontrole nie zostały jeszcze przypisane do tej lokalizacji.",
+        "notFound": "Nie znaleziono lokalizacji"
+      },
+      "urlRequired": "Wymagany początkowy URL",
+      "fixHighlightedFields": "Popraw zaznaczone pola przed zapisaniem"
     }
   },
   "shortcuts": {
@@ -9788,6 +10226,8 @@
       "panelEditorQueryInspector": "Otwórz inspektor zapytań",
       "metricsRunQuery": "Wykonaj zapytanie PromQL",
       "metricsRefresh": "Odśwież",
+      "metricsAddToDashboard": "Dodaj do pulpitu nawigacyjnego",
+      "metricsCopyUrl": "Skopiuj link do udostępnienia",
       "tracesSearch": "Wykonaj zapytanie",
       "tracesRefresh": "Odśwież",
       "alertsCreate": "Utwórz nowy alert",

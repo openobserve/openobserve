@@ -205,3 +205,32 @@
   border-color: color-mix(in srgb, var(--color-success-400) 50%, transparent) !important;
   box-shadow: 0 0.375rem 1rem color-mix(in srgb, var(--color-success-500) 20%, transparent) !important;
 }
+
+/* ── Drag-lag suppression (moved out of PipelineEditor.vue's unscoped <style>) ─
+ * Killing transitions/animations mid-drag stops nodes lagging the cursor. These
+ * target Vue Flow's canvas ROOT (`.vue-flow`) and its nodes DURING a drag, and
+ * are intentionally UNSCOPED: on the pipeline canvas `.vue-flow` sits inside the
+ * `.o2vf_node` container, but on the workflow canvas `.o2vf_node` IS the
+ * `.vue-flow` element — so a `.o2vf_node .vue-flow` descendant selector would
+ * miss workflows. Global (this file is import-global) hits both. NEVER set
+ * `transform: none` here — Vue Flow positions each node via inline
+ * `transform: translate(x,y)`, so zeroing it snaps nodes to the origin mid-drag.
+ * Previously pipeline-only; living here extends the same suppression to the
+ * workflow canvas, which imports this file too. */
+.vue-flow.dragging *,
+.vue-flow:has(.vue-flow__node:active) * {
+  transition: none !important;
+  animation: none !important;
+}
+
+.vue-flow__node.dragging,
+.vue-flow__node:active {
+  transition: none !important;
+  animation: none !important;
+}
+
+.vue-flow__node.dragging *,
+.vue-flow__node:active * {
+  transition: none !important;
+  animation: none !important;
+}

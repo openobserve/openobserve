@@ -56,7 +56,9 @@ mod tests {
             json,
         },
     };
+    use enrichment_data::enrichment::storage::{Values, local};
     use infra::schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS};
+    use ingestion_common::IngestionResponse;
     use openobserve::migration;
     use openobserve_api::handler::{
         grpc::{auth::check_auth, flight::FlightServiceImpl},
@@ -69,11 +71,7 @@ mod tests {
         alerts::responses::{GetAlertResponseBody, ListAlertsResponseBody},
         destinations::{Destination, DestinationType},
     };
-    use openobserve_core::{
-        alerts::scheduler::handlers::handle_triggers,
-        enrichment::storage::{Values, local},
-        ingestion_types::IngestionResponse,
-    };
+    use openobserve_core::alerts::scheduler::handlers::handle_triggers;
     use prost::Message;
     use proto::{cluster_rpc::search_server::SearchServer, prometheus_rpc};
     use search_service::SEARCH_SERVER;
@@ -3131,7 +3129,7 @@ mod tests {
         payload.push(record2);
 
         // Call save_enrichment_data
-        let result = openobserve_core::enrichment_table::save_enrichment_data(
+        let result = enrichment_data::enrichment_table::save_enrichment_data(
             org_id, table_name, payload, false, // append_data = false
         )
         .await;
@@ -3141,7 +3139,7 @@ mod tests {
         assert!(response.status().is_success());
 
         // Verify schema was created in database
-        let schema_exists = openobserve_core::schema::stream_schema_exists(
+        let schema_exists = schema::stream_schema_exists(
             org_id,
             table_name,
             config::meta::stream::StreamType::EnrichmentTables,
@@ -3183,7 +3181,7 @@ mod tests {
 
         // Check get_enrichment_table function, it should return same data
         let data =
-            openobserve_core::enrichment::get_enrichment_table(org_id, table_name, false).await;
+            enrichment_data::enrichment::get_enrichment_table(org_id, table_name, false).await;
         assert!(data.is_ok());
         let data = data.unwrap();
         assert!(data.len() == 2);
@@ -3226,7 +3224,7 @@ mod tests {
 
     async fn e2e_cleanup_enrichment_table(org_id: &str, stream_name: &str) {
         // Clean up the enrichment table and its schema
-        openobserve_core::enrichment_table::delete_enrichment_table(
+        enrichment_data::enrichment_table::delete_enrichment_table(
             org_id,
             stream_name,
             config::meta::stream::StreamType::EnrichmentTables,
@@ -3284,7 +3282,7 @@ mod tests {
         );
         initial_payload.push(record1);
 
-        let result1 = openobserve_core::enrichment_table::save_enrichment_data(
+        let result1 = enrichment_data::enrichment_table::save_enrichment_data(
             org_id,
             table_name,
             initial_payload,
@@ -3339,7 +3337,7 @@ mod tests {
         );
         append_payload.push(record2);
 
-        let result2 = openobserve_core::enrichment_table::save_enrichment_data(
+        let result2 = enrichment_data::enrichment_table::save_enrichment_data(
             org_id,
             table_name,
             append_payload,
@@ -3349,7 +3347,7 @@ mod tests {
         assert!(result2.is_ok());
 
         // Verify schema still exists and is valid
-        let schema_exists = openobserve_core::schema::stream_schema_exists(
+        let schema_exists = schema::stream_schema_exists(
             org_id,
             table_name,
             config::meta::stream::StreamType::EnrichmentTables,
@@ -3409,7 +3407,7 @@ mod tests {
         record1.insert("age".to_string(), json::Value::String("25".to_string()));
         initial_payload.push(record1);
 
-        let result1 = openobserve_core::enrichment_table::save_enrichment_data(
+        let result1 = enrichment_data::enrichment_table::save_enrichment_data(
             org_id,
             table_name,
             initial_payload,
@@ -3449,7 +3447,7 @@ mod tests {
         ); // New field
         append_payload.push(record2);
 
-        let result2 = openobserve_core::enrichment_table::save_enrichment_data(
+        let result2 = enrichment_data::enrichment_table::save_enrichment_data(
             org_id,
             table_name,
             append_payload,

@@ -413,8 +413,8 @@ describe("TraceDetails", () => {
     });
 
     it("should show search navigation buttons when there are results", async () => {
-      // Search is a waterfall-view affordance — it is hidden on the flame-graph
-      // (the default view), map and thread tabs.
+      // Search is a waterfall-view affordance — it is hidden on the flame-graph,
+      // map and thread tabs.
       wrapper.vm.activeTab = "waterfall";
       wrapper.vm.searchResults = 5;
       wrapper.vm.currentIndex = 2;
@@ -3035,8 +3035,8 @@ describe("TraceDetails", () => {
 
     // The fixture trace has no LLM spans, so the dag and thread tabs are
     // filtered out of traceTabs regardless of the stored order.
-    it("defaults to the flame graph when nothing is persisted", () => {
-      expect(wrapper.vm.activeTab).toBe("flame-graph");
+    it("defaults to the waterfall when nothing is persisted", () => {
+      expect(wrapper.vm.activeTab).toBe("waterfall");
     });
 
     it("restores the persisted active tab on mount", async () => {
@@ -3059,14 +3059,14 @@ describe("TraceDetails", () => {
       await remount();
 
       expect(tabValues()).not.toContain("thread");
-      expect(wrapper.vm.activeTab).toBe("flame-graph");
+      expect(wrapper.vm.activeTab).toBe("waterfall");
     });
 
     it("ignores a persisted tab that is no longer a known tab", async () => {
       localStorage.setItem(ACTIVE_KEY, "some-removed-tab");
       await remount();
 
-      expect(wrapper.vm.activeTab).toBe("flame-graph");
+      expect(wrapper.vm.activeTab).toBe("waterfall");
     });
 
     it("renders tabs in the persisted order", async () => {
@@ -3095,18 +3095,18 @@ describe("TraceDetails", () => {
       localStorage.setItem(ORDER_KEY, "{not json");
       await remount();
 
-      expect(tabValues()).toEqual(["flame-graph", "waterfall", "map"]);
+      expect(tabValues()).toEqual(["waterfall", "flame-graph", "map"]);
     });
 
     it("moves a tab before the drop target and persists the new order", async () => {
       wrapper.vm.onTabReorder({ from: "map", to: "flame-graph", before: true });
       await wrapper.vm.$nextTick();
 
-      expect(tabValues()).toEqual(["map", "flame-graph", "waterfall"]);
+      expect(tabValues()).toEqual(["waterfall", "map", "flame-graph"]);
       expect(storedOrder()).toEqual([
+        "waterfall",
         "map",
         "flame-graph",
-        "waterfall",
         "dag",
         "thread",
       ]);
@@ -3114,13 +3114,13 @@ describe("TraceDetails", () => {
 
     it("moves a tab after the drop target", async () => {
       wrapper.vm.onTabReorder({
-        from: "flame-graph",
+        from: "waterfall",
         to: "map",
         before: false,
       });
       await wrapper.vm.$nextTick();
 
-      expect(tabValues()).toEqual(["waterfall", "map", "flame-graph"]);
+      expect(tabValues()).toEqual(["flame-graph", "map", "waterfall"]);
     });
 
     it("keeps hidden tabs in the persisted order so the arrangement survives", async () => {

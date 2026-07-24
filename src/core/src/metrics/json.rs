@@ -41,6 +41,8 @@ use config::{
 use datafusion::arrow::datatypes::Schema;
 use db;
 use infra::schema::{SchemaCache, get_partition_time_level};
+use ingestion_common::{IngestionResponse, StreamStatus};
+use schema::check_for_schema;
 
 use super::get_exclude_labels;
 use crate::{
@@ -50,9 +52,7 @@ use crate::{
         TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id,
         get_write_partition_key, write_file,
     },
-    ingestion_types::{IngestionResponse, StreamStatus},
     pipeline::batch_execution::ExecutablePipeline,
-    schema::check_for_schema,
 };
 
 const VALID_METRICS_TYPES: &[&str] = &["counter", "gauge", "histogram", "summary"];
@@ -88,10 +88,10 @@ pub async fn ingest(
     org_id: &str,
     stream_name: Option<&str>,
     body: Bytes,
-    user: crate::ingestion_types::IngestUser,
+    user: ingestion_common::IngestUser,
 ) -> Result<IngestionResponse> {
     // check system resource
-    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, stream_name).await {
+    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None).await {
         // we do not want to log trial period expired errors
         if matches!(e, infra::errors::Error::TrialPeriodExpired) {
             return Ok(IngestionResponse {
@@ -134,6 +134,10 @@ pub async fn ingest(
     // records buffer
     let mut json_data_by_stream: HashMap<String, Vec<_>> = HashMap::new();
 
+    // check if stream is deleting from cache
+    let mut stream_delete_status = std::collections::HashMap::new();
+    let mut skipped_records: u32 = 0;
+
     let reader: Vec<json::Value> = json::from_slice(&body)?;
     for record in reader.into_iter() {
         // JSON Flattening
@@ -149,6 +153,27 @@ pub async fn ingest(
                 }
             },
         };
+
+        // check stream if it is deleting
+        let is_deleting = match stream_delete_status.get(&stream_name) {
+            Some(v) => *v,
+            None => {
+                let flag = db::compact::retention::is_deleting_stream(
+                    org_id,
+                    StreamType::Metrics,
+                    &stream_name,
+                    None,
+                );
+                stream_delete_status.insert(stream_name.clone(), flag);
+                flag
+            }
+        };
+
+        if is_deleting {
+            skipped_records += 1;
+            continue;
+        }
+
         let metrics_type = record
             .get(TYPE_LABEL)
             .and_then(|v| v.as_str())
@@ -258,6 +283,11 @@ pub async fn ingest(
                 .or_default()
                 .push((local_val, metrics_type));
         }
+    }
+
+    // warn if any records were skipped due to streams being deleted
+    if skipped_records > 0 {
+        log::warn!("[METRICS:JSON] Skipped {skipped_records} records due to streams being deleted");
     }
 
     // process records buffered for pipeline processing
