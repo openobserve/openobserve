@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-maps-query-builder-dropdown w-[48.1875rem]! h-[20.1875rem] shadow-md p-4 translate-y-2 rounded-none"
+              class="field-function-menu-popup dashboard-maps-query-builder-dropdown w-[48.1875rem]! shadow-md overflow-hidden p-0 translate-y-2 rounded-none"
               :data-test="`dashboard-name-item-${nameLabel}-menu`"
             >
               <div class="pt-0.75 pr-4 pb-4 pl-4"
@@ -217,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-maps-query-builder-dropdown w-[48.1875rem]! h-[20.1875rem] shadow-md p-4 translate-y-2 rounded-none"
+              class="field-function-menu-popup dashboard-maps-query-builder-dropdown w-[48.1875rem]! shadow-md overflow-hidden p-0 translate-y-2 rounded-none"
               :data-test="`dashboard-value_for_maps-item-${valueLabel}-menu`"
             >
               <div class="pt-0.75 pr-4 pb-4 pl-4"

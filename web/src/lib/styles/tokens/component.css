@@ -407,6 +407,11 @@
   --color-badge-blue-soft-bg: var(--color-blue-50);
   --color-badge-blue-soft-text: var(--color-blue-700);
 
+  /* Bracket-pair colorization — Monaco rainbow brackets (vs light) */
+  --color-bracket-1: #0431fa;
+  --color-bracket-2: #319331;
+  --color-bracket-3: #7b3814;
+
   /* Badge — purple (solid/soft variants for correlation) */
   --color-badge-purple-solid-bg: var(--color-purple-600);
   --color-badge-purple-solid-text: var(--color-white);
@@ -1305,6 +1310,11 @@
   --color-badge-blue-ol-text: var(--color-badge-blue-ol-text);
   --color-badge-blue-soft-bg: var(--color-badge-blue-soft-bg);
   --color-badge-blue-soft-text: var(--color-badge-blue-soft-text);
+
+  /* Editor bracket-pair colorization */
+  --color-bracket-1: var(--color-bracket-1);
+  --color-bracket-2: var(--color-bracket-2);
+  --color-bracket-3: var(--color-bracket-3);
 
   /* Badge — purple (solid/soft variants) */
   --color-badge-purple-solid-bg: var(--color-badge-purple-solid-bg);

@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-sankey-chart-builder-dropdown w-[48.1875rem]! h-[20.1875rem] shadow-md p-4 translate-y-2 rounded-none"
+              class="field-function-menu-popup dashboard-sankey-chart-builder-dropdown w-[48.1875rem]! shadow-md overflow-hidden p-0 translate-y-2 rounded-none"
               :data-test="`dashboard-source-item-${sourceLabel}-menu`"
             >
               <div class="pt-0.75 pr-4 pb-4 pl-4"
@@ -217,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-sankey-chart-builder-dropdown w-[48.1875rem]! h-[20.1875rem] shadow-md p-4 translate-y-2 rounded-none"
+              class="field-function-menu-popup dashboard-sankey-chart-builder-dropdown w-[48.1875rem]! shadow-md overflow-hidden p-0 translate-y-2 rounded-none"
               :data-test="`dashboard-target-item-${targetLabel}-menu`"
             >
               <div class="pt-0.75 pr-4 pb-4 pl-4"
@@ -347,7 +347,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-sankey-chart-builder-dropdown w-[48.1875rem]! h-[20.1875rem] shadow-md p-4 translate-y-2 rounded-none"
+              class="field-function-menu-popup dashboard-sankey-chart-builder-dropdown w-[48.1875rem]! shadow-md overflow-hidden p-0 translate-y-2 rounded-none"
               :data-test="`dashboard-value-item-${valueLabel}-menu`"
             >
               <div class="pt-0.75 pr-4 pb-4 pl-4"

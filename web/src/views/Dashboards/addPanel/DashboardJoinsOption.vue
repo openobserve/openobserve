@@ -57,7 +57,7 @@
                 </OButton>
               </template>
               <div
-                class="p-4"
+                class="p-0"
                 :data-test="`dashboard-join-menu-${index}`"
               >
                 <AddJoinPopUp

@@ -48,15 +48,38 @@ describe("AxisFieldChipLabel", () => {
       ]);
     });
 
-    it("should colour the function magenta and the brackets blue by default", () => {
+    it("should colour the function magenta, brackets by depth, field body", () => {
       wrapper = mountLabel({ label: "count(a.b)" });
       const spans = leafSpans(wrapper);
       const fn = spans.find((s) => s.text === "count");
       const openBracket = spans.find((s) => s.text === "(");
       const field = spans.find((s) => s.text === "b");
       expect(fn?.class).toContain("text-badge-magenta-ol-text");
-      expect(openBracket?.class).toContain("text-badge-blue-ol-text");
+      // outermost bracket pair → first bracket-depth colour
+      expect(openBracket?.class).toContain("text-bracket-1");
       expect(field?.class).toContain("text-text-body");
+    });
+
+    it("should colour bracket pairs by nesting depth (matched open/close)", () => {
+      wrapper = mountLabel({
+        label: "count(count(distinct(anomaly_id)))",
+      });
+      const brackets = leafSpans(wrapper).filter(
+        (s) => s.text === "(" || s.text === ")",
+      );
+      // opens: depth 0,1,2 → bracket-1,2,3 ; closes ascend back 2,1,0 → 3,2,1
+      const depthClass = (s: { class: string }) =>
+        ["text-bracket-1", "text-bracket-2", "text-bracket-3"].find((c) =>
+          s.class.includes(c),
+        );
+      expect(brackets.map(depthClass)).toEqual([
+        "text-bracket-1",
+        "text-bracket-2",
+        "text-bracket-3",
+        "text-bracket-3",
+        "text-bracket-2",
+        "text-bracket-1",
+      ]);
     });
 
     it("should treat a dotless argument as all field with no prefix", () => {
@@ -67,6 +90,33 @@ describe("AxisFieldChipLabel", () => {
         "kubernetes_namespace_name",
         ")",
       ]);
+    });
+  });
+
+  describe("nested / multiple functions", () => {
+    it("should colour every function magenta, including nested ones", () => {
+      wrapper = mountLabel({
+        label: "histogram(_timestamp, acos(actual_value))",
+      });
+      const spans = leafSpans(wrapper);
+      const magenta = spans
+        .filter((s) => s.class.includes("text-badge-magenta-ol-text"))
+        .map((s) => s.text);
+      expect(magenta).toEqual(["histogram", "acos"]);
+    });
+
+    it("should colour deeply nested aggregations at every level", () => {
+      wrapper = mountLabel({
+        label: "count(count(distinct(anomaly_id)))",
+      });
+      const spans = leafSpans(wrapper);
+      const magenta = spans
+        .filter((s) => s.class.includes("text-badge-magenta-ol-text"))
+        .map((s) => s.text);
+      expect(magenta).toEqual(["count", "count", "distinct"]);
+      // the innermost identifier is a column, not a function
+      const col = spans.find((s) => s.text === "anomaly_id");
+      expect(col?.class).toContain("text-text-body");
     });
   });
 

@@ -88,10 +88,15 @@ describe("SortByBtnGrp", () => {
   };
 
   describe("Component Rendering", () => {
-    it("should render sort by label", () => {
+    it("should not render the legacy sort by label when redesigned group renders", () => {
+      // The literal "Sort By:" text was removed from the template; the parent
+      // (DynamicFunctionPopUp) now renders the heading instead.
       wrapper = createWrapper();
 
-      expect(wrapper.text()).toContain("Sort By:");
+      expect(wrapper.text()).not.toContain("Sort By:");
+      expect(
+        wrapper.find('[data-test="dashboard-sort-by-btn-group"]').exists(),
+      ).toBe(true);
     });
 
     it("should render button group", () => {

@@ -1,18 +1,24 @@
+<!-- Copyright 2026 OpenObserve Inc. -->
+
 <template>
   <div class="flex flex-col">
+    <!-- Function selector -->
     <div class="w-60 flex-none">
       <OSelect
         v-model="fields.functionName"
-        :label="t('dashboard.selectFunction.selectFunction')"
-        label-position="inside"
         :options="filteredFunctions"
         data-test="dashboard-function-dropdown"
         class="w-full"
         @search="onFunctionSearch"
-      />
+      >
+        <template #icon-left>
+          <OIcon name="function" size="sm" />
+        </template>
+      </OSelect>
     </div>
+
+    <!-- Argument tree -->
     <div class="w-full mt-2">
-      <!-- Loop through the args for the first n-1 arguments -->
       <div class="w-full">
         <div
           v-for="(arg, argIndex) in argRows"
@@ -23,7 +29,7 @@
             class="flex"
             :style="{ marginLeft: isChild ? '-48px' : '0px' }"
           >
-            <div class="mr-2 relative w-3 min-h-12.5">
+            <div class="mr-1.5 relative w-2.5 min-h-12.5">
               <!-- Vertical Line using top & bottom instead of height -->
               <div
                 class="absolute top-0 w-px bg-accent opacity-50"
@@ -32,12 +38,12 @@
                     argIndex === fields.args.length - 1
                       ? 'calc(100% - 32px)'
                       : '0',
-                  left: '6px',
+                  left: '5px',
                 }"
               ></div>
 
               <!-- SubTask Arrow -->
-              <div class="absolute top-7.5 left-1.25 text-text-secondary">
+              <div class="absolute top-7.5 left-1 text-text-secondary">
                 <SubTaskArrow />
               </div>
             </div>
@@ -48,8 +54,8 @@
                   getParameterLabel(fields.functionName, argIndex)
                 }}</label>
               </div>
-              <div class="flex items-start">
-                <!-- type selector -->
+              <div class="flex items-start gap-1">
+                <!-- Argument type switcher -->
                 <OSelect
                   v-model="fields.args[argIndex].type"
                   @update:model-value="onArgTypeChange(fields.args[argIndex])"
@@ -71,11 +77,13 @@
                       size="sm"
                     />
                   </template>
-                  <template #trigger><!-- icon-only --></template>
+                  <!-- empty slot keeps the trigger icon-only -->
+                  <template #trigger><span class="sr-only"></span></template>
                 </OSelect>
-                <!-- Left field selector using StreamFieldSelect -->
+
+                <!-- Field selector -->
                 <div
-                  class="w-52"
+                  class="w-52 flex-none"
                   v-if="fields.args[argIndex]?.type === 'field'"
                 >
                   <StreamFieldSelect
@@ -103,7 +111,7 @@
                   type="number"
                   v-model.number="fields.args[argIndex].value"
                   :placeholder="t('dashboard.selectFunction.enterNumber')"
-                  class="w-52"
+                  class="w-52 flex-none"
                   :data-test="`dashboard-function-dropdown-arg-number-input-${argIndex}`"
                 />
 
@@ -138,6 +146,7 @@
                   v-if="canRemoveArgument(fields.functionName, argIndex)"
                   variant="ghost"
                   size="icon"
+                  class="shrink-0"
                   @click="removeArgument(argIndex)"
                   :data-test="`dashboard-function-dropdown-arg-remove-button-${argIndex}`"
                   icon-left="close"
@@ -147,25 +156,26 @@
             </div>
           </div>
         </div>
-
-        <!-- Add more arguments if allowed -->
       </div>
     </div>
+
+    <!-- Add more arguments if allowed -->
     <OButton
       v-if="canAddArgument(fields.functionName)"
       variant="outline"
       size="sm"
       @click="addArgument()"
-      class="mt-3"
+      class="mt-3 w-fit border-dashed"
+      icon-left="add"
       :data-test="`dashboard-function-dropdown-add-argument-button`"
     >
-      + {{ t('dashboard.selectFunction.add') }}
+      {{ t('dashboard.selectFunction.add') }}
     </OButton>
   </div>
 </template>
 
 <script lang="ts">
-import { ref, watch, toRef, computed, inject } from "vue";
+import { ref, watch, computed, inject } from "vue";
 import { useI18n } from "vue-i18n";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
@@ -296,8 +306,6 @@ export default {
         }))
         .filter((v) => v.label.toLowerCase().indexOf(searchVal) > -1);
     };
-
-    // const availableFunctions = ref(["arrzip", "concat", "count", "sum"]);
 
     const getValidationForFunction = (functionName: string) => {
       return (
@@ -435,7 +443,7 @@ export default {
 
       // Return the type for the adjusted index, or an empty array if the index is out of bounds
       const types = argsValidation[adjustedIndex]?.type || [];
-      // Inject icon name for each option so dropdown items show icons
+      // Inject icon name for each option so the switcher buttons show icons
       return types.map((t: any) => ({
         ...t,
         icon: getIconBasedOnArgType(t.value),
@@ -445,7 +453,7 @@ export default {
     // watcher on functionName
     watch(
       () => fields.value.functionName,
-      (newVal) => {
+      () => {
         // Save the old args
         const oldArgs = [...fields.value.args];
 
@@ -497,6 +505,13 @@ export default {
       }
     };
 
+    const setArgType = (argIndex: number, type: string) => {
+      const arg = fields.value.args[argIndex];
+      if (!arg || arg.type === type) return;
+      arg.type = type;
+      onArgTypeChange(arg);
+    };
+
     const getIconBasedOnArgType = (type: string) => {
       switch (type) {
         case "field":
@@ -542,7 +557,6 @@ export default {
       t,
       fields,
       argRows,
-      // availableFunctions,
       getValidationForFunction,
       canAddArgument,
       canRemoveArgument,
@@ -557,6 +571,7 @@ export default {
       onFunctionSearch,
       initializeFunctions,
       onArgTypeChange,
+      setArgType,
       getAllSelectedStreams,
       getIconBasedOnArgType,
       getParameterLabel,
@@ -564,17 +579,3 @@ export default {
   },
 };
 </script>
-
-<style scoped>
-/* keep(lib-override:OSelect): compact the arg-type OSelect trigger to icon +
-   chevron only — hides the internal label span and tightens the trigger button,
-   which live in the select's own DOM and aren't reachable via utilities. */
-.arg-type-select :deep(span[class~="flex-1"][class~="truncate"]) {
-  display: none !important;
-}
-
-.arg-type-select :deep(button[type="button"]) {
-  min-width: 2rem;
-  padding-inline-end: 1.5rem !important;
-}
-</style>

@@ -54,82 +54,113 @@
             >
           </OButton>
         </template>
-        <div class="p-4 w-72">
-          <div class="flex items-center gap-1">
-            <StreamFieldSelect
-              class="w-full"
-              :streams="getAllSelectedStreams()"
-              v-model="conditionModel.column"
-              :data-test="`dashboard-add-condition-column-${conditionIndex}`"
-            />
-            <OButton
-              variant="ghost"
-              size="icon"
-              @click="removeColumnName"
-              :data-test="`dashboard-add-condition-remove-column-${conditionIndex}`"
-              icon-left="close"
-            >
-            </OButton>
-          </div>
-          <div>
-            <div class="p-1">
-              <div class="gap-1">
-                <OTabs v-model="conditionModel.type" dense>
-                  <OTab
-                    name="list"
-                    :label="t('common.list')"
-                    class="flex-1"
-                    :data-test="`dashboard-add-condition-list-${conditionIndex}`"
-                  ></OTab>
-                  <OTab
-                    name="condition"
-                    :label="t('common.condition')"
-                    class="flex-1"
-                    :data-test="`dashboard-add-condition-condition-${conditionIndex}`"
-                  ></OTab>
-                </OTabs>
-                <OSeparator />
-                <div>
-                  <OTabPanels v-model="conditionModel.type" animated>
-                    <OTabPanel name="condition">
-                      <div class="flex flex-col gap-2">
-                        <OSelect
-                          v-model="conditionModel.operator"
-                          :options="operators"
-                          :label="t('common.operator')"
-                          data-test="dashboard-add-condition-operator"
-                          class="o2-custom-select-dashboard w-full"
-                        />
-                        <OCombobox
-                          v-if="
-                            !['Is Null', 'Is Not Null'].includes(
-                              condition.operator,
-                            )
-                          "
-                          :label="t('common.value')"
-                          v-model="conditionModel.value"
-                          :items="dashboardVariablesFilterItems"
-                          search-regex="(?:^|[^$])\$?(\w+)"
-                          data-test="dashboard-add-condition-value"
-                        />
-                      </div>
-                    </OTabPanel>
-                    <OTabPanel name="list">
-                      <OSelect
-                        v-model="conditionModel.values"
-                        :options="sortedFilteredListOptions"
-                        :label="t('common.selectFilter')"
-                        multiple
-                        searchable
-                        :error="condition.values?.length === 0"
-                        :error-message="condition.values?.length === 0 ? 'At least 1 item required' : ''"
-                        data-test="dashboard-add-condition-list-tab"
-                        class="o2-custom-select-dashboard"
-                      />
-                    </OTabPanel>
-                  </OTabPanels>
-                </div>
+        <div class="w-80">
+          <div class="flex flex-col gap-2.5 p-3">
+            <div class="flex flex-col gap-1">
+              <div
+                class="text-2xs font-semibold text-text-secondary"
+              >
+                {{ t('common.field') }}
               </div>
+              <div class="flex items-center gap-1.5">
+                <StreamFieldSelect
+                  class="min-w-0 flex-1"
+                  :streams="getAllSelectedStreams()"
+                  v-model="conditionModel.column"
+                  :data-test="`dashboard-add-condition-column-${conditionIndex}`"
+                />
+                <OButton
+                  variant="outline"
+                  size="icon"
+                  class="shrink-0"
+                  @click="removeColumnName"
+                  :data-test="`dashboard-add-condition-remove-column-${conditionIndex}`"
+                  icon-left="close"
+                >
+                </OButton>
+              </div>
+            </div>
+
+            <div>
+              <OTabs v-model="conditionModel.type" dense>
+                <OTab
+                  name="list"
+                  :label="t('common.list')"
+                  class="flex-1"
+                  :data-test="`dashboard-add-condition-list-${conditionIndex}`"
+                ></OTab>
+                <OTab
+                  name="condition"
+                  :label="t('common.condition')"
+                  class="flex-1"
+                  :data-test="`dashboard-add-condition-condition-${conditionIndex}`"
+                ></OTab>
+              </OTabs>
+              <OSeparator />
+              <!-- -mx-1 px-1: padding so the animated panels don't clip focus rings -->
+              <OTabPanels
+                v-model="conditionModel.type"
+                animated
+                class="-mx-1 px-1"
+              >
+                <OTabPanel name="condition">
+                  <div class="flex flex-col gap-3 pt-3">
+                    <div class="flex flex-col gap-1">
+                      <div
+                        class="text-2xs font-semibold text-text-secondary"
+                      >
+                        {{ t('common.operator') }}
+                      </div>
+                      <OSelect
+                        v-model="conditionModel.operator"
+                        :options="operators"
+                        data-test="dashboard-add-condition-operator"
+                        class="o2-custom-select-dashboard w-full"
+                      />
+                    </div>
+                    <div
+                      v-if="
+                        !['Is Null', 'Is Not Null'].includes(
+                          condition.operator,
+                        )
+                      "
+                      class="flex flex-col gap-1"
+                    >
+                      <div
+                        class="text-2xs font-semibold text-text-secondary"
+                      >
+                        {{ t('common.value') }}
+                      </div>
+                      <OCombobox
+                        v-model="conditionModel.value"
+                        :items="dashboardVariablesFilterItems"
+                        search-regex="(?:^|[^$])\$?(\w+)"
+                        :placeholder="t('common.enterValueOrVariable')"
+                        data-test="dashboard-add-condition-value"
+                      />
+                    </div>
+                  </div>
+                </OTabPanel>
+                <OTabPanel name="list">
+                  <div class="flex flex-col gap-1 pt-3">
+                    <div
+                      class="text-2xs font-semibold text-text-secondary"
+                    >
+                      {{ t('common.selectFilter') }}
+                    </div>
+                    <OSelect
+                      v-model="conditionModel.values"
+                      :options="sortedFilteredListOptions"
+                      multiple
+                      searchable
+                      :error="condition.values?.length === 0"
+                      :error-message="condition.values?.length === 0 ? 'At least 1 item required' : ''"
+                      data-test="dashboard-add-condition-list-tab"
+                      class="o2-custom-select-dashboard"
+                    />
+                  </div>
+                </OTabPanel>
+              </OTabPanels>
             </div>
           </div>
         </div>

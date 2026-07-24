@@ -13,168 +13,170 @@
  limitations under the License.
 -->
 
-<!-- eslint-disable vue/no-unused-components -->
 <template>
   <div data-test="dashboard-join-pop-up" class="w-156 flex flex-col max-h-[54vh] overflow-hidden">
-    <div class="flex justify-between items-center mb-3.75" data-test="dashboard-join-pop-up-header">
-      <div class="flex-1 gap-2">
-        <div class="flex items-center gap-2 text-theme-accent">
-          <LeftJoinSvg class="h-5.25" />
-          <label>{{ t('dashboard.addJoinPopUp.join') }}</label>
+    <div class="flex min-h-0 flex-1 flex-col p-3">
+      <div class="mb-2 flex items-start justify-between gap-4">
+        <div class="flex min-w-0 flex-1 flex-col gap-1">
+          <div class="flex items-center gap-2 text-badge-teal-ol-text">
+            <LeftJoinSvg class="h-4" />
+            <span class="text-compact font-semibold">{{ t('dashboard.addJoinPopUp.join') }}</span>
+          </div>
+          <label
+            class="text-2xs font-semibold uppercase tracking-wider text-text-secondary"
+            >{{ t('dashboard.addJoinPopUp.joiningStream') }}</label
+          >
+          <OSelect
+            :model-value="mainStream"
+            :options="[]"
+            disabled
+            data-test="dashboard-config-panel-join-from"
+          />
         </div>
-        <OSelect
-          :model-value="mainStream"
-          :options="[]"
-          disabled
-          :label="t('dashboard.addJoinPopUp.joiningStream')"
-          data-test="dashboard-config-panel-join-from"
-        />
+
+        <div class="flex shrink-0 flex-col items-center gap-1">
+          <label
+            for="joinType"
+            class="text-2xs font-semibold uppercase tracking-wider text-text-secondary"
+            >{{ t('dashboard.addJoinPopUp.joinType') }}</label
+          >
+          <div class="flex items-center justify-center gap-1.5">
+            <button
+              v-for="option in joinTypeOptions"
+              :key="option.type"
+              type="button"
+              class="flex cursor-pointer flex-col items-center gap-0.5 rounded-default border px-2.5 py-1.5 transition-colors"
+              :class="
+                localJoinType === option.type
+                  ? 'border-badge-teal-ol-border bg-badge-teal-soft-bg text-badge-teal-ol-text'
+                  : 'border-transparent text-text-secondary hover:bg-surface-subtle'
+              "
+              :aria-pressed="localJoinType === option.type"
+              :aria-label="option.ariaLabel"
+              :data-test="`dashboard-join-type-${option.type}`"
+              @click="handleJoinTypeChange(option.type)"
+            >
+              <component
+                :is="option.icon"
+                :shouldFill="localJoinType === option.type"
+              />
+              <div
+                class="text-xs"
+                :class="localJoinType === option.type ? 'font-semibold' : ''"
+              >
+                {{ option.label }}
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <div class="flex min-w-0 flex-1 flex-col gap-1">
+          <div class="flex items-center gap-2 text-badge-teal-ol-text">
+            <RightJoinSvg class="h-4" />
+            <span class="text-compact font-semibold">{{ t('dashboard.addJoinPopUp.on') }}</span>
+          </div>
+          <label
+            class="text-2xs font-semibold uppercase tracking-wider text-text-secondary"
+            >{{ t('dashboard.addJoinPopUp.onStream') }}</label
+          >
+          <OSelect
+            v-model="modelValueModel.stream"
+            :options="streamOptions"
+            searchable
+            data-test="dashboard-config-panel-join-to"
+          />
+        </div>
       </div>
 
-      <div class="flex items-center gap-2 pt-5.25 px-2.5 text-theme-accent">
-        <LeftJoinLineSvg class="h-10 w-14.5" />
+      <div class="flex items-center gap-4">
+        <div class="border-t border-border-default flex-1"></div>
+        <div
+          class="py-2 text-center text-xs text-text-secondary"
+          v-if="showJoinSummary"
+        >
+          {{ t('dashboard.addJoinPopUp.performing') }}
+          <span
+            class="inline-flex items-center rounded-default bg-badge-teal-soft-bg px-1.5 py-0.5 text-xs font-semibold text-badge-teal-ol-text"
+          >{{ joinTypeLabel }} {{ t('dashboard.addJoinPopUp.join') }}</span> {{ t('dashboard.addJoinPopUp.between') }}
+          <span class="font-semibold text-text-body">{{ mainStream }}</span> {{ t('dashboard.addJoinPopUp.and') }}
+          <span class="font-semibold text-text-body">{{ modelValue.stream }}</span>
+        </div>
+        <div class="border-t border-border-default flex-1"></div>
       </div>
 
-      <div class="flex flex-col items-center">
-        <label for="joinType">{{ t('dashboard.addJoinPopUp.joinType') }}</label>
-        <div class="flex justify-center items-center gap-2">
+      <div class="flex min-h-0 flex-1 flex-col">
+        <div class="mb-2.5 shrink-0">
+          <h3 class="text-sm not-italic font-semibold leading-normal m-0">{{ t('dashboard.addJoinPopUp.joiningClause') }}</h3>
+          <p class="text-xs not-italic font-normal leading-normal mt-1 mb-0 mx-0 text-text-secondary">
+            {{ t('dashboard.addJoinPopUp.selectFieldsDescription') }}
+          </p>
+        </div>
+
+        <div
+          class="flex-1 min-h-0 overflow-y-auto"
+          data-test="dashboard-join-clause-list"
+        >
           <div
-            class="flex flex-col items-center cursor-pointer transition-opacity duration-200 text-theme-accent hover:opacity-80"
-            @click="handleJoinTypeChange('left')"
-            :aria-label="t('panel.leftJoin')"
-            data-test="dashboard-join-type-left"
+            v-for="(arg, argIndex) in modelValue.conditions"
+            :key="argIndex + JSON.stringify(arg)"
+            class="mb-2 rounded-default border border-border-default bg-surface-panel p-2.5"
           >
-            <LeftJoinTypeSvg :shouldFill="localJoinType === 'left'" />
-            <div :class="getJoinTypeLabelClass('left')">{{ t('dashboard.addJoinPopUp.left') }}</div>
-          </div>
-          <div
-            class="flex flex-col items-center cursor-pointer transition-opacity duration-200 text-theme-accent hover:opacity-80"
-            @click="handleJoinTypeChange('inner')"
-            :aria-label="t('panel.innerJoin')"
-            data-test="dashboard-join-type-inner"
-          >
-            <InnerJoinTypeSvg :shouldFill="localJoinType === 'inner'" />
-            <div :class="getJoinTypeLabelClass('inner')">{{ t('dashboard.addJoinPopUp.inner') }}</div>
-          </div>
-          <div
-            class="flex flex-col items-center cursor-pointer transition-opacity duration-200 text-theme-accent hover:opacity-80"
-            @click="handleJoinTypeChange('right')"
-            :aria-label="t('panel.rightJoin')"
-            data-test="dashboard-join-type-right"
-          >
-            <RightJoinTypeSvg :shouldFill="localJoinType === 'right'" />
-            <div :class="getJoinTypeLabelClass('right')">{{ t('dashboard.addJoinPopUp.right') }}</div>
+            <div
+              class="mb-1.5 text-2xs font-semibold uppercase tracking-wider text-text-secondary"
+            >
+              {{ t('dashboard.addJoinPopUp.clause', { number: argIndex + 1 }) }}
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="flex-1 min-w-0">
+                <StreamFieldSelect
+                  :streams="getStreamsBasedJoinIndex()"
+                  v-model="modelValueModel.conditions[argIndex].leftField"
+                  :data-test="`dashboard-join-condition-left-field-${argIndex}`"
+                />
+              </div>
+
+              <div class="w-20 shrink-0">
+                <OSelect
+                  v-model="modelValueModel.conditions[argIndex].operation"
+                  :options="operationSelectOptions"
+                  :data-test="`dashboard-join-condition-operation-${argIndex}`"
+                />
+              </div>
+
+              <div class="flex-1 min-w-0">
+                <StreamFieldSelect
+                  :streams="rightFieldStreams"
+                  v-model="modelValueModel.conditions[argIndex].rightField"
+                  :data-test="`dashboard-join-condition-right-field-${argIndex}`"
+                />
+              </div>
+
+              <OButton
+                variant="outline"
+                size="icon"
+                class="shrink-0"
+                :data-test="`dashboard-join-condition-remove-${argIndex}`"
+                :disabled="modelValue.conditions.length === 1"
+                @click="handleRemoveCondition(argIndex)"
+                :aria-label="t('panel.removeClause')"
+                icon-left="close"
+              >
+                <OTooltip :content="t('dashboard.addJoinPopUp.removeClause')" />
+              </OButton>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div class="flex items-center gap-2 pt-5.25 px-2.5 text-theme-accent">
-        <RightJoinLineSvg class="h-10 w-14.5" />
-      </div>
-
-      <div class="flex-1 gap-2">
-        <div class="flex items-center gap-2 text-theme-accent">
-          <RightJoinSvg class="h-5.25" />
-          <label>{{ t('dashboard.addJoinPopUp.on') }}</label>
-        </div>
-
-        <OSelect
-          v-model="modelValueModel.stream"
-          :options="streamOptions"
-          :label="t('dashboard.addJoinPopUp.onStream')"
-          searchable
-          data-test="dashboard-config-panel-join-to"
-        />
-      </div>
-    </div>
-
-    <div class="flex items-center gap-4">
-      <div class="border-t border-border-default flex-1"></div>
-      <div
-        class="py-2 text-center text-xs text-text-body"
-        v-if="showJoinSummary"
-      >
-        {{ t('dashboard.addJoinPopUp.performing') }}
-        <span
-          class="inline-flex items-center rounded-default px-1.5 py-0.5 text-xs font-semibold bg-[color-mix(in_srgb,var(--color-accent)_15%,transparent)] text-accent"
-        >{{ joinTypeLabel }} {{ t('dashboard.addJoinPopUp.join') }}</span> {{ t('dashboard.addJoinPopUp.between') }}
-        <span class="font-semibold">{{ mainStream }}</span> {{ t('dashboard.addJoinPopUp.and') }}
-        <span class="font-semibold">{{ modelValue.stream }}</span>
-      </div>
-      <div class="border-t border-border-default flex-1"></div>
-    </div>
-
-    <div class="mb-2.5 flex flex-col min-h-0 flex-1">
-      <div class="mb-2.5 shrink-0">
-        <h3 class="text-sm not-italic font-semibold leading-normal m-0">{{ t('dashboard.addJoinPopUp.joiningClause') }}</h3>
-        <p class="text-xs not-italic font-normal leading-normal mt-1 mb-0 mx-0">
-          {{ t('dashboard.addJoinPopUp.selectFieldsDescription') }}
-        </p>
-      </div>
-
-      <div
-        class="flex-1 min-h-0 overflow-y-auto"
-        data-test="dashboard-join-clause-list"
-      >
-      <div
-        v-for="(arg, argIndex) in modelValue.conditions"
-        :key="argIndex + JSON.stringify(arg)"
-        class="mb-2.5 p-2.5 border border-border-default rounded-default"
-      >
-        <div class="mb-2 font-medium">{{ t('dashboard.addJoinPopUp.clause', { number: argIndex + 1 }) }}</div>
-        <div class="flex items-center gap-2.5">
-          <div class="flex-1 min-w-0 overflow-hidden">
-            <StreamFieldSelect
-              :streams="getStreamsBasedJoinIndex()"
-              v-model="modelValueModel.conditions[argIndex].leftField"
-              :data-test="`dashboard-join-condition-left-field-${argIndex}`"
-            />
-          </div>
-
-          <div class="flex-1 min-w-0 overflow-hidden">
-            <OSelect
-              :label-position="'inside'"
-              v-model="modelValueModel.conditions[argIndex].operation"
-              :options="operationSelectOptions"
-              :label="t('dashboard.addJoinPopUp.selectOperation')"
-              :data-test="`dashboard-join-condition-operation-${argIndex}`"
-            />
-          </div>
-
-          <div class="flex-1 min-w-0 overflow-hidden">
-            <StreamFieldSelect
-              :streams="rightFieldStreams"
-              v-model="modelValueModel.conditions[argIndex].rightField"
-              :data-test="`dashboard-join-condition-right-field-${argIndex}`"
-            />
-          </div>
-
-          <OButton
-            variant="ghost"
-            size="icon"
-            :aria-label="t('panel.addClause')"
-            :data-test="`dashboard-join-condition-add-${argIndex}`"
-            @click="handleAddCondition(argIndex)"
-            icon-left="add"
-          >
-            <template #icon-left><OIcon name="add" size="sm" /></template>
-            <OTooltip :content="t('dashboard.addJoinPopUp.addAnotherClause')" />
-          </OButton>
-
-          <OButton
-            variant="ghost"
-            size="icon-circle"
-            :data-test="`dashboard-join-condition-remove-${argIndex}`"
-            :disabled="modelValue.conditions.length === 1"
-            @click="handleRemoveCondition(argIndex)"
-            :aria-label="t('panel.removeClause')"
-            icon-left="close"
-          >
-            <template #icon-left><OIcon name="close" size="sm" /></template>
-            <OTooltip :content="t('dashboard.addJoinPopUp.removeClause')" />
-          </OButton>
-        </div>
-      </div>
+        <OButton
+          variant="outline"
+          size="sm"
+          class="mt-2 w-fit shrink-0"
+          icon-left="add"
+          data-test="dashboard-join-add-clause"
+          @click="handleAddCondition(modelValue.conditions.length - 1)"
+        >
+          {{ t('dashboard.addJoinPopUp.addClause') }}
+        </OButton>
       </div>
     </div>
   </div>
@@ -182,7 +184,6 @@
 
 <script lang="ts">
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import {
@@ -192,6 +193,7 @@ import {
   inject,
   ref,
   computed,
+  markRaw,
   PropType,
 } from "vue";
 import { useI18n } from "vue-i18n";
@@ -202,10 +204,8 @@ import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import StreamFieldSelect from "@/components/dashboards/addPanel/StreamFieldSelect.vue";
 import LeftJoinSvg from "@/components/icons/LeftJoinSvg.vue";
 import LeftJoinTypeSvg from "@/components/icons/LeftJoinTypeSvg.vue";
-import LeftJoinLineSvg from "@/components/icons/LeftJoinLineSvg.vue";
 import RightJoinSvg from "@/components/icons/RightJoinSvg.vue";
 import RightJoinTypeSvg from "@/components/icons/RightJoinTypeSvg.vue";
-import RightJoinLineSvg from "@/components/icons/RightJoinLineSvg.vue";
 import InnerJoinTypeSvg from "@/components/icons/InnerJoinTypeSvg.vue";
 
 export interface StreamOption {
@@ -264,13 +264,8 @@ export default defineComponent({
     OTooltip,
     StreamFieldSelect,
     LeftJoinSvg,
-    LeftJoinTypeSvg,
-    LeftJoinLineSvg,
     RightJoinSvg,
-    RightJoinTypeSvg,
-    RightJoinLineSvg,
     InnerJoinTypeSvg,
-    OIcon,
   },
 
   props: {
@@ -407,13 +402,29 @@ export default defineComponent({
     }
 
     /**
-     * Gets CSS class for join type label
+     * Join-type picker options — icon components are markRaw'd so Vue does not
+     * wrap them in reactivity when rendered via <component :is>.
      */
-    function getJoinTypeLabelClass(type: string): string {
-      return props.modelValue.joinType === type
-        ? "text-primary font-[600]"
-        : "";
-    }
+    const joinTypeOptions = [
+      {
+        type: "left" as const,
+        icon: markRaw(LeftJoinTypeSvg),
+        label: t("dashboard.addJoinPopUp.left"),
+        ariaLabel: t("panel.leftJoin"),
+      },
+      {
+        type: "inner" as const,
+        icon: markRaw(InnerJoinTypeSvg),
+        label: t("dashboard.addJoinPopUp.inner"),
+        ariaLabel: t("panel.innerJoin"),
+      },
+      {
+        type: "right" as const,
+        icon: markRaw(RightJoinTypeSvg),
+        label: t("dashboard.addJoinPopUp.right"),
+        ariaLabel: t("panel.rightJoin"),
+      },
+    ];
 
     /**
      * Gets list of streams available for left field based on join index
@@ -564,7 +575,7 @@ export default defineComponent({
       joinTypeLabel,
       localJoinType,
       rightFieldStreams,
-      getJoinTypeLabelClass,
+      joinTypeOptions,
       getStreamsBasedJoinIndex,
       handleJoinTypeChange,
       handleAddCondition,
