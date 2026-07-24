@@ -353,7 +353,7 @@ const summaryStats = computed<StatItem[]>(() => {
       key: "boolean",
       label: t("onlineEvals.scoreConfig.dataTypes.boolean"),
       value: v(c.boolean),
-      icon: "toggle-on",
+      icon: "toggle-off",
       tone: "teal",
       max: share,
       dataTest: "score-config-summary-boolean",
