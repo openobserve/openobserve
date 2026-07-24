@@ -102,9 +102,7 @@ export function useTableCore<TData>(
   // keeps px-2; when false the actions column is last and gets the 1rem right
   // edge inset. `actionColumnWidth` reads this to budget the right padding.
   const hasTrailingSpacer = computed<boolean>(() => {
-    const base = indexColumn.value
-      ? [indexColumn.value, ...props.columns]
-      : props.columns;
+    const base = indexColumn.value ? [indexColumn.value, ...props.columns] : props.columns;
     const hasAutoWidth = base.some((c) => c.meta?.autoWidth);
     return (
       (props.enableColumnResize ?? false) &&
@@ -115,9 +113,7 @@ export function useTableCore<TData>(
   });
 
   const effectiveColumns = computed<OTableColumnDef<TData>[]>(() => {
-    const base = indexColumn.value
-      ? [indexColumn.value, ...props.columns]
-      : props.columns;
+    const base = indexColumn.value ? [indexColumn.value, ...props.columns] : props.columns;
     // An `autoWidth` column flexes permanently and absorbs leftover on its own,
     // so those tables need no spacer. Every other resizable table gets an
     // invisible trailing spacer: it sits before the pinned actions column and
@@ -191,14 +187,10 @@ export function useTableCore<TData>(
     return raw.map((c: any) => (typeof c === "string" ? c : c.id));
   });
   const rightPinnedIds = computed(() =>
-    effectiveColumns.value
-      .filter((c) => c.pinned === "right" || c.isAction)
-      .map((c) => c.id),
+    effectiveColumns.value.filter((c) => c.pinned === "right" || c.isAction).map((c) => c.id),
   );
   const leftPinnedIds = computed(() => {
-    const explicit = effectiveColumns.value
-      .filter((c) => c.pinned === "left")
-      .map((c) => c.id);
+    const explicit = effectiveColumns.value.filter((c) => c.pinned === "left").map((c) => c.id);
     const pivot = pivotRowColumnIds.value ?? [];
     return [...new Set([...explicit, ...pivot])];
   });
@@ -247,10 +239,10 @@ export function useTableCore<TData>(
         accessorKey: col.accessorKey ?? col.id,
         accessorFn: col.accessorFn as any,
         cell: col.cell
-          ? (() => {
+          ? () => {
               if (typeof col.cell === "string") return col.cell;
               return col.cell;
-            })
+            }
           : undefined,
         size,
         // Resize floor: just enough that the dragged column stays usable (its
@@ -258,7 +250,9 @@ export function useTableCore<TData>(
         // layout guard, since the Excel-style width strategy means a drag only
         // ever changes the dragged column. Columns that need a larger minimum
         // (e.g. the name column) set their own `minSize`. Rigid columns locked.
-        minSize: rigid ? size : (col.minSize ?? (col.size !== undefined && col.size < 48 ? col.size : 48)),
+        minSize: rigid
+          ? size
+          : (col.minSize ?? (col.size !== undefined && col.size < 48 ? col.size : 48)),
         maxSize: rigid ? size : (col.maxSize ?? 800),
         enableSorting: (props.sorting === "client" && col.sortable) ?? false,
         enableColumnFilter: col.filterable ?? false,
@@ -267,7 +261,10 @@ export function useTableCore<TData>(
         // Rigid (actions / #), permanent-elastic (autoWidth), and the invisible
         // spacer are never resizable. `flex` columns ARE resizable — dragging one
         // freezes it (OTable) then resizes it like any other column.
-        enableResizing: (rigid || col.meta?.autoWidth || col.meta?.spacer) ? false : (col.resizable ?? props.enableColumnResize ?? false),
+        enableResizing:
+          rigid || col.meta?.autoWidth || col.meta?.spacer
+            ? false
+            : (col.resizable ?? props.enableColumnResize ?? false),
         enablePinning: col.pinnable ?? props.enableColumnPin ?? false,
         meta: {
           // Action columns (pinned-right icon buttons) center by default — the
@@ -299,9 +296,7 @@ export function useTableCore<TData>(
 
   const isClientSort = computed(() => props.sorting === "client");
   const isClientPagination = computed(() => props.pagination === "client");
-  const isClientFilter = computed(
-    () => (props.filterMode ?? "client") === "client",
-  );
+  const isClientFilter = computed(() => (props.filterMode ?? "client") === "client");
 
   // Built-in aggregation functions for footer totals
   const aggregationFns: Record<string, AggregationFn<TData>> = {
@@ -313,7 +308,10 @@ export function useTableCore<TData>(
     },
     avg: (columnId: string, leafRows: Row<TData>[]) => {
       if (leafRows.length === 0) return 0;
-      return leafRows.reduce((sum, row) => sum + (Number(row.getValue(columnId)) || 0), 0) / leafRows.length;
+      return (
+        leafRows.reduce((sum, row) => sum + (Number(row.getValue(columnId)) || 0), 0) /
+        leafRows.length
+      );
     },
     min: (columnId: string, leafRows: Row<TData>[]) => {
       if (leafRows.length === 0) return undefined;
@@ -336,16 +334,11 @@ export function useTableCore<TData>(
     autoResetPageIndex: !props.keepPageOnDataChange,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: isClientSort.value ? getSortedRowModel() : undefined,
-    getFilteredRowModel: isClientFilter.value
-      ? getFilteredRowModel()
-      : undefined,
-    getPaginationRowModel: isClientPagination.value
-      ? getPaginationRowModel()
-      : undefined,
+    getFilteredRowModel: isClientFilter.value ? getFilteredRowModel() : undefined,
+    getPaginationRowModel: isClientPagination.value ? getPaginationRowModel() : undefined,
     onColumnFiltersChange: (updater) => {
       const old = columnFilters.value;
-      columnFilters.value =
-        typeof updater === "function" ? updater(old) : updater;
+      columnFilters.value = typeof updater === "function" ? updater(old) : updater;
     },
     aggregationFns,
     getSubRows: props.getSubRows as any,
@@ -355,8 +348,7 @@ export function useTableCore<TData>(
     onSortingChange: (updater) => {
       if (props.sorting === "server") return;
       const old = sortingState.value;
-      const next =
-        typeof updater === "function" ? updater(old) : updater;
+      const next = typeof updater === "function" ? updater(old) : updater;
       sortingState.value = next;
     },
     onColumnSizingChange: (updater: any) => {
@@ -366,8 +358,7 @@ export function useTableCore<TData>(
     },
     onColumnPinningChange: (updater: any) => {
       const old = columnPinning.value;
-      const next =
-        typeof updater === "function" ? updater(old) : updater;
+      const next = typeof updater === "function" ? updater(old) : updater;
       columnPinning.value = next;
     },
     defaultColumn: {

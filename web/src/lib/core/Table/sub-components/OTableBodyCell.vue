@@ -42,20 +42,14 @@ const props = defineProps<{
   dense?: boolean;
   bordered?: boolean;
   enableCellCopy?: boolean;
-  getCellStyle?: (params: {
-    columnId: string;
-    row: any;
-    value: any;
-  }) => Record<string, any>;
+  getCellStyle?: (params: { columnId: string; row: any; value: any }) => Record<string, any>;
   /** Pivot row-field cell merge (G17): hide the cell's content / inner border so
    *  a group of equal row-field values reads as one merged cell. */
   pivotMerge?: { hideContent: boolean; hideBorder: boolean } | null;
 }>();
 
 const emit = defineEmits<{
-  "cell-click": [
-    params: { columnId: string; row: any; value: any },
-  ];
+  "cell-click": [params: { columnId: string; row: any; value: any }];
 }>();
 
 const meta = computed(() => props.cell.column.columnDef.meta as any);
@@ -63,9 +57,7 @@ const align = computed(() => meta.value?.align ?? "left");
 
 // Record-name column weight. Only the default-rendered text path uses this;
 // custom cells style their own.
-const defaultTextClass = computed(() => [
-  "text-text-body",
-]);
+const defaultTextClass = computed(() => ["text-text-body"]);
 
 const alignClass = computed(() => {
   if (align.value === "center") return "text-center";
@@ -89,28 +81,22 @@ const slotAlignClass = computed(() => {
 // must wrap (multi-line) — otherwise a slotted logs cell would clip instead of
 // growing the row height. Mirrors the default (non-slot) wrap behaviour.
 const slotContentClass = computed(() =>
-  props.wrap
-    ? "min-w-0 flex-1 break-words whitespace-normal"
-    : "truncate min-w-0 flex-1",
+  props.wrap ? "min-w-0 flex-1 break-words whitespace-normal" : "truncate min-w-0 flex-1",
 );
 
 const isPinned = computed(() => props.cell.column.getIsPinned?.() ?? false);
 
 const pinOffset = computed(() => {
   if (!isPinned.value) return 0;
-  if (isPinned.value === "left")
-    return props.cell.column.getStart?.("left") ?? 0;
-  if (isPinned.value === "right")
-    return props.cell.column.getAfter?.("right") ?? 0;
+  if (isPinned.value === "left") return props.cell.column.getStart?.("left") ?? 0;
+  if (isPinned.value === "right") return props.cell.column.getAfter?.("right") ?? 0;
   return 0;
 });
 
 const rawValue = computed(() => props.cell.getValue());
 
 const displayValue = computed(() => {
-  const formatFn = meta.value?.format as
-    | ((value: any, row: any) => any)
-    | undefined;
+  const formatFn = meta.value?.format as ((value: any, row: any) => any) | undefined;
   // Call `format` even for null/undefined — dashboard format fns turn empty
   // cells into the configured `no_value_replacement` (they'd render blank
   // otherwise). When no format fn is set, pass the raw value through unchanged.
@@ -118,21 +104,14 @@ const displayValue = computed(() => {
   return formatFn(rawValue.value, props.row.original);
 });
 
-const horizontalScroll = inject<{ value: boolean } | null>(
-  "o2TableHorizontalScroll",
-  null,
-);
+const horizontalScroll = inject<{ value: boolean } | null>("o2TableHorizontalScroll", null);
 
 // Pivot: right-pinned total columns (P1-A3) — keep body total cells in step with
 // the sticky header + grand-total footer on horizontal scroll.
-const stickyColTotals = inject<{ value: boolean } | null>(
-  "o2TableStickyColTotals",
-  null,
-);
+const stickyColTotals = inject<{ value: boolean } | null>("o2TableStickyColTotals", null);
 const pivotTotalStyle = computed<Record<string, any>>(() => {
   if (!stickyColTotals?.value || !meta.value?._isTotalColumn) return {};
-  const rightOffset =
-    (meta.value._totalColRightIndex ?? 0) * PIVOT_TABLE_TOTAL_COLUMN_WIDTH;
+  const rightOffset = (meta.value._totalColRightIndex ?? 0) * PIVOT_TABLE_TOTAL_COLUMN_WIDTH;
   return {
     position: "sticky",
     right: `${rightOffset}px`,
@@ -196,9 +175,7 @@ const highlightedHtml = computed(() => {
 // ── Tree mode: inline chevron + indent for the designated tree column ──
 const treeCtx = inject(OTableTreeContextKey, null);
 const isTreeColumn = computed(
-  () =>
-    !!treeCtx?.value?.enabled &&
-    treeCtx.value.treeColumnId === props.cell.column.id,
+  () => !!treeCtx?.value?.enabled && treeCtx.value.treeColumnId === props.cell.column.id,
 );
 const treeMeta = computed(() => {
   if (!isTreeColumn.value) return null;
@@ -212,9 +189,7 @@ const treeIndentPx = computed(() => (treeMeta.value?.depth ?? 0) * 16);
  * For child rows we want the horizontal stub to start at the *parent's*
  * chevron x, which is `depth - 1` indents in.
  */
-const treeChevronX = computed(
-  () => 8 + (treeMeta.value?.depth ?? 0) * 16 + 9,
-);
+const treeChevronX = computed(() => 8 + (treeMeta.value?.depth ?? 0) * 16 + 9);
 const treeParentChevronX = computed(
   () => 8 + Math.max((treeMeta.value?.depth ?? 0) - 1, 0) * 16 + 9,
 );
@@ -241,9 +216,7 @@ function handleClick() {
 // keys the cell.
 const hasCellActions = computed(() => !!slots["cell-hover-actions"]);
 const cellActionsCtx = inject(OTableCellActionsKey, null);
-const isCellActionActive = computed(
-  () => cellActionsCtx?.activeCellKey.value === props.cell.id,
-);
+const isCellActionActive = computed(() => cellActionsCtx?.activeCellKey.value === props.cell.id);
 function onCellActionsEnter() {
   if (hasCellActions.value) cellActionsCtx?.setActiveCell(props.cell.id);
 }
@@ -261,28 +234,34 @@ function onCellActionsLeave() {
       // instead of falling back to a grey inherited value in dark mode. Inner
       // links/badges override this with their own color.
       'text-text-body',
-      meta?.spacer ? 'px-0 align-middle' : (meta?.compactPadding ? 'px-1 align-middle' : 'px-2 align-middle'),
-      (bordered && !pivotMerge?.hideBorder) ? 'border-b border-table-row-divider' : '',
+      meta?.spacer
+        ? 'px-0 align-middle'
+        : meta?.compactPadding
+          ? 'px-1 align-middle'
+          : 'px-2 align-middle',
+      bordered && !pivotMerge?.hideBorder ? 'border-table-row-divider border-b' : '',
       alignClass,
       isAction ? 'w-0 whitespace-nowrap' : '',
-       isPinned
-        ? (rowSelected
-            ? 'bg-table-row-selected-bg group-hover/row:bg-table-row-hover-bg transition-colors duration-150'
-            : 'bg-table-cell-bg group-hover/row:bg-table-row-hover-bg transition-colors duration-150')
+      isPinned
+        ? rowSelected
+          ? 'bg-table-row-selected-bg group-hover/row:bg-table-row-hover-bg transition-colors duration-150'
+          : 'bg-table-cell-bg group-hover/row:bg-table-row-hover-bg transition-colors duration-150'
         : '',
       wrap
         ? 'break-words whitespace-normal'
         : horizontalScroll?.value
           ? 'whitespace-nowrap'
           : isAction
-            ? 'whitespace-nowrap overflow-hidden'
-            : 'whitespace-nowrap overflow-hidden text-ellipsis',
+            ? 'overflow-hidden whitespace-nowrap'
+            : 'overflow-hidden text-ellipsis whitespace-nowrap',
       meta?.cellClass ?? '',
-      (isTreeColumn || hasCellActions) ? 'relative' : '',
+      isTreeColumn || hasCellActions ? 'relative' : '',
       isTreeColumn && treeMeta?.isParent && treeMeta?.isExpanded ? 'o2-tree-parent-expanded' : '',
-      isTreeColumn && treeMeta && (treeMeta.parentId !== null) ? 'o2-tree-child' : '',
+      isTreeColumn && treeMeta && treeMeta.parentId !== null ? 'o2-tree-child' : '',
       isTreeColumn && treeMeta?.isLastChild ? 'o2-tree-last-child' : '',
-      isTreeColumn && treeMeta && (treeMeta.parentId !== null) && !treeMeta.hasChildren ? 'o2-tree-leaf' : '',
+      isTreeColumn && treeMeta && treeMeta.parentId !== null && !treeMeta.hasChildren
+        ? 'o2-tree-leaf'
+        : '',
     ]"
     :style="[
       cellStyle,
@@ -300,33 +279,30 @@ function onCellActionsLeave() {
     <!-- Tree-mode wrapper: indent + chevron + cell content -->
     <div
       v-if="isTreeColumn"
-      class="flex items-center gap-1 min-w-0"
+      class="flex min-w-0 items-center gap-1"
       :style="{ paddingLeft: `${treeIndentPx}px` }"
     >
       <span
         v-if="treeMeta?.hasChildren || (treeMeta && treeMeta.parentId !== null)"
-        class="inline-flex items-center justify-center w-4.5 h-4.5 shrink-0"
+        class="inline-flex h-4.5 w-4.5 shrink-0 items-center justify-center"
       >
         <button
           v-if="treeMeta?.hasChildren"
           type="button"
-          class="inline-flex items-center justify-center w-4.5 h-4.5 p-0 bg-transparent border-0 rounded-default cursor-pointer text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body"
+          class="rounded-default text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body inline-flex h-4.5 w-4.5 cursor-pointer items-center justify-center border-0 bg-transparent p-0"
           :data-test="`o2-table-tree-toggle-${cell.column.id}`"
           :aria-expanded="treeMeta?.isExpanded ? 'true' : 'false'"
           @click="onTreeToggle"
         >
-          <OIcon
-            :name="treeMeta?.isExpanded ? 'expand-more' : 'chevron-right'"
-            size="sm"
-          />
+          <OIcon :name="treeMeta?.isExpanded ? 'expand-more' : 'chevron-right'" size="sm" />
         </button>
         <span
           v-else
-          class="size-1.75 bg-theme-accent opacity-75 rounded-default ring-2 ring-table-cell-bg z-3 relative"
+          class="bg-theme-accent rounded-default ring-table-cell-bg relative z-3 size-1.75 opacity-75 ring-2"
           aria-hidden="true"
         />
       </span>
-      <div class="flex-1 min-w-0">
+      <div class="min-w-0 flex-1">
         <div v-if="$slots.default" :class="slotAlignClass">
           <div v-if="!isAction" :class="slotContentClass"><slot /></div>
           <slot v-else />
@@ -336,11 +312,7 @@ function onCellActionsLeave() {
           :render="cell.column.columnDef.cell"
           :props="cell.getContext()"
         />
-        <span
-          v-else-if="highlightedHtml"
-          :class="defaultTextClass"
-          v-html="highlightedHtml"
-        />
+        <span v-else-if="highlightedHtml" :class="defaultTextClass" v-html="highlightedHtml" />
         <span v-else :class="defaultTextClass">
           {{ displayValue }}
         </span>
@@ -361,11 +333,7 @@ function onCellActionsLeave() {
         :props="cell.getContext()"
       />
       <!-- Highlighted HTML (safe: composable escapes user content before wrapping) -->
-      <span
-        v-else-if="highlightedHtml"
-        :class="defaultTextClass"
-        v-html="highlightedHtml"
-      />
+      <span v-else-if="highlightedHtml" :class="defaultTextClass" v-html="highlightedHtml" />
       <!-- Default: plain text -->
       <span v-else :class="defaultTextClass">
         {{ displayValue }}
@@ -377,7 +345,7 @@ function onCellActionsLeave() {
       v-if="enableCellCopy && !$slots.default"
       type="button"
       :data-test="`o2-table-cell-copy-${cell.column.id}`"
-      class="absolute right-1 opacity-0 group-hover:opacity-100 bg-surface-base border border-border-default rounded-default cursor-pointer p-0.5 text-text-muted hover:text-text-body leading-none transition-opacity"
+      class="bg-surface-base border-border-default rounded-default text-text-muted hover:text-text-body absolute right-1 cursor-pointer border p-0.5 leading-none opacity-0 transition-opacity group-hover:opacity-100"
       :title="copied ? 'Copied!' : 'Copy'"
       @click="handleCopy"
     >

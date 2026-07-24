@@ -194,14 +194,7 @@ const globalStubs = {
   // and its cell slots are scoped `{ row, value, column }` (not `{ item, cell }`).
   OTable: {
     name: "OTable",
-    props: [
-      "data",
-      "columns",
-      "rowHeight",
-      "defaultColumns",
-      "enableColumnReorder",
-      "rowClass",
-    ],
+    props: ["data", "columns", "rowHeight", "defaultColumns", "enableColumnReorder", "rowClass"],
     emits: ["row-click"],
     template: `
       <div>

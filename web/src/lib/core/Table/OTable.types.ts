@@ -39,46 +39,46 @@ export const TABLE_CHECKBOX_COL_SIZE = 44;
 export const TABLE_INDEX_COL_SIZE = 56;
 
 export const COL = {
-  name:         200,
-  firstName:    130,
-  lastName:     130,
-  email:        220,
-  description:  300,
-  status:       100,
-  toggle:        80,
-  date:         200,
+  name: 200,
+  firstName: 130,
+  lastName: 130,
+  email: 220,
+  description: 300,
+  status: 100,
+  toggle: 80,
+  date: 200,
   // Full "YYYY-MM-DD HH:mm:ss" timestamps — predictable, so fix their width.
-  createdAt:    200,
-  updatedAt:    200,
+  createdAt: 200,
+  updatedAt: 200,
   dateAbsolute: 160,
-  duration:     120,
-  frequency:    130,
-  type:         180,
-  streamType:   120,
-  streamName:   180,
-  method:        80,
-  count:         90,
-  sizeBytes:    130,
-  url:          220,
-  template:     180,
-  owner:        220,
-  folder:       150,
-  role:         160,
-  authType:     100,
-  token:        200,
-  cron:         160,
-  price:        110,
+  duration: 120,
+  frequency: 130,
+  type: 180,
+  streamType: 120,
+  streamName: 180,
+  method: 80,
+  count: 90,
+  sizeBytes: 130,
+  url: 220,
+  template: 180,
+  owner: 220,
+  folder: 150,
+  role: 160,
+  authType: 100,
+  token: 200,
+  cron: 160,
+  price: 110,
   defaultModel: 180,
-  version:      100,
+  version: 100,
   // Synthetic monitoring
   responseTime: 90,
-  uptime:       130,
-  locations:    120,
-  interval:     72,
-  steps:        72,
-  assertions:   90,
-  lastCheck:    100,
-  history:      180,
+  uptime: 130,
+  locations: 120,
+  interval: 72,
+  steps: 72,
+  assertions: 90,
+  lastCheck: 100,
+  history: 180,
 } as const;
 
 // ── Column Definition ────────────────────────────────────────────
@@ -352,11 +352,7 @@ export interface OTableProps<TData = any> {
   /** Returns a CSS color for the status bar (4px left border) per row */
   getRowStatusColor?: (row: TData) => string | undefined;
   /** Returns inline styles for individual cells */
-  getCellStyle?: (params: {
-    columnId: string;
-    row: TData;
-    value: any;
-  }) => Record<string, any>;
+  getCellStyle?: (params: { columnId: string; row: TData; value: any }) => Record<string, any>;
   /** Show hover-visible copy button on each cell */
   enableCellCopy?: boolean;
   /** Fixed row height in px (for virtual scroll accuracy) */
@@ -425,10 +421,7 @@ export interface OTableEmits<TData = any> {
   /** A column's close ("x") affordance was clicked (G4). Payload is the column
    *  definition; the consumer decides how to remove/hide it. */
   "close-column": [column: OTableColumnDef<TData>];
-  "update:columnSizes": [
-    sizes: Record<string, number>,
-    idMap: Record<string, string>,
-  ];
+  "update:columnSizes": [sizes: Record<string, number>, idMap: Record<string, string>];
 
   // Row reorder
   "row-reorder": [data: TData[]];
@@ -473,18 +466,8 @@ export interface OTableSlots<TData = any> {
    * shape above so that reserved key stays assignable to this index signature.
    */
   [key: `cell-${string}`]:
-    | ((props: {
-        row: TData;
-        column: OTableColumnDef<TData>;
-        value: any;
-        index: number;
-      }) => any)
-    | ((props: {
-        row: TData;
-        column: OTableColumnDef<TData>;
-        value: any;
-        active: boolean;
-      }) => any)
+    | ((props: { row: TData; column: OTableColumnDef<TData>; value: any; index: number }) => any)
+    | ((props: { row: TData; column: OTableColumnDef<TData>; value: any; active: boolean }) => any)
     | undefined;
   /** Custom header content */
   "header-actions"?: () => any;

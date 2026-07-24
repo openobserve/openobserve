@@ -348,11 +348,7 @@ describe("TableRenderer", () => {
     // `({ columnId, row, value }) => Record<string, any>` (a style OBJECT, not a
     // raw-CSS string), and the column config is looked up by id (col.name) from
     // data.columns — so tests configure the column and call with the new params.
-    const styleFor = (
-      colConfig: any,
-      value: any,
-      valueMapping?: any[],
-    ): Record<string, any> => {
+    const styleFor = (colConfig: any, value: any, valueMapping?: any[]): Record<string, any> => {
       wrapper = createWrapper({
         data: { columns: [{ name: "x", field: "x", ...colConfig }], rows: [] },
         ...(valueMapping ? { valueMapping } : {}),
@@ -648,9 +644,7 @@ describe("TableRenderer", () => {
       const table = wrapper.findComponent({ name: "OTable" }).vm.table;
       expect(table.getRowModel().rows.length).toBe(5);
 
-      wrapper
-        .findComponent({ name: "TablePaginationControls" })
-        .vm.$emit("update:rowsPerPage", 10);
+      wrapper.findComponent({ name: "TablePaginationControls" }).vm.$emit("update:rowsPerPage", 10);
       await flushPromises();
 
       expect(table.getRowModel().rows.length).toBe(10);

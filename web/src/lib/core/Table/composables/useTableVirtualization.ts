@@ -65,44 +65,43 @@ export function useTableVirtualization(options: VirtualizationOptions) {
     // it: when a ref/getter scrollEl (or the parentRef template ref) flips from
     // null → the real element after mount, the options recompute and the
     // virtualizer rebinds its scroll listener to the correct element (G10).
-    const resolvedScrollEl =
-      (toValue(scrollEl) as HTMLElement | null) ?? parentRef.value;
+    const resolvedScrollEl = (toValue(scrollEl) as HTMLElement | null) ?? parentRef.value;
     return {
-    count: rows.value.length,
-    getScrollElement: () => resolvedScrollEl,
-    scrollMargin,
-    estimateSize: (index: number) => {
-      const row = rows.value[index];
-      // Check for expanded rows (metadata flag)
-      if ((row?.original as any)?.isExpandedRow) {
-        return expandedRowHeights?.value?.[index] ?? 300;
-      }
-      // In variable-height mode `rowHeight` is only the initial estimate; the
-      // real height is supplied by measureElement once the row renders.
-      return rowHeight;
-    },
-    overscan,
-    // Called by the virtualizer when a row invokes `measureRowElement` (below).
-    // It reads the element's `data-index` and returns the measured DOM height for
-    // expanded rows AND — in variable-height mode — every data row. Fixed-height
-    // rows never call it (they keep `estimateSize`), so this stays cheap there.
-    measureElement:
-      typeof window !== "undefined"
-        ? (element: any) => {
-            const idx = Number(element?.getAttribute?.("data-index"));
-            const row = Number.isFinite(idx) ? rows.value[idx] : undefined;
-            const isExpandedRow = (row?.original as any)?.isExpandedRow;
-            const dyn = !!toValue(dynamicRowHeight);
-            if (isExpandedRow || dyn) {
-              const height = element.getBoundingClientRect().height;
-              if (isExpandedRow && expandedRowHeights?.value) {
-                expandedRowHeights.value[idx] = height;
+      count: rows.value.length,
+      getScrollElement: () => resolvedScrollEl,
+      scrollMargin,
+      estimateSize: (index: number) => {
+        const row = rows.value[index];
+        // Check for expanded rows (metadata flag)
+        if ((row?.original as any)?.isExpandedRow) {
+          return expandedRowHeights?.value?.[index] ?? 300;
+        }
+        // In variable-height mode `rowHeight` is only the initial estimate; the
+        // real height is supplied by measureElement once the row renders.
+        return rowHeight;
+      },
+      overscan,
+      // Called by the virtualizer when a row invokes `measureRowElement` (below).
+      // It reads the element's `data-index` and returns the measured DOM height for
+      // expanded rows AND — in variable-height mode — every data row. Fixed-height
+      // rows never call it (they keep `estimateSize`), so this stays cheap there.
+      measureElement:
+        typeof window !== "undefined"
+          ? (element: any) => {
+              const idx = Number(element?.getAttribute?.("data-index"));
+              const row = Number.isFinite(idx) ? rows.value[idx] : undefined;
+              const isExpandedRow = (row?.original as any)?.isExpandedRow;
+              const dyn = !!toValue(dynamicRowHeight);
+              if (isExpandedRow || dyn) {
+                const height = element.getBoundingClientRect().height;
+                if (isExpandedRow && expandedRowHeights?.value) {
+                  expandedRowHeights.value[idx] = height;
+                }
+                return height;
               }
-              return height;
+              return rowHeight;
             }
-            return rowHeight;
-          }
-        : undefined,
+          : undefined,
     };
   });
 
