@@ -20,12 +20,10 @@ enterprise = [
     "dep:o2_openfga",
     "common/enterprise",
     "config/enterprise",
-    "tantivy_utils/enterprise",
     "promql/enterprise",
     "promql-service/enterprise",
     "search/enterprise",
     "search_service/enterprise",
-    "compaction/enterprise",
     "stream/enterprise",
     "enrichment-data/enterprise",
     "usage_reporting/enterprise",
@@ -60,7 +58,6 @@ search.workspace = true
 search_service.workspace = true
 ingestion-common.workspace = true
 schema.workspace = true
-compaction.workspace = true
 stream.workspace = true
 enrichment-data.workspace = true
 usage_reporting.workspace = true
@@ -132,8 +129,6 @@ ingester.workspace = true
 wal.workspace = true
 chromiumoxide.workspace = true
 lettre.workspace = true
-tantivy.workspace = true
-tantivy_utils.workspace = true
 zip.workspace = true
 futures-util.workspace = true
 sourcemap.workspace = true
