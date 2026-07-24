@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div>
         <OSpinner size="md" class="mx-auto block" />
-        <div class="text-center w-full">Loading Dashboard</div>
+        <div class="text-center w-full">{{ t('rum.loadingDashboard') }}</div>
       </div>
     </div>
   </div>

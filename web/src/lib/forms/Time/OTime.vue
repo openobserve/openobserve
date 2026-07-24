@@ -4,7 +4,10 @@
 import type { TimeProps, TimeEmits, TimeSlots } from "./OTime.types";
 import { computed, ref, useAttrs, useId, watch } from "vue";
 import { PopoverRoot, PopoverTrigger, PopoverContent } from "reka-ui";
+import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+
+const { t } = useI18n();
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -271,7 +274,7 @@ const fieldClasses = computed(() => [
           tabindex="-1"
           class="flex items-center ps-3 text-datepicker-icon shrink-0 select-none outline-none cursor-pointer focus-visible:opacity-80"
           :disabled="disabled || undefined"
-          aria-label="Open time picker"
+          :aria-label="t('components.time.openTimePicker')"
         >
           <OIcon name="schedule" size="sm" />
         </PopoverTrigger>
@@ -296,7 +299,7 @@ const fieldClasses = computed(() => [
           v-if="clearable && modelValue"
           type="button"
           tabindex="-1"
-          aria-label="Clear"
+          :aria-label="t('components.time.clear')"
           class="flex items-center pe-2 text-datepicker-icon hover:opacity-80 transition-colors"
           @click="handleClear"
         >
@@ -376,9 +379,9 @@ const fieldClasses = computed(() => [
                   ? 'bg-datepicker-day-selected-bg text-datepicker-day-selected-text'
                   : 'text-datepicker-weekday-text hover:bg-datepicker-clock-hover-bg',
               ]"
-              aria-label="AM"
+              :aria-label="t('components.time.am')"
               @click="setAM"
-            >AM</button>
+            >{{ t('components.time.am') }}</button>
             <div class="w-px bg-datepicker-border shrink-0" aria-hidden="true" />
             <button
               type="button"
@@ -388,9 +391,9 @@ const fieldClasses = computed(() => [
                   ? 'bg-datepicker-day-selected-bg text-datepicker-day-selected-text'
                   : 'text-datepicker-weekday-text hover:bg-datepicker-clock-hover-bg',
               ]"
-              aria-label="PM"
+              :aria-label="t('components.time.pm')"
               @click="setPM"
-            >PM</button>
+            >{{ t('components.time.pm') }}</button>
           </div>
         </div>
 
@@ -458,7 +461,7 @@ const fieldClasses = computed(() => [
 
         <!-- Footer: step dots + Close -->
         <div class="flex items-center justify-between px-4 pb-3">
-          <div class="flex items-center gap-1.5" role="group" aria-label="Step">
+          <div class="flex items-center gap-1.5" role="group" :aria-label="t('components.time.step')">
             <button
               type="button"
               :class="[
@@ -467,7 +470,7 @@ const fieldClasses = computed(() => [
                   ? 'w-4 h-2 bg-datepicker-day-selected-bg'
                   : 'size-2 bg-datepicker-border hover:bg-datepicker-weekday-text',
               ]"
-              aria-label="Hour"
+              :aria-label="t('components.time.hour')"
               @click="clockMode = 'hour'"
             />
             <button
@@ -478,7 +481,7 @@ const fieldClasses = computed(() => [
                   ? 'w-4 h-2 bg-datepicker-day-selected-bg'
                   : 'size-2 bg-datepicker-border hover:bg-datepicker-weekday-text',
               ]"
-              aria-label="Minute"
+              :aria-label="t('components.time.minute')"
               @click="clockMode = 'minute'"
             />
             <button
@@ -490,7 +493,7 @@ const fieldClasses = computed(() => [
                   ? 'w-4 h-2 bg-datepicker-day-selected-bg'
                   : 'size-2 bg-datepicker-border hover:bg-datepicker-weekday-text',
               ]"
-              aria-label="Second"
+              :aria-label="t('components.time.second')"
               @click="clockMode = 'second'"
             />
           </div>
@@ -499,7 +502,7 @@ const fieldClasses = computed(() => [
             class="text-xs font-medium text-datepicker-day-selected-bg outline-none ring-offset-1 ring-offset-surface-base hover:opacity-80 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring transition-[box-shadow] duration-150"
             data-test="otime-close"
             @click="popoverOpen = false"
-          >Close</button>
+          >{{ t('common.close') }}</button>
         </div>
       </PopoverContent>
     </PopoverRoot>

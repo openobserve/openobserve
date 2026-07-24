@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <section
     class="grid grid-cols-2 lg:grid-cols-5 gap-2 p-2"
     data-test="rum-sessions-metrics-strip"
-    aria-label="Session metrics summary"
+    :aria-label="t('rum.sessionMetricsAria')"
   >
     <button
       v-for="card in cards"

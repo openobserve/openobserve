@@ -15,7 +15,7 @@
     >
       <!-- Show streaming status with spinner + stop button -->
       <template v-if="isGenerating">
-        <img :src="nlpIcon" alt="AI" class="w-5 h-5 shrink-0" />
+        <img :src="nlpIcon" :alt="t('search.aiIconAlt')" class="w-5 h-5 shrink-0" />
         <OSpinner variant="dots" size="xs" />
         <span class="text-sm flex-1 truncate">{{ streamingText || aiStatusText || t('search.analyzingQuery') }}</span>
         <OButton
@@ -39,7 +39,7 @@
           @keydown.enter="handleAIInputEnter"
         >
           <template #icon-left>
-            <img :src="nlpIcon" alt="AI" class="w-5 h-5" />
+            <img :src="nlpIcon" :alt="t('search.aiIconAlt')" class="w-5 h-5" />
           </template>
         </OInput>
         <!-- Send Button -->
@@ -105,7 +105,7 @@
         class="group absolute! top-0.75 z-100 bg-[image:var(--color-gradient-ai-subtle)]! text-text-inverse! [transition:background_0.3s_ease,box-shadow_0.3s_ease]! w-7.5! h-7.5! min-w-7.5! min-h-7.5! rounded-default hover:bg-[image:var(--color-gradient-ai)]! hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)]!"
         :style="props.hasExpandButton ? { right: '2.375rem' } : { right: '0.25rem' }"
       >
-        <img :src="nlpIcon" alt="AI Mode" class="w-4.5 h-4.5 transition-transform duration-[600ms] ease-[ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert" />
+        <img :src="nlpIcon" :alt="t('search.aiModeIconAlt')" class="w-4.5 h-4.5 transition-transform duration-[600ms] ease-[ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert" />
         <OTooltip :content="props.disableAi && props.disableAiReason ? props.disableAiReason : t('nlMode.toggle')" />
       </OButton>
     </div>

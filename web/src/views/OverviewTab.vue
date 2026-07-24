@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag type="countChip" value="warning">{{ incidentsTotal }}</OTag>
           <span v-if="incidentsTotal > incidents.length" class="ml-2 text-xs font-normal text-text-secondary align-middle">{{ t('overview.showingOf', { shown: incidents.length, total: incidentsTotal }) }}</span>
         </div>
-        <button class="text-xs font-medium text-primary-600 bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToIncidentList">{{ t('overview.viewAll') }} →</button>
+        <button class="text-xs font-medium text-primary-600 bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToIncidentList">{{ t('overview.viewAll') }} {{ t('overview.viewAllArrow') }}</button>
       </div>
       <div class="flex flex-col border border-[0.0625em] border-border-default rounded-default overflow-hidden">
         <div
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex items-center shrink-0 gap-[0.3rem] whitespace-nowrap w-48">
             <span class="text-xs text-text-secondary min-w-[4.5rem]">{{ relativeTime_(inc.first_alert_at) }}</span>
             <span class="text-xs text-text-secondary">·</span>
-            <span class="text-xs font-normal text-text-secondary">{{ inc.alert_count }} alerts</span>
+            <span class="text-xs font-normal text-text-secondary">{{ inc.alert_count }} {{ t('overview.alertsSuffix') }}</span>
           </div>
           <span class="invisible group-hover:visible shrink-0 whitespace-nowrap">
             <OButton
@@ -110,10 +110,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t('overview.services') }}
           <OTag type="countChip" value="warning">{{ services.length }}</OTag>
           <span v-if="servicePanelVisible && selectedService" class="text-xs font-normal text-text-secondary ml-1">
-            — viewing <strong class="font-semibold text-text-body">{{ selectedService.label ?? selectedService.id }}</strong>
+            {{ t('overview.viewingLabel') }} <strong class="font-semibold text-text-body">{{ selectedService.label ?? selectedService.id }}</strong>
           </span>
         </div>
-        <button class="text-xs font-medium text-primary-600 bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToServiceGraph">{{ t('overview.viewAll') }} →</button>
+        <button class="text-xs font-medium text-primary-600 bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToServiceGraph">{{ t('overview.viewAll') }} {{ t('overview.viewAllArrow') }}</button>
       </div>
       <div class="relative">
         <!-- Left fade + floating scroll control (only present when scrollable) -->
@@ -232,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t('overview.activeAnomalies') }}
           <OTag type="countChip" value="warning">{{ anomalies.length }}</OTag>
         </div>
-        <button class="text-xs font-medium text-primary-600 bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToAnomalies">{{ t('overview.viewAll') }} →</button>
+        <button class="text-xs font-medium text-primary-600 bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToAnomalies">{{ t('overview.viewAll') }} {{ t('overview.viewAllArrow') }}</button>
       </div>
       <div class="flex flex-col gap-1.5">
         <div
@@ -278,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t('overview.recentEvents') }}
           <OTag type="countChip" value="warning">{{ recentEvents.length }}</OTag>
         </div>
-        <button class="text-xs font-medium text-primary-600 bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToAlertList">{{ t('overview.viewAll') }} →</button>
+        <button class="text-xs font-medium text-primary-600 bg-none border-none p-0 cursor-pointer whitespace-nowrap transition-opacity duration-150 opacity-80 hover:opacity-100 hover:underline" @click="goToAlertList">{{ t('overview.viewAll') }} {{ t('overview.viewAllArrow') }}</button>
       </div>
       <div class="flex flex-col gap-0 border border-[0.0625em] border-border-default rounded-default overflow-hidden bg-surface-base">
         <div
@@ -295,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             value="error"
             class="shrink-0"
             :title="`Failed ${ev.failCount} times in this window`"
-          >×{{ ev.failCount }}</OTag>
+          >{{ t('overview.timesSymbol') }}{{ ev.failCount }}</OTag>
           <span class="shrink-0 text-text-secondary text-xs whitespace-nowrap">{{ ev.timeAgo }}</span>
         </div>
       </div>

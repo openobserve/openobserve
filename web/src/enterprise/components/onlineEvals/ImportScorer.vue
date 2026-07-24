@@ -54,7 +54,7 @@ the Free Software Foundation, either version 3 of the License, or
                     <OInput
                       :data-test="`scorer-import-name-input-${err.itemIndex}`"
                       v-model="nameFixers[err.itemIndex]"
-                      label="Name *"
+                      :label="t('onlineEvals.importNameRequired')"
                       @update:model-value="updateName(err.itemIndex, $event)"
                     />
                   </div>
@@ -70,7 +70,7 @@ the Free Software Foundation, either version 3 of the License, or
                     <OInput
                       :data-test="`scorer-import-rename-input-${err.itemIndex}`"
                       v-model="nameFixers[err.itemIndex]"
-                      label="New Name *"
+                      :label="t('onlineEvals.importNewNameRequired')"
                       @update:model-value="updateName(err.itemIndex, $event)"
                     />
                   </div>
@@ -87,7 +87,7 @@ the Free Software Foundation, either version 3 of the License, or
                       :data-test="`scorer-import-type-select-${err.itemIndex}`"
                       v-model="typeFixers[err.itemIndex]"
                       :options="typeOptions"
-                      label="Type *"
+                      :label="t('onlineEvals.importTypeRequired')"
                       @update:model-value="updateType(err.itemIndex, $event)"
                     />
                   </div>
@@ -104,7 +104,7 @@ the Free Software Foundation, either version 3 of the License, or
                       :data-test="`scorer-import-score-config-select-${err.itemIndex}`"
                       v-model="scoreConfigFixers[err.itemIndex]"
                       :options="scoreConfigOptions"
-                      label="Score Config *"
+                      :label="t('onlineEvals.importScoreConfigRequired')"
                       @update:model-value="updateScoreConfigRef(err.itemIndex, $event)"
                     />
                   </div>
@@ -121,7 +121,7 @@ the Free Software Foundation, either version 3 of the License, or
                       :data-test="`scorer-import-provider-select-${err.itemIndex}`"
                       v-model="providerFixers[err.itemIndex]"
                       :options="providerOptions"
-                      label="Provider *"
+                      :label="t('onlineEvals.importProviderRequired')"
                       @update:model-value="updateProviderRef(err.itemIndex, $event)"
                     />
                   </div>

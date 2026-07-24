@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <p class="flex-1 min-w-0 m-0 text-sm truncate">
       <strong class="font-semibold">{{ getTrialPeriodMessage() }}</strong>
       <span class="mx-1 opacity-60">·</span>
-      <span>Upgrade to a plan to continue enjoying the services by OpenObserve.</span>
+      <span>{{ t("billing.upgradeToPlanMessage") }}</span>
     </p>
 
     <!-- CTA button -->

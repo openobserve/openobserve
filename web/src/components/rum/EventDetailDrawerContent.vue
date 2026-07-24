@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ rawEvent.service || "Unknown User" }}
               </div>
               <div class="text-xs flex items-center">
-                V {{ rawEvent.version || "Unknown User" }}
+                {{ t('common.versionAbbreviation') }} {{ rawEvent.version || "Unknown User" }}
               </div>
               <div class="text-xs flex items-center">
                 <OIcon name="mail" size="sm" class="pr-1" />
@@ -100,17 +100,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTab
             data-test="event-detail-overview-tab"
             name="overview"
-            label="Overview"
+            :label="t('common.overview')"
           />
           <OTab
             data-test="event-detail-network-tab"
             name="network"
-            label="Network"
+            :label="t('common.network')"
           />
           <OTab
             data-test="event-detail-attributes-tab"
             name="attributes"
-            label="Attributes"
+            :label="t('common.attributes')"
           />
         </OTabs>
       </div>
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="mb-3"
             data-test="error-details"
           >
-            <div class="font-bold mb-1 text-sm">Error Details</div>
+            <div class="font-bold mb-1 text-sm">{{ t('common.errorDetails') }}</div>
             <div>
               <div
                 v-if="rawEvent?.error_type"
@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="w-25 font-medium text-text-secondary shrink-0"
                 >
-                  Error Type:
+                  {{ t('common.errorTypeLabel') }}
                 </div>
                 <div class="flex-1 break-words">
                   {{ rawEvent.error_type }}
@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="w-25 font-medium text-text-secondary shrink-0"
                 >
-                  Message:
+                  {{ t('common.messageLabel') }}
                 </div>
                 <div class="flex-1 break-words">
                   {{ rawEvent.error_message }}
@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="w-25 font-medium text-text-secondary shrink-0"
                 >
-                  Handling:
+                  {{ t('common.handlingLabel') }}
                 </div>
                 <div class="flex-1 break-words">
                   <span
@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="w-25 font-medium text-text-secondary shrink-0"
                 >
-                  Error ID:
+                  {{ t('common.errorIdLabel') }}
                 </div>
                 <div class="flex-1 break-words">
                   <code
@@ -210,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="mb-3"
             data-test="view-details"
           >
-            <div class="font-bold mb-1 text-sm">View Details</div>
+            <div class="font-bold mb-1 text-sm">{{ t('common.viewDetails') }}</div>
             <div>
               <div
                 v-if="rawEvent?.view_loading_type"
@@ -219,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="w-25 font-medium text-text-secondary shrink-0"
                 >
-                  Loading Type:
+                  {{ t('common.loadingTypeLabel') }}
                 </div>
                 <div class="flex-1 capitalize break-words">
                   {{ rawEvent.view_loading_type.replace("_", " ") }}
@@ -232,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="w-25 font-medium text-text-secondary shrink-0"
                 >
-                  URL:
+                  {{ t('common.urlLabel') }}
                 </div>
                 <div
                   class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
@@ -248,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="w-25 font-medium text-text-secondary shrink-0"
                 >
-                  View ID:
+                  {{ t('common.viewIdLabel') }}
                 </div>
                 <div class="flex-1 break-words">
                   <code
@@ -264,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Action Details -->
           <EventDetailsSection
             v-if="event.type === 'action'"
-            title="Action Details"
+            :title="t('common.actionDetails')"
             :fields="actionFields"
             data-test="action-details"
             class="mb-3"
@@ -276,13 +276,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="mt-2 p-2 text-center">
                 <OSpinner size="xs" />
                 <div class="mt-1 text-text-secondary text-xs">
-                  Loading related events...
+                  {{ t('common.loadingRelatedEvents') }}
                 </div>
               </div>
             </template>
             <template v-else-if="relatedResources.length > 0">
               <div class="font-bold mb-1 text-sm">
-                Related Events ({{ relatedResources.length }})
+                {{ t('common.relatedEvents') }} ({{ relatedResources.length }})
               </div>
               <div>
                 <div
@@ -338,7 +338,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span
                         class="overflow-hidden text-ellipsis whitespace-nowrap text-xs"
                       >
-                        {{ item.action_type }} on {{ item.action_target_name }}
+                        {{ item.action_type }} {{ t('common.on') }} {{ item.action_target_name }}
                       </span>
                     </template>
 
@@ -347,7 +347,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span
                         class="overflow-hidden text-ellipsis whitespace-nowrap text-xs"
                       >
-                        {{ item.type }} event
+                        {{ item.type }} {{ t('common.event') }}
                       </span>
                     </template>
                   </div>
@@ -382,13 +382,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="item._oo_trace_id"
                       variant="outline"
                       size="xs"
-                      title="View trace details"
+                      :title="t('common.viewTraceDetails')"
                       data-test="view-trace-btn"
                       class="ml-2 h-5! px-1.5"
                       @click.stop="navigateToSpecificTrace(item._oo_trace_id)"
                     >
                       <OIcon name="account-tree" size="xs" />
-                      <span v-if="item._oo_trace_id">View Trace</span>
+                      <span v-if="item._oo_trace_id">{{ t('common.viewTrace') }}</span>
                     </OButton>
                   </div>
                 </div>
@@ -402,7 +402,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTabPanel name="network" padding="sm" data-test="network-tab">
         <template v-if="networkResources.length > 0">
           <div class="font-bold mb-2 text-sm">
-            Network Requests ({{ networkResources.length }})
+            {{ t('common.networkRequests') }} ({{ networkResources.length }})
           </div>
           <div>
             <div
@@ -449,14 +449,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-center py-8 text-text-muted text-sm"
           data-test="network-empty-state"
         >
-          No network requests found for this event
+          {{ t('common.noNetworkRequestsFound') }}
         </div>
       </OTabPanel>
 
       <!-- Console Tab -->
       <OTabPanel name="console" padding="sm" data-test="console-tab">
         <div class="text-center py-8 text-text-muted text-sm">
-          Console logs coming soon
+          {{ t('common.consoleLogsComingSoon') }}
         </div>
       </OTabPanel>
 
@@ -467,7 +467,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="performance-tab"
       >
         <div class="text-center py-8 text-text-muted text-sm">
-          Performance metrics coming soon
+          {{ t('common.performanceMetricsComingSoon') }}
         </div>
       </OTabPanel>
 

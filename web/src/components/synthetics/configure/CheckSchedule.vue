@@ -233,7 +233,7 @@ const startTime = computed({
         <OInput
           v-model="cron"
           :label="t('synthetics.scheduleAlert.cronExpression')"
-          placeholder="*/5 * * * *"
+          :placeholder="t('synthetics.scheduleAlert.cronPlaceholder')"
           class="w-83!"
           data-test="synthetics-check-schedule-cron-input"
         />

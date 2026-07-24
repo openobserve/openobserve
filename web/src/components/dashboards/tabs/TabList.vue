@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="dashboard-tab-add-btn"
       icon-left="add"
     >
-      <OTooltip content="Add Tab" />
+      <OTooltip :content="t('dashboard.newTab')" />
     </OButton>
     <AddTab
       v-model:open="showAddTabDialog"
@@ -78,6 +78,7 @@ import { computed, inject, ref } from "vue";
 import { defineComponent } from "vue";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
 import { useRoute } from "vue-router";
+import { useI18n } from "vue-i18n";
 
 export default defineComponent({
   name: "TabList",
@@ -100,6 +101,7 @@ export default defineComponent({
   },
   emits: ["refresh"],
   setup(props, { emit }) {
+    const { t } = useI18n();
     const route = useRoute();
     const showAddTabDialog = ref(false);
     const isHovered = ref(false);
@@ -117,6 +119,7 @@ export default defineComponent({
     };
 
     return {
+      t,
       showAddTabDialog,
       refreshDashboard,
       tabs,

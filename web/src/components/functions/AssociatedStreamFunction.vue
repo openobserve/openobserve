@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OInnerLoading
             :showing="loadingFunctions"
-            label="Fetching functions..."
+            :label="t('logStream.fetchingFunctions')"
             size="sm"
           />
         </div>
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="ml-3 mb-1"
                   @click="addFunctionInProgress = true"
                 >
-                  Associate Function
+                  {{ t('logStream.associateFunction') }}
                 </OButton>
               </div>
             </template>
@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="!addFunctionInProgress"
                 class="w-full text-center"
               >
-                No functions found
+                {{ t('logStream.noFunctionsFound') }}
               </div>
             </template>
           </OTable>

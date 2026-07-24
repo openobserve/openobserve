@@ -27,13 +27,13 @@ const logoSrc = computed(() =>
     <div class="welcome-hero__row flex items-center gap-3.5">
       <div class="welcome-hero__logo-wrap relative inline-flex">
         <span class="welcome-hero__logo-halo absolute inset-[-18px] rounded-full bg-[radial-gradient(closest-side,rgba(123,97,255,0.35),rgba(245,158,11,0.12)_55%,transparent_70%)] blur-[14px] pointer-events-none z-0" aria-hidden="true"></span>
-        <img :src="logoSrc" alt="O2 Assistant" class="welcome-hero__logo relative z-1 w-14 h-14" />
+        <img :src="logoSrc" :alt="t('aiAssistant.welcome.taglineHighlight')" class="welcome-hero__logo relative z-1 w-14 h-14" />
       </div>
 
       <div class="welcome-hero__heading-block flex items-center">
         <div class="welcome-hero__title m-0 text-3xl font-bold tracking-[-0.01em] leading-[1.15] text-typography-body flex items-center gap-2">
           {{ greeting }}
-          <span class="welcome-hero__wave text-2xl leading-none inline-block [transform-origin:70%_70%]" aria-hidden="true">👋</span>
+          <span class="welcome-hero__wave text-2xl leading-none inline-block [transform-origin:70%_70%]" aria-hidden="true">{{ t("aiAssistant.welcome.wave") }}</span>
         </div>
       </div>
     </div>
@@ -50,11 +50,11 @@ const logoSrc = computed(() =>
       <span class="welcome-hero__code welcome-hero__code--vrl font-mono text-xs font-semibold py-px px-1.5 rounded-default tracking-[0.01em] text-lang-vrl-text bg-lang-vrl-bg">{{
         t("aiAssistant.welcome.taglineVrl")
       }}</span>
-      and
+      {{ t('common.and') }}
       <span class="welcome-hero__code welcome-hero__code--promql font-mono text-xs font-semibold py-px px-1.5 rounded-default tracking-[0.01em] text-lang-promql-text bg-lang-promql-bg">{{
         t("aiAssistant.welcome.taglinePromql")
       }}</span>
-      — {{ t("aiAssistant.welcome.taglineAnd") }}
+      {{ t("aiAssistant.welcome.taglineDash") }} {{ t("aiAssistant.welcome.taglineAnd") }}
     </div>
 
     <div v-if="email" class="welcome-hero__meta inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 mt-1.5 py-1.5 px-3 rounded-full bg-[color-mix(in_srgb,var(--color-border-default)_30%,transparent)] text-2xs">

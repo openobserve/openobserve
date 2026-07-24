@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="containerRef"
       class="flex items-center gap-3  py-2 flex-1 min-w-0"
     >
-      <span class="text-2! m-0 text-typography-meta shrink-0">Correlated by:</span>
+      <span class="text-2! m-0 text-typography-meta shrink-0">{{ t('correlation.correlatedBy') }}</span>
       <div class="flex items-center gap-2 min-w-0 overflow-hidden">
         <ODimensionChip
           v-for="chip in displayedChips"
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="cursor-default"
             :data-test="`correlation-event-header-overflow-${hiddenChipCount}`"
           >
-            <template v-if="hiddenChipCount !== contextChips.length">+</template>{{ hiddenChipCount }}<template v-if="hiddenChipCount === contextChips.length"> Fields</template>
+            <template v-if="hiddenChipCount !== contextChips.length">+</template>{{ hiddenChipCount }}<template v-if="hiddenChipCount === contextChips.length"> {{ t('correlation.fieldsLabel') }}</template>
           </OTag>
           <OTooltip side="top" :disabled="hiddenChipCount === 0">
             <template #content>
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex items-center gap-3 shrink-0"
     >
       <OSeparator vertical class="my-2" />
-      <span class="text-2! m-0 text-typography-meta">View by:</span>
+      <span class="text-2! m-0 text-typography-meta">{{ t('correlation.viewBy') }}</span>
       <OToggleGroup
         :model-value="activeSubject ?? undefined"
         type="single"
@@ -164,6 +164,9 @@ import {
   convertTimeFromMicroToMilli,
   timestampToTimezoneDate,
 } from "@/utils/zincutils";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 type ChipKind = "context" | "subject";
 

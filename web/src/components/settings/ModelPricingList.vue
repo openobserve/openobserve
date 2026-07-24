@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <img
                 :src="ooLogo"
                 class="w-4 h-4"
-                alt="OpenObserve"
+                :alt="t('modelPricing.openObserveLogoAlt')"
               />
               <OTooltip side="top" align="center" :content="t('modelPricing.sourceBuiltIn')" />
             </span>
@@ -394,7 +394,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <img
               :src="ooLogo"
               class="w-4.5 h-4.5"
-              alt="OpenObserve"
+              :alt="t('modelPricing.openObserveLogoAlt')"
             />
             <OTooltip side="top" align="center" :content="t('modelPricing.sourceBuiltIn')" />
           </span>

@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #expansion="{ row }">
             <div class="p-3 bg-surface-base border-t border-(--color-border-default,var(--color-border-default))">
               <div class="text-sm font-medium mb-2">
-                Source Map Files ({{ row.files.length }})
+                {{ t('rum.sourceMapFilesCount', { count: row.files.length }) }}
               </div>
               <ul
                 class="flex flex-col divide-y divide-border border rounded-default overflow-y-auto"
@@ -131,11 +131,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="flex items-center gap-2 px-3 py-2"
                 >
                   <div class="flex flex-col flex-1 min-w-0">
-                    <span class="block text-xs text-muted-foreground">Source File</span>
+                    <span class="block text-xs text-muted-foreground">{{ t('rum.sourceFile') }}</span>
                     <span class="font-mono break-all text-sm">{{ file.source_file_name }}</span>
                   </div>
                   <div class="flex flex-col flex-1 min-w-0">
-                    <span class="block text-xs text-muted-foreground">Source Map File</span>
+                    <span class="block text-xs text-muted-foreground">{{ t('rum.sourceMapFile') }}</span>
                     <span class="font-mono break-all text-sm">{{ file.source_map_file_name }}</span>
                   </div>
                 </li>

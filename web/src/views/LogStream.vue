@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 class="flex items-center w-full text-xs font-normal"
               >
-                {{ scope.totalRows }} Stream(s)
+                {{ scope.totalRows }} {{ t('logStream.streamsUnit') }}
                 <OButton
                   v-if="selectedIds.length > 0"
                   icon-left="delete"
@@ -285,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="deleteAssociatedAlertsPipelines"
           />
           <span class="text-text-secondary text-xs font-medium">
-            Delete all Pipelines and Alerts associated with the selected streams
+            {{ t('logStream.deleteAssociatedAlertsPipelinesBatch') }}
           </span>
         </div>
       </div>

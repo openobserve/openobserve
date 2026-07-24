@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex flex-col justify-between">
                 <!-- Title row -->
                 <div class="flex justify-between items-center">
-                  <div class="text-(length:--text-sm) font-semibold leading-(--leading-base) tracking-normal text-text-heading text-left"> Action Scripts</div>
+                  <div class="text-(length:--text-sm) font-semibold leading-(--leading-base) tracking-normal text-text-heading text-left"> {{ t('billing.actionScripts') }}</div>
                   <div class="opacity-80">
                     <img :src="actionScriptIcon" />
                   </div>
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Bottom Section (40%) -->
             <div class="text-(length:--text-2xl) font-semibold leading-(--leading-xl) tracking-normal text-text-body text-left flex items-end ">
-              2
+              {{ '2' }}
             </div>
             </div>
             </div>
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex flex-col justify-between">
                 <!-- Title row -->
                 <div class="flex justify-between items-center">
-                  <div class="text-(length:--text-sm) font-semibold leading-(--leading-base) tracking-normal text-text-heading text-left">Error Tracking</div>
+                  <div class="text-(length:--text-sm) font-semibold leading-(--leading-base) tracking-normal text-text-heading text-left">{{ t('billing.errorTracking') }}</div>
                   <div class="opacity-80">
                     <img :src="errorTrackingIcon" />
                   </div>
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Bottom Section (40%) -->
             <div class="text-(length:--text-2xl) font-semibold leading-(--leading-xl) tracking-normal text-text-body text-left flex items-end ">
-              300
+              {{ '300' }}
             </div>
             </div>
             </div>
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex flex-col justify-between">
                 <!-- Title row -->
                 <div class="flex justify-between items-center">
-                  <div class="text-(length:--text-sm) font-semibold leading-(--leading-base) tracking-normal text-text-heading text-left" data-test="billings-usage-tile-title">RUM Session</div>
+                  <div class="text-(length:--text-sm) font-semibold leading-(--leading-base) tracking-normal text-text-heading text-left" data-test="billings-usage-tile-title">{{ t('billing.rumSession') }}</div>
                   <div class="opacity-80">
                     <img :src="rumSessionIcon" />
                   </div>
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Bottom Section (40%) -->
             <div class="text-(length:--text-2xl) font-semibold leading-(--leading-xl) tracking-normal text-text-body text-left flex items-end ">
-              20
+              {{ '20' }}
             </div>
             </div>
             </div>
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="usageCost[tile.key]"
               class="text-(length:--text-xs) font-medium text-text-secondary"
             >
-              ${{ usageCost[tile.key] }}
+              {{ '$' + usageCost[tile.key] }}
             </div>
           </div>
         </div>

@@ -22,7 +22,7 @@
         data-test="common-json-editor-validation-errors"
         class="p-3 text-status-error-text shrink-0 max-h-50 overflow-y-auto"
       >
-        <div class="font-bold mb-2">Please fix the following issues:</div>
+        <div class="font-bold mb-2">{{ t('common.pleaseFixIssues') }}</div>
         <ul class="ml-3">
           <li v-for="(error, index) in localValidationErrors" :key="index">
             {{ error }}

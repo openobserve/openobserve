@@ -330,8 +330,8 @@ const showAssertions = computed(
               <span class="text-xs text-text-muted">{{ t('synthetics.protocolRun.timeline') }}</span>
               <span class="text-xs">
                 {{ t('synthetics.protocolRun.scheduled') }} {{ fmtTs(run.scheduledTs) }}
-                → {{ t('synthetics.protocolRun.started') }} {{ fmtTs(run.startedTs) }}
-                → {{ t('synthetics.protocolRun.completed') }} {{ fmtTs(run.completedTs) }}
+                {{ t('synthetics.protocolRun.timelineArrow') }} {{ t('synthetics.protocolRun.started') }} {{ fmtTs(run.startedTs) }}
+                {{ t('synthetics.protocolRun.timelineArrow') }} {{ t('synthetics.protocolRun.completed') }} {{ fmtTs(run.completedTs) }}
               </span>
             </div>
           </div>

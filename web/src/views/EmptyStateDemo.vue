@@ -10,14 +10,13 @@
       <div class="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 class="text-2xl font-semibold text-text-heading">
-            Empty states — full set for review
+            {{ t('emptyState.demo.pageTitle') }}
           </h1>
           <p class="text-sm text-text-secondary mt-1 max-w-2xl">
-            Every preset below is a real
-            <code class="text-text-body">&lt;OEmptyState&gt;</code> with its
-            production copy, illustration, and action. Each detailed scene has its
-            own character micro-animation and pauses under OS "reduce motion".
-            Nothing is wired into real pages yet.
+            {{ t('emptyState.demo.introText') }}
+            <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- component name shown as code, not translatable -->
+            <code class="text-text-body">&lt;OEmptyState&gt;</code>
+            {{ t('emptyState.demo.introTextSuffix') }}
           </p>
         </div>
         <div class="flex items-center gap-2">
@@ -41,6 +40,7 @@
             <span class="text-xs font-semibold uppercase tracking-wider text-text-secondary">
               {{ p.label }}
             </span>
+            <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- code example showing preset prop syntax, not translatable -->
             <code class="text-2xs text-text-disabled">preset="{{ p.preset }}"</code>
           </div>
           <div class="rounded-default border border-border-default h-110 overflow-hidden">
@@ -57,21 +57,21 @@
 
       <div>
         <h2 class="text-lg font-semibold text-text-heading mb-1">
-          Character — optional, only where it adds value
+          {{ t('emptyState.demo.characterSectionTitle') }}
         </h2>
         <p class="text-sm text-text-secondary mb-3 max-w-2xl">
-          The illustration is just a named choice, so a scene can opt into a
-          character (e.g. a prominent first-run hero) while everything else stays
-          object-only. Same component, <code class="text-text-body">illustration="explorer"</code>.
+          {{ t('emptyState.demo.characterSectionDesc') }}
+          <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- code example of the illustration prop, not translatable -->
+          <code class="text-text-body">illustration="explorer"</code>.
         </p>
         <div class="rounded-default border border-border-default h-110 overflow-hidden">
           <OEmptyState
             size="hero"
             variant="create"
             illustration="explorer"
-            title="We couldn't find any data"
-            description="Nothing matches yet — try a different stream, widen the time range, or create something new."
-            action-label="Clear filters"
+            :title="t('emptyState.demo.noDataTitle')"
+            :description="t('emptyState.demo.noDataDescription')"
+            :action-label="t('emptyState.demo.clearFiltersAction')"
             action-icon="filter-list"
             @action="onAction()"
           />
@@ -80,12 +80,12 @@
 
       <div>
         <h2 class="text-lg font-semibold text-text-heading mb-3">
-          Sizes — the same system at block &amp; inline scale
+          {{ t('emptyState.demo.sizesSectionTitle') }}
         </h2>
         <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
           <section class="flex flex-col gap-2">
             <span class="text-xs font-semibold uppercase tracking-wider text-text-secondary">
-              size="block" (inside a card / dashboard panel)
+              {{ t('emptyState.demo.sizeBlockLabel') }}
             </span>
             <div class="rounded-default border border-border-default overflow-hidden">
               <OEmptyState preset="no-search-results" size="block" @action="onAction('block')" />
@@ -93,7 +93,7 @@
           </section>
           <section class="flex flex-col gap-2">
             <span class="text-xs font-semibold uppercase tracking-wider text-text-secondary">
-              size="inline" (table body / dropdown)
+              {{ t('emptyState.demo.sizeInlineLabel') }}
             </span>
             <div class="rounded-default border border-border-default overflow-hidden">
               <OEmptyState preset="no-search-results" size="inline" @action="onAction('inline')" />
@@ -110,6 +110,9 @@ import { ref } from "vue";
 
 import { OEmptyState, type EmptyStatePresetName } from "@/lib/core/EmptyState";
 import OButton from "@/lib/core/Button/OButton.vue";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 // local dark-mode preview wrapper so reviewers can flip themes without changing
 // their global setting (mirrors the app's `.dark` class on a scoped root).

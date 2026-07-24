@@ -33,6 +33,9 @@ import OTime from "@/lib/forms/Time/OTime.vue";
 import { parseDate } from "@internationalized/date";
 import type { DateValue } from "@internationalized/date";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 const props = withDefaults(defineProps<DateTimeRangeProps>(), {
   startDate: "",
@@ -401,7 +404,7 @@ const triggerClasses = computed(() => [
             data-test="datetimerange-tab-relative"
             @click="activeTab = 'relative'"
           >
-            Relative
+            {{ t('common.relative') }}
           </button>
           <button
             type="button"
@@ -414,7 +417,7 @@ const triggerClasses = computed(() => [
             data-test="datetimerange-tab-absolute"
             @click="activeTab = 'absolute'"
           >
-            Absolute
+            {{ t('common.absolute') }}
           </button>
         </div>
 
@@ -458,7 +461,7 @@ const triggerClasses = computed(() => [
           >
             <span
               class="w-14 text-xs text-datepicker-relative-label shrink-0"
-            >Custom</span>
+            >{{ t('common.custom') }}</span>
             <input
               v-model="customAmount"
               type="number"
@@ -489,7 +492,7 @@ const triggerClasses = computed(() => [
           >
             <span
               class="text-xs text-datepicker-relative-label"
-            >Timezone</span>
+            >{{ t('common.timezone') }}</span>
             <button
               type="button"
               :disabled="disabled"
@@ -520,7 +523,7 @@ const triggerClasses = computed(() => [
               <input
                 v-model="tzSearch"
                 type="text"
-                placeholder="Search timezone..."
+                :placeholder="t('components.dateTimeRange.searchTimezonePlaceholder')"
                 autofocus
                 class="w-full h-7 px-2 text-xs bg-datepicker-bg text-datepicker-text border-b border-datepicker-inner-border outline-none focus:border-datepicker-focus-border placeholder:text-datepicker-placeholder"
                 data-test="datetimerange-timezone-search"
@@ -541,7 +544,7 @@ const triggerClasses = computed(() => [
                 <div
                   v-if="filteredTimezones.length === 0"
                   class="px-2 py-2 text-xs text-datepicker-weekday-text"
-                >No timezones found</div>
+                >{{ t('components.dateTimeRange.noTimezonesFound') }}</div>
               </div>
             </div>
           </div>
@@ -557,7 +560,7 @@ const triggerClasses = computed(() => [
               class="px-4 py-1.5 rounded-default text-sm font-medium transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base bg-datepicker-day-selected-bg text-datepicker-day-selected-text hover:opacity-90 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring disabled:opacity-50 disabled:cursor-not-allowed"
               data-test="datetimerange-relative-apply"
               @click="commitRelative"
-            >Apply</button>
+            >{{ t('common.apply') }}</button>
           </div>
         </div>
 
@@ -670,7 +673,7 @@ const triggerClasses = computed(() => [
           <div v-if="!hideTime" class="flex gap-3 [--color-datepicker-border:var(--color-datepicker-inner-border)]">
             <OTime
               v-model="stagedStartTime"
-              label="Start time"
+              :label="t('common.startTime')"
               :with-seconds="withSeconds"
               :disabled="disabled"
               data-test="datetimerange-start-time"
@@ -678,7 +681,7 @@ const triggerClasses = computed(() => [
             />
             <OTime
               v-model="stagedEndTime"
-              label="End time"
+              :label="t('common.endTime')"
               :with-seconds="withSeconds"
               :disabled="disabled"
               data-test="datetimerange-end-time"
@@ -688,7 +691,7 @@ const triggerClasses = computed(() => [
 
           <!-- Timezone -->
           <div v-if="showTimezone" class="flex flex-col gap-1">
-            <span class="text-xs text-datepicker-label">Timezone</span>
+            <span class="text-xs text-datepicker-label">{{ t('common.timezone') }}</span>
             <button
               type="button"
               :disabled="disabled"
@@ -719,7 +722,7 @@ const triggerClasses = computed(() => [
               <input
                 v-model="tzSearch"
                 type="text"
-                placeholder="Search timezone..."
+                :placeholder="t('components.dateTimeRange.searchTimezonePlaceholder')"
                 autofocus
                 class="w-full h-9 px-3 text-sm bg-datepicker-bg text-datepicker-text border-b border-datepicker-inner-border outline-none focus:border-datepicker-focus-border placeholder:text-datepicker-placeholder"
                 data-test="datetimerange-timezone-search"
@@ -740,7 +743,7 @@ const triggerClasses = computed(() => [
                 <div
                   v-if="filteredTimezones.length === 0"
                   class="px-3 py-2 text-sm text-datepicker-weekday-text"
-                >No timezones found</div>
+                >{{ t('components.dateTimeRange.noTimezonesFound') }}</div>
               </div>
             </div>
           </div>
@@ -753,7 +756,7 @@ const triggerClasses = computed(() => [
               class="px-4 py-1.5 rounded-default text-sm font-medium transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base bg-datepicker-day-selected-bg text-datepicker-day-selected-text hover:opacity-90 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring disabled:opacity-50 disabled:cursor-not-allowed"
               data-test="datetimerange-apply"
               @click="handleApply"
-            >Apply</button>
+            >{{ t('common.apply') }}</button>
           </div>
         </div>
       </PopoverContent>

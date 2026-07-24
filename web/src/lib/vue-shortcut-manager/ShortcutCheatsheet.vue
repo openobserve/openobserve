@@ -143,7 +143,7 @@
                       <span
                         v-if="part === 'then'"
                         class="text-3xs text-text-secondary mx-0.5"
-                        >then</span
+                        >{{ t('shortcuts.then') }}</span
                       >
                       <kbd
                         v-else
@@ -216,7 +216,7 @@
                       <span
                         v-if="part === 'then'"
                         class="text-3xs text-text-secondary mx-0.5"
-                        >then</span
+                        >{{ t('shortcuts.then') }}</span
                       >
                       <kbd
                         v-else
@@ -241,7 +241,7 @@
         <div class="flex items-center gap-1.5 flex-wrap">
           <kbd
             class="inline-flex items-center justify-center h-5 px-1.5 bg-surface-base border border-border-default rounded-default font-mono text-2xs shadow-[0_1px_0_0_var(--color-border-default)]"
-            >Esc</kbd
+            >{{ t('shortcuts.escKey') }}</kbd
           >
           <span>{{ t("shortcuts.footerClose") }}</span>
           <span class="opacity-40">·</span>

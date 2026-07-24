@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <IngestionDocLink
       href="https://openobserve.ai/blog/send-metrics-using-kube-prometheus-stack-to-openobserve"
     >
-      to learn how to ingest metrics using Prometheus</IngestionDocLink
+      {{ t('ingestion.prometheusDocLinkText') }}</IngestionDocLink
     >
   </IngestionContent>
 </template>
@@ -33,6 +33,7 @@ import { getEndPoint, getImageURL, getIngestionURL } from "../../../utils/zincut
 import CopyContent from "@/components/CopyContent.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
+import { useI18n } from "vue-i18n";
 
 export default defineComponent({
   name: "traces-otlp",
@@ -46,6 +47,7 @@ export default defineComponent({
   },
   components: { CopyContent, IngestionContent, IngestionDocLink },
   setup() {
+    const { t } = useI18n();
     const store = useStore();
     const endpoint: any = ref({
       url: "",
@@ -65,6 +67,7 @@ export default defineComponent({
       username: [EMAIL]
       password: [PASSCODE]`;
     return {
+      t,
       store,
       config,
       endpoint,

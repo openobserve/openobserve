@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <button
                   @click="copyToClipboard(store.state.zoConfig.commit_hash)"
                   class="inline-flex items-center justify-center p-0.5 rounded-default border-none bg-transparent cursor-pointer text-text-muted hover:text-info transition-colors duration-150"
-                  title="Copy commit hash"
+                  :title="t('about.copyCommitHash')"
                 >
                   <OIcon name="content-copy" size="sm" />
                 </button>
@@ -90,8 +90,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OIcon name="settings" size="md" class="text-accent shrink-0" />
                 <div class="flex-1 flex flex-col gap-0.5 min-w-0">
-                  <span class="text-sm font-semibold font-mono text-text-heading whitespace-nowrap overflow-hidden text-ellipsis">Cargo.toml</span>
-                  <span class="text-xs text-text-muted">Rust crates</span>
+                  <span class="text-sm font-semibold font-mono text-text-heading whitespace-nowrap overflow-hidden text-ellipsis">{{ t('about.cargoToml') }}</span>
+                  <span class="text-xs text-text-muted">{{ t('about.rustCrates') }}</span>
                 </div>
                 <OIcon name="open-in-new" size="sm" class="text-text-muted shrink-0" />
               </a>
@@ -102,8 +102,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OIcon name="backpack" size="md" class="text-accent shrink-0" />
                 <div class="flex-1 flex flex-col gap-0.5 min-w-0">
-                  <span class="text-sm font-semibold font-mono text-text-heading whitespace-nowrap overflow-hidden text-ellipsis">package.json</span>
-                  <span class="text-xs text-text-muted">Node packages</span>
+                  <span class="text-sm font-semibold font-mono text-text-heading whitespace-nowrap overflow-hidden text-ellipsis">{{ t('about.packageJson') }}</span>
+                  <span class="text-xs text-text-muted">{{ t('about.nodePackages') }}</span>
                 </div>
                 <OIcon name="open-in-new" size="sm" class="text-text-muted shrink-0" />
               </a>
@@ -114,8 +114,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OIcon name="javascript" size="md" class="text-accent shrink-0" />
                 <div class="flex-1 flex flex-col gap-0.5 min-w-0">
-                  <span class="text-sm font-semibold font-mono text-text-heading whitespace-nowrap overflow-hidden text-ellipsis">npmjs.com</span>
-                  <span class="text-xs text-text-muted">JS registry</span>
+                  <span class="text-sm font-semibold font-mono text-text-heading whitespace-nowrap overflow-hidden text-ellipsis">{{ t('about.npmjsCom') }}</span>
+                  <span class="text-xs text-text-muted">{{ t('about.jsRegistry') }}</span>
                 </div>
                 <OIcon name="open-in-new" size="sm" class="text-text-muted shrink-0" />
               </a>
@@ -126,8 +126,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OIcon name="inventory-2" size="md" class="text-accent shrink-0" />
                 <div class="flex-1 flex flex-col gap-0.5 min-w-0">
-                  <span class="text-sm font-semibold font-mono text-text-heading whitespace-nowrap overflow-hidden text-ellipsis">crates.io</span>
-                  <span class="text-xs text-text-muted">Rust registry</span>
+                  <span class="text-sm font-semibold font-mono text-text-heading whitespace-nowrap overflow-hidden text-ellipsis">{{ t('about.cratesIo') }}</span>
+                  <span class="text-xs text-text-muted">{{ t('about.rustRegistry') }}</span>
                 </div>
                 <OIcon name="open-in-new" size="sm" class="text-text-muted shrink-0" />
               </a>
@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 href="https://github.com/openobserve/openobserve/blob/main/LICENSE"
                 target="_blank"
                 class="text-text-link no-underline font-medium border-b border-[color-mix(in_srgb,var(--color-text-link)_35%,transparent)] transition-colors duration-200 hover:border-text-link"
-              >GNU Affero General Public License (AGPL)</a>.
+              >{{ t('about.agplFullName') }}</a>.
             </OText>
             <OText v-if="store.state.zoConfig.build_type == 'enterprise' && config.isCloud == 'false'" variant="body" as="div" class="leading-relaxed">
               {{ t("about.license_info_msg") }}
@@ -177,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="inline-flex items-center gap-1.5 py-2 px-3.5 rounded-default bg-[color-mix(in_srgb,var(--color-accent)_8%,var(--color-card-glass-bg))] text-accent no-underline text-sm font-medium border border-[color-mix(in_srgb,var(--color-accent)_18%,transparent)] transition-all duration-200"
               >
                 <OIcon name="code" size="sm" />
-                GitHub
+                {{ t('about.github') }}
               </a>
               <a
                 href="https://openobserve.ai"
@@ -185,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="inline-flex items-center gap-1.5 py-2 px-3.5 rounded-default bg-[color-mix(in_srgb,var(--color-accent)_8%,var(--color-card-glass-bg))] text-accent no-underline text-sm font-medium border border-[color-mix(in_srgb,var(--color-accent)_18%,transparent)] transition-all duration-200"
               >
                 <OIcon name="language" size="sm" />
-                Website
+                {{ t('about.website') }}
               </a>
             </div>
           </div>
@@ -200,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="workspace-premium" size="md" />
               </div>
               <div>
-                <OText variant="label" class="uppercase tracking-widest m-0 mb-1 text-accent">License &amp; Usage</OText>
+                <OText variant="label" class="uppercase tracking-widest m-0 mb-1 text-accent">{{ t('about.licenseAndUsage') }}</OText>
                 <h2 class="text-xl font-semibold m-0 text-text-heading">{{ t("about.ent_lincese_detail_lbl") }}</h2>
               </div>
             </div>
@@ -241,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <button
                           @click="copyToClipboard(licenseData.license.license_id)"
                           class="inline-flex items-center justify-center p-0.5 rounded-default border-none bg-transparent cursor-pointer text-text-muted hover:text-accent transition-colors duration-150"
-                          title="Copy license ID"
+                          :title="t('about.copyLicenseId')"
                         >
                           <OIcon name="content-copy" size="sm" />
                         </button>
@@ -261,7 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </td>
                   </tr>
                   <tr class="border-b border-table-row-divider last:border-b-0">
-                    <td class="w-2/5 font-semibold text-sm text-table-header-text py-2.5 px-3.5 border-r border-table-row-divider whitespace-nowrap bg-table-header-bg">Edition</td>
+                    <td class="w-2/5 font-semibold text-sm text-table-header-text py-2.5 px-3.5 border-r border-table-row-divider whitespace-nowrap bg-table-header-bg">{{ t('about.editionLbl') }}</td>
                     <td class="text-sm text-text-body py-2.5 px-3.5">{{ t("about.value_license_enterprise") }}</td>
                   </tr>
                   <tr class="border-b border-table-row-divider last:border-b-0">
@@ -281,7 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <p class="text-sm font-semibold m-0 mb-1 text-text-heading">{{ t("about.usage_limits") }}</p>
               <p class="text-xs m-0 mb-4 text-text-muted">
                 {{ licenseData.license.limits?.Ingestion?.typ || 'PerDayCount' }}
-                · limit {{ licenseData.license.limits?.Ingestion?.value || 50 }} GB / day
+                {{ t('about.limitPrefix') }} {{ licenseData.license.limits?.Ingestion?.value || 50 }} {{ t('about.gbPerDay') }}
               </p>
               <div v-if="licenseData.ingestion_used !== undefined">
                 <div class="flex items-baseline gap-2 mb-3">
@@ -289,7 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="text-4xl font-bold text-text-body leading-none"
                     :class="licenseData.ingestion_used > 90 ? 'text-status-error-text' : licenseData.ingestion_used > 70 ? 'text-status-warning-text' : ''"
                   >{{ licenseData.ingestion_used.toFixed(2) }}%</span>
-                  <span class="text-xs text-text-secondary">of daily limit used today</span>
+                  <span class="text-xs text-text-secondary">{{ t('about.ofDailyLimitUsedToday') }}</span>
                 </div>
                 <div class="h-1.5 rounded-full bg-card-glass-border overflow-hidden mb-1.5">
                   <div
@@ -299,8 +299,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
                 <div class="flex justify-between text-xs text-text-muted mb-3.5">
-                  <span>{{ ((licenseData.ingestion_used / 100) * (licenseData.license.limits?.Ingestion?.value || 50)).toFixed(0) }} GB today</span>
-                  <span>{{ licenseData.license.limits?.Ingestion?.value || 50 }} GB / day</span>
+                  <span>{{ ((licenseData.ingestion_used / 100) * (licenseData.license.limits?.Ingestion?.value || 50)).toFixed(0) }} {{ t('about.gbToday') }}</span>
+                  <span>{{ licenseData.license.limits?.Ingestion?.value || 50 }} {{ t('about.gbPerDay') }}</span>
                 </div>
               </div>
               <div class="flex items-start gap-1.5 text-xs text-status-positive bg-[color-mix(in_srgb,var(--color-status-positive)_8%,var(--color-card-glass-bg))] border border-[color-mix(in_srgb,var(--color-status-positive)_22%,transparent)] rounded-default py-2 px-3">

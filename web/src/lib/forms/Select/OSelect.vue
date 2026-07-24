@@ -49,6 +49,9 @@ import {
   setActiveOverlay,
   clearActiveOverlay,
 } from "@/lib/overlay/Dropdown/ODropdown.context";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 type NormalizedOption = {
   label: string;
@@ -1172,7 +1175,7 @@ const fieldWidthClass = computed(() => {
                       class="inline-flex items-center rounded-default px-2 py-0.5 text-xs bg-select-item-hover-bg text-select-text shrink-0"
                       data-test="o-select-overflow-chip"
                     >
-                      +{{ overflowSelectedCount }} more
+                      +{{ overflowSelectedCount }} {{ t('components.select.more') }}
                     </span>
                   </div>
                 </template>
@@ -1212,7 +1215,7 @@ const fieldWidthClass = computed(() => {
               v-if="clearable && hasSelection"
               type="button"
               tabindex="-1"
-              aria-label="Clear selection"
+              :aria-label="t('components.select.clearSelection')"
               :class="[
                 'flex items-center justify-center size-3.5',
                 'text-input-clear-btn hover:text-input-clear-btn-hover',
@@ -1321,7 +1324,7 @@ const fieldWidthClass = computed(() => {
                   v-if="selectAll && multiple && selectableOptions.length > 0"
                   role="button"
                   tabindex="0"
-                  aria-label="Toggle all options"
+                  :aria-label="t('components.select.toggleAllOptions')"
                   :aria-checked="
                     allSelected ? 'true' : partiallySelected ? 'mixed' : 'false'
                   "
@@ -1364,7 +1367,7 @@ const fieldWidthClass = computed(() => {
                       <polyline points="2,6 5,9 10,3" />
                     </svg>
                   </span>
-                  <span class="truncate font-medium">Select all</span>
+                  <span class="truncate font-medium">{{ t('components.select.selectAllLabel') }}</span>
                 </div>
 
                 <!-- Consumer-supplied rows rendered above the option list -->
@@ -1377,7 +1380,7 @@ const fieldWidthClass = computed(() => {
                     v-if="filteredOptions.length === 0"
                     class="px-3 py-2 text-sm text-select-placeholder"
                   >
-                    <slot name="empty">No options found</slot>
+                    <slot name="empty">{{ t('components.select.noOptionsFound') }}</slot>
                   </div>
 
                   <!-- Virtualised list — spacer div with absolutely positioned rows -->
@@ -1621,7 +1624,7 @@ const fieldWidthClass = computed(() => {
                       <polyline points="1.5,5 4,8 8.5,2" />
                     </svg>
                   </span>
-                  <span>Multi select</span>
+                  <span>{{ t('components.select.multiSelect') }}</span>
                 </span>
 
                 <span class="w-px h-3.5 bg-input-border shrink-0" aria-hidden="true" />
@@ -1631,7 +1634,7 @@ const fieldWidthClass = computed(() => {
                   <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="size-3 shrink-0" aria-hidden="true">
                     <path d="M4 2h6M4 5h6M4 8h3" />
                   </svg>
-                  <span>Single select</span>
+                  <span>{{ t('components.select.singleSelect') }}</span>
                 </span>
               </div>
               </template>
@@ -1729,7 +1732,7 @@ const fieldWidthClass = computed(() => {
             v-if="clearable && hasSelection"
             type="button"
             tabindex="-1"
-            aria-label="Clear selection"
+            :aria-label="t('components.select.clearSelection')"
             :class="[
               'flex items-center justify-center size-3.5',
               'text-input-clear-btn hover:text-input-clear-btn-hover',

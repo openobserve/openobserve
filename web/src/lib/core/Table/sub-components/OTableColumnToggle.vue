@@ -2,12 +2,15 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { OTableColumnDef } from "../OTable.types";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   columns: OTableColumnDef[];
@@ -88,10 +91,10 @@ function resetToDefault(): void {
       data-test="o2-table-column-toggle-panel"
     >
       <p class="px-3 py-1 text-xs font-medium text-text-secondary">
-        Columns
+        {{ t('components.table.columnToggle.columns') }}
       </p>
 
-      <ul role="listbox" aria-label="Toggle column visibility" aria-multiselectable="true">
+      <ul role="listbox" :aria-label="t('components.table.columnToggle.toggleVisibilityAria')" aria-multiselectable="true">
         <li
           v-for="col in toggleableColumns"
           :key="col.id"
@@ -124,7 +127,7 @@ function resetToDefault(): void {
           @click="resetToDefault"
         >
           <OIcon name="refresh" size="sm" class="shrink-0" />
-          <span class="select-none">Reset to default</span>
+          <span class="select-none">{{ t('components.table.columnToggle.resetToDefault') }}</span>
         </button>
         <button
           v-if="props.hasResizedColumns"
@@ -133,7 +136,7 @@ function resetToDefault(): void {
           @click="emit('reset:columnSizes')"
         >
           <OIcon name="refresh" size="sm" class="shrink-0" />
-          <span class="select-none">Reset column widths</span>
+          <span class="select-none">{{ t('components.table.columnToggle.resetColumnWidths') }}</span>
         </button>
       </div>
     </div>

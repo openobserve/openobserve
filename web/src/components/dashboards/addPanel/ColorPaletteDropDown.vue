@@ -137,9 +137,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ t("dashboard.colorSeriesBy") }}
       <div>
         <OToggleGroup v-model="dashboardPanelData.data.config.color.seriesBy">
-          <OToggleGroupItem value="last">Last</OToggleGroupItem>
-          <OToggleGroupItem value="min">Min</OToggleGroupItem>
-          <OToggleGroupItem value="max">Max</OToggleGroupItem>
+          <OToggleGroupItem value="last">{{ t("dashboard.last") }}</OToggleGroupItem>
+          <OToggleGroupItem value="min">{{ t("dashboard.min") }}</OToggleGroupItem>
+          <OToggleGroupItem value="max">{{ t("dashboard.max") }}</OToggleGroupItem>
         </OToggleGroup>
       </div>
     </div>

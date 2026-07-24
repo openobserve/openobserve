@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         clearable
       >
         <template #empty>
-          <span>No pipelines found</span>
+          <span>{{ t('pipeline.noPipelinesFound') }}</span>
         </template>
       </OSelect>
       <OTableColumnToggle
@@ -244,8 +244,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="pipeline-history-details-dialog"
       v-model:open="detailsDialog"
       size="lg"
-      title="Pipeline Execution Details"
-      primary-button-label="Close"
+      :title="t('pipeline.executionDetailsTitle')"
+      :primary-button-label="t('common.close')"
       @click:primary="detailsDialog = false"
     >
       <div class="scroll" style="max-height: 70vh" v-if="selectedRow">
@@ -255,14 +255,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex gap-3">
               <div class="w-1/2">
                 <div class="text-xs text-text-label mb-1">
-                  Pipeline Name
+                  {{ t('pipeline.pipelineNameLabel') }}
                 </div>
                 <div class="text-sm font-medium">
                   {{ selectedRow.pipeline_name }}
                 </div>
               </div>
               <div class="w-1/2">
-                <div class="text-xs text-text-label mb-1">Status</div>
+                <div class="text-xs text-text-label mb-1">{{ t('common.status') }}</div>
                 <OTag type="queryStatus" :value="selectedRow.status" />
               </div>
             </div>
@@ -274,13 +274,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="py-1">
             <div class="flex gap-3">
               <div class="w-1/2">
-                <div class="text-xs text-text-label mb-1">Timestamp</div>
+                <div class="text-xs text-text-label mb-1">{{ t('pipeline.timestampLabel') }}</div>
                 <div class="text-sm">
                   {{ formatDate(selectedRow.timestamp) }}
                 </div>
               </div>
               <div class="w-1/2">
-                <div class="text-xs text-text-label mb-1">Duration</div>
+                <div class="text-xs text-text-label mb-1">{{ t('common.duration') }}</div>
                 <div class="text-sm">
                   {{
                     formatDuration(
@@ -298,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="py-1">
             <div class="flex gap-3">
               <div class="w-1/2">
-                <div class="text-xs text-text-label mb-1">Type</div>
+                <div class="text-xs text-text-label mb-1">{{ t('common.type') }}</div>
                 <div class="text-sm">
                   <OIcon
                     :name="selectedRow.is_realtime ? 'speed' : 'schedule'"
@@ -309,7 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div class="w-1/2">
-                <div class="text-xs text-text-label mb-1">Silenced</div>
+                <div class="text-xs text-text-label mb-1">{{ t('pipeline.silencedLabel') }}</div>
                 <div class="text-sm">
                   <OIcon
                     v-if="selectedRow.is_silenced"
@@ -340,24 +340,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex gap-3">
                 <div v-if="selectedRow.evaluation_took_in_secs" class="w-1/3">
                   <div class="text-xs text-text-label mb-1">
-                    Evaluation Time
+                    {{ t('pipeline.evaluationTimeLabel') }}
                   </div>
                   <div class="text-sm">
+                    <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- SI unit abbreviation for seconds, appended directly to a numeric value; not natural-language text -->
                     {{ selectedRow.evaluation_took_in_secs.toFixed(2) }}s
                   </div>
                 </div>
                 <div v-if="selectedRow.query_took" class="w-1/3">
-                  <div class="text-xs text-text-label mb-1">Query Time</div>
+                  <div class="text-xs text-text-label mb-1">{{ t('pipeline.queryTimeLabel') }}</div>
                   <div class="text-sm">
+                    <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- SI unit abbreviation for milliseconds, appended directly to a numeric value; not natural-language text -->
                     {{ (selectedRow.query_took / 1000).toFixed(2) }}ms
                   </div>
                 </div>
                 <div v-if="selectedRow.retries > 0" class="w-1/3">
-                  <div class="text-xs text-text-label mb-1">Retries</div>
+                  <div class="text-xs text-text-label mb-1">{{ t('pipeline.retriesLabel') }}</div>
                   <div class="text-sm">{{ selectedRow.retries }}</div>
                 </div>
                 <div v-if="selectedRow.delay_in_secs" class="w-1/3">
-                  <div class="text-xs text-text-label mb-1">Delay</div>
+                  <div class="text-xs text-text-label mb-1">{{ t('pipeline.delay') }}</div>
+                  <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- SI unit abbreviation for seconds, appended directly to a numeric value; not natural-language text -->
                   <div class="text-sm">{{ selectedRow.delay_in_secs }}s</div>
                 </div>
                 <div
@@ -368,7 +371,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="w-1/3"
                 >
                   <div class="text-xs text-text-label mb-1">
-                    Result Status
+                    {{ t('pipeline.resultStatusLabel') }}
                   </div>
                   <div class="text-sm">
                     <OIcon
@@ -389,7 +392,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-if="selectedRow.source_node">
             <OSeparator class="my-2" />
             <div class="py-1">
-              <div class="text-xs text-text-label mb-1">Source Node</div>
+              <div class="text-xs text-text-label mb-1">{{ t('pipeline.sourceNodeLabel') }}</div>
               <div class="text-sm font-mono text-compact">
                 {{ selectedRow.source_node }}
               </div>
@@ -402,7 +405,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="py-1">
               <div class="text-xs text-text-label mb-1">
                 <OIcon name="error" size="xs" class="mr-1" />
-                Error Details
+                {{ t('pipeline.errorDetailsLabel') }}
               </div>
               <div
                 class="rounded-default border border-solid border-status-negative/30 p-2 mt-2 bg-status-error-bg"
@@ -426,7 +429,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="py-1">
               <div class="text-xs text-text-label mb-1">
                 <OIcon name="check-circle" size="xs" class="mr-1" />
-                Response
+                {{ t('pipeline.responseLabel') }}
               </div>
               <div
                 class="rounded-default border border-solid border-status-positive/30 p-2 mt-2 bg-status-success-bg"
@@ -458,7 +461,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ? `Last error: ${new Date(errorMessage.last_error_timestamp / 1000).toLocaleString()}`
           : undefined
       "
-      primary-button-label="Close"
+      :primary-button-label="t('common.close')"
       @update:open="(v) => !v && closeErrorDialog()"
       @click:primary="closeErrorDialog"
     >
@@ -466,7 +469,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="error" size="md" class="text-status-error-text" />
       </template>
       <div class="mb-4">
-        <div class="text-compact font-semibold tracking-[0.02em] opacity-80 mb-2">Error Summary</div>
+        <div class="text-compact font-semibold tracking-[0.02em] opacity-80 mb-2">{{ t('pipeline.errorSummaryLabel') }}</div>
         <div class="p-4 rounded-default font-mono text-compact leading-[1.6] whitespace-pre-wrap wrap-break-word bg-banner-error-soft-bg border border-banner-error-soft-border text-banner-error-soft-text">
           {{ errorMessage?.error }}
         </div>

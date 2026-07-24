@@ -273,7 +273,7 @@ class="mr-1" />
           data-test="correlated-logs-pagination"
         >
           <span class="opacity-60">
-            {{ (currentPage - 1) * displayPageSize + 1 }}–{{ Math.min(currentPage * displayPageSize, searchResults.length) }} of {{ searchResults.length }}
+            {{ (currentPage - 1) * displayPageSize + 1 }}–{{ Math.min(currentPage * displayPageSize, searchResults.length) }} {{ t('search.of') }} {{ searchResults.length }}
           </span>
           <OPagination
             :model-value="currentPage"

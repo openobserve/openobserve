@@ -49,7 +49,7 @@
                      slot inside an inline-flex row, so sibling blocks would sit
                      side-by-side. A single flex-col child keeps title over body. -->
                 <div class="flex flex-col">
-                  <div class="font-semibold mb-1">{{ transTypeValue === '1' ? t('function.javascript') : t('function.vrl') }} Tip:</div>
+                  <div class="font-semibold mb-1">{{ transTypeValue === '1' ? t('function.javascript') : t('function.vrl') }} {{ t('function.tipLabel') }}</div>
                   <div>{{ transTypeValue === '1' ? t('function.jsFunctionHint') : t('function.vrlFunctionHint') }}</div>
                 </div>
               </template>

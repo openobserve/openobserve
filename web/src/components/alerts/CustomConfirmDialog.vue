@@ -21,8 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="title"
     persistent
     :show-close="false"
-    secondary-button-label="Cancel"
-    primary-button-label="Clear & Continue"
+    :secondary-button-label="t('common.cancel')"
+    :primary-button-label="t('confirmDialog.clearAndContinue')"
     @click:secondary="onCancel"
     @click:primary="onConfirm"
   >
@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, watch } from "vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import { useI18n } from "vue-i18n";
 
 export default defineComponent({
   name: "CustomConfirmDialog",
@@ -55,6 +56,7 @@ export default defineComponent({
   },
   emits: ["update:modelValue", "confirm", "cancel"],
   setup(props, { emit }) {
+    const { t } = useI18n();
     const isVisible = ref(props.modelValue);
 
     watch(
@@ -82,6 +84,7 @@ export default defineComponent({
       isVisible,
       onCancel,
       onConfirm,
+      t,
     };
   },
 });

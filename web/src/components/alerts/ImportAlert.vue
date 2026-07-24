@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <base-import
     ref="baseImportRef"
-    title="Import Alert"
+    :title="t('alerts.importAlertTitle')"
     test-prefix="alert"
     class="flex-1 min-h-0"
     :is-importing="isAlertImporting"
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             accept=".json"
             multiple
             drop-zone
-            help-text=".json files only"
+            :help-text="t('alerts.jsonFilesOnlyHint')"
             size="md"
           />
         </div>
@@ -81,9 +81,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="alertErrorsToDisplay.length > 0"
         class="text-center text-sm font-semibold text-text-heading py-3 shrink-0"
       >
-        Error Validations
+        {{ t('dashboard.importDashboardPage.errorValidations') }}
       </div>
-      <div v-else class="text-center text-sm font-semibold text-text-heading py-3 shrink-0">Output Messages</div>
+      <div v-else class="text-center text-sm font-semibold text-text-heading py-3 shrink-0">{{ t('alerts.outputMessages') }}</div>
       <OSeparator class="mt-1 shrink-0" />
       <div class="error-report-container flex-1 min-h-0">
         <!-- Alert Errors Section -->
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :model-value="userSelectedAlertName[index] || ''"
                       :label="t('alerts.name') + ' *'"
                       :error="!userSelectedAlertName[index]?.toString().trim()"
-                      error-message="Field is required!"
+                      :error-message="t('alerts.validation.fieldRequired')"
                       @update:model-value="(val) => {
                         userSelectedAlertName[index] = val as string;
                         updateAlertName(val as string, index);
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :label="t('alerts.stream_name') + ' *'"
                       searchable
                       :error="!userSelectedStreamName[index]"
-                      error-message="Field is required!"
+                      :error-message="t('alerts.validation.fieldRequired')"
                       @update:model-value="(val) => {
                         userSelectedStreamName[index] = val as string;
                         updateStreamFields(val as string, index);
@@ -163,13 +163,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="alert-import-destination-name-input"
                       :model-value="userSelectedDestinations[index] || []"
                       :options="filteredDestinations"
-                      label="Destinations *"
+                      :label="t('alerts.destinationsRequiredLabel')"
                       multiple
                       searchable
                       @search="filterDestinations"
                       class="w-75!"
                       :error="!userSelectedDestinations[index]?.length"
-                      error-message="Field is required!"
+                      :error-message="t('alerts.validation.fieldRequired')"
                       @update:model-value="(val) => {
                         userSelectedDestinations[index] = val as string[];
                         updateUserSelectedDestinations(val as string[], index);
@@ -193,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :label="t('alerts.streamType') + ' *'"
                       class="w-75!"
                       :error="!userSelectedStreamType[index]"
-                      error-message="Field is required!"
+                      :error-message="t('alerts.validation.fieldRequired')"
                       @update:model-value="(val) => {
                         userSelectedStreamType[index] = val as string;
                         updateStreams(val as string, index);
@@ -214,12 +214,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="alert-import-timezone-input"
                       :model-value="userSelectedTimezone[index] || ''"
                       :options="filteredTimezone"
-                      label="Timezone *"
+                      :label="t('alerts.timezoneRequiredLabel')"
                       searchable
                       @search="timezoneFilterFn"
                       class="w-75!"
                       :error="!userSelectedTimezone[index]"
-                      error-message="Field is required!"
+                      :error-message="t('alerts.validation.fieldRequired')"
                       @update:model-value="(val) => {
                         userSelectedTimezone[index] = val as string;
                         updateTimezone(val as string, index);
@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="alert-import-org-id-input"
                       :model-value="userSelectedOrgId[index] || null"
                       :options="organizationDataList"
-                      label="Organization Id"
+                      :label="t('alerts.organizationIdLabel')"
                       labelKey="label"
                       valueKey="value"
                       @update:model-value="(val) => {
@@ -262,7 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="text-base mb-2.5 uppercase text-primary"
             data-test="alert-import-creation-title"
           >
-            Alert Creation
+            {{ t('alerts.alertCreationTitle') }}
           </div>
           <div
             class="error-list"

@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OFormInput
                         data-test="dashboard-import-url-control"
                         name="url"
-                        label="URL"
+                        :label="t('common.url')"
                         :placeholder="t('dashboard.addURL')"
                       />
                     </div>

@@ -29,11 +29,14 @@ import { copyToClipboard } from "@/utils/clipboard";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useI18n } from "vue-i18n";
 import type {
   CodeBlockProps,
   CodeBlockEmits,
   CodeBlockSlots,
 } from "./OCodeBlock.types";
+
+const { t } = useI18n();
 
 const props = withDefaults(defineProps<CodeBlockProps>(), {
   copyable: true,
@@ -107,7 +110,7 @@ const onCopy = () => {
           <i class="block size-2.5 rounded-full bg-status-positive" />
         </span>
         <span class="o2-code-lang font-mono text-2xs uppercase tracking-wider opacity-55"
-          >Terminal</span
+          >{{ t('components.codeBlock.terminal') }}</span
         >
       </span>
       <span
@@ -143,7 +146,7 @@ const onCopy = () => {
           @click="onCopy"
         >
           <OIcon name="content-copy" size="sm" />
-          <OTooltip content="Copy" side="top" />
+          <OTooltip :content="t('common.copy')" side="top" />
         </OButton>
       </div>
     </div>

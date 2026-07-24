@@ -197,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="close-actions-btn"
       >
         <OIcon name="close" size="sm" />
-        <OTooltip content="Close actions" />
+        <OTooltip :content="t('alerts.insights.actions.closeActions')" />
       </OButton>
     </div>
 
@@ -209,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div v-show="isLoading" class="flex items-center justify-center h-100">
             <OSpinner size="md" />
-            <div class="ml-3">Loading insights...</div>
+            <div class="ml-3">{{ t('alerts.insights.loading.insights') }}</div>
           </div>
 
           <div :class="isLoading ? 'invisible' : 'visible'">

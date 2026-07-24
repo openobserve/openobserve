@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="context-menu-configure-dedup"
         >
           <OIcon name="tune" size="sm" class="mr-2" />
-          <span>Configure Dedup</span>
+          <span>{{ t('alerts.insights.actions.configureDedup') }}</span>
         </div>
         <div
           class="menu-item flex items-center py-2 px-4 cursor-pointer [transition:background-color_0.2s] text-sm"
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="context-menu-edit-alert"
         >
           <OIcon name="edit" size="sm" class="mr-2" />
-          <span>Edit Alert</span>
+          <span>{{ t('alerts.insights.actions.editAlert') }}</span>
         </div>
         <div
           class="menu-item flex items-center py-2 px-4 cursor-pointer [transition:background-color_0.2s] text-sm"
@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="context-menu-view-history"
         >
           <OIcon name="history" size="sm" class="mr-2" />
-          <span>View Alert History</span>
+          <span>{{ t('alerts.insights.actions.viewAlertHistory') }}</span>
         </div>
       </div>
       <OSeparator />
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="context-menu-cancel"
         >
           <OIcon name="close" size="sm" class="mr-2" />
-          <span>Cancel</span>
+          <span>{{ t('common.cancel') }}</span>
         </div>
       </div>
     </template>
@@ -71,8 +71,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted } from "vue";
+import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+
+const { t } = useI18n();
 
 const props = defineProps<{
   x: number;

@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost-neutral"
         size="icon"
         class="gap-0!"
-        title="Add field to table"
+        :title="t('search.addFieldToTable')"
         @click.stop="$emit('toggle-field', field)"
       >
         <OIcon name="visibility" size="sm" />
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost-neutral"
         class="gap-0!"
         size="icon"
-        title="Remove field from table"
+        :title="t('search.removeFieldFromTable')"
         @click.stop="$emit('toggle-field', field)"
       >
         <OIcon name="visibility-off" size="sm" />
@@ -100,6 +100,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFieldRow from "@/lib/lists/FieldList/OFieldRow.vue";
 import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
+import { useI18n } from "vue-i18n";
 
 interface Props {
   field: any;
@@ -115,6 +116,8 @@ const props = withDefaults(defineProps<Props>(), {
   showVisibilityToggle: true,
   showFtsFieldValues: false,
 });
+
+const { t } = useI18n();
 
 defineEmits<{
   "add-to-filter": [value: string];

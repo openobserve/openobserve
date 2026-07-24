@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OIcon data-test="toc-header-icon" name="format-list-bulleted" size="sm" class="opacity-80" />
         <span data-test="toc-header-title" class="text-xs font-semibold text-text-body">
-          Table of Contents
+          {{ t('alerts.incidents.tableOfContents') }}
         </span>
       </div>
 
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div data-test="toc-content" class="p-3 flex-1 overflow-auto">
         <!-- Table of Contents -->
         <div v-if="tableOfContents.length === 0" data-test="toc-empty-state" class="text-xs italic text-text-secondary">
-          No sections available
+          {{ t('alerts.incidents.noSectionsAvailable') }}
         </div>
         <div v-else class="space-y-1">
           <!-- TOC Items -->
@@ -138,6 +138,7 @@ import { defineComponent, PropType } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useI18n } from "vue-i18n";
 
 interface TocItem {
   id: string;
@@ -168,5 +169,9 @@ export default defineComponent({
     },
   },
   emits: ['scroll-to-section', 'toggle-section'],
+  setup() {
+    const { t } = useI18n();
+    return { t };
+  },
 });
 </script>

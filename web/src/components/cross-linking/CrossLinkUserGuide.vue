@@ -13,7 +13,7 @@
         data-test="cross-link-help-btn"
       >
         <OIcon name="help" size="sm" class="size-4" />
-        <OTooltip content="User Guide" side="bottom" align="center" />
+        <OTooltip :content="t('crossLinks.userGuide')" side="bottom" align="center" />
       </OButton>
     </template>
 
@@ -26,9 +26,11 @@
       <p class="mt-1 mb-2">{{ t("crossLinks.guideFieldDesc") }}</p>
       <ul class="mt-1 mb-3 ml-5 p-0">
         <li class="my-1">
+          <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- cross-link URL template variable syntax, must stay identical in every language -->
           <span class="bg-highlight-bg px-1.25 py-px rounded-default font-mono text-[0.85em]">${field.__name}</span> – {{ t("crossLinks.guideFieldName") }}
         </li>
         <li class="my-1">
+          <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- cross-link URL template variable syntax, must stay identical in every language -->
           <span class="bg-highlight-bg px-1.25 py-px rounded-default font-mono text-[0.85em]">${field.__value}</span> – {{ t("crossLinks.guideFieldValue") }}
         </li>
       </ul>
@@ -37,31 +39,37 @@
       <p class="mt-1 mb-2">{{ t("crossLinks.guideTimeDesc") }}</p>
       <ul class="mt-1 mb-3 ml-5 p-0">
         <li class="my-1">
+          <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- cross-link URL template variable syntax, must stay identical in every language -->
           <span class="bg-highlight-bg px-1.25 py-px rounded-default font-mono text-[0.85em]">${start_time}</span> – {{ t("crossLinks.guideStartTime") }}
         </li>
         <li class="my-1">
+          <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- cross-link URL template variable syntax, must stay identical in every language -->
           <span class="bg-highlight-bg px-1.25 py-px rounded-default font-mono text-[0.85em]">${end_time}</span> – {{ t("crossLinks.guideEndTime") }}
         </li>
       </ul>
       <p class="mt-1 mb-2">
         {{ t("crossLinks.guideTimeExample") }}
+        <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- cross-link URL template variable syntax, must stay identical in every language -->
         <span class="bg-highlight-bg px-1.25 py-px rounded-default font-mono text-[0.85em]">from=${start_time}&amp;to=${end_time}</span>
       </p>
 
       <div class="header font-semibold mt-3 mb-1">{{ t("crossLinks.guideQueryHeader") }}</div>
       <p class="mt-1 mb-2">{{ t("crossLinks.guideQueryDesc") }}</p>
       <ul class="mt-1 mb-3 ml-5 p-0">
-        <li class="my-1"><span class="bg-highlight-bg px-1.25 py-px rounded-default font-mono text-[0.85em]">${query}</span> – {{ t("crossLinks.guideQuery") }}</li>
         <li class="my-1">
+          <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- cross-link URL template variable syntax, must stay identical in every language -->
+          <span class="bg-highlight-bg px-1.25 py-px rounded-default font-mono text-[0.85em]">${query}</span> – {{ t("crossLinks.guideQuery") }}
+        </li>
+        <li class="my-1">
+          <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- cross-link URL template variable syntax, must stay identical in every language -->
           <span class="bg-highlight-bg px-1.25 py-px rounded-default font-mono text-[0.85em]">${query_encoded}</span> – {{ t("crossLinks.guideQueryEncoded") }}
         </li>
       </ul>
 
       <div class="header font-semibold mt-3 mb-1">{{ t("crossLinks.guideExampleHeader") }}</div>
       <p class="mt-1 mb-2">
-        <span class="bg-highlight-bg px-1.25 py-px rounded-default font-mono text-[0.85em]"
-          >https://example.com/trace/${field.__value}?from=${start_time}&amp;to=${end_time}</span
-        >
+        <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- cross-link URL template variable syntax, must stay identical in every language -->
+        <span class="bg-highlight-bg px-1.25 py-px rounded-default font-mono text-[0.85em]">https://example.com/trace/${field.__value}?from=${start_time}&amp;to=${end_time}</span>
       </p>
     </div>
   </ODropdown>

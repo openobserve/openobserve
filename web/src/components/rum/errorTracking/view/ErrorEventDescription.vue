@@ -26,8 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="bg-surface-subtle rounded-default p-2"
       >
 {
-  <span class="text-primary">from</span> : {{ column.view_referrer }},
-  <span class="text-primary">to</span> : {{ column.view_url }}
+  <span class="text-primary">{{ t('rum.from') }}</span> : {{ column.view_referrer }},
+  <span class="text-primary">{{ t('rum.to') }}</span> : {{ column.view_url }}
 }</pre>
     </template>
     <template
@@ -56,6 +56,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 const props = defineProps({
   column: {

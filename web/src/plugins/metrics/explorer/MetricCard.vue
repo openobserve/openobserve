@@ -152,6 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="lastRefreshedAt ml-1.25 mr-0.5 text-[smaller] whitespace-nowrap overflow-hidden text-ellipsis shrink-0"
           :data-test="`metrics-explorer-card-last-refreshed-${card.name}`"
         >
+          <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- decorative clock emoji glyph, not localizable text -->
           <span class="text-[smaller] mr-0.5">
             🕑
             <OTooltip side="bottom" align="end">

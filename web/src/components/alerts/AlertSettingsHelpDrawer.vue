@@ -254,16 +254,17 @@ defineExpose({ applyTemplate, previewTemplate });
           t("alerts.alertSettings.helpLegendTitle")
         }}</span>
         <span class="help-legend__item">
-          <span class="help-legend__swatch help-legend__swatch--live">High CPU</span>
+          <span class="help-legend__swatch help-legend__swatch--live">{{ t("alerts.alertSettings.helpLegendLiveExample") }}</span>
           <span class="help-legend__sep">=</span>
           {{ t("alerts.alertSettings.helpLegendLive") }}
         </span>
         <span class="help-legend__item">
-          <span class="help-legend__swatch help-legend__swatch--sample">42</span>
+          <span class="help-legend__swatch help-legend__swatch--sample">{{ t("alerts.alertSettings.helpLegendSampleExample") }}</span>
           <span class="help-legend__sep">=</span>
           {{ t("alerts.alertSettings.helpLegendSample") }}
         </span>
         <span class="help-legend__item">
+          <!-- eslint-disable-next-line local/no-bare-bound-text-props -- "{rows}" is a literal token name shown as documentation, not translatable text -->
           <span class="help-legend__swatch help-legend__swatch--opaque">{{ "{rows}" }}</span>
           <span class="help-legend__sep">=</span>
           {{ t("alerts.alertSettings.helpLegendOpaque") }}

@@ -10,6 +10,9 @@ import type {
 import { computed, ref, useAttrs, useId } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -287,7 +290,7 @@ const wrapperClasses = computed(() => [
             v-if="!disabled"
             type="button"
             tabindex="-1"
-            aria-label="Remove file"
+            :aria-label="t('components.file.removeFile')"
             :data-test="`o-file-chip-${i}-remove-btn`"
             class="flex items-center text-file-chip-remove hover:opacity-80"
             @click.stop="removeFile(i, $event)"
@@ -311,7 +314,7 @@ const wrapperClasses = computed(() => [
         v-if="files.length > 0 && !disabled"
         type="button"
         tabindex="-1"
-        aria-label="Clear all"
+        :aria-label="t('components.file.clearAll')"
         class="flex items-center text-file-icon hover:opacity-80 shrink-0"
         @click.stop="handleClear($event)"
       >

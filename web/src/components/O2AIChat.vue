@@ -53,7 +53,7 @@
                 <div class="search-history-bar-sticky sticky top-0 z-2 bg-surface-base p-2 border-b border-separator shrink-0">
                   <OSearchInput
                     v-model="historySearchTerm"
-                    placeholder="Search chat history"
+                    :placeholder="t('aiAssistant.searchChatHistory')"
                     class="mt-1"
                   />
                 </div>
@@ -84,7 +84,7 @@
                         @click.stop="deleteChat(chat.id)"
                       >
                         <OIcon name="delete" size="sm" />
-                        <OTooltip content="Delete chat" />
+                        <OTooltip :content="t('aiAssistant.deleteChatTooltip')" />
                       </OButton>
                     </div>
                   </ODropdownItem>
@@ -92,7 +92,7 @@
                     v-if="filteredChatHistory.length === 0"
                     class="text-center text-text-muted p-2"
                   >
-                    No matching chats found
+                    {{ t('aiAssistant.noMatchingChatsFound') }}
                   </div>
                 </div>
 
@@ -110,7 +110,7 @@
                     <template #icon-left>
                       <OIcon name="delete-sweep" size="sm" />
                     </template>
-                    Clear all conversations
+                    {{ t('aiAssistant.clearAllConversations') }}
                   </OButton>
                 </div>
               </div>
@@ -126,7 +126,7 @@
               @click.stop="openEditTitleDialog"
             >
               <OIcon name="edit" size="sm" />
-              <OTooltip content="Edit title" />
+              <OTooltip :content="t('aiAssistant.editTitleTooltip')" />
             </OButton>
             <OButton variant="ghost" size="icon-sm" @click="addNewChat">
               <OIcon name="add" size="sm" />
@@ -158,7 +158,7 @@
       <OSeparator class="bg-separator" />
 
       <!-- History Panel -->
-      <ODrawer data-test="o2-ai-chat-history-drawer" bleed v-model:open="showHistory" size="sm" title="Chat History">
+      <ODrawer data-test="o2-ai-chat-history-drawer" bleed v-model:open="showHistory" size="sm" :title="t('aiAssistant.chatHistory')">
         <ul class="flex flex-col divide-y divide-border">
           <li
             v-for="chat in chatHistory"
@@ -172,7 +172,7 @@
               {{ new Date(chat.timestamp).toLocaleString() }}
             </span>
             <span class="block text-xs text-muted-foreground">
-              Model: {{ chat.model }}
+              {{ t('aiAssistant.modelLabel') }} {{ chat.model }}
             </span>
           </li>
         </ul>
@@ -183,9 +183,9 @@
         data-test="o2-ai-chat-edit-title-dialog"
         v-model:open="showEditTitleDialog"
         size="sm"
-        title="Edit Chat Title"
-        secondary-button-label="Cancel"
-        primary-button-label="Save"
+        :title="t('aiAssistant.editChatTitle')"
+        :secondary-button-label="t('common.cancel')"
+        :primary-button-label="t('common.save')"
         @click:secondary="showEditTitleDialog = false"
         @click:primary="saveEditedTitle"
       >
@@ -193,15 +193,15 @@
           v-model="editingTitle"
           autofocus
           @keyup.enter="saveEditedTitle"
-          placeholder="Enter chat title"
+          :placeholder="t('aiAssistant.enterChatTitle')"
         />
       </ODialog>
 
       <!-- Delete Chat Confirmation Dialog -->
       <ConfirmDialog
         v-model="showDeleteChatConfirmDialog"
-        title="Delete Chat"
-        message="Are you sure you want to delete this chat? This action cannot be undone."
+        :title="t('aiAssistant.deleteChat')"
+        :message="t('aiAssistant.deleteChatConfirmMessage')"
         @update:ok="confirmDeleteChat"
         @update:cancel="showDeleteChatConfirmDialog = false"
       />
@@ -209,8 +209,8 @@
       <!-- Clear All Conversations Confirmation Dialog -->
       <ConfirmDialog
         v-model="showClearAllConfirmDialog"
-        title="Clear All Conversations"
-        message="Are you sure you want to clear all conversations? This action cannot be undone."
+        :title="t('aiAssistant.clearAllConversationsTitle')"
+        :message="t('aiAssistant.clearAllConversationsMessage')"
         @update:ok="confirmClearAllConversations"
         @update:cancel="showClearAllConfirmDialog = false"
       />
@@ -267,7 +267,7 @@
                 <div class="relative inline-block">
                   <span
                     class="text-sm font-[600] ml-7.5 text-center"
-                    >O2 Assistant</span
+                    >{{ t('aiAssistant.welcome.taglineHighlight') }}</span
                   >
                   <!-- Same shared Beta tag as the Workflows screens. -->
                   <BetaBadge class="ml-2" />
@@ -404,19 +404,19 @@
                       <!-- Error details for failed tool calls -->
                       <template v-if="block.success === false">
                         <div v-if="block.resultMessage" class="detail-item flex flex-col gap-1">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Error</span>
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{ t('common.error') }}</span>
                           <span class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere] text-status-negative">{{
                             block.resultMessage
                           }}</span>
                         </div>
                         <div v-if="block.errorType" class="detail-item flex flex-col gap-1">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Type</span>
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{ t('common.type') }}</span>
                           <code class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]">{{
                             block.errorType
                           }}</code>
                         </div>
                         <div v-if="block.suggestion" class="detail-item flex flex-col gap-1">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Suggestion</span>
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{ t('aiAssistant.suggestion') }}</span>
                           <span class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere] italic opacity-85">{{
                             block.suggestion
                           }}</span>
@@ -428,18 +428,18 @@
                           v-if="block.summary.count !== undefined"
                           class="detail-item flex flex-col gap-1"
                         >
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Results</span>
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{ t('aiAssistant.results') }}</span>
                           <span class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]"
-                            >{{ block.summary.count }} records</span
+                            >{{ block.summary.count }} {{ t('aiAssistant.recordsSuffix') }}</span
                           >
                         </div>
                         <div
                           v-if="block.summary.took !== undefined"
                           class="detail-item flex flex-col gap-1"
                         >
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Duration</span>
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{ t('common.duration') }}</span>
                           <span class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]"
-                            >{{ block.summary.took }}ms</span
+                            >{{ block.summary.took }}{{ t('aiAssistant.ms') }}</span
                           >
                         </div>
                         <!-- CLI tool summary (return_code / stdout_lines / stderr_lines / truncated) -->
@@ -447,7 +447,7 @@
                           v-if="block.summary.return_code !== undefined"
                           class="detail-item flex flex-col gap-1"
                         >
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Exit code</span>
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{ t('aiAssistant.exitCode') }}</span>
                           <code class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]">{{
                             block.summary.return_code
                           }}</code>
@@ -456,23 +456,23 @@
                           v-if="block.summary.stdout_lines !== undefined"
                           class="detail-item flex flex-col gap-1"
                         >
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Stdout</span>
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{ t('aiAssistant.stdout') }}</span>
                           <span class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]"
-                            >{{ block.summary.stdout_lines }} lines</span
+                            >{{ block.summary.stdout_lines }} {{ t('aiAssistant.lines') }}</span
                           >
                         </div>
                         <div
                           v-if="block.summary.stderr_lines"
                           class="detail-item flex flex-col gap-1"
                         >
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Stderr</span>
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{ t('aiAssistant.stderr') }}</span>
                           <span class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]"
-                            >{{ block.summary.stderr_lines }} lines</span
+                            >{{ block.summary.stderr_lines }} {{ t('aiAssistant.lines') }}</span
                           >
                         </div>
                         <div v-if="block.summary.truncated" class="detail-item flex flex-col gap-1">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Output</span>
-                          <span class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]">truncated</span>
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{ t('common.output') }}</span>
+                          <span class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]">{{ t('aiAssistant.truncatedLabel') }}</span>
                         </div>
                       </template>
                       <!-- Existing context details -->
@@ -481,7 +481,7 @@
                         class="detail-item flex flex-col gap-1"
                       >
                         <div class="detail-header flex items-center justify-between">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Query</span>
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{ t('common.query') }}</span>
                           <OButton
                             variant="ghost"
                             size="icon-xs-circle"
@@ -493,7 +493,7 @@
                             "
                           >
                             <OIcon name="content-copy" size="sm" />
-                            <OTooltip content="Copy query" />
+                            <OTooltip :content="t('aiAssistant.copyQuery')" />
                           </OButton>
                         </div>
                         <code class="detail-value query-value text-xs select-text font-mono p-2 rounded-default whitespace-pre-wrap break-all cursor-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">{{
@@ -504,7 +504,7 @@
                         v-if="getToolCallDisplayData(block.context)?.stream"
                         class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">Stream</span>
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{ t('aiAssistant.stream') }}</span>
                         <code class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]">{{
                           getToolCallDisplayData(block.context)?.stream
                         }}</code>
@@ -513,7 +513,7 @@
                         v-if="getToolCallDisplayData(block.context)?.type"
                         class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">Type</span>
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{ t('common.type') }}</span>
                         <code class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]">{{
                           getToolCallDisplayData(block.context)?.type
                         }}</code>
@@ -522,7 +522,7 @@
                         v-if="getToolCallDisplayData(block.context)?.start_time"
                         class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">Start</span>
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{ t('aiAssistant.start') }}</span>
                         <span class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]">{{
                           formatTimestamp(
                             getToolCallDisplayData(block.context)?.start_time,
@@ -533,7 +533,7 @@
                         v-if="getToolCallDisplayData(block.context)?.end_time"
                         class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">End</span>
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{ t('aiAssistant.end') }}</span>
                         <span class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]">{{
                           formatTimestamp(
                             getToolCallDisplayData(block.context)?.end_time,
@@ -547,7 +547,7 @@
                         "
                         class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">From</span>
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{ t('aiAssistant.from') }}</span>
                         <span class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]">{{
                           getToolCallDisplayData(block.context)?.from
                         }}</span>
@@ -559,7 +559,7 @@
                         "
                         class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">Size</span>
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{ t('aiAssistant.size') }}</span>
                         <span class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]">{{
                           getToolCallDisplayData(block.context)?.size
                         }}</span>
@@ -568,7 +568,7 @@
                         v-if="getToolCallDisplayData(block.context)?.query_type"
                         class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">Query Type</span>
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{ t('aiAssistant.queryType') }}</span>
                         <code class="detail-value text-xs select-text min-w-0 max-w-full break-words [overflow-wrap:anywhere]">{{
                           getToolCallDisplayData(block.context)?.query_type
                         }}</code>
@@ -578,7 +578,7 @@
                         class="detail-item flex flex-col gap-1"
                       >
                         <div class="detail-header flex items-center justify-between">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">VRL</span>
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{ t('aiAssistant.welcome.taglineVrl') }}</span>
                           <OButton
                             variant="ghost"
                             size="icon-xs-circle"
@@ -590,7 +590,7 @@
                             "
                           >
                             <OIcon name="content-copy" size="sm" />
-                            <OTooltip content="Copy VRL" />
+                            <OTooltip :content="t('aiAssistant.copyVrl')" />
                           </OButton>
                         </div>
                         <code class="detail-value query-value text-xs select-text font-mono p-2 rounded-default whitespace-pre-wrap break-all cursor-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">{{
@@ -602,7 +602,7 @@
                         class="detail-item flex flex-col gap-1"
                       >
                         <div class="detail-header flex items-center justify-between">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Command</span>
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{ t('aiAssistant.command') }}</span>
                           <OButton
                             variant="ghost"
                             size="icon-xs-circle"
@@ -614,7 +614,7 @@
                             "
                           >
                             <OIcon name="content-copy" size="sm" />
-                            <OTooltip content="Copy command" />
+                            <OTooltip :content="t('aiAssistant.copyCommand')" />
                           </OButton>
                         </div>
                         <code class="detail-value query-value text-xs select-text font-mono p-2 rounded-default whitespace-pre-wrap break-all cursor-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">{{
@@ -625,7 +625,7 @@
                       <template v-if="block.response && block.response.hits">
                         <div class="detail-item flex flex-col gap-1">
                           <div class="detail-header flex items-center justify-between">
-                            <span class="detail-label text-2xs font-semibold uppercase opacity-60">Results</span>
+                            <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{ t('aiAssistant.results') }}</span>
                             <OButton
                               variant="ghost"
                               size="icon-xs-circle"
@@ -637,7 +637,7 @@
                               "
                             >
                               <OIcon name="content-copy" size="sm" />
-                              <OTooltip content="Copy results" />
+                              <OTooltip :content="t('aiAssistant.copyResults')" />
                             </OButton>
                           </div>
                           <div class="tool-response-hits flex flex-col gap-1 text-xs font-mono px-2 py-1.5 rounded-default max-h-50 overflow-y-auto [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">
@@ -661,17 +661,17 @@
                           <span
                             v-if="block.response.total !== undefined"
                             class="context-tag"
-                            >Total: {{ block.response.total }}</span
+                            >{{ t('aiAssistant.total') }} {{ block.response.total }}</span
                           >
                           <span
                             v-if="block.response.took !== undefined"
                             class="context-tag"
-                            >Took: {{ block.response.took }}ms</span
+                            >{{ t('aiAssistant.took') }} {{ block.response.took }}{{ t('aiAssistant.ms') }}</span
                           >
                           <span
                             v-if="block.response.hits_truncated"
                             class="context-tag"
-                            >Showing first
+                            >{{ t('aiAssistant.showingFirst') }}
                             {{ block.response.hits.length }}</span
                           >
                         </div>
@@ -684,7 +684,7 @@
                         "
                       >
                         <div v-if="block.response.input" class="detail-item flex flex-col gap-1">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Input Events</span>
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{ t('aiAssistant.inputEvents') }}</span>
                           <div class="tool-response-hits flex flex-col gap-1 text-xs font-mono px-2 py-1.5 rounded-default max-h-50 overflow-y-auto [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">
                             <div
                               v-for="(evt, eIdx) in block.response.input"
@@ -707,7 +707,7 @@
                           </div>
                         </div>
                         <div v-if="block.response.output" class="detail-item flex flex-col gap-1">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Output</span>
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{ t('common.output') }}</span>
                           <div class="tool-response-hits flex flex-col gap-1 text-xs font-mono px-2 py-1.5 rounded-default max-h-50 overflow-y-auto [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">
                             <div
                               v-for="(res, rIdx) in block.response.output"
@@ -732,7 +732,7 @@
                                 v-if="res.message"
                                 class="hit-field break-all select-text cursor-text text-status-negative"
                               >
-                                <span class="hit-key opacity-60 font-semibold">error:</span>
+                                <span class="hit-key opacity-60 font-semibold">{{ t('aiAssistant.errorLabel') }}</span>
                                 {{ res.message }}
                               </span>
                             </div>
@@ -752,7 +752,7 @@
                           class="detail-item flex flex-col gap-1"
                         >
                           <div class="detail-header flex items-center justify-between">
-                            <span class="detail-label text-2xs font-semibold uppercase opacity-60">Items</span>
+                            <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{ t('aiAssistant.items') }}</span>
                             <OButton
                               variant="ghost"
                               size="icon-xs-circle"
@@ -764,7 +764,7 @@
                               "
                             >
                               <OIcon name="content-copy" size="sm" />
-                              <OTooltip content="Copy items" />
+                              <OTooltip :content="t('aiAssistant.copyItems')" />
                             </OButton>
                           </div>
                           <div class="tool-response-hits flex flex-col gap-1 text-xs font-mono px-2 py-1.5 rounded-default max-h-50 overflow-y-auto [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">
@@ -792,7 +792,7 @@
                       <!-- Tool response: generic fallback (string or other) -->
                       <div v-else-if="block.response" class="detail-item flex flex-col gap-1">
                         <div class="detail-header flex items-center justify-between">
-                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">Response</span>
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{ t('aiAssistant.response') }}</span>
                           <OButton
                             variant="ghost"
                             size="icon-xs-circle"
@@ -806,7 +806,7 @@
                             "
                           >
                             <OIcon name="content-copy" size="sm" />
-                            <OTooltip content="Copy response" />
+                            <OTooltip :content="t('aiAssistant.copyResponse')" />
                           </OButton>
                         </div>
                         <code class="detail-value query-value text-xs select-text font-mono p-2 rounded-default whitespace-pre-wrap break-all cursor-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]">{{
@@ -856,7 +856,7 @@
                           @click.stop="copyToClipboard(block.content)"
                         >
                           <OIcon name="content-copy" size="sm" />
-                          <OTooltip content="Copy content" />
+                          <OTooltip :content="t('aiAssistant.copyContent')" />
                         </OButton>
                         <code
                           class="log-entry-code block font-mono text-2xs leading-relaxed p-3 pr-10 whitespace-pre-wrap [word-wrap:break-word] select-text cursor-text max-h-75 overflow-y-auto bg-surface-base text-text-body dark:[background:var(--color-syntax-bg)] dark:text-text-secondary"
@@ -886,7 +886,7 @@
                       v-if="block.recoverable"
                       class="stream-error-recoverable mt-1 pl-6 text-2xs opacity-70"
                     >
-                      This error may be temporary. You can try again.
+                      {{ t('aiAssistant.errorMayBeTemporary') }}
                     </div>
                   </div>
                   <!-- Navigation block - standalone navigation button -->
@@ -936,7 +936,7 @@
                             @click="copyToClipboard(textBlock.content)"
                           >
                             <OIcon size="sm" name="content-copy" />
-                            <span class="ml-1">Copy</span>
+                            <span class="ml-1">{{ t('common.copy') }}</span>
                           </OButton>
                         </div>
                         <span class="generated-code-block">
@@ -955,7 +955,7 @@
                             @click="retryGeneration(message)"
                           >
                             <OIcon size="sm" name="refresh" />
-                            <span class="ml-1">Retry</span>
+                            <span class="ml-1">{{ t('common.retry') }}</span>
                           </OButton>
                         </div>
                       </div>
@@ -1020,7 +1020,7 @@
                           @click="copyToClipboard(block.content)"
                         >
                           <OIcon size="sm" name="content-copy" />
-                          <span class="ml-1">Copy</span>
+                          <span class="ml-1">{{ t('common.copy') }}</span>
                         </OButton>
                       </div>
                       <span class="generated-code-block">
@@ -1060,7 +1060,7 @@
                     @click="likeCodeBlock(index)"
                   >
                     <OIcon name="thumb-up-off-alt" size="xs" />
-                    <OTooltip content="Helpful" />
+                    <OTooltip :content="t('aiAssistant.helpful')" />
                   </OButton>
                   <OButton
                     variant="ghost"
@@ -1075,7 +1075,7 @@
                     @click="dislikeCodeBlock(index)"
                   >
                     <OIcon name="thumb-down-off-alt" size="xs" />
-                    <OTooltip content="Not helpful" />
+                    <OTooltip :content="t('aiAssistant.notHelpful')" />
                   </OButton>
                 </div>
               </div>
@@ -1153,7 +1153,7 @@
                     "
                     class="context-tag inline-flex items-center text-2xs px-2 py-1 rounded-default font-medium text-ai-accent dark:text-text-secondary [background:color-mix(in_srgb,var(--color-ai-accent)_10%,transparent)] dark:[background:color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)]"
                   >
-                    Stream:
+                    {{ t('aiAssistant.streamPrefix') }}
                     {{ getToolCallDisplayData(activeToolCall.context)?.stream }}
                   </span>
                   <span
@@ -1162,7 +1162,7 @@
                     "
                     class="context-tag inline-flex items-center text-2xs px-2 py-1 rounded-default font-medium text-ai-accent dark:text-text-secondary [background:color-mix(in_srgb,var(--color-ai-accent)_10%,transparent)] dark:[background:color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)]"
                   >
-                    Type:
+                    {{ t('aiAssistant.typePrefix') }}
                     {{
                       getToolCallDisplayData(activeToolCall.context)?.query_type
                     }}
@@ -1194,7 +1194,7 @@
             @click="scrollToBottomSmooth"
           >
             <OIcon name="arrow-downward" size="sm" />
-            <OTooltip side="top" align="center" content="Scroll to bottom" />
+            <OTooltip side="top" align="center" :content="t('aiAssistant.scrollToBottom')" />
           </OButton>
         </div>
       </div>

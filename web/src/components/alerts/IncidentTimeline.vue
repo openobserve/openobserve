@@ -28,8 +28,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex flex-col items-center justify-center py-16 text-text-muted"
     >
       <OIcon name="forum" class="mb-3 opacity-40 size-14!" />
-      <div class="text-base font-medium mb-1">No activity yet</div>
-      <div class="text-sm text-text-muted">Events and comments will appear here</div>
+      <div class="text-base font-medium mb-1">{{ t('alerts.incidents.noActivityYet') }}</div>
+      <div class="text-sm text-text-muted">{{ t('alerts.incidents.eventsAndCommentsAppearHere') }}</div>
     </div>
 
     <!-- Activity Feed with Timeline -->
@@ -41,13 +41,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-circle-sm"
           @click="scrollToTop"
           data-test="incident-timeline-scroll-top"
-        ><OIcon name="keyboard-arrow-up" size="sm" /><OTooltip content="Scroll to top" /></OButton>
+        ><OIcon name="keyboard-arrow-up" size="sm" /><OTooltip :content="t('alerts.incidents.scrollToTop')" /></OButton>
         <OButton
           variant="ghost-muted"
           size="icon-circle-sm"
           @click="scrollToBottom"
           data-test="incident-timeline-scroll-bottom"
-        ><OIcon name="keyboard-arrow-down" size="sm" /><OTooltip content="Scroll to bottom" /></OButton>
+        ><OIcon name="keyboard-arrow-down" size="sm" /><OTooltip :content="t('alerts.incidents.scrollToBottom')" /></OButton>
       </div>
 
       <div ref="timelineContainer" class="flex-1 min-h-0 overflow-y-auto px-3 pt-2 pb-4">
@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="inline-flex items-center px-2 py-0.5 rounded-default text-xs font-semibold"
                           :style="badgeStyle(getEventBadgeColor(event))"
                         >
-                          AI SRE
+                          {{ t('alerts.incidents.aiSreBadge') }}
                           <OTooltip v-if="event.type === 'ai_analysis_failed' && getFailureTooltip(event)" :delay="300" side="bottom" align="start" :max-width="'24rem'" :content="getFailureTooltip(event)" />
                         </span>
                         <span class="text-sm"
@@ -204,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span class="text-xs"
                         :class="'text-text-secondary'"
                       >
-                        commented {{ formatRelativeTime(event.timestamp) }}
+                        {{ t('alerts.incidents.commentedPrefix') }} {{ formatRelativeTime(event.timestamp) }}
                       </span>
                     </div>
 
@@ -247,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OInput
             v-model="commentText"
             type="textarea"
-            placeholder="Write a comment..."
+            :placeholder="t('alerts.incidents.commentPlaceholder')"
             :rows="3"
             @keydown.ctrl.enter.prevent="submitComment"
             @keydown.meta.enter.prevent="submitComment"
@@ -263,7 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="submitting"
               @click="submitComment"
               data-test="incident-timeline-comment-send"
-            ><OIcon name="send" size="sm" /><OTooltip content="Send comment" /></OButton>
+            ><OIcon name="send" size="sm" /><OTooltip :content="t('alerts.incidents.sendComment')" /></OButton>
           </div>
         </div>
       </div>
@@ -274,6 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, onMounted, watch, nextTick } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import { useTheme } from "@/composables/useTheme";
 import { formatToDateOnly } from "@/utils/date";
 import incidentsService from "@/services/incidents";
@@ -295,6 +296,7 @@ interface Props {
 const props = defineProps<Props>();
 
 const store = useStore();
+const { t } = useI18n();
 const { isDark } = useTheme();
 
 const events = ref<any[]>([]);

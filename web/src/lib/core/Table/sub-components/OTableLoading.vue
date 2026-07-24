@@ -4,6 +4,9 @@
 import { computed, inject } from "vue";
 import type { Column } from "@tanstack/vue-table";
 import { TABLE_CHECKBOX_COL_SIZE, type OTableColumnDef } from "../OTable.types";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   /** Number of skeleton rows. Default: 10 */
@@ -135,7 +138,7 @@ const alignClassFor = (col: Column<any, any>): string => {
     data-test="o2-table-skeleton-body"
     aria-busy="true"
     aria-live="polite"
-    aria-label="Loading data"
+    :aria-label="t('components.tableLoading.ariaLabel')"
   >
     <tr
       v-for="r in rowCount"

@@ -33,16 +33,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- No Token Error -->
       <div v-if="state === 'no_token'" class="text-center">
         <OIcon name="warning" style="width: 80px; height: 80px;" />
-        <h5 class="mt-3">No Marketplace Token Found</h5>
+        <h5 class="mt-3">{{ t('billing.azureMarketplace.noTokenFound') }}</h5>
         <p class="text-text-secondary">
-          Please start the registration process from Azure Marketplace.
+          {{ t('billing.azureMarketplace.noTokenDescription') }}
         </p>
         <OButton
           variant="primary"
           size="sm-action"
           class="mt-4"
           @click="goToDashboard"
-        >Go to Dashboard</OButton>
+        >{{ t('billing.azureMarketplace.goToDashboard') }}</OButton>
       </div>
 
       <!-- Error State -->
@@ -54,24 +54,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm-action"
           class="mt-4"
           @click="resetAndRetry"
-        >Try Again</OButton>
+        >{{ t('billing.azureMarketplace.tryAgain') }}</OButton>
       </div>
 
       <!-- Org Selection/Creation -->
       <div v-else-if="state === 'select_org'" class="text-center">
         <OIcon name="cloud" style="width: 60px; height: 60px;" />
-        <h4 class="mt-3">Complete Azure Marketplace Setup</h4>
+        <h4 class="mt-3">{{ t('billing.azureMarketplace.completeSetup') }}</h4>
         <p class="text-text-secondary mb-4">
-          Link your Azure Marketplace subscription to an organization
+          {{ t('billing.azureMarketplace.linkSubscriptionDescription') }}
         </p>
 
         <div class="max-w-100 mx-auto">
           <!-- Create New Org -->
           <OCard class="rounded-default transition-all duration-200 hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)] mb-4">
             <OCardSection role="body">
-              <div class="text-xl font-semibold">Create New Organization</div>
+              <div class="text-xl font-semibold">{{ t('billing.azureMarketplace.createNewOrg') }}</div>
               <p class="text-text-secondary">
-                Create a new organization with Azure Marketplace billing
+                {{ t('billing.azureMarketplace.createNewOrgDescription') }}
               </p>
               <OForm
                 id="azure-create-org-form"
@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OFormInput
                   name="newOrgName"
                   data-test="azure-marketplace-org-name"
-                  label="Organization Name"
+                  :label="t('billing.azureMarketplace.orgName')"
                   required
                   class="mb-3"
                 />
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="sm-action"
                   block
                   :loading="isSubmitting"
-                >Create &amp; Link</OButton>
+                >{{ t('billing.azureMarketplace.createAndLink') }}</OButton>
               </OForm>
             </OCardSection>
           </OCard>
@@ -105,9 +105,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="rounded-default transition-all duration-200 hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)]"
           >
             <OCardSection role="body">
-              <div class="text-xl font-semibold">Link to Existing Organization</div>
+              <div class="text-xl font-semibold">{{ t('billing.azureMarketplace.linkToExisting') }}</div>
               <p class="text-text-secondary">
-                Link Azure billing to an existing organization
+                {{ t('billing.azureMarketplace.linkBillingDescription') }}
               </p>
               <OForm
                 id="azure-link-org-form"
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :options="eligibleOrganizations as any[]"
                   label-key="name"
                   value-key="identifier"
-                  label="Select Organization"
+                  :label="t('billing.azureMarketplace.selectOrganization')"
                   required
                   class="mb-3"
                 />
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="sm-action"
                   block
                   :loading="isSubmitting"
-                >Link Azure Billing</OButton>
+                >{{ t('billing.azureMarketplace.linkAzureBilling') }}</OButton>
               </OForm>
             </OCardSection>
           </OCard>
@@ -142,33 +142,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Processing State -->
       <div v-else-if="state === 'processing'" class="text-center">
         <OSpinner variant="dots" size="xl" />
-        <h5 class="mt-3">Setting up your subscription...</h5>
-        <p class="text-text-secondary">Please wait while we configure your account.</p>
+        <h5 class="mt-3">{{ t('billing.azureMarketplace.settingUp') }}</h5>
+        <p class="text-text-secondary">{{ t('billing.azureMarketplace.pleaseWait') }}</p>
       </div>
 
 
       <!-- Success State -->
       <div v-else-if="state === 'success'" class="text-center">
         <OIcon name="check-circle" style="width: 80px; height: 80px;" />
-        <h4 class="mt-3">Subscription Activated!</h4>
+        <h4 class="mt-3">{{ t('billing.azureMarketplace.subscriptionActivated') }}</h4>
         <p class="text-text-secondary">
-          Your Azure Marketplace subscription is now active.
+          {{ t('billing.azureMarketplace.activatedDescription') }}
         </p>
         <OButton
           variant="primary"
           size="sm-action"
           class="mt-4"
           @click="goToDashboard"
-        >Go to Dashboard</OButton>
+        >{{ t('billing.azureMarketplace.goToDashboard') }}</OButton>
       </div>
 
       <!-- Payment Failed State -->
       <div v-else-if="state === 'payment_failed'" class="text-center">
         <OIcon name="error" style="width: 80px; height: 80px;" />
-        <h5 class="mt-3">Payment Failed</h5>
+        <h5 class="mt-3">{{ t('billing.azureMarketplace.paymentFailed') }}</h5>
         <p class="text-text-secondary">
-          There was an issue with activating Azure subscription. Please check
-          your Azure account or contact support.
+          {{ t('billing.azureMarketplace.paymentFailedDescription') }}
         </p>
         <OButton
           as="a"
@@ -176,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="primary"
           size="sm-action"
           class="mt-4"
-        >Contact Support</OButton>
+        >{{ t('billing.azureMarketplace.contactSupport') }}</OButton>
       </div>
     </div>
   </div>
@@ -344,6 +343,7 @@ export default defineComponent({
     };
 
     return {
+      t,
       store,
       isDark,
       state,

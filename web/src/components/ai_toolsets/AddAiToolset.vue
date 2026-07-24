@@ -81,13 +81,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("aiToolset.mcpConfig") }}
             </div>
             <div class="o2-input mb-4">
-              <OFormInput
+              <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- example URL format, not translatable content -->
+              <OFormInput placeholder="https://api.example.com/mcp/"
                 data-test="ai-toolset-mcp-url"
                 name="mcp.url"
                 :label="t('aiToolset.mcpUrl')"
                 required
                 class="showLabelOnTop w-full"
-                placeholder="https://api.example.com/mcp/"
               />
             </div>
             <div class="o2-input mb-4">
@@ -164,22 +164,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div class="o2-input mb-4">
-              <OFormInput
+              <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- example CLI command name, not translatable content -->
+              <OFormInput placeholder="kubectl"
                 data-test="ai-toolset-cli-command"
                 name="cli.command"
                 :label="t('aiToolset.cliCommand')"
                 required
                 class="showLabelOnTop w-full"
-                placeholder="kubectl"
               />
             </div>
             <div class="o2-input mb-4">
-              <OFormInput
+              <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- example CLI subcommand names, not translatable content -->
+              <OFormInput placeholder="get, describe, logs"
                 name="cli.allowed_subcommands_raw"
                 :label="t('aiToolset.allowedSubcommands')"
                 :helpText="t('aiToolset.subcommandsHint')"
                 class="showLabelOnTop w-full"
-                placeholder="get, describe, logs"
               />
             </div>
             <div class="flex gap-4 mb-4">

@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="trace-details-sidebar-header-toolbar-ttft"
           >
             <template #icon><OIcon name="speed" size="xs" /></template>
-            <span class="text-3xs font-medium mr-0.75 text-text-secondary">TTFT</span>
+            <span class="text-3xs font-medium mr-0.75 text-text-secondary">{{ t('traces.traceDetailsSidebar.ttft') }}</span>
             <span class="text-3xs font-semibold text-text-body">{{ getTTFT }}</span>
           </OTag>
 
@@ -233,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('traces.traceDetailsSidebar.totalCost')"
           >
             <span class="text-3xs font-semibold text-badge-orange-ol-text"
-              >${{ Number(llmMetrics.cost.total).toFixed(5) }}</span
+              >{{ t('traces.sessionDetail.currencySymbol') }}{{ Number(llmMetrics.cost.total).toFixed(5) }}</span
             >
           </OTag>
         </div>
@@ -496,7 +496,7 @@ class="h-5! text-xs!">
                 <template #icon-left
                   ><OIcon name="data-object" size="xs" class="shrink-0"
                 /></template>
-                JSON
+                {{ t('common.json') }}
               </OToggleGroupItem>
               <OToggleGroupItem value="table"
 size="xs"

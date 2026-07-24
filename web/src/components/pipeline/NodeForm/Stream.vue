@@ -94,25 +94,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="selectedNodeType == 'output'"
               class="note-message bg-banner-warning-bg text-banner-warning-text w-full rounded-default p-3 flex flex-col gap-2"
             >
-              <div class="text-sm text-banner-warning-text">Guidelines:</div>
+              <div class="text-sm text-banner-warning-text">{{ t('alerts.guidelinesLabel') }}</div>
               <div class="flex flex-col gap-1 text-sm text-banner-warning-text">
                 <div class="flex items-start gap-2">
                   <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-status-warning-text" />
                   <span>
-                    Select an existing stream from the list or enter the name to create a new one
+                    {{ t('alerts.selectStreamGuideline') }}
                   </span>
                 </div>
                 <div class="flex items-start gap-2">
                   <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-status-warning-text" />
                   <span>
-                    <span class="highlight font-bold text-text-link">Enrichment_tables</span> as destination stream is only available for scheduled pipelines
+                    <span class="highlight font-bold text-text-link">{{ t('alerts.enrichmentTablesTerm') }}</span> {{ t('alerts.enrichmentTablesDestinationNote') }}
                   </span>
                 </div>
                 <div class="flex items-start gap-2">
                   <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-status-warning-text" />
                   <span>
-                    Use curly braces <span class="code font-mono py-px px-1 rounded-default bg-code-bg text-code-text">{}</span> to configure stream name dynamically. e.g.
-                    <span class="code font-mono py-px px-1 rounded-default bg-code-bg text-code-text">static_text_{fieldname}_postfix</span>. Static text before/after <span class="code font-mono py-px px-1 rounded-default bg-code-bg text-code-text">{}</span> is optional
+                    {{ t('alerts.useCurlyBracesNote') }} <span class="code font-mono py-px px-1 rounded-default bg-code-bg text-code-text">{}</span> {{ t('alerts.configureStreamNameDynamicNote') }}
+                    <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- example stream-name pattern with placeholder syntax, must stay literal across locales -->
+                    <span class="code font-mono py-px px-1 rounded-default bg-code-bg text-code-text">static_text_{fieldname}_postfix</span>{{ t('alerts.staticTextBeforeAfterNote') }} <span class="code font-mono py-px px-1 rounded-default bg-code-bg text-code-text">{}</span> {{ t('alerts.isOptionalNote') }}
                   </span>
                 </div>
               </div>

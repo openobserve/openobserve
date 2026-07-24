@@ -85,38 +85,74 @@ const TEXT_ATTRS = [
   "content", "help-text", "caption", "description", "subtitle", "header",
   "empty-label", "error-message", "button-label", "primary-button-label",
   "secondary-button-label", "confirm-text", "cancel-text",
+  // Additional O2/app text props, discovered by scanning web/src for every
+  // `:prop="t(...)"` — a prop a dev already wraps in t() is by definition
+  // translatable text, so its STATIC / bound-literal form must be guarded too.
+  // Re-run that scan when adding text-carrying props and keep this in sync.
+  "sub-title", "footer-title", "dirty-title", "action-label", "ok-label", "firing-label",
+  "neutral-button-label", "filter-label", "empty-message", "no-match-text",
+  "search-placeholder", "ai-placeholder", "ai-tooltip", "disable-ai-reason",
+  "full-time-prefix", "legend-healthy", "legend-avg",
 ];
 const TEXT_ATTR_SET = new Set(TEXT_ATTRS);
 
-// Bans hardcoded text in a BOUND text prop — :label="'Save'" or :label=`Go`.
-// `vue/no-bare-strings-in-template` only inspects STATIC attributes, so a bound
-// string/template literal slips through — meaning a dev could bypass the check by
-// adding a `:`. This closes that gap. t()-bound and variable-bound values are
-// expressions (not literals), so they correctly pass; a literal with no letters
-// (punctuation like :label="'—'") is skipped. Non-<template> files are a no-op.
+// Bans hardcoded text left directly in a <template> that the built-in
+// `vue/no-bare-strings-in-template` (STATIC attrs + text nodes only) can't see:
+//   • a BOUND text prop        — :label="'Save'" / :label=`Go`
+//   • a v-text / v-html literal — v-text="'Save'"
+//   • a text interpolation      — {{ 'Save' }}
+// so a dev can't dodge the check by adding a `:`, a v-text, or mustaches. t()-bound
+// and variable-bound values are expressions (not bare literals) so they correctly
+// pass; a literal with no letters (punctuation like '—') is skipped. Only BARE
+// literals are caught — composed expressions (:label="'a'+b", ternaries, `${x} y`)
+// remain a separate, not-yet-enforced gap. Non-<template> files are a no-op.
 noLegacyO2Tokens.rules["no-bare-bound-text-props"] = {
-  meta: { type: "problem", docs: { description: "Ban hardcoded text in bound component text props" } },
+  meta: { type: "problem", docs: { description: "Ban hardcoded text in bound text props, v-text/v-html, and {{ }} literals" } },
   create(context) {
     const sourceCode = context.sourceCode ?? context.getSourceCode();
     const ps = sourceCode.parserServices ?? context.parserServices;
     if (!ps || !ps.defineTemplateBodyVisitor) return {};
+    // A bare string literal (or zero-expression template literal) that contains a
+    // letter → return the text; otherwise null (expressions, variables, and
+    // punctuation-only literals all pass).
+    const bareText = (expr) => {
+      if (!expr) return null;
+      let text = null;
+      if (expr.type === "Literal" && typeof expr.value === "string") text = expr.value;
+      else if (expr.type === "TemplateLiteral" && expr.expressions.length === 0)
+        text = expr.quasis[0].value.cooked;
+      return text != null && /\p{L}/u.test(text) ? text : null;
+    };
     return ps.defineTemplateBodyVisitor({
       VAttribute(node) {
         if (!node.directive) return; // static attrs → handled by no-bare-strings
-        const key = node.key;
-        if (!key || !key.name || key.name.name !== "bind") return; // only v-bind / :
-        const arg = key.argument;
-        if (!arg || arg.type !== "VIdentifier" || !TEXT_ATTR_SET.has(arg.name)) return;
-        const expr = node.value && node.value.expression;
-        if (!expr) return;
-        let text = null;
-        if (expr.type === "Literal" && typeof expr.value === "string") text = expr.value;
-        else if (expr.type === "TemplateLiteral" && expr.expressions.length === 0)
-          text = expr.quasis[0].value.cooked;
-        if (text == null || !/\p{L}/u.test(text)) return; // must contain a letter
+        const dir = node.key && node.key.name && node.key.name.name;
+        const text = bareText(node.value && node.value.expression);
+        if (text == null) return;
+        if (dir === "bind") {
+          const arg = node.key.argument; // only :prop / v-bind:prop in the text-attr set
+          if (!arg || arg.type !== "VIdentifier" || !TEXT_ATTR_SET.has(arg.name)) return;
+          context.report({
+            node,
+            message: `Hardcoded text "${text}" in bound prop :${arg.name} — use t('...') with a key in en-US.json.`,
+          });
+        } else if (dir === "text" || dir === "html") {
+          context.report({
+            node,
+            message: `Hardcoded text "${text}" in v-${dir} — use t('...') with a key in en-US.json.`,
+          });
+        }
+      },
+      VExpressionContainer(node) {
+        // Only text-position interpolation {{ '...' }}. A directive value's container
+        // has a VAttribute parent and is handled above; here the parent is the element.
+        const p = node.parent;
+        if (!p || (p.type !== "VElement" && p.type !== "VDocumentFragment")) return;
+        const text = bareText(node.expression);
+        if (text == null) return;
         context.report({
           node,
-          message: `Hardcoded text "${text}" in bound prop :${arg.name} — use t('...') with a key in en-US.json.`,
+          message: `Hardcoded text "${text}" in {{ }} — use t('...') with a key in en-US.json.`,
         });
       },
     });

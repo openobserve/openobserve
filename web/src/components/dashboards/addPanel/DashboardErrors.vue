@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="mr-1"
         />
         <span class="text-sm font-semibold text-status-error-text">
-          Errors ({{ props.errors.errors.length }})
+          {{ t('dashboard.dashboardErrors.errorsCount', { count: props.errors.errors.length }) }}
         </span>
       </div>
     </div>

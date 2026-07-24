@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #tooltip>
             <OTooltip max-width="250px">
               <template #content>
-                <b>Step - </b>
+                <b>{{ t("dashboard.stepPrefix") }}</b>
                 {{ t("dashboard.stepValueTooltip") }}
                 <br />
                 {{ t("dashboard.stepValueExample") }}
@@ -318,7 +318,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'inactive'
                 }`"
               >
+                <!-- eslint-disable vue/no-bare-strings-in-template -- "px" is the pixel unit abbreviation, kept identical across locales -->
                 px
+                <!-- eslint-enable vue/no-bare-strings-in-template -->
               </OButton>
               <OButton
                 @click="setUnit('%')"
@@ -370,7 +372,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'inactive'
                 }`"
               >
+                <!-- eslint-disable vue/no-bare-strings-in-template -- "px" is the pixel unit abbreviation, kept identical across locales -->
                 px
+                <!-- eslint-enable vue/no-bare-strings-in-template -->
               </OButton>
               <OButton
                 @click="setHeightUnit('%')"
@@ -577,14 +581,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :content="t('dashboard.multiSqlQueryLabelHint')"
             />
           </div>
-          <OInput
+          <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- template placeholder variable name, must stay identical in every language -->
+          <OInput placeholder="{field_name}"
             v-model="
               dashboardPanelDataModel.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].config.query_label
             "
             size="sm"
-            placeholder="{field_name}"
             class="w-full"
             :data-test="`dashboard-config-legend-${dashboardPanelData.layout.currentQueryIndex}`"
             @focus="() => {
@@ -616,7 +620,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ].config.limit = typeof value === 'number' ? value : null)
           "
           @blur="() => dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].config.limit == null && (dashboardPanelDataModel.data.queries[dashboardPanelData.layout.currentQueryIndex].config.limit = 0)"
-          placeholder="0"
+          :placeholder="t('dashboard.zeroPlaceholder')"
           :label="t('dashboard.queryLimit')"
           data-test="dashboard-config-limit"
         >
@@ -842,7 +846,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model.number="dashboardPanelDataModel.data.config.label_option.rotate"
           :label="t('dashboard.labelRotate')"
           type="number"
-          placeholder="0"
+          :placeholder="t('dashboard.zeroPlaceholder')"
           @update:model-value="
             (value: any) =>
               (dashboardPanelDataModel.data.config.label_option.rotate =
@@ -866,7 +870,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex-1 min-w-0"
             v-model.number="dashboardPanelDataModel.data.config.axis_label_rotate"
             type="number"
-            placeholder="0"
+            :placeholder="t('dashboard.zeroPlaceholder')"
             :label="t('dashboard.axisLabelRotate')"
             @update:model-value="
               (value: any) =>
@@ -895,7 +899,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelDataModel.data.config.axis_label_truncate_width
             "
             type="number"
-            placeholder="0"
+            :placeholder="t('dashboard.zeroPlaceholder')"
             :label="t('dashboard.axisLabelTruncate')"
             @update:model-value="
               (value: any) =>
@@ -1482,7 +1486,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           type="number"
           :label="t('dashboard.gaugeMaxValue')"
-          placeholder="100"
+          :placeholder="t('dashboard.hundredPlaceholder')"
           @update:model-value="
             (value: any) =>
               (dashboardPanelDataModel.data.queries[

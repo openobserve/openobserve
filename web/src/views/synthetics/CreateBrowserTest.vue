@@ -572,7 +572,7 @@ function onClearResults() {
             class="flex-shrink-0 w-7 h-7 rounded-full bg-primary-500 text-text-inverse flex items-center justify-center text-sm font-semibold"
             :class="extensionInstalled ? 'bg-[var(--color-status-success-text)]!': ''"
             >
-              1
+              {{ t('synthetics.createBrowserTest.setupStepNumber1') }}
             </span>
             <div class="flex-1 min-w-0 flex justify-between">
               <div class="flex flex-col items-start">
@@ -624,7 +624,7 @@ function onClearResults() {
             <span
               class="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-sm font-semibold"
               :class="extensionInstalled ? incognitoAllowed ? 'bg-[var(--color-status-success-text)]! text-text-inverse' : 'bg-primary-500 text-text-inverse' : 'bg-surface-subtle text-text-muted'"
-            >2</span>
+            >{{ t('synthetics.createBrowserTest.setupStepNumber2') }}</span>
             <div class="flex-1 min-w-0 flex justify-between">
               <div class="flex flex-col items-start">
                 <h4 class="text-sm font-semibold text-text-heading m-0 mb-1">{{ t('synthetics.createBrowserTest.setupStep2Title') }}</h4>

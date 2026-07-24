@@ -27,11 +27,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <div>
             <h6 class="text-xl! font-bold m-0 mb-2!">
-              Complete AWS Integration
+              {{ t('ingestion.completeAwsIntegration') }}
             </h6>
             <p class="text-sm mt-0 mb-0" :class="descriptionClass">
-              Deploy all selected AWS services in one click using a single
-              CloudFormation stack.
+              {{ t('ingestion.deployAwsServicesOneClick') }}
             </p>
           </div>
         </div>
@@ -39,25 +38,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Deployment Mode Toggle -->
       <div class="mb-6">
-        <div class="mb-3 font-semibold text-sm" :class="stepLabelClass">Deployment mode</div>
+        <div class="mb-3 font-semibold text-sm" :class="stepLabelClass">{{ t('ingestion.deploymentMode') }}</div>
         <OToggleGroup
           v-model="deploymentMode"
           data-test="aws-deployment-mode-toggle"
         >
-          <OToggleGroupItem value="single">Single Region</OToggleGroupItem>
+          <OToggleGroupItem value="single">{{ t('ingestion.singleRegion') }}</OToggleGroupItem>
           <OToggleGroupItem value="stackset"
-            >Multi-Region (StackSets)</OToggleGroupItem
+            >{{ t('ingestion.multiRegionStackSets') }}</OToggleGroupItem
           >
         </OToggleGroup>
         <div class="mt-2 text-xs" :class="hintTextClass">
           <span v-if="deploymentMode === 'single'">
-            Deploys a CloudFormation stack in one AWS region. Parameters are
-            pre-filled automatically.
+            {{ t('ingestion.singleRegionDeployHint') }}
           </span>
           <span v-else>
-            Deploys across multiple regions using CloudFormation StackSets.
-            Requires AWS Organizations or self-managed IAM roles. Parameters are
-            shown for copy-paste into the AWS console wizard.
+            {{ t('ingestion.stackSetDeployHint') }}
           </span>
         </div>
       </div>
@@ -74,18 +70,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :name="showServices ? 'expand-less' : 'expand-more'" size="sm"
               color="primary"
             />
-            <div class="font-semibold text-sm" :class="stepLabelClass">Select services to monitor</div>
+            <div class="font-semibold text-sm" :class="stepLabelClass">{{ t('ingestion.selectServicesToMonitor') }}</div>
             <OTag type="countChip" value="accent">
               {{ enabledServices.length }} /
-              {{ QUICK_SETUP_SERVICES.length }} selected
+              {{ QUICK_SETUP_SERVICES.length }} {{ t('ingestion.selected') }}
             </OTag>
           </div>
           <div class="flex gap-2" @click.stop>
             <OButton variant="ghost-primary" size="xs" @click="selectAll"
-              >Select all</OButton
+              >{{ t('ingestion.selectAll') }}</OButton
             >
             <OButton variant="ghost-primary" size="xs" @click="deselectAll"
-              >Deselect all</OButton
+              >{{ t('ingestion.deselectAll') }}</OButton
             >
           </div>
         </div>
@@ -115,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Single Region: region picker -->
       <div v-if="deploymentMode === 'single'" class="mb-6">
-        <div class="mb-3 font-semibold text-sm" :class="stepLabelClass">Deployment region</div>
+        <div class="mb-3 font-semibold text-sm" :class="stepLabelClass">{{ t('ingestion.deploymentRegion') }}</div>
         <OSelect
           v-model="selectedRegion"
           :options="AWS_REGIONS"
@@ -130,9 +126,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-else>
         <div class="mb-6">
           <div class="mb-3 font-semibold text-sm" :class="stepLabelClass">
-            Admin region
+            {{ t('ingestion.adminRegion') }}
             <span class="font-normal text-xs text-text-muted"
-              >(where the StackSet is managed)</span
+              >{{ t('ingestion.whereStackSetIsManaged') }}</span
             >
           </div>
           <OSelect
@@ -157,16 +153,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 color="primary"
               />
               <div class="font-semibold text-sm" :class="stepLabelClass">
-                Target regions
+                {{ t('ingestion.targetRegions') }}
                 <span class="font-normal text-xs text-text-muted"
-                  >(where stacks will be deployed)</span
+                  >{{ t('ingestion.whereStacksWillBeDeployed') }}</span
                 >
               </div>
               <OTag
                 v-if="targetRegions.length > 0"
                 type="countChip"
                 value="accent"
-                >{{ targetRegions.length }} selected</OTag
+                >{{ targetRegions.length }} {{ t('ingestion.selected') }}</OTag
               >
             </div>
             <div class="flex gap-2" @click.stop>
@@ -174,13 +170,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost-primary"
                 size="xs"
                 @click="selectAllRegions"
-                >Select all</OButton
+                >{{ t('ingestion.selectAll') }}</OButton
               >
               <OButton
                 variant="ghost-primary"
                 size="xs"
                 @click="targetRegions = []"
-                >Clear</OButton
+                >{{ t('ingestion.clear') }}</OButton
               >
             </div>
           </div>
@@ -209,26 +205,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="mb-6">
-          <div class="mb-3 font-semibold text-sm" :class="stepLabelClass">Deployment model</div>
+          <div class="mb-3 font-semibold text-sm" :class="stepLabelClass">{{ t('ingestion.deploymentModel') }}</div>
           <OToggleGroup
             v-model="stackSetModel"
             data-test="aws-stackset-model-toggle"
           >
-            <OToggleGroupItem value="self">Self-managed</OToggleGroupItem>
+            <OToggleGroupItem value="self">{{ t('ingestion.selfManaged') }}</OToggleGroupItem>
             <OToggleGroupItem value="service"
-              >Service-managed (AWS Organizations)</OToggleGroupItem
+              >{{ t('ingestion.serviceManagedAwsOrganizations') }}</OToggleGroupItem
             >
           </OToggleGroup>
           <div class="mt-2 text-xs" :class="hintTextClass">
             <span v-if="stackSetModel === 'self'">
-              Requires
-              <code>AWSCloudFormationStackSetAdministrationRole</code> and
-              <code>AWSCloudFormationStackSetExecutionRole</code> IAM roles in
-              your account.
+              {{ t('ingestion.requires') }}
+              <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- AWS IAM role name, must stay identical in every locale -->
+              <code>AWSCloudFormationStackSetAdministrationRole</code>
+              {{ t('ingestion.and') }}
+              <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- AWS IAM role name, must stay identical in every locale -->
+              <code>AWSCloudFormationStackSetExecutionRole</code>
+              {{ t('ingestion.iamRolesInYourAccount') }}
             </span>
             <span v-else>
-              Uses AWS Organizations. Your account must be the management or
-              delegated admin account.
+              {{ t('ingestion.usesAwsOrganizationsHint') }}
             </span>
           </div>
         </div>
@@ -263,7 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="enabledServices.length === 0"
           class="text-sm text-status-error-text"
         >
-          Select at least one service
+          {{ t('ingestion.selectAtLeastOneService') }}
         </span>
         <span
           v-else-if="
@@ -271,15 +269,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           class="text-sm text-status-error-text"
         >
-          Select at least one target region
+          {{ t('ingestion.selectAtLeastOneTargetRegion') }}
         </span>
         <span v-else class="text-sm" :class="hintTextClass">
-          {{ enabledServices.length }} service{{
+          {{ enabledServices.length }} {{ t('ingestion.service') }}{{
             enabledServices.length > 1 ? "s" : ""
           }}
-          selected
+          {{ t('ingestion.selected') }}
           <template v-if="deploymentMode === 'stackset'">
-            · {{ targetRegions.length }} region{{
+            · {{ targetRegions.length }} {{ t('ingestion.region') }}{{
               targetRegions.length > 1 ? "s" : ""
             }}</template
           >
@@ -297,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="rounded-default p-4" :class="paramHelperClass">
             <div class="flex items-center justify-between mb-3">
               <div class="font-semibold text-sm" :class="stepLabelClass">
-                Parameters to enter in the AWS wizard
+                {{ t('ingestion.parametersToEnterInAwsWizard') }}
               </div>
               <OButton
                 variant="ghost"
@@ -308,8 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </div>
             <p class="text-xs mb-3" :class="hintTextClass">
-              The StackSets console doesn't support URL pre-fill. Enter these
-              values as you go through the wizard.
+              {{ t('ingestion.stackSetsNoPrefillHint') }}
             </p>
             <div class="flex flex-col gap-1.5">
               <div
@@ -327,14 +324,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click="copyParam(param.value)"
                   >
                     <OIcon name="content-copy" size="sm" />
-                    <OTooltip content="Copy" />
+                    <OTooltip :content="t('common.copy')" />
                   </OButton>
                 </div>
               </div>
             </div>
             <div class="mt-3">
               <div class="font-semibold text-xs mb-1" :class="stepLabelClass">
-                Target regions to enter in "Deployment targets":
+                {{ t('ingestion.targetRegionsToEnterInDeploymentTargets') }}
               </div>
               <div class="flex flex-wrap gap-1 mt-1">
                 <OTag
@@ -357,6 +354,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed } from "vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
@@ -387,6 +385,7 @@ export default defineComponent({
 },
   setup() {
     const store = useStore();
+    const { t } = useI18n();
 
     const deploymentMode = ref<"single" | "stackset">("single");
     const stackSetModel = ref<"self" | "service">("self");
@@ -575,6 +574,7 @@ export default defineComponent({
     };
 
     return {
+      t,
       quickInstallBgClass,
       descriptionClass,
       stepLabelClass,

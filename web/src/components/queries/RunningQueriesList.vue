@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="text-xs font-bold whitespace-nowrap"
             data-test="running-queries-last-refresh"
           >
-            Last Data Refresh Time: {{ lastRefreshed }}
+            {{ t("queries.lastDataRefreshTime") }} {{ lastRefreshed }}
           </span>
           <div class="flex-1"></div>
           <OToggleGroup

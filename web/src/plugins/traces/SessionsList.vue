@@ -200,14 +200,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Tokens -->
         <template #cell-tokens="{ row }">
           <span class="text-xs tabular-nums">
-            {{ formatTokens(row.inputTokens) }} → {{ formatTokens(row.outputTokens) }} = {{ formatTokens(row.tokens) }}
+            {{ formatTokens(row.inputTokens) }} {{ t('traces.sessionDetail.tokensArrow') }} {{ formatTokens(row.outputTokens) }} = {{ formatTokens(row.tokens) }}
             <OTooltip :content="t('traces.sessionsList.tokenTooltip', { input: row.inputTokens.toLocaleString(), output: row.outputTokens.toLocaleString(), total: row.tokens.toLocaleString() })" />
           </span>
         </template>
 
         <!-- Cost -->
         <template #cell-cost="{ row }">
-          <span class="text-xs">${{ row.cost.toFixed(4) }}</span>
+          <span class="text-xs">{{ t('traces.sessionDetail.currencySymbol') }}{{ row.cost.toFixed(4) }}</span>
         </template>
 
         <!-- Status (derived from error_count) -->

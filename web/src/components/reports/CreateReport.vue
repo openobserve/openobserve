@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="showLabelOnTop"
                   :readonly="isEditingReport"
                   :disabled="isEditingReport"
-                  help-text="Characters like :, ?, /, #, and spaces are not allowed."
+                  :help-text="t('reports.validation.resourceNameInvalid')"
                   tabindex="0"
                   style="width: 20.625rem"
                 />
@@ -105,8 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   side="right"
                   align="center"
                 >
-                  <template #content>Note: Cached reports are stored for quick access to
-                  dashboards; sharing is disabled for these reports.</template>
+                  <template #content>{{ t('reports.cachedReportHint') }}</template>
                 </OTooltip>
               </OIcon>
             </div>
@@ -121,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OStep
                 data-test="add-report-select-dashboard-step"
                 :name="1"
-                title="Select Dashboard"
+                :title="t('reports.selectDashboardStep')"
                 icon="edit"
                 :done="step > 1"
               >
@@ -202,9 +201,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <OFormDateTimeRange
                         :name="`dashboards[${index}].timerange`"
-                        label="Time Range"
+                        :label="t('reports.timeRange')"
                         required
-                        description="Generates report with the data from specified time range"
+                        :description="t('reports.timeRangeDescription')"
                         auto-apply
                         data-test="add-report-timerange-dropdown"
                         menu-align="start"
@@ -274,7 +273,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OBanner
                           variant="warning"
                           icon="info"
-                          content="PNG captures only the first visible page of the dashboard. Use PDF if the dashboard spans multiple pages."
+                          :content="t('reports.pngPageLimitNote')"
                         />
                       </div>
 
@@ -315,7 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               color="input-border"
                               class="showLabelOnTop"
                               style="min-width: 120px"
-                              placeholder="e.g. 1440"
+                              :placeholder="t('reports.widthPlaceholder')"
                               data-test="add-report-dimension-width"
                             />
                           </div>
@@ -328,13 +327,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               color="input-border"
                               class="showLabelOnTop"
                               style="min-width: 120px"
-                              placeholder="e.g. 900"
+                              :placeholder="t('reports.heightPlaceholder')"
                               data-test="add-report-dimension-height"
                             />
                           </div>
                           <div class="col-auto flex items-end">
                             <div class="text-xs text-text-muted pb-1">
-                              Leave blank to use server defaults
+                              {{ t('reports.dimensionsDefaultHint') }}
                             </div>
                           </div>
                         </div>
@@ -359,7 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       )
                     "
                   >
-                    Continue
+                    {{ t('reports.continue') }}
                   </OButton>
                 </div>
               </OStep>
@@ -367,7 +366,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OStep
                 data-test="add-report-select-schedule-step"
                 :name="2"
-                title="Schedule"
+                :title="t('reports.scheduleStep')"
                 icon="schedule"
                 :done="step > 2"
                 class="mt-3"
@@ -377,7 +376,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="font-size: var(--text-sm)"
                     class="font-bold text-text-secondary mb-2"
                   >
-                    Frequency
+                    {{ t('reports.frequency') }}
                   </div>
                   <OFormToggleGroup
                     name="frequencyType"
@@ -412,19 +411,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >
                             <OTooltip side="right" align="center">
                               <template #content><span style="font-size: var(--text-sm)">
-                                Pattern: * * * * * * means every second.
+                                {{ t('reports.cronPatternHint') }}
                                 <br />
-                                Format: [Second (optional) 0-59] [Minute 0-59]
-                                [Hour 0-23] [Day of Month 1-31, 'L'] [Month
-                                1-12] [Day of Week 0-7 or '1L-7L', 0 and 7 for
-                                Sunday].
+                                {{ t('reports.cronFormatHint') }}
                                 <br />
-                                Use '*' to represent any value, 'L' for the last
-                                day/weekday. <br />
-                                Example: 0 0 12 * * ? - Triggers at 12:00 PM
-                                daily. It specifies second, minute, hour, day of
-                                month, month, and day of week,
-                                respectively.</span
+                                {{ t('reports.cronWildcardHint') }} <br />
+                                {{ t('reports.cronExampleHint') }}</span
                               ></template>
                             </OTooltip>
                           </OIcon>
@@ -472,10 +464,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="sm"
                       >
                         <OTooltip side="right" align="center">
-                          <template #content>"Schedule Now" will schedule the report using the
-                          current date, time, and timezone.<br />
-                          In "Schedule Later" you can customize the date, time,
-                          and timezone.</template>
+                          <template #content>{{ t('reports.scheduleNowHint') }}<br />
+                          {{ t('reports.scheduleLaterHint') }}</template>
                         </OTooltip>
                       </OIcon>
                     </div>
@@ -491,7 +481,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         <OFormInput
                           name="customInterval"
-                          label="Repeat every"
+                          :label="t('reports.repeatEvery')"
                           required
                           color="input-border"
                           class="showLabelOnTop w-full"
@@ -507,7 +497,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OFormSelect
                           name="customPeriod"
                           :options="customFrequencyOptions"
-                          :label="'Frequency'"
+                          :label="t('reports.frequency')"
                           required
                           class="showLabelOnTop no-case"
                           style="width: 100% !important"
@@ -529,7 +519,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         <OFormDate
                           name="date"
-                          :label="'Start Date'"
+                          :label="t('reports.startDate')"
                           required
                           data-test="add-report-schedule-start-date-field"
                         />
@@ -540,7 +530,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         <OFormTime
                           name="time"
-                          :label="'Start Time'"
+                          :label="t('common.startTime')"
                           required
                           data-test="add-report-schedule-start-time-field"
                         />
@@ -566,7 +556,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm-action"
                     @click="step--"
                   >
-                    Back
+                    {{ t('common.back') }}
                   </OButton>
                   <OButton
                     data-test="add-report-step2-continue-btn"
@@ -579,7 +569,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       )
                     "
                   >
-                    Continue
+                    {{ t('reports.continue') }}
                   </OButton>
                 </div>
               </OStep>
@@ -588,7 +578,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="!isCachedReportValue"
                 data-test="add-report-share-step"
                 :name="3"
-                title="Share"
+                :title="t('reports.shareStep')"
                 icon="mail"
                 :done="step > 3"
                 class="mt-3"
@@ -624,7 +614,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div data-test="add-report-share-message-section" class="pt-3">
                     <div style="font-size: var(--text-sm)" class="font-bold text-text-secondary">
-                      Message
+                      {{ t('reports.messageLabel') }}
                     </div>
 
                     <div data-test="add-report-share-message-input">
@@ -650,9 +640,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="sm"
                     >
                       <OTooltip max-width="320px">
-                        <template #content>Captures a PNG screenshot of the dashboard and embeds it
-                        inline in the email body alongside the PDF attachment
-                        for a quick visual preview.</template>
+                        <template #content>{{ t('reports.imagePreviewHint') }}</template>
                       </OTooltip>
                     </OIcon>
                   </div>
@@ -664,7 +652,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm-action"
                     @click="step--"
                   >
-                    Back
+                    {{ t('common.back') }}
                   </OButton>
                 </div>
               </OStep>

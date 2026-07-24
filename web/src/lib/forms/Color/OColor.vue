@@ -19,6 +19,9 @@ import {
 } from "reka-ui";
 import type { Color } from "reka-ui";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -214,7 +217,7 @@ const wrapperClasses = computed(() => [
             type="text"
             :value="swatchHex"
             maxlength="7"
-            placeholder="#000000"
+            :placeholder="t('components.color.hexPlaceholder')"
             :disabled="disabled"
             class="w-full rounded-default border px-2 py-1 text-xs font-mono outline-none text-datepicker-text placeholder:text-datepicker-placeholder bg-datepicker-bg border-datepicker-border focus:border-datepicker-focus-border"
             @input="handleText"
@@ -252,7 +255,7 @@ const wrapperClasses = computed(() => [
         v-if="clearable && modelValue"
         type="button"
         tabindex="-1"
-        aria-label="Clear"
+        :aria-label="t('components.color.clear')"
         class="flex items-center pe-2 text-datepicker-icon hover:opacity-80 transition-colors"
         @click="handleClear"
       >

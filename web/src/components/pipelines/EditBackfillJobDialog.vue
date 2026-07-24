@@ -18,9 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     v-model:open="show"
     size="sm"
-    title="Edit Backfill Job"
-    secondary-button-label="Cancel"
-    primary-button-label="Update Job"
+    :title="t('pipeline.editBackfillJobTitle')"
+    :secondary-button-label="t('common.cancel')"
+    :primary-button-label="t('pipeline.updateJob')"
     form-id="edit-backfill-form"
     @click:secondary="onCancel"
     data-test="edit-backfill-job-dialog"
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div>
             <div class="flex items-center gap-4">
               <div class="text-sm font-medium whitespace-nowrap">
-                Time Range <span class="text-status-error-text">*</span>
+                {{ t('pipeline.timeRange') }} <span class="text-status-error-text">*</span>
               </div>
               <OFormDateTimeRange
                 name="timerange"
@@ -57,21 +57,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="mt-2"
             v-model="showAdvanced"
             icon="settings"
-            label="Advanced Options"
+            :label="t('pipeline.advancedOptions')"
             data-test="advanced-options-expansion"
           >
             <div class="p-3 space-y-2 mt-2">
               <!-- Chunk Period -->
               <div>
                 <div class="text-xs mb-1">
-                  Chunk Period (minutes)
+                  {{ t('pipeline.chunkPeriodMinutesLabel') }}
                   <OIcon name="info-outline" size="sm" />
-                    <OTooltip content="Size of each processing chunk in minutes. Default: 60" />
+                    <OTooltip :content="t('pipeline.chunkPeriodDefaultTooltip')" />
                 </div>
                 <OFormInput
                   name="chunkPeriodMinutes"
                   type="number"
-                  placeholder="60"
+                  :placeholder="t('pipeline.chunkPeriodDefaultPlaceholder')"
                   data-test="chunk-period-input"
                 />
               </div>
@@ -79,14 +79,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Delay Between Chunks -->
               <div>
                 <div class="text-xs mb-1">
-                  Delay Between Chunks (seconds)
+                  {{ t('pipeline.delayBetweenChunksLabel') }}
                   <OIcon name="info-outline" size="sm" />
-                    <OTooltip content="Delay between processing chunks in seconds. Default: 5" />
+                    <OTooltip :content="t('pipeline.chunkDelayTooltip')" />
                 </div>
                 <OFormInput
                   name="delayBetweenChunks"
                   type="number"
-                  placeholder="5"
+                  :placeholder="t('pipeline.defaultDelaySecondsPlaceholder')"
                   data-test="delay-between-chunks-input"
                 />
               </div>
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div>
                 <OFormCheckbox
                   name="deleteBeforeBackfill"
-                  label="Delete existing data before backfill"
+                  :label="t('pipeline.deleteDataBeforeBackfill')"
                   data-test="delete-before-backfill-checkbox"
                 />
                 <div
@@ -105,15 +105,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="flex items-start">
                     <OIcon name="warning" size="sm" class="mr-2 mt-0.5" />
                     <div class="text-xs text-banner-warning-text">
-                      <div class="font-semibold mb-1">Warning: Irreversible Data Deletion</div>
+                      <div class="font-semibold mb-1">{{ t('pipeline.irreversibleDeletionWarning') }}</div>
                       <div class="mb-2">
-                        This will permanently delete all data in the destination stream for the specified time
-                        range before running the backfill. This action cannot be undone.
+                        {{ t('pipeline.deleteBackfillWarningMessage') }}
                       </div>
-                      <div class="font-semibold text-xs mb-1">Time Alignment Requirements (UTC):</div>
+                      <div class="font-semibold text-xs mb-1">{{ t('pipeline.timeAlignmentRequirements') }}</div>
                       <ul class="ml-5 space-y-0.5 list-disc text-xs">
-                        <li><strong>Logs</strong> streams: Times must align to hour boundaries in UTC (e.g., 10:00:00, not 10:15:00)</li>
-                        <li><strong>Metrics/Traces</strong> streams: Times must align to day boundaries in UTC (e.g., 00:00:00)</li>
+                        <li><strong>{{ t('common.logs') }}</strong> {{ t('pipeline.logsHourBoundaryNote') }}</li>
+                        <li><strong>{{ t('pipeline.metricsTracesLabel') }}</strong> {{ t('pipeline.dayBoundaryNote') }}</li>
                       </ul>
                     </div>
                   </div>

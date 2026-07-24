@@ -440,6 +440,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select.prevent="searchObj.meta.showTransformEditor = !searchObj.meta.showTransformEditor"
             >
               <template #icon-left>
+                <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- "fx" is a stylized function/formula glyph (like Excel's fx icon), not translatable UI text -->
                 <span class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0 font-mono text-compact italic font-bold text-accent">fx</span>
               </template>
               {{ t('search.functionEditorLabel') }}
@@ -769,6 +770,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :size="toolbarToggleIconOnly ? 'sm' : 'md'"
             @click.stop
           />
+          <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- "fx" is a stylized function/formula glyph (like Excel's fx icon), not translatable UI text -->
           <span class="font-mono text-sm italic font-bold text-accent shrink-0">fx</span>
           <OTooltip :content="t('search.functionEditorLabel')" />
         </OButton>
@@ -1405,7 +1407,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :has-expand-button="true"
                       :disable-ai="isVrlEditorDisabled"
                       :disable-ai-reason="
-                        isVrlEditorDisabled ? t('search.vrlOnlyForTable') : ''
+                        isVrlEditorDisabled ? t('search.vrlOnlyForTableWarning') : ''
                       "
                       :ai-placeholder="t('search.askAIFunctionPlaceholder')"
                       :ai-tooltip="t('search.enterFunctionPrompt')"

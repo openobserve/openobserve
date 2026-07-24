@@ -138,7 +138,7 @@
               <dt>{{ t("onlineEvals.scorer.detail.scorerTypeLabel") }}</dt>
               <dd class="flex flex-wrap items-center gap-1.5">
                 <OTag type="scorerType" :value="scorerType" />
-                <OTag type="fieldTag" value="soft">v{{ row.version }}</OTag>
+                <OTag type="fieldTag" value="soft">{{ t("onlineEvals.versionPrefix") }}{{ row.version }}</OTag>
               </dd>
 
               <template v-if="scorerType === 'llm_judge'">
@@ -181,7 +181,7 @@
                 producesConfig.name
               }}</span>
               <span class="sd-produces__version"
-                >v{{ producesConfig.version }}</span
+                >{{ t("onlineEvals.versionPrefix") }}{{ producesConfig.version }}</span
               >
               <span class="sd-produces__sep">·</span>
               <span class="sd-produces__type">{{
@@ -257,7 +257,7 @@
               <li class="sd-versions__item sd-versions__item--active">
                 <div class="sd-versions__head">
                   <span class="sd-versions__label"
-                    >v{{ row.version }}</span
+                    >{{ t("onlineEvals.versionPrefix") }}{{ row.version }}</span
                   >
                   <OTag type="activeVersionFlag" value="active" />
                 </div>

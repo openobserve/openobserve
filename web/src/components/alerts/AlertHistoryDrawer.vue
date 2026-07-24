@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #icon-left>
                   <OIcon name="history" size="sm" />
                 </template>
-                History
+                {{ t('alert_list.alert_history') }}
               </OToggleGroupItem>
               <OToggleGroupItem
                 value="condition"
@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #icon-left>
                   <OIcon name="code" size="sm" />
                 </template>
-                Condition
+                {{ t('common.condition') }}
               </OToggleGroupItem>
             </OToggleGroup>
           </div>
@@ -195,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <OTag type="alertState" value="flapping" class="cursor-pointer shrink-0" @click="toggleFlappingGroup(row.timestamp)" />
                       <span class="text-2xs truncate text-text-secondary">
-                        {{ row._children.length }} rows · {{ row._duration }}
+                        {{ row._children.length }} {{ t('alerts.alertDetails.rowsSeparator') }} {{ row._duration }}
                       </span>
                     </div>
                     <!-- Normal row -->
@@ -284,7 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         'text-text-secondary'
                       "
                     >
-                      SQL
+                      {{ t('alerts.alertDetails.sql') }}
                     </span>
                   </div>
                   <OButton

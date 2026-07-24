@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #empty>
             <div class="px-3 py-2 text-muted-foreground">
-              No alerts found
+              {{ t('alerts.noAlertsFound') }}
             </div>
           </template>
         </OSelect>
@@ -156,9 +156,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="block" size="sm">
                 <OTooltip>
                   <template #content>
-                    Suppressed by deduplication
+                    {{ t('alerts.suppressedByDeduplication') }}
                     <div v-if="row.dedup_count">
-                      {{ row.dedup_count }} occurrence{{ row.dedup_count > 1 ? 's' : '' }}
+                      {{ row.dedup_count }} {{ t('alerts.occurrence') }}{{ row.dedup_count > 1 ? 's' : '' }}
                     </div>
                   </template>
                 </OTooltip>
@@ -168,24 +168,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="group-work" size="md">
                 <OTooltip>
                   <template #content>
-                    Grouped notification
-                    <div>{{ row.group_size }} alerts batched together</div>
+                    {{ t('alerts.groupedNotification') }}
+                    <div>{{ row.group_size }} {{ t('alerts.alertsBatchedTogether') }}</div>
                   </template>
                 </OTooltip>
               </OIcon>
+              <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- "×" is a language-agnostic multiplier symbol, not translatable text -->
               <span class="text-xs ml-1">×{{ row.group_size || 1 }}</span>
             </div>
             <div v-else class="text-status-positive flex items-center justify-center">
               <OIcon name="check-circle" size="md">
                 <OTooltip>
                   <template #content>
-                    Notification sent
+                    {{ t('alerts.notificationSent') }}
                     <div v-if="row.dedup_count && row.dedup_count > 1">
-                      {{ row.dedup_count }} occurrences deduplicated
+                      {{ row.dedup_count }} {{ t('alerts.occurrencesDeduplicated') }}
                     </div>
                   </template>
                 </OTooltip>
               </OIcon>
+              <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- "×" is a language-agnostic multiplier symbol, not translatable text -->
               <span v-if="row.dedup_count && row.dedup_count > 1" class="text-xs ml-1">
                 ×{{ row.dedup_count }}
               </span>
@@ -200,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="showDetailsDialog(row)"
               data-test="alert-history-view-details"
             >
-              <OTooltip content="View Details" />
+              <OTooltip :content="t('alerts.viewDetails')" />
             </OButton>
             <OButton
               v-if="row.error"
@@ -221,8 +223,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODialog data-test="alert-history-details-dialog"
       v-model:open="detailsDialog"
       :width="55"
-      title="Alert Execution Details"
-      primary-button-label="Close"
+      :title="t('alerts.alertExecutionDetails')"
+      :primary-button-label="t('common.close')"
       @click:primary="detailsDialog = false"
     >
       <div v-if="selectedRow" class="gap-2">
@@ -230,13 +232,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="py-1 px-0">
               <div class="flex gap-3">
                 <div class="w-1/2">
-                  <div class="text-xs text-text-secondary mb-1">Alert Name</div>
+                  <div class="text-xs text-text-secondary mb-1">{{ t('alerts.alertName') }}</div>
                   <div class="text-sm font-medium">
                     {{ selectedRow.alert_name }}
                   </div>
                 </div>
                 <div class="w-1/2">
-                  <div class="text-xs text-text-secondary mb-1">Status</div>
+                  <div class="text-xs text-text-secondary mb-1">{{ t('common.status') }}</div>
                   <OTag type="alertState" :value="selectedRow.status" />
                 </div>
               </div>
@@ -248,13 +250,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="py-1 px-0">
               <div class="flex gap-3">
                 <div class="w-1/2">
-                  <div class="text-xs text-text-secondary mb-1">Timestamp</div>
+                  <div class="text-xs text-text-secondary mb-1">{{ t('alerts.timestamp') }}</div>
                   <div class="text-sm">
                     {{ formatHistoryDate(selectedRow.timestamp) }}
                   </div>
                 </div>
                 <div class="w-1/2">
-                  <div class="text-xs text-text-secondary mb-1">Duration</div>
+                  <div class="text-xs text-text-secondary mb-1">{{ t('common.duration') }}</div>
                   <div class="text-sm">
                     {{
                       formatDuration(
@@ -272,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="py-1 px-0">
               <div class="flex gap-3">
                 <div class="w-1/2">
-                  <div class="text-xs text-text-secondary mb-1">Type</div>
+                  <div class="text-xs text-text-secondary mb-1">{{ t('common.type') }}</div>
                   <div class="text-sm">
                     <OIcon
                       :name="selectedRow.is_realtime ? 'speed' : 'schedule'"
@@ -283,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
                 <div class="w-1/2">
-                  <div class="text-xs text-text-secondary mb-1">Silenced</div>
+                  <div class="text-xs text-text-secondary mb-1">{{ t('alerts.insights.filters.silenced') }}</div>
                   <div class="text-sm">
                     <OIcon
                       v-if="selectedRow.is_silenced"
@@ -316,22 +318,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex gap-3">
                   <div v-if="selectedRow.evaluation_took_in_secs" class="w-1/3">
                     <div class="text-xs text-text-secondary mb-1">
-                      Evaluation Time
+                      {{ t('alerts.evaluationTime') }}
                     </div>
                     <div class="text-sm">
+                      <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- "s" is the seconds unit abbreviation, kept identical across locales -->
                       {{ selectedRow.evaluation_took_in_secs.toFixed(2) }}s
                     </div>
                   </div>
                   <div v-if="selectedRow.query_took" class="w-1/3">
                     <div class="text-xs text-text-secondary mb-1">
-                      Query Time
+                      {{ t('alerts.queryTime') }}
                     </div>
                     <div class="text-sm">
+                      <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- "ms" is the milliseconds unit abbreviation, kept identical across locales -->
                       {{ (selectedRow.query_took / 1000).toFixed(2) }}ms
                     </div>
                   </div>
                   <div v-if="selectedRow.retries > 0" class="w-1/3">
-                    <div class="text-xs text-text-secondary mb-1">Retries</div>
+                    <div class="text-xs text-text-secondary mb-1">{{ t('alerts.retries') }}</div>
                     <div class="text-sm">{{ selectedRow.retries }}</div>
                   </div>
                 </div>
@@ -342,7 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="selectedRow.source_node">
               <OSeparator class="my-2" />
               <div class="py-1 px-0">
-                <div class="text-xs text-text-secondary mb-1">Source Node</div>
+                <div class="text-xs text-text-secondary mb-1">{{ t('alerts.sourceNode') }}</div>
                 <div class="text-sm font-mono">
                   {{ selectedRow.source_node }}
                 </div>
@@ -359,7 +363,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="xs"
                     class="mr-1"
                   />
-                  Error Details
+                  {{ t('alerts.errorDetails') }}
                 </div>
                 <div class="rounded-default border border-solid border-negative/30 p-2 mt-2 bg-status-error-bg">
                   <pre
@@ -387,7 +391,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="xs"
                     class="mr-1"
                   />
-                  Response
+                  {{ t('alerts.response') }}
                 </div>
                 <div class="rounded-default border border-solid border-positive/30 p-2 mt-2 bg-status-success-bg">
                   <pre
@@ -412,7 +416,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="errorDialog"
       size="md"
       :title="errorMessage.alert_name"
-      primary-button-label="Close"
+      :primary-button-label="t('common.close')"
       @click:primary="closeErrorDialog"
     >
       <template #header-left>
@@ -420,14 +424,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #header-right>
         <div class="flex items-center text-compact opacity-70 ml-9 text-xs">
-          <span class="mr-1">Last error:</span>
+          <span class="mr-1">{{ t('alerts.lastError') }}</span>
           <OIcon name="schedule" size="xs" class="mr-1" />
           {{ errorMessage.last_error_timestamp && new Date(errorMessage.last_error_timestamp / 1000).toLocaleString() }}
         </div>
       </template>
 
       <div class="mb-4">
-        <div class="text-sm font-semibold tracking-[0.02em] opacity-80 mb-2">Error Summary</div>
+        <div class="text-sm font-semibold tracking-[0.02em] opacity-80 mb-2">{{ t('alerts.errorSummary') }}</div>
         <div class="p-4 rounded-default font-mono text-compact leading-[1.6] whitespace-pre-wrap wrap-break-word bg-status-error-bg border border-solid border-status-negative text-status-error-text">
           {{ errorMessage.error }}
         </div>

@@ -187,8 +187,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <table v-if="!hideRelativeTime" class="px-3 w-[calc(100%-0.8rem)] mx-[0.4rem] mt-2 mb-[0.3rem] startEndTime">
                 <tbody>
                   <tr>
-                    <td class="label o-input-label text-compact font-medium leading-tight text-input-label-text pr-1.5 w-1/2">Start time</td>
-                    <td class="label o-input-label text-compact font-medium leading-tight text-input-label-text pl-1.5 w-1/2">End time</td>
+                    <td class="label o-input-label text-compact font-medium leading-tight text-input-label-text pr-1.5 w-1/2">{{ t('common.startTime') }}</td>
+                    <td class="label o-input-label text-compact font-medium leading-tight text-input-label-text pl-1.5 w-1/2">{{ t('common.endTime') }}</td>
                   </tr>
                   <tr>
                     <td class="pr-1.5 w-1/2">

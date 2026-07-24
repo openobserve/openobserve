@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OIcon name="warning" size="sm" class="mr-2" />
         <span class="text-base leading-5.5 text-text-body"
-          >Failed to load pricing details. Please refresh the page.</span
+          >{{ t("billing.pricingErrorMessage") }}</span
         >
       </div>
       <div
@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OTag>
         <div class="text-xs text-text-secondary mt-2">
-          Billing is handled through your AWS account
+          {{ t("billing.awsManagedMessage") }}
         </div>
       </div>
       <div
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OTag>
         <div class="text-xs text-text-secondary mt-2">
-          Billing is handled through your Azure account
+          {{ t("billing.azureManagedMessage") }}
         </div>
       </div>
       <!-- External contract - billed offline, no Stripe portal to open -->
@@ -125,8 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OTag>
         <div class="text-xs text-text-secondary mt-2">
-          Billing is handled through your contract — contact your account
-          manager for changes
+          {{ t("billing.contractManagedMessage") }}
         </div>
       </div>
       <!-- Stripe billing - show subscribe/manage buttons -->

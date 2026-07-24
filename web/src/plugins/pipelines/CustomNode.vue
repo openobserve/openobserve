@@ -482,7 +482,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
             v-if="showDeleteTooltip"
             class="fixed bg-status-negative text-white py-1.5 px-2.5 rounded-default text-2xs z-[1000] shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-black)_30%,transparent)] pointer-events-none whitespace-nowrap left-3.75"
           >
-            Delete Node
+            {{ t('pipeline.deleteNodeTitle') }}
             <div class="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] [border-top-color:#dc2626]"></div>
           </div>
         </div>

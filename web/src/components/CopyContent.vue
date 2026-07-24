@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="copyToClipboardFn()"
       >
         <OIcon name="content-copy" size="sm" />
-        <OTooltip content="Copy" side="top" />
+        <OTooltip :content="t('common.copy')" side="top" />
       </OButton>
     </div>
     <pre data-test="rum-content-text" class="text-sm whitespace-pre-wrap wrap-break-word m-0 p-3 pr-10 leading-5">{{ computedContent }}</pre>

@@ -19,10 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="semantic-field-groups-config-import-drawer"
     v-model:open="internalOpen"
     :width="40"
-    title="Import Semantic Groups"
-    sub-title="Upload JSON file to import semantic field groups"
-    secondary-button-label="Cancel"
-    primary-button-label="Apply Changes"
+    :title="t('correlation.importSemanticGroupsTitle')"
+    :sub-title="t('correlation.importSemanticGroupsSubtitle')"
+    :secondary-button-label="t('common.cancel')"
+    :primary-button-label="t('correlation.applyChanges')"
     :primary-button-disabled="!hasSelectedChanges"
     :primary-button-loading="isApplying"
     @click:secondary="handleClose"
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="mb-3">
         <OFile
           v-model="jsonFile"
-          label="Select JSON file"
+          :label="t('correlation.selectJsonFile')"
           accept=".json"
           @update:model-value="loadFile"
           data-test="semantic-groups-import-file-drawer"
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Loading State -->
       <div v-if="isLoading" class="text-center p-4">
         <OSpinner variant="dots" size="lg" />
-        <div class="text-sm text-text-muted mt-3">Analyzing file...</div>
+        <div class="text-sm text-text-muted mt-3">{{ t('correlation.analyzingFile') }}</div>
       </div>
 
       <!-- Diff Preview -->
@@ -68,18 +68,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="col-auto">
               <OTag type="diffCategory" value="new">
                 <strong>{{ diffData.additions.length }}</strong
-                >&nbsp;New
+                >&nbsp;{{ t('correlation.new') }}
               </OTag>
             </div>
             <div class="col-auto">
               <OTag type="diffCategory" value="modified">
                 <strong>{{ diffData.modifications.length }}</strong
-                >&nbsp;Modified
+                >&nbsp;{{ t('correlation.modified') }}
               </OTag>
             </div>
             <div class="col-auto">
               <OTag type="diffCategory" value="unchanged">
-                {{ diffData.unchanged.length }} Unchanged
+                {{ diffData.unchanged.length }} {{ t('correlation.unchanged') }}
               </OTag>
             </div>
           </div>
@@ -92,16 +92,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost-primary"
               size="xs"
               @click="selectAllAdditions"
-              >Select All New</OButton
+              >{{ t('correlation.selectAllNew') }}</OButton
             >
             <OButton
               variant="ghost-warning"
               size="xs"
               @click="selectAllModifications"
-              >Select All Modified</OButton
+              >{{ t('correlation.selectAllModified') }}</OButton
             >
             <OButton variant="ghost-muted" size="xs" @click="deselectAll"
-              >Clear All</OButton
+              >{{ t('correlation.clearAll') }}</OButton
             >
           </OButtonGroup>
         </div>
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="diffData.additions.length > 0" class="mb-3">
             <div class="text-sm font-semibold border-b border-separator text-status-positive p-2">
               <OIcon name="add-circle" size="sm" />
-              New ({{ selectedAdditions.length }}/{{
+              {{ t('correlation.new') }} ({{ selectedAdditions.length }}/{{
                 diffData.additions.length
               }})
             </div>
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     group.display
                   }}</span>
                   <span class="block text-xs text-muted-foreground">
-                    {{ group.id }} • {{ group.fields.length }} fields
+                    {{ group.id }} • {{ group.fields.length }} {{ t('correlation.fieldsCount') }}
                   </span>
                 </div>
                 <div class="flex items-center shrink-0 ms-auto">
@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="diffData.modifications.length > 0" class="mb-3">
             <div class="text-sm font-semibold border-b border-separator text-status-warning-text p-2">
               <OIcon name="edit" size="sm" />
-              Modified ({{ selectedModifications.length }}/{{
+              {{ t('correlation.modified') }} ({{ selectedModifications.length }}/{{
                 diffData.modifications.length
               }})
             </div>
@@ -180,8 +180,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     mod.proposed.display
                   }}</span>
                   <span class="block text-xs text-muted-foreground">
+                    <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- decorative arrow separator, not language-specific text -->
                     {{ mod.proposed.id }} • {{ mod.current.fields.length }} →
-                    {{ mod.proposed.fields.length }} fields
+                    {{ mod.proposed.fields.length }} {{ t('correlation.fieldsCount') }}
                   </span>
                 </div>
                 <div class="flex items-center shrink-0 ms-auto">
@@ -214,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span class="text-sm">{{ group.display }}</span>
                     <span class="block text-xs text-muted-foreground"
                       >{{ group.id }} •
-                      {{ group.fields.length }} fields</span
+                      {{ group.fields.length }} {{ t('correlation.fieldsCount') }}</span
                     >
                   </div>
                 </li>
@@ -227,9 +228,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Empty State -->
       <div v-else class="empty-state text-center p-4">
         <OIcon name="cloud-upload" class="mb-3 size-16!" />
-        <div class="text-xl font-semibold text-text-muted mb-2">Upload a JSON file</div>
+        <div class="text-xl font-semibold text-text-muted mb-2">{{ t('correlation.uploadAJsonFile') }}</div>
         <div class="text-sm text-text-secondary">
-          The system will analyze the file and show you what will change
+          {{ t('correlation.analyzeFilePrompt') }}
         </div>
       </div>
     </div>
@@ -242,12 +243,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="md"
     :title="selectedGroup?.display"
     :sub-title="`ID: ${selectedGroup?.id}`"
-    primary-button-label="Close"
+    :primary-button-label="t('common.close')"
     @click:primary="showGroupDialog = false"
   >
     <div>
       <div class="text-sm font-medium mb-2">
-        Fields ({{ selectedGroup?.fields.length }})
+        {{ t('correlation.fieldsLabel') }} ({{ selectedGroup?.fields.length }})
       </div>
       <OTag
         v-for="field in selectedGroup?.fields"
@@ -267,15 +268,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="showModificationDialog"
     size="lg"
     :title="selectedModification?.proposed.display"
-    sub-title="Compare Changes"
-    primary-button-label="Close"
+    :sub-title="t('correlation.compareChanges')"
+    :primary-button-label="t('common.close')"
     @click:primary="showModificationDialog = false"
   >
     <div class="flex gap-3">
       <div class="w-1/2">
-        <div class="text-sm font-medium text-status-error-text mb-2">Current</div>
+        <div class="text-sm font-medium text-status-error-text mb-2">{{ t('correlation.current') }}</div>
         <div class="text-xs mb-1">
-          {{ selectedModification?.current.fields.length }} fields
+          {{ selectedModification?.current.fields.length }} {{ t('correlation.fieldsCount') }}
         </div>
         <div class="max-h-62.5 overflow-y-auto p-2 bg-surface-subtle rounded-default">
           <OTag
@@ -290,9 +291,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div class="w-1/2">
-        <div class="text-sm font-medium text-status-positive mb-2">Proposed</div>
+        <div class="text-sm font-medium text-status-positive mb-2">{{ t('correlation.proposed') }}</div>
         <div class="text-xs mb-1">
-          {{ selectedModification?.proposed.fields.length }} fields
+          {{ selectedModification?.proposed.fields.length }} {{ t('correlation.fieldsCount') }}
         </div>
         <div class="max-h-62.5 overflow-y-auto p-2 bg-surface-subtle rounded-default">
           <OTag
@@ -333,7 +334,9 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useI18n } from "vue-i18n";
 
+const { t } = useI18n();
 
 interface SemanticGroup {
   id: string;

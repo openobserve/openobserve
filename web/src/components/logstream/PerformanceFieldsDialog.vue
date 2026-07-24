@@ -15,15 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog data-test="performance-fields-dialog" :open="modelValue" @update:open="(v) => $emit('update:modelValue', v)" persistent size="md" title="Index Fields Detected"
-    secondary-button-label="Skip"
-    primary-button-label="Add Fields"
+  <ODialog data-test="performance-fields-dialog" :open="modelValue" @update:open="(v) => $emit('update:modelValue', v)" persistent size="md" :title="t('logStream.performanceFieldsDialog.title')"
+    :secondary-button-label="t('logStream.performanceFieldsDialog.skipButton')"
+    :primary-button-label="t('logStream.performanceFieldsDialog.addFieldsButton')"
     @click:secondary="$emit('skip')"
     @click:primary="$emit('add-fields')"
   >
     <div v-if="fieldsByType.fts.length > 0" class="mb-2">
       <div class="text-xs font-medium mb-1">
-        Full Text Search ({{ fieldsByType.fts.length }})
+        {{ t('logStream.performanceFieldsDialog.ftsCount', { count: fieldsByType.fts.length }) }}
       </div>
       <div
         class="p-2 max-h-50 overflow-y-auto border rounded-default border-border-default bg-surface-subtle"
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div v-if="fieldsByType.secondaryIndex.length > 0">
       <div class="text-xs font-medium mb-1">
-        Secondary Index ({{ fieldsByType.secondaryIndex.length }})
+        {{ t('logStream.performanceFieldsDialog.secondaryIndexCount', { count: fieldsByType.secondaryIndex.length }) }}
       </div>
       <div
         class="p-2 max-h-50 overflow-y-auto border rounded-default border-border-default bg-surface-subtle"
@@ -83,6 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, computed, PropType } from "vue";
+import { useI18n } from "vue-i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -108,6 +109,7 @@ export default defineComponent({
   },
   emits: ["update:modelValue", "add-fields", "skip", "remove-field"],
   setup(props) {
+    const { t } = useI18n();
     // Computed property to group missing fields by type
     const fieldsByType = computed(() => {
       return {
@@ -119,6 +121,7 @@ export default defineComponent({
     });
 
     return {
+      t,
       fieldsByType,
     };
   },

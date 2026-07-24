@@ -26,6 +26,9 @@ import {
   ToastDescription,
   ToastClose,
 } from "reka-ui"
+import { useI18n } from "vue-i18n"
+
+const { t } = useI18n()
 
 defineOptions({ inheritAttrs: false })
 
@@ -289,7 +292,7 @@ onUnmounted(() => {
               class="size-3.5"
               aria-hidden="true"
             />
-            Affected Sections
+            {{ t('components.toast.affectedSections') }}
           </button>
           <ul
             v-if="detailsExpanded"
@@ -314,7 +317,7 @@ onUnmounted(() => {
       <!-- Dismiss button -->
       <ToastClose
         :class="['shrink-0 flex items-center rounded-default p-0.5 text-toast-fg-secondary hover:text-toast-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-toast-info-border', title ? 'self-start' : 'self-center']"
-        aria-label="Dismiss notification"
+        :aria-label="t('components.toast.dismissNotification')"
       >
         <OIcon name="close" size="sm" class="size-4" aria-hidden="true" />
       </ToastClose>

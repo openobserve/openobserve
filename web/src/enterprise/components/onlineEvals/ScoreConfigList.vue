@@ -88,7 +88,7 @@
 
         <template #cell-version="{ row }">
           <span class="inline-flex items-center gap-1.5 tabular-nums">
-            <span class="w-1.5 h-1.5 rounded-full bg-status-positive inline-block" />v{{ row.version }}
+            <span class="w-1.5 h-1.5 rounded-full bg-status-positive inline-block" />{{ t('onlineEvals.versionPrefix') }}{{ row.version }}
           </span>
         </template>
 

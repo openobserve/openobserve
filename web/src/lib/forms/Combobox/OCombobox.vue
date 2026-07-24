@@ -24,6 +24,9 @@ import {
   watch,
 } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -277,7 +280,7 @@ const hasInsideLabel = computed(
             <ComboboxEmpty
               class="py-2 px-3 text-sm text-select-placeholder text-center"
             >
-              No options found
+              {{ t('components.combobox.noOptionsFound') }}
             </ComboboxEmpty>
 
             <ComboboxItem

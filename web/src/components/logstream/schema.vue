@@ -34,19 +34,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <img
           :src="getTimelineIcon"
-          alt="Timeline Icon"
+          :alt="t('logStream.timelineIcon')"
           class="w-3.5 h-3.5 opacity-70"
         />
         <div class="flex items-center gap-1.5">
           <span
             class="text-3xs font-medium px-1.5 py-0.5 rounded-default text-text-secondary bg-surface-subtle"
           >
-            UTC
+            {{ t('logStream.utc') }}
           </span>
           <div
             class="text-xs font-semibold text-text-body"
           >
             {{ indexData.stats.doc_time_min }}
+            <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- decorative arrow separator between timestamps, not language-specific text -->
             <span class="text-base leading-none">→</span>
             {{ indexData.stats.doc_time_max }}
           </div>
@@ -88,12 +89,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       class="tile-title text-xs font-bold text-left text-text-secondary"
                     >
-                      Events
+                      {{ t('common.events') }}
                     </div>
                     <div class="tile-icon opacity-80">
                       <img
                         src="@/assets/images/home/records.svg"
-                        alt="Records Icon"
+                        :alt="t('logStream.recordsIcon')"
                         class="h-6 w-6"
                       />
                     </div>
@@ -123,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="tile-icon opacity-80">
                       <img
                         src="@/assets/images/home/ingested_size.svg"
-                        alt="Ingested Size Icon"
+                        :alt="t('logStream.ingestedSizeIcon')"
                         class="h-6 w-6"
                       />
                     </div>
@@ -155,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="tile-icon opacity-80">
                       <img
                         src="@/assets/images/home/compressed_size.svg"
-                        alt="Compressed Size Icon"
+                        :alt="t('logStream.compressedSizeIcon')"
                         class="h-6 w-6"
                       />
                     </div>
@@ -187,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="tile-icon opacity-80">
                       <img
                         src="@/assets/images/home/index_size.svg"
-                        alt="Index Size Icon"
+                        :alt="t('logStream.indexSizeIcon')"
                         class="h-6 w-6"
                       />
                     </div>
@@ -212,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OTab
                         name="schemaSettings"
                         icon="settings"
-                        label="Schema Settings"
+                        :label="t('logStream.schemaSettingsTab')"
                         data-test="schema-settings-tab"
                       />
 
@@ -220,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OTab
                         name="redButton"
                         icon="backup"
-                        label="Extended Retention"
+                        :label="t('logStream.extendedRetentionTab')"
                         data-test="schema-extended-retention-tab"
                       />
 
@@ -228,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OTab
                         name="configuration"
                         icon="tune"
-                        label="Configuration"
+                        :label="t('logStream.configurationTab')"
                         data-test="schema-configuration-tab"
                       />
                       <!-- Cross-Linking Tab -->
@@ -262,8 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <label
                         class="bg-banner-warning-bg py-1 px-4 rounded-default border border-banner-warning-border text-banner-warning-text font-semibold"
                       >
-                        {{ t("logStream.mapping") }} Default FTS keys used (no
-                        custom keys set).</label
+                        {{ t("logStream.mapping") }} {{ t("logStream.defaultFtsKeysUsed") }}</label
                       >
                     </div>
                   </div>
@@ -284,9 +284,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <template #icon-left
                               ><OIcon name="verified-user" size="sm"
                             /></template>
-                            User Defined Schema ({{
-                              indexData.defined_schema_fields.length
-                            }})
+                            {{
+                              t("logStream.userDefinedSchemaCount", {
+                                count: indexData.defined_schema_fields.length,
+                              })
+                            }}
                           </OToggleGroupItem>
                           <OToggleGroupItem value="allFields" size="sm">
                             <template #icon-left
@@ -307,7 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                         <OTooltip
                           side="right"
-                          content="Other fields show only the schema fields that existed before the stream was configured to use a user-defined schema."
+                          :content="t('logStream.otherFieldsSchemaTooltip')"
                         />
                       </div>
                     </div>
@@ -328,7 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="icon-sm"
                         class="my-2"
                         @click.stop="openDialog"
-                        title="Add Field(s)"
+                        :title="t('logStream.addFieldsTitle')"
                         icon-left="add"
                       />
                     </div>
@@ -342,7 +344,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         style="padding: 4px 16px 4px 16px"
                       >
                         <div class="flex justify-between items-center">
-                          <div class="text-xl font-semibold">Add Field(s)</div>
+                          <div class="text-xl font-semibold">{{ t('logStream.addFieldsTitle') }}</div>
                           <div>
                             <OButton
                               data-test="add-stream-cancel-btn"
@@ -498,7 +500,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Data Retention -->
                       <div v-if="showDataRetention" class="flex flex-col gap-1 p-3">
                         <label class="text-compact font-[500] text-text-heading">
-                          Data Retention (days)
+                          {{ t('logStream.dataRetentionDaysLabel') }}
                         </label>
                         <OInput
                           data-test="stream-details-data-retention-input"
@@ -510,17 +512,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                         <!-- casts: number input can hold "" at runtime while cleared -->
                         <small v-if="dataRetentionDays > 0 && (dataRetentionDays as any) != ''">
-                          Global retention is {{ store.state.zoConfig.data_retention_days }} days
+                          {{ t('logStream.globalRetentionDays', { days: store.state.zoConfig.data_retention_days }) }}
                         </small>
                         <small v-if="dataRetentionDays <= 0 || (dataRetentionDays as any) == ''" class="text-status-error-text">
-                          Retention period must be at least 1 day
+                          {{ t('logStream.retentionMinOneDay') }}
                         </small>
                       </div>
 
                       <!-- Max Query Range -->
                       <div class="flex flex-col gap-1 p-3">
                         <label class="text-compact font-[500] text-text-heading">
-                          Max Query Range (hours)
+                          {{ t('logStream.maxQueryRangeHoursLabel') }}
                         </label>
                         <OInput
                           data-test="stream-details-max-query-range-input"
@@ -530,7 +532,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="max-w-55"
                           @update:model-value="markFormDirty"
                         />
-                        <small>Maximum time range allowed for queries. Set 0 for unlimited range.</small>
+                        <small>{{ t('logStream.maxQueryRangeHelp') }}</small>
                       </div>
 
                       <!-- Flatten Level -->
@@ -546,12 +548,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="max-w-55"
                           @update:model-value="markFormDirty"
                         />
-                        <small>Global is {{ store.state.zoConfig.ingest_flatten_level || 3 }}</small>
+                        <small>{{ t('logStream.globalFlattenLevel', { level: store.state.zoConfig.ingest_flatten_level || 3 }) }}</small>
                       </div>
 
                       <!-- Toggles -->
                       <div class="flex items-center justify-between px-3 py-2.5 text-compact">
-                        <span>Use Stream Stats for Partitioning</span>
+                        <span>{{ t('logStream.approxPartition') }}</span>
                         <OSwitch
                           data-test="log-stream-use_approx-toggle-btn"
                           v-model="approxPartition"
@@ -560,7 +562,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
 
                       <div v-if="showStoreOriginalDataToggle" class="flex items-center justify-between px-3 py-2.5 text-compact">
-                        <span>Store Original Data</span>
+                        <span>{{ t('logStream.storeOriginalData') }}</span>
                         <OSwitch
                           data-test="log-stream-store-original-data-toggle-btn"
                           v-model="storeOriginalData"
@@ -569,7 +571,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
 
                       <div class="flex items-center justify-between px-3 py-2.5 text-compact">
-                        <span>Enable Distinct Values</span>
+                        <span>{{ t('logStream.enableDistinctValues') }}</span>
                         <OSwitch
                           data-test="log-stream-enabled-distinct-values-toggle-btn"
                           v-model="enableDistinctFields"
@@ -592,18 +594,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span class="font-semibold">
                       <OIcon name="info" class="mr-1" size="sm" />
 
-                      Additional
                       {{
-                        store.state.zoConfig.extended_data_retention_days
-                      }}
-                      days of extension will be applied to the selected date
-                      ranges</span
+                        t("logStream.extendedRetentionInfo", {
+                          days: store.state.zoConfig.extended_data_retention_days,
+                        })
+                      }}</span
                     >
                   </div>
                   <div class="mt-2 flex flex-col flex-1 min-h-0">
                     <div class="text-center mt-2 flex items-center">
                       <div class="flex items-center">
-                        <span class="font-bold"> Select Date</span>
+                        <span class="font-bold"> {{ t('logStream.selectDate') }}</span>
                         <date-time
                           class="mx-2"
                           @on:date-change="dateChangeValue"
@@ -613,7 +614,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :minDate="minDate ?? undefined"
                         />
                       </div>
-                      <span class="font-bold"> (UTC Timezone) </span>
+                      <span class="font-bold"> {{ t('logStream.utcTimezone') }} </span>
                     </div>
 
                     <div class="mt-2 flex-1 min-h-0 flex flex-col">
@@ -673,8 +674,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span
                         v-if="activeMainTab == 'schemaSettings'"
                         class="px-2 py-2"
-                        ><strong> {{ selectedFields.length }}</strong> fields
-                        selected</span
+                        ><strong> {{ selectedFields.length }}</strong>
+                        {{ t("logStream.fieldsSelected") }}</span
                       >
                       <OButton
                         v-if="
@@ -755,7 +756,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div v-else class="p-3">
-      <h5>Wait while loading...</h5>
+      <h5>{{ t('logStream.waitLoading') }}</h5>
     </div>
   </ODrawer>
   <ODrawer
@@ -782,7 +783,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="schema-pattern-association-cancel-btn"
           @click="patternAssociationDialog.show = false"
         >
-          Cancel
+          {{ t('common.cancel') }}
         </OButton>
         <OButton
           variant="primary"
@@ -791,21 +792,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="!assocPatternsRef?.isFormDirty"
           @click="assocPatternsRef?.updateRegexPattern()"
         >
-          Update Changes
+          {{ t('logStream.updateChanges') }}
         </OButton>
       </div>
     </template>
   </ODrawer>
 
   <ConfirmDialog
-    title="Delete Action"
+    :title="t('logStream.deleteActionTitle')"
     :message="t('logStream.deleteActionMessage')"
     @update:ok="deleteFields()"
     @update:cancel="confirmQueryModeChangeDialog = false"
     v-model="confirmQueryModeChangeDialog"
   />
   <ConfirmDialog
-    title="Delete Dates"
+    :title="t('logStream.deleteDatesTitle')"
     :message="t('logStream.deleteDatesMessage')"
     @update:ok="deleteDates()"
     @update:cancel="confirmDeleteDatesDialog = false"

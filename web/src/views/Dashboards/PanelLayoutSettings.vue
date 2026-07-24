@@ -46,13 +46,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OForm>
 
         <div class="text-xs flex items-center gap-1 mt-1">
-          <span class="whitespace-nowrap">Approximately <strong>{{ getRowCount }}</strong> table rows will be displayed</span>
+          <span class="whitespace-nowrap">{{ t('dashboard.approximately') }} <strong>{{ getRowCount }}</strong> {{ t('dashboard.tableRowsWillBeDisplayed') }}</span>
           <OIcon
             name="info-outline"
             class="cursor-pointer shrink-0"
             size="xs"
           />
-            <OTooltip content="1 unit = 30px" />
+            <OTooltip :content="t('dashboard.unitPixelHint')" />
         </div>
 
 

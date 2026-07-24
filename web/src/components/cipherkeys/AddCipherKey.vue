@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :disabled="isSubmitting"
                         @click="continueToStep2"
                       >
-                        Continue
+                        {{ t('cipherKey.continue') }}
                       </OButton>
                     </div>
                   </div>

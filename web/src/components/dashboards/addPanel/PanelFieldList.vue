@@ -129,7 +129,7 @@
                 data-test="dashboard-add-p-data"
                 @click.stop="addBreakDownAxisItem(row)"
               >
-                +P
+                {{ t('panel.addPivotShort') }}
           </OButton>
           <OButton
             v-if="
@@ -148,7 +148,7 @@
             data-test="dashboard-add-b-data"
             @click.stop="addBreakDownAxisItem(row)"
           >
-            +B
+            {{ t('panel.addBreakdownShort') }}
           </OButton>
           <OButton
             v-if="dashboardPanelData.data.type == 'heatmap'"
@@ -158,7 +158,7 @@
             data-test="dashboard-add-z-data"
             @click.stop="addZAxisItem(row)"
           >
-            +Z
+            {{ t('panel.addZAxisShort') }}
           </OButton>
           <OButton
             v-if="
@@ -178,7 +178,7 @@
               addFilteredItem(row as { name: string; stream: string })
             "
           >
-            +F
+            {{ t('panel.addFilterShort') }}
           </OButton>
         </div>
 
@@ -198,7 +198,7 @@
             data-test="dashboard-add-latitude-data"
             @click.stop="addLatitude(row)"
           >
-            +Lat
+            {{ t('panel.addLatitudeShort') }}
           </OButton>
           <OButton
             variant="ghost-neutral"
@@ -211,7 +211,7 @@
             data-test="dashboard-add-longitude-data"
             @click.stop="addLongitude(row)"
           >
-            +Lng
+            {{ t('panel.addLongitudeShort') }}
           </OButton>
           <OButton
             variant="ghost-neutral"
@@ -224,7 +224,7 @@
             data-test="dashboard-add-weight-data"
             @click.stop="addWeight(row)"
           >
-            +W
+            {{ t('panel.addWeightShort') }}
           </OButton>
           <OButton
             v-if="
@@ -244,7 +244,7 @@
               addFilteredItem(row as { name: string; stream: string })
             "
           >
-            +F
+            {{ t('panel.addFilterShort') }}
           </OButton>
         </div>
 
@@ -264,7 +264,7 @@
             data-test="dashboard-add-x-data"
             @click.stop="addMapName(row)"
           >
-            +N
+            {{ t('panel.addNameShort') }}
           </OButton>
           <OButton
             variant="ghost-neutral"
@@ -277,7 +277,7 @@
             data-test="dashboard-add-y-data"
             @click.stop="addMapValue(row)"
           >
-            +V
+            {{ t('panel.addValueShort') }}
           </OButton>
           <OButton
             variant="ghost-neutral"
@@ -287,7 +287,7 @@
               addFilteredItem(row as { name: string; stream: string })
             "
           >
-            +F
+            {{ t('panel.addFilterShort') }}
           </OButton>
         </div>
 
@@ -307,7 +307,7 @@
             data-test="dashboard-add-source-data"
             @click.stop="addSource(row)"
           >
-            +S
+            {{ t('panel.addSourceShort') }}
           </OButton>
           <OButton
             variant="ghost-neutral"
@@ -320,7 +320,7 @@
             data-test="dashboard-add-target-data"
             @click.stop="addTarget(row)"
           >
-            +T
+            {{ t('panel.addTargetShort') }}
           </OButton>
           <OButton
             variant="ghost-neutral"
@@ -333,7 +333,7 @@
             data-test="dashboard-add-value-data"
             @click.stop="addValue(row)"
           >
-            +V
+            {{ t('panel.addValueShort') }}
           </OButton>
           <OButton
             v-if="
@@ -353,7 +353,7 @@
               addFilteredItem(row as { name: string; stream: string })
             "
           >
-            +F
+            {{ t('panel.addFilterShort') }}
           </OButton>
         </div>
           </template>

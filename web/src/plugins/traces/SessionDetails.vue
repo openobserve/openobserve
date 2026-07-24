@@ -419,7 +419,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="flex flex-col gap-[0.2rem] min-w-0">
                 <span class="text-xs font-semibold tabular-nums text-right text-text-secondary">
-                  ${{ trace.cost.toFixed(4) }}
+                  {{ t('traces.sessionDetail.currencySymbol') }}{{ trace.cost.toFixed(4) }}
                 </span>
                 <OProgressBar :value="ratio(trace.cost, maxTurnCost)" size="xs" />
               </div>
@@ -508,8 +508,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-text-secondary tabular-nums">
                   <span>{{ formatTime(trace.startTimeMicros) }}</span>
                   <span>· {{ formatDuration(trace.durationNanos) }}</span>
-                  <span>· ${{ trace.cost.toFixed(4) }}</span>
-                  <span>· {{ formatTokens(trace.inputTokens) }} → {{ formatTokens(trace.outputTokens) }}</span>
+                  <span>· {{ t('traces.sessionDetail.currencySymbol') }}{{ trace.cost.toFixed(4) }}</span>
+                  <span>· {{ formatTokens(trace.inputTokens) }} {{ t('traces.sessionDetail.tokensArrow') }} {{ formatTokens(trace.outputTokens) }}</span>
                   <span v-if="turnDetail(trace.traceId)">
                     · {{ turnDetail(trace.traceId)!.llmCalls }} {{ t('traces.sessionDetail.stats.llmCalls') }}
                     · {{ turnDetail(trace.traceId)!.toolCalls }} {{ t('traces.sessionDetail.stats.toolCalls') }}
@@ -675,7 +675,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <span class="flex flex-col items-end min-w-[3.25rem]">
                   <span class="text-2xs font-semibold tabular-nums text-text-secondary">
-                    ${{ row.cost.toFixed(4) }}
+                    {{ t('traces.sessionDetail.currencySymbol') }}{{ row.cost.toFixed(4) }}
                   </span>
                   <span v-if="detail && detail.cost > 0" class="text-3xs tabular-nums text-text-muted">
                     {{ ((row.cost / detail.cost) * 100).toFixed(1) }}%

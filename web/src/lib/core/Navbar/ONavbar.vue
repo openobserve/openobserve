@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-show="visible"
     v-bind="$attrs"
     role="navigation"
-    aria-label="Main navigation"
+    :aria-label="t('components.navbar.mainNavigation')"
     data-test="navbar-main-nav"
     data-o2-navbar
     class="left-drawer o2-navbar-scroll flex flex-col bg-surface-chrome-deeper shrink-0 min-h-0 overflow-y-auto w-[5.5rem] pb-1"

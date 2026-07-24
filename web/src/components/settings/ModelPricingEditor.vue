@@ -284,7 +284,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="isTemplateActive(idx, tpl.keys)"
                       class="text-sm leading-none opacity-75 ml-0.5 hover:opacity-100"
                       @click.stop="clearTemplate(idx, tpl.keys)"
-                      >×</span
+                    >
+                      {{ '×' }}</span
                     >
                   </OButton>
                 </div>
@@ -335,8 +336,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :placeholder="t('modelPricing.pricePlaceholder')"
                         :data-test="`model-pricing-price-value-input-${idx}-${entryIdx}`"
                       >
-                        <template #icon-left
-                          ><span class="price-dollar text-xs pb-0.5">$</span></template
+                        <template #icon-left>
+                          <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- currency symbol glyph, identical in every language -->
+                          <span class="price-dollar text-xs pb-0.5">$</span></template
                         >
                       </OFormInput>
                       <!-- Fixed input-height band keeps the delete button centered
@@ -389,8 +391,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :placeholder="t('modelPricing.pricePlaceholder')"
                         :data-test="`model-pricing-add-price-value-input-${idx}`"
                       >
-                        <template #icon-left
-                          ><span class="price-dollar text-xs pb-0.5">$</span></template
+                        <template #icon-left>
+                          <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- currency symbol glyph, identical in every language -->
+                          <span class="price-dollar text-xs pb-0.5">$</span></template
                         >
                       </OFormInput>
                       <OButton
@@ -449,10 +452,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             {{ entry.key }}
                           </td>
                           <td class="px-4 py-2 text-text-body">
-                            ${{ formatPreviewCost(fromPerMillion(entry.value), 1000) }}
+                            {{ '$' + formatPreviewCost(fromPerMillion(entry.value), 1000) }}
                           </td>
                           <td class="px-4 py-2 text-text-body">
-                            ${{ formatPreviewCost(fromPerMillion(entry.value), 1000000) }}
+                            {{ '$' + formatPreviewCost(fromPerMillion(entry.value), 1000000) }}
                           </td>
                         </tr>
                       </tbody>

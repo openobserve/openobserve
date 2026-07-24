@@ -20,14 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="text-center w-full"
       style="font-size: var(--text-3xl); margin: 40px 0px"
     >
-      Member Subscription
+      {{ t('billing.memberSubscription.title') }}
     </div>
     <div v-if="status == 'processing'">{{ message }}</div>
     <div
       v-else-if="status == 'error' && error == ''"
       class="text-center"
     >
-      Error while processing member subscription request.<br /><br />
+      {{ t('billing.memberSubscription.errorProcessing') }}<br /><br />
     </div>
 
     <SanitizedHtmlRenderer
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="text-base leading-7.5 w-[70%] mx-auto text-left"
     />
 
-    <div v-else>Thank you for your subscription.</div>
+    <div v-else>{{ t('billing.memberSubscription.thankYou') }}</div>
 
     <!-- <div
       v-if="status == 'error' && error !== ''"
@@ -57,6 +57,7 @@ import { useLocalOrganization, getPath } from "../utils/zincutils";
 import organizationsService from "../services/organizations";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useI18n } from "vue-i18n";
 
 export default defineComponent({
   name: "PageUser",
@@ -113,10 +114,12 @@ export default defineComponent({
   setup() {
     const $store = useStore();
     const $router = useRouter();
+    const { t } = useI18n();
 
     return {
       $router,
       $store,
+      t,
     };
   },
 });

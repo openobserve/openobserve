@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <div class="text-2xl font-semibold leading-7 text-text-body text-left flex items-end">
-            {{ aiUsage.credits_used }} / {{ aiUsage.credits_limit }} credits used
+            {{ aiUsage.credits_used }} / {{ aiUsage.credits_limit }} {{ t("billing.creditsUsedLabel") }}
           </div>
           <div v-if="aiUsage.mode === 'exhausted'" class="text-status-error-text mt-2" style="font-size: var(--text-compact);">
             {{ t(aiUsage.requires_additional_credits ? "billing.aiContractExhaustedMessage" : "billing.aiExhaustedMessage") }}

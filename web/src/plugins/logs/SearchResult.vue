@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 type="logsResultChip"
                 value="info"
                 data-test="logs-result-pattern-time-chip"
-              >{{ patternChips.time }} ms</OTag>
+              >{{ patternChips.time }} {{ t('logs.searchResult.msUnit') }}</OTag>
             </template>
             <span v-else class="truncate min-w-0">{{ patternSummaryText }}</span>
           </template>
@@ -460,7 +460,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="oo-pin-tooltip__action oo-pin-tooltip__action--exclude"
                   :title="t('logs.searchResult.exclude')"
                   @click.stop="applyPinnedFilter(row.rawValue, 'exclude')"
-                  >≠</span
+                  >{{ t('logs.searchResult.notEqualSymbol') }}</span
                 >
               </span>
             </div>

@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="scrollToBottomSmooth"
       >
         <OIcon name="arrow-downward" size="sm" />
-        <OTooltip content="Scroll to bottom" side="top" />
+        <OTooltip :content="t('alerts.summary.scrollToBottom')" side="top" />
       </OButton>
     </div>
   </div>

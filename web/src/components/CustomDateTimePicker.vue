@@ -53,7 +53,7 @@
                 </div>
               </div>
               <div class="relative-row [&>*]:mr-1.5 px-3 py-2 flex items-center border-b border-border-default">
-                <div class="text-sm font-semibold min-w-18.75">Custom</div>
+                <div class="text-sm font-semibold min-w-18.75">{{ t('common.custom') }}</div>
                 <div class="flex gap-2">
                   <div class="flex flex-col w-20">
                     <OInput
@@ -96,6 +96,9 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import type { DropdownAlign } from "@/lib/overlay/Dropdown/ODropdown.types";
 import { ref, reactive, watch, computed } from "vue";
 import type { PropType } from "vue";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 // Period keys used to index relativeDates and label lookups.
 type PeriodKey = "s" | "m" | "h" | "d" | "w" | "M";

@@ -12,6 +12,10 @@ import { STEPPER_CONTEXT_KEY, STEPPER_REGISTER_KEY } from './OStepper.types'
 import type { Component } from 'vue'
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
+
 const props = withDefaults(defineProps<OStepperProps>(), {
   orientation: 'horizontal',
   animated: true,
@@ -116,7 +120,7 @@ function triggerClasses(step: StepRegistration): string {
 <template>
   <div
     role="group"
-    aria-label="Steps"
+    :aria-label="t('components.stepper.steps')"
     class="o-stepper flex flex-col"
   >
     <!--
@@ -127,7 +131,7 @@ function triggerClasses(step: StepRegistration): string {
     <div
       v-if="isHorizontal"
       role="list"
-      aria-label="Steps"
+      :aria-label="t('components.stepper.steps')"
       class="sticky top-0 z-10 flex items-start w-full pb-2 bg-surface-base!"
     >
       <template v-for="(step, index) in sortedSteps" :key="step.name">

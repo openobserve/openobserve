@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <legend class="px-2 text-xs text-text-heading ml-2 py-0 px-1">
         {{ getAuthenticationTypeLabel(authType) }}
-        Configuration
+        {{ t('cipherKey.configuration') }}
       </legend>
       <div v-if="authType === 'access_key'">
         <div v-if="!isUpdate || isUpdateAccessKey || accessKey == ''">
@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <legend class="px-2 text-xs text-text-heading ml-2 py-0 px-1">
         {{ getSecretOptionLabel(secretType) }}
-        Configuration
+        {{ t('cipherKey.configuration') }}
       </legend>
       <div v-if="secretType === 'static_secret'">
         <OFormInput

@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="text-text-secondary text-xs tabular-nums whitespace-nowrap"
                     :title="t('iam.orgCleanupTasksDialog.attempts', { n: child.attempts })"
                   >
-                    {{ child.attempts }}×
+                    {{ child.attempts }}{{ t('iam.orgCleanupTasksDialog.attemptsMultiplier') }}
                   </span>
                   <OBadge :variant="badgeVariant(child.status)" size="sm" class="whitespace-nowrap">
                     {{ child.status }}
@@ -182,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="text-text-secondary text-xs tabular-nums whitespace-nowrap"
                 :title="t('iam.orgCleanupTasksDialog.attempts', { n: row.task.attempts })"
               >
-                {{ row.task.attempts }}×
+                {{ row.task.attempts }}{{ t('iam.orgCleanupTasksDialog.attemptsMultiplier') }}
               </span>
 
               <!-- Status badge -->

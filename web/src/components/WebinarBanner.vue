@@ -45,11 +45,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OButton
         variant="webinar-dismiss"
-        aria-label="Dismiss webinar banner"
+        :aria-label="t('components.webinarBanner.dismissBannerAriaLabel')"
         @click="dismiss"
         data-test="webinar-top-bar-dismiss-btn"
       >
-        Dismiss
+        {{ t('components.webinarBanner.dismiss') }}
       </OButton>
     </div>
   </div>
@@ -103,8 +103,10 @@ import { ref, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useI18n } from "vue-i18n";
 
 const store = useStore();
+const { t } = useI18n();
 
 const props = defineProps<{
   variant: "header" | "home";

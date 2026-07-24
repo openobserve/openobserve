@@ -22,6 +22,7 @@ limitations under the License.
   >
 
     <div data-test="destination-preview-card" class="w-full">
+        <!-- eslint-disable vue/no-bare-strings-in-template -- simulated notification preview: mirrors the actual server-rendered (non-localized) alert message, so it is intentionally hardcoded, not translated -->
         <!-- Slack Preview -->
         <div v-if="type === 'slack'" data-test="slack-preview" class="slack-message max-w-150 mx-auto bg-white border border-border-default rounded-default p-4 shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
           <div class="slack-message-container flex gap-3">
@@ -242,6 +243,7 @@ limitations under the License.
         </div>
     </div>
 
+    <!-- eslint-enable vue/no-bare-strings-in-template -->
     <template #footer>
       <div class="flex items-center justify-center gap-2 w-full">
         <OButton
@@ -251,14 +253,14 @@ limitations under the License.
           @click="copyTemplate"
           icon-left="content-copy"
         >
-          Copy Template
+          {{ t('alerts.previewCopyTemplateBtn') }}
         </OButton>
         <OButton
           variant="outline"
           size="sm-action"
           @click="isOpen = false"
         >
-          Close
+          {{ t('common.close') }}
         </OButton>
       </div>
     </template>

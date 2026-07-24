@@ -1,5 +1,54 @@
 {
   "emptyState": {
+    "illustrations": {
+      "noHistoryYet": "No history yet",
+      "noLogsFound": "No logs found",
+      "noMatchingResults": "No matching results",
+      "scanningForData": "Scanning for data",
+      "listeningForData": "Listening for data",
+      "pickStreamToStartExploring": "Pick a stream to start exploring",
+      "connect": {
+        "ariaLabel": "Connect a data source to create your first stream"
+      },
+      "constellation": {
+        "ariaLabel": "Waiting for data"
+      },
+      "dataScene": {
+        "ariaLabel": "No data yet"
+      },
+      "error": {
+        "ariaLabel": "Something went wrong"
+      },
+      "explorer": {
+        "ariaLabel": "No data found"
+      },
+      "floatingDocs": {
+        "ariaLabel": "No items yet"
+      },
+      "waiting": {
+        "ariaLabel": "Waiting for data to arrive"
+      },
+      "waveBars": {
+        "ariaLabel": "Waiting for a signal"
+      },
+      "hourglass": {
+        "ariaLabel": "Waiting for data to arrive"
+      },
+      "orbit": {
+        "ariaLabel": "Waiting for data"
+      }
+    },
+    "createFirstItem": "Create your first item",
+    "newBrowserCheck": "New browser check",
+    "allCaughtUp": "You're all caught up",
+    "noPanels": {
+      "title": "No panels here yet",
+      "description": "Add a panel to start visualizing logs, metrics, and traces.",
+      "action": "Add panel",
+      "actionDesc": "Charts, tables & more"
+    },
+    "noPanelsYet": "No panels yet",
+    "createFirstAlert": "Create your first alert",
     "noSearchResults": {
       "title": "We couldn't find any data",
       "description": "Nothing matches your current filters or time range. Try broadening your search, widening the time range, or clearing the filters.",
@@ -360,9 +409,58 @@
       "regexPatterns": "regex patterns",
       "monitors": "monitors",
       "modelPricing": "model pricing definitions"
+    },
+    "demo": {
+      "pageTitle": "Empty states — full set for review",
+      "introText": "Every preset below is a real",
+      "introTextSuffix": "with its production copy, illustration, and action. Each detailed scene has its own character micro-animation and pauses under OS \"reduce motion\". Nothing is wired into real pages yet.",
+      "characterSectionTitle": "Character — optional, only where it adds value",
+      "characterSectionDesc": "The illustration is just a named choice, so a scene can opt into a character (e.g. a prominent first-run hero) while everything else stays object-only. Same component,",
+      "noDataTitle": "We couldn't find any data",
+      "noDataDescription": "Nothing matches yet — try a different stream, widen the time range, or create something new.",
+      "clearFiltersAction": "Clear filters",
+      "sizesSectionTitle": "Sizes — the same system at block & inline scale",
+      "sizeBlockLabel": "size=\"block\" (inside a card / dashboard panel)",
+      "sizeInlineLabel": "size=\"inline\" (table body / dropdown)"
     }
   },
   "common": {
+    "and": "and",
+    "versionAbbreviation": "V",
+    "overview": "Overview",
+    "network": "Network",
+    "errorDetails": "Error Details",
+    "errorTypeLabel": "Error Type:",
+    "messageLabel": "Message:",
+    "handlingLabel": "Handling:",
+    "errorIdLabel": "Error ID:",
+    "viewDetails": "View Details",
+    "loadingTypeLabel": "Loading Type:",
+    "urlLabel": "URL:",
+    "viewIdLabel": "View ID:",
+    "actionDetails": "Action Details",
+    "loadingRelatedEvents": "Loading related events...",
+    "relatedEvents": "Related Events",
+    "on": "on",
+    "event": "event",
+    "viewTraceDetails": "View trace details",
+    "viewTrace": "View Trace",
+    "networkRequests": "Network Requests",
+    "noNetworkRequestsFound": "No network requests found for this event",
+    "consoleLogsComingSoon": "Console logs coming soon",
+    "performanceMetricsComingSoon": "Performance metrics coming soon",
+    "pageNotFound": "Page not found",
+    "pageNotFoundDescription": "The page you're looking for doesn't exist or has been moved.",
+    "addIcon": "Add icon",
+    "loadingIndicator": "Loading",
+    "pleaseFixIssues": "Please fix the following issues:",
+    "dataStreamingInProgress": "Data streaming in progress",
+    "key": "Key",
+    "timezone": "Timezone",
+    "dragToResizeResetHint": "Drag to resize · double-click to reset",
+    "success": "Success",
+    "loading": "Loading...",
+    "getStartedRUM": "Get Started with RUM",
     "beta": "Beta",
     "close": "Close",
     "cancel": "Cancel",
@@ -508,7 +606,10 @@
     "fillRequiredFields": "Please fill required fields",
     "test": "Test",
     "username": "Username",
-    "password": "Password"
+    "password": "Password",
+    "shortUrl": {
+      "redirecting": "Redirecting..."
+    }
   },
   "flow": {
     "stepPicker": {
@@ -553,6 +654,24 @@
     "mustBeLessThan": "Must be less than {value}"
   },
   "search": {
+    "selectedLabel": "selected",
+    "selectToFilter": "Select to filter",
+    "clearSelection": "Clear selection",
+    "includeModeHint": "Include mode (=)",
+    "excludeModeHint": "Exclude mode (≠)",
+    "fetchingValues": "Fetching values...",
+    "noDataInRangeHint": "No data in range — values from active filter",
+    "viewMoreValues": "View more values",
+    "aiIconAlt": "AI",
+    "aiModeIconAlt": "AI Mode",
+    "firstPage": "First page",
+    "lastPage": "Last page",
+    "sqlQuery": "SQL Query",
+    "queryEditorLabel": "Query Editor:",
+    "pluralSuffix": "(s)",
+    "addFieldToTable": "Add field to table",
+    "removeFieldFromTable": "Remove field from table",
+    "rows": "rows",
     "resetFields": "Reset selected table fields",
     "metrics": "Metrics",
     "selectIndex": "Select Stream First",
@@ -863,6 +982,7 @@
     "changeQueryModeConfirm": "Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off."
   },
   "menu": {
+    "upgradeToProPlan": "Upgrade to PRO Plan",
     "home": "Home",
     "about": "About",
     "user": "Users",
@@ -903,6 +1023,22 @@
     "synthetic": "Synthetic"
   },
   "rum": {
+    "sessionMetricsAria": "Session metrics summary",
+    "frustration": "Frustration",
+    "sourceMapFilesCount": "Source Map Files ({count})",
+    "sourceFile": "Source File",
+    "sourceMapFile": "Source Map File",
+    "loadingDashboard": "Loading Dashboard",
+    "sourceMapZipFileLabel": "Source Map ZIP File *",
+    "serviceNamePlaceholder": "Enter service name",
+    "versionPlaceholder": "Enter version (e.g., 1.0.0)",
+    "environmentPlaceholder": "Enter environment (optional)",
+    "upload": "Upload",
+    "dropFileHere": "Drop your file here",
+    "orClickToBrowse": "or click to browse",
+    "zipFilesOnly": ".zip files only",
+    "from": "from",
+    "to": "to",
     "title": "Real User Monitoring",
     "subtitle": "Monitor real-user sessions, errors, and frontend performance",
     "issueColumn": "Issue",
@@ -1089,6 +1225,29 @@
     "failedToTranslateStackTrace": "Failed to translate stack trace. Source maps may not be available."
   },
   "about": {
+    "copyCommitHash": "Copy commit hash",
+    "cargoToml": "Cargo.toml",
+    "rustCrates": "Rust crates",
+    "packageJson": "package.json",
+    "nodePackages": "Node packages",
+    "npmjsCom": "npmjs.com",
+    "jsRegistry": "JS registry",
+    "cratesIo": "crates.io",
+    "rustRegistry": "Rust registry",
+    "agplFullName": "GNU Affero General Public License (AGPL)",
+    "github": "GitHub",
+    "website": "Website",
+    "licenseAndUsage": "License & Usage",
+    "copyLicenseId": "Copy license ID",
+    "editionLbl": "Edition",
+    "limitPrefix": "· limit",
+    "gbPerDay": "GB / day",
+    "ofDailyLimitUsedToday": "of daily limit used today",
+    "gbToday": "GB today",
+    "editionsLabel": "EDITIONS",
+    "yourPlan": "Your Plan",
+    "allFivePillars": "ALL FIVE PILLARS",
+    "license_key_required": "License key is required",
     "name": "OpenObserve",
     "introduction": "Observability simplified.",
     "version": "Version",
@@ -1401,6 +1560,24 @@
     }
   },
   "login": {
+    "redirectingToSsoMessage": "Redirecting to SSO login page. If you are not redirected, please",
+    "clickHere": "click here",
+    "loginWithSso": "Login with SSO",
+    "loginAsInternalUser": "Login as internal user",
+    "openObserveLogoAlt": "OpenObserve Logo",
+    "getStartedBannerMessage": "Try OpenObserve today for more efficient and performant observability.",
+    "getStartedBannerAlt": "Get Started Banner",
+    "getStartedHeading": "One last thing before we begin",
+    "hearAboutUsLabel": "How did you hear about us?",
+    "hearAboutUsPlaceholder": "Eg. From a friend",
+    "whereDoYouWorkLabel": "Where do you work?",
+    "whereDoYouWorkPlaceholder": "Company Name",
+    "agreeToTermsPrefix": "I have read and agree with the",
+    "termsOfUse": "Terms of use",
+    "and": "and",
+    "privacyPolicyStar": "Privacy policy*",
+    "startTrialButton": "Start your 14-day Trial",
+    "copyrightNotice": "© OpenObserve",
     "userid": "User ID",
     "userEmail": "User Email",
     "signIn": "Sign In",
@@ -1795,6 +1972,7 @@
       "apiKeyCopyError": "Error while copy API Key."
     },
     "orgCleanupTasksDialog": {
+      "attemptsMultiplier": "×",
       "deletionProgress": "Deletion progress — {orgName}",
       "stepsComplete": "{done} of {total} steps complete",
       "completed": "Completed",
@@ -1941,6 +2119,8 @@
     "selectOrganizationForQuota": "Select an Organization to set quotas"
   },
   "organization": {
+    "searchByNameOrId": "Search by name or ID",
+    "noOrganizationsFound": "No organizations found",
     "header": "Organizations",
     "orgBeingDeletedSwitching": "This organization is being deleted. Switching you to another organization.",
     "orgName": "Organization Name",
@@ -1988,6 +2168,48 @@
     "search": "Search Template"
   },
   "logStream": {
+    "timelineIcon": "Timeline Icon",
+    "utc": "UTC",
+    "recordsIcon": "Records Icon",
+    "ingestedSizeIcon": "Ingested Size Icon",
+    "compressedSizeIcon": "Compressed Size Icon",
+    "indexSizeIcon": "Index Size Icon",
+    "schemaSettingsTab": "Schema Settings",
+    "extendedRetentionTab": "Extended Retention",
+    "configurationTab": "Configuration",
+    "defaultFtsKeysUsed": "Default FTS keys used (no custom keys set).",
+    "userDefinedSchemaCount": "User Defined Schema ({count})",
+    "otherFieldsSchemaTooltip": "Other fields show only the schema fields that existed before the stream was configured to use a user-defined schema.",
+    "addFieldsTitle": "Add Field(s)",
+    "dataRetentionDaysLabel": "Data Retention (days)",
+    "globalRetentionDays": "Global retention is {days} days",
+    "retentionMinOneDay": "Retention period must be at least 1 day",
+    "maxQueryRangeHoursLabel": "Max Query Range (hours)",
+    "maxQueryRangeHelp": "Maximum time range allowed for queries. Set 0 for unlimited range.",
+    "globalFlattenLevel": "Global is {level}",
+    "enableDistinctValues": "Enable Distinct Values",
+    "extendedRetentionInfo": "Additional {days} days of extension will be applied to the selected date ranges",
+    "selectDate": "Select Date",
+    "utcTimezone": "(UTC Timezone)",
+    "fieldsSelected": "fields selected",
+    "waitLoading": "Wait while loading...",
+    "updateChanges": "Update Changes",
+    "deleteActionTitle": "Delete Action",
+    "deleteDatesTitle": "Delete Dates",
+    "fetchingFunctions": "Fetching functions...",
+    "associateFunction": "Associate Function",
+    "noFunctionsFound": "No functions found",
+    "streamsUnit": "Stream(s)",
+    "deleteAssociatedAlertsPipelinesBatch": "Delete all Pipelines and Alerts associated with the selected streams",
+    "allFieldsCount": "All Fields ({count})",
+    "performanceFieldsDialog": {
+      "title": "Index Fields Detected",
+      "skipButton": "Skip",
+      "addFieldsButton": "Add Fields",
+      "ftsCount": "Full Text Search ({count})",
+      "secondaryIndexCount": "Secondary Index ({count})"
+    },
+    "deleteField": "Delete field",
     "header": "Streams",
     "subtitle": "Index management and stream configuration",
     "streamNameHelpText": "Use alphanumeric characters, underscore and colon only.",
@@ -2283,6 +2505,124 @@
     }
   },
   "pipeline": {
+    "importPipelineTitle": "Import Pipeline",
+    "errorValidations": "Error Validations",
+    "outputMessages": "Output Messages",
+    "pipelineCreation": "Pipeline Creation",
+    "noPipelinesFound": "No pipelines found",
+    "executionDetailsTitle": "Pipeline Execution Details",
+    "pipelineNameLabel": "Pipeline Name",
+    "timestampLabel": "Timestamp",
+    "silencedLabel": "Silenced",
+    "evaluationTimeLabel": "Evaluation Time",
+    "queryTimeLabel": "Query Time",
+    "retriesLabel": "Retries",
+    "resultStatusLabel": "Result Status",
+    "sourceNodeLabel": "Source Node",
+    "errorDetailsLabel": "Error Details",
+    "responseLabel": "Response",
+    "errorSummaryLabel": "Error Summary",
+    "triggerConditionInfoLine1": "Based upon the condition of trigger the pipeline will get trigger",
+    "triggerConditionInfoLine2": "e.g. if the trigger value is >100 and the query returns a value of 101 then the pipeline will trigger.",
+    "thresholdInfoLine1": "The threshold above/below which the alert will trigger.",
+    "thresholdInfoLine2": "e.g. if the threshold is >100 and the query returns a value of 101 then the alert will trigger.",
+    "cronToggleInfo": "Configure the option to enable a cron expression.",
+    "frequencyMinutesInfoLine1": "How often the task should be executed.",
+    "frequencyMinutesInfoLine2": "e.g., 2 minutes means that the task will run every 2 minutes and will be processed based on the other parameters provided.",
+    "cronPatternInfo": "Pattern: * * * * * * means every second.",
+    "cronFormatInfo": "Format: [Second (optional) 0-59] [Minute 0-59] [Hour 0-23] [Day of Month 1-31, 'L'] [Month 1-12] [Day of Week 0-7 or '1L-7L', 0 and 7 for Sunday].",
+    "cronWildcardInfo": "Use '*' to represent any value, 'L' for the last day/weekday.",
+    "cronExampleInfo": "Example: 0 0 12 * * ? - Triggers at 12:00 PM daily. It specifies second, minute, hour, day of month, month, and day of week, respectively.",
+    "periodInfoLine1": "Period for which the query should run.",
+    "periodInfoLine2": "e.g. 10 minutes means that whenever the query will run it will use the last 10 minutes of data. If the query runs at 4:00 PM then it will use the data from 3:50 PM to 4:00 PM.",
+    "periodShouldMatchFrequency": "Note: The period should be the same as frequency.",
+    "delayInfoLine1": "Delay for which the pipeline is scheduled to run.",
+    "delayInfoLine2": "e.g. 10 minutes delay means that the pipeline will run 10 minutes after its scheduled time.",
+    "closeDrawer": "Close drawer",
+    "conditionValueGuidelines": "Condition value Guidelines:",
+    "emptyValueGuideline": "To check for an empty value, use",
+    "exampleColon": ". Example:",
+    "nullValueGuideline": "To check for an Null value, use",
+    "customColumnGuideline": "To add a custom column, type column name and press",
+    "enterKey": "Enter",
+    "conditionsNotMetWarning": "If conditions are not met, the record will be dropped.",
+    "missingFieldWarning": "If the record does not have the specified field, it will be dropped.",
+    "unsavedChangesDetected": "Unsaved changes detected. Click \"Save\" to preserve your updates.",
+    "edgeDeleteHint": "Press Backspace/Delete to remove the edge",
+    "dropHere": "Drop here",
+    "backfillJobDetailsTitle": "Backfill Job Details",
+    "cancelJob": "Cancel Job",
+    "jobInformation": "Job Information",
+    "jobId": "Job ID",
+    "pipelineLabel": "Pipeline",
+    "timeRange": "Time Range",
+    "created": "Created",
+    "progressLabel": "Progress",
+    "overallProgress": "Overall Progress",
+    "phase": "Phase",
+    "chunks": "Chunks",
+    "currentPosition": "Current Position",
+    "estimatedCompletion": "Estimated Completion",
+    "deletionDetails": "Deletion Details",
+    "deletionJobIds": "Deletion Job IDs",
+    "errorDetails": "Error Details",
+    "errorMessage": "Error Message",
+    "timeline": "Timeline",
+    "jobCreated": "Job Created",
+    "backfillStarted": "Backfill Started",
+    "inProgress": "In Progress",
+    "jobCompleted": "Job Completed",
+    "allDataProcessedSuccessfully": "All data processed successfully",
+    "jobFailed": "Job Failed",
+    "errorOccurredDuringProcessing": "An error occurred during processing",
+    "jobCanceled": "Job Canceled",
+    "jobCanceledByUser": "Job was canceled by user",
+    "jobNotFound": "Job not found",
+    "createBackfillJobTitle": "Create Backfill Job for",
+    "createBackfillJob": "Create Backfill Job",
+    "advancedOptions": "Advanced Options",
+    "chunkPeriodMinutesLabel": "Chunk Period (minutes)",
+    "chunkPeriodDescription": "Size of each processing chunk",
+    "defaultChunkPeriodTooltip": "Default: {minutes} minutes",
+    "delayBetweenChunksLabel": "Delay Between Chunks (seconds)",
+    "delayBetweenChunksDescription": "Wait time between processing chunks",
+    "defaultDelaySecondsPlaceholder": "5",
+    "defaultDelayTooltip": "Default: 5 seconds",
+    "deleteDataBeforeBackfill": "Delete existing data before backfill",
+    "irreversibleDeletionWarning": "Warning: Irreversible Data Deletion",
+    "deleteBackfillWarningMessage": "This will permanently delete all data in the destination stream for the specified time range before running the backfill. This action cannot be undone.",
+    "timeAlignmentRequirements": "Time Alignment Requirements (UTC):",
+    "logsHourBoundaryNote": "streams: Times must align to hour boundaries in UTC (e.g., 10:00:00, not 10:15:00)",
+    "metricsTracesLabel": "Metrics/Traces",
+    "dayBoundaryNote": "streams: Times must align to day boundaries in UTC (e.g., 00:00:00)",
+    "estimatedProcessingTime": "Estimated Processing Time:",
+    "estimatedChunks": "Estimated Chunks:",
+    "confirmDataDeletion": "Confirm Data Deletion",
+    "yesDeleteAndBackfill": "Yes, Delete and Backfill",
+    "deleteBackfillConfirmMessage": "You have selected to delete existing data before backfill. This will permanently delete all data in the destination stream for the specified time range.",
+    "actionCannotBeUndone": "This action CANNOT be undone or cancelled once the job is created.",
+    "areYouSureProceed": "Are you sure you want to proceed?",
+    "clearFilters": "Clear Filters",
+    "backfillJobLabel": "Backfill Job",
+    "chunksUnit": "chunks",
+    "notAvailable": "N/A",
+    "never": "Never",
+    "jobTooltipLabel": "Job",
+    "resumeJob": "Resume Job",
+    "editJob": "Edit Job",
+    "viewDetails": "View Details",
+    "deleteJobTooltip": "Delete Job",
+    "backfillJobErrorTitle": "Backfill Job Error",
+    "jobIdLabel": "Job ID",
+    "errorMessageLabel": "Error Message",
+    "editBackfillJobTitle": "Edit Backfill Job",
+    "updateJob": "Update Job",
+    "chunkPeriodDefaultTooltip": "Size of each processing chunk in minutes. Default: 60",
+    "chunkPeriodDefaultPlaceholder": "60",
+    "organizationId": "Organization Id",
+    "functionName": "Function Name",
+    "remoteDestination": "Remote Destination",
+    "failedToLoadPipeline": "Failed to load pipeline",
     "header": "Pipelines",
     "subtitle": "Transform, enrich and route data in flight",
     "create": "Create Pipeline",
@@ -2406,7 +2746,8 @@
     "evalTemplates": "Evaluation Templates",
     "selectStream": "Select a stream ...",
     "queryEditorPlaceholder": "Select a stream or write SQL query here...",
-    "moreErrors": "... and {count} more errors"
+    "moreErrors": "... and {count} more errors",
+    "chunkDelayTooltip": "Delay between processing chunks in seconds. Default: 5"
   },
   "evalTemplate": {
     "header": "Evaluation Templates",
@@ -2452,6 +2793,48 @@
     "tooltipPromptTemplate": "The prompt sent to the LLM. Use {input}, {output}, and {context} as placeholders for dynamic values at evaluation time."
   },
   "function": {
+    "updateModeLabel": "Update Mode",
+    "existingUrlsCount": "Existing URLs ({count})",
+    "reloadModeLabel": "Reload Mode:",
+    "reloadModeDescription": "Re-process all existing URLs from scratch. Use this when the CSV file content at the URLs has been updated but the URLs themselves haven't changed.",
+    "appendModeLabel": "Append Mode:",
+    "appendModeDescription": "Add a new URL to existing ones. Data from all URLs will be combined.",
+    "importantLabel": "Important:",
+    "appendModeWarning": "The new CSV file must have the same columns as the existing data. The enrichment table schema cannot be changed.",
+    "replaceFailedUrlLabel": "Replace Failed URL:",
+    "replaceFailedUrlDescription": "Replace only the failed URL with a new one. All successful URLs and their data will be kept. Use this to fix typos or broken URLs.",
+    "replaceModeLabel": "Replace Mode:",
+    "replaceModeDescription": "Delete all existing URLs and data, then use only the new URL you provide below.",
+    "csvUrlPlaceholder": "https://example.com/data.csv",
+    "csvFileUrlLabel": "CSV File URL",
+    "csvUrlHelpText": "Must be a publicly accessible CSV file",
+    "deleteTransformDialogTitle": "Delete Transform",
+    "deleteTransformConfirmMessage": "Are you sure you want to delete transform?",
+    "deleteFunctionsDialogTitle": "Delete Functions",
+    "noPipelinesAssociated": "No pipelines associated with this function",
+    "statusAllCompleted": "Status: All Completed",
+    "urlJobsCompleted": "URL job(s) completed",
+    "clickUrlToSeeDetails": "Click \"Url\" to see details",
+    "statusProcessing": "Status: Processing",
+    "jobsCurrentlyProcessing": "One or more jobs are currently processing",
+    "progressNotRealTimeNote": "Note: Progress is not real-time. Refresh to see latest updates.",
+    "clickUrlForDetails": "Click \"Url\" for details",
+    "statusFailed": "Status: Failed",
+    "jobsFailedNote": "One or more jobs have failed",
+    "clickToRetryFailedJobs": "Click to see details and retry failed jobs",
+    "statusPending": "Status: Pending",
+    "jobsWaitingToBeProcessed": "Job(s) waiting to be processed",
+    "deleteEnrichmentTableTitle": "Delete Enrichment Table",
+    "deleteEnrichmentTableConfirm": "Are you sure you want to delete enrichment table?",
+    "bulkDeleteEnrichmentTablesTitle": "Bulk Delete Enrichment Tables",
+    "urlJobsFor": "URL Jobs for",
+    "jobLabelPrefix": "Job",
+    "recordsLabel": "Records:",
+    "sizeLabel": "Size:",
+    "errorLabel": "Error:",
+    "noUrlJobsFound": "No URL jobs found",
+    "tipLabel": "Tip:",
+    "associatedPipelines": "Associated Pipelines",
     "csvFileRequired": "CSV File is required!",
     "urlRequired": "URL is required!",
     "urlMustStartWithHttp": "URL must start with http:// or https://",
@@ -2525,6 +2908,7 @@
     "addFunction": "Add Function"
   },
   "latencyInsights": {
+    "arrowSeparator": "→",
     "title": "Insights",
     "tabLabel": "Duration",
     "analyzeButton": "Duration Analysis",
@@ -2584,11 +2968,92 @@
     "maybeLater": "Maybe later"
   },
   "confirmDialog": {
+    "continueFromWherePaused": "Continue from where it paused",
+    "startFromNow": "Start from now.",
+    "clearAndContinue": "Clear & Continue",
     "cancel": "Cancel",
     "ok": "OK",
     "loading": "Loading..."
   },
   "ingestion": {
+    "updateRUMTokenMessage": "Are you sure you want to update rum token for this organization?",
+    "completeAwsIntegration": "Complete AWS Integration",
+    "deployAwsServicesOneClick": "Deploy all selected AWS services in one click using a single CloudFormation stack.",
+    "deploymentMode": "Deployment mode",
+    "singleRegion": "Single Region",
+    "multiRegionStackSets": "Multi-Region (StackSets)",
+    "singleRegionDeployHint": "Deploys a CloudFormation stack in one AWS region. Parameters are pre-filled automatically.",
+    "stackSetDeployHint": "Deploys across multiple regions using CloudFormation StackSets. Requires AWS Organizations or self-managed IAM roles. Parameters are shown for copy-paste into the AWS console wizard.",
+    "selectServicesToMonitor": "Select services to monitor",
+    "selected": "selected",
+    "selectAll": "Select all",
+    "deselectAll": "Deselect all",
+    "deploymentRegion": "Deployment region",
+    "adminRegion": "Admin region",
+    "whereStackSetIsManaged": "(where the StackSet is managed)",
+    "targetRegions": "Target regions",
+    "whereStacksWillBeDeployed": "(where stacks will be deployed)",
+    "clear": "Clear",
+    "deploymentModel": "Deployment model",
+    "selfManaged": "Self-managed",
+    "serviceManagedAwsOrganizations": "Service-managed (AWS Organizations)",
+    "requires": "Requires",
+    "and": "and",
+    "iamRolesInYourAccount": "IAM roles in your account.",
+    "usesAwsOrganizationsHint": "Uses AWS Organizations. Your account must be the management or delegated admin account.",
+    "selectAtLeastOneService": "Select at least one service",
+    "selectAtLeastOneTargetRegion": "Select at least one target region",
+    "service": "service",
+    "region": "region",
+    "parametersToEnterInAwsWizard": "Parameters to enter in the AWS wizard",
+    "stackSetsNoPrefillHint": "The StackSets console doesn't support URL pre-fill. Enter these values as you go through the wizard.",
+    "targetRegionsToEnterInDeploymentTargets": "Target regions to enter in \"Deployment targets\":",
+    "curl": "Curl",
+    "filebeat": "Filebeat",
+    "fluentbit": "FluentBit",
+    "fluentd": "Fluentd",
+    "vector": "Vector",
+    "otelCollector": "OTEL Collector",
+    "logstash": "Logstash",
+    "syslogNg": "Syslog-ng",
+    "loongCollector": "LoongCollector",
+    "metrics": {
+      "prometheus": "Prometheus",
+      "vmagent": "vmagent",
+      "nightingale": "Nightingale",
+      "otelCollector": "OTEL Collector",
+      "telegraf": "Telegraf",
+      "awsCloudwatchMetrics": "AWS CloudWatch Metrics"
+    },
+    "otlpHttp": "OTLP HTTP",
+    "otlpGrpc": "OTLP gRPC",
+    "fluentBitDocLinkText": "to explore the process of sending logs from Kubernetes to OpenObserve using FluentBit.",
+    "loongCollectorDocLinkText": "to learn more about LoongCollector configuration.",
+    "nightingaleDocLinkText": "to learn how to ingest metrics using Nightingale",
+    "prometheusDocLinkText": "to learn how to ingest metrics using Prometheus",
+    "cloudwatchMetrics": {
+      "docLinkText": "to explore the process of setting up a CloudWatch custom metric stream with Data Firehose to OpenObserve. You may choose JSON or OpenTelemetry 1.0 as the output format.",
+      "outputNote": "Note: Output is available under Logs with stream name 'cloudwatch_metrics'."
+    },
+    "docLinkClick": "Click",
+    "docLinkHere": "here",
+    "docLinkDefaultText": "to check further documentation.",
+    "checkFurtherDocumentationAt": "Check further documentation at:",
+    "openTelemetryTabLabel": "OpenTelemetry",
+    "otelCollectorTabLabel": "OTEL Collector",
+    "vmagent": {
+      "singleTargetTitle": "Single remote write target",
+      "fanoutTitle": "Fan-out to multiple backends",
+      "tipPrefix": "Tip: `vmagent` can duplicate writes by repeating the",
+      "tipSuffix": "flag, so you can keep an existing VictoriaMetrics destination while also forwarding metrics to OpenObserve.",
+      "docLinkText": "to learn more about configuring vmagent remote write targets."
+    },
+    "ai": {
+      "viewDocsPrefix": "Click",
+      "viewDocsLinkLabel": "here",
+      "viewDocsSuffix": "to check further documentation.",
+      "selectIntegrationPrompt": "Select an integration to view details."
+    },
     "header": "Data sources",
     "passwordLabel": "Reset Token",
     "resetTokenBtnLabel": "Reset Token",
@@ -2669,8 +3134,38 @@
     "pubsub": "Pub/Sub Logs",
     "aiLabel": "AI Integrations",
     "azureSetup": {
+      "step1Number": "1",
+      "step1Title": "Deploy ARM Template",
+      "step1Description": "Creates an Event Hub namespace, Event Hub, and all required resources in your Azure subscription.",
+      "deployToAzure": "Deploy to Azure",
+      "step2Number": "2",
+      "step2Title": "Configure Diagnostic Settings",
+      "step2Description": "After the ARM deployment completes, route Activity Logs to the Event Hub that was created.",
+      "azurePortalTab": "Azure Portal",
+      "azureCliTab": "Azure CLI",
+      "goTo": "Go to",
+      "portalSubscriptionPath": "Azure Portal → Subscriptions → your subscription",
+      "clickPrefix": "Click",
+      "activityLogMenuItem": "Activity log",
+      "inLeftMenu": "in the left menu",
+      "exportActivityLogs": "Export Activity Logs",
+      "orOpenParen": "(or",
+      "diagnosticSettingsPath": "Diagnostic settings → + Add diagnostic setting",
+      "enterNameCheckCategories": "Enter a name, check the log categories you want to enable",
+      "underPrefix": "Under",
+      "destinationDetails": "Destination details",
+      "chooseSuffix": ", choose",
+      "streamToEventHub": "Stream to an event hub",
+      "selectEventHubPrefix": "Select the Event Hub namespace and Event Hub created in Step 1 (prefix:",
+      "logCategoriesToEnable": "Log categories to enable",
+      "selectAllCategories": "Select all",
+      "clearCategories": "Clear",
+      "resourceGroupLabel": "Resource Group",
+      "deploymentNameLabel": "Deployment Name",
+      "selectAtLeastOneCategory": "Select at least one log category above.",
+      "runCommandAfterDeployment": "Run this command after your ARM deployment completes:",
       "activityLogsTitle": "Azure Activity Logs",
-      "activityLogsDescription": "Stream Azure subscription activity logs to OpenObserve via Event Hub. The ARM template sets up the Event Hub infrastructure \u2014 you then configure Azure to export logs to it.",
+      "activityLogsDescription": "Stream Azure subscription activity logs to OpenObserve via Event Hub. The ARM template sets up the Event Hub infrastructure — you then configure Azure to export logs to it.",
       "manualTitle": "Manual Configuration (for reference)",
       "searchPlaceholder": "Search Azure services...",
       "categoryAll": "All Services",
@@ -2793,9 +3288,59 @@
     "tokenRotateError": "Failed to rotate token.",
     "tokenDeleteError": "Failed to delete token.",
     "noTokensFound": "No ingestion tokens found.",
-    "createdBy": "Created by"
+    "createdBy": "Created by",
+    "setupCard": {
+      "setup": "setup",
+      "downloadEnvTooltip": "Download .env",
+      "notTestedYet": "Not Tested Yet",
+      "startIngestingTestFor": "start ingesting, then test for",
+      "checkingFor": "Checking for",
+      "ellipsis": "…",
+      "on": "on",
+      "no": "No",
+      "foundYet": "Found Yet",
+      "nothingOn": "nothing on",
+      "runAppAndTestAgain": "— run your app and test again",
+      "checking": "Checking…",
+      "testAgain": "Test Again",
+      "mostLikelyFix": "Most Likely Fix —",
+      "iFixedItTestAgain": "I Fixed It — Test Again",
+      "seeAllTroubleshooting": "See All Troubleshooting",
+      "whatTheInstallerDoes": "What The Installer Does",
+      "installsViaPip": "Installs via pip and verifies imports:",
+      "writesTheseKeysTo": "Writes these keys to",
+      "idempotentSuffix": "(idempotent):",
+      "troubleshooting": "Troubleshooting",
+      "fullIntegrationDocs": "Full integration docs:",
+      "arrow": "→",
+      "stuck": "Stuck?",
+      "askOnSlack": "Ask on Slack"
+    }
   },
   "dashboard": {
+    "approximately": "Approximately",
+    "tableRowsWillBeDisplayed": "table rows will be displayed",
+    "unitPixelHint": "1 unit = 30px",
+    "outputMessages": "Output Messages",
+    "noMessagesToDisplay": "No messages to display",
+    "stepPrefix": "Step - ",
+    "zeroPlaceholder": "0",
+    "hundredPlaceholder": "100",
+    "last": "Last",
+    "sortBy": "Sort By:",
+    "alertContextMenu": {
+      "thresholdAbove": "Create Alert with threshold above {value}",
+      "thresholdBelow": "Create Alert with threshold below {value}"
+    },
+    "rawQueryBuilder": {
+      "instruction": "Write a SQL query for complex actions."
+    },
+    "dashboardErrors": {
+      "errorsCount": "Errors ({count})"
+    },
+    "doubleClickToRename": "Double-click to rename",
+    "promqlChartConfig": "PromQL Chart Config",
+    "refreshToApplyVariableChanges": "Refresh to apply variable changes",
     "selectField": "Field",
     "selectIndex": "Stream",
     "selectStreamType": "Stream Type",
@@ -3904,6 +4449,20 @@
     }
   },
   "panel": {
+    "addPivotShort": "+P",
+    "addBreakdownShort": "+B",
+    "addZAxisShort": "+Z",
+    "addFilterShort": "+F",
+    "addLatitudeShort": "+Lat",
+    "addLongitudeShort": "+Lng",
+    "addWeightShort": "+W",
+    "addNameShort": "+N",
+    "addValueShort": "+V",
+    "addSourceShort": "+S",
+    "addTargetShort": "+T",
+    "chartNotUpToDate": "Your chart is not up to date",
+    "chartOutdatedMessage": "Chart Configuration / Variables has been updated, but the chart was not updated automatically. Click on the \"Apply\" button to run the query again",
+    "exampleCharts": "Example Charts",
     "header": "Panel",
     "add": "Add Panel",
     "save": "Save",
@@ -3997,6 +4556,8 @@
     "value": "Value"
   },
   "home": {
+    "alertsOverviewSection": "Alerts overview section",
+    "pipelinesOverviewSection": "Pipelines overview section",
     "streams": "Streams",
     "totalDataIngested": "Ingested Size",
     "totalDataCompressed": "Compressed Size",
@@ -4045,6 +4606,10 @@
     "explore": "Explore"
   },
   "overview": {
+    "viewAllArrow": "→",
+    "alertsSuffix": "alerts",
+    "viewingLabel": "— viewing",
+    "timesSymbol": "×",
     "title": "System Overview",
     "activeAnomalies": "Active Anomalies",
     "activeIncidents": "Active Incidents",
@@ -4083,6 +4648,60 @@
     "clearAllMessage": "This will permanently delete all chat history. This action cannot be undone."
   },
   "aiAssistant": {
+    "confirmDialog": {
+      "allow": "Allow",
+      "alwaysAllow": "Always Allow",
+      "no": "No"
+    },
+    "searchChatHistory": "Search chat history",
+    "deleteChatTooltip": "Delete chat",
+    "noMatchingChatsFound": "No matching chats found",
+    "clearAllConversations": "Clear all conversations",
+    "editTitleTooltip": "Edit title",
+    "chatHistory": "Chat History",
+    "modelLabel": "Model:",
+    "editChatTitle": "Edit Chat Title",
+    "enterChatTitle": "Enter chat title",
+    "deleteChat": "Delete Chat",
+    "deleteChatConfirmMessage": "Are you sure you want to delete this chat? This action cannot be undone.",
+    "clearAllConversationsTitle": "Clear All Conversations",
+    "clearAllConversationsMessage": "Are you sure you want to clear all conversations? This action cannot be undone.",
+    "suggestion": "Suggestion",
+    "results": "Results",
+    "recordsSuffix": "records",
+    "ms": "ms",
+    "exitCode": "Exit code",
+    "stdout": "Stdout",
+    "lines": "lines",
+    "stderr": "Stderr",
+    "truncatedLabel": "truncated",
+    "copyQuery": "Copy query",
+    "stream": "Stream",
+    "start": "Start",
+    "end": "End",
+    "from": "From",
+    "size": "Size",
+    "queryType": "Query Type",
+    "copyVrl": "Copy VRL",
+    "command": "Command",
+    "copyCommand": "Copy command",
+    "copyResults": "Copy results",
+    "total": "Total:",
+    "took": "Took:",
+    "showingFirst": "Showing first",
+    "inputEvents": "Input Events",
+    "errorLabel": "error:",
+    "items": "Items",
+    "copyItems": "Copy items",
+    "response": "Response",
+    "copyResponse": "Copy response",
+    "copyContent": "Copy content",
+    "errorMayBeTemporary": "This error may be temporary. You can try again.",
+    "helpful": "Helpful",
+    "notHelpful": "Not helpful",
+    "streamPrefix": "Stream:",
+    "typePrefix": "Type:",
+    "scrollToBottom": "Scroll to bottom",
     "greeting": {
       "morning": "Good Morning",
       "afternoon": "Good Afternoon",
@@ -4090,6 +4709,8 @@
       "night": "Working Late"
     },
     "welcome": {
+      "wave": "👋",
+      "taglineDash": "—",
       "taglineLead": "I'm",
       "taglineHighlight": "O2 Assistant",
       "taglineTail": ". I can write your",
@@ -4144,6 +4765,16 @@
     "attachImageTooltip": "Attach images (PNG, JPEG, max 2MB)"
   },
   "billing": {
+    "pricingErrorMessage": "Failed to load pricing details. Please refresh the page.",
+    "awsManagedMessage": "Billing is handled through your AWS account",
+    "azureManagedMessage": "Billing is handled through your Azure account",
+    "contractManagedMessage": "Billing is handled through your contract — contact your account manager for changes",
+    "upgradeToPlanMessage": "Upgrade to a plan to continue enjoying the services by OpenObserve.",
+    "creditsUsedLabel": "credits used",
+    "actionScripts": "Action Scripts",
+    "errorTracking": "Error Tracking",
+    "rumSession": "RUM Session",
+    "licenseExpiryContactAdmin": "Please update your license by contacting your administrator.",
     "header": "Usage & Billing",
     "plans": "Plans",
     "title": "Simple, transparent pricing",
@@ -4268,9 +4899,44 @@
       "memberOrgsTitle": "Member Organizations",
       "searchMemberOrg": "Search Organization",
       "noMemberMatch": "No Matching Organizations"
+    },
+    "azureMarketplace": {
+      "noTokenFound": "No Marketplace Token Found",
+      "noTokenDescription": "Please start the registration process from Azure Marketplace.",
+      "goToDashboard": "Go to Dashboard",
+      "tryAgain": "Try Again",
+      "completeSetup": "Complete Azure Marketplace Setup",
+      "linkSubscriptionDescription": "Link your Azure Marketplace subscription to an organization",
+      "createNewOrg": "Create New Organization",
+      "createNewOrgDescription": "Create a new organization with Azure Marketplace billing",
+      "orgName": "Organization Name",
+      "createAndLink": "Create & Link",
+      "linkToExisting": "Link to Existing Organization",
+      "linkBillingDescription": "Link Azure billing to an existing organization",
+      "selectOrganization": "Select Organization",
+      "linkAzureBilling": "Link Azure Billing",
+      "settingUp": "Setting up your subscription...",
+      "pleaseWait": "Please wait while we configure your account.",
+      "subscriptionActivated": "Subscription Activated!",
+      "activatedDescription": "Your Azure Marketplace subscription is now active.",
+      "paymentFailed": "Payment Failed",
+      "paymentFailedDescription": "There was an issue with activating Azure subscription. Please check your Azure account or contact support.",
+      "contactSupport": "Contact Support"
+    },
+    "memberSubscription": {
+      "title": "Member Subscription",
+      "errorProcessing": "Error while processing member subscription request.",
+      "thankYou": "Thank you for your subscription."
     }
   },
   "awsMarketplace": {
+    "noTokenFound": "No Marketplace Token Found",
+    "noTokenDescription": "Please start the registration process from AWS Marketplace.",
+    "completeSetup": "Complete AWS Marketplace Setup",
+    "linkSubscriptionDescription": "Link your AWS Marketplace subscription to an organization",
+    "createAndLink": "Create & Link",
+    "linkBillingDescription": "Link AWS billing to an existing organization",
+    "pendingActivationDescription": "Please wait while we confirm activation with AWS and set up your account.",
     "title": "AWS Marketplace Registration",
     "subtitle": "Complete your OpenObserve subscription setup",
     "invalidLink": "Invalid Registration Link",
@@ -4318,6 +4984,89 @@
     "SearchSQLCancelled": "Error: Search SQL was cancelled."
   },
   "alerts": {
+    "importAlertTitle": "Import Alert",
+    "jsonFilesOnlyHint": ".json files only",
+    "outputMessages": "Output Messages",
+    "destinationsRequiredLabel": "Destinations *",
+    "timezoneRequiredLabel": "Timezone *",
+    "organizationIdLabel": "Organization Id",
+    "alertCreationTitle": "Alert Creation",
+    "noAlertsFound": "No alerts found",
+    "suppressedByDeduplication": "Suppressed by deduplication",
+    "occurrence": "occurrence",
+    "groupedNotification": "Grouped notification",
+    "alertsBatchedTogether": "alerts batched together",
+    "notificationSent": "Notification sent",
+    "occurrencesDeduplicated": "occurrences deduplicated",
+    "alertExecutionDetails": "Alert Execution Details",
+    "evaluationTime": "Evaluation Time",
+    "queryTime": "Query Time",
+    "sourceNode": "Source Node",
+    "errorDetails": "Error Details",
+    "response": "Response",
+    "lastError": "Last error:",
+    "errorSummary": "Error Summary",
+    "searchThisFolderTooltip": "Search only this folder",
+    "searchAllFoldersTooltip": "Search across all folders",
+    "reloadAlertsTooltip": "Reload alerts",
+    "triggerDetection": "Trigger Detection",
+    "retrain": "Re-train",
+    "selectedLabel": "selected",
+    "resume": "Resume",
+    "deleteAlertTitle": "Delete Alert",
+    "deleteAlertMessage": "Are you sure you want to delete this alert?",
+    "deleteAlertsTitle": "Delete Alerts",
+    "ms": "ms",
+    "previewCopyTemplateBtn": "Copy Template",
+    "never": "Never",
+    "deleteActionTitle": "Delete Action",
+    "deleteActionMessage": "Are you sure you want to delete Action?",
+    "bulkDeleteActionScriptsTitle": "Bulk Delete Action Scripts",
+    "guidelinesLabel": "Guidelines:",
+    "selectStreamGuideline": "Select an existing stream from the list or enter the name to create a new one",
+    "enrichmentTablesTerm": "Enrichment_tables",
+    "enrichmentTablesDestinationNote": "as destination stream is only available for scheduled pipelines",
+    "useCurlyBracesNote": "Use curly braces",
+    "configureStreamNameDynamicNote": "to configure stream name dynamically. e.g.",
+    "staticTextBeforeAfterNote": ". Static text before/after",
+    "isOptionalNote": "is optional",
+    "noTriggersLoaded": "No triggers loaded",
+    "more": "more",
+    "externalDestinationTitle": "External Destination",
+    "serviceGraphLegendTitle": "Graph Legend",
+    "serviceGraphRootCause": "Red = Potential Root Cause",
+    "serviceGraphHighFrequency": "Orange = High Frequency",
+    "serviceGraphNormal": "Blue = Normal",
+    "serviceGraphTemporalFlow": "Purple arrows show temporal flow",
+    "serviceGraphUnavailable": "Service Graph Unavailable",
+    "serviceGraphNoTopologyData": "No topology data available for this incident.",
+    "totalAlerts": "Total Alerts",
+    "usingDeduplication": "Using Deduplication",
+    "deduplicationConfiguredTooltip": "Alerts with deduplication configured",
+    "suppressionRate24h": "Suppression Rate (24h)",
+    "suppressed": "suppressed /",
+    "total": "total",
+    "passedLabel": "Passed:",
+    "pendingBatches": "Pending Batches",
+    "pendingBatchesTooltip": "Alerts waiting to be grouped together",
+    "historyTimeline": {
+      "skipped": "Skipped",
+      "flapping": "Flapping",
+      "flipsSuffix": "flips",
+      "evaluationsSuffix": "evaluations"
+    },
+    "analyzeIncident": "Analyze Incident",
+    "writeQueryToSeePreview": "Write a query to see preview",
+    "alertName": "Alert Name",
+    "type": "Type",
+    "isSilenced": "Is Silenced",
+    "timestamp": "Timestamp",
+    "startTime": "Start Time",
+    "endTime": "End Time",
+    "duration": "Duration",
+    "retries": "Retries",
+    "dedup": "Dedup",
+    "noDestinations": "No destinations available",
     "validation": {
       "streamTypeRequired": "Stream type is required.",
       "streamNameRequired": "Stream name is required.",
@@ -4625,6 +5374,7 @@
       "fingerprintFieldsHelp": "Leave empty to auto-detect based on query (SQL: GROUP BY columns, PromQL: labels, Custom: condition fields)"
     },
     "summary": {
+      "scrollToBottom": "Scroll to bottom",
       "title": "Summary",
       "configureAlert": "Configure your alert to see a summary",
       "alertName": "Alert Name",
@@ -4748,6 +5498,8 @@
         "message": "Right-click on charts to create filters. Zoom on timeline to filter by time range. Use toggles to filter by status."
       },
       "actions": {
+        "closeActions": "Close actions",
+        "viewAlertHistory": "View Alert History",
         "actionsFor": "Actions for:",
         "configureDedup": "Configure Dedup",
         "configureDedupTooltip": "Configure deduplication for this alert",
@@ -4757,11 +5509,46 @@
         "viewHistoryTooltip": "View execution history for this alert"
       },
       "loading": {
+        "insights": "Loading insights...",
         "dashboardConfig": "Loading dashboard configuration...",
         "refreshing": "Refreshing dashboard..."
       }
     },
     "incidents": {
+      "activityTab": "Activity",
+      "alertGraph": "Alert Graph",
+      "totalAlerts": "Total Alerts",
+      "affectedServices": "Affected Services",
+      "activeDuration": "Active Duration",
+      "alertFrequency": "Alert Frequency",
+      "utc": "UTC",
+      "firstAlertReceived": "First Alert Received",
+      "peakActivity": "Peak Activity",
+      "alertsInFiveMins": "alerts in 5 mins",
+      "latestAlert": "Latest Alert",
+      "showFullActivity": "Show Full Activity",
+      "correlatedBy": "Correlated By",
+      "alertActivity": "Alert Activity",
+      "manage": "Manage",
+      "alertDetailsHeader": "Alert Details",
+      "period": "Period",
+      "frequency": "Frequency",
+      "silence": "Silence",
+      "ifPrefix": "if",
+      "noConditionsDefined": "No conditions defined",
+      "loadingCorrelatedMetrics": "Loading correlated metrics...",
+      "loadingCorrelatedTraces": "Loading correlated traces...",
+      "disambiguationChangedMessage": "The service discovery configuration (disambiguation fields) was changed after this incident was created.",
+      "noActivityYet": "No activity yet",
+      "eventsAndCommentsAppearHere": "Events and comments will appear here",
+      "scrollToTop": "Scroll to top",
+      "scrollToBottom": "Scroll to bottom",
+      "aiSreBadge": "AI SRE",
+      "commentedPrefix": "commented",
+      "commentPlaceholder": "Write a comment...",
+      "sendComment": "Send comment",
+      "tableOfContents": "Table of Contents",
+      "noSectionsAvailable": "No sections available",
       "title": "Incidents",
       "subtitle": "Incident management and tracking",
       "search": "Search incidents...",
@@ -4847,6 +5634,8 @@
       "noAlertActivityData": "No alert activity data"
     },
     "alertDetails": {
+      "sql": "SQL",
+      "rowsSeparator": "rows ·",
       "alertName": "Alert Name",
       "sqlQuery": "SQL Query",
       "promqlQuery": "PromQL Query",
@@ -4912,6 +5701,8 @@
       "monthCount": "{n} Month | {n} Months"
     },
     "alertSettings": {
+      "helpLegendLiveExample": "High CPU",
+      "helpLegendSampleExample": "42",
       "sectionTitle": "Settings",
       "fieldRequired": "Field is required!",
       "noDestinationsAvailable": "No destinations available",
@@ -5068,6 +5859,8 @@
       "customMode": "Custom"
     },
     "anomaly": {
+      "fillInSetupStepToSeeSummary": "Fill in the setup step to see a summary.",
+      "scrollToBottom": "Scroll to bottom",
       "filters": "Filters",
       "fieldPlaceholder": "Field",
       "noFieldsFound": "No fields found",
@@ -5162,6 +5955,7 @@
     },
     "lastRun": "Last run: {time}",
     "queryEditor": {
+      "sqlVrlBadge": "SQL + VRL",
       "noStream": "none",
       "showVrlEditor": "show VRL editor",
       "hideVrlEditor": "hide VRL editor",
@@ -5222,6 +6016,18 @@
     }
   },
   "alert_templates": {
+    "exportTemplate": "Export Template",
+    "selected": "selected",
+    "deleteTemplateTitle": "Delete Template",
+    "deleteTemplateMessage": "Are you sure you want to delete template?",
+    "deleteTemplatesTitle": "Delete Templates",
+    "importTemplateTitle": "Import Template",
+    "outputMessages": "Output Messages",
+    "templateCreationTitle": "Template Creation",
+    "importNameLabel": "Template Name *",
+    "importBodyLabel": "Template Body *",
+    "importTypeLabel": "Template Type *",
+    "importTitleLabel": "Template Title *",
     "header": "Templates",
     "add": "New template",
     "edit": "Edit",
@@ -5253,6 +6059,48 @@
     "contentCopied": "Content Copied Successfully!"
   },
   "alert_destinations": {
+    "chooseTypeTitle": "Choose Type",
+    "selectDestinationType": "Select Destination Type",
+    "connectionStepTitle": "Connection",
+    "connectionDetailsTitle": "Connection Details",
+    "urlHelpText": "Base URL without trailing slash (e.g., https://your-domain.com)",
+    "organizationHelpText": "OpenObserve organization identifier",
+    "streamHelpText": "OpenObserve stream name",
+    "endpointPathLabel": "Endpoint Path",
+    "endpointPathHelpText": "Path will be appended to base URL (must start with /)",
+    "esBulkIndexHelpText": "Index name where data will be written in Elasticsearch",
+    "metadataConfigurationTitle": "Metadata Configuration",
+    "splunkSourceHelpText": "Splunk source field for event metadata",
+    "splunkSourceTypeHelpText": "Splunk sourcetype field for event metadata",
+    "splunkHostnameHelpText": "Splunk host field for event metadata",
+    "ddSourceHelpText": "Source attribute for Datadog logs",
+    "ddTagsHelpText": "Comma-separated tags for Datadog logs",
+    "datadogServiceHelpText": "Service name for Datadog logs",
+    "datadogHostnameHelpText": "Hostname for Datadog logs",
+    "exampleLabel": "Example:",
+    "subtitle": "Where triggered alerts are delivered",
+    "exportDestination": "Export Destination",
+    "deleteDestinationTitle": "Delete Destination",
+    "deleteDestinationMessage": "Are you sure you want to delete destination?",
+    "deleteDestinationsTitle": "Delete Destinations",
+    "selected": "selected",
+    "organizationLabel": "Organization",
+    "defaultPlaceholder": "e.g., default",
+    "streamNameLabel": "Stream Name",
+    "esBulkIndexNameLabel": "ESBulk Index Name",
+    "esBulkIndexNamePlaceholder": "Enter index name (e.g., logs, events)",
+    "sourceLabel": "Source",
+    "sourcePlaceholder": "Enter source (e.g., http:my_source)",
+    "sourceTypeLabel": "Source Type",
+    "sourceTypePlaceholder": "Enter source type (e.g., _json)",
+    "hostnameLabel": "Hostname",
+    "hostnamePlaceholder": "Enter hostname (e.g., server01)",
+    "ddSourceLabel": "DD Source",
+    "ddSourcePlaceholder": "Enter source (e.g., nginx, java)",
+    "ddTagsLabel": "DD Tags",
+    "ddTagsPlaceholder": "Enter tags (e.g., env:prod,version:1.0)",
+    "serviceLabel": "Service",
+    "servicePlaceholder": "Enter service name (e.g., api-gateway)",
     "header": "Notification Destinations",
     "add": "New destination",
     "edit": "Edit",
@@ -5341,6 +6189,7 @@
     "search": "Search destination"
   },
   "storage_settings": {
+    "heroBrand": "OpenObserve.",
     "tabLabel": "BYOB",
     "title": "Bring Your Own Bucket",
     "notEnabled": "BYOB is not enabled for this organization",
@@ -5847,6 +6696,7 @@
       "defaultsLoadFailed": "Failed to load GenAI agent mapping defaults"
     },
     "correlation": {
+      "identityConfigNoSets": "Configure at least one identity set before saving.",
       "title": "Correlation Settings",
       "subtitle": "Discover and manage service correlations across logs, traces, and metrics",
       "serviceIdentityTab": "Service Identity",
@@ -6154,6 +7004,12 @@
       "genAiAgentMappingDesc": "Map GenAI spans to agent identifiers"
     },
     "organizationManagementPage": {
+      "setAiCredits": "Set AI Credits",
+      "setAiCreditsSubtitle": "Set the organization's lifetime AI credit allowance.",
+      "saveCredits": "Save Credits",
+      "totalAiCredits": "Total AI Credits",
+      "currentlyUsedLabel": "Currently used:",
+      "credits": "credits",
       "revoke": "Revoke",
       "enableStorage": "Enable Storage",
       "storageEnabled": "Storage Enabled",
@@ -6329,6 +7185,29 @@
     }
   },
   "reports": {
+    "cachedReportHint": "Note: Cached reports are stored for quick access to dashboards; sharing is disabled for these reports.",
+    "selectDashboardStep": "Select Dashboard",
+    "timeRangeDescription": "Generates report with the data from specified time range",
+    "pngPageLimitNote": "PNG captures only the first visible page of the dashboard. Use PDF if the dashboard spans multiple pages.",
+    "widthPlaceholder": "e.g. 1440",
+    "heightPlaceholder": "e.g. 900",
+    "dimensionsDefaultHint": "Leave blank to use server defaults",
+    "continue": "Continue",
+    "scheduleStep": "Schedule",
+    "cronPatternHint": "Pattern: * * * * * * means every second.",
+    "cronFormatHint": "Format: [Second (optional) 0-59] [Minute 0-59] [Hour 0-23] [Day of Month 1-31, 'L'] [Month 1-12] [Day of Week 0-7 or '1L-7L', 0 and 7 for Sunday].",
+    "cronWildcardHint": "Use '*' to represent any value, 'L' for the last day/weekday.",
+    "cronExampleHint": "Example: 0 0 12 * * ? - Triggers at 12:00 PM daily. It specifies second, minute, hour, day of month, month, and day of week, respectively.",
+    "scheduleNowHint": "\"Schedule Now\" will schedule the report using the current date, time, and timezone.",
+    "scheduleLaterHint": "In \"Schedule Later\" you can customize the date, time, and timezone.",
+    "repeatEvery": "Repeat every",
+    "shareStep": "Share",
+    "messageLabel": "Message",
+    "imagePreviewHint": "Captures a PNG screenshot of the dashboard and embeds it inline in the email body alongside the PDF attachment for a quick visual preview.",
+    "searchThisFolderTitle": "Search only this folder",
+    "searchAllFoldersTitle": "Search across all folders",
+    "never": "Never",
+    "startDate": "Start Date",
     "header": "Reports",
     "subtitle": "Scheduled reports and exports",
     "searchThisFolder": "This folder",
@@ -6377,6 +7256,8 @@
     }
   },
   "queries": {
+    "selectOption": "Select option",
+    "lastDataRefreshTime": "Last Data Refresh Time:",
     "runningQueries": "Running Queries",
     "search": "Search",
     "sessionId": "Session ID",
@@ -6396,6 +7277,7 @@
     "querySource": "Query Source"
   },
   "traces": {
+    "errLabel": "ERR",
     "serviceGraph": {
       "searchPlaceholder": "Search Services",
       "noStreamsDetected": "No streams detected. Ensure service graph metrics include stream_name labels.",
@@ -6642,6 +7524,9 @@
       "viewByStream": "View by Stream"
     },
     "sessionDetail": {
+      "currencySymbol": "$",
+      "tokensArrow": "→",
+      "axisZeroLabel": "0",
       "backToSessions": "Back to Sessions",
       "pageTitle": "Session Detail",
       "failedToLoad": "Failed to load session",
@@ -6744,6 +7629,7 @@
       }
     },
     "servicesCatalog": {
+      "noStreamsDetected": "No streams detected",
       "tabLabel": "Service Catalog",
       "title": "Service Catalog",
       "footerTitle": "Services",
@@ -6764,6 +7650,9 @@
         "operations": "Operations"
       },
       "status": {
+        "criticalThreshold": "> 10%",
+        "warningThreshold": "5 – 10%",
+        "degradedThreshold": "1 – 5%",
         "healthy": "Healthy",
         "degraded": "Degraded",
         "warning": "Warning",
@@ -6947,6 +7836,7 @@
       "empty": "(empty)"
     },
     "threadView": {
+      "historicalIcon": "↶",
       "llmStep": "{n} LLM step",
       "llmSteps": "{n} LLM steps",
       "steps": "Steps",
@@ -6979,6 +7869,7 @@
       "invalidParameters": "Invalid parameters for DAG fetch"
     },
     "traceDetailsSidebar": {
+      "ttft": "TTFT",
       "service": "Service",
       "duration": "Duration",
       "start": "Start",
@@ -7065,9 +7956,40 @@
     },
     "tracesNoEventsState": {
       "lastData": "Last data: {formatted} ({zone})"
+    },
+    "correlation": {
+      "distributedTrace": "Distributed Trace",
+      "loadingTraceData": "Loading trace data...",
+      "noTraceInfoAvailable": "No trace information available for this event",
+      "traceIdLabel": "Trace ID:",
+      "copyTraceId": "Copy Trace ID",
+      "spanIdLabel": "Span ID:",
+      "spanHierarchy": "Span Hierarchy:",
+      "applicationSpan": "Application Span",
+      "browserSdkSpanPrefix": "Browser SDK Span (",
+      "closingParen": ")",
+      "backendSpansPrefix": "Backend Spans (",
+      "performanceBreakdown": "Performance Breakdown:",
+      "totalDuration": "Total Duration:",
+      "browserLabel": "Browser:",
+      "networkLabel": "Network:",
+      "backendLabel": "Backend:",
+      "viewTraceDetails": "View Trace Details",
+      "backendTraceNotAvailable": "Backend trace data not yet available. Trace data may take up to 30 seconds to be ingested."
     }
   },
   "actions": {
+    "zipFileHint": "Note: Only .zip files are accepted and it may contain various resources such as .py, .txt and main.py file etc.",
+    "schedule": "Schedule",
+    "immediateTriggerHint": "The script will be triggered immediately after it is saved",
+    "cronPatternHint": "Pattern: * * * * * means every minute .",
+    "cronFormatHint": "Format: [Minute 0-59] [Hour 0-23] [Day of Month 1-31, 'L'] [Month 1-12] [Day of Week 0-7 or '1L-7L', 0 and 7 for Sunday].",
+    "cronWildcardHint": "Use '*' to represent any value, 'L' for the last day/weekday.",
+    "cronExampleHint": "Example: 0 12 * * ? - Triggers at 12:00 PM daily. It specifies minute, hour, day of month, month, and day of week, respectively.",
+    "selectServiceAccount": "Select Service Account",
+    "serviceAccountPermissionsHint": "Make sure service account has permissions to access Actions.",
+    "environmentalVariables": "Environmental Variables",
+    "pageSubtitle": "Custom automation and scripting",
     "testAction": "Test action",
     "save": "Save",
     "name": "Action Name",
@@ -7145,6 +8067,8 @@
     "invalidJson": "Must be valid JSON"
   },
   "cipherKey": {
+    "configuration": "Configuration",
+    "continue": "Continue",
     "header": "Cipher Keys",
     "add": "New cipher key",
     "search": "Search Cipher Key",
@@ -7210,6 +8134,9 @@
     "json": "JSON"
   },
   "nodes": {
+    "tcpEstablishedPrefix": " (E:",
+    "tcpCloseWaitPrefix": ", C:",
+    "tcpTimeWaitPrefix": ", T:",
     "header": "All Nodes",
     "search": "Search Node",
     "name": "Node Name",
@@ -7318,6 +8245,30 @@
     "delayMessage": "Search History might be delayed by"
   },
   "correlation": {
+    "unstableDimensionNote": "Unstable dimension - changes on pod restart. Default: All values.",
+    "streamsSelectedCount": "{selected} of {total} selected",
+    "importSemanticGroupsTitle": "Import Semantic Groups",
+    "importSemanticGroupsSubtitle": "Upload JSON file to import semantic field groups",
+    "applyChanges": "Apply Changes",
+    "selectJsonFile": "Select JSON file",
+    "analyzingFile": "Analyzing file...",
+    "new": "New",
+    "modified": "Modified",
+    "unchanged": "Unchanged",
+    "selectAllNew": "Select All New",
+    "selectAllModified": "Select All Modified",
+    "clearAll": "Clear All",
+    "fieldsCount": "fields",
+    "uploadAJsonFile": "Upload a JSON file",
+    "analyzeFilePrompt": "The system will analyze the file and show you what will change",
+    "fieldsLabel": "Fields",
+    "compareChanges": "Compare Changes",
+    "current": "Current",
+    "proposed": "Proposed",
+    "correlatedBy": "Correlated by:",
+    "viewBy": "View by:",
+    "other": "Other",
+    "unstableDimensionTooltip": "This dimension is unstable and may produce unreliable correlations.",
     "title": "Correlated Metrics - {service}",
     "loading": "Loading correlation data...",
     "loadingMetrics": "Loading {count} metric stream(s)...",
@@ -7432,7 +8383,26 @@
     "deduplicateFieldTooltip": "Select which field mappings to use for deduplication fingerprinting",
     "alertDeduplicationMessage": "Alerts with the same values for these fields will be deduplicated (e.g., same fingerprint = same field values)",
     "atLeastOneDeduplicationField": "At least one field mapping is required for deduplication",
-    "noSemanticGroupsInCategory": "No semantic groups in category: {category}"
+    "noSemanticGroupsInCategory": "No semantic groups in category: {category}",
+    "importSemanticGroups": {
+      "title": "Import Semantic Groups",
+      "selectJsonFile": "Select JSON file",
+      "applyChanges": "Apply Changes",
+      "new": "New",
+      "modified": "Modified",
+      "unchanged": "Unchanged",
+      "selectAllNew": "Select All New",
+      "selectAllModified": "Select All Modified",
+      "clearAll": "Clear All",
+      "fields": "fields",
+      "fieldsChangeArrow": "→",
+      "uploadPrompt": "Upload a JSON file to get started",
+      "uploadHint": "The system will analyze the file and show you what will change",
+      "fieldsHeading": "Fields",
+      "compareChanges": "Compare Changes",
+      "current": "Current",
+      "proposed": "Proposed"
+    }
   },
   "search_scheduler_job": {
     "title": "Search Job Scheduler",
@@ -7475,6 +8445,8 @@
     "logs": "Logs"
   },
   "pipeline_list": {
+    "createBackfill": "Create Backfill",
+    "viewError": "View Error",
     "sql_query": "SQL Query",
     "export": "Export",
     "pause": "Pause",
@@ -7554,6 +8526,8 @@
     "guideExampleHeader": "Example"
   },
   "modelPricing": {
+    "openObserveLogoAlt": "OpenObserve",
+    "currencySymbol": "$",
     "header": "LLM Model Pricing",
     "matchingPriorityTooltip": "Model Matching Priority: Your Org > Global > Built-in",
     "searchPlaceholder": "Search models...",
@@ -7827,6 +8801,26 @@
     }
   },
   "onlineEvals": {
+    "versionPrefix": "v",
+    "importNameRequired": "Name *",
+    "importNewNameRequired": "New Name *",
+    "importDataTypeRequired": "Data Type *",
+    "importMinRequired": "Min *",
+    "importMaxRequired": "Max *",
+    "importCategoriesRequired": "Categories (comma-separated) *",
+    "importCategoriesPlaceholder": "good, ok, bad",
+    "importTypeRequired": "Type *",
+    "importScoreConfigRequired": "Score Config *",
+    "importProviderRequired": "Provider *",
+    "scoreConfigLibrary": {
+      "searchPlaceholder": "Search Score Configs...",
+      "scoreConfigsLabel": "score config(s)"
+    },
+    "scorerLibrary": {
+      "noProvidersMessage": "Create a Provider first before importing LLM Judge scorers.",
+      "searchPlaceholder": "Search Scorers...",
+      "scorerCountSuffix": "scorer(s)"
+    },
     "title": "Evaluations",
     "description": "Configure LLM providers, score definitions, scorers, and live evaluation jobs.",
     "loading": "Loading online eval configuration...",
@@ -8092,6 +9086,8 @@
       "comingSoonBadge": "Coming Soon"
     },
     "provider": {
+      "sectionStep1": "01",
+      "sectionStep2": "02",
       "backTo": "Back to Providers",
       "createTitle": "Create LLM Provider",
       "editTitle": "Edit LLM Provider",
@@ -8124,6 +9120,9 @@
       "apiKeyRequired": "API key is required"
     },
     "scoreConfig": {
+      "gteSymbol": "≥",
+      "lteSymbol": "≤",
+      "ellipsis": "…",
       "booleanValues": "true / false",
       "detail": {
         "eyebrow": "Score Config",
@@ -8414,7 +9413,7 @@
           "inputOutput": {
             "span": "Map these to the span fields holding the input and output.",
             "trace": "Input and output from the trace's root span.",
-            "session": "Not available \u2014 a session has no single input or output."
+            "session": "Not available — a session has no single input or output."
           },
           "statistics": {
             "span": "Map this name like any other scorer variable when evaluating a single span.",
@@ -8432,7 +9431,7 @@
             "session": "Traces in time order, represented as conversation turns."
           }
         },
-        "indexDescription": "{spansVar} and {stepsVar} arrive as JSON arrays. Reference the whole variable \u2014 indexed access like {indexedVar} is not supported."
+        "indexDescription": "{spansVar} and {stepsVar} arrive as JSON arrays. Reference the whole variable — indexed access like {indexedVar} is not supported."
       },
       "identitySection": "Identity",
       "judgeSection": "Judge configuration",
@@ -8453,7 +9452,7 @@
       "includeReasoningLabel": "Include Reasoning",
       "includeReasoningHint": "The judge explains why it gave that score, saved with each result.",
       "extraFieldsLabel": "Extra Metadata Fields (Optional)",
-      "extraFieldsHint": "Ask the judge to return extra values with each score \u2014 a category or a confidence, for example.",
+      "extraFieldsHint": "Ask the judge to return extra values with each score — a category or a confidence, for example.",
       "extraFields": {
         "colName": "Field Name",
         "colType": "Type",
@@ -8551,6 +9550,8 @@
     },
     "job": {
       "detail": {
+        "secondsSuffix": "s",
+        "versionPrefix": "v",
         "close": "Close",
         "eyebrow": "Eval Job",
         "refresh": "Refresh",
@@ -8764,7 +9765,7 @@
         "variableCount": "{count} variables",
         "systemProvided": {
           "title": "{scope} Variables",
-          "description": "OpenObserve supplies these values from the {scope} itself. A scorer prompt can use them directly \u2014 no mapping needed.",
+          "description": "OpenObserve supplies these values from the {scope} itself. A scorer prompt can use them directly — no mapping needed.",
           "badge": "System provided",
           "selectorRequired": "Span Selector required",
           "columns": {
@@ -8805,7 +9806,7 @@
         "customSchema": "Custom Fields",
         "defaultSchemaHelp": "These eight fields are read from every matching span. Anything missing comes through empty.",
         "fields": "Fields",
-        "fieldsHelp": "Only these fields are read \u2014 nothing else is sent to the scorer.",
+        "fieldsHelp": "Only these fields are read — nothing else is sent to the scorer.",
         "maximumSpans": "Maximum Spans",
         "budget": "Limits how many spans are selected from the trace.",
         "validation": {
@@ -9052,6 +10053,8 @@
       "failedToCopySql": "Failed to copy SQL to clipboard"
     },
     "searchResult": {
+      "msUnit": "ms",
+      "notEqualSymbol": "≠",
       "collapseFields": "Collapse Fields",
       "openFields": "Open Fields",
       "events": "events",
@@ -9273,7 +10276,12 @@
     "lastRefreshed": "Last refreshed: {time}"
   },
   "synthetics": {
+    "zeroPlaceholder": "0",
+    "onePlaceholder": "1",
     "authNetwork": {
+      "removeVariable": "Remove variable {index}",
+      "removeHeader": "Remove header {index}",
+      "removeCookie": "Remove cookie {index}",
       "addCookie": "Add cookie",
       "addHeader": "Add header",
       "addVariable": "Add variable",
@@ -9340,6 +10348,8 @@
       "urlTargetPlaceholder": "https://api.example.com/health"
     },
     "createBrowserTest": {
+      "setupStepNumber1": "1",
+      "setupStepNumber2": "2",
       "buildManually": "Build manually",
       "continue": "Continue",
       "gateDescription": "Tell us where to start -- you'll record the journey next. Everything else (schedule, alerts, RUM) gets set up after.",
@@ -9403,6 +10413,8 @@
       "checks": "Checks"
     },
     "journey": {
+      "stackTraceLabel": "stack trace",
+      "selectorPlaceholder": "#my-button or .class-name",
       "actionLabel": "Action",
       "addStep": "Add Step",
       "addStepManually": "Add a step manually",
@@ -9475,6 +10487,7 @@
       "title": "Locations"
     },
     "newCheck": {
+      "comingSoon": "Coming Soon",
       "back": "Checks",
       "browser": "Browser Test",
       "browserDesc": "Record multi-step user journeys in a real browser",
@@ -9559,6 +10572,7 @@
       }
     },
     "protocolRun": {
+      "timelineArrow": "→",
       "assertions": "Assertions",
       "assertionsFailed": "Failed",
       "assertionsPassed": "Passed",
@@ -9595,6 +10609,7 @@
       "warning": "Warning"
     },
     "results": {
+      "p95Label": "p95",
       "clearFilters": "Clear filters",
       "clearFiltersDesc": "Remove all active filters",
       "device": "Device",
@@ -9756,6 +10771,7 @@
       "errorPatternsWindowDesc": "Normalized across {window} · click a row to filter runs"
     },
     "scheduleAlert": {
+      "cronPlaceholder": "*/5 * * * *",
       "addNewDestination": "Add New Destination",
       "alert": "Alert",
       "alertedIfFails": "Alerted if test fails",
@@ -9932,6 +10948,8 @@
     }
   },
   "shortcuts": {
+    "then": "then",
+    "escKey": "Esc",
     "title": "Keyboard Shortcuts",
     "mac": "Mac",
     "windowsLinux": "Windows / Linux",
@@ -10111,6 +11129,114 @@
       "rumErrorsRefresh": "Refresh list",
       "rumSessionsRefresh": "Refresh list",
       "sourceMapsRefresh": "Refresh list"
+    }
+  },
+  "components": {
+    "codeBlock": {
+      "terminal": "Terminal"
+    },
+    "spinner": {
+      "loading": "Loading"
+    },
+    "stepper": {
+      "steps": "Steps"
+    },
+    "attributeValueCell": {
+      "addIcon": "Add icon"
+    },
+    "groupHeader": {
+      "icon": "icon"
+    },
+    "combobox": {
+      "noOptionsFound": "No options found"
+    },
+    "input": {
+      "clear": "Clear"
+    },
+    "dialog": {
+      "closeDialog": "Close dialog"
+    },
+    "drawer": {
+      "closeDrawer": "Close drawer"
+    },
+    "navbar": {
+      "mainNavigation": "Main navigation"
+    },
+    "tableLoading": {
+      "ariaLabel": "Loading data"
+    },
+    "skeleton": {
+      "loading": "Loading"
+    },
+    "toast": {
+      "affectedSections": "Affected Sections",
+      "dismissNotification": "Dismiss notification"
+    },
+    "color": {
+      "hexPlaceholder": "#000000",
+      "clear": "Clear"
+    },
+    "file": {
+      "removeFile": "Remove file",
+      "clearAll": "Clear all"
+    },
+    "date": {
+      "openCalendar": "Open calendar",
+      "clear": "Clear"
+    },
+    "dateTimeRange": {
+      "searchTimezonePlaceholder": "Search timezone...",
+      "noTimezonesFound": "No timezones found"
+    },
+    "pagination": {
+      "pagination": "Pagination",
+      "previousPage": "Previous page",
+      "nextPage": "Next page"
+    },
+    "select": {
+      "more": "more",
+      "clearSelection": "Clear selection",
+      "toggleAllOptions": "Toggle all options",
+      "selectAllLabel": "Select all",
+      "noOptionsFound": "No options found",
+      "multiSelect": "Multi select",
+      "singleSelect": "Single select"
+    },
+    "time": {
+      "openTimePicker": "Open time picker",
+      "clear": "Clear",
+      "am": "AM",
+      "pm": "PM",
+      "step": "Step",
+      "hour": "Hour",
+      "minute": "Minute",
+      "second": "Second"
+    },
+    "table": {
+      "columnToggle": {
+        "columns": "Columns",
+        "toggleVisibilityAria": "Toggle column visibility",
+        "resetToDefault": "Reset to default",
+        "resetColumnWidths": "Reset column widths"
+      }
+    },
+    "predefinedThemes": {
+      "title": "Theme",
+      "light": "Light",
+      "dark": "Dark",
+      "customThemeColorAriaLabel": "Pick a custom theme color",
+      "customColor": "Custom Color",
+      "themeSyncNote": "Saved to this device only — themes don't sync across different browsers or devices.",
+      "pickCustomColorTitle": "Pick Custom Color"
+    },
+    "webinarBanner": {
+      "dismissBannerAriaLabel": "Dismiss webinar banner",
+      "dismiss": "Dismiss"
+    },
+    "databaseDeprecationBanner": {
+      "ariaLabel": "MySQL deprecation warning",
+      "title": "⚠️ MySQL support is DEPRECATED and will be removed in future.",
+      "description": "Please migrate to PostgreSQL to ensure continued support."
     }
   }
 }

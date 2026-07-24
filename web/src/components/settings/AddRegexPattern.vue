@@ -102,19 +102,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="text-xs font-normal leading-4.5">
                 {{ t("regex_patterns.unsupported_lookaround_note") }}
                 {{ t("regex_patterns.unsupported_lookaround_example") }}
-                <code
-                  class="font-mono text-xs px-1 py-px rounded-default bg-banner-info-border"
-                  >(?=openobserve)\w+</code
-                >
+                <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- regex pattern example, must stay literal in every locale -->
+                <code class="font-mono text-xs px-1 py-px rounded-default bg-banner-info-border">(?=openobserve)\w+</code>
                 <OIcon
                   name="arrow-right-alt"
                   size="xs"
                   class="inline-block align-middle mx-1"
                 />
-                <code
-                  class="font-mono text-xs px-1 py-px rounded-default bg-banner-info-border"
-                  >openobserve\w*</code
-                >
+                <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- regex pattern example, must stay literal in every locale -->
+                <code class="font-mono text-xs px-1 py-px rounded-default bg-banner-info-border">openobserve\w*</code>
               </div>
             </OBanner>
             <div class="regex-pattern-input-container">

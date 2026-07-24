@@ -2,6 +2,7 @@
 
 <script setup lang="ts" generic="TData extends Record<string, any>">
 import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, provide, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { useTableColumnPersistence } from "./composables/useTableColumnPersistence";
 import OTableColumnToggle from "./sub-components/OTableColumnToggle.vue";
 import { FlexRender } from "@tanstack/vue-table";
@@ -27,6 +28,7 @@ import OTableEmpty from "./sub-components/OTableEmpty.vue";
 import OTableLoading from "./sub-components/OTableLoading.vue";
 import OTableError from "./sub-components/OTableError.vue";
 
+const { t } = useI18n();
 const props = withDefaults(defineProps<OTableProps<TData>>(), {
   pagination: "client",
   pageSize: 20,
@@ -851,7 +853,7 @@ defineExpose({
     <OBanner
       v-else-if="props.streaming && displayRows.length > 0"
       variant="info"
-      :content="'Loading...'"
+      :content="t('common.loading')"
       dense
       data-test="o2-table-loading-banner"
     />
@@ -1118,7 +1120,7 @@ defineExpose({
         v-if="showStreaming"
         data-test="o2-table-streaming-bar"
         class="sticky bottom-0 h-1 w-full bg-table-streaming-bar animate-pulse z-10"
-        aria-label="Data streaming in progress"
+        :aria-label="t('common.dataStreamingInProgress')"
       />
     </div>
 

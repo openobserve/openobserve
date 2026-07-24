@@ -1,9 +1,9 @@
 <template>
   <div class="w-full" data-test="dashboard-raw-query-builder">
     <div class="query-section" data-test="dashboard-raw-query-section">
-      <div class="query-label" data-test="dashboard-raw-query-title">Query</div>
+      <div class="query-label" data-test="dashboard-raw-query-title">{{ t('common.query') }}</div>
       <div class="query-label text-xs" data-test="dashboard-raw-query-instruction">
-        Write a SQL query for complex actions.
+        {{ t('dashboard.rawQueryBuilder.instruction') }}
       </div>
 
       <OTextarea
@@ -18,6 +18,7 @@
 <script lang="ts">
 import { ref, watch } from "vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
+import { useI18n } from "vue-i18n";
 
 export default {
   name: "RawQueryBuilder",
@@ -30,6 +31,7 @@ export default {
   },
   emits: ["update:modelValue"],
   setup(props, { emit }) {
+    const { t } = useI18n();
     const fields = ref(props.modelValue);
 
     watch(
@@ -41,6 +43,7 @@ export default {
     );
 
     return {
+      t,
       fields,
     };
   },

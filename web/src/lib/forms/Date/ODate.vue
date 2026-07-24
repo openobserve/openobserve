@@ -25,6 +25,9 @@ import {
 import { parseDate } from "@internationalized/date";
 import type { DateValue } from "@internationalized/date";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -175,7 +178,7 @@ const wrapperClasses = computed(() => [
         <!-- Calendar trigger (calendar icon) -->
         <DatePickerTrigger
           class="flex items-center ps-3 text-datepicker-icon shrink-0 outline-none cursor-pointer disabled:cursor-not-allowed"
-          aria-label="Open calendar"
+          :aria-label="t('components.date.openCalendar')"
         >
           <OIcon name="calendar-month" size="sm" aria-hidden="true" />
         </DatePickerTrigger>
@@ -210,7 +213,7 @@ const wrapperClasses = computed(() => [
           v-if="clearable && modelValue"
           type="button"
           tabindex="-1"
-          aria-label="Clear"
+          :aria-label="t('components.date.clear')"
           class="flex items-center pe-2 text-datepicker-icon hover:opacity-80 transition-colors"
           @click="handleClear"
         >
@@ -326,7 +329,7 @@ const wrapperClasses = computed(() => [
             :disabled="disabled"
             class="px-4 py-1.5 rounded-default text-xs font-medium bg-datepicker-day-selected-bg text-datepicker-day-selected-text outline-none ring-offset-1 ring-offset-surface-base hover:opacity-90 transition-[box-shadow] duration-150 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring disabled:opacity-50 disabled:cursor-not-allowed"
             @click="handleApply"
-          >Apply</button>
+          >{{ t('common.apply') }}</button>
         </div>
       </DatePickerContent>
     </DatePickerRoot>

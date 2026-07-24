@@ -104,14 +104,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               size="xs"
                               icon-left="folder-outline"
                               data-test="report-list-search-scope-current"
-                              title="Search only this folder"
+                              :title="t('reports.searchThisFolderTitle')"
                             >{{ t('reports.searchThisFolder') }}</OToggleGroupItem>
                             <OToggleGroupItem
                               value="all"
                               size="xs"
                               icon-left="search"
                               data-test="report-list-search-across-folders-toggle"
-                              title="Search across all folders"
+                              :title="t('reports.searchAllFoldersTitle')"
                             >{{ t('reports.searchAllFolders') }}</OToggleGroupItem>
                           </OToggleGroup>
                         </template>
@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     unit="us"
                     mode="absolute"
                     :timezone="store.state.timezone"
-                    empty-label="Never"
+                    :empty-label="t('reports.never')"
                   />
                 </template>
 

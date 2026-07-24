@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               value="neutral"
               class="shrink-0"
             >
-              +{{ getSortedDimensions(row.group_values).length - 2 }} more
+              +{{ getSortedDimensions(row.group_values).length - 2 }} {{ t('alerts.more') }}
               <OTooltip :delay="300" :max-width="'28rem'">
                 <template #content>
                   <div class="space-y-1">

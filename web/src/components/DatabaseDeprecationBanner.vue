@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="feature-card mb-3"
     v-if="showDeprecationWarning"
     role="region"
-    aria-label="MySQL deprecation warning"
+    :aria-label="t('components.databaseDeprecationBanner.ariaLabel')"
     data-test="database-deprecation-banner-message"
   >
     <div class="flex items-center">
@@ -28,14 +28,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-base font-semibold leading-6 text-text-heading"
           data-test="database-deprecation-banner-title"
         >
-          ⚠️ MySQL support is DEPRECATED and will be removed in future.
+          {{ t('components.databaseDeprecationBanner.title') }}
         </span>
         <br />
         <span
           class="text-sm font-normal leading-5 text-text-secondary"
           data-test="database-deprecation-banner-subtitle"
         >
-          Please migrate to PostgreSQL to ensure continued support.
+          {{ t('components.databaseDeprecationBanner.description') }}
         </span>
       </div>
       <div class="col-auto ml-2">
@@ -47,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, onMounted } from "vue";
+import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 
@@ -57,6 +58,7 @@ export default defineComponent({
   name: "DatabaseDeprecationBanner",
   components: { OButton },
   setup() {
+    const { t } = useI18n();
     const store = useStore();
     const showDeprecationWarning = ref(false);
 
@@ -104,6 +106,7 @@ export default defineComponent({
     });
 
     return {
+      t,
       store,
       showDeprecationWarning,
       dismissWarning,

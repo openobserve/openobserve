@@ -200,7 +200,7 @@
                 :checked="formValues.healthyDirection === 'gte'"
                 @change="form.setFieldValue('healthyDirection', 'gte')"
               />
-              <span class="font-mono text-lg font-bold text-text-body text-center">≥</span>
+              <span class="font-mono text-lg font-bold text-text-body text-center">{{ t("onlineEvals.scoreConfig.gteSymbol") }}</span>
               <span class="text-compact text-text-body">{{ t("onlineEvals.scoreConfig.gteLabel") }}</span>
               <OFormInput
                 name="healthyGteValue"
@@ -227,7 +227,7 @@
                 :checked="formValues.healthyDirection === 'lte'"
                 @change="form.setFieldValue('healthyDirection', 'lte')"
               />
-              <span class="font-mono text-lg font-bold text-text-body text-center">≤</span>
+              <span class="font-mono text-lg font-bold text-text-body text-center">{{ t("onlineEvals.scoreConfig.lteSymbol") }}</span>
               <span class="text-compact text-text-body">{{ t("onlineEvals.scoreConfig.lteLabel") }}</span>
               <OFormInput
                 name="healthyLteValue"
@@ -246,7 +246,7 @@
         <template v-else-if="formValues.dataType === 'categorical'">
           <div class="text-xs font-medium text-text-secondary mb-2">{{ t("onlineEvals.scoreConfig.healthyCategories") }}</div>
           <div v-if="formValues.categories.length === 0" class="text-2xs italic text-text-secondary px-3 py-2.5 border border-dashed border-dialog-header-border rounded-default bg-card-bg">
-            {{ t("onlineEvals.scoreConfig.addCategoryPlaceholder") }}…
+            {{ t("onlineEvals.scoreConfig.addCategoryPlaceholder") }}{{ t("onlineEvals.scoreConfig.ellipsis") }}
           </div>
           <div v-else class="flex flex-col gap-0.5 border border-dialog-header-border rounded-default bg-card-bg p-1">
             <label

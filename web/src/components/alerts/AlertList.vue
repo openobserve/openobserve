@@ -149,14 +149,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               size="xs"
                               icon-left="folder-outline"
                               data-test="alert-list-search-scope-current"
-                              title="Search only this folder"
+                              :title="t('alerts.searchThisFolderTooltip')"
                             >{{ t('alerts.searchThisFolder') }}</OToggleGroupItem>
                             <OToggleGroupItem
                               value="all"
                               size="xs"
                               icon-left="search"
                               data-test="alert-list-search-across-folders-toggle"
-                              title="Search across all folders"
+                              :title="t('alerts.searchAllFoldersTooltip')"
                             >{{ t('alerts.searchAllFolders') }}</OToggleGroupItem>
                           </OToggleGroup>
                         </template>
@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="alert-list-refresh-btn"
                     @click="refreshAlerts"
                   >
-                    <OTooltip side="bottom" content="Reload alerts" shortcut-id="alertsRefresh" />
+                    <OTooltip side="bottom" :content="t('alerts.reloadAlertsTooltip')" shortcut-id="alertsRefresh" />
                   </OButton>
                 </template>
 
@@ -217,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     unit="iso"
                     mode="absolute"
                     :timezone="store.state.timezone"
-                    empty-label="Never"
+                    :empty-label="t('alerts.anomaly.retrainNever')"
                   />
                 </template>
 
@@ -227,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     unit="iso"
                     mode="absolute"
                     :timezone="store.state.timezone"
-                    empty-label="Never"
+                    :empty-label="t('alerts.anomaly.retrainNever')"
                   />
                 </template>
 
@@ -376,7 +376,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <template #icon-left>
                           <OIcon name="drive-file-move" size="sm" />
                         </template>
-                        Move
+                        {{ t("common.move") }}
                       </ODropdownItem>
                       <ODropdownSeparator />
                       <ODropdownItem
@@ -399,7 +399,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <template #icon-left>
                           <OIcon size="sm" name="download" />
                         </template>
-                        Export
+                        {{ t("common.export") }}
                       </ODropdownItem>
                       <ODropdownSeparator />
                       <!-- Anomaly Detection: Trigger Detection + Re-train -->
@@ -411,7 +411,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <template #icon-left>
                             <OIcon size="sm" name="sound-sampler" />
                           </template>
-                          Trigger Detection
+                          {{ t("alerts.triggerDetection") }}
                         </ODropdownItem>
                         <ODropdownItem
                           :data-test="`alert-list-${row.name}-retrain-anomaly`"
@@ -420,7 +420,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <template #icon-left>
                             <OIcon size="sm" name="replay" />
                           </template>
-                          Re-train
+                          {{ t("alerts.retrain") }}
                         </ODropdownItem>
                       </template>
                       <!-- Regular alerts: Trigger Alert item -->
@@ -474,7 +474,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       class="text-xs font-normal flex items-center min-w-25"
                     >
-                      <template v-if="selectedAlerts.length > 0">{{ selectedAlerts.length }} of {{ resultTotal }} selected</template>
+                      <template v-if="selectedAlerts.length > 0">{{ selectedAlerts.length }} {{ t('alerts.conditionOf') }} {{ resultTotal }} {{ t('alerts.selectedLabel') }}</template>
                       <template v-else>{{ resultTotal }} {{ t("alerts.header") }}</template>
                     </div>
 
@@ -485,7 +485,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="sm"
                       icon-left="drive-file-move"
                       @click="moveMultipleAlerts"
-                    >Move</OButton>
+                    >{{ t("common.move") }}</OButton>
                     <OButton
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-export-alerts-btn"
@@ -493,7 +493,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="sm"
                       icon-left="download"
                       @click="multipleExportAlert"
-                    >Export</OButton>
+                    >{{ t("common.export") }}</OButton>
                     <OButton
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-pause-alerts-btn"
@@ -501,7 +501,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="sm"
                       icon-left="pause"
                       @click="bulkToggleAlerts('pause')"
-                    >Pause</OButton>
+                    >{{ t("alerts.pause") }}</OButton>
                     <OButton
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-unpause-alerts-btn"
@@ -509,7 +509,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="sm"
                       icon-left="play-arrow"
                       @click="bulkToggleAlerts('resume')"
-                    >Resume</OButton>
+                    >{{ t("alerts.resume") }}</OButton>
                     <OButton
                       v-if="selectedAlerts.length > 0"
                       data-test="alert-list-delete-alerts-btn"
@@ -518,7 +518,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       icon-left="delete"
                       :loading="bulkDeleteLoading"
                       @click="openBulkDeleteDialog"
-                    >Delete</OButton>
+                    >{{ t("common.delete") }}</OButton>
                   </div>
                 </template>
               </OTable>
@@ -555,15 +555,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <ConfirmDialog
-      title="Delete Alert"
-      message="Are you sure you want to delete this alert?"
+      :title="t('alerts.deleteAlertTitle')"
+      :message="t('alerts.deleteAlertMessage')"
       @update:ok="deleteAlertByAlertId"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
     />
 
     <ConfirmDialog
-      title="Delete Alerts"
+      :title="t('alerts.deleteAlertsTitle')"
       :message="`Are you sure you want to delete ${selectedAlerts.length} alert(s)?`"
       @update:ok="bulkDeleteAlerts"
       @update:cancel="confirmBulkDelete = false"
@@ -586,12 +586,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OInput
             data-test="to-be-clone-alert-name"
             v-model="toBeCloneAlertName"
-            label="Alert Name"
+            :label="t('alerts.alertName')"
           />
           <OSelect
             data-test="to-be-clone-stream-type"
             v-model="toBeClonestreamType"
-            label="Stream Type"
+            :label="t('alerts.streamType')"
             :options="streamTypes"
             @update:model-value="updateStreams()"
             class="mt-1"
@@ -600,7 +600,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="to-be-clone-stream-name"
             v-model="toBeClonestreamName"
             :disabled="!toBeClonestreamType"
-            label="Stream Name"
+            :label="t('alerts.stream_name')"
             :options="indexOptions"
             searchable
             @update:model-value="updateStreamName"

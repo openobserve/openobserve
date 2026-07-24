@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OCard data-test="total-alerts-card" class="border border-border-default transition-all duration-200 hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
       <OCardSection class="p-4">
         <div data-test="total-alerts-value" class="text-2xl font-semibold">{{ summary.total_alerts }}</div>
-        <div data-test="total-alerts-label" class="text-sm text-text-secondary">Total Alerts</div>
+        <div data-test="total-alerts-label" class="text-sm text-text-secondary">{{ t('alerts.totalAlerts') }}</div>
       </OCardSection>
     </OCard>
 
@@ -32,9 +32,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon data-test="dedup-filter-icon" name="filter-alt" size="sm" />
         </div>
         <div data-test="alerts-with-dedup-label" class="text-sm text-text-secondary flex items-center gap-1">
-          Using Deduplication
+          {{ t('alerts.usingDeduplication') }}
           <OIcon data-test="dedup-info-icon" name="info-outline" size="xs" class="cursor-pointer" />
-            <OTooltip content="Alerts with deduplication configured" />
+            <OTooltip :content="t('alerts.deduplicationConfiguredTooltip')" />
         </div>
       </OCardSection>
     </OCard>
@@ -56,14 +56,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ formatPercentage(summary.suppression_rate) }}
         </div>
         <div data-test="suppression-rate-label" class="text-sm text-text-secondary flex items-center gap-1">
-          Suppression Rate (24h)
+          {{ t('alerts.suppressionRate24h') }}
           <OIcon data-test="suppression-info-icon" name="info-outline" size="xs" class="cursor-pointer" />
             <OTooltip>
               <template #content>
-                {{ summary.suppressions_total }} suppressed /
-                {{ summary.suppressions_total + summary.passed_total }} total
+                {{ summary.suppressions_total }} {{ t('alerts.suppressed') }}
+                {{ summary.suppressions_total + summary.passed_total }} {{ t('alerts.total') }}
                 <div class="mt-1">
-                  Passed: {{ summary.passed_total }}
+                  {{ t('alerts.passedLabel') }} {{ summary.passed_total }}
                 </div>
               </template>
             </OTooltip>
@@ -79,9 +79,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon data-test="pending-batches-icon" name="group-work" size="sm" />
         </div>
         <div data-test="pending-batches-label" class="text-sm text-text-secondary flex items-center gap-1">
-          Pending Batches
+          {{ t('alerts.pendingBatches') }}
           <OIcon data-test="pending-batches-info-icon" name="info-outline" size="xs" class="cursor-pointer" />
-            <OTooltip content="Alerts waiting to be grouped together" />
+            <OTooltip :content="t('alerts.pendingBatchesTooltip')" />
         </div>
       </OCardSection>
     </OCard>
@@ -96,7 +96,9 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import { useI18n } from "vue-i18n";
 
+const { t } = useI18n();
 const store = useStore();
 
 interface DedupSummary {

@@ -20,13 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <IngestionDocLink
       href="https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-metric-streams-setup-datalake.html"
     >
-      to explore the process of setting up a CloudWatch custom metric stream
-      with Data Firehose to OpenObserve. You may choose JSON or OpenTelemetry
-      1.0 as the output format.</IngestionDocLink
+      {{ t('ingestion.cloudwatchMetrics.docLinkText') }}</IngestionDocLink
     >
     <div class="italic">
-      Note: Output is available under Logs with stream name
-      'cloudwatch_metrics'.
+      {{ t('ingestion.cloudwatchMetrics.outputNote') }}
     </div>
   </IngestionContent>
 </template>
@@ -39,6 +36,7 @@ import { getEndPoint, getImageURL, getIngestionURL } from "../../../utils/zincut
 import CopyContent from "@/components/CopyContent.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
+import { useI18n } from "vue-i18n";
 
 export default defineComponent({
   name: "cloudwatchMetrics",
@@ -52,6 +50,7 @@ export default defineComponent({
   },
   components: { CopyContent, IngestionContent, IngestionDocLink },
   setup() {
+    const { t } = useI18n();
     const store = useStore();
     const endpoint: any = ref({
       url: "",
@@ -67,6 +66,7 @@ export default defineComponent({
     const content = `HTTP Endpoint: ${endpoint.value.url}/aws/${store.state.selectedOrganization.identifier}/cloudwatch_metrics/_kinesis_firehose
 Access Key: [BASIC_PASSCODE]`;
     return {
+      t,
       store,
       config,
       endpoint,

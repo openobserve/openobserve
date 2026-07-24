@@ -23,7 +23,7 @@ the Free Software Foundation, either version 3 of the License, or
       <OIcon name="error-outline" class="mb-2" style="width: 3em; height: 3em" />
       <div class="text-status-error-text">{{ loadError }}</div>
       <OButton variant="primary" size="sm" class="mt-4" @click="loadCatalog">
-        Retry
+        {{ t('common.retry') }}
       </OButton>
     </div>
 
@@ -32,17 +32,17 @@ the Free Software Foundation, either version 3 of the License, or
       class="flex flex-col items-center justify-center flex-1 p-8 text-text-secondary"
       data-test="scorer-library-no-providers"
     >
-      Create a Provider first before importing LLM Judge scorers.
+      {{ t('onlineEvals.scorerLibrary.noProvidersMessage') }}
     </div>
 
     <div v-else class="flex flex-col min-h-0 flex-1">
       <div class="flex items-end gap-3 mb-4">
         <div class="flex items-center gap-2 shrink-0 w-60">
-          <label class="text-xs font-semibold text-text-secondary whitespace-nowrap">Provider</label>
+          <label class="text-xs font-semibold text-text-secondary whitespace-nowrap">{{ t('onlineEvals.scorer.providerLabel') }}</label>
           <OSelect
             v-model="selectedProviderId"
             :options="providerOptions"
-            placeholder="Select provider"
+            :placeholder="t('onlineEvals.scorer.providerPlaceholder')"
             size="md"
             class="w-full"
             data-test="scorer-library-provider-select"
@@ -50,7 +50,7 @@ the Free Software Foundation, either version 3 of the License, or
         </div>
         <OSearchInput
           v-model="searchQuery"
-          placeholder="Search Scorers..."
+          :placeholder="t('onlineEvals.scorerLibrary.searchPlaceholder')"
           clearable
           class="flex-1 min-w-0"
           data-test="scorer-library-search"
@@ -70,7 +70,7 @@ the Free Software Foundation, either version 3 of the License, or
           <span>{{ allVisibleSelected ? "Clear all" : "Select all" }}</span>
         </label>
         <span class="text-xs text-text-secondary">
-          {{ filteredEntries.length }} scorer(s)
+          {{ filteredEntries.length }} {{ t('onlineEvals.scorerLibrary.scorerCountSuffix') }}
         </span>
       </div>
 
@@ -126,6 +126,7 @@ the Free Software Foundation, either version 3 of the License, or
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -144,6 +145,8 @@ import {
 } from "@/services/online-evals-catalog.service";
 import { entityId } from "./utils/evalEntity";
 import { showError } from "./utils/evalFormat";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   orgId: string;

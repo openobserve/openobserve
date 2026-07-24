@@ -3,6 +3,7 @@
 
 import type { InputProps, InputEmits, InputSlots } from "./OInput.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useI18n } from "vue-i18n";
 import {
   computed,
   nextTick,
@@ -13,6 +14,8 @@ import {
   useId,
   watch,
 } from "vue";
+
+const { t } = useI18n();
 
 // Forward the consumer's `data-test` from <OInput data-test="…"> onto the
 // root wrapper so E2E selectors can scope to the specific field instance
@@ -370,7 +373,7 @@ const wrapperClasses = computed(() => [
         "
         type="button"
         tabindex="-1"
-        aria-label="Clear"
+        :aria-label="t('components.input.clear')"
         :data-test="parentDataTest ? `${parentDataTest}-clear` : undefined"
         class="flex items-center pe-2 text-input-clear-btn hover:text-input-clear-btn-hover transition-colors"
         @click="handleClear"

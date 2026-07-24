@@ -488,7 +488,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="loading && !$slots.loading"
           data-test="tenstack-table-skeleton-body"
           aria-busy="true"
-          aria-label="Loading"
+          :aria-label="t('common.loadingIndicator')"
         >
           <!-- Rows use flex to align with the real virtual/data rows. -->
           <tr

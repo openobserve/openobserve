@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="xs"
           @click="closeTraceDetail"
           data-test="rum-player-traces-tab-back-btn"
-          aria-label="Back"
+          :aria-label="t('common.back')"
         >
           <OIcon name="arrow-back" size="sm" />
         </OButton>

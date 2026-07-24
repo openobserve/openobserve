@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
 
           <span class="inline-flex cursor-default">
-            <OTag type="countChip" value="alerts">{{ triggers.length }} Alerts</OTag>
+            <OTag type="countChip" value="alerts">{{ triggers.length }} {{ t('alerts.incidents.alertCount') }}</OTag>
             <OTooltip :content="t('alerts.incidents.alertCount') + ': ' + triggers.length + ' correlated alerts'" />
           </span>
         </template>
@@ -127,12 +127,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OTab
             name="overview"
-            label="Overview"
+            :label="t('alerts.insights.tabs.overview')"
             data-test="incident-overview-tab"
           />
           <OTab
             name="activity"
-            label="Activity"
+            :label="t('alerts.incidents.activityTab')"
             data-test="incident-activity-tab"
           />
           <OTab
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <OTab
             name="serviceGraph"
-            label="Alert Graph"
+            :label="t('alerts.incidents.alertGraph')"
             data-test="incident-alert-graph-tab"
           />
           <OTab
@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Top: Title and Icon -->
               <div class="flex justify-between items-start">
                 <div :class="'text-text-secondary'" class="text-sm font-medium">
-                  Total Alerts
+                  {{ t('alerts.incidents.totalAlerts') }}
                 </div>
                 <div class="w-8 h-8 rounded-default flex items-center justify-center bg-badge-amber-soft-bg">
                   <OIcon name="bolt" size="sm" class="text-badge-amber-soft-text" />
@@ -247,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Top: Title and Icon -->
               <div class="flex justify-between items-start">
                 <div :class="'text-text-secondary'" class="text-sm font-medium">
-                  Affected Services
+                  {{ t('alerts.incidents.affectedServices') }}
                 </div>
                 <div class="w-8 h-8 rounded-default flex items-center justify-center bg-badge-purple-soft-bg">
                   <OIcon name="dns" size="sm" class="text-badge-purple-soft-text" />
@@ -267,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Top: Title and Icon -->
               <div class="flex justify-between items-start">
                 <div :class="'text-text-secondary'" class="text-sm font-medium">
-                  Active Duration
+                  {{ t('alerts.incidents.activeDuration') }}
                 </div>
                 <div class="w-8 h-8 rounded-default flex items-center justify-center bg-badge-success-soft-bg">
                   <OIcon name="schedule" size="sm" class="text-badge-success-soft-text" />
@@ -289,7 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Top: Title and Icon -->
               <div class="flex justify-between items-start">
                 <div :class="'text-text-secondary'" class="text-sm font-medium">
-                  Alert Frequency
+                  {{ t('alerts.incidents.alertFrequency') }}
                 </div>
                 <div class="w-8 h-8 rounded-default flex items-center justify-center bg-badge-error-soft-bg">
                   <OIcon name="show-chart" size="sm" class="text-badge-error-soft-text" />
@@ -321,7 +321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       class="px-2 py-0.5 rounded-default text-xs font-medium bg-surface-panel text-text-secondary"
                     >
-                      UTC
+                      {{ t('alerts.incidents.utc') }}
                     </div>
                   </div>
 
@@ -339,7 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ></div>
                       <div class="flex-1">
                         <div :class="'text-text-heading'" class="text-sm font-medium mb-1">
-                          First Alert Received
+                          {{ t('alerts.incidents.firstAlertReceived') }}
                         </div>
                         <div :class="'text-text-secondary'" class="text-xs">
                           {{ incidentDetails?.first_alert_at ? formatTimestampUTC(incidentDetails.first_alert_at) : 'N/A' }}
@@ -356,12 +356,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ></div>
                       <div class="flex-1">
                         <div :class="'text-text-heading'" class="text-sm font-medium mb-1">
-                          Peak Activity
+                          {{ t('alerts.incidents.peakActivity') }}
                         </div>
                         <div :class="'text-text-secondary'" class="text-xs">
                           {{ peakActivity.timestamp ? formatTimestampUTC(peakActivity.timestamp) : 'N/A' }}
                           <span :class="'text-text-muted'" class="mx-1.5">|</span>
-                          <span>{{ peakActivity.count }} alerts in 5 mins</span>
+                          <span>{{ peakActivity.count }} {{ t('alerts.incidents.alertsInFiveMins') }}</span>
                         </div>
                       </div>
                     </div>
@@ -374,7 +374,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ></div>
                       <div class="flex-1">
                         <div :class="'text-text-heading'" class="text-sm font-medium mb-1">
-                          Latest Alert
+                          {{ t('alerts.incidents.latestAlert') }}
                         </div>
                         <div :class="'text-text-secondary'" class="text-xs">
                           {{ incidentDetails?.last_alert_at ? formatTimestampUTC(incidentDetails.last_alert_at) : 'N/A' }}
@@ -392,7 +392,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="sm"
                       @click="activeTab = 'activity'"
                       data-test="incident-timeline-show-full-activity"
-                    ><span class="text-xs">Show Full Activity</span></OButton>
+                    ><span class="text-xs">{{ t('alerts.incidents.showFullActivity') }}</span></OButton>
                   </div>
                 </div>
                 <!-- Incident Details (66.67% width) -->
@@ -447,7 +447,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Correlated By -->
                     <div class="grid gap-2 grid-cols-[7.5rem_1fr]">
                       <div :class="'text-text-secondary'" class="text-xs font-medium">
-                        Correlated By
+                        {{ t('alerts.incidents.correlatedBy') }}
                       </div>
                       <div
                         class="flex items-center gap-2 px-2.5 py-1 rounded-default border text-xs min-w-0 bg-surface-panel border-border-default text-text-body"
@@ -465,7 +465,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Created At -->
                     <div class="grid gap-2 grid-cols-[7.5rem_1fr]">
                       <div :class="'text-text-secondary'" class="text-xs font-medium">
-                        Created At
+                        {{ t('alerts.createdAt') }}
                       </div>
                       <div :class="'text-text-body'" class="text-sm">
                         {{ incidentDetails?.created_at ? formatTimestamp(incidentDetails.created_at) : 'N/A' }}
@@ -475,7 +475,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Updated At -->
                     <div class="grid gap-2 grid-cols-[7.5rem_1fr]">
                       <div :class="'text-text-secondary'" class="text-xs font-medium">
-                        Updated At
+                        {{ t('common.updated_at') }}
                       </div>
                       <div :class="'text-text-body'" class="text-sm">
                         {{ incidentDetails?.updated_at ? formatTimestamp(incidentDetails.updated_at) : 'N/A' }}
@@ -495,7 +495,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :class="'text-text-heading'"
                     class="text-sm font-semibold"
                   >
-                    Alert Activity
+                    {{ t('alerts.incidents.alertActivity') }}
                   </div>
                 </div>
 
@@ -523,7 +523,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :class="'text-text-heading'"
                     class="text-sm font-semibold"
                   >
-                    Manage
+                    {{ t('alerts.incidents.manage') }}
                   </div>
                 </div>
 
@@ -535,7 +535,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :class="'text-text-secondary'"
                       class="text-xs font-semibold"
                     >
-                      Status
+                      {{ t('common.status') }}
                     </div>
                     <div class="flex gap-2 flex-wrap">
                       <button
@@ -562,7 +562,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :class="'text-text-secondary'"
                       class="text-xs font-semibold"
                     >
-                      Severity
+                      {{ t('alerts.incidents.severity') }}
                     </div>
                     <div class="flex gap-2 flex-wrap">
                       <button
@@ -597,7 +597,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :class="'text-text-heading'"
                     class="text-sm font-semibold"
                   >
-                    Dimensions
+                    {{ t('alerts.incidents.stableDimensions') }}
                   </div>
                 </div>
 
@@ -755,7 +755,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OIcon name="info" size="sm" class="opacity-80" />
                 <span :class="'text-text-secondary'" class="text-sm font-semibold">
-                  Alert Details
+                  {{ t('alerts.incidents.alertDetailsHeader') }}
                 </span>
               </div>
               <!-- Content -->
@@ -777,7 +777,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Alert Name -->
                       <div class="flex flex-col gap-0.5">
                         <span :class="'text-text-secondary'" class="text-3xs uppercase tracking-wide">
-                          Alert Name
+                          {{ t('alerts.incidents.alertName') }}
                         </span>
                         <span :class="'text-text-body'" class="text-sm font-medium">
                           {{ alerts[selectedAlertIndex]?.name || 'N/A' }}
@@ -788,7 +788,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="grid grid-cols-2 gap-2">
                         <div class="flex flex-col gap-0.5">
                           <span :class="'text-text-secondary'" class="text-3xs uppercase tracking-wide">
-                            Stream Type
+                            {{ t('alerts.streamType') }}
                           </span>
                           <OTag
                             type="streamType"
@@ -798,7 +798,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                         <div class="flex flex-col gap-0.5">
                           <span :class="'text-text-secondary'" class="text-3xs uppercase tracking-wide">
-                            Stream Name
+                            {{ t('alerts.stream_name') }}
                           </span>
                           <span :class="'text-text-body'" class="text-sm font-medium truncate">
                             {{ alerts[selectedAlertIndex]?.stream_name || 'N/A' }}
@@ -810,7 +810,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="grid grid-cols-2 gap-2">
                         <div class="flex flex-col gap-0.5">
                           <span :class="'text-text-secondary'" class="text-3xs uppercase tracking-wide">
-                            Threshold
+                            {{ t('alerts.messages.thresholdMarkLine') }}
                           </span>
                           <span :class="'text-text-body'" class="text-sm font-medium">
                             {{ alerts[selectedAlertIndex]?.trigger_condition?.operator || '' }} {{ alerts[selectedAlertIndex]?.trigger_condition?.threshold || 'N/A' }}
@@ -818,7 +818,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                         <div class="flex flex-col gap-0.5">
                           <span :class="'text-text-secondary'" class="text-3xs uppercase tracking-wide">
-                            Period
+                            {{ t('alerts.incidents.period') }}
                           </span>
                           <span :class="'text-text-body'" class="text-sm font-medium">
                             {{ formatPeriod(alerts[selectedAlertIndex]?.trigger_condition?.period) }}
@@ -830,7 +830,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="grid grid-cols-2 gap-2">
                         <div class="flex flex-col gap-0.5">
                           <span :class="'text-text-secondary'" class="text-3xs uppercase tracking-wide">
-                            Frequency
+                            {{ t('alerts.incidents.frequency') }}
                           </span>
                           <span :class="'text-text-body'" class="text-sm font-medium">
                             {{ alerts[selectedAlertIndex]?.trigger_condition?.frequency || 'N/A' }} {{ alerts[selectedAlertIndex]?.trigger_condition?.frequency_type || 'min' }}
@@ -838,10 +838,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                         <div class="flex flex-col gap-0.5">
                           <span :class="'text-text-secondary'" class="text-3xs uppercase tracking-wide">
-                            Silence
+                            {{ t('alerts.incidents.silence') }}
                           </span>
                           <span :class="'text-text-body'" class="text-sm font-medium">
-                            {{ alerts[selectedAlertIndex]?.trigger_condition?.silence || 'N/A' }} min
+                            {{ alerts[selectedAlertIndex]?.trigger_condition?.silence || 'N/A' }} {{ t('common.min') }}
                           </span>
                         </div>
                       </div>
@@ -867,12 +867,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <!-- Custom Conditions -->
                       <div v-else-if="alerts[selectedAlertIndex]?.query_condition?.conditions">
-                        <pre :class="['text-compact overflow-x-auto whitespace-pre-wrap break-words', 'text-text-body']">if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.conditions) }}</pre>
+                        <pre :class="['text-compact overflow-x-auto whitespace-pre-wrap break-words', 'text-text-body']">{{ t('alerts.incidents.ifPrefix') }} {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.conditions) }}</pre>
                       </div>
 
                       <!-- No conditions -->
                       <div v-else :class="'text-text-muted'" class="text-sm italic">
-                        No conditions defined
+                        {{ t('alerts.incidents.noConditionsDefined') }}
                       </div>
                     </div>
                   </div>
@@ -898,7 +898,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ correlationError || 'No correlated logs found' }}
             </div>
             <div v-if="correlationError && correlationError.includes('disambiguation fields')" class="text-sm text-text-secondary mt-2 max-w-125 text-center">
-              The service discovery configuration (disambiguation fields) was changed after this incident was created.
+              {{ t('alerts.incidents.disambiguationChangedMessage') }}
             </div>
             <OButton
               v-if="correlationError && !correlationError.includes('disambiguation fields')"
@@ -906,7 +906,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="md"
               @click="refreshCorrelation"
               class="mt-3"
-            ><OIcon name="refresh" size="sm" class="mr-1" />Retry</OButton>
+            ><OIcon name="refresh" size="sm" class="mr-1" />{{ t('common.retry') }}</OButton>
           </div>
 
           <!-- Success State - CorrelatedLogsTable -->
@@ -935,7 +935,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Loading State -->
           <div v-if="correlationLoading" class="flex flex-col items-center justify-center flex-1 h-full">
             <OSpinner size="lg" class="mb-4" data-test="incident-telemetry-loading-indicator" />
-            <div class="text-base">Loading correlated metrics...</div>
+            <div class="text-base">{{ t('alerts.incidents.loadingCorrelatedMetrics') }}</div>
           </div>
 
           <!-- Error/No Data State -->
@@ -947,7 +947,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ correlationError || 'No correlated metrics found' }}
             </div>
             <div v-if="correlationError && correlationError.includes('disambiguation fields')" class="text-sm text-text-secondary mt-2 max-w-125 text-center">
-              The service discovery configuration (disambiguation fields) was changed after this incident was created.
+              {{ t('alerts.incidents.disambiguationChangedMessage') }}
             </div>
             <OButton
               v-if="correlationError && !correlationError.includes('disambiguation fields')"
@@ -955,7 +955,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="md"
               @click="refreshCorrelation"
               class="mt-3"
-            ><OIcon name="refresh" size="sm" class="mr-1" />Retry</OButton>
+            ><OIcon name="refresh" size="sm" class="mr-1" />{{ t('common.retry') }}</OButton>
           </div>
 
           <!-- Success State - TelemetryCorrelationDashboard -->
@@ -993,7 +993,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Loading State -->
           <div v-if="correlationLoading" class="flex flex-col items-center justify-center flex-1 h-full">
             <OSpinner size="lg" class="mb-4" data-test="incident-telemetry-loading-indicator" />
-            <div class="text-base">Loading correlated traces...</div>
+            <div class="text-base">{{ t('alerts.incidents.loadingCorrelatedTraces') }}</div>
           </div>
 
           <!-- Error/No Data State -->
@@ -1005,7 +1005,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ correlationError || 'No correlated traces found' }}
             </div>
             <div v-if="correlationError && correlationError.includes('disambiguation fields')" class="text-sm text-text-secondary mt-2 max-w-125 text-center">
-              The service discovery configuration (disambiguation fields) was changed after this incident was created.
+              {{ t('alerts.incidents.disambiguationChangedMessage') }}
             </div>
             <OButton
               v-if="correlationError && !correlationError.includes('disambiguation fields')"
@@ -1013,7 +1013,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="md"
               @click="refreshCorrelation"
               class="mt-3"
-            ><OIcon name="refresh" size="sm" class="mr-1" />Retry</OButton>
+            ><OIcon name="refresh" size="sm" class="mr-1" />{{ t('common.retry') }}</OButton>
           </div>
 
           <!-- Success State - TelemetryCorrelationDashboard -->

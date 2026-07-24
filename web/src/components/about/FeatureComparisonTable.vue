@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="compare-arrows" size="md" />
       </div>
       <div>
-        <div class="text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.1em] text-accent m-0 mb-0.5">EDITIONS</div>
+        <div class="text-[length:var(--text-xs)] font-semibold uppercase tracking-[0.1em] text-accent m-0 mb-0.5">{{ t('about.editionsLabel') }}</div>
         <div class="text-[length:var(--text-xl)] font-semibold text-text-heading m-0 tracking-[-0.015em]">{{ t("about.feature_comparison_lbl") }}</div>
       </div>
     </div>
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Your Plan badge (floats above the card top border) -->
         <div v-if="buildType === ed.id" data-test="feature-comparison-table-your-plan-badge" class="absolute top-[-14px] left-1/2 -translate-x-1/2 inline-flex items-center py-1 px-3.5 rounded-full text-3xs font-bold uppercase tracking-[0.08em] whitespace-nowrap bg-accent text-button-primary-foreground">
           <OIcon name="arrow-upward" size="sm" class="mr-1" />
-          Your Plan
+          {{ t('about.yourPlan') }}
         </div>
 
         <!-- Edition name + hosting + price ────────────────────────────── -->
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- All Five Pillars chips ────────────────────────────────────── -->
         <div class="bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-glass-bg))] border border-[color-mix(in_srgb,var(--color-accent)_15%,transparent)] rounded-default p-3 mb-4">
-          <div class="text-3xs font-bold uppercase tracking-[0.12em] text-text-label m-0 mb-2">ALL FIVE PILLARS</div>
+          <div class="text-3xs font-bold uppercase tracking-[0.12em] text-text-label m-0 mb-2">{{ t('about.allFivePillars') }}</div>
           <div class="flex flex-wrap gap-1.5 mb-1.5">
             <span v-for="pillarId in PILLAR_IDS" :key="pillarId" data-test="feature-comparison-table-pillar-chip" class="inline-flex items-center py-[0.1875rem] px-2 rounded-default text-2xs font-medium bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] text-accent border border-[color-mix(in_srgb,var(--color-accent)_20%,transparent)] mr-1.5 mb-1.5">
               {{ t(`about.feature_${pillarId}`) }}

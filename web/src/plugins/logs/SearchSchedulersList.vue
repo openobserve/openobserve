@@ -226,7 +226,10 @@
                 <div class="text-xs font-normal flex items-center w-25 mr-md">
                   {{ resultTotal }} {{ t('search_scheduler_job.results') }}
                 </div>
-                <div class="ml-auto mr-2">{{ t('search_scheduler_job.max_limit') }} : <b>1000</b></div>
+                <div class="ml-auto mr-2">{{ t('search_scheduler_job.max_limit') }} :
+                  <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- hardcoded numeric limit value, not translatable text -->
+                  <b>1000</b>
+                </div>
               </div>
             </template>
             <template #empty>

@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="inline-flex items-center gap-1 py-0.5 px-2 bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] rounded-default text-2xs font-medium text-theme-accent whitespace-nowrap dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_20%,transparent)]"
         >
           <OIcon name="format-list-numbered" size="xs" />
-          {{ formatNumber(node.metrics.output_rows) }} rows
+          {{ formatNumber(node.metrics.output_rows) }} {{ t('search.rows') }}
         </span>
         <span
           v-if="node.metrics.elapsed_compute"
@@ -132,6 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, PropType, ref, computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { OperatorNode } from "@/utils/queryPlanParser";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
@@ -159,6 +160,7 @@ export default defineComponent({
     },
   },
   setup(props) {
+    const { t } = useI18n();
     const childrenExpanded = ref(true);
     const detailsExpanded = ref(false);
 
@@ -220,6 +222,7 @@ export default defineComponent({
     };
 
     return {
+      t,
       childrenExpanded,
       detailsExpanded,
       connector,

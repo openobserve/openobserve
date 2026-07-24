@@ -695,7 +695,7 @@ function openChromeExtensions() {
         <span class="flex items-center gap-1 text-xs text-text-secondary truncate flex-1 min-w-0">
           <span class="truncate">{{ currentUrl }}</span>
         </span>
-        <span class="text-xs text-text-muted">{{ capturedSteps.length }} steps</span>
+        <span class="text-xs text-text-muted">{{ capturedSteps.length }} {{ t('synthetics.table.stepsSuffix') }}</span>
       </div>
 
       <JourneySteps
@@ -794,10 +794,11 @@ function openChromeExtensions() {
                 data-test="synthetics-journey-step-selector-type-select"
                 @update:model-value="(v: any) => handleStepUpdate(row, { selectorType: v })"
               />
+              <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- CSS selector syntax example, not user-facing prose -->
               <OInput
                 :model-value="row.selector ?? ''"
                 :label="t('synthetics.journey.selectorLabel')"
-                placeholder="#my-button or .class-name"
+                :placeholder="t('synthetics.journey.selectorPlaceholder')"
                 class="w-100!"
                 :required="true"
                 :error="selectorErrors.has(row.id)"

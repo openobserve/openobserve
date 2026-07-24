@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import type { SkeletonProps } from "./OSkeleton.types";
 import { computed, useAttrs } from "vue";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 const props = withDefaults(defineProps<SkeletonProps>(), {
   type: "rect",
@@ -70,7 +73,7 @@ const classes = computed(() => [
   <span
     :class="classes"
     role="status"
-    aria-label="Loading"
+    :aria-label="t('components.skeleton.loading')"
     aria-live="polite"
     aria-busy="true"
   />

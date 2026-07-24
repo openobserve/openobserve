@@ -101,7 +101,7 @@ const silenceMinutes = computed({
             v-model="retries"
             type="number"
             class="w-25!"
-            placeholder="0"
+            :placeholder="t('synthetics.zeroPlaceholder')"
             data-test="synthetics-check-alerts-retries-input"
           />
           <span class="text-sm text-text-body whitespace-nowrap">{{ t('synthetics.scheduleAlert.retriesOnFailureSuffix') }}</span>
@@ -112,7 +112,7 @@ const silenceMinutes = computed({
             v-model="retryDelayMs"
             type="number"
             class="w-25!"
-            placeholder="0"
+            :placeholder="t('synthetics.zeroPlaceholder')"
             data-test="synthetics-check-alerts-retry-delay-input"
           />
           <span class="text-sm text-text-body whitespace-nowrap">{{ t('synthetics.scheduleAlert.retryDelaySuffix') }}</span>
@@ -125,7 +125,7 @@ const silenceMinutes = computed({
             v-model="failureThreshold"
             type="number"
             class="w-25!"
-            placeholder="1"
+            :placeholder="t('synthetics.onePlaceholder')"
             data-test="synthetics-check-alerts-failure-threshold-input"
           />
           <span class="text-sm text-text-body whitespace-nowrap">{{ t('synthetics.scheduleAlert.alertedIfFailsSuffix') }}</span>

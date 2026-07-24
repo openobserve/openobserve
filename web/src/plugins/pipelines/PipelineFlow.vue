@@ -19,13 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div data-test="pipeline-flow-container" class="flex items-center justify-between">
      <div data-test="pipeline-flow-unsaved-changes-warning-text" v-show="pipelineObj.dirtyFlag" class="text-status-warning-text border border-status-warning-text rounded-default flex items-center px-2 mr-3">
       <OIcon name="info" class="mr-1 " size="sm" />
-     Unsaved changes detected. Click "Save" to preserve your updates.
+     {{ t('pipeline.unsavedChangesDetected') }}
    </div>
 
    <!-- Edge deletion help notification -->
    <div v-if="showEdgeHelpNotification" class="edge-help-notification absolute top-5 left-1/2 -translate-x-1/2 z-[1000] bg-surface-base text-text-body py-2.5 px-4 rounded-default text-sm shadow-[0_4px_20px_rgba(0,0,0,0.15)] border border-border-default flex items-center dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
      <OIcon name="info" class="mr-1" size="sm" />
-     Press Backspace/Delete to remove the edge
+     {{ t('pipeline.edgeDeleteHint') }}
    </div>
 
  </div>
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           transition: 'background-color 0.2s ease',
         }"
       >
-        <p v-if="isDragOver">Drop here</p>
+        <p v-if="isDragOver">{{ t('pipeline.dropHere') }}</p>
       </DropzoneBackground>
       <template #node-input="{ id, data }">
         <CustomNode :id="id" :data="data" io_type="input" />

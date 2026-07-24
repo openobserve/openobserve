@@ -83,11 +83,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-xs-circle"
               icon-left="paid"
-              aria-label="Set AI Credits"
+              :aria-label="t('settings.organizationManagementPage.setAiCredits')"
               data-test="org-management-set-ai-credits-btn"
               @click.stop="toggleAiCreditsDialog(row)"
             >
-              <OTooltip content="Set AI Credits" />
+              <OTooltip :content="t('settings.organizationManagementPage.setAiCredits')" />
             </OButton>
             <OButton
               variant="ghost"
@@ -201,9 +201,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="aiCreditsPrompt"
       size="sm"
       :title="`Set AI Credits for ${aiCreditsDataRow?.name}`"
-      sub-title="Set the organization's lifetime AI credit allowance."
+      :sub-title="t('settings.organizationManagementPage.setAiCreditsSubtitle')"
       :secondary-button-label="t('common.cancel')"
-      primary-button-label="Save Credits"
+      :primary-button-label="t('settings.organizationManagementPage.saveCredits')"
       form-id="org-ai-credits-form"
       @click:secondary="aiCreditsPrompt = false"
     >
@@ -218,11 +218,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             name="creditsLimit"
             type="number"
             data-test="ai-credits-limit-input"
-            label="Total AI Credits"
+            :label="t('settings.organizationManagementPage.totalAiCredits')"
             required
           />
           <div class="text-xs text-text-secondary">
-            Currently used: {{ formatCredits(aiCreditsDataRow?.credits_used) }} credits
+            {{ t('settings.organizationManagementPage.currentlyUsedLabel') }} {{ formatCredits(aiCreditsDataRow?.credits_used) }} {{ t('settings.organizationManagementPage.credits') }}
           </div>
         </div>
       </OForm>

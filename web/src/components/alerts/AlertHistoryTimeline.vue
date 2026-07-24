@@ -33,11 +33,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
         <span v-if="skippedCount > 0" class="flex items-center gap-1 text-2xs text-text-muted">
           <span class="inline-block w-2 h-2 rounded-default bg-border-default" />
-          {{ skippedCount }} Skipped
+          {{ skippedCount }} {{ t('alerts.historyTimeline.skipped') }}
         </span>
         <span v-if="hasFlappingZone" class="flex items-center gap-1 text-2xs font-semibold text-badge-purple-ol-text brightness-90">
           <span class="inline-block w-2 h-2 rounded-default o2-flap-swatch" />
-          Flapping
+          {{ t('alerts.historyTimeline.flapping') }}
         </span>
       </div>
 
@@ -64,8 +64,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="o2-flap-pill absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.25 whitespace-nowrap px-3 py-1 rounded-full text-xs font-semibold pointer-events-none shadow-md text-badge-purple-solid-text bg-badge-purple-solid-bg"
           >
-            <span class="font-semibold">⚡ Flapping</span>
-            <span class="opacity-60 font-normal">•</span>{{ seg.flips }} flips
+            <span class="font-semibold">{{ '⚡' }} {{ t('alerts.historyTimeline.flapping') }}</span>
+            <span class="opacity-60 font-normal">•</span>{{ seg.flips }} {{ t('alerts.historyTimeline.flipsSuffix') }}
             <span class="opacity-60 font-normal">•</span>{{ seg.durationLabel }}
           </div>
           <div
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ normalizeStatus(seg.status) }}
             </div>
             <div class="opacity-60 mt-0.5">{{ seg.startLabel }}</div>
-            <div v-if="seg.count > 1" class="opacity-50 text-3xs">{{ seg.count }} evaluations</div>
+            <div v-if="seg.count > 1" class="opacity-50 text-3xs">{{ seg.count }} {{ t('alerts.historyTimeline.evaluationsSuffix') }}</div>
           </div>
         </div>
       </template>
@@ -124,6 +124,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, computed } from "vue";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 const props = withDefaults(
   defineProps<{

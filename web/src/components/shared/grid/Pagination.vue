@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
       <div class="ml-1">
         {{ resultTotal }}
-        {{ pageTitle.slice(-1) == "s" ? pageTitle.slice(0, -1) : pageTitle }}(s)
+        {{ pageTitle.slice(-1) == "s" ? pageTitle.slice(0, -1) : pageTitle }}{{ t('search.pluralSuffix') }}
       </div>
     </div>
     <div class="ml-auto">

@@ -86,7 +86,7 @@
       data-test="panel-last-refreshed-at"
     >
       <span class="lastRefreshedAtIcon text-[smaller] mr-0.5">
-        🕑
+        {{ '🕑' }}
         <OTooltip side="bottom" align="end">
           <template #content>{{ t('dashboard.panelErrorButtons.lastRefreshed') }}<RelativeTime :timestamp="lastTriggeredAt" /></template>
         </OTooltip>

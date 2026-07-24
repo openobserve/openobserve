@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @dblclick.stop.prevent="startEditQueryName(index, tab)"
                 class="cursor-pointer select-none whitespace-nowrap text-xs"
                
-                :title="'Double-click to rename'"
+                :title="t('dashboard.doubleClickToRename')"
                 :data-test="`dashboard-panel-query-tab-name-${index}`"
               >{{ tab.tabName || ('Query ' + (Number(index) + 1)) }}</span>
               <!-- Eye icon + its tooltip wrapped in a span so the tooltip's

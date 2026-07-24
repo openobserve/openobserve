@@ -32,9 +32,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="mr-1"
         />
         {{ t("rum.learnWebVitalsLabel") }}
-        <a
+        <!-- eslint-disable-next-line vue/no-bare-strings-in-template -- URL used verbatim as tooltip, not translatable UI text -->
+        <a title="https://web.dev/articles/vitals"
           href="https://web.dev/articles/vitals"
-          title="https://web.dev/articles/vitals"
           class="ml-1 text-badge-indigo-soft-text"
           target="_blank"
         >
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div>
         <OSpinner size="md" class="mx-auto block" />
-        <div class="text-center w-full">Loading Dashboard</div>
+        <div class="text-center w-full">{{ t('rum.loadingDashboard') }}</div>
       </div>
     </div>
   </div>

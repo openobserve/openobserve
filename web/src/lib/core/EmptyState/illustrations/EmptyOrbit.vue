@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
     role="img"
-    aria-label="Waiting for data"
+    :aria-label="t('emptyState.illustrations.orbit.ariaLabel')"
   >
     <ellipse cx="104" cy="80" rx="86" ry="54" fill="var(--color-primary-500)" opacity="0.06" />
 
@@ -56,6 +56,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
+
 withDefaults(
   defineProps<{ width?: number; animated?: boolean }>(),
   { width: 208, animated: true },

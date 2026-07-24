@@ -36,13 +36,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Step 1: Choose Destination Type -->
         <OStep
           :name="1"
-          title="Choose Type"
+          :title="t('alert_destinations.chooseTypeTitle')"
           icon="edit"
           :done="step > 1"
           :navigable="step > 1"
         >
           <div class="text-sm font-medium mb-3">
-            Select Destination Type <span class="text-status-error-text">*</span>
+            {{ t('alert_destinations.selectDestinationType') }} <span class="text-status-error-text">*</span>
           </div>
           <div class="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3 mb-4">
             <div
@@ -82,13 +82,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Step 2: Connection Details -->
         <OStep
           :name="2"
-          title="Connection"
+          :title="t('alert_destinations.connectionStepTitle')"
           icon="compare-arrows"
           :done="step > 2"
           :navigable="step > 2"
         >
           <div class="text-sm font-medium mb-4">
-            Connection Details
+            {{ t('alert_destinations.connectionDetailsTitle') }}
           </div>
 
           <div class="flex flex-col gap-4">
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="url"
               :label="t('alert_destinations.url')"
               required
-              help-text="Base URL without trailing slash (e.g., https://your-domain.com)"
+              :help-text="t('alert_destinations.urlHelpText')"
               tabindex="0"
             />
 
@@ -122,10 +122,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OFormInput
                   data-test="add-destination-openobserve-org-input"
                   name="org"
-                  :label="'Organization'"
+                  :label="t('alert_destinations.organizationLabel')"
                   required
-                  :placeholder="'e.g., default'"
-                  help-text="OpenObserve organization identifier"
+                  :placeholder="t('alert_destinations.defaultPlaceholder')"
+                  :help-text="t('alert_destinations.organizationHelpText')"
                   tabindex="0"
                 />
               </div>
@@ -133,10 +133,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OFormInput
                   data-test="add-destination-openobserve-stream-input"
                   name="stream"
-                  :label="'Stream Name'"
+                  :label="t('alert_destinations.streamNameLabel')"
                   required
-                  :placeholder="'e.g., default'"
-                  help-text="OpenObserve stream name"
+                  :placeholder="t('alert_destinations.defaultPlaceholder')"
+                  :help-text="t('alert_destinations.streamHelpText')"
                   tabindex="0"
                 />
               </div>
@@ -145,10 +145,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OFormInput
               data-test="add-destination-url-endpoint-input"
               name="url_endpoint"
-              label="Endpoint Path"
+              :label="t('alert_destinations.endpointPathLabel')"
               :required="destinationType !== 'custom'"
               :disabled="destinationType !== 'custom'"
-              help-text="Path will be appended to base URL (must start with /)"
+              :help-text="t('alert_destinations.endpointPathHelpText')"
               tabindex="0"
             />
             <!-- Method field - only shown for Custom destination type -->
@@ -180,10 +180,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="outputFormat === 'esbulk'"
               data-test="add-destination-esbulk-index-input"
               name="esbulk_index"
-              :label="'ESBulk Index Name'"
+              :label="t('alert_destinations.esBulkIndexNameLabel')"
               required
-              :placeholder="'Enter index name (e.g., logs, events)'"
-              help-text="Index name where data will be written in Elasticsearch"
+              :placeholder="t('alert_destinations.esBulkIndexNamePlaceholder')"
+              :help-text="t('alert_destinations.esBulkIndexHelpText')"
               tabindex="0"
             />
 
@@ -203,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Destination-specific Metadata Section -->
           <div v-if="showMetadataFields" class="flex flex-col gap-4 mt-4">
             <div class="w-full text-sm font-bold text-input-label">
-              Metadata Configuration
+              {{ t('alert_destinations.metadataConfigurationTitle') }}
             </div>
 
             <!-- Splunk Metadata Fields -->
@@ -211,27 +211,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OFormInput
                 data-test="add-destination-metadata-source-input"
                 name="metadata.source"
-                :label="'Source'"
-                :placeholder="'Enter source (e.g., http:my_source)'"
-                help-text="Splunk source field for event metadata"
+                :label="t('alert_destinations.sourceLabel')"
+                :placeholder="t('alert_destinations.sourcePlaceholder')"
+                :help-text="t('alert_destinations.splunkSourceHelpText')"
                 tabindex="0"
               />
 
               <OFormInput
                 data-test="add-destination-metadata-sourcetype-input"
                 name="metadata.sourcetype"
-                :label="'Source Type'"
-                :placeholder="'Enter source type (e.g., _json)'"
-                help-text="Splunk sourcetype field for event metadata"
+                :label="t('alert_destinations.sourceTypeLabel')"
+                :placeholder="t('alert_destinations.sourceTypePlaceholder')"
+                :help-text="t('alert_destinations.splunkSourceTypeHelpText')"
                 tabindex="0"
               />
 
               <OFormInput
                 data-test="add-destination-metadata-hostname-input"
                 name="metadata.hostname"
-                :label="'Hostname'"
-                :placeholder="'Enter hostname (e.g., server01)'"
-                help-text="Splunk host field for event metadata"
+                :label="t('alert_destinations.hostnameLabel')"
+                :placeholder="t('alert_destinations.hostnamePlaceholder')"
+                :help-text="t('alert_destinations.splunkHostnameHelpText')"
                 tabindex="0"
               />
             </template>
@@ -241,38 +241,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OFormInput
                 data-test="add-destination-metadata-ddsource-input"
                 name="metadata.ddsource"
-                :label="'DD Source'"
+                :label="t('alert_destinations.ddSourceLabel')"
                 required
-                :placeholder="'Enter source (e.g., nginx, java)'"
-                help-text="Source attribute for Datadog logs"
+                :placeholder="t('alert_destinations.ddSourcePlaceholder')"
+                :help-text="t('alert_destinations.ddSourceHelpText')"
                 tabindex="0"
               />
 
               <OFormInput
                 data-test="add-destination-metadata-ddtags-input"
                 name="metadata.ddtags"
-                :label="'DD Tags'"
+                :label="t('alert_destinations.ddTagsLabel')"
                 required
-                :placeholder="'Enter tags (e.g., env:prod,version:1.0)'"
-                help-text="Comma-separated tags for Datadog logs"
+                :placeholder="t('alert_destinations.ddTagsPlaceholder')"
+                :help-text="t('alert_destinations.ddTagsHelpText')"
                 tabindex="0"
               />
 
               <OFormInput
                 data-test="add-destination-metadata-service-input"
                 name="metadata.service"
-                :label="'Service'"
-                :placeholder="'Enter service name (e.g., api-gateway)'"
-                help-text="Service name for Datadog logs"
+                :label="t('alert_destinations.serviceLabel')"
+                :placeholder="t('alert_destinations.servicePlaceholder')"
+                :help-text="t('alert_destinations.datadogServiceHelpText')"
                 tabindex="0"
               />
 
               <OFormInput
                 data-test="add-destination-metadata-hostname-input"
                 name="metadata.hostname"
-                :label="'Hostname'"
-                :placeholder="'Enter hostname (e.g., server01)'"
-                help-text="Hostname for Datadog logs"
+                :label="t('alert_destinations.hostnameLabel')"
+                :placeholder="t('alert_destinations.hostnamePlaceholder')"
+                :help-text="t('alert_destinations.datadogHostnameHelpText')"
                 tabindex="0"
               />
             </template>
@@ -281,7 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="flex flex-col gap-1 mt-4">
             <div class="o-input-label text-compact font-medium leading-tight text-input-label-text flex items-center">
-              Headers
+              {{ t('alert_destinations.headers') }}
             </div>
             <div class="flex flex-col gap-2">
             <div
@@ -365,7 +365,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="connectionNotes.example"
                   class="mt-2 p-2 rounded-default text-compact bg-surface-base"
                 >
-                  <strong>Example:</strong>
+                  <strong>{{ t('alert_destinations.exampleLabel') }}</strong>
                   <code class="ml-1 bg-transparent p-0 font-mono text-text-link">{{ connectionNotes.example }}</code>
                 </div>
               </div>
@@ -393,7 +393,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="!canProceedStep1"
             @click="nextStep"
           >
-            Continue
+            {{ t('alerts.continue') }}
           </OButton>
         </div>
         <div v-if="step > 1" class="flex gap-2">
@@ -404,7 +404,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="isSubmitting"
             @click="prevStep"
           >
-            Back
+            {{ t('common.back') }}
           </OButton>
           <OButton
             data-test="add-destination-cancel-btn"

@@ -231,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </span>
                     <span class="flex-1" />
                     <OBadge v-if="!histogramError" variant="default" size="sm">
-                      p95 {{ p95Label }}
+                      {{ t('synthetics.results.p95Label') }} {{ p95Label }}
                     </OBadge>
                     <span
                       v-else

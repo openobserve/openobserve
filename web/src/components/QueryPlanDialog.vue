@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <header class="shrink-0 flex items-center gap-2 h-11 px-4 bg-card-glass-bg border-b border-solid border-card-glass-border">
               <div class="flex items-center gap-2">
                 <OIcon name="code" size="sm" class="text-text-secondary" />
-                <h3 class="text-(length:--text-sm) font-(--font-semibold) text-text-heading m-0 tracking-[0.01em]">SQL Query</h3>
+                <h3 class="text-(length:--text-sm) font-(--font-semibold) text-text-heading m-0 tracking-[0.01em]">{{ t('search.sqlQuery') }}</h3>
               </div>
             </header>
             <div class="flex-1 overflow-y-auto p-4">

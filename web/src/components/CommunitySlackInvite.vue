@@ -191,7 +191,7 @@ const joinSlack = () => {
           variant="ghost"
           size="icon-sm"
           class="-mr-1 shrink-0"
-          aria-label="Close"
+          :aria-label="t('common.close')"
           data-test="community-slack-invite-close-btn"
           @click="dismiss"
         >

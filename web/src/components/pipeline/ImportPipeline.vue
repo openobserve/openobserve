@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <base-import
     ref="baseImportRef"
-    title="Import Pipeline"
+    :title="t('pipeline.importPipelineTitle')"
     test-prefix="pipeline"
     hide-header
     container-class=""
@@ -33,9 +33,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="pipelineErrorsToDisplay.length > 0"
           class="text-center text-sm font-semibold text-text-heading py-3 shrink-0"
         >
-          Error Validations
+          {{ t('pipeline.errorValidations') }}
         </div>
-        <div v-else class="text-center text-sm font-semibold text-text-heading py-3 shrink-0">Output Messages</div>
+        <div v-else class="text-center text-sm font-semibold text-text-heading py-3 shrink-0">{{ t('pipeline.outputMessages') }}</div>
         <OSeparator class="mt-1 shrink-0" />
         <div class="error-report-container flex-1 min-h-0">
           <!-- Pipeline Errors Section -->
@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         style="height: 200px"
                         data-test="pipeline-import-sql-query-input"
                         :model-value="userSelectedSqlQuery[index] || ''"
-                        :label="'SQL Query'"
+                        :label="t('pipeline.sqlQuery')"
                         :debounceTime="300"
                         language="sql"
                         @update:query="(val) => {
@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="pipeline-import-org-id-input"
                         :model-value="userSelectedOrgId[index] || null"
                         :options="organizationData"
-                        :label="'Organization Id'"
+                        :label="t('pipeline.organizationId')"
                         labelKey="label"
                         valueKey="value"
                         searchable
@@ -227,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="pipeline-import-destination-function-name-input"
                         :model-value="userSelectedFunctionName[errorMessage.nodeIndex] || ''"
                         :options="existingFunctions"
-                        :label="'Function Name'"
+                        :label="t('pipeline.functionName')"
                         class="py-2 showLabelOnTop no-case"
                         style="width: 300px"
                         :error="touchedFunctionName[errorMessage.nodeIndex] && !userSelectedFunctionName[errorMessage.nodeIndex]"
@@ -254,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="pipeline-import-destination-stream-type-input"
                         :model-value="userSelectedRemoteDestination[index] || ''"
                         :options="pipelineDestinations"
-                        :label="'Remote Destination'"
+                        :label="t('pipeline.remoteDestination')"
                         class="py-2 showLabelOnTop no-case"
                         style="width: 300px"
                         :error="touchedRemoteDestination[index] && !userSelectedRemoteDestination[index]"
@@ -280,7 +280,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="pipeline-import-destination-stream-type-input"
                         :model-value="userSelectedTimezone[index] || ''"
                         :options="timezoneOptions"
-                        :label="'Timezone'"
+                        :label="t('common.timezone')"
                         searchable
                         class="py-2 showLabelOnTop no-case"
                         style="width: 300px"
@@ -305,7 +305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-base mb-2.5 uppercase text-primary"
               data-test="pipeline-import-creation-title"
             >
-              Pipeline Creation
+              {{ t('pipeline.pipelineCreation') }}
             </div>
             <div
               v-for="(val, index) in pipelineCreators"

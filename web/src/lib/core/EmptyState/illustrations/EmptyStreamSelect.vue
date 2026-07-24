@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
     role="img"
-    aria-label="Pick a stream to start exploring"
+    :aria-label="t('emptyState.illustrations.pickStreamToStartExploring')"
     :class="['es-root', { 'es-static': !animated }]"
   >
     <!-- Ground shadow -->
@@ -68,6 +68,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
+
 withDefaults(
   defineProps<{ width?: number; animated?: boolean }>(),
   { width: 260, animated: true },

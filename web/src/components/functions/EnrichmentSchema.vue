@@ -78,7 +78,7 @@
               data-test="enrichment-schema-total-fields"
               class="text-sm w-28.75 h-7.5 rounded-default flex items-center justify-center bg-theme-accent text-text-inverse"
             >
-                All Fields ({{ schemaData.schema.length }})
+                {{ t('logStream.allFieldsCount', { count: schemaData.schema.length }) }}
             </div>
                 <OSearchInput
                   data-test="schema-field-search-input"

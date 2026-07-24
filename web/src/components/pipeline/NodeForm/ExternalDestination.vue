@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODrawer
     :open="internalOpen"
     @update:open="handleDrawerClose"
-    title="External Destination"
+    :title="t('alerts.externalDestinationTitle')"
     size="lg"
     :show-close="true"
     @keydown.stop
