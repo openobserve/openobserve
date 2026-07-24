@@ -2,6 +2,7 @@
 import DashboardCreate from "./dashboardPages/dashboard-create";
 import DashboardListPage from "./dashboardPages/dashboard-list";
 import DashboardFolder from "./dashboardPages/dashboard-folder";
+import DashboardFavorites from "./dashboardPages/dashboard-favorites";
 import DashboardactionPage from "./dashboardPages/dashboard-panel-actions";
 import DashboardPanelConfigs from "./dashboardPages/dashboard-panel-configs";
 import DashboardPanel from "./dashboardPages/dashboard-panel-edit";
@@ -118,6 +119,7 @@ class PageManager {
     this.dashboardCreate = new DashboardCreate(page);
     this.dashboardList = new DashboardListPage(page);
     this.dashboardFolder = new DashboardFolder(page);
+    this.dashboardFavorites = new DashboardFavorites(page);
     this.dashboardPanelActions = new DashboardactionPage(page);
     this.dashboardPanelConfigs = new DashboardPanelConfigs(page);
     this.dashboardPanelEdit = new DashboardPanel(page);

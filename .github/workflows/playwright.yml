@@ -304,6 +304,7 @@ jobs:
                 "dashboard-multi-sql.spec.js",
                 "crossLinkMultiStream.spec.js",
                 "dashboards-form-validation.spec.js",
+                "dashboard-favorites.spec.js",
               ]
           - testfolder: "Dashboards-Settings"
             browser: "chrome"
