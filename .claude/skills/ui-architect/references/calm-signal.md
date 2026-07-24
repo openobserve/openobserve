@@ -34,14 +34,20 @@ firing/paused state — its signal is category + recency + ownership.
 All token-backed and dark-mode-safe. Reuse these before inventing anything.
 
 - **Summary strip** — `OStatStrip` + `OStatCard`
-  ([web/src/lib/data/StatStrip](../../../web/src/lib/data/StatStrip)). A row of
-  KPI tiles at the top of a list/dashboard. Data-driven via `:items`
+  ([web/src/lib/data/StatStrip](../../../web/src/lib/data/StatStrip)). **The one
+  KPI-tile primitive** — new stat tiles use this, never a hand-rolled tile or the
+  legacy `KpiCard`/`KpiCardRow` (being migrated onto `OStatStrip`). A row of KPI
+  tiles at the top of a list/dashboard. Data-driven via `:items`
   (`{ key, label, value, icon, tone, max?, trend?, selectable?, dataTest }`);
-  `tone` (`success | warning | error | primary | neutral`) is the single colour
-  knob. `max` draws a proportion bar (share of total). Set `selectable` +
+  `tone` (`success | warning | error | primary | info | orange | neutral`) is the
+  single colour knob. `max` draws a proportion bar (share of total). The tone icon
+  sits in a **rounded-square chip** (`rounded-default`) — every icon chip in the
+  app is a rounded square, never a circle (`rounded-full`). Set `selectable` +
   `:selected-key` + `@select` to make tiles **double as filters**. Compose
   `<OStatCard>` directly (with the `#chart` slot) for sparklines on overviews.
-  Place it via `OTable`'s **`#subheader`** slot to sit below the search/tabs.
+  Place it via `OTable`'s **`#subheader`** slot (wrapped in
+  `px-page-edge py-1.5 border-b border-table-row-divider`) to sit below the
+  search/tabs. See **Summary-strip conventions** below for ordering + selection.
 - **Status / category chips** — `OTag` with a `type=` group from
   `badgeGroups.ts` (`alertStatus`, `alertType`, `severity`, `streamType`,
   `userRole`, `serviceStatus`, …). One registry → the same value is the same
@@ -60,6 +66,34 @@ All token-backed and dark-mode-safe. Reuse these before inventing anything.
 
 Reference implementation of most of the above: the Alerts list,
 [web/src/components/alerts/AlertList.vue](../../../web/src/components/alerts/AlertList.vue).
+
+### Summary-strip conventions
+
+Once a strip is `selectable`, four rules keep every strip behaving identically
+(reference strips: Alerts, Incidents, Eval Jobs):
+
+- **Order attention-first, left → right.** The most critical / attention-worthy
+  tile is leftmost, descending to the calm/inert ones — e.g. `failed → recent →
+  active → paused`, `P1 → P2 → P3 → P4`, `degraded → paused → active → draft →
+  archived`. This mirrors the row rail's "critical colour on the left edge": what
+  needs attention lives on the left, everywhere.
+- **The "All" / "Total" tile is LAST and never highlighted.** It only clears the
+  facet; it is never itself the active tile. Wire `:selected-key` to the *raw
+  filter value* (`null` / `"all"` when unfiltered) so nothing shows the ring while
+  viewing everything — never fall back to selecting "All" as the default.
+- **Selection toggles off.** Re-clicking the already-active tile clears the filter
+  (back to unfiltered), matching every other strip:
+  `onSelect(key) → filter = key === "all" || filter === key ? cleared : key`.
+- **Selected state is an accent border, not a fill** — the `OStatCard` default;
+  see Step 3.
+
+**Tile → section → drawer linkage.** When a tile drills into a table or a detail
+drawer, reuse the **same glyph + tone** on the section header and the drawer header
+so "this number → this table → this drawer" reads at a glance. The AI Observability
+panels do this with a small section-header component
+([PanelSectionHeader.vue](../../../web/src/enterprise/views/AIObservability/PanelSectionHeader.vue))
+whose rounded-square icon chip matches the tile's — copy that pattern whenever a
+strip feeds a drill-down.
 
 ---
 
