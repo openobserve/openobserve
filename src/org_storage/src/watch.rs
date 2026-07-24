@@ -15,9 +15,9 @@
 
 use std::sync::Arc;
 
-use db::org_storage_providers::OSP_PREFIX;
 use infra::{db::Event, table::org_storage_providers::OrgStorageProvider};
-use parquet::data_type::AsBytes;
+
+use crate::store::OSP_PREFIX;
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     let cluster_coordinator = ::infra::db::get_coordinator().await;
@@ -40,13 +40,13 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     log::error!("watch_org_storage_providers : missing value for put");
                     continue;
                 };
-                let Ok(entry) = serde_json::from_slice::<OrgStorageProvider>(item_v.as_bytes())
+                let Ok(entry) = serde_json::from_slice::<OrgStorageProvider>(item_v.as_ref())
                 else {
                     log::error!("watch_org_storage_providers : invalid json value for put");
                     continue;
                 };
                 let org_id = entry.org_id.clone();
-                let provider = match super::get_provider(&org_id, entry.provider_type, &entry.data)
+                let provider = match crate::get_provider(&org_id, entry.provider_type, &entry.data)
                     .await
                 {
                     Ok(provider) => provider,
@@ -59,7 +59,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 };
                 log::info!("[org_storage]: received provider info via nats org {org_id}");
                 infra::storage::add_account(&org_id, provider).await;
-                ::db::org_storage_providers::update_cached_entry(entry).await;
+                crate::store::update_cached_entry(entry).await;
             }
             Event::Delete(ev) => {
                 log::error!(

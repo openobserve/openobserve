@@ -7435,6 +7435,7 @@ dependencies = [
  "o2_openfga",
  "openobserve-api-common",
  "openobserve-core",
+ "openobserve-org-storage",
  "regex",
  "reqwest 0.13.2",
  "sea-orm",
@@ -7514,8 +7515,6 @@ dependencies = [
  "arrow-schema",
  "async-trait",
  "audit",
- "aws-config",
- "aws-credential-types",
  "aws-sdk-sns",
  "axum",
  "base64 0.22.1",
@@ -7549,11 +7548,9 @@ dependencies = [
  "o2_dex",
  "o2_enterprise",
  "o2_openfga",
- "object_store",
  "opentelemetry",
  "opentelemetry-proto",
  "parking_lot 0.12.5",
- "parquet",
  "prometheus",
  "promql",
  "promql-parser",
@@ -7621,6 +7618,7 @@ dependencies = [
  "o2_enterprise",
  "o2_openfga",
  "openobserve-core",
+ "openobserve-org-storage",
  "prometheus",
  "promql-service",
  "proto",
@@ -7656,6 +7654,25 @@ dependencies = [
  "tokio",
  "url",
  "utoipa",
+]
+
+[[package]]
+name = "openobserve-org-storage"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "aws-config",
+ "aws-credential-types",
+ "bytes",
+ "chrono",
+ "config",
+ "hashbrown 0.16.1",
+ "infra",
+ "log",
+ "object_store",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]

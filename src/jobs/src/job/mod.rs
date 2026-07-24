@@ -1079,7 +1079,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         tokio::task::spawn(db::keys::cache::cache());
         tokio::task::spawn(db::keys::watch::watch());
         tokio::task::spawn(org_storage::run());
-        tokio::task::spawn(openobserve_core::org_storage_providers::watch::watch());
+        tokio::task::spawn(openobserve_org_storage::watch::watch());
         tokio::task::spawn(openobserve_core::workflows::runtime::clean());
         tokio::task::spawn(db::workflows::watch());
         if LOCAL_NODE.is_alert_manager() {
