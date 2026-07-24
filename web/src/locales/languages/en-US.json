@@ -5453,7 +5453,7 @@
       "modeWorkspace": "Favorites",
       "workspace": {
         "emptyScratchpadTitle": "You have no favorites yet",
-        "emptyScratchpadDesc": "Add metrics to your favorites in Explore (the ♥ on a card) to collect them here. When you want to keep them, Convert to a dashboard."
+        "emptyScratchpadDesc": "Add metrics to your favorites in Explore (the ★ on a card) to collect them here. When you want to keep them, Convert to a dashboard."
       },
       "visualizePlaceholder": "Visualize is coming soon — build a chart from a PromQL query, right here.",
       "railsAriaLabel": "Metric filters",
@@ -5472,7 +5472,8 @@
       "queryFailed": "Query failed",
       "noData": "No data",
       "noMetrics": "No metrics in this organization yet.",
-      "learnIngest": "Learn how to ingest metrics",
+      "setupIngestion": "Set up metrics ingestion",
+      "setupIngestionDesc": "Connect a metrics data source",
       "noMatch": "No metrics match the current filters",
       "noMatchHint": "Try removing a label filter, clearing prefix/suffix selections, or switching from “With data” to “All”.",
       "noMatchHintFavorites": "Try removing a label filter, or switching from “With data” to “All”.",
@@ -5500,6 +5501,7 @@
         "helpAria": "About {name}: {help}",
         "refreshAria": "Refresh {name}",
         "refreshTooltip": "Refresh this metric",
+        "refreshToApplyTimeRange": "Refresh to apply the selected time range",
         "configureAria": "Configure function for {name}",
         "configureTooltip": "Configure function",
         "favoriteAddAria": "Add {name} to your favorites",
