@@ -1,9 +1,19 @@
 import pytest
 """
-API tests for JavaScript function _meta organization restriction.
+API tests for JavaScript function organization behaviour.
 
-This module tests that JavaScript functions (transType=1) are only allowed
-in the _meta organization, while VRL functions (transType=0) work in all orgs.
+Backend contract (validated on OSS + ENT builds, current main):
+The functions *backend* imposes NO org restriction on JavaScript functions —
+JS (transType=1) is accepted in every org, including `default`, on BOTH OSS
+and Enterprise builds. The `_meta`-only rule that used to exist now lives ONLY
+in the frontend (AddFunction.vue gates the JS radio on
+`isEnterprise || isCloud || org === "_meta"`, baked at build time). Since API
+tests hit the backend directly, there is no edition difference to assert here.
+
+Historical note (PR #13156): earlier the backend returned 400 with
+"JavaScript functions are only allowed in the '_meta' organization" for JS in
+non-_meta orgs. That restriction was removed. These tests assert the current
+"JS allowed everywhere" contract; the class name is kept for git continuity.
 
 Note: The functions API uses camelCase for field names (transType) due to
 serde(rename_all = "camelCase") on the Transform struct.
@@ -12,7 +22,7 @@ The test endpoint uses snake_case (trans_type) for TestVRLRequest struct.
 
 
 class TestMetaOrgJavaScriptRestriction:
-    """Test JavaScript functions restricted to _meta org only.
+    """JavaScript functions are accepted in all orgs at the backend/API layer.
 
     IMPORTANT - API Field Name Format:
     - Create/Update endpoints (POST/PUT /api/{org}/functions): use `transType` (camelCase)
@@ -42,34 +52,36 @@ class TestMetaOrgJavaScriptRestriction:
         # Cleanup
         session.delete(f"{base_url}api/{org_id}/functions/test_js_meta")
 
-    def test_create_js_function_in_default_org_blocked(self, create_session, base_url):
-        """JavaScript function creation should fail in default org."""
+    def test_create_js_function_in_default_org_allowed(self, create_session, base_url):
+        """JavaScript function creation succeeds in default org (JS no longer _meta-only).
 
-        pytest.skip("JS fns are now allowed in non _meta orgs")
-        return
-    
+        Previously this returned 400 with a restriction message. The backend
+        restriction was removed (PR #13156), so JS create in a non-_meta org
+        now returns 200 on every edition. (Positive side of "JS allowed
+        everywhere" — the negative case no longer exists at the API layer.)
+        """
         session = create_session
         org_id = "default"
 
         payload = {
-            "name": "test_js_default",
+            "name": "test_js_default_allowed",
             "function": "row.processed = true;",
             "params": "row",
-            "transType": 1,  # JavaScript - should be blocked (camelCase for Transform struct)
+            "transType": 1,  # JavaScript (camelCase for Transform struct)
         }
+
+        # Cleanup any leftover from previous runs
+        session.delete(f"{base_url}api/{org_id}/functions/test_js_default_allowed")
 
         resp = session.post(f"{base_url}api/{org_id}/functions", json=payload)
 
-        assert resp.status_code == 400, (
-            f"Expected 400 for JS function in default org, "
-            f"but got {resp.status_code}: {resp.content}"
+        assert resp.status_code == 200, (
+            f"Expected 200 for JS function in default org (JS is no longer "
+            f"_meta-only), but got {resp.status_code}: {resp.content}"
         )
 
-        # Verify error message
-        response_text = resp.text
-        assert "JavaScript functions are only allowed in the '_meta' organization" in response_text, (
-            f"Expected restriction error message, but got: {response_text}"
-        )
+        # Cleanup
+        session.delete(f"{base_url}api/{org_id}/functions/test_js_default_allowed")
 
     def test_test_js_function_in_meta_org_success(self, create_session, base_url):
         """Testing JavaScript function should succeed in _meta org."""
@@ -89,46 +101,44 @@ class TestMetaOrgJavaScriptRestriction:
             f"but got {resp.status_code}: {resp.content}"
         )
 
-    def test_test_js_function_in_default_org_blocked(self, create_session, base_url):
-        """Testing JavaScript function should fail in default org."""
+    def test_test_js_function_in_default_org_allowed(self, create_session, base_url):
+        """Testing a JavaScript function succeeds in default org (JS no longer _meta-only).
 
-        pytest.skip("JS fns are now allowed in non _meta orgs")
-        return
-
+        /functions/test with a valid JS transform in a non-_meta org now
+        returns 200 and the transformed event, on every edition (PR #13156).
+        """
         session = create_session
         org_id = "default"
 
         payload = {
             "function": "row.count = (row.count || 0) + 1;",
             "events": [{"name": "test", "count": 5}],
-            "trans_type": 1,  # JavaScript - should be blocked
+            "trans_type": 1,  # JavaScript
         }
 
         resp = session.post(f"{base_url}api/{org_id}/functions/test", json=payload)
 
-        assert resp.status_code == 400, (
-            f"Expected 400 for JS function test in default org, "
-            f"but got {resp.status_code}: {resp.content}"
+        assert resp.status_code == 200, (
+            f"Expected 200 for JS function test in default org (JS is no longer "
+            f"_meta-only), but got {resp.status_code}: {resp.content}"
         )
 
-        # Verify error message
-        response_text = resp.text
-        assert "JavaScript functions are only allowed in the '_meta' organization" in response_text
+        # The transform runs: count 5 -> 6
+        body = resp.json()
+        assert body["results"][0]["event"].get("count") == 6, (
+            f"expected JS transform to run (count 5 -> 6), got: {body['results']}"
+        )
 
-    def test_update_vrl_to_js_in_default_org_blocked(self, create_session, base_url):
+    def test_update_vrl_to_js_in_default_org_allowed(self, create_session, base_url):
         """
-        Test that updating a VRL function to JavaScript in default org is BLOCKED.
+        Updating a VRL function to JavaScript in default org succeeds (JS no longer _meta-only).
 
-        This ensures users cannot bypass the JS restriction by:
-        1. Creating a VRL function in default org
-        2. Updating it to JavaScript
-
-        The backend enforces JS restriction on both create AND update operations.
+        Previously the backend rejected VRL->JS updates outside _meta with a
+        400 restriction message. That restriction was removed (PR #13156), so:
+        1. Create a VRL function in default org
+        2. Update it to JavaScript
+        both now return 200 on every edition.
         """
-
-        pytest.skip("JS fns are now allowed in non _meta orgs")
-        return
-
         session = create_session
         org_id = "default"
 
@@ -146,7 +156,7 @@ class TestMetaOrgJavaScriptRestriction:
         create_resp = session.post(f"{base_url}api/{org_id}/functions", json=vrl_payload)
         assert create_resp.status_code == 200, f"Failed to create VRL function: {create_resp.content}"
 
-        # Try to update to JavaScript - should be BLOCKED
+        # Update to JavaScript - now allowed
         js_payload = {
             "name": "test_update_to_js",
             "function": "row.processed = true;",
@@ -159,16 +169,9 @@ class TestMetaOrgJavaScriptRestriction:
             json=js_payload
         )
 
-        # Should return 400 - JS restriction enforced on updates
-        assert update_resp.status_code == 400, (
-            f"Expected 400 for VRL->JS update in default org, "
-            f"but got {update_resp.status_code}: {update_resp.content}"
-        )
-
-        # Verify error message
-        response_text = update_resp.text
-        assert "JavaScript functions are only allowed in the '_meta' organization" in response_text, (
-            f"Expected restriction error message, but got: {response_text}"
+        assert update_resp.status_code == 200, (
+            f"Expected 200 for VRL->JS update in default org (JS is no longer "
+            f"_meta-only), but got {update_resp.status_code}: {update_resp.content}"
         )
 
         # Cleanup
@@ -320,67 +323,133 @@ class TestTransTypeAutoDetection:
 
 
 class TestErrorMessages:
-    """Test error message quality and consistency."""
+    """Runtime-error surfacing on /functions/test (PR #13156 behaviour change).
 
-    def test_error_message_content(self, create_session, base_url):
-        """Error message should be clear and actionable."""
+    The old "JS is only allowed in _meta" 400 restriction is gone (see
+    TestMetaOrgJavaScriptRestriction). What matters now for error messaging is
+    the per-event surfacing of RUNTIME errors: code that compiles cleanly but
+    throws when run against an event returns 200, with the error attached to
+    that event in results[].message (for both VRL and JS). These tests pin that
+    contract. (Absorbs the former restriction-message tests, which asserted
+    behaviour that no longer exists.)
+    """
 
-        pytest.skip("JS fns are now allowed in non _meta orgs")
-        return
-
+    def test_js_runtime_error_message_content(self, create_session, base_url):
+        """A JS runtime error is surfaced per-event with a clear ReferenceError."""
         session = create_session
         org_id = "default"
 
         payload = {
-            "name": "test_error_msg",
-            "function": "row.test = true;",
-            "params": "row",
-            "transType": 1,  # JavaScript - blocked (camelCase for Transform struct)
-        }
-
-        resp = session.post(f"{base_url}api/{org_id}/functions", json=payload)
-
-        assert resp.status_code == 400
-        response_text = resp.text
-
-        # Check error message contains key information
-        assert "JavaScript" in response_text, "Error should mention JavaScript"
-        assert "_meta" in response_text, "Error should mention _meta org"
-        assert "organization" in response_text, "Error should mention organization"
-        assert "VRL" in response_text, "Error should suggest VRL alternative"
-
-    def test_error_message_consistency(self, create_session, base_url):
-        """Error message should be consistent across save and test endpoints."""
-
-        pytest.skip("JS fns are now allowed in non _meta orgs")
-        return
-
-        session = create_session
-        org_id = "default"
-
-        # Test save endpoint (camelCase for Transform struct)
-        save_payload = {
-            "name": "test_consistency",
-            "function": "row.test = true;",
-            "params": "row",
-            "transType": 1,
-        }
-        save_resp = session.post(f"{base_url}api/{org_id}/functions", json=save_payload)
-        save_error = save_resp.text
-
-        # Test test endpoint (snake_case for TestVRLRequest struct)
-        test_payload = {
-            "function": "row.test = true;",
+            "function": "row.field = undefinedVar;",  # valid syntax, throws at runtime
             "events": [{"name": "test"}],
             "trans_type": 1,
         }
-        test_resp = session.post(f"{base_url}api/{org_id}/functions/test", json=test_payload)
-        test_error = test_resp.text
+        resp = session.post(f"{base_url}api/{org_id}/functions/test", json=payload)
 
-        # Both should have same core error message
-        expected_message = "JavaScript functions are only allowed in the '_meta' organization"
-        assert expected_message in save_error, "Save endpoint should have restriction message"
-        assert expected_message in test_error, "Test endpoint should have restriction message"
+        assert resp.status_code == 200, (
+            f"JS runtime error should be 200 (per-event surfacing), "
+            f"but got {resp.status_code}: {resp.content}"
+        )
+        results = resp.json()["results"]
+        assert results, f"expected per-event results, got: {results}"
+        msg = results[0].get("message", "")
+        assert "ReferenceError" in msg, f"expected ReferenceError in message, got: {msg!r}"
+        assert "undefinedVar" in msg, f"expected the offending name in message, got: {msg!r}"
+
+    def test_runtime_error_surfaced_for_both_vrl_and_js(self, create_session, base_url):
+        """Runtime errors surface per-event for BOTH languages (200 + results[].message).
+
+        Consistency check: whether the transform is VRL or JS, a runtime
+        failure that compiles cleanly returns 200 and carries the error in
+        results[].message rather than a top-level 400.
+        """
+        session = create_session
+        org_id = "default"
+
+        # JS runtime error
+        js_resp = session.post(
+            f"{base_url}api/{org_id}/functions/test",
+            json={
+                "function": "row.field = undefinedVar;",
+                "events": [{"name": "test"}],
+                "trans_type": 1,
+            },
+        )
+        assert js_resp.status_code == 200, f"JS: {js_resp.status_code} {js_resp.content}"
+        js_msg = js_resp.json()["results"][0].get("message", "")
+        assert js_msg, f"JS runtime error should carry a per-event message, got: {js_msg!r}"
+
+        # VRL runtime error (to_int! aborts when the value can't be coerced)
+        vrl_resp = session.post(
+            f"{base_url}api/{org_id}/functions/test",
+            json={
+                "function": ".x = to_int!(.s)",
+                "events": [{"s": "notanumber"}],
+                "trans_type": 0,
+            },
+        )
+        assert vrl_resp.status_code == 200, f"VRL: {vrl_resp.status_code} {vrl_resp.content}"
+        vrl_msg = vrl_resp.json()["results"][0].get("message", "")
+        assert "vrl runtime error" in vrl_msg, (
+            f"VRL runtime error should carry a per-event message, got: {vrl_msg!r}"
+        )
+
+    def test_partial_failure_flags_only_failing_events(self, create_session, base_url):
+        """Per-event semantics: in a mixed batch, only the failing event carries a message.
+
+        The JS function throws only when row.bad is truthy, so event 1 fails
+        (ReferenceError) and event 2 transforms cleanly. Response is 200 with
+        one message-bearing result and one clean result.
+        """
+        session = create_session
+        org_id = "default"
+
+        payload = {
+            "function": "if (row.bad) { row.x = undefinedVar; } else { row.x = 1; }",
+            "events": [{"bad": True}, {"bad": False}],
+            "trans_type": 1,
+        }
+        resp = session.post(f"{base_url}api/{org_id}/functions/test", json=payload)
+
+        assert resp.status_code == 200, f"{resp.status_code}: {resp.content}"
+        results = resp.json()["results"]
+        assert len(results) == 2, f"expected one result per event, got: {results}"
+        assert "ReferenceError" in results[0].get("message", ""), (
+            f"failing event should carry a runtime error, got: {results[0]}"
+        )
+        assert not results[1].get("message"), (
+            f"clean event should have no error message, got: {results[1]}"
+        )
+        assert results[1]["event"].get("x") == 1, (
+            f"clean event should be transformed (x=1), got: {results[1]}"
+        )
+
+    def test_syntax_error_still_returns_400(self, create_session, base_url):
+        """Regression guard: a genuine SYNTAX error still 400s (not the 200 runtime path).
+
+        Pins the line between "syntax error -> 400" and "runtime error -> 200"
+        so a future change can't blur it. Covers both languages.
+        """
+        session = create_session
+        org_id = "default"
+
+        # JS syntax error
+        js_resp = session.post(
+            f"{base_url}api/{org_id}/functions/test",
+            json={"function": "function broken {", "events": [{"a": 1}], "trans_type": 1},
+        )
+        assert js_resp.status_code == 400, (
+            f"JS syntax error should be 400, got {js_resp.status_code}: {js_resp.content}"
+        )
+
+        # VRL syntax error
+        vrl_resp = session.post(
+            f"{base_url}api/{org_id}/functions/test",
+            json={"function": "=====", "events": [{"a": 1}], "trans_type": 0},
+        )
+        assert vrl_resp.status_code == 400, (
+            f"VRL syntax error should be 400, got {vrl_resp.status_code}: {vrl_resp.content}"
+        )
 
 
 class TestEdgeCases:
