@@ -28,11 +28,11 @@ use infra::table::workflows::{self, Workflow, WorkflowError, WorkflowRunData, Wo
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use usage_reporting::publish_triggers_usage;
 
 use crate::{
     common::{infra::config::ALERTS, meta::authz::Authz, utils::get_nats_lock},
     pipeline::batch_execution::{ExecutablePipeline, WorkflowResult},
-    self_reporting::publish_triggers_usage,
 };
 
 pub mod runtime;

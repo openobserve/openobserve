@@ -24,12 +24,14 @@ publish = false
 [features]
 default = []
 enterprise = [
+    "audit/enterprise",
     "openobserve-api/enterprise",
     "openobserve-core/enterprise",
     "openobserve-jobs/enterprise",
     "super_cluster_queue/enterprise",
     "search_service/enterprise",
     "enrichment-data/enterprise",
+    "usage_reporting/enterprise",
 ]
 vectorscan = [
     "openobserve-api/vectorscan",
@@ -215,6 +217,7 @@ pin-project-lite.workspace = true
 flight.workspace = true
 async-stream.workspace = true
 sourcemap.workspace = true
+audit.workspace = true
 openobserve-api.workspace = true
 web.workspace = true
 openobserve-api-management.workspace = true
@@ -228,6 +231,7 @@ db.workspace = true
 search.workspace = true
 search_service.workspace = true
 super_cluster_queue.workspace = true
+usage_reporting.workspace = true
 openobserve-jobs.workspace = true
 openobserve-mcp.workspace = true
 

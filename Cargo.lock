@@ -7187,6 +7187,7 @@ dependencies = [
  "async-recursion",
  "async-stream",
  "async-trait",
+ "audit",
  "aws-sdk-sns",
  "axum",
  "axum-client-ip",
@@ -7308,6 +7309,7 @@ dependencies = [
  "transform",
  "uaparser",
  "url",
+ "usage_reporting",
  "utoipa",
  "utoipa-swagger-ui",
  "version-compare",
@@ -7398,6 +7400,7 @@ dependencies = [
  "tracing-opentelemetry",
  "transform",
  "url",
+ "usage_reporting",
  "utoipa",
  "utoipa-swagger-ui",
  "zip 8.2.0",
@@ -7454,6 +7457,7 @@ dependencies = [
  "tracing",
  "transform",
  "url",
+ "usage_reporting",
  "utoipa",
  "vrl",
 ]
@@ -7651,6 +7655,7 @@ dependencies = [
  "tokio",
  "tonic",
  "transform",
+ "usage_reporting",
  "wal",
 ]
 

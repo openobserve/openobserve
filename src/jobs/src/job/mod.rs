@@ -15,7 +15,9 @@
 
 use config::{DEFAULT_ORG, cluster::LOCAL_NODE, spawn_pausable_job};
 use db;
-use openobserve_core::{alerts, self_reporting, users};
+#[cfg(feature = "cloud")]
+use openobserve_core::self_reporting;
+use openobserve_core::{alerts, users};
 use regex::Regex;
 #[cfg(feature = "enterprise")]
 use {
@@ -489,7 +491,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         );
     }
 
-    tokio::task::spawn(self_reporting::run());
+    tokio::task::spawn(usage_reporting::run());
 
     // cache short_urls
     tokio::task::spawn(db::short_url::watch());
@@ -903,7 +905,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     use config::meta::self_reporting::usage::{
                         TriggerData, TriggerDataStatus, TriggerDataType,
                     };
-                    openobserve_core::self_reporting::publish_triggers_usage(TriggerData {
+                    usage_reporting::publish_triggers_usage(TriggerData {
                         _timestamp: start_us,
                         org: org_id,
                         module: TriggerDataType::AnomalyDetectionTraining,

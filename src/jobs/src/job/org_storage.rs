@@ -82,7 +82,7 @@ async fn test_storage_validity() {
                     "org {} has been removed from org storage cache, and will use default storage",
                     provider.org_id
                 );
-                openobserve_core::self_reporting::publish_error(ErrorData {
+                usage_reporting::publish_error(ErrorData {
                     _timestamp: chrono::Utc::now().timestamp_micros(),
                     stream_params: Default::default(),
                     error_source: ErrorSource::OrgStorage(OrgStorageError {

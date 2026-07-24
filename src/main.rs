@@ -56,7 +56,7 @@ use openobserve_api::{
     },
     router,
 };
-use openobserve_core::{bootstrap, metadata, self_reporting};
+use openobserve_core::{bootstrap, metadata};
 use openobserve_jobs::job;
 use openobserve_node::{cluster_info::ClusterInfoService, node::NodeService};
 use opentelemetry::{KeyValue, global, trace::TracerProvider};
@@ -106,6 +106,13 @@ use tracing_subscriber::{
 #[allow(non_upper_case_globals)]
 #[unsafe(export_name = "malloc_conf")]
 pub static malloc_conf: &[u8] = b"prof:true,prof_active:true,lg_prof_sample:16\0";
+
+async fn flush_reporting() {
+    #[cfg(feature = "enterprise")]
+    audit::flush().await;
+
+    usage_reporting::flush().await;
+}
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -428,7 +435,7 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 
     // flush usage report
-    self_reporting::flush().await;
+    flush_reporting().await;
 
     // flush service discovery
     #[cfg(feature = "enterprise")]
@@ -1349,7 +1356,7 @@ async fn init_action_server() -> Result<(), anyhow::Error> {
     log::info!("HTTP server stopped");
 
     // flush usage report
-    self_reporting::flush().await;
+    flush_reporting().await;
 
     // stop telemetry
     if cfg.common.telemetry_enabled {
