@@ -117,10 +117,10 @@ const benefits = computed(() => [
 // dark enough for a white person glyph). Full literal classes so Tailwind emits
 // them. These are placeholders — not real members.
 const avatarBgClasses = [
-  "bg-primary-700",
-  "bg-primary-600",
-  "bg-primary-500",
-  "bg-primary-400",
+  "bg-avatar-tint-1",
+  "bg-avatar-tint-2",
+  "bg-avatar-tint-3",
+  "bg-avatar-tint-4",
 ];
 
 // Every dismissal path (× / overlay / Escape, Maybe later, or Join Slack)
@@ -153,7 +153,7 @@ const joinSlack = () => {
       <!-- Header: Slack badge, title to its right, close button on the far right -->
       <div class="flex items-start gap-3">
         <div
-          class="flex h-12 w-12 shrink-0 items-center justify-center rounded-default bg-primary-50"
+          class="flex h-12 w-12 shrink-0 items-center justify-center rounded-default bg-icon-chip-primary-bg"
           aria-hidden="true"
         >
           <svg
@@ -221,7 +221,7 @@ const joinSlack = () => {
             stroke-width="2.5"
             stroke-linecap="round"
             stroke-linejoin="round"
-            class="mt-0.5 h-4 w-4 shrink-0 text-primary-600"
+            class="mt-0.5 h-4 w-4 shrink-0 text-accent"
             aria-hidden="true"
           >
             <path d="M20 6 9 17l-5-5" />

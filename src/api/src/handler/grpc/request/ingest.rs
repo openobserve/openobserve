@@ -20,15 +20,13 @@ use config::{
 };
 use http::StatusCode;
 use infra::errors::{Error, Result};
+use ingestion_common::{IngestUser, SystemJobType};
 use proto::cluster_rpc::{
     IngestionRequest, IngestionResponse, IngestionType, ingest_server::Ingest,
 };
 use tonic::{Request, Response, Status};
 
-use crate::{
-    common::meta::ingestion::{IngestUser, SystemJobType},
-    service::ingestion::create_log_ingestion_req,
-};
+use crate::service::ingestion::create_log_ingestion_req;
 
 #[derive(Default)]
 pub struct Ingester;
@@ -63,7 +61,7 @@ impl Ingest for Ingester {
                 let data = bytes::Bytes::from(in_data.data);
                 match create_log_ingestion_req(log_ingestion_type, data) {
                     Err(e) => Err(e),
-                    Ok(ingestion_req) => crate::service::logs::ingest::ingest(
+                    Ok(ingestion_req) => openobserve_core::logs::ingest::ingest(
                         0,
                         &org_id,
                         &stream_name,
@@ -93,7 +91,7 @@ impl Ingest for Ingester {
                     )))
                 } else {
                     let data = bytes::Bytes::from(in_data.data);
-                    crate::service::metrics::json::ingest(&org_id, stream_name, data, internal_user)
+                    openobserve_core::metrics::json::ingest(&org_id, stream_name, data, internal_user)
                         .await
                         .map(|_| ()) // we don't care about success response
                         .map_err(|e| Error::IngestionError(format!("error in ingesting metrics {e}")))
@@ -112,7 +110,7 @@ impl Ingest for Ingester {
                 } else {
                     let data = bytes::Bytes::from(in_data.data);
                     // internal ingestion does not require email id
-                    crate::service::traces::ingest_json(&org_id, data, OtlpRequestType::Grpc, &stream_name, internal_user)
+                    openobserve_core::traces::ingest_json(&org_id, data, OtlpRequestType::Grpc, &stream_name, internal_user)
                         .await
                         .map(|_| ()) // we don't care about success response
                         .map_err(|e| Error::IngestionError(format!("error in ingesting traces {e}")))
@@ -138,7 +136,7 @@ impl Ingest for Ingester {
                         .unwrap_or(true),
                     None => true,
                 };
-                match crate::service::enrichment_table::save_enrichment_data(
+                match enrichment_data::enrichment_table::save_enrichment_data(
                     &org_id,
                     &stream_name,
                     json_records,
@@ -171,7 +169,7 @@ impl Ingest for Ingester {
                 let data = bytes::Bytes::from(in_data.data);
                 match create_log_ingestion_req(log_ingestion_type, data) {
                     Err(e) => Err(e),
-                    Ok(ingestion_req) => crate::service::logs::ingest::ingest(
+                    Ok(ingestion_req) => openobserve_core::logs::ingest::ingest(
                         0,
                         &org_id,
                         &stream_name,

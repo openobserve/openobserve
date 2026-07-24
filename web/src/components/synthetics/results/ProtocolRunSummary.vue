@@ -6,6 +6,7 @@
 // (those are browser-run concepts).
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import { useStore } from 'vuex'
 import OPageHeader from '@/lib/core/PageHeader/OPageHeader.vue'
 import OPageLayout from '@/lib/core/PageLayout/OPageLayout.vue'
@@ -23,8 +24,9 @@ const props = withDefaults(
     runId: string
     executionId: string
     drawerMode?: boolean
+    locationNames?: Record<string, string>
   }>(),
-  { drawerMode: false },
+  { drawerMode: false, locationNames: () => ({}) },
 )
 
 const emit = defineEmits<{
@@ -36,6 +38,9 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const store = useStore()
+const route = useRoute()
+// The check's folder (name), carried on the results-page route as ?folder=.
+const folderName = computed(() => String(route.query.folder ?? ''))
 const synthetics = useSyntheticResults()
 
 const run = computed(() => synthetics.protocolRunDetail.value)
@@ -61,7 +66,7 @@ async function loadRun() {
 async function loadAssertionDefs() {
   try {
     const org = store.state.selectedOrganization.identifier
-    const res = await syntheticsService.get(org, props.monitorId)
+    const res = await syntheticsService.get(org, props.monitorId, folderName.value)
     assertionDefs.value = ((res.data as any)?.config?.assertions ?? []) as HttpAssertion[]
   } catch {
     assertionDefs.value = []
@@ -69,6 +74,10 @@ async function loadAssertionDefs() {
 }
 
 onMounted(loadAssertionDefs)
+
+function locationLabel(id: string): string {
+  return props.locationNames?.[id] ?? id
+}
 
 watch(
   () => [props.runId, props.executionId] as [string, string],
@@ -204,7 +213,7 @@ const showAssertions = computed(
         <!-- ── Result ── -->
         <div class="rounded-default border border-border-default">
           <div class="flex items-center border-b border-border-default py-2 px-3">
-            <div class="w-[0.1875rem] h-4 rounded-default mr-2 shrink-0 bg-primary-600" />
+            <div class="w-[0.1875rem] h-4 rounded-default mr-2 shrink-0 bg-accent" />
             <h3 class="text-base font-semibold text-text-heading">{{ t('synthetics.protocolRun.result') }}</h3>
           </div>
           <div class="px-3 py-3 grid grid-cols-2 gap-3">
@@ -237,7 +246,7 @@ const showAssertions = computed(
         <!-- ── Timing breakdown ── -->
         <div v-if="timingBars.length" class="rounded-default border border-border-default">
           <div class="flex items-center border-b border-border-default py-2 px-3">
-            <div class="w-[0.1875rem] h-4 rounded-default mr-2 shrink-0 bg-primary-600" />
+            <div class="w-[0.1875rem] h-4 rounded-default mr-2 shrink-0 bg-accent" />
             <h3 class="text-base font-semibold text-text-heading">{{ t('synthetics.protocolRun.timings') }}</h3>
           </div>
           <div class="px-3 py-3 flex flex-col gap-2">
@@ -245,7 +254,7 @@ const showAssertions = computed(
               <span class="w-20 shrink-0 text-xs text-text-secondary">{{ t(`synthetics.protocolRun.phase.${bar.phase}`) }}</span>
               <div class="flex-1 h-3 rounded-default bg-surface-subtle overflow-hidden">
                 <div
-                  class="h-full rounded-default bg-primary-600"
+                  class="h-full rounded-default bg-accent"
                   :style="{ width: bar.pct + '%' }"
                 />
               </div>
@@ -262,7 +271,7 @@ const showAssertions = computed(
         <!-- ── Assertions (http) ── -->
         <div v-if="showAssertions" class="rounded-default border border-border-default">
           <div class="flex items-center border-b border-border-default py-2 px-3">
-            <div class="w-[0.1875rem] h-4 rounded-default mr-2 shrink-0 bg-primary-600" />
+            <div class="w-[0.1875rem] h-4 rounded-default mr-2 shrink-0 bg-accent" />
             <h3 class="text-base font-semibold text-text-heading">{{ t('synthetics.protocolRun.assertions') }}</h3>
             <OBadge
               class="ml-2"
@@ -288,7 +297,7 @@ const showAssertions = computed(
         <!-- ── TLS certificate ── -->
         <div v-if="certExpiryDate" class="rounded-default border border-border-default">
           <div class="flex items-center border-b border-border-default py-2 px-3">
-            <div class="w-[0.1875rem] h-4 rounded-default mr-2 shrink-0 bg-primary-600" />
+            <div class="w-[0.1875rem] h-4 rounded-default mr-2 shrink-0 bg-accent" />
             <h3 class="text-base font-semibold text-text-heading">{{ t('synthetics.protocolRun.tlsCert') }}</h3>
           </div>
           <div class="px-3 py-3 flex items-center gap-2 text-sm">
@@ -306,13 +315,13 @@ const showAssertions = computed(
         <!-- ── Probe ── -->
         <div class="rounded-default border border-border-default">
           <div class="flex items-center border-b border-border-default py-2 px-3">
-            <div class="w-[0.1875rem] h-4 rounded-default mr-2 shrink-0 bg-primary-600" />
+            <div class="w-[0.1875rem] h-4 rounded-default mr-2 shrink-0 bg-accent" />
             <h3 class="text-base font-semibold text-text-heading">{{ t('synthetics.protocolRun.probe') }}</h3>
           </div>
           <div class="px-3 py-3 grid grid-cols-2 gap-3 text-sm">
             <div class="flex flex-col gap-1.5 p-3 rounded-default bg-surface-subtle">
               <span class="text-xs text-text-muted">{{ t('synthetics.protocolRun.location') }}</span>
-              <span class="font-medium">{{ run.location || '—' }}</span>
+              <span class="font-medium">{{ locationLabel(run.location) || '—' }}</span>
             </div>
             <div class="flex flex-col gap-1.5 p-3 rounded-default bg-surface-subtle">
               <span class="text-xs text-text-muted">{{ t('synthetics.protocolRun.runtime') }}</span>

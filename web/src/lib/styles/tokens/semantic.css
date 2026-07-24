@@ -70,11 +70,11 @@
      so thin small marks stay readable — that dark flip is why it can't be raw primary-600. */
   --color-accent: var(--color-primary-600);
 
-  /* Favorite (filled heart) — a rose/pink-leaning red, deliberately warmer
-     than the destructive error red so "loved" and "danger" never read as the
-     same hue on a row that carries both. Only the FILLED heart uses this;
-     unfavorited outlines stay neutral. */
-  --color-favorite: #F43F5E;
+  /* Favorite (filled star) — a warm yellow, deliberately distinct from the
+     destructive error red so "starred" and "danger" never read as the same hue
+     on a row that carries both. Only the FILLED star uses this; unfavorited
+     outlines stay neutral. */
+  --color-favorite: #EAB308;
 }
 
 /* ── Register ALL semantic tokens for Tailwind utilities ── */
@@ -109,10 +109,11 @@
   --color-surface-chrome:        var(--color-surface-chrome);
   --color-surface-chrome-deeper: var(--color-surface-chrome-deeper);
 
-  /* Borders — only `default` is registered as an app-facing utility. `strong`/`subtle`
-     are library-internal: defined in :root above and consumed by component tokens
-     (checkbox, table row-divider, tooltip, …) via var(), but NOT registered here, so
-     no `border-border-strong/subtle` utility exists. Feature code uses `default` only. */
+  /* Borders — only `default` is registered as an app-facing utility.
+     `strong` and `subtle` stay library-internal: defined in :root above and
+     consumed by component tokens (checkbox, file, datepicker, …) and via
+     `var(--color-border-strong)` in scoped CSS, but NOT registered here, so no
+     `border-border-strong` / `border-border-subtle` utility exists. */
   --color-border-default: var(--color-border-default);
 
   /* Overlay scrim */

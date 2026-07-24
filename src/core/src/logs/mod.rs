@@ -19,6 +19,8 @@ use std::{
     time::Instant,
 };
 
+#[cfg(feature = "cloud")]
+use ::stream::get_stream;
 use arrow_schema::{DataType, Field};
 use bulk::SCHEMA_CONFORMANCE_FAILED;
 use config::{
@@ -36,23 +38,19 @@ use config::{
         util::DISTINCT_STREAM_PREFIX,
     },
 };
+use db;
 use infra::{
     errors::{Error, Result},
     schema::{SchemaCache, get_partition_time_level},
 };
+use ingestion_common::IngestionStatus;
+use schema::{check_for_schema, stream_schema_exists};
 
-#[cfg(feature = "cloud")]
-use crate::service::stream::get_stream;
 use crate::{
-    common::meta::{ingestion::IngestionStatus, stream::SchemaRecords},
-    service::{
-        alerts::alert::AlertExt,
-        db,
-        ingestion::{TriggerAlertData, evaluate_trigger, get_write_partition_key, write_file},
-        metadata::{MetadataItem, MetadataType, distinct_values::DvItem, write},
-        schema::{check_for_schema, stream_schema_exists},
-        self_reporting::report_request_usage_stats,
-    },
+    alerts::alert::AlertExt,
+    common::meta::stream::SchemaRecords,
+    ingestion::{TriggerAlertData, evaluate_trigger, get_write_partition_key, write_file},
+    metadata::{MetadataItem, MetadataType, distinct_values::DvItem, write},
 };
 
 pub mod bulk;
@@ -284,7 +282,7 @@ async fn write_logs_by_stream(
                 // req_stats already divides the size in mb
                 req_stats.size = *size as f64 / SIZE_IN_MB;
             }
-            report_request_usage_stats(
+            usage_reporting::report_request_usage_stats(
                 req_stats,
                 org_id,
                 &stream_name,
@@ -337,7 +335,7 @@ async fn write_logs(
 
     // Start get stream alerts
     let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
-    crate::service::ingestion::get_stream_alerts(
+    crate::ingestion::get_stream_alerts(
         &[StreamParams {
             org_id: org_id.to_owned().into(),
             stream_name: stream_name.to_owned().into(),

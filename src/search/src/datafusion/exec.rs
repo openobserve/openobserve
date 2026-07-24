@@ -49,11 +49,8 @@ use datafusion::{
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::WorkGroup;
-#[cfg(all(feature = "enterprise", feature = "vortex"))]
-use {
-    vortex::{VortexSessionDefault, io::session::RuntimeSessionExt, session::VortexSession},
-    vortex_datafusion::VortexFormat,
-};
+use vortex::{VortexSessionDefault, io::session::RuntimeSessionExt, session::VortexSession};
+use vortex_datafusion::VortexFormat;
 
 use super::{
     peak_memory_pool::PeakMemoryPool, planner::extension_planner::OpenobserveQueryPlanner,
@@ -287,6 +284,17 @@ impl<'a> DataFusionContextBuilder<'a> {
 }
 
 pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
+    register_builtin_udfs(ctx);
+    let udf_list = get_all_transform(org_id)?;
+    for udf in udf_list {
+        ctx.register_udf(udf.clone());
+    }
+    Ok(())
+}
+
+/// Register the org-independent O2 UDFs/UDAFs (everything except the per-org
+/// VRL transform functions).
+pub fn register_builtin_udfs(ctx: &SessionContext) {
     ctx.register_udf(super::udf::str_match_udf::STR_MATCH_UDF.clone());
     ctx.register_udf(super::udf::str_match_udf::STR_MATCH_IGNORE_CASE_UDF.clone());
     ctx.register_udf(super::udf::fuzzy_match_udf::FUZZY_MATCH_UDF.clone());
@@ -314,10 +322,6 @@ pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
         super::udaf::summary_percentile::SummaryPercentile::new(),
     ));
     ctx.register_udf(super::udf::cast_to_timestamp_udf::CAST_TO_TIMESTAMP_UDF.clone());
-    let udf_list = get_all_transform(org_id)?;
-    for udf in udf_list {
-        ctx.register_udf(udf.clone());
-    }
 
     #[cfg(feature = "enterprise")]
     {
@@ -331,8 +335,25 @@ pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
             o2_enterprise::enterprise::search::datafusion::udaf::approx_topk_distinct::ApproxTopKDistinct::new(),
         ));
     }
+}
 
-    Ok(())
+/// Names of every function usable in O2 SQL: the DataFusion built-ins plus
+/// the built-in O2 UDFs (per-org VRL functions excluded). Snapshotted once —
+/// the registry is static for the process lifetime. Used for did-you-mean
+/// suggestions on "Invalid function" errors.
+pub fn registered_function_names() -> &'static [String] {
+    static NAMES: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
+    NAMES.get_or_init(|| {
+        let ctx = SessionContext::new();
+        register_builtin_udfs(&ctx);
+        let state = ctx.state();
+        let mut names: Vec<String> = state.scalar_functions().keys().cloned().collect();
+        names.extend(state.aggregate_functions().keys().cloned());
+        names.extend(state.window_functions().keys().cloned());
+        names.sort();
+        names.dedup();
+        names
+    })
 }
 
 pub async fn register_metrics_table(
@@ -437,29 +458,20 @@ impl TableBuilder {
 
         // Group files by format
         let mut parquet_files = Vec::new();
-        #[cfg(all(feature = "enterprise", feature = "vortex"))]
         let mut vortex_files = Vec::new();
 
         for file in files {
             match FileFormat::from_extension(&file.key) {
-                #[cfg(all(feature = "enterprise", feature = "vortex"))]
                 Some(FileFormat::Vortex) => vortex_files.push(file),
                 _ => parquet_files.push(file), // Default to parquet
             }
         }
 
-        #[cfg(all(feature = "enterprise", feature = "vortex"))]
         log::info!(
             "[trace_id: {}] parquet_files numbers: {}, vortex_files numbers: {}",
             session.id,
             parquet_files.len(),
             vortex_files.len()
-        );
-        #[cfg(not(all(feature = "enterprise", feature = "vortex")))]
-        log::info!(
-            "[trace_id: {}] parquet_files numbers: {}",
-            session.id,
-            parquet_files.len()
         );
 
         // Build table providers for each format
@@ -478,7 +490,6 @@ impl TableBuilder {
             tables.push(table);
         }
 
-        #[cfg(all(feature = "enterprise", feature = "vortex"))]
         if !vortex_files.is_empty() {
             let table = self
                 .build_table_for_format(
@@ -506,16 +517,9 @@ impl TableBuilder {
         // Configure listing options with the appropriate file format
         let file_format: Arc<dyn DataFusionFileFormat> = match format {
             FileFormat::Parquet => Arc::new(ParquetFormat::default()),
-            #[cfg(all(feature = "enterprise", feature = "vortex"))]
             FileFormat::Vortex => {
                 let vortex_session = VortexSession::default().with_tokio();
                 Arc::new(VortexFormat::new(vortex_session))
-            }
-            #[cfg(not(all(feature = "enterprise", feature = "vortex")))]
-            FileFormat::Vortex => {
-                return Err(DataFusionError::Execution(
-                    "Vortex file format requires enterprise and vortex features".to_string(),
-                ));
             }
         };
 

@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use ::promql;
 use axum::{
     body::{Body, Bytes},
     extract::{Path, Query},
@@ -25,18 +26,17 @@ use config::{
 };
 use futures::StreamExt;
 use infra::errors;
+use ingestion_common::IngestUser;
+use openobserve_api_common::extractors::Headers;
+use openobserve_core::{auth::UserEmail, metrics};
 use promql_parser::parser;
+use promql_service as core_promql;
 #[cfg(feature = "enterprise")]
 use {config::meta::stream::StreamType, o2_openfga::meta::mapping::OFGA_MODELS};
 
 use crate::{
-    common::{
-        meta::{http::HttpResponse as MetaHttpResponse, ingestion::IngestUser},
-        utils::{auth::UserEmail, http::get_or_create_trace_id},
-    },
-    extractors::Headers,
+    common::{meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id},
     search::error_utils::map_error_to_http_response,
-    service::{metrics, promql},
 };
 
 /// prometheus remote-write endpoint for metrics
@@ -177,21 +177,20 @@ async fn query(
         if let Err(e) = search_service::check_search_allowed(org_id, None) {
             return MetaHttpResponse::too_many_requests(e);
         }
-        use crate::{
-            common::utils::auth::{AuthExtractor, is_root_user},
-            service::db::org_users::get_cached_user_org,
-        };
+        use db::org_users::get_cached_user_org;
+
+        use crate::service::auth::AuthExtractor;
 
         let ast = parser::parse(&req.query.clone().unwrap()).unwrap();
         let mut visitor = promql::name_visitor::MetricNameVisitor::default();
         promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
 
-        if !is_root_user(user_email) {
+        if !db::user::is_root_user(user_email) {
             let stream_type_str = StreamType::Metrics.as_str();
             for name in visitor.into_names() {
                 let user: config::meta::user::User =
                     get_cached_user_org(org_id, user_email).unwrap();
-                if !crate::service::authz::check_permissions(
+                if !openobserve_core::authz::check_permissions(
                     user_email,
                     AuthExtractor {
                         auth: "".to_string(),
@@ -241,7 +240,7 @@ async fn query(
     let end = start;
     let timeout = search_timeout(req.timeout);
 
-    let req = promql::MetricsQueryRequest {
+    let req = core_promql::MetricsQueryRequest {
         query: req.query.unwrap_or_default(),
         start,
         end,
@@ -450,10 +449,9 @@ async fn query_range(
     let trace_id = get_or_create_trace_id(headers, &http_span);
     #[cfg(feature = "enterprise")]
     {
-        use crate::{
-            common::utils::auth::{AuthExtractor, is_root_user},
-            service::db::org_users::get_cached_user_org,
-        };
+        use db::org_users::get_cached_user_org;
+
+        use crate::service::auth::AuthExtractor;
 
         if let Err(e) = search_service::check_search_allowed(org_id, None) {
             return MetaHttpResponse::too_many_requests(e);
@@ -476,13 +474,13 @@ async fn query_range(
         let mut visitor = promql::name_visitor::MetricNameVisitor::default();
         promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
 
-        if !is_root_user(user_email) {
+        if !db::user::is_root_user(user_email) {
             let stream_type_str = StreamType::Metrics.as_str();
             for name in visitor.into_names() {
                 let user: config::meta::user::User =
                     get_cached_user_org(org_id, user_email).unwrap();
                 if user.is_external
-                    && !crate::service::authz::check_permissions(
+                    && !openobserve_core::authz::check_permissions(
                         user_email,
                         AuthExtractor {
                             auth: "".to_string(),
@@ -572,7 +570,7 @@ async fn query_range(
 
     let timeout = search_timeout(req.timeout);
 
-    let search_req = promql::MetricsQueryRequest {
+    let search_req = core_promql::MetricsQueryRequest {
         query: req.query.unwrap_or_default(),
         start,
         end,
@@ -651,10 +649,10 @@ pub async fn metadata(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        use crate::common::utils::auth::{AuthExtractor, is_root_user};
+        use openobserve_core::auth::AuthExtractor;
 
-        if !is_root_user(&_user_email.user_id) {
-            use crate::service::db::org_users::get_cached_user_org;
+        if !db::user::is_root_user(&_user_email.user_id) {
+            use db::org_users::get_cached_user_org;
             let user = match get_cached_user_org(&org_id, &_user_email.user_id) {
                 Some(u) => u,
                 None => return MetaHttpResponse::forbidden("Unauthorized Access"),
@@ -677,7 +675,7 @@ pub async fn metadata(
                     org_id
                 ),
             };
-            if !crate::service::authz::check_permissions(
+            if !openobserve_core::authz::check_permissions(
                 &_user_email.user_id,
                 AuthExtractor {
                     auth: "".to_string(),
@@ -822,10 +820,9 @@ async fn series(
 
     #[cfg(feature = "enterprise")]
     {
-        use crate::{
-            common::utils::auth::{AuthExtractor, is_root_user},
-            service::db::org_users::get_cached_user_org,
-        };
+        use db::org_users::get_cached_user_org;
+
+        use crate::service::auth::AuthExtractor;
 
         let metric_name = match selector
             .as_ref()
@@ -835,11 +832,11 @@ async fn series(
             None => "".to_string(),
         };
 
-        if !is_root_user(_user_email) {
+        if !db::user::is_root_user(_user_email) {
             let user: config::meta::user::User = get_cached_user_org(org_id, _user_email).unwrap();
             let stream_type_str = StreamType::Metrics.as_str();
             if user.is_external
-                && !crate::service::authz::check_permissions(
+                && !openobserve_core::authz::check_permissions(
                     _user_email,
                     AuthExtractor {
                         auth: "".to_string(),
@@ -971,16 +968,16 @@ async fn labels(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        use crate::common::utils::auth::{AuthExtractor, is_root_user};
+        use openobserve_core::auth::AuthExtractor;
 
-        if !is_root_user(_user_email) {
-            use crate::service::db::org_users::get_cached_user_org;
+        if !db::user::is_root_user(_user_email) {
+            use db::org_users::get_cached_user_org;
             let user = match get_cached_user_org(org_id, _user_email) {
                 Some(u) => u,
                 None => return MetaHttpResponse::forbidden("Unauthorized Access"),
             };
             let stream_type_str = StreamType::Metrics.as_str();
-            if !crate::service::authz::check_permissions(
+            if !openobserve_core::authz::check_permissions(
                 _user_email,
                 AuthExtractor {
                     auth: "".to_string(),
@@ -1089,16 +1086,16 @@ pub async fn label_values(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        use crate::common::utils::auth::{AuthExtractor, is_root_user};
+        use openobserve_core::auth::AuthExtractor;
 
-        if !is_root_user(&_user_email.user_id) {
-            use crate::service::db::org_users::get_cached_user_org;
+        if !db::user::is_root_user(&_user_email.user_id) {
+            use db::org_users::get_cached_user_org;
             let user = match get_cached_user_org(&org_id, &_user_email.user_id) {
                 Some(u) => u,
                 None => return MetaHttpResponse::forbidden("Unauthorized Access"),
             };
             let stream_type_str = StreamType::Metrics.as_str();
-            if !crate::service::authz::check_permissions(
+            if !openobserve_core::authz::check_permissions(
                 &_user_email.user_id,
                 AuthExtractor {
                     auth: "".to_string(),
@@ -1310,7 +1307,7 @@ fn search_timeout(timeout: Option<String>) -> i64 {
 async fn search(
     trace_id: &str,
     org_id: &str,
-    req: promql::MetricsQueryRequest,
+    req: core_promql::MetricsQueryRequest,
     user_email: &str,
     timeout: i64,
 ) -> Response {
@@ -1322,7 +1319,7 @@ async fn search(
         .super_cluster
         .enabled;
 
-    match promql::search::search(
+    match core_promql::search::search(
         trace_id,
         org_id,
         &req,
@@ -1371,7 +1368,7 @@ async fn search(
 async fn search_streaming(
     trace_id: &str,
     org_id: &str,
-    req: promql::MetricsQueryRequest,
+    req: core_promql::MetricsQueryRequest,
     user_email: &str,
     timeout: i64,
 ) -> Response {
@@ -1417,7 +1414,7 @@ async fn search_streaming(
             let mut req = req.clone();
             req.start = start;
             req.end = end;
-            match promql::search::search(
+            match core_promql::search::search(
                 &req_trace_id,
                 &org_id,
                 &req,

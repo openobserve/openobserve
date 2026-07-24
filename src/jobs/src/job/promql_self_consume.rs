@@ -23,6 +23,7 @@ use config::{
     utils::{prom_json_encoder::JsonEncoder, util::zero_or},
 };
 use hashbrown::HashSet;
+use ingestion_common::{IngestUser, SystemJobType};
 use proto::cluster_rpc::{
     IngestionData, IngestionRequest, IngestionType, ingest_client::IngestClient,
 };
@@ -34,10 +35,7 @@ use tonic::{
     metadata::{MetadataKey, MetadataValue},
 };
 
-use crate::{
-    common::meta::ingestion::{IngestUser, SystemJobType},
-    service::{self, grpc::get_ingester_channel},
-};
+use crate::service::{self, grpc::get_ingester_channel};
 
 static METRICS_WHITELIST: Lazy<HashSet<String>> = Lazy::new(|| {
     config::get_config()

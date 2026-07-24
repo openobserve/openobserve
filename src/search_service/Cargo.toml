@@ -20,12 +20,13 @@ vectorscan = [
     "o2_enterprise/vectorscan",
     "search/vectorscan",
 ]
-vortex = ["config/vortex", "o2_enterprise?/vortex", "search/vortex"]
 
 [dependencies]
+anyhow.workspace = true
 audit = { workspace = true, optional = true }
 common.workspace = true
 transform.workspace = true
+vector-enrichment.workspace = true
 search.workspace = true
 async-recursion.workspace = true
 arrow.workspace = true
@@ -60,7 +61,3 @@ tracing.workspace = true
 tracing-opentelemetry.workspace = true
 wal.workspace = true
 usage_reporting.workspace = true
-
-[dev-dependencies]
-expect-test.workspace = true
-float-cmp.workspace = true

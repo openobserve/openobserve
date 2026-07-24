@@ -23,7 +23,7 @@
         </template>
       </OButton>
     </template>
-    <div class="date-time-dialog w-85.25 z-[10001] max-h-150">
+    <div class="date-time-dialog w-85.25 z-10001 max-h-150">
       <div class="flex justify-between">
         <OTabPanels v-model="picker.activeTab">
           <OTabPanel name="relative">

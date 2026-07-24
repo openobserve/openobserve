@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #guidelines>
           <div
-            class="note-container bg-banner-warning-bg text-banner-warning-text w-full rounded-default p-3 my-3 flex flex-col gap-2"
+            class="note-container bg-banner-warning-bg border border-banner-warning-border text-banner-warning-text w-full rounded-default p-3 my-3 flex flex-col gap-2"
             data-test="add-condition-note-container"
           >
             <div

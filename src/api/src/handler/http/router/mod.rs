@@ -24,6 +24,11 @@ use axum::{
     routing::{delete, get, patch, post, put},
 };
 use config::get_config;
+use openobserve_api_management::request::{
+    alerts, authz, dashboards, folders, organization, users,
+};
+use openobserve_api_query::{promql, search, traces};
+use openobserve_core::auth::AuthExtractor;
 use tower_http::{
     cors::{AllowOrigin, CorsLayer},
     decompression::RequestDecompressionLayer,
@@ -32,7 +37,7 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::self_reporting::audit,
+    audit::audit,
     axum::body::{Body, to_bytes},
     base64::{Engine as _, engine::general_purpose},
     config::utils::time::now_micros,
@@ -44,10 +49,7 @@ use {
 
 use super::request::*;
 use crate::{
-    common::{
-        meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL},
-        utils::auth::AuthExtractor,
-    },
+    common::meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL},
     handler::http::{
         auth::validator::{
             RequestData, oo_validator, validator_aws, validator_gcp, validator_proxy_url,
@@ -60,9 +62,8 @@ use crate::{
 pub mod decompression;
 pub mod middlewares;
 pub mod openapi;
-pub mod ui;
 
-pub use crate::common::meta::http::ERROR_HEADER;
+pub use common::meta::http::ERROR_HEADER;
 
 /// Custom header name for O2 Assistant session tracking (UUID v7)
 pub const X_O2_ASSISTANT_SESSION_ID: header::HeaderName =
@@ -390,10 +391,7 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
             .to_string()
             .ends_with("_stream")
             || path.ends_with("ai/chat_stream")
-            || crate::common::meta::ingestion_routes::is_ingestion_write(
-                &http_method,
-                ingestion_path,
-            ))
+            || common::meta::ingestion_routes::is_ingestion_write(&http_method, ingestion_path))
     {
         let query_params = request.uri().query().unwrap_or("").to_string();
         let org_id = {
@@ -495,24 +493,22 @@ pub async fn proxy(Path(params): Path<PathParamProxyURL>) -> impl IntoResponse {
     // SSRF protection: validate the target URL (incl. DNS resolution) before issuing
     // the proxied request. The reqwest client is built via `build_safe_client` so
     // redirect chains and connect-time DNS are re-validated too.
-    if let Err(e) = crate::common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(
-        &params.target_url,
-    )
-    .await
+    if let Err(e) =
+        common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(&params.target_url)
+            .await
     {
         return (StatusCode::BAD_REQUEST, format!("URL blocked: {e}")).into_response();
     }
-    let client =
-        match crate::common::utils::ssrf_guard::build_safe_client(reqwest::Client::builder()) {
-            Ok(c) => c,
-            Err(e) => {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Failed to build HTTP client: {e}"),
-                )
-                    .into_response();
-            }
-        };
+    let client = match common::utils::ssrf_guard::build_safe_client(reqwest::Client::builder()) {
+        Ok(c) => c,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to build HTTP client: {e}"),
+            )
+                .into_response();
+        }
+    };
     match client.get(&params.target_url).send().await {
         Ok(resp) => {
             let status = StatusCode::from_u16(resp.status().as_u16())
@@ -1116,7 +1112,8 @@ pub fn service_routes() -> Router {
                 // Synthetics — CRUD + locations
                 .route("/{org_id}/synthetics", get(synthetics::list_synthetics).post(synthetics::create_synthetic).delete(synthetics::delete_synthetics_bulk))
                 .route("/{org_id}/synthetics/locations", get(synthetics::list_locations).post(synthetics::create_location))
-                .route("/{org_id}/synthetics/locations/{id}", put(synthetics::update_location).delete(synthetics::delete_location))
+                .route("/{org_id}/synthetics/agent-setup", get(synthetics::agent_setup))
+                .route("/{org_id}/synthetics/locations/{id}", get(synthetics::get_location).put(synthetics::update_location).delete(synthetics::delete_location))
                 .route("/{org_id}/synthetics/{id}", get(synthetics::get_synthetic).put(synthetics::update_synthetic).delete(synthetics::delete_synthetic))
                 .route("/{org_id}/synthetics/{id}/run", post(synthetics::run_synthetic_now))
                 .route("/{org_id}/synthetics/{id}/enable", put(synthetics::set_synthetic_enabled))
@@ -1126,22 +1123,23 @@ pub fn service_routes() -> Router {
                 .route("/{org_id}/synthetics/{id}/runs/{run_id}", get(synthetics::get_run_detail))
                 // Synthetics — folder move (v2 prefix to match the shared MoveAcrossFolders utility)
                 .route("/v2/{org_id}/synthetics/move", patch(synthetics::move_synthetics))
-                // Synthetics — job API (no org prefix; authenticated via o2syn_ token)
-                .route("/synthetics/jobs/resolve", post(synthetics::job_resolve))
-                .route("/synthetics/jobs/lease", post(synthetics::job_lease))
-                .route("/synthetics/jobs/ack", post(synthetics::job_ack))
+                // Synthetics — job API (org-scoped path; authenticated via the
+                // o2syn_ token, whose org must match {org_id} in the path)
+                .route("/{org_id}/synthetics/jobs/resolve", post(synthetics::job_resolve))
+                .route("/{org_id}/synthetics/jobs/lease", post(synthetics::job_lease))
+                .route("/{org_id}/synthetics/jobs/ack", post(synthetics::job_ack))
                 .route(
-                    "/synthetics/jobs/artifact-urls",
+                    "/{org_id}/synthetics/jobs/artifact-urls",
                     post(synthetics::job_artifact_urls),
                 )
-                .route("/synthetics/jobs/upload", post(synthetics::job_upload))
-                // Synthetics — agent liveness API (no org prefix; o2syn_ token)
+                .route("/{org_id}/synthetics/jobs/upload", post(synthetics::job_upload))
+                // Synthetics — agent liveness API (org-scoped; o2syn_ token)
                 .route(
-                    "/synthetics/agent/register",
+                    "/{org_id}/synthetics/agent/register",
                     post(synthetics::agent_register),
                 )
                 .route(
-                    "/synthetics/agent/heartbeat",
+                    "/{org_id}/synthetics/agent/heartbeat",
                     post(synthetics::agent_heartbeat),
                 );
         }
@@ -1329,7 +1327,7 @@ pub fn other_service_routes() -> Router {
 }
 
 /// Create the full application router
-pub fn create_app_router() -> Router {
+pub fn create_app_router(ui_routes: fn() -> Router) -> Router {
     let cfg = get_config();
 
     let mut app = if config::cluster::LOCAL_NODE.is_router() {
@@ -1374,7 +1372,7 @@ pub fn create_app_router() -> Router {
                 "/",
                 get(move || core::future::ready(axum::response::Redirect::permanent(&web_path))),
             )
-            .nest_service("/web", ui::ui_routes());
+            .nest_service("/web", ui_routes());
     }
 
     // Set request body size limit (equivalent to actix-web's PayloadConfig)

@@ -62,8 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       data-test="edit-group-footer"
-    class="flex justify-end w-full flex-shrink-0"
-      style="z-index: 2"
+    class="flex justify-end w-full flex-shrink-0 z-2"
     >
       <div class="bg-card-glass-bg w-full py-2 px-page-edge justify-end flex gap-2 border-t border-border-default">
       <OButton

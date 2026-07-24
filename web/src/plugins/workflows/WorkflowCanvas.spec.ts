@@ -78,6 +78,10 @@ vi.mock("@vue-flow/core", async () => {
         </div>
       `,
     },
+    // The empty-canvas start node renders the shared FlowNodeCard, which
+    // imports Handle + Position from this module.
+    Handle: { name: "Handle", props: ["id", "type", "position"], template: "<div class='mock-handle' />" },
+    Position: { Top: "top", Right: "right", Bottom: "bottom", Left: "left" },
     useVueFlow: () => ({
       onNodesInitialized: (cb: any) => {
         state.nodesInitializedCb = cb;
@@ -230,9 +234,9 @@ describe("WorkflowCanvas", () => {
   });
 
   describe("VueFlow config", () => {
-    it("uses a 0.9 default zoom and the 0.2 - 4 zoom bounds", () => {
+    it("uses a 0.8 default zoom and the 0.2 - 4 zoom bounds", () => {
       wrapper = mountCanvas();
-      expect(flow(wrapper).props("defaultViewport")).toEqual({ zoom: 0.9 });
+      expect(flow(wrapper).props("defaultViewport")).toEqual({ zoom: 0.8 });
       expect(flow(wrapper).props("minZoom")).toBe(0.2);
       expect(flow(wrapper).props("maxZoom")).toBe(4);
     });
@@ -312,32 +316,41 @@ describe("WorkflowCanvas", () => {
     });
   });
 
-  describe("empty-state hint", () => {
-    it("shows the hint when the canvas has no nodes", () => {
+  // The empty canvas now offers a clickable start node (which opens the trigger
+  // picker) in place of the old hint text.
+  describe("empty-canvas start node", () => {
+    const startNode = (w: any) =>
+      w.find('[data-test="workflow-flow-start-node"]');
+
+    it("shows the start node when the canvas has no nodes", () => {
       wrapper = mountCanvas();
-      const hint = wrapper.find('[data-test="workflow-flow-empty-text"]');
-      expect(hint.exists()).toBe(true);
-      expect(hint.text()).toBe("Add A Trigger To Start Building Your Workflow");
+      const node = startNode(wrapper);
+      expect(node.exists()).toBe(true);
+      expect(node.text()).toBe("Choose a Trigger");
     });
 
-    it("hides the hint once a node exists", async () => {
+    it("hides the start node once a node exists", async () => {
       wfObj.currentSelectedWorkflow.nodes = [triggerNode()];
       wrapper = mountCanvas();
       await nextTick();
-      expect(
-        wrapper.find('[data-test="workflow-flow-empty-text"]').exists(),
-      ).toBe(false);
+      expect(startNode(wrapper).exists()).toBe(false);
     });
 
-    it("re-shows the hint when the last node is removed", async () => {
+    it("re-shows the start node when the last node is removed", async () => {
       wfObj.currentSelectedWorkflow.nodes = [triggerNode()];
       wrapper = mountCanvas();
       await nextTick();
       wfObj.currentSelectedWorkflow.nodes = [];
       await nextTick();
-      expect(
-        wrapper.find('[data-test="workflow-flow-empty-text"]').exists(),
-      ).toBe(true);
+      expect(startNode(wrapper).exists()).toBe(true);
+    });
+
+    it("is hidden on the read-only Runs canvas", async () => {
+      wfObj.readOnly = true;
+      wrapper = mountCanvas();
+      await nextTick();
+      expect(startNode(wrapper).exists()).toBe(false);
+      wfObj.readOnly = false;
     });
   });
 

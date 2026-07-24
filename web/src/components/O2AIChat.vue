@@ -5153,11 +5153,10 @@ export default defineComponent({
           isLoading.value = false;
           activeToolCall.value = null;
           stopAnalyzingRotation();
-          finalizeTextBlock();
-          if (typewriterAnimationId.value) {
-            cancelAnimationFrame(typewriterAnimationId.value);
-            typewriterAnimationId.value = null;
-          }
+          // The owning instance's processStream already wrote the final text
+          // into the message blocks, so this instance only clears its own
+          // typewriter UI.
+          resetTypewriterState();
           // Reflect the completed turn into the sync handshake + history so a
           // later mount reads the finished chat, not a mid-stream snapshot.
           store.dispatch("setCurrentChatTimestamp", currentChatId.value);

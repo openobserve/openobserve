@@ -34,12 +34,17 @@ use config::{
     },
     utils::{flatten, json::*, schema::format_partition_key},
 };
+use db::{
+    self,
+    alerts::{alert::scheduler_key, realtime_triggers::REALTIME_ALERT_TRIGGERS},
+};
 use infra::{
     errors::{Error, Result},
     schema::STREAM_RECORD_ID_GENERATOR,
 };
+use ingestion_common::IngestionRequest;
 use proto::cluster_rpc::IngestionType;
-use transform::vrl::compiler::runtime::Runtime;
+use vrl::compiler::runtime::Runtime;
 
 use super::{
     db::alerts::alert,
@@ -47,20 +52,12 @@ use super::{
     self_reporting::publish_triggers_usage,
 };
 use crate::{
-    common::{
-        infra::config::{REALTIME_ALERT_TRIGGERS, STREAM_ALERTS},
-        meta::{ingestion::IngestionRequest, stream::SchemaRecords},
-    },
-    service::{
-        alerts::alert::AlertExt,
-        db::{self, alerts::alert::scheduler_key},
-    },
+    alerts::alert::AlertExt,
+    common::{infra::config::STREAM_ALERTS, meta::stream::SchemaRecords},
 };
 
 pub mod grpc;
 pub mod ingestion_service;
-
-pub use transform::compile_vrl_function;
 
 pub type TriggerAlertData = Vec<(Alert, Vec<Map<String, Value>>)>;
 
@@ -79,11 +76,6 @@ pub fn get_thread_id() -> usize {
     // Use wrapping modulo to ensure even distribution across worker threads/buckets
     REQUEST_COUNTER.fetch_add(1, Ordering::Relaxed) % cfg.limit.http_worker_num
 }
-
-pub use transform::{
-    apply_vrl_fn,
-    js::{apply_js_fn, compile_js_function},
-};
 
 pub async fn get_stream_partition_keys(
     org_id: &str,
@@ -284,7 +276,7 @@ pub fn get_write_partition_key(
 }
 
 pub fn init_functions_runtime() -> Runtime {
-    crate::common::utils::functions::init_vrl_runtime()
+    transform::init_vrl_runtime()
 }
 
 pub async fn write_file(
@@ -559,6 +551,7 @@ pub fn refactor_map(
 #[cfg(test)]
 mod tests {
     use infra::schema::{STREAM_SETTINGS, unwrap_stream_settings};
+    use transform::compile_vrl_function;
 
     use super::*;
 

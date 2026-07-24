@@ -27,7 +27,7 @@ use config::{
 use hashbrown::HashMap;
 
 #[cfg(feature = "cloud")]
-use crate::service::organization;
+use crate::organization;
 
 pub struct CoreBatchPublisher;
 
@@ -206,8 +206,7 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
                 "[SELF-REPORTING] thread_{thread_id} batch upserting {} pipeline errors to DB",
                 pipeline_errors.len()
             );
-            if let Err(e) = crate::service::db::pipeline_errors::batch_upsert(pipeline_errors).await
-            {
+            if let Err(e) = crate::db::pipeline_errors::batch_upsert(pipeline_errors).await {
                 log::error!(
                     "[SELF-REPORTING] thread_{thread_id} failed to batch upsert pipeline errors to DB: {e}"
                 );

@@ -16,7 +16,7 @@
 use config::{cluster::LOCAL_NODE, meta::promql::ClusterLeader, spawn_pausable_job};
 use hashbrown::HashMap;
 
-use crate::{common::infra::config::METRIC_CLUSTER_LEADER, service::db};
+use crate::common::infra::config::METRIC_CLUSTER_LEADER;
 
 pub fn run() -> Option<tokio::task::JoinHandle<()>> {
     if !LOCAL_NODE.is_ingester() {

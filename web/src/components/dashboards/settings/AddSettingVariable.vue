@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </DashboardHeader>
 
       <div
-        class="overflow-y-auto px-0.75 pb-4 flex-1 min-h-0 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-default [scrollbar-color:var(--color-border-strong)_transparent] [&::-webkit-scrollbar-thumb]:bg-border-strong"
+        class="overflow-y-auto px-0.75 pb-4 flex-1 min-h-0 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-default [scrollbar-color:var(--color-border-default)_transparent] [&::-webkit-scrollbar-thumb]:bg-border-default"
       >
         <OForm
           greedy

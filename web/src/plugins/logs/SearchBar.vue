@@ -241,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon
                       :name="
                         favoriteViews.includes(view.view_id)
-                          ? 'favorite'
+                          ? 'star'
                           : 'saved-search'
                       "
                       size="sm"
@@ -616,7 +616,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <div
                 v-if="showDownloadSubmenu && !isDownloadDisabled"
-                class="search-download-submenu absolute right-full top-0 mr-1 min-w-40 bg-dropdown-bg [border:0.063rem_solid_var(--color-card-glass-border)] rounded-default [box-shadow:0_0.5rem_1.5rem_var(--color-hover-shadow)] py-1 px-0 z-[9999]"
+                class="search-download-submenu absolute right-full top-0 mr-1 min-w-40 bg-dropdown-bg [border:0.063rem_solid_var(--color-card-glass-border)] rounded-default [box-shadow:0_0.5rem_1.5rem_var(--color-hover-shadow)] py-1 px-0 z-9999"
                 data-test="search-download-submenu"
               >
                 <button
@@ -1307,7 +1307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost"
         size="icon-toolbar"
         @click="toggleEditorFullscreen"
-        class="absolute! z-[51] top-[0.1875rem] right-1 [border:1px_solid_var(--color-card-glass-border)]! rounded-default w-7.5! h-7.5! min-w-7.5! min-h-7.5!"
+        class="absolute! z-51 top-[0.1875rem] right-1 [border:1px_solid_var(--color-card-glass-border)]! rounded-default w-7.5! h-7.5! min-w-7.5! min-h-7.5!"
       >
         <OTooltip :content="isFocused ? t('search.collapse') : t('search.expand')" />
       </OButton>
@@ -1377,7 +1377,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   searchObj.meta.queryEditorPlaceholderFlag &&
                   !searchObj.meta.nlpMode
                 "
-                class="query-editor-placeholder-overlay absolute top-0 left-0 right-0 bottom-0 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-[1] select-none"
+                class="query-editor-placeholder-overlay absolute top-0 left-0 right-0 bottom-0 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-1 select-none"
               >
                 <span class="query-editor-placeholder-typewriter">{{ editorPlaceholder }}</span>
               </div>
@@ -1427,7 +1427,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <div
                       v-if="!searchObj.data.tempFunctionContent && searchObj.meta.functionEditorPlaceholderFlag && !isVrlEditorDisabled"
-                      class="query-editor-placeholder-overlay absolute top-0 left-0 right-0 bottom-0 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-[1] select-none"
+                      class="query-editor-placeholder-overlay absolute top-0 left-0 right-0 bottom-0 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-1 select-none"
                     >
                       <span class="query-editor-placeholder-typewriter">{{ vrlPlaceholder }}</span>
                     </div>
@@ -1517,7 +1517,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <div>
         <div
-          class="text-sm font-semibold leading-tight pr-2 text-text-label"
+          class="text-compact font-medium leading-tight pr-2 text-input-label-text"
         >{{ t("search.fileType") }}</div>
         <OButtonGroup
           data-test="custom-download-file-type-button-group"
@@ -1794,8 +1794,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OIcon
                         :name="
                           favoriteViews.includes(row.view_id)
-                            ? 'favorite'
-                            : 'favorite-border'
+                            ? 'star'
+                            : 'star-outline'
                         "
                         size="xs"
                         :class="
@@ -1885,7 +1885,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data-test="`logs-search-bar-favorite-${row.view_id}-saved-view-btn`"
                       @click.stop="handleFavoriteSavedView(row, true)"
                     >
-                      <OIcon name="favorite" size="xs" class="text-favorite" />
+                      <OIcon name="star" size="xs" class="text-favorite" />
                     </OButton>
                     <OButton
                       :title="t('common.edit')"
@@ -2876,6 +2876,20 @@ export default defineComponent({
       // reappearing in the search bar.
       if (searchObj.loadingStream) {
         return;
+      }
+
+      // A URL / short-link restore has just set the SQL query, but the lazy-loaded
+      // Monaco editor fires this callback with an empty "" as it mounts, BEFORE the
+      // restored value is applied. Treating that transient empty as a real edit
+      // wipes searchObj.data.query and (below) flips SQL mode off — the intermittent
+      // "shared SQL link opens an empty editor" bug. While a restore is pending,
+      // ignore the empty emission; clear the flag as soon as the real (non-empty)
+      // value lands so genuine later clears by the user still work.
+      if (searchObj.meta.pendingUrlQueryRestore) {
+        if (value.trim() === "") {
+          return;
+        }
+        searchObj.meta.pendingUrlQueryRestore = false;
       }
 
       // if (searchObj.meta.jobId != "") {

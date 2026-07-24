@@ -1,8 +1,9 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { BrowserCheck, BrowserCheckSchedule } from '@/types/synthetics'
+import { getCronIntervalDifferenceInSeconds } from '@/utils/queryUtils'
 import OInput from '@/lib/forms/Input/OInput.vue'
 import OSelect from '@/lib/forms/Select/OSelect.vue'
 import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue'
@@ -12,7 +13,10 @@ import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue'
 import ODate from '@/lib/forms/Date/ODate.vue'
 import OTime from '@/lib/forms/Time/OTime.vue'
 
-const props = defineProps<{ check: BrowserCheck }>()
+const props = defineProps<{
+  check: BrowserCheck;
+  validationErrors?: Record<string, string>;
+}>();
 const emit = defineEmits<{ 'update:check': [value: BrowserCheck] }>()
 
 const { t } = useI18n()
@@ -93,6 +97,34 @@ const cron = computed({
   set: (v: string) => updateSchedule({ cron: v }),
 })
 
+const cronError = ref('')
+
+watch(
+  () => [props.check.schedule.cron, props.check.schedule.type] as const,
+  ([cronVal, type]) => {
+    if (type !== 'cron') {
+      cronError.value = ''
+      return
+    }
+    const trimmed = (cronVal ?? '').trim()
+    if (!trimmed) {
+      cronError.value = t('reports.validation.invalidCron')
+      return
+    }
+    // Single-space split matches the 6-field check in CreateReport.schema.ts
+    if (trimmed.split(' ').length !== 6) {
+      cronError.value = t('reports.validation.cronSixFields')
+      return
+    }
+    try {
+      getCronIntervalDifferenceInSeconds(trimmed)
+      cronError.value = ''
+    } catch {
+      cronError.value = t('reports.validation.invalidCron')
+    }
+  },
+)
+
 function buildTimezoneOptions(): { label: string; value: string }[] {
   try {
     const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -172,7 +204,7 @@ const startTime = computed({
 <template>
   <div class="rounded-default border border-border-default mb-4">
     <div class="flex items-center border-b border-border-default py-2.5 px-3">
-      <div class="w-[0.1875rem] h-4 rounded-default mr-2 shrink-0 bg-primary-600" />
+      <div class="w-[0.1875rem] h-4 rounded-default mr-2 shrink-0 bg-accent" />
       <h3 class="text-base font-semibold text-text-heading">
         {{ t('synthetics.scheduleAlert.schedule') }}
       </h3>
@@ -230,13 +262,33 @@ const startTime = computed({
 
       <!-- Cron inputs -->
       <div v-if="check.schedule.type === 'cron'" class="flex items-start gap-3 flex-wrap">
-        <OInput
-          v-model="cron"
-          :label="t('synthetics.scheduleAlert.cronExpression')"
-          :placeholder="t('synthetics.scheduleAlert.cronPlaceholder')"
-          class="w-83!"
-          data-test="synthetics-check-schedule-cron-input"
-        />
+        <div>
+          <div class="mb-1 font-bold text-text-secondary">
+            {{ t('synthetics.scheduleAlert.cronExpression') }}
+            <OIcon name="info" size="sm" class="ml-1 cursor-pointer text-text-muted">
+              <OTooltip side="right" align="center">
+                <template #content>
+                  <span style="font-size: var(--text-sm); white-space: pre-line">
+                    {{ t('reports.cronFormatTooltip') }}
+                  </span>
+                </template>
+              </OTooltip>
+            </OIcon>
+          </div>
+          <OInput
+            v-model="cron"
+            :placeholder="'0 */5 * * * *'"
+            class="w-83!"
+            data-test="synthetics-check-schedule-cron-input"
+          />
+          <p
+            v-if="cronError"
+            class="text-xs text-status-error-text mt-1"
+            data-test="synthetics-check-schedule-cron-error"
+          >
+            {{ cronError }}
+          </p>
+        </div>
         <OSelect
           v-model="timezone"
           :label="t('synthetics.scheduleAlert.timezone')"
@@ -264,6 +316,15 @@ const startTime = computed({
           data-test="synthetics-check-schedule-custom-interval-unit-select"
         />
       </div>
+
+      <!-- Validation error -->
+      <p
+        v-if="props.validationErrors?.schedule"
+        class="text-xs text-status-error-text"
+        data-test="synthetics-check-schedule-error"
+      >
+        {{ props.validationErrors.schedule }}
+      </p>
 
       <!-- Schedule Later date/time pickers -->
       <div v-if="startType === 'later' && check.schedule.type !== 'cron'" class="flex items-start gap-3 flex-wrap">

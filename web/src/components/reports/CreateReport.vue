@@ -410,14 +410,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             class="ml-1 cursor-pointer text-text-muted"
                           >
                             <OTooltip side="right" align="center">
-                              <template #content><span style="font-size: var(--text-sm)">
-                                {{ t('reports.cronPatternHint') }}
-                                <br />
-                                {{ t('reports.cronFormatHint') }}
-                                <br />
-                                {{ t('reports.cronWildcardHint') }} <br />
-                                {{ t('reports.cronExampleHint') }}</span
-                              ></template>
+                              <template #content>
+                                <span style="font-size: var(--text-sm); white-space: pre-line">
+                                  {{ t('reports.cronFormatTooltip') }}
+                                </span>
+                              </template>
                             </OTooltip>
                           </OIcon>
                         </div>
@@ -662,8 +659,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      class="flex justify-end px-3 w-full py-3 bg-card-glass-bg sticky! bottom-0 border-t border-card-glass-border"
-      style="z-index: 2"
+      class="flex justify-end px-3 w-full py-3 bg-card-glass-bg sticky! bottom-0 border-t border-card-glass-border z-2"
     >
       <OButton
         data-test="add-report-cancel-btn"

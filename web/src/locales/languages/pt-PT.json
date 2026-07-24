@@ -376,6 +376,12 @@
     "datetimeMessage": "* Você pode escolher várias datas",
     "datetimeRelative": "RELATIVO",
     "datetimeAbsolute": "ABSOLUTO",
+    "dateRange": "Intervalo de datas",
+    "copyRange": "Copiar intervalo de tempo para a área de transferência",
+    "pasteRange": "Colar intervalo de tempo",
+    "dateRangeCopied": "Intervalo de datas copiado",
+    "dateRangePasted": "Intervalo de datas colado",
+    "dateRangePasteError": "Não foi possível analisar o intervalo de datas",
     "relative": "Relativo",
     "absolute": "Absoluto",
     "move": "Mova-se",
@@ -512,7 +518,6 @@
   },
   "flow": {
     "stepPicker": {
-      "title": "Adicionar uma etapa",
       "search": "Pesquisar etapas…",
       "noMatch": "Nenhuma etapa correspondente"
     },
@@ -900,7 +905,7 @@
     "language": "Idioma",
     "actions": "Ações",
     "keyboardShortcuts": "Atalhos de teclado",
-    "synthetic": "Sintético"
+    "synthetic": "Sintéticos"
   },
   "rum": {
     "title": "Monitoramento de usuários reais",
@@ -2066,7 +2071,7 @@
   "workflow": {
     "header": "Fluxos de trabalho",
     "subtitle": "Automatize ações com gatilhos, lógica e destinos",
-    "create": "Novo fluxo de trabalho",
+    "create": "Novo workflow",
     "createTitle": "Criar fluxo de trabalho",
     "createConfirm": "Criar",
     "createSuccess": "Fluxo de trabalho criado com sucesso",
@@ -2217,7 +2222,7 @@
       "linkPartial": "Vinculado a {ok} alerta(s), {failed} falhou",
       "linkError": "Não foi possível vincular os alertas."
     },
-    "canvasEmpty": "Adicione um gatilho para começar a construir seu fluxo de trabalho",
+    "chooseTrigger": "Escolher um Gatilho",
     "node": {
       "kindTrigger": "Gatilho",
       "kindLogic": "Lógica",
@@ -2229,8 +2234,6 @@
       "notConfigured": "Ainda não configurado",
       "configComingSoon": "A configuração de {node} virá em uma etapa posterior",
       "addNext": "Adicionar próxima etapa",
-      "stepDialogTitle": "Adicionar uma etapa",
-      "paletteTitle": "Nós",
       "sectionTransform": "Transformar",
       "sectionDestination": "Destino",
       "paletteCollapse": "Recolher",
@@ -2376,7 +2379,11 @@
     "deleteNodeTitle": "Excluir Node",
     "deleteNodeLlmEvalConfirm": "Tem certeza de que deseja excluir esse nó de avaliação do LLM?",
     "cancel": "Cancelar",
-    "dragDropNodesHere": "Arraste e solte os nós aqui",
+    "collapseNodes": "Recolher Nós",
+    "openNodes": "Abrir Nós",
+    "chooseSource": "Escolher uma Fonte",
+    "sourceStreamDesc": "Processar dados em tempo real conforme são ingeridos em um stream",
+    "sourceQueryDesc": "Executar uma consulta em um cronograma e processar seus resultados",
     "promqlOnlyForMetrics": "O ProMQL só está disponível para o tipo de fluxo de métricas",
     "invalidCronExpression": "Expressão cron inválida",
     "cronRequired": "A expressão cron é obrigatória",
@@ -2651,6 +2658,7 @@
     "kubernetes": "Kubernetes",
     "windows": "Janela",
     "linux": "Linux",
+    "macos": "macOS",
     "awsconfig": "Amazon Web Services (AWS)",
     "gcpconfig": "Plataforma de nuvem do Google (GCP)",
     "azure": "Microsoft Azure",
@@ -3324,6 +3332,8 @@
     "seriesName": "Nome da série",
     "seriesValue": "Valor da série",
     "axisValue": "Valor do eixo",
+    "expandAllSections": "Expandir todas as seções",
+    "collapseAllSections": "Recolher todas as seções",
     "configSectionGeneral": "Geral",
     "configSectionPromqlTable": "Modo de tabela ProMQL",
     "configSectionGeographic": "Configuração geográfica",
@@ -5653,6 +5663,7 @@
     "groupDestinationsTemplates": "Destinos e Modelos",
     "groupDataAI": "Dados e IA",
     "groupOperations": "Operações",
+    "groupSynthetics": "Sintéticos",
     "groupAccount": "Conta",
     "generalDesc": "Tema, padrões de consulta e preferências essenciais",
     "orgDesc": "Parâmetros e identificadores da organização",
@@ -6350,6 +6361,7 @@
     "description": "Descrição",
     "cron": "Cron Job",
     "cronExpression": "Expressão Cron",
+    "cronFormatTooltip": "Padrão: * * * * * * significa a cada segundo.\nFormato: [Segundo (opcional) 0-59] [Minuto 0-59] [Hora 0-23] [Dia do Mês 1-31, 'L'] [Mês 1-12] [Dia da Semana 0-7 ou '1L-7L', 0 e 7 para domingo].\nUse '*' para representar qualquer valor, 'L' para o último dia/dia útil.\nExemplo: 0 0 12 * * ? - Dispara diariamente às 12:00.",
     "timeRange": "Intervalo de tempo",
     "frequency": "Frequência",
     "lastTriggeredAt": "Acionado pela última vez em",
@@ -7718,7 +7730,7 @@
       "sessions": "Navegue e inspecione as sessões dos agentes, passo a passo",
       "agentGraph": "Veja com o que seus agentes interagem — ferramentas, modelos, serviços e bancos de dados",
       "agentBehavior": "Identifique agentes presos em loops e os erros que os fazem falhar",
-      "quality": "Classifique e acompanhe a qualidade de suas respostas de LLM",
+      "quality": "Acompanhe a qualidade da pontuação em avaliações de span, trace e sessão",
       "evalJobs": "Execute e monitore trabalhos de avaliação em suas sessões",
       "scorers": "Crie e gerencie os marcadores que classificam os resultados do LLM",
       "scoreConfigs": "Configure as rubricas de pontuação usadas por suas avaliações"
@@ -7726,7 +7738,11 @@
     "agentGraph": {
       "allAgents": "Todos os agentes",
       "stream": "Stream",
-      "agent": "Agente"
+      "agent": "Agente",
+      "noAgentsTitle": "Nenhum agente encontrado",
+      "noAgentsDescription": "Nenhum agente foi descoberto neste intervalo de tempo. Tente ampliar o intervalo ou verifique se seus traces incluem atributos de agente gen_ai.",
+      "agentCountSingular": "agente",
+      "agentCountPlural": "agentes"
     },
     "kpi": {
       "totalCost": "Custo total",
@@ -7868,7 +7884,22 @@
     },
     "quality": {
       "scopeLabel": "Todas as dimensões de qualidade neste espaço de trabalho",
+      "agentLabel": "Agente",
       "agentPlaceholder": "Todos os agentes",
+      "kpisAriaLabel": "KPIs de Nível 1",
+      "dataTypes": {
+        "numericShort": "Núm",
+        "categoricalShort": "Cat",
+        "booleanShort": "Bool"
+      },
+      "scopes": {
+        "filterLabel": "Escopo da pontuação",
+        "filterHint": "Compare esta Configuração de Pontuação entre escopos de destino de avaliação.",
+        "all": "Todos",
+        "span": "Span",
+        "trace": "Trace",
+        "session": "Sessão"
+      },
       "timeRange": {
         "label": "Intervalo de tempo",
         "last1h": "Última 1 hora",
@@ -7882,20 +7913,20 @@
       },
       "refresh": "Atualizar",
       "kpis": {
-        "evaluated": {
-          "title": "Traços avaliados",
+        "scoreResults": {
+          "title": "Resultados da Pontuação",
           "unit": "",
-          "hint": "IDs de rastreamento distintos em _llm_scores dentro da janela"
+          "hint": "Últimos resultados de pontuação em avaliações de span, trace e sessão na janela"
         },
         "evaluationCost": {
           "title": "Custo de avaliação",
           "unit": "$",
           "hint": "Soma do custo do marcador do LLM Judge na janela"
         },
-        "jobSuccess": {
-          "title": "Sucesso no trabalho",
+        "scorerSuccess": {
+          "title": "Sucesso do Avaliador",
           "unit": "%",
-          "hint": "Taxa de sucesso na execução do Online Eval Job"
+          "hint": "Invocações bem-sucedidas do avaliador como porcentagem de todas as invocações do avaliador"
         },
         "scorerFailures": {
           "title": "Falhas no marcador",
@@ -7903,11 +7934,12 @@
           "hint": "Falha na invocação do marcador na janela"
         },
         "latencyP95": {
-          "title": "Latência p95",
+          "title": "Latência do Avaliador p95",
           "unit": "s",
-          "hint": "Latência p95 do Scorer-Call"
+          "hint": "Latência de invocação do avaliador no percentil 95"
         },
         "vsPrev": "versus anterior",
+        "noPriorData": "sem dados anteriores",
         "noData": "—"
       },
       "loading": "Carregando dados de qualidade...",
@@ -7916,7 +7948,9 @@
         "noData": "Ainda não há pontuações para essa configuração nesta janela.",
         "empty": {
           "title": "Aguardando suas primeiras pontuações",
-          "description": "Nenhuma pontuação foi registrada para esta configuração no intervalo de tempo selecionado. Elas aparecerão aqui automaticamente assim que um avaliador que a utilize for executado."
+          "titleScoped": "Nenhuma pontuação de {scope} nesta janela",
+          "description": "Nenhuma pontuação foi registrada para esta configuração no intervalo de tempo selecionado. Elas aparecerão aqui automaticamente assim que um avaliador que a utilize for executado.",
+          "descriptionScoped": "Nenhuma pontuação de {scope} foi recebida para esta configuração no intervalo de tempo selecionado. Escolha outro escopo ou amplie o intervalo de tempo."
         },
         "drillTitle": "Perfure até traçar",
         "trendTitle": "Tendência",
@@ -7925,12 +7959,18 @@
         "compositionTitle": "Composição ao longo do tempo",
         "categoryDistributionTitle": "Distribuição de categorias",
         "passRateTitle": "Taxa de aprovação ao longo do tempo",
+        "healthyRateTitle": "Taxa saudável ao longo do tempo",
+        "trueRateTitle": "Taxa verdadeira ao longo do tempo",
         "trueFalseTitle": "Verdadeiro versus falso",
         "legendAvg": "Média",
         "legendP95": "p95",
         "legendThreshold": "limite {direção} {valor}",
         "legendHealthy": "saudável",
         "legendUnhealthy": "insalubre",
+        "legendHealthyRate": "Taxa saudável",
+        "legendTrueRate": "Taxa verdadeira",
+        "legendTrueCount": "verdadeiro ({count})",
+        "legendFalseCount": "falso ({count})",
         "kpis": {
           "average": "Média",
           "p50": "P50",
@@ -7938,11 +7978,49 @@
           "p50p95": "P50/P95",
           "unhealthy": "Insalubre",
           "healthy": "Saudável",
-          "coverage": "Cobertura"
+          "trueRate": "Taxa verdadeira",
+          "falseRate": "Taxa falsa",
+          "coverage": "Cobertura",
+          "targetsScored": "Alvos pontuados"
+        },
+        "health": {
+          "title": "Status de saúde",
+          "noThreshold": "Nenhum limite saudável está configurado. As pontuações ainda não podem ser classificadas como saudáveis ou em degradação.",
+          "thresholdOnly": "Saudável se {threshold}",
+          "summary": "{percent}% abaixo do limite · Saudável se {threshold}"
+        }
+      },
+      "runs": {
+        "title": "Pontuações de avaliação",
+        "hint": "As pontuações e raciocínios vêm de _llm_scores. Selecione uma execução para abrir seu trace de avaliador para investigação adicional.",
+        "filterLabel": "Filtrar pontuações de avaliação",
+        "footerTitle": "Pontuações de Avaliação",
+        "noThresholdHint": "Defina um limite saudável nesta Configuração de Pontuação para classificar e destacar pontuações não saudáveis.",
+        "noReasoning": "Nenhum raciocínio registrado",
+        "unknownAgent": "Agente desconhecido",
+        "unknownScope": "Escopo desconhecido",
+        "queryError": "As pontuações de avaliação não puderam ser atualizadas. A última página bem-sucedida ainda é exibida.",
+        "empty": "Nenhuma pontuação de avaliação neste intervalo de tempo.",
+        "emptyUnhealthy": "Nenhuma pontuação não saudável neste intervalo de tempo.",
+        "filters": {
+          "all": "Todas as pontuações",
+          "unhealthy": "Não saudável"
+        },
+        "health": {
+          "healthy": "Saudável",
+          "unhealthy": "Não saudável"
+        },
+        "columns": {
+          "time": "Avaliado",
+          "result": "Pontuação",
+          "reasoning": "Raciocínio",
+          "target": "Alvo",
+          "agent": "Agente"
         }
       },
       "sidebar": {
         "allConfigs": "Todas as configurações",
+        "scoreCount": "{count} pontuações",
         "empty": "Nenhuma configuração corresponde a esse filtro."
       },
       "overview": {
@@ -7959,13 +8037,30 @@
         "waitingPrimaryCta": "Vagas de avaliação abertas",
         "waitingRefreshCta": "Atualizar",
         "noThreshold": "sem limite",
+        "relativeTime": {
+          "daysAgo": "{day}d atrás",
+          "monthsAgo": "{month}mo atrás"
+        },
+        "status": {
+          "healthy": "Saudável",
+          "unhealthy": "Precisa de atenção",
+          "noThreshold": "Limiar não definido",
+          "noData": "Sem dados de pontuação"
+        },
+        "health": {
+          "thresholdSummary": "{percent}% abaixo · Saudável se {threshold}",
+          "noThresholdHint": "Definir um limiar saudável",
+          "noDataHint": "Nenhuma pontuação nesta janela"
+        },
         "columns": {
+          "health": "Saúde",
           "scoreConfig": "Configuração de pontuação",
           "type": "Tipo",
+          "quality": "Qualidade",
           "totalScores": "Pontuações totais",
-          "coverage": "Cobertura",
+          "scopeMix": "Mistura de Escopos",
           "unhealthy": "Insalubre",
-          "trend": "Tendência",
+          "volumeTrend": "Tendência de Volume",
           "threshold": "Saudável se",
           "updated": "Atualizado"
         }
@@ -7993,11 +8088,10 @@
     "buttons": {
       "cancel": "Cancelar",
       "close": "Fechar",
-      "create": "Criar",
       "remove": "Remover",
       "save": "Salvar",
       "saveAsDraft": "Salvar como Rascunho",
-      "createAndActivate": "Criar e Ativar"
+      "createAndActivate": "Salvar e Ativar"
     },
     "scorerTypeDialog": {
       "title": "Crie um novo marcador",
@@ -8081,8 +8175,7 @@
         "createdLabel": "Criado",
         "updatedLabel": "Atualizado"
       },
-      "createTitle": "Nova configuração de pontuação",
-      "editTitlePrefix": "Editar",
+      "createTitle": "Nova Configuração de Pontuação",
       "subtitle": "As configurações de pontuação definem o tipo de pontuação, limites de saúde e categorias.",
       "eyebrow": "Configurações de Pontuação",
       "sectionTitle": "Configurações de Pontuação",
@@ -8091,8 +8184,6 @@
       "searchPlaceholder": "Pesquisar configurações",
       "allTypes": "Todos os tipos",
       "newButton": "Nova configuração de pontuação",
-      "saveButton": "Salvar alterações",
-      "createButton": "Criar",
       "columns": {
         "index": "#",
         "name": "Nome",
@@ -8297,14 +8388,13 @@
       "backTo": "Voltar para Scorers",
       "badgeRemote": "Remoto",
       "badgeLlm": "Juiz LLM",
-      "createTitleRemote": "Criar marcador remoto",
-      "createTitleLlm": "Crie o Juiz Scorer do LLM",
-      "editTitleRemote": "Editar marcador remoto",
-      "editTitleLlm": "Editar LLM Judge Scorer",
+      "createTitleRemote": "Novo Avaliador Remoto",
+      "createTitleLlm": "Novo Avaliador Juiz LLM",
+      "editTitleRemote": "Atualizar Avaliador Remoto",
+      "editTitleLlm": "Atualizar Avaliador Juiz LLM",
       "subtitleRemote": "Ligue para um endpoint HTTP que você hospeda. Nós renderizamos a solicitação; você retorna uma pontuação.",
-      "subtitleLlm": "Um modelo de linguagem avalia cada rastreamento usando a solicitação que você fornece.",
+      "subtitleLlm": "Um modelo de linguagem avalia cada alvo de avaliação usando o prompt que você fornece.",
       "descriptionPlaceholder": "Um breve resumo do que este avaliador mede.",
-      "producesScoreHelp": "Qual dimensão este avaliador mede?",
       "providerHelp": "Escolha o Provedor de LLM que este avaliador chama. Gerencie os provedores em {settingsLink}.",
       "providerHelpSettingsLink": "Configurações",
       "refreshProviders": "Atualizar Provedores",
@@ -8317,8 +8407,49 @@
       "rangeLabel": "Intervalo:",
       "healthyLabel": "Saudável:",
       "typeLabel": "Tipo:",
-      "promptVariablesLabel": "Variáveis:",
-      "promptHelp": "Concentre-se na lógica de avaliação. Use {inputVar} e {outputVar} como placeholders.",
+      "promptVariablesLabel": "Variáveis neste prompt:",
+      "promptVariableGuide": {
+        "title": "Variáveis de Prompt Disponíveis",
+        "description": "Essas variáveis podem ser usadas no prompt acima. Como cada uma é preenchida depende do que o Trabalho de Avaliação avalia.",
+        "columns": {
+          "variable": "Variável de prompt"
+        },
+        "scopes": {
+          "span": "Span",
+          "trace": "Trace",
+          "session": "Sessão"
+        },
+        "statuses": {
+          "jobMapped": "Mapear no Trabalho de Avaliação",
+          "systemProvided": "Fornecido pelo sistema",
+          "requiresSelector": "Fornecido pelo sistema · requer Seletor de Span",
+          "selectorRequired": "Seletor de Span necessário",
+          "unavailable": "Não disponível"
+        },
+        "variables": {
+          "inputOutput": {
+            "span": "Mapeie estes para os campos de span que contêm a entrada e a saída.",
+            "trace": "Entrada e saída do span raiz do trace.",
+            "session": "Não disponível — uma sessão não tem uma única entrada ou saída."
+          },
+          "statistics": {
+            "span": "Mapeie este nome como qualquer outra variável de scorer ao avaliar um único span.",
+            "trace": "Métricas de trace: contagem de spans, duração, chamadas de LLM e ferramentas, erros, tokens e custo.",
+            "session": "Métricas de sessão: contagens de traces e turnos, duração e erros."
+          },
+          "spans": {
+            "span": "Mapeie este nome como qualquer outra variável de scorer ao avaliar um único span.",
+            "trace": "Um subconjunto filtrado dos spans do trace, escolhido pelo Seletor de Span do Eval Job.",
+            "session": "Não disponível para sessões."
+          },
+          "steps": {
+            "span": "Mapeie este nome como qualquer outra variável de scorer ao avaliar um único span.",
+            "trace": "Spans em ordem cronológica; o meio é dobrado quando o trace é muito longo.",
+            "session": "Traces em ordem cronológica, representados como turnos de conversa."
+          }
+        },
+        "indexDescription": "{spansVar} e {stepsVar} chegam como arrays JSON. Referencie a variável inteira — acesso indexado como {indexedVar} não é suportado."
+      },
       "identitySection": "Identidade",
       "judgeSection": "Configuração do juiz",
       "endpointSection": "Ponto final",
@@ -8336,10 +8467,9 @@
       "modelPlaceholder": "gpt-4o",
       "promptLabel": "Aviso do juiz",
       "includeReasoningLabel": "Incluir Raciocínio",
-      "includeReasoningHint": "O LLM explica sua pontuação. Armazenado em score.metadata.reasoning.",
-      "extraFieldsLabel": "Campos de Metadados Extras",
-      "extraFieldsOptional": "Opcional",
-      "extraFieldsHint": "Adicione campos que o LLM deve gerar junto com a pontuação. Armazenados em score.metadata para análise posterior.",
+      "includeReasoningHint": "O juiz explica por que deu essa pontuação, salvo com cada resultado.",
+      "extraFieldsLabel": "Campos de Metadados Extras (Opcional)",
+      "extraFieldsHint": "Peça ao juiz para retornar valores extras com cada pontuação — uma categoria ou uma confiança, por exemplo.",
       "extraFields": {
         "colName": "Nome do Campo",
         "colType": "Tipo",
@@ -8441,9 +8571,12 @@
         "eyebrow": "Trabalho de Avaliação",
         "refresh": "Atualizar",
         "descriptionSection": "Descrição",
-        "targetSection": "Alvo",
+        "targetSection": "Alvo da Avaliação",
         "streamLabel": "Stream",
         "streamTypeLabel": "Tipo de Stream",
+        "targetScopeLabel": "Avaliar Cada",
+        "idleWindowLabel": "Janela de Inatividade",
+        "maxAgeLabel": "Idade Máxima",
         "filterLabel": "Filtro",
         "filterEmpty": "Sem filtro — cada span é avaliado",
         "scorersSection": "Avaliadores",
@@ -8453,13 +8586,30 @@
         "scorerTypeRemote": "Remoto",
         "producesPrefix": "Produz",
         "viewScorerHint": "Ver",
-        "inputMappingSection": "Mapeamento de Entrada",
+        "inputMappingSection": "Variáveis de Prompt",
         "samplingSection": "Amostragem",
         "samplingModeLabel": "Modo",
         "samplingValueLabel": "Valor",
         "samplingAll": "Avaliar cada correspondência",
         "samplingRate": "Amostra aleatória por taxa",
         "samplingCount": "Primeiras N correspondências",
+        "manualSection": "Avaliação Manual",
+        "manualHelp": "Coloque os scorers deste job na fila para um alvo explícito. Execuções manuais ignoram a amostragem automática e registram o motivo nos metadados da pontuação.",
+        "manualTargetIdLabel": "ID do Alvo",
+        "manualSpanIdLabel": "ID do Span",
+        "manualSpanIdPlaceholder": "span_id",
+        "manualTraceIdLabel": "ID do Trace",
+        "manualTraceIdPlaceholder": "trace_id",
+        "manualSessionIdLabel": "ID da Sessão",
+        "manualSessionIdPlaceholder": "session_id",
+        "manualReasonLabel": "Motivo",
+        "manualReasonPlaceholder": "Por que você está re-executando este alvo?",
+        "manualVariablesLabel": "Variáveis JSON",
+        "manualVariablesObjectError": "As variáveis devem ser um objeto JSON",
+        "manualTargetRequired": "ID do Alvo é obrigatório",
+        "manualSubmit": "Executar Avaliação Manual",
+        "manualSuccess": "Tarefa(s) de avaliação {count} enfileirada(s)",
+        "manualError": "Avaliação manual falhou",
         "metadataSection": "Metadados",
         "versionLabel": "Versão",
         "pipelineLabel": "ID do Pipeline",
@@ -8512,6 +8662,7 @@
         "name": "Nome",
         "status": "Status",
         "stream": "Stream",
+        "targetScope": "Escopo",
         "scorers": "Avaliadores",
         "successRate": "Taxa de sucesso",
         "created": "Criado",
@@ -8526,8 +8677,9 @@
       },
       "descriptionPlaceholder": "O que este trabalho monitora?",
       "samplingValueHelp": "Insira uma taxa entre 0 e 1.",
-      "samplingValueAllHelp": "Não aplicável quando o modo é Todos — cada evento correspondente será avaliado.",
-      "samplingHelp": "Aplicado após o Filtro. Controla o custo — apenas os spans correspondentes contam para a taxa.",
+      "samplingValuePreview": "Avalia {percent}% dos alvos correspondentes.",
+      "samplingValueAllHelp": "Cada alvo correspondente é avaliado.",
+      "samplingHelp": "Executa após a filtragem, para controlar o custo.",
       "presets": {
         "label": "Predefinições rápidas",
         "rootSpans": "Apenas spans raiz",
@@ -8535,23 +8687,46 @@
         "toolCalls": "Chamadas de ferramentas"
       },
       "backTo": "Voltar para Eval Jobs",
-      "createTitle": "Crie um trabalho de avaliação online",
-      "editTitle": "Editar trabalho de avaliação online",
+      "createTitle": "Novo Eval Job",
+      "editTitle": "Atualizar Eval Job",
       "stepper": {
         "target": "Alvo",
         "scorers": "Marcadores",
         "mapping": "Mapeamento",
         "sampling": "Amostragem"
       },
-      "targetSection": "Alvo",
+      "detailsSection": "Detalhes",
+      "targetSection": "Alvo da Avaliação",
       "filteringSection": "Filtragem",
       "scorersSection": "Marcadores e mapeamento",
       "nameLabel": "Nome",
       "namePlaceholder": "Monitor de fidelidade de produção",
-      "streamLabel": "Fluxo de entrada",
-      "streamPlaceholder": "padrão",
+      "streamLabel": "Stream",
+      "streamPlaceholder": "Selecionar Stream",
       "streamTypeLabel": "Tipo de stream",
       "streamTypePlaceholder": "rastros",
+      "targetScopeLabel": "Avaliar Cada",
+      "targetScopes": {
+        "span": "Span",
+        "trace": "Trace",
+        "session": "Sessão"
+      },
+      "targetScopeHelp": {
+        "span": "Avalie cada span correspondente independentemente.",
+        "trace": "Avalie um trace inteiro após o fechamento da janela de conclusão.",
+        "session": "Avalie uma sessão entre traces após o fechamento da janela de conclusão."
+      },
+      "completionSection": "Critérios de conclusão",
+      "completionHelp": {
+        "trace": "O trace é avaliado assim que o primeiro destes for atendido.",
+        "session": "A sessão é avaliada assim que o primeiro destes for atendido."
+      },
+      "idleWindowLabel": "Janela ociosa (segundos)",
+      "idleWindowHelp": "Avaliado após {duration} sem novos spans.",
+      "idleWindowHelpEmpty": "Avaliado assim que não chegam novos spans.",
+      "maxAgeLabel": "Idade máxima (segundos)",
+      "maxAgeHelp": "Avaliado {duration} após o primeiro span.",
+      "maxAgeHelpEmpty": "Avaliado em uma idade fixa, mesmo que spans ainda estejam chegando.",
       "descriptionLabel": "Descrição",
       "samplingModeLabel": "Modo de amostragem",
       "samplingValueLabel": "Taxa de amostragem",
@@ -8562,7 +8737,11 @@
       },
       "scorerPicker": {
         "title": "Marcadores",
-        "hint": "Selecione um ou mais marcadores para disputar cada período combinado.",
+        "hint": {
+          "span": "Selecione um ou mais scorers para executar para cada span correspondente.",
+          "trace": "Selecione um ou mais scorers para executar para cada trace elegível.",
+          "session": "Selecione um ou mais scorers para executar para cada sessão elegível."
+        },
         "meta": "{tipo} · v {versão}",
         "placeholder": "Selecionar Avaliadores",
         "searchPlaceholder": "Pesquisar avaliadores…",
@@ -8570,21 +8749,113 @@
       },
       "filter": {
         "title": "Condição do filtro",
-        "hint": "Somente intervalos que correspondam a essa condição entram na amostragem e na pontuação."
+        "hint": {
+          "span": "Apenas spans que atendem a esta condição entram na amostragem e pontuação.",
+          "trace": "Um trace entra na amostragem e pontuação se algum de seus spans atender a esta condição.",
+          "session": "Uma sessão entra na amostragem e pontuação se algum de seus spans atender a esta condição."
+        }
+      },
+      "selector": {
+        "title": "Quais Spans (Opcional)",
+        "hint": {
+          "trace": "Deixe vazio para incluir cada span no trace."
+        }
+      },
+      "endSignal": {
+        "title": "Sinal de término (opcional)",
+        "hint": {
+          "trace": "Defina uma condição de span que fecha o trace imediatamente quando qualquer span a atende.",
+          "session": "Defina uma condição de span que fecha a sessão imediatamente quando qualquer span a atende."
+        }
       },
       "inputMapping": {
-        "title": "Mapeamento de entrada",
-        "hint": "Mapeie os campos de abrangência em cada variável do modelo de pontuação.",
+        "title": "Variáveis do prompt",
+        "hint": {
+          "span": "Mapeie cada variável para o campo do span que fornece seu valor.",
+          "trace": "Os valores do trace são preenchidos automaticamente. Mapeie qualquer outra coisa para um campo do span.",
+          "session": "Os valores da sessão são preenchidos automaticamente. Mapeie qualquer outra coisa para um campo do span."
+        },
         "selectScorers": "Selecione marcadores para configurar seus mapeamentos.",
         "noVariables": "Esse marcador não tem variáveis de modelo para mapear.",
-        "variableCount": "variáveis {count}"
+        "variableCount": "variáveis {count}",
+        "systemProvided": {
+          "title": "Variáveis de {scope}",
+          "description": "O OpenObserve fornece esses valores do próprio {scope}. Um prompt de scorer pode usá-los diretamente — nenhum mapeamento necessário.",
+          "badge": "Fornecido pelo sistema",
+          "selectorRequired": "Span Selector obrigatório",
+          "columns": {
+            "variable": "Variável do prompt",
+            "source": "Origem",
+            "description": "Valor fornecido"
+          },
+          "variables": {
+            "input": {
+              "trace": "Entrada do span raiz do trace."
+            },
+            "output": {
+              "trace": "Saída do span raiz do trace."
+            },
+            "statistics": {
+              "trace": "Métricas do trace: contagem de spans, duração, chamadas LLM e ferramentas, erros, tokens e custo.",
+              "session": "Métricas da sessão: contagens de traces e turnos, duração e erros."
+            },
+            "spans": {
+              "trace": "Um subconjunto filtrado de spans, escolhido pelo Span Selector do job."
+            },
+            "steps": {
+              "trace": "Spans em ordem cronológica; o meio é recolhido quando o trace é muito longo.",
+              "session": "Traces em ordem cronológica, representados como turnos de conversa."
+            }
+          }
+        }
+      },
+      "spanSelector": {
+        "select": "Selecionar Span Selector",
+        "bindingHelp": "Os traces podem ter centenas de spans. Escolha aqueles que este scorer deve analisar.",
+        "createForScorer": "Criar para scorer",
+        "createForScorerTitle": "Criar um Span Selector para este scorer",
+        "editorTitle": "Span Selector",
+        "name": "Nome do seletor",
+        "schemaMode": "Campos a ler",
+        "defaultSchema": "Campos padrão de GenAI",
+        "customSchema": "Campos Personalizados",
+        "defaultSchemaHelp": "Estes oito campos são lidos de cada span correspondente. Qualquer coisa ausente vem vazia.",
+        "fields": "Campos",
+        "fieldsHelp": "Apenas estes campos são lidos — nada mais é enviado ao scorer.",
+        "maximumSpans": "Máximo de Spans",
+        "budget": "Limita quantos spans são selecionados da trace.",
+        "validation": {
+          "name": "Insira um nome de seletor.",
+          "duplicateName": "Os nomes dos seletores devem ser únicos neste job.",
+          "filter": "Complete ou remova a condição de filtro inacabada.",
+          "fields": "Selecione pelo menos um campo para um esquema personalizado.",
+          "maximumSpans": "O máximo de spans deve ser um número inteiro positivo.",
+          "budget": "Muitos spans para os campos selecionados. Reduza a contagem de spans ou leia menos campos.",
+          "binding": "Selecione um Seletor de Span para cada scorer."
+        }
       },
       "preview": {
-        "title": "prévia",
-        "hint": "Use os campos à esquerda para definir a meta de avaliação da produção.",
-        "matchedSuffix": "períodos combinados · últimas 24h",
+        "scopes": {
+          "span": {
+            "title": "Spans Correspondentes",
+            "hint": "Depois de escolher um stream e filtro, este painel mostrará quantos spans seu job corresponderá.",
+            "matchedSuffix": "spans correspondidos · últimas 24h",
+            "matchedLoading": "Contando spans correspondidos…"
+          },
+          "trace": {
+            "title": "Traces Correspondentes",
+            "hint": "Depois de escolher um stream e filtro, este painel mostrará quantas traces seu job corresponderá.",
+            "matchedSuffix": "traces correspondidas · últimas 24h",
+            "matchedLoading": "Contando traces correspondidas…"
+          },
+          "session": {
+            "title": "Sessões Correspondentes",
+            "hint": "Depois de escolher um stream e filtro, este painel mostrará quantas sessões seu job corresponderá.",
+            "matchedSuffix": "sessões correspondidas · últimas 24h",
+            "matchedLoading": "Contando sessões correspondidas…"
+          }
+        },
         "matchedError": "Não foi possível carregar a contagem de partidas",
-        "matchedLoading": "Contando intervalos combinados...",
         "matchedIncomplete": "Conclua a condição do filtro para atualizar a contagem.",
         "summaryTitle": "Resumo",
         "summaryName": "Nome",
@@ -8601,6 +8872,7 @@
       "validation": {
         "nameRequired": "Job name is required",
         "streamRequired": "A stream is required",
+        "idleWindowMinimum": "A janela ociosa deve ter pelo menos 45 segundos",
         "samplingValueRequired": "A sampling value is required"
       }
     }
@@ -8723,7 +8995,9 @@
     "cellActions": {
       "copy": "Copiar",
       "includeTerm": "Incluir termo",
-      "excludeTerm": "Excluir termo"
+      "excludeTerm": "Excluir termo",
+      "sendValueToAi": "Enviar Valor para IA",
+      "sendRowToAi": "Enviar Linha para IA"
     },
     "indexList": {
       "noMatchingFields": "Nenhum campo correspondente encontrado",
@@ -9107,12 +9381,20 @@
       "stepJourney": "Jornada",
       "untitledCheck": "Verificação sem título",
       "variablesHint": "Suporta {variables} como {baseUrl}.",
-      "setupStep2Title": "Ativar modo anônimo",
-      "setupIncognitoHint": "Abra chrome://extensions, clique em {details} e ative {setting}."
+      "setupStep2Title": "Clique no ícone do Gravador OpenObserve na sua barra de ferramentas",
+      "setupIncognitoHint": "Abra chrome://extensions, clique em {details} e ative {setting}.",
+      "setupStep2Description": "O Chrome não consegue conectar automaticamente a páginas que estavam abertas antes de você instalar a extensão. Clicar no ícone da extensão injeta o gravador nesta aba — uma etapa única.",
+      "setupIconActivateHint": "Clique em {icon} na sua barra de ferramentas para ativar o gravador para esta página.",
+      "setupStep3Title": "Ativar modo anônimo",
+      "setupStep3IncognitoHint": "Abra chrome://extensions, clique em {details}, depois ative {setting}.",
+      "setupReady": "Conectado ✓",
+      "setupConnected": "Conectado ✓"
     },
     "dialog": {
       "bulkDeleteBody": "Tem certeza de que deseja excluir {count} verificação(ões)? Esta ação não pode ser desfeita.",
       "bulkDeleteTitle": "Excluir verificações",
+      "deleteSingleBody": "Tem certeza de que deseja excluir \"{name}\"? Esta ação não pode ser desfeita.",
+      "deleteSingleTitle": "Excluir Verificação",
       "duplicateTitle": "Duplicar verificação"
     },
     "empty": {
@@ -9212,11 +9494,88 @@
       "unknown": "Desconhecido"
     },
     "locations": {
+      "addLocation": "Adicionar Localização",
+      "bottomHeader": "localizações",
+      "bulkDeleteConfirmMessage": "Tem certeza de que deseja excluir {count} localizações?",
+      "bulkDeleteConfirmTitle": "Excluir Localizações",
+      "bulkDeleteFailed": "Falha ao excluir localizações",
+      "bulkDeletePartial": "{success} de {total} localizações excluídas",
+      "bulkDeleteSuccess": "{count} localizações excluídas",
+      "cancel": "Cancelar",
       "comingSoon": "Mais regiões e locais privados — Em breve",
+      "createClose": "Criar e Fechar",
+      "createFailed": "Falha ao criar localização",
+      "createSuccess": "Localização criada com sucesso",
+      "createTitle": "Adicionar Localização",
+      "customProviderLabel": "Provedor Personalizado",
+      "customProviderPlaceholder": "Insira o nome do provedor",
+      "customProviderRequired": "O nome do provedor personalizado é obrigatório",
+      "deleteConfirmMessage": "Tem certeza de que deseja excluir esta localização?",
+      "deleteConfirmTitle": "Excluir Localização",
+      "deleteFailed": "Falha ao excluir localização",
+      "deleteSuccess": "Localização excluída com sucesso",
+      "description": "Gerenciar localizações públicas de sonda para monitoramento sintético",
+      "disable": "Desativar",
+      "disabledSuccess": "Localização desativada",
+      "disabling": "Desativando…",
+      "editTitle": "Editar Localização",
       "empty": "Nenhum local disponível",
+      "enable": "Ativar",
+      "enabled": "Ativado",
+      "enabledSuccess": "Localização ativada",
+      "enabling": "Ativando…",
+      "exportFailed": "Falha ao exportar localizações",
+      "exportSuccess": "Localizações exportadas com sucesso",
+      "exportTitle": "Exportar",
+      "fetchFailed": "Falha ao buscar localizações",
+      "bulkDisableFailed": "Falha ao desativar localizações",
+      "bulkDisabledPartial": "{success} de {total} localizações desativadas",
+      "bulkDisabledSuccess": "{count} localizações desativadas",
+      "bulkEnableFailed": "Falha ao ativar localizações",
+      "bulkEnabledPartial": "{success} de {total} localizações ativadas",
+      "bulkEnabledSuccess": "{count} localizações ativadas",
+      "importFailed": "Falha ao importar localizações",
+      "importJsonLabel": "Entrada JSON",
+      "importLabelRequired": "O rótulo é obrigatório para o item {index}",
+      "importPlaceholder": "Cole a matriz JSON de localizações aqui...",
+      "importProviderRequired": "O provedor é obrigatório para o item {index}",
+      "importRegionRequired": "A região é obrigatória para o item {index}",
+      "importSuccess": "{count} localizações importadas com sucesso",
+      "importTitle": "Importar",
+      "invalidJson": "Formato JSON inválido",
+      "label": "Rótulo",
+      "labelPlaceholder": "ex.: AWS US East (N. Virginia)",
+      "labelRequired": "O rótulo é obrigatório",
       "locationAwsEast": "AWS · us-east-1",
+      "locationId": "ID da Localização",
+      "noPreview": "Insira um JSON válido para visualizar as localizações",
+      "preview": "Visualizar",
+      "provider": "Provedor",
+      "providerOther": "Outro",
+      "providerPlaceholder": "Selecione um provedor",
+      "providerRequired": "O provedor é obrigatório",
+      "region": "Região",
+      "regionPlaceholder": "ex.: us-east-1",
+      "regionRequired": "A região é obrigatória",
+      "searchPlaceholder": "Pesquisar localizações…",
+      "selectedCount": "{selected} de {total} localizações selecionadas",
       "subtitle": "Selecione os locais de onde a jornada é executada",
-      "title": "Localizações"
+      "title": "Localizações",
+      "privateBadge": "Privado",
+      "publicTitle": "Público",
+      "privateTitle": "Localizações privadas",
+      "setupAgent": "Configurar agente privado",
+      "privateEmptyBody": "Execute esta verificação a partir de sua própria VPC ou rede on-premise.",
+      "offlineWarning": "Nenhum agente ativo — a verificação não será executada daqui até que um agente retorne.",
+      "liveAgents": "{count} agentes ativos",
+      "liveAgentsNamed": "{count} agentes ativos ({names})",
+      "offlineSince": "Offline · visto pela última vez {ago}",
+      "pendingAgent": "Aguardando o primeiro agente registrar",
+      "toggleFailed": "Falha ao alternar localização",
+      "updateClose": "Atualizar e Fechar",
+      "updateFailed": "Falha ao atualizar localização",
+      "updateSuccess": "Localização atualizada com sucesso",
+      "uploadFile": "Carregar arquivo JSON"
     },
     "newCheck": {
       "back": "Verificações",
@@ -9229,6 +9588,7 @@
       "httpDesc": "Verifique endpoints, códigos de status e corpos de resposta",
       "leave": "Sair",
       "loadEditFailed": "Falha ao carregar a verificação para edição — o formulário mostra valores padrão, não salve",
+      "notFoundInOrg": "Esta verificação não existe na organização atual.",
       "modalSubtitle": "Escolha o que deseja monitorar",
       "modalTitle": "Criar uma verificação",
       "pageTitle": "Nova verificação {label}",
@@ -9251,7 +9611,7 @@
       "willBeCreatedIn": "Será criado em"
     },
     "pageSubtitle": "Monitore proativamente disponibilidade, desempenho e jornadas do usuário a partir de locais globais",
-    "pageTitle": "Verificações sintéticas",
+    "pageTitle": "Sintéticos",
     "protocolConfig": {
       "http": {
         "addAssertion": "Adicionar asserção",
@@ -9348,6 +9708,7 @@
       "failed": "Falhou",
       "failedRuns": "Execuções com falha",
       "jumpToLastRun": "Ir para última execução",
+      "jumpToLatestData": "Ir para os dados mais recentes",
       "lastRun": "Última corrida",
       "location": "Localização",
       "monitors": "Monitores",
@@ -9487,10 +9848,13 @@
       "tabSteps": "Etapas",
       "timelineAllFailed": "Todas {count} falharam",
       "timelineAllPassed": "Todas {count} passaram",
+      "timelineAllWarning": "Todos {count} aviso",
       "timelineMixed": "{passed} passaram, {failed} falharam de {total}",
       "timelineNow": "Agora",
       "triggerManual": "Manual",
       "triggerSchedule": "Agendamento",
+      "warning": "Aviso",
+      "warningRuns": "Execuções de aviso",
       "window24h": "Últimas 24 horas",
       "window1h": "Última 1 hora",
       "windowDays": "Últimos {days} dias",
@@ -9630,10 +9994,12 @@
     "tabs": {
       "all": "Todos",
       "browser": "Navegador",
+      "checks": "Verificações",
       "http": "HTTP",
       "ssh": "SSH",
       "tcp": "TCP",
-      "tls": "TLS"
+      "tls": "TLS",
+      "private": "Localizações Privadas"
     },
     "timeline": {
       "failed": "Falhou",
@@ -9672,7 +10038,79 @@
       "nameRequired": "O nome é obrigatório",
       "selectorRequired": "Seletor é obrigatório para \"{step}\"",
       "urlInvalid": "Insira uma URL válida começando com http:// ou https://",
-      "urlRequired": "A URL inicial é obrigatória"
+      "urlRequired": "A URL inicial é obrigatória",
+      "fixHighlightedFields": "Corrija os campos destacados antes de salvar"
+    },
+    "privateLocations": {
+      "searchPlaceholder": "Pesquisar localizações...",
+      "setupAgent": "Configurar um agente",
+      "copySetupCmd": "Comando de configuração",
+      "deleteTitle": "Excluir localização",
+      "deleteBody": "Excluir localização privada \"{name}\"? Seus agentes pararão de receber trabalhos.",
+      "deleteBlocked": "Em uso por {count} verificações — desatribua-as primeiro",
+      "status": {
+        "online": "Online",
+        "offline": "Offline",
+        "pending": "Pendente"
+      },
+      "table": {
+        "name": "Nome",
+        "region": "Região",
+        "agents": "Agentes",
+        "types": "Tipos",
+        "checks": "Verificações",
+        "checksPerMin": "C/min",
+        "lastSeen": "Último visto"
+      },
+      "empty": {
+        "title": "Nenhuma localização privada ainda",
+        "description": "Implante o agente em sua rede com AGENT_LOCATION definido — a localização se registra e aparece aqui automaticamente. Nenhuma configuração manual na interface.",
+        "action": "Configurar um agente"
+      },
+      "toast": {
+        "deleted": "Localização excluída",
+        "deleteFailed": "Falha ao excluir localização",
+        "copied": "Comando de configuração copiado",
+        "copyFailed": "Falha ao copiar para a área de transferência",
+        "locationRequired": "Insira um nome de localização antes de copiar o comando de instalação."
+      },
+      "setup": {
+        "title": "Configurar um agente privado",
+        "step1Title": "Implantar o agente",
+        "step1Body": "Execute o contêiner em qualquer máquina em sua rede — Docker, Kubernetes ou binário nativo. AGENT_LOCATION nomeia a localização; use o mesmo nome em todos os agentes que devem servi-la.",
+        "step2Title": "Veja a localização aparecer",
+        "step2Body": "No primeiro registro, a linha de localização é criada automaticamente e fica Online — nada a adicionar na interface. Mais agentes com o mesmo AGENT_LOCATION se juntam à mesma localização.",
+        "step3Title": "Atribuir a verificações",
+        "step3Body": "Selecione esta localização ao criar ou editar qualquer verificação. As verificações serão executadas a partir de sua própria infraestrutura.",
+        "noToken": "Não foi possível carregar o comando de configuração — verifique suas permissões e tente novamente.",
+        "browserNote": "Os testes de navegador ainda não podem ser executados a partir de locais privados — apenas verificações de protocolo (HTTP, TCP, TLS, SSH).",
+        "locationNameLabel": "Nome do local",
+        "locationNamePlaceholder": "Sede Corporativa",
+        "tabDocker": "Docker",
+        "tabK8s": "Kubernetes",
+        "tabLinux": "Linux",
+        "tabWindows": "Windows",
+        "agentNameLabel": "Nome do agente (opcional)",
+        "agentNamePlaceholder": "gerado automaticamente a partir do hostname",
+        "agentNameHint": "Deixe em branco para que o agente se nomeie a partir do seu hostname — útil ao executar vários agentes em um único local."
+      },
+      "detail": {
+        "title": "Local privado",
+        "back": "Locais privados",
+        "version": "Versão",
+        "pool": "Pool",
+        "agentsTitle": "Agentes",
+        "agentsSubtitle": "Os agentes se registram automaticamente a partir da sua infraestrutura e são somente leitura aqui.",
+        "agentName": "Agente",
+        "recoverAgent": "Recupere este agente — copie um comando de configuração pré-preenchido com seu nome",
+        "noAgents": "Nenhum agente se registrou para este local ainda.",
+        "checksTitle": "Verificações em execução a partir deste local",
+        "checkName": "Nome",
+        "noChecks": "Nenhuma verificação está atribuída a este local ainda.",
+        "notFound": "Local não encontrado"
+      },
+      "urlRequired": "URL inicial é obrigatória",
+      "fixHighlightedFields": "Corrija os campos destacados antes de salvar"
     }
   },
   "shortcuts": {
@@ -9788,6 +10226,8 @@
       "panelEditorQueryInspector": "Abra o inspetor de consultas",
       "metricsRunQuery": "Executar consulta ProMQL",
       "metricsRefresh": "Atualizar",
+      "metricsAddToDashboard": "Adicionar ao painel",
+      "metricsCopyUrl": "Copiar link de compartilhamento",
       "tracesSearch": "Traços de pesquisa",
       "tracesRefresh": "Atualizar",
       "alertsCreate": "Criar novo alerta",

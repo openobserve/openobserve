@@ -64,14 +64,31 @@ const defaultObject = {
   },
   dialog: dialogObj,
   nodeTypes: [] as Array<{ label: string; icon: string; isSectionHeader: boolean; subtype?: string; io_type?: string; tooltip?: string }>,
+  // Node rail open/closed. Lives here rather than in PipelineEditor because the
+  // toggle sits in Vue Flow's control stack (PipelineFlow) while the rail it
+  // opens is rendered by the editor — shared state is the seam between them.
+  // Starts CLOSED so the canvas gets the full width on open.
+  showNodePalette: false,
   currentSelectedPipeline: defaultPipelineObj,
   pipelineWithoutChange: defaultPipelineObj,
   functions: {},
   // Edge to create when the staged node's config is saved (hover-`+` add-after).
   pendingEdge: <any>null,
-  // Step picker (searchable "add next step" dialog) — hover-`+` on a node opens
-  // it with the source node id; picking a type calls addNodeAfter.
-  stepPicker: { show: false, source: "" },
+  // Step picker (searchable dialog), in one of two modes:
+  //   "next"   — the node's source handle was clicked; `source` is that node id
+  //              and picking a type calls addNodeAfter.
+  //   "source" — the empty-canvas start node was clicked; there is no source
+  //              node yet, so `position` carries where to drop the first one
+  //              and picking a type calls addSourceNode.
+  stepPicker: {
+    show: false,
+    source: "",
+    mode: "next" as "next" | "source",
+    // Flow coords for the new node (source mode only).
+    position: null as { x: number; y: number } | null,
+    // Viewport coords of the click, so the picker opens at the node.
+    anchor: null as { x: number; y: number } | null,
+  },
   pipelineNameError: false,
   pipelineNameErrorMessage: "",
   previousNodeOptions:<any>[],
@@ -361,12 +378,72 @@ export default function useDragAndDrop() {
     }
   }
 
-  // Hover-`+` opens the step picker anchored to this source node.
-  function openStepPicker(sourceId: string) {
-    pipelineObj.stepPicker = { show: true, source: sourceId };
+  // Clicking a node's source handle opens the step picker anchored to it.
+  function openStepPicker(sourceId: string, event?: MouseEvent) {
+    pipelineObj.stepPicker = {
+      show: true,
+      source: sourceId,
+      mode: "next",
+      position: null,
+      anchor: event ? { x: event.clientX, y: event.clientY } : null,
+    };
   }
+
+  // The empty-canvas start node opens the SAME picker, restricted to sources.
+  // The click point becomes the new node's position, so the node lands where
+  // the placeholder the user clicked was sitting.
+  function openSourcePicker(event: MouseEvent) {
+    pipelineObj.stepPicker = {
+      show: true,
+      source: "",
+      mode: "source",
+      position: screenToFlowCoordinate({ x: event.clientX, y: event.clientY }),
+      anchor: { x: event.clientX, y: event.clientY },
+    };
+  }
+
   function closeStepPicker() {
-    pipelineObj.stepPicker = { show: false, source: "" };
+    pipelineObj.stepPicker = {
+      show: false,
+      source: "",
+      mode: "next",
+      position: null,
+      anchor: null,
+    };
+  }
+
+  // Start node picked: stage the pipeline's first (source) node and open its
+  // config modal. Mirrors onDrop — no edge, since nothing precedes it — and is
+  // committed on Save / discarded on Cancel exactly like a dropped node.
+  function addSourceNode(
+    item: { subtype: string; io_type: string },
+    position: { x: number; y: number } | null,
+  ) {
+    const nodeId = getUUID();
+    const newNode = {
+      id: nodeId,
+      type: item.io_type || "input",
+      io_type: item.io_type || "input",
+      position: position ?? { x: 0, y: 0 },
+      data: { label: nodeId, node_type: item.subtype },
+    };
+
+    // Same re-centering as onDrop: the position above is the click point, so
+    // shift by half the rendered size once dimensions are known.
+    const { off } = onNodesInitialized(() => {
+      updateNode(nodeId, (node) => ({
+        position: {
+          x: node.position.x - node.dimensions.width / 2,
+          y: node.position.y - node.dimensions.height / 2,
+        },
+      }));
+      off();
+    });
+
+    pipelineObj.currentSelectedNodeData = newNode;
+    pipelineObj.dialog.name = item.subtype;
+    pipelineObj.dialog.show = true;
+    pipelineObj.isEditNode = false;
   }
 
   // Hover-`+` "add step after": stage a new node below `sourceId` and open its
@@ -462,6 +539,18 @@ export default function useDragAndDrop() {
     pipelineObj.dirtyFlag = false;
     pipelineObj.hasInputNode = false;
     pipelineObj.draggedNode = null;
+    // Transient editor state — the module singleton outlives one editor visit,
+    // so anything left set here leaks into the next pipeline that opens. The
+    // rail in particular documents itself as "starts CLOSED".
+    pipelineObj.showNodePalette = false;
+    pipelineObj.stepPicker = {
+      show: false,
+      source: "",
+      mode: "next",
+      position: null,
+      anchor: null,
+    };
+    pipelineObj.pendingEdge = null;
   };
 
   const getInputNodeStream = () => {
@@ -500,7 +589,9 @@ export default function useDragAndDrop() {
     addNode,
     addNodeAfter,
     openStepPicker,
+    openSourcePicker,
     closeStepPicker,
+    addSourceNode,
     editNode,
     deletePipelineNode,
     resetPipelineData,

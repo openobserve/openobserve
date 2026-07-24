@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="card-label text-compact font-medium text-center leading-[1.3] mt-1 text-text-body group-[.selected]:text-text-body">{{ destType.label }}</div>
               <div
                 v-if="destinationType === destType.value"
-                class="absolute top-1.5 right-1.5 w-5 h-5 rounded-full overflow-hidden bg-status-positive text-text-inverse flex items-center justify-center z-[1]"
+                class="absolute top-1.5 right-1.5 w-5 h-5 rounded-full overflow-hidden bg-status-positive text-text-inverse flex items-center justify-center z-1"
               >
                 <!-- eslint-disable-next-line vue/max-attributes-per-line -->
                 <OIcon name="check" size="xs" />

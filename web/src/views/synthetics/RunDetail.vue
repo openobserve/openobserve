@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :run-id="runIdParam"
     :execution-id="executionIdParam"
     :drawer-mode="drawerMode"
+    :location-names="locationNames"
     @update-status="emit('update-status', $event)"
   />
   <OPageLayout
@@ -274,7 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon
                     name="smart_display"
                     size="sm"
-                    class="text-primary-700"
+                    class="text-accent"
                   />
                   <span class="font-bold text-sm text-text-heading"
                     >{{ t('synthetics.runDetail.sessionReplay') }}</span
@@ -384,7 +385,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <dt class="text-sm font-semibold text-text-secondary capitalize tracking-wide">{{ t('synthetics.runDetail.detailSelector') }}</dt>
                             <dd class="text-text-secondary">{{ row.detail }}</dd>
                             <dt class="text-sm font-semibold text-text-secondary capitalize tracking-wide">{{ t('synthetics.runDetail.detailUrl') }}</dt>
-                            <dd class="truncate text-text-secondary">{{ row.detail }}</dd>
+                            <dd class="truncate text-text-secondary">{{ row.url || currentRun.url }}</dd>
                             <dt class="text-sm font-semibold text-text-secondary capitalize tracking-wide">{{ t('synthetics.results.duration') }}</dt>
                             <dd class="text-text-secondary">{{ row.durStr }}</dd>
                           </dl>
@@ -561,6 +562,7 @@ import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import syntheticsService from "@/services/synthetics";
 import { timestampToTimezoneDate } from "@/utils/timezone";
+import { locationDisplayLabel } from "@/utils/synthetics/format";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
@@ -627,6 +629,22 @@ const { t } = useI18n();
 const route = useRoute();
 const store = useStore();
 
+// id -> "Name (region)" — the run's location field is the raw id (KSUID for
+// private, "aws-us-east-1" for public); resolve it for display.
+const locationNames = ref<Record<string, string>>({});
+function locationLabel(id: string): string {
+  return locationNames.value[id] ?? id;
+}
+syntheticsService
+  .getLocations(store.state.selectedOrganization.identifier)
+  .then((res) => {
+    const locations: { id: string; label: string; region: string }[] = (res.data as any).locations ?? [];
+    locationNames.value = Object.fromEntries(
+      locations.map((loc) => [loc.id, locationDisplayLabel(loc.label, loc.region)]),
+    );
+  })
+  .catch((err) => console.error("[synthetics] failed to load locations", err));
+
 // ── Source IDs — props in drawer mode, route params otherwise ────────────────
 const monitorId = computed(() =>
   props.drawerMode ? props.overrideMonitorId : String(route.params.id ?? ""),
@@ -639,6 +657,9 @@ const executionIdParam = computed(() =>
     ? props.overrideExecutionId
     : String(route.params.executionId ?? ""),
 );
+// The check's folder (name), carried on the results-page route as ?folder=.
+// Passed to per-check API calls so RBAC can resolve folder-scoped grants.
+const folderName = computed(() => String(route.query.folder ?? ""));
 
 // ── Composable ─────────────────────────────────────────────────────────────
 const synthetics = useSyntheticResults();
@@ -651,7 +672,7 @@ const monitorType = ref<string | null>(null);
 async function resolveMonitorType() {
   try {
     const org = store.state.selectedOrganization.identifier;
-    const res = await syntheticsService.get(org, monitorId.value);
+    const res = await syntheticsService.get(org, monitorId.value, folderName.value);
     monitorType.value = (res.data as any)?.type ?? "browser";
   } catch {
     monitorType.value = "browser";
@@ -683,6 +704,7 @@ interface StepRow {
   action: string;
   name: string;
   detail: string;
+  url: string;
   duration: number;
   status: "pass" | "fail";
   icon: string;
@@ -717,6 +739,7 @@ function buildSteps(detail: SyntheticRunDetail | null): StepRow[] {
         recorded?.url ||
         ex.step_id.slice(0, 8),
       detail: recorded?.selector ?? recorded?.url ?? ex.step_id,
+      url: recorded?.url ?? "",
       duration: ex.duration_ms,
       status: isFail ? ("fail" as const) : ("pass" as const),
       icon: recorded ? actionIcon(recorded.action) : "radio_button_checked",
@@ -793,6 +816,7 @@ async function presignRunArtifacts() {
       orgId,
       monitorId.value,
       keys,
+      folderName.value,
     );
     const map: Record<string, string> = {};
     for (const entry of data.urls ?? []) {
@@ -819,7 +843,7 @@ function screenshotUrl(key: string | null): string {
   const signed = artifactUrls.value[key];
   if (signed) return signed;
   const orgId = store.state.selectedOrganization.identifier;
-  return syntheticsService.artifactUrl(orgId, key);
+  return syntheticsService.artifactUrl(orgId, key, folderName.value);
 }
 
 // ── Display model for the current run (mapped from SyntheticRunDetail) ─────
@@ -1096,7 +1120,7 @@ const infoChips = computed<InfoChip[]>(() => [
   },
   {
     label: t('synthetics.results.location'),
-    value: currentRun.value.location,
+    value: locationLabel(currentRun.value.location),
     icon: locationIcon(currentRun.value.location),
   },
 ]);

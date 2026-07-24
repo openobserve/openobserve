@@ -15,6 +15,7 @@
 
 use std::sync::Arc;
 
+use common::meta::organization::ClusterInfo;
 use config::meta::cluster::NodeInfo;
 use infra::file_list as infra_file_list;
 use proto::cluster_rpc::{
@@ -22,8 +23,6 @@ use proto::cluster_rpc::{
     GetDeleteJobStatusResponse,
 };
 use tonic::{Request, Response, Status};
-
-use crate::common::meta::organization::ClusterInfo;
 
 pub struct ClusterInfoService;
 
@@ -70,7 +69,7 @@ impl proto::cluster_rpc::cluster_info_service_server::ClusterInfoService for Clu
         let req = request.into_inner();
 
         // Get the key from the database
-        match crate::service::db::compact::compactor_manual_jobs::get_job(&req.ksuid).await {
+        match crate::db::compact::compactor_manual_jobs::get_job(&req.ksuid).await {
             Ok(job) => {
                 // Job still exists, return pending status
                 Ok(Response::new(GetDeleteJobStatusResponse {

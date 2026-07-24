@@ -15,7 +15,6 @@
 
 pub mod bloom_pruner;
 pub mod datafusion;
-pub mod enrichment;
 pub mod file_cache;
 pub mod index;
 pub mod inspector;

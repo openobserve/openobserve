@@ -173,4 +173,3 @@ html.theme-switching *::after {
   from { opacity: 1; clip-path: inset(0 0 0 0 round 0.5rem); }
   to   { opacity: 0; clip-path: inset(100% 0 0 0 round 0.5rem); }
 }
-

@@ -15,7 +15,6 @@
 
 use std::sync::{Arc, LazyLock as Lazy};
 
-use ::db::pipeline as db_pipeline;
 use config::{
     cluster::LOCAL_NODE,
     meta::{
@@ -23,14 +22,15 @@ use config::{
         stream::StreamParams,
     },
 };
-use infra::{coordinator::pipelines::PIPELINES_WATCH_PREFIX, db, pipeline as infra_pipeline};
+use infra::{
+    coordinator::pipelines::PIPELINES_WATCH_PREFIX, pipeline as db_pipeline,
+    pipeline as infra_pipeline,
+};
 
 use crate::{
-    common::infra::config::{
-        PIPELINE_ID_TO_ORG, PIPELINE_STREAM_MAPPING, SCHEDULED_PIPELINES,
-        STREAM_EXECUTABLE_PIPELINES,
-    },
-    service::pipeline::batch_execution::ExecutablePipeline,
+    cache::STREAM_EXECUTABLE_PIPELINES,
+    common::infra::config::{PIPELINE_ID_TO_ORG, PIPELINE_STREAM_MAPPING, SCHEDULED_PIPELINES},
+    pipeline::batch_execution::ExecutablePipeline,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -254,7 +254,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         && !config::get_config().common.mmdb_disable_download
     {
         log::info!("[PIPELINE:CACHE] waiting mmdb data to be available");
-        Lazy::force(&crate::service::enrichment_table::geoip::MMDB_INIT_NOTIFIER)
+        Lazy::force(&enrichment_data::enrichment_table::geoip::MMDB_INIT_NOTIFIER)
             .notified()
             .await;
         log::info!("[PIPELINE:CACHE] done waiting");
@@ -372,7 +372,7 @@ async fn update_cache(event: PipelineTableEvent<'_>) {
 /// (which also initializes `ExecutablePipeline` objects) remains gated to ingester /
 /// querier / alert_manager nodes.
 pub async fn watch_id_to_org() -> Result<(), anyhow::Error> {
-    let cluster_coordinator = db::get_coordinator().await;
+    let cluster_coordinator = infra::db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(PIPELINES_WATCH_PREFIX).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("[Pipeline::watch_id_to_org] started");
@@ -385,7 +385,7 @@ pub async fn watch_id_to_org() -> Result<(), anyhow::Error> {
             }
         };
         match ev {
-            db::Event::Put(ev) => {
+            infra::db::Event::Put(ev) => {
                 let pipeline_id = ev.key.strip_prefix(PIPELINES_WATCH_PREFIX).unwrap();
                 let Ok(pipeline) = get_by_id(pipeline_id).await else {
                     log::error!(
@@ -398,11 +398,11 @@ pub async fn watch_id_to_org() -> Result<(), anyhow::Error> {
                     .await
                     .insert(pipeline.id, pipeline.org);
             }
-            db::Event::Delete(ev) => {
+            infra::db::Event::Delete(ev) => {
                 let pipeline_id = ev.key.strip_prefix(PIPELINES_WATCH_PREFIX).unwrap();
                 PIPELINE_ID_TO_ORG.write().await.remove(pipeline_id);
             }
-            db::Event::Empty => {}
+            infra::db::Event::Empty => {}
         }
     }
     log::info!("[Pipeline::watch_id_to_org] ended");
@@ -456,7 +456,7 @@ async fn remove_realtime_pipeline_cache(pipeline_id: &str) -> bool {
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    let cluster_coordinator = db::get_coordinator().await;
+    let cluster_coordinator = infra::db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(PIPELINES_WATCH_PREFIX).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("[Pipeline::watch] His watch is started");
@@ -469,7 +469,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
         };
         match ev {
-            db::Event::Put(ev) => {
+            infra::db::Event::Put(ev) => {
                 let pipeline_id = ev.key.strip_prefix(PIPELINES_WATCH_PREFIX).unwrap();
                 let Ok(pipeline) = get_by_id(pipeline_id).await else {
                     log::error!("[Pipeline::watch] error getting pipeline by id from db");
@@ -529,7 +529,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     }
                 }
             }
-            db::Event::Delete(ev) => {
+            infra::db::Event::Delete(ev) => {
                 let pipeline_id = ev.key.strip_prefix(PIPELINES_WATCH_PREFIX).unwrap();
                 PIPELINE_ID_TO_ORG.write().await.remove(pipeline_id);
                 if remove_realtime_pipeline_cache(pipeline_id).await {
@@ -549,7 +549,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     );
                 }
             }
-            db::Event::Empty => {}
+            infra::db::Event::Empty => {}
         }
     }
 

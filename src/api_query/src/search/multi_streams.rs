@@ -13,6 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#[cfg(feature = "enterprise")]
+use ::search::AuditContext;
+#[cfg(feature = "enterprise")]
+use ::search::sql::visitor::cipher_key::get_cipher_key_names;
+#[cfg(feature = "enterprise")]
+use audit::audit;
 use axum::{
     Json,
     body::Bytes,
@@ -36,39 +42,33 @@ use config::{
 use futures::stream::StreamExt;
 use hashbrown::HashMap;
 use infra::errors;
-#[cfg(feature = "enterprise")]
-use search_service::sql::visitor::cipher_key::get_cipher_key_names;
+use openobserve_api_common::extractors::Headers;
+use openobserve_core::auth::UserEmail;
+use search_service::{
+    self as SearchService, query_range::get_settings_max_query_range,
+    streaming::process_search_stream_request_multi,
+};
 use tokio::sync::mpsc;
 use tracing::{Instrument, Span};
+use transform as functions;
+use usage_reporting::report_request_usage_stats;
 #[cfg(feature = "cloud")]
 use {
-    crate::service::organization::is_org_in_free_trial_period,
     axum::http::StatusCode as AxumStatusCode,
+    openobserve_core::organization::is_org_in_free_trial_period,
 };
 
-#[cfg(feature = "enterprise")]
-use crate::{common::meta::search::AuditContext, service::self_reporting::audit};
 use crate::{
     common::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
-        utils::{
-            auth::UserEmail,
-            functions,
-            http::{
-                get_clear_cache_from_request, get_dashboard_info_from_request,
-                get_fallback_order_by_col_from_request, get_or_create_trace_id,
-                get_search_event_context_from_request, get_search_type_from_request,
-                get_stream_type_from_request, get_use_cache_from_request,
-            },
-            stream::get_settings_max_query_range,
+        utils::http::{
+            get_clear_cache_from_request, get_dashboard_info_from_request,
+            get_fallback_order_by_col_from_request, get_or_create_trace_id,
+            get_search_event_context_from_request, get_search_type_from_request,
+            get_stream_type_from_request, get_use_cache_from_request,
         },
     },
-    extractors::Headers,
     search::{error_utils::map_error_to_http_response, utils::SearchStreamGuard},
-    service::{
-        search::{self as SearchService, streaming::process_search_stream_request_multi},
-        self_reporting::report_request_usage_stats,
-    },
 };
 
 /// SearchStreamData
@@ -286,17 +286,14 @@ pub async fn search_multi(
         {
             use o2_openfga::meta::mapping::OFGA_MODELS;
 
-            use crate::{
-                common::utils::auth::{AuthExtractor, is_root_user},
-                service::users::get_user,
-            };
+            use crate::service::{auth::AuthExtractor, users::get_user};
 
-            if !is_root_user(user_id) {
+            if !db::user::is_root_user(user_id) {
                 let user: config::meta::user::User =
                     get_user(Some(&org_id), user_id).await.unwrap();
                 let stream_type_str = stream_type.as_str();
 
-                if !crate::service::authz::check_permissions(
+                if !openobserve_core::authz::check_permissions(
                     user_id,
                     AuthExtractor {
                         auth: "".to_string(),
@@ -336,11 +333,11 @@ pub async fn search_multi(
             // Check permissions on stream ends
             // Check permissions on keys
             for key in keys_used {
-                if !is_root_user(user_id) {
+                if !db::user::is_root_user(user_id) {
                     let user: config::meta::user::User =
                         get_user(Some(&org_id), user_id).await.unwrap();
 
-                    if !crate::service::authz::check_permissions(
+                    if !openobserve_core::authz::check_permissions(
                         user_id,
                         AuthExtractor {
                             auth: "".to_string(),
@@ -539,12 +536,12 @@ pub async fn search_multi(
         // compile vrl function & apply the same before returning the response
 
         let apply_over_hits = RESULT_ARRAY.is_match(input_fn);
-        let mut runtime = crate::common::utils::functions::init_vrl_runtime();
-        let program = match crate::service::ingestion::compile_vrl_function(input_fn, &org_id) {
+        let mut runtime = transform::init_vrl_runtime();
+        let program = match transform::compile_vrl_function(input_fn, &org_id) {
             Ok(program) => {
                 let registry = program
                     .config
-                    .get_custom::<transform::vector_enrichment::TableRegistry>()
+                    .get_custom::<vector_enrichment::TableRegistry>()
                     .unwrap();
                 registry.finish_load();
                 Some(program)
@@ -560,7 +557,7 @@ pub async fn search_multi(
             Some(program) => {
                 report_function_usage = true;
                 if apply_over_hits {
-                    let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
+                    let (ret_val, err) = transform::apply_vrl_fn(
                         &mut runtime,
                         &VRLResultResolver {
                             program: program.program.clone(),
@@ -623,7 +620,7 @@ pub async fn search_multi(
                         .hits
                         .into_iter()
                         .filter_map(|hit| {
-                            let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
+                            let (ret_val, err) = transform::apply_vrl_fn(
                                 &mut runtime,
                                 &VRLResultResolver {
                                     program: program.program.clone(),
@@ -1269,12 +1266,9 @@ pub async fn search_multi_stream(
     {
         use o2_openfga::meta::mapping::OFGA_MODELS;
 
-        use crate::{
-            common::utils::auth::{AuthExtractor, is_root_user},
-            service::users::get_user,
-        };
+        use crate::service::{auth::AuthExtractor, users::get_user};
 
-        if !is_root_user(&user_id) {
+        if !db::user::is_root_user(&user_id) {
             let user: config::meta::user::User = get_user(Some(&org_id), &user_id).await.unwrap();
             let stream_type_str = stream_type.as_str();
             let user_role = user.role.clone();
@@ -1322,7 +1316,7 @@ pub async fn search_multi_stream(
 
             // Check permissions for each unique stream
             for stream_name in stream_names {
-                if !crate::service::authz::check_permissions(
+                if !openobserve_core::authz::check_permissions(
                     &user_id,
                     AuthExtractor {
                         auth: "".to_string(),

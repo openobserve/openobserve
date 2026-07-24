@@ -322,7 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="histogram-skeleton__y-label" style="width: 2.25rem" />
                 <div class="histogram-skeleton__y-label" style="width: 1rem" />
               </div>
-              <div class="histogram-skeleton__plot">
+              <div class="histogram-skeleton__plot border-l border-b border-card-glass-border">
                 <div class="histogram-skeleton__bars">
                   <div
                     v-for="h in skeletonBarHeights"
@@ -335,7 +335,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <!-- x-axis labels row -->
             <div class="histogram-skeleton__x-axis">
-              <div v-for="i in 6" :key="i" class="histogram-skeleton__x-label" />
+              <div v-for="i in 6" :key="i" class="histogram-skeleton__x-label bg-skeleton-base" />
             </div>
           </div>
 
@@ -1145,7 +1145,7 @@ export default defineComponent({
     const correlationDashboardProps = ref<any>(null);
     const correlationLoading = ref(false);
     const correlationError = ref<string | null>(null);
-    const detailTableInitialTab = ref<string>("json");
+    const detailTableInitialTab = ref<string>("table");
     const { findRelatedTelemetry, semanticGroups } = useServiceCorrelation();
 
     // Flag to prevent duplicate correlation API calls
@@ -1441,7 +1441,7 @@ export default defineComponent({
     const openLogDetails = (props: any, index: number) => {
       searchObj.meta.showDetailTab = true;
       searchObj.meta.resultGrid.navigation.currentRowIndex = index;
-      detailTableInitialTab.value = "json"; // Reset to default tab
+      detailTableInitialTab.value = "table"; // Reset to default tab
 
       // Prepare correlation context (but don't open panel automatically)
       const logData = searchObj.data.queryResults?.hits?.[index];
@@ -2373,8 +2373,6 @@ export default defineComponent({
     min-width: 0;
     display: flex;
     flex-direction: column;
-    border-left: 1px solid var(--color-card-glass-border);
-    border-bottom: 1px solid var(--color-card-glass-border);
   }
 
   &__bars {
@@ -2424,7 +2422,6 @@ export default defineComponent({
     width: 2.25rem;
     height: 0.4375rem;
     border-radius: 0.125rem;
-    background-color: var(--color-skeleton-base);
   }
 }
 

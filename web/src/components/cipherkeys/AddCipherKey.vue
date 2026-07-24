@@ -130,8 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="mx-2">
-          <div class="flex justify-end px-2 py-4 w-full gap-2 border-t border-border-default sticky"
-            style="bottom: 0px; z-index: 2"
+          <div class="flex justify-end px-2 py-4 w-full gap-2 border-t border-border-default sticky bottom-0 z-2"
           >
             <OButton
               data-test="add-cipher-key-cancel-btn"

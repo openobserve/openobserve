@@ -48,6 +48,7 @@ import Cloud from "~icons/material-symbols/cloud-outline";
 import Code from "~icons/material-symbols/code";
 import CompareArrows from "~icons/material-symbols/compare-arrows";
 import ContentCopy from "~icons/material-symbols/content-copy-outline";
+import ContentPaste from "~icons/material-symbols/content-paste";
 import Delete from "~icons/material-symbols/delete-outline";
 import Download from "~icons/material-symbols/download";
 import Edit from "~icons/material-symbols/edit-outline";
@@ -310,6 +311,8 @@ import Input from "~icons/material-symbols/input";
 import Transform from "~icons/material-symbols/transform";
 import Favorite from "~icons/material-symbols/favorite";
 import FavoriteBorder from "~icons/material-symbols/favorite-outline";
+import Star from "~icons/material-symbols/star";
+import StarOutline from "~icons/material-symbols/star-outline";
 import RadioButtonUnchecked from "~icons/material-symbols/radio-button-unchecked";
 import RadioButtonChecked from "~icons/material-symbols/radio-button-checked";
 import ComputerIcon from "~icons/material-symbols/computer-outline";
@@ -353,6 +356,8 @@ export const iconRegistry = {
   "stars": Stars,
   "favorite": Favorite,
   "favorite-border": FavoriteBorder,
+  "star": Star,
+  "star-outline": StarOutline,
   "backpack": Backpack,
   "block": Block,
   "bolt": Bolt,
@@ -373,6 +378,7 @@ export const iconRegistry = {
   "code": Code,
   "compare-arrows": CompareArrows,
   "content-copy": ContentCopy,
+  "content-paste": ContentPaste,
   "delete": Delete,
   "download": Download,
   "edit": Edit,

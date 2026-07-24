@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="settings" size="md" class="text-accent shrink-0" />
                 <div class="flex-1 flex flex-col gap-0.5 min-w-0">
                   <span class="text-sm font-semibold font-mono text-text-heading whitespace-nowrap overflow-hidden text-ellipsis">{{ t('about.cargoToml') }}</span>
-                  <span class="text-xs text-text-muted">{{ t('about.rustCrates') }}</span>
+                  <span class="text-xs text-text-secondary">{{ t('about.rustCrates') }}</span>
                 </div>
                 <OIcon name="open-in-new" size="sm" class="text-text-muted shrink-0" />
               </a>
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="backpack" size="md" class="text-accent shrink-0" />
                 <div class="flex-1 flex flex-col gap-0.5 min-w-0">
                   <span class="text-sm font-semibold font-mono text-text-heading whitespace-nowrap overflow-hidden text-ellipsis">{{ t('about.packageJson') }}</span>
-                  <span class="text-xs text-text-muted">{{ t('about.nodePackages') }}</span>
+                  <span class="text-xs text-text-secondary">{{ t('about.nodePackages') }}</span>
                 </div>
                 <OIcon name="open-in-new" size="sm" class="text-text-muted shrink-0" />
               </a>
@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="javascript" size="md" class="text-accent shrink-0" />
                 <div class="flex-1 flex flex-col gap-0.5 min-w-0">
                   <span class="text-sm font-semibold font-mono text-text-heading whitespace-nowrap overflow-hidden text-ellipsis">{{ t('about.npmjsCom') }}</span>
-                  <span class="text-xs text-text-muted">{{ t('about.jsRegistry') }}</span>
+                  <span class="text-xs text-text-secondary">{{ t('about.jsRegistry') }}</span>
                 </div>
                 <OIcon name="open-in-new" size="sm" class="text-text-muted shrink-0" />
               </a>
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="inventory-2" size="md" class="text-accent shrink-0" />
                 <div class="flex-1 flex flex-col gap-0.5 min-w-0">
                   <span class="text-sm font-semibold font-mono text-text-heading whitespace-nowrap overflow-hidden text-ellipsis">{{ t('about.cratesIo') }}</span>
-                  <span class="text-xs text-text-muted">{{ t('about.rustRegistry') }}</span>
+                  <span class="text-xs text-text-secondary">{{ t('about.rustRegistry') }}</span>
                 </div>
                 <OIcon name="open-in-new" size="sm" class="text-text-muted shrink-0" />
               </a>

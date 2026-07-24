@@ -243,6 +243,7 @@ class UnflattenedPage {
         await this.page
             .locator('[data-test="logs-search-result-detail-dialog"][data-state="open"]')
             .waitFor({ state: 'visible', timeout: 10000 });
+        await this.openJsonDetailTab();
         // JSON content renders asynchronously after the drawer opens. Wait for the
         // first detail key to actually render instead of a fixed 3s sleep — the keys
         // appearing IS the signal callers need before probing for _o2_id, and the
@@ -252,6 +253,33 @@ class UnflattenedPage {
             .first()
             .waitFor({ state: 'visible', timeout: 10000 })
             .catch(() => {});
+    }
+
+    /**
+     * Select the JSON tab in the log detail drawer.
+     *
+     * The drawer now opens on the Table tab — see 4194865a63 "logs sidebar table
+     * will be default view and draggable tabs", which flipped
+     * SearchResult.vue's `detailTableInitialTab` and DetailTable's `initialTab`
+     * default from "json" to "table". Everything this page object reads
+     * (`_o2_id`, the per-key `log-expand-detail-key-*` rows, the unflattened
+     * sub-tab) lives in the JSON panel, and `OTabPanels` is used with
+     * `keep-alive`, so the inactive JSON panel stays mounted but `v-show`-hidden.
+     * It is therefore present in the DOM yet never *visible*, which is what made
+     * every `_o2_id` probe time out.
+     *
+     * The tab bar is user-reorderable (order persisted in localStorage), so
+     * select by data-test rather than position.
+     */
+    async openJsonDetailTab() {
+        const jsonTab = this.page
+            .locator('[data-test="logs-search-result-detail-dialog"] [data-test="log-detail-json-tab"]')
+            .first();
+        await jsonTab.waitFor({ state: 'visible', timeout: 10000 });
+        if ((await jsonTab.getAttribute('data-state')) !== 'active') {
+            await jsonTab.click();
+        }
+        await this.logDetailJsonContent.waitFor({ state: 'visible', timeout: 10000 });
     }
 
     /**
@@ -276,9 +304,18 @@ class UnflattenedPage {
      * drawer OPEN on the matching row so the caller can continue interacting
      * with the `_o2_id` element.  Returns -1 if no row in the range contains
      * `_o2_id`.
+     *
+     * Pass `deadlineAt` (an absolute `Date.now()` value) to cap how long the
+     * sweep may run.  Each row costs a drawer open plus a probe, so a 15-row
+     * sweep on a slow runner could otherwise outlive the whole test timeout and
+     * get the test killed mid-action instead of returning -1.
      */
-    async findRowWithO2Id(maxRows = 5) {
+    async findRowWithO2Id(maxRows = 5, { deadlineAt = null } = {}) {
         for (let rowIndex = 0; rowIndex < maxRows; rowIndex++) {
+            if (deadlineAt && Date.now() >= deadlineAt) {
+                console.warn(`findRowWithO2Id: time budget reached after scanning ${rowIndex} row(s)`);
+                break;
+            }
             const expandBtn = this.page.locator(
                 `[data-test="log-table-column-${rowIndex}-_timestamp"] [data-test="table-row-expand-menu"]`
             );

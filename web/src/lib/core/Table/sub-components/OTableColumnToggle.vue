@@ -77,7 +77,7 @@ function resetToDefault(): void {
         </OButton>
         <span
           v-if="hiddenCount > 0"
-          class="absolute -top-1 -right-1 inline-flex items-center justify-center rounded-full bg-primary-600 text-white text-3xs font-medium w-4 h-4 leading-none pointer-events-none"
+          class="absolute -top-1 -right-1 inline-flex items-center justify-center rounded-full bg-count-badge-bg text-white text-3xs font-medium w-4 h-4 leading-none pointer-events-none"
           data-test="o2-table-column-toggle-hidden-badge"
         >
           {{ hiddenCount }}

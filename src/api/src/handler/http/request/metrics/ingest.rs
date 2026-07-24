@@ -24,14 +24,13 @@ use config::axum::middlewares::{
 };
 #[cfg(feature = "cloud")]
 use config::meta::stream::StreamType;
-
+use ingestion_common::IngestUser;
+use openobserve_core::auth::UserEmail;
 #[cfg(feature = "cloud")]
-use crate::service::ingestion::check_ingestion_allowed;
+use openobserve_core::ingestion::check_ingestion_allowed;
+
 use crate::{
-    common::{
-        meta::{http::HttpResponse as MetaHttpResponse, ingestion::IngestUser},
-        utils::auth::UserEmail,
-    },
+    common::meta::http::HttpResponse as MetaHttpResponse,
     handler::http::{
         extractors::Headers,
         request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},

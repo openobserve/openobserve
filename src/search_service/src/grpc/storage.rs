@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-pub use ::search::file_cache::{cache_files, calc_target_partitions};
+use ::search::file_cache::{cache_files, calc_target_partitions};
 use arrow_schema::Schema;
 use config::{
     cluster::LOCAL_NODE,
@@ -37,11 +37,11 @@ use infra::{
 use itertools::Itertools;
 use tracing::Instrument;
 
-pub use crate::tantivy::tantivy_search;
 use crate::{
     bloom_pruner,
     index::IndexCondition,
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+    tantivy::tantivy_search,
 };
 
 /// search in remote object storage
