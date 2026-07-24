@@ -35,10 +35,11 @@ use datafusion::{
 use hashbrown::HashMap;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::sampling::execution::generate_row_group_access_plan;
-#[cfg(all(feature = "enterprise", feature = "vortex"))]
-use o2_enterprise::enterprise::search::vortex::generate_vortex_access_plan;
 
-use crate::{datafusion::storage, index::IndexCondition};
+use crate::{
+    datafusion::{storage, vortex::generate_vortex_access_plan},
+    index::IndexCondition,
+};
 
 /// Row group size used by writers before the `row_group_size` puffin property
 /// existed. Any .ttv file without the property was produced with this value.
@@ -82,7 +83,6 @@ pub fn generate_access_plan(file: &mut PartitionedFile) {
             #[cfg(not(feature = "enterprise"))]
             FileSelection::RowGroups(_) => {}
         },
-        #[cfg(all(feature = "enterprise", feature = "vortex"))]
         FileFormat::Vortex => match selection {
             FileSelection::Rows(row_ids) => {
                 if let Some(access_plan) = generate_vortex_access_plan(&row_ids) {
@@ -92,8 +92,6 @@ pub fn generate_access_plan(file: &mut PartitionedFile) {
             // row-group sampling is parquet only; vortex falls back to a full scan
             FileSelection::RowGroups(_) => {}
         },
-        #[cfg(not(all(feature = "enterprise", feature = "vortex")))]
-        FileFormat::Vortex => {}
     }
 }
 

@@ -16,10 +16,8 @@
 //! Record readers used by the Tantivy index builder.
 
 mod parquet;
-#[cfg(all(feature = "vortex", feature = "enterprise"))]
 mod vortex;
 
-#[cfg(all(feature = "vortex", feature = "enterprise"))]
 use std::ops::Range;
 
 use arrow::{error::ArrowError, record_batch::RecordBatch};
@@ -29,8 +27,7 @@ use config::{FileFormat, utils::parquet::RecordBatchStream};
 pub(super) type RecordBatchIter = Box<dyn Iterator<Item = Result<RecordBatch, ArrowError>>>;
 
 pub(super) enum ChunkSelector {
-    Parquet(usize), // row_group id
-    #[cfg(all(feature = "vortex", feature = "enterprise"))]
+    Parquet(usize),     // row_group id
     Vortex(Range<u64>), // row range
 }
 
@@ -43,12 +40,7 @@ pub(super) async fn file_stream(
 ) -> Result<RecordBatchStream, anyhow::Error> {
     match file_format {
         FileFormat::Parquet => parquet::scan_parquet_async(data, projection).await,
-        #[cfg(all(feature = "vortex", feature = "enterprise"))]
         FileFormat::Vortex => vortex::scan_vortex_async(data, projection).await,
-        #[cfg(not(all(feature = "vortex", feature = "enterprise")))]
-        FileFormat::Vortex => Err(anyhow::anyhow!(
-            "Vortex file format requires the vortex feature"
-        )),
     }
 }
 
@@ -62,7 +54,6 @@ pub(super) fn chunk_iter(
         ChunkSelector::Parquet(row_group_id) => {
             parquet::scan_parquet_row_group(data, projection, row_group_id)
         }
-        #[cfg(all(feature = "vortex", feature = "enterprise"))]
         ChunkSelector::Vortex(row_range) => {
             vortex::scan_vortex_row_range(data, projection, row_range)
         }

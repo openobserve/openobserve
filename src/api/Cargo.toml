@@ -40,13 +40,6 @@ vectorscan = [
     "search_service/vectorscan",
     "stream/vectorscan",
 ]
-vortex = [
-    "config/vortex",
-    "openobserve-api-query/vortex",
-    "openobserve-core/vortex",
-    "promql-service/vortex",
-    "search_service/vortex",
-]
 profiling = [
     "dep:tikv-jemalloc-ctl",
     "dep:tikv-jemalloc-sys",

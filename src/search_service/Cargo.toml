@@ -20,7 +20,6 @@ vectorscan = [
     "o2_enterprise/vectorscan",
     "search/vectorscan",
 ]
-vortex = ["config/vortex", "o2_enterprise?/vortex", "search/vortex"]
 
 [dependencies]
 anyhow.workspace = true
