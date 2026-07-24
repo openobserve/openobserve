@@ -521,6 +521,16 @@ function pivotTotalCell(col: OTableColumnDef<TData>): any {
   return fmt ? fmt(val, row) : val;
 }
 
+// Combined inline style for a grand-total tfoot cell: the right-pinned
+// sticky-total-column geometry plus the monospace font for number/timestamp
+// columns (`col.mono`), so the total row's digits align with the mono body
+// cells above it. Inline so it wins over the scoped `td { --font-sans }` rule.
+function pivotTotalCellStyle(col: OTableColumnDef<TData>): Record<string, any> {
+  const style = pivotTotalColumnStyle(col);
+  if ((col as any).mono) style.fontFamily = "var(--font-mono)";
+  return style;
+}
+
 // Right-pinned total-column style for the grand-total tfoot cell (pixel math
 // matches the header/body sticky total columns).
 function pivotTotalColumnStyle(col: OTableColumnDef<TData>): Record<string, any> {
@@ -1377,7 +1387,7 @@ defineExpose({
                       : 'text-left',
                   props.stickyColTotals && (col.meta as any)?._isTotalColumn ? 'font-semibold' : '',
                 ]"
-                :style="pivotTotalColumnStyle(col)"
+                :style="pivotTotalCellStyle(col)"
               >
                 {{ pivotTotalCell(col) }}
               </td>
