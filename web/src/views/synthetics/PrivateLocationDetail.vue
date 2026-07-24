@@ -1,7 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 <template>
   <OPageLayout
-    :title="detail?.label || t('synthetics.privateLocations.detail.title')"
     icon="location-on"
     :back="{
       label: t('synthetics.privateLocations.detail.back'),
@@ -9,6 +8,12 @@
     }"
     bleed
   >
+    <template #title>
+      <span class="inline-flex min-w-0 items-center gap-2">
+        <span class="truncate">{{ detail?.label || t("synthetics.privateLocations.detail.title") }}</span>
+        <BetaBadge />
+      </span>
+    </template>
     <template #title-trail>
       <OBadge v-if="detail" :variant="statusVariant(detail.status)" :dot="true" size="sm">
         {{ t(`synthetics.privateLocations.status.${detail.status}`) }}
@@ -211,6 +216,7 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { resolveBadge } from "@/lib/core/Badge/badgeGroups";
+import BetaBadge from "@/components/common/BetaBadge.vue";
 import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer.vue";
 import syntheticsService from "@/services/synthetics";
 import type { AgentSetup, SyntheticLocationDetail } from "@/types/synthetics";
