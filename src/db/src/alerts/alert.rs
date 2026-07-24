@@ -34,7 +34,10 @@ use infra::{
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use svix_ksuid::Ksuid;
 
-use crate::{self as db, workflows::WorkflowTriggerType};
+use crate::{
+    self as db,
+    workflows::{AssociationDeleteEvent, WorkflowTriggerType},
+};
 
 /// Gets the alert and its parent folder.
 pub async fn get_by_id<C: ConnectionTrait>(
@@ -290,6 +293,12 @@ pub async fn delete_by_id<C: ConnectionTrait>(
     };
     let alert_id_str = alert_id.to_string();
 
+    db::workflows::delete_workflow_association(AssociationDeleteEvent::Entity {
+        org_id: org_id.to_string(),
+        entity_id: alert_id_str.clone(),
+    })
+    .await?;
+
     table::delete_by_id(conn, org_id, alert_id).await?;
     infra::coordinator::alerts::emit_delete_event(org_id, &alert_id_str).await?;
     #[cfg(feature = "enterprise")]
@@ -326,6 +335,12 @@ pub async fn delete_by_name(
         return Ok(());
     };
     let alert_id_str = alert_id.to_string();
+
+    db::workflows::delete_workflow_association(AssociationDeleteEvent::Entity {
+        org_id: org_id.to_string(),
+        entity_id: alert_id_str.clone(),
+    })
+    .await?;
 
     table::delete_by_name(client, org_id, "default", stream_type, stream_name, name).await?;
     infra::coordinator::alerts::emit_delete_event(org_id, &alert_id_str).await?;
