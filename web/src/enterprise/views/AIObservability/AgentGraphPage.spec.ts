@@ -250,11 +250,12 @@ describe("AgentGraphPage — agent-mode stream gating", () => {
     // agentless stream like `introspection`.
     expect(values).toEqual(["streamA", "streamB"]);
 
-    // Each label is annotated with the agent count for that stream.
+    // The option label is the BARE stream name (the agent count is rendered as
+    // a separate badge beside the picker, not crammed into the truncated label).
     const labelByValue = Object.fromEntries(
       opts.map((o) => [o.attributes("data-option"), o.text()]),
     );
-    expect(labelByValue["streamA"]).toContain("(1 traces.agentCountSingular)");
-    expect(labelByValue["streamB"]).toContain("(2 traces.agentCountPlural)");
+    expect(labelByValue["streamA"]).toBe("streamA");
+    expect(labelByValue["streamB"]).toBe("streamB");
   });
 });

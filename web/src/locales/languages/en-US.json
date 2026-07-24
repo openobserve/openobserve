@@ -5905,6 +5905,11 @@
       "versionHelp": "Incoming attributes to use as the agent's version.",
       "versionInfo": "Checked only when the standard gen_ai.agent.version attribute is missing or empty. Add one incoming telemetry attribute per line.",
       "fieldsPlaceholder": "agent.name\nllm.agent.name",
+      "agentNamePlaceholder": "my.custom.agent_name\nteam.agent.label",
+      "agentIdPlaceholder": "my.custom.agent_id\nteam.agent.uid",
+      "envPlaceholder": "my.custom.env\ntier",
+      "versionPlaceholder": "my.custom.version\nrelease.tag",
+      "alwaysAppliedStandard": "Standard (checked first):",
       "applyDefaults": "Apply defaults",
       "resetToEmpty": "Reset to empty",
       "clearRegistry": "Clear registry",
@@ -6471,8 +6476,8 @@
   "traces": {
     "agentDefaultVariant": "default",
     "allAgents": "All Agents",
-    "agentCountSingular": "agent",
-    "agentCountPlural": "agents",
+    "agentCountBadgeSingular": "{count} agent",
+    "agentCountBadgePlural": "{count} agents",
     "serviceGraph": {
       "searchPlaceholder": "Search Services",
       "noStreamsDetected": "No streams detected. Ensure service graph metrics include stream_name labels.",

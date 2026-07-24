@@ -62,21 +62,23 @@ export function buildAgentSelectOptions(
  * shared across every AI page's Stream picker so they read identically. `value`
  * stays the bare stream name; the label carries the count.
  */
+/**
+ * Stream-picker options. The label is the bare stream name (so it truncates
+ * cleanly with a tooltip in a fixed-width trigger — stream names are arbitrary
+ * length), and the agent count rides along as `agentCount` so callers render it
+ * as a separate badge rather than cramming it into the truncated label text.
+ */
 export function buildStreamSelectOptions(
   streams: string[],
   agents: GenAiAgentListItem[],
-  t: (k: string) => string,
-): SelectOption[] {
+): (SelectOption & { agentCount: number })[] {
   const counts = new Map<string, number>();
   for (const a of agents) {
     counts.set(a.source_stream, (counts.get(a.source_stream) ?? 0) + 1);
   }
-  return streams.map((s) => {
-    const n = counts.get(s) ?? 0;
-    const word =
-      n === 1
-        ? t("traces.agentCountSingular")
-        : t("traces.agentCountPlural");
-    return { label: `${s} (${n} ${word})`, value: s };
-  });
+  return streams.map((s) => ({
+    label: s,
+    value: s,
+    agentCount: counts.get(s) ?? 0,
+  }));
 }

@@ -89,6 +89,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="w-full rounded-default"
         />
       </div>
+      <!-- Agent count for the selected stream — beside the picker, consistent
+           with the env/version scope chips beside the agent picker. -->
+      <StreamAgentCountBadge
+        v-if="filterMode === 'stream' && activeStream"
+        :count="selectedStreamCount"
+        data-test="agent-graph-stream-count"
+      />
       <div
         v-else
         data-test="agent-graph-agent-selector"
@@ -255,6 +262,7 @@ import {
   buildStreamSelectOptions,
 } from "@/plugins/traces/agentOptionFormat";
 import OAgentBadges from "@/components/shared/OAgentBadges.vue";
+import StreamAgentCountBadge from "@/components/shared/StreamAgentCountBadge.vue";
 import { useAiDateRange } from "@/enterprise/composables/useAiDateRange";
 
 defineOptions({ name: "AIAgentGraphPage" });
@@ -378,7 +386,12 @@ const availableStreams = computed(() => [
 // truncated) stream names. `value` stays the bare stream name. The full stream
 // name is kept in `title` so a truncated label still reveals itself on hover.
 const streamSelectOptions = computed(() =>
-  buildStreamSelectOptions(availableStreams.value, agents.value, t),
+  buildStreamSelectOptions(availableStreams.value, agents.value),
+);
+const selectedStreamCount = computed(
+  () =>
+    streamSelectOptions.value.find((o) => o.value === activeStream.value)
+      ?.agentCount ?? 0,
 );
 
 const selectedAgent = computed<GenAiAgentListItem | null>(

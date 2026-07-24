@@ -117,6 +117,13 @@
           class="w-full rounded-default"
         />
       </div>
+      <!-- Agent count for the selected stream — beside the picker, mirroring the
+           env/version scope chips beside the agent picker. -->
+      <StreamAgentCountBadge
+        v-if="filterMode === 'stream' && activeStream"
+        :count="selectedStreamCount"
+        data-test="agent-behavior-stream-count"
+      />
       <!-- Scope chips: which env/version variant is in view (agent mode only). -->
       <OAgentBadges
         v-if="filterMode === 'agent' && selectedAgent"
@@ -166,6 +173,7 @@ import {
   buildStreamSelectOptions,
 } from "@/plugins/traces/agentOptionFormat";
 import OAgentBadges from "@/components/shared/OAgentBadges.vue";
+import StreamAgentCountBadge from "@/components/shared/StreamAgentCountBadge.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import {
   useAiDateRange,
@@ -203,7 +211,14 @@ const agentSelectOptions = computed(() =>
   buildAgentSelectOptions(agents.value, t),
 );
 const streamSelectOptions = computed(() =>
-  buildStreamSelectOptions(availableStreams.value, agents.value, t),
+  buildStreamSelectOptions(availableStreams.value, agents.value),
+);
+// Agent count for the currently-selected stream — rendered as a badge in the
+// stream picker trigger (so the count isn't crammed into the truncated name).
+const selectedStreamCount = computed(
+  () =>
+    streamSelectOptions.value.find((o) => o.value === activeStream.value)
+      ?.agentCount ?? 0,
 );
 const selectedAgent = computed<GenAiAgentListItem | null>(
   () => agents.value.find((a) => agentKey(a) === activeAgentKey.value) ?? null,

@@ -64,6 +64,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="onStreamChange"
         />
       </div>
+      <!-- Agent count for the selected stream — beside the picker, consistent
+           with the env/version scope chips beside the agent picker. -->
+      <StreamAgentCountBadge
+        v-if="filterMode === 'stream' && activeStream"
+        :count="selectedStreamCount"
+        data-test="sessions-stream-count"
+      />
       <div
         v-else
         data-test="sessions-list-agent-selector"
@@ -276,6 +283,7 @@ import {
   buildStreamSelectOptions,
 } from "./agentOptionFormat";
 import OAgentBadges from "@/components/shared/OAgentBadges.vue";
+import StreamAgentCountBadge from "@/components/shared/StreamAgentCountBadge.vue";
 
 interface Props {
   streamName: string;
@@ -353,7 +361,12 @@ const agentSelectOptions = computed(() =>
   buildAgentSelectOptions(agents.value, t, { includeAllAgents: true }),
 );
 const streamSelectOptions = computed(() =>
-  buildStreamSelectOptions(availableStreams.value, agents.value, t),
+  buildStreamSelectOptions(availableStreams.value, agents.value),
+);
+const selectedStreamCount = computed(
+  () =>
+    streamSelectOptions.value.find((o) => o.value === activeStream.value)
+      ?.agentCount ?? 0,
 );
 
 const selectedAgent = computed<GenAiAgentListItem | null>(() => {
