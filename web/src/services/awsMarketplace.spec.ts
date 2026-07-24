@@ -55,23 +55,27 @@ describe("awsMarketplace service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         "/api/test-org/aws-marketplace/link-subscription",
-        { token: "marketplace-token-xyz" }
+        { token: "marketplace-token-xyz" },
       );
     });
 
     it("should use the org_identifier in the URL", async () => {
-      mockHttpInstance.post.mockResolvedValue({ data: { success: true, customer_identifier: "cust-1" } });
+      mockHttpInstance.post.mockResolvedValue({
+        data: { success: true, customer_identifier: "cust-1" },
+      });
 
       await awsMarketplace.linkSubscription("prod-org", "token-abc");
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         "/api/prod-org/aws-marketplace/link-subscription",
-        { token: "token-abc" }
+        { token: "token-abc" },
       );
     });
 
     it("should handle different org and token combinations", async () => {
-      mockHttpInstance.post.mockResolvedValue({ data: { success: true, customer_identifier: "cust" } });
+      mockHttpInstance.post.mockResolvedValue({
+        data: { success: true, customer_identifier: "cust" },
+      });
 
       const cases = [
         { org: "org1", token: "tok-111" },
@@ -83,7 +87,7 @@ describe("awsMarketplace service", () => {
         await awsMarketplace.linkSubscription(org, token);
         expect(mockHttpInstance.post).toHaveBeenCalledWith(
           `/api/${org}/aws-marketplace/link-subscription`,
-          { token }
+          { token },
         );
       }
     });
@@ -96,10 +100,7 @@ describe("awsMarketplace service", () => {
       };
       mockHttpInstance.post.mockResolvedValue({ data: responseData });
 
-      const result = await awsMarketplace.linkSubscription(
-        "test-org",
-        "link-token"
-      );
+      const result = await awsMarketplace.linkSubscription("test-org", "link-token");
 
       expect(result).toEqual({ data: responseData });
     });
@@ -107,9 +108,9 @@ describe("awsMarketplace service", () => {
     it("should propagate errors from the POST request", async () => {
       mockHttpInstance.post.mockRejectedValue(new Error("Invalid token"));
 
-      await expect(
-        awsMarketplace.linkSubscription("test-org", "bad-token")
-      ).rejects.toThrow("Invalid token");
+      await expect(awsMarketplace.linkSubscription("test-org", "bad-token")).rejects.toThrow(
+        "Invalid token",
+      );
     });
 
     it("should propagate HTTP error responses", async () => {
@@ -121,9 +122,9 @@ describe("awsMarketplace service", () => {
       };
       mockHttpInstance.post.mockRejectedValue(httpError);
 
-      await expect(
-        awsMarketplace.linkSubscription("test-org", "used-token")
-      ).rejects.toEqual(httpError);
+      await expect(awsMarketplace.linkSubscription("test-org", "used-token")).rejects.toEqual(
+        httpError,
+      );
     });
   });
 
@@ -140,7 +141,7 @@ describe("awsMarketplace service", () => {
       await awsMarketplace.getActivationStatus("test-org", "cust-aws-123");
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        "/api/test-org/aws-marketplace/activation-status?customer_id=cust-aws-123"
+        "/api/test-org/aws-marketplace/activation-status?customer_id=cust-aws-123",
       );
     });
 
@@ -152,7 +153,7 @@ describe("awsMarketplace service", () => {
       await awsMarketplace.getActivationStatus("prod-org", "cust-1");
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        "/api/prod-org/aws-marketplace/activation-status?customer_id=cust-1"
+        "/api/prod-org/aws-marketplace/activation-status?customer_id=cust-1",
       );
     });
 
@@ -170,7 +171,7 @@ describe("awsMarketplace service", () => {
       for (const { org, customerId } of cases) {
         await awsMarketplace.getActivationStatus(org, customerId);
         expect(mockHttpInstance.get).toHaveBeenCalledWith(
-          `/api/${org}/aws-marketplace/activation-status?customer_id=${customerId}`
+          `/api/${org}/aws-marketplace/activation-status?customer_id=${customerId}`,
         );
       }
     });
@@ -184,10 +185,7 @@ describe("awsMarketplace service", () => {
       };
       mockHttpInstance.get.mockResolvedValue({ data: responseData });
 
-      const result = await awsMarketplace.getActivationStatus(
-        "test-org",
-        "cust-active-789"
-      );
+      const result = await awsMarketplace.getActivationStatus("test-org", "cust-active-789");
 
       expect(result).toEqual({ data: responseData });
     });
@@ -201,10 +199,7 @@ describe("awsMarketplace service", () => {
         },
       });
 
-      const result = await awsMarketplace.getActivationStatus(
-        "test-org",
-        "cust-pending"
-      );
+      const result = await awsMarketplace.getActivationStatus("test-org", "cust-pending");
 
       expect(result.data.status).toBe("pending_activation");
     });
@@ -219,10 +214,7 @@ describe("awsMarketplace service", () => {
         },
       });
 
-      const result = await awsMarketplace.getActivationStatus(
-        "test-org",
-        "cust-failed"
-      );
+      const result = await awsMarketplace.getActivationStatus("test-org", "cust-failed");
 
       expect(result.data.status).toBe("payment_failed");
     });
@@ -230,9 +222,9 @@ describe("awsMarketplace service", () => {
     it("should propagate errors from the GET request", async () => {
       mockHttpInstance.get.mockRejectedValue(new Error("Network timeout"));
 
-      await expect(
-        awsMarketplace.getActivationStatus("test-org", "cust-timeout")
-      ).rejects.toThrow("Network timeout");
+      await expect(awsMarketplace.getActivationStatus("test-org", "cust-timeout")).rejects.toThrow(
+        "Network timeout",
+      );
     });
 
     it("should propagate HTTP 404 error", async () => {
@@ -244,9 +236,9 @@ describe("awsMarketplace service", () => {
       };
       mockHttpInstance.get.mockRejectedValue(httpError);
 
-      await expect(
-        awsMarketplace.getActivationStatus("test-org", "unknown-cust")
-      ).rejects.toEqual(httpError);
+      await expect(awsMarketplace.getActivationStatus("test-org", "unknown-cust")).rejects.toEqual(
+        httpError,
+      );
     });
   });
 
@@ -272,23 +264,14 @@ describe("awsMarketplace service", () => {
           },
         });
 
-      const linkResult = await awsMarketplace.linkSubscription(
-        "test-org",
-        "aws-redirect-token"
-      );
+      const linkResult = await awsMarketplace.linkSubscription("test-org", "aws-redirect-token");
       expect(linkResult.data.success).toBe(true);
       expect(linkResult.data.customer_identifier).toBe("cust-flow-1");
 
-      const pendingStatus = await awsMarketplace.getActivationStatus(
-        "test-org",
-        "cust-flow-1"
-      );
+      const pendingStatus = await awsMarketplace.getActivationStatus("test-org", "cust-flow-1");
       expect(pendingStatus.data.status).toBe("pending_activation");
 
-      const activeStatus = await awsMarketplace.getActivationStatus(
-        "test-org",
-        "cust-flow-1"
-      );
+      const activeStatus = await awsMarketplace.getActivationStatus("test-org", "cust-flow-1");
       expect(activeStatus.data.status).toBe("active");
 
       expect(mockHttpInstance.post).toHaveBeenCalledTimes(1);

@@ -1,10 +1,10 @@
 <template>
   <div class="cross-link-manager">
     <!-- Header -->
-    <div class="flex justify-between items-center mb-3">
+    <div class="mb-3 flex items-center justify-between">
       <div>
         <div class="text-base font-bold">{{ title }}</div>
-        <div v-if="subtitle" class="text-xs text-text-muted">
+        <div v-if="subtitle" class="text-text-muted text-xs">
           {{ subtitle }}
         </div>
       </div>
@@ -16,7 +16,7 @@
         @click="onAddClick"
         data-test="add-cross-link-btn"
       >
-        {{ t('crossLinks.addCrossLink') }}
+        {{ t("crossLinks.addCrossLink") }}
       </OButton>
     </div>
 
@@ -25,35 +25,30 @@
       <div
         v-for="(link, idx) in links"
         :key="link.name"
-        class="cross-link-item border border-card-glass-border rounded-default mb-1 p-2"
+        class="cross-link-item border-card-glass-border rounded-default mb-1 border p-2"
         :data-test="`cross-link-item-${idx}`"
       >
-        <div class="flex justify-between items-start">
-          <div class="flex-1 min-w-0">
+        <div class="flex items-start justify-between">
+          <div class="min-w-0 flex-1">
             <!-- Name -->
             <div
-              class="text-sm font-medium font-bold truncate text-text-heading"
+              class="text-text-heading truncate text-sm font-bold font-medium"
               :title="link.name"
               :data-test="`cross-link-item-name-${idx}`"
             >
               {{ link.name }}
-              <OTag
-                v-if="link._source"
-                type="crossLinkSource"
-                :value="link._source"
-                class="ml-1"
-              />
+              <OTag v-if="link._source" type="crossLinkSource" :value="link._source" class="ml-1" />
             </div>
             <!-- URL -->
             <div
-              class="text-xs truncate mt-1 text-text-muted"
+              class="text-text-muted mt-1 truncate text-xs"
               :title="link.url"
               :data-test="`cross-link-item-url-${idx}`"
             >
               {{ link.url }}
             </div>
             <!-- Fields -->
-            <div v-if="link.fields?.length" class="flex flex-wrap gap-1 mt-1">
+            <div v-if="link.fields?.length" class="mt-1 flex flex-wrap gap-1">
               <OTag
                 v-for="(field, fIdx) in link.fields"
                 :key="fIdx"
@@ -66,7 +61,7 @@
             </div>
           </div>
           <!-- Actions -->
-          <div v-if="!readonly" class="flex items-center gap-1 ml-2 shrink-0">
+          <div v-if="!readonly" class="ml-2 flex shrink-0 items-center gap-1">
             <OButton
               variant="ghost"
               size="icon-sm"
@@ -87,11 +82,7 @@
     </div>
 
     <!-- Empty State -->
-    <div
-      v-else
-      class="text-center py-4 text-sm text-text-muted"
-      data-test="cross-link-empty"
-    >
+    <div v-else class="text-text-muted py-4 text-center text-sm" data-test="cross-link-empty">
       {{ t("crossLinks.emptyState", { addLabel: t("crossLinks.addCrossLink") }) }}
     </div>
 
@@ -111,9 +102,8 @@ import { defineComponent, ref, computed, type PropType } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import CrossLinkDialog from "./CrossLinkDialog.vue";
-import OButton from '@/lib/core/Button/OButton.vue';
-import OTag from '@/lib/core/Badge/OTag.vue';
-
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 
 export interface CrossLink {
   name: string;
@@ -183,9 +173,7 @@ export default defineComponent({
       let updated: CrossLink[];
 
       if (editingOriginalName.value) {
-        const idx = props.modelValue.findIndex(
-          (l) => l.name === editingOriginalName.value,
-        );
+        const idx = props.modelValue.findIndex((l) => l.name === editingOriginalName.value);
         if (idx >= 0) {
           updated = [...props.modelValue];
           updated[idx] = link;

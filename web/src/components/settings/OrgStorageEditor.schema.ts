@@ -63,6 +63,4 @@ export const makeOrgStorageEditorSchema = (t: (_key: string) => string) =>
       }
     });
 
-export type OrgStorageEditorForm = z.infer<
-  ReturnType<typeof makeOrgStorageEditorSchema>
->;
+export type OrgStorageEditorForm = z.infer<ReturnType<typeof makeOrgStorageEditorSchema>>;

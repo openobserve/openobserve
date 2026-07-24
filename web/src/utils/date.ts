@@ -179,16 +179,10 @@ export const getDurationObjectFromParams = (params: any) => {
     obj.absolute.startTime = `${startTimeDateObj
       .getHours()
       .toString()
-      .padStart(2, "0")}:${startTimeDateObj
-      .getMinutes()
-      .toString()
-      .padStart(2, "0")}`;
+      .padStart(2, "0")}:${startTimeDateObj.getMinutes().toString().padStart(2, "0")}`;
 
     const toTimeDateObj = new Date(toTime);
-    obj.absolute.endTime = `${toTimeDateObj
-      .getHours()
-      .toString()
-      .padStart(2, "0")}:${toTimeDateObj
+    obj.absolute.endTime = `${toTimeDateObj.getHours().toString().padStart(2, "0")}:${toTimeDateObj
       .getMinutes()
       .toString()
       .padStart(2, "0")}`;
@@ -260,10 +254,7 @@ function normalizeFormat(format: string): string {
  * Format a value using date-fns format.
  * Accepts a Date object, ISO string, or number (milliseconds since epoch).
  */
-export function formatDate(
-  value: number | string | Date,
-  formatStr: string,
-): string {
+export function formatDate(value: number | string | Date, formatStr: string): string {
   const input = typeof value === "string" ? new Date(value) : value;
   return dfFormat(input, normalizeFormat(formatStr));
 }
@@ -289,16 +280,14 @@ export function formatTimestampNs(ns: number, format: string): string {
 // ---------------------------------------------------------------------------
 
 /** "YYYY-MM-DD HH:mm:ss" — standard readable datetime */
-export const formatToReadable = (us: number): string =>
-  formatTimestamp(us, "YYYY-MM-DD HH:mm:ss");
+export const formatToReadable = (us: number): string => formatTimestamp(us, "YYYY-MM-DD HH:mm:ss");
 
 /** "YYYY-MM-DD HH:mm:ss.SSS" — readable with milliseconds */
 export const formatToDetailed = (us: number): string =>
   formatTimestamp(us, "YYYY-MM-DD HH:mm:ss.SSS");
 
 /** "YYYY-MM-DDTHH:mm:ssZ" — ISO 8601 compact */
-export const formatToISO = (us: number): string =>
-  formatTimestamp(us, "YYYY-MM-DDTHH:mm:ssZ");
+export const formatToISO = (us: number): string => formatTimestamp(us, "YYYY-MM-DDTHH:mm:ssZ");
 
 /** "MMM DD, YYYY HH:mm:ss.SSS Z" — human-readable with ms + tz */
 export const formatToHuman = (us: number): string =>
@@ -309,12 +298,10 @@ export const formatToHumanShort = (us: number): string =>
   formatTimestamp(us, "MMM DD, YYYY HH:mm:ss Z");
 
 /** "MMM D, YYYY" — date only (e.g. "May 19, 2026") */
-export const formatToDateOnly = (us: number): string =>
-  formatTimestamp(us, "MMM D, YYYY");
+export const formatToDateOnly = (us: number): string => formatTimestamp(us, "MMM D, YYYY");
 
 /** "MMM DD, HH:mm" — month day + time, no year */
-export const formatToTimeCompact = (us: number): string =>
-  formatTimestamp(us, "MMM DD, HH:mm");
+export const formatToTimeCompact = (us: number): string => formatTimestamp(us, "MMM DD, HH:mm");
 
 // ---------------------------------------------------------------------------
 // Relative time
@@ -327,10 +314,7 @@ export const formatToTimeCompact = (us: number): string =>
  * subtractRelativeTime(new Date(), { minutes: 15 }) // 15 min ago
  * subtractRelativeTime(new Date(), { days: 7 })     // 7 days ago
  */
-export function subtractRelativeTime(
-  endDate: Date | number,
-  period: Record<string, number>,
-): Date {
+export function subtractRelativeTime(endDate: Date | number, period: Record<string, number>): Date {
   return sub(endDate, period);
 }
 
@@ -369,14 +353,9 @@ export const convertUnixToDateFormat = (
  * @param {string} time - time in HH:MM 24hr format
  * @param {string} timezone - timezone
  */
-export const convertDateToTimestamp = (
-  date: string,
-  time: string,
-  timezone: string,
-) => {
+export const convertDateToTimestamp = (date: string, time: string, timezone: string) => {
   try {
-    const browserTime =
-      "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
+    const browserTime = "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
 
     const [day, month, year] = date.split("-");
     const [hour, minute] = time.split(":");

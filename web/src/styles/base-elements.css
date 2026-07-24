@@ -103,7 +103,8 @@ body:has(.printMode) {
    Verbatim move. The two @layer base sub-blocks keep their layer; the
    html/body/::placeholder rules stay unlayered exactly as they were —
    re-layering decisions belong to W2.d, after visual verification. */
-html, body {
+html,
+body {
   margin: 0 !important;
   padding: 0 !important;
 }
@@ -130,80 +131,85 @@ body {
  * bare <p>/<h2>/… elements.
  */
 @layer base {
-h1, h2, h3, h4, h5, h6 {
-  color: var(--color-text-heading);
-  margin: 0;
-}
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    color: var(--color-text-heading);
+    margin: 0;
+  }
 
-h1 {
-  font-size: var(--text-2xl);
-  font-weight: var(--font-semibold);
-  line-height: var(--leading-2xl);
-  letter-spacing: var(--tracking-tight);
-}
+  h1 {
+    font-size: var(--text-2xl);
+    font-weight: var(--font-semibold);
+    line-height: var(--leading-2xl);
+    letter-spacing: var(--tracking-tight);
+  }
 
-h2 {
-  font-size: var(--text-xl);
-  font-weight: var(--font-medium);
-  line-height: var(--leading-xl);
-  letter-spacing: var(--tracking-normal);
-}
+  h2 {
+    font-size: var(--text-xl);
+    font-weight: var(--font-medium);
+    line-height: var(--leading-xl);
+    letter-spacing: var(--tracking-normal);
+  }
 
-h3 {
-  font-size: var(--text-lg);
-  font-weight: var(--font-medium);
-  line-height: var(--leading-lg);
-  letter-spacing: var(--tracking-normal);
-}
+  h3 {
+    font-size: var(--text-lg);
+    font-weight: var(--font-medium);
+    line-height: var(--leading-lg);
+    letter-spacing: var(--tracking-normal);
+  }
 
-h4 {
-  font-size: var(--text-base);
-  font-weight: var(--font-medium);
-  line-height: var(--leading-md);
-  letter-spacing: var(--tracking-normal);
-}
+  h4 {
+    font-size: var(--text-base);
+    font-weight: var(--font-medium);
+    line-height: var(--leading-md);
+    letter-spacing: var(--tracking-normal);
+  }
 
-h5 {
-  font-size: var(--text-sm);
-  font-weight: var(--font-medium);
-  line-height: var(--leading-base);
-  letter-spacing: var(--tracking-normal);
-}
+  h5 {
+    font-size: var(--text-sm);
+    font-weight: var(--font-medium);
+    line-height: var(--leading-base);
+    letter-spacing: var(--tracking-normal);
+  }
 
-h6 {
-  font-size: var(--text-compact);
-  font-weight: var(--font-medium);
-  line-height: var(--leading-sm);
-  letter-spacing: var(--tracking-normal);
-}
+  h6 {
+    font-size: var(--text-compact);
+    font-weight: var(--font-medium);
+    line-height: var(--leading-sm);
+    letter-spacing: var(--tracking-normal);
+  }
 
-p {
-  color: var(--color-text-body);
-  font-size: var(--text-sm);
-  line-height: var(--leading-base);
-  margin: 0;
-}
+  p {
+    color: var(--color-text-body);
+    font-size: var(--text-sm);
+    line-height: var(--leading-base);
+    margin: 0;
+  }
 
-a {
-  color: var(--color-text-link);
-  text-decoration: none;
-}
+  a {
+    color: var(--color-text-link);
+    text-decoration: none;
+  }
 
-a:hover {
-  color: var(--color-text-link-hover);
-  text-decoration: underline;
-}
+  a:hover {
+    color: var(--color-text-link-hover);
+    text-decoration: underline;
+  }
 
-small {
-  font-size: var(--text-xs);
-  color: var(--color-text-secondary);
-}
+  small {
+    font-size: var(--text-xs);
+    color: var(--color-text-secondary);
+  }
 
-label:not(.o-input-label) {
-  font-size: var(--text-compact);
-  color: var(--color-text-label);
-  font-weight: var(--font-normal);
-}
+  label:not(.o-input-label) {
+    font-size: var(--text-compact);
+    color: var(--color-text-label);
+    font-weight: var(--font-normal);
+  }
 }
 
 @layer base {

@@ -12,11 +12,7 @@ const classes = computed(() => {
   const base: string[] = [];
 
   if (props.role === "header") {
-    base.push(
-      "flex flex-row items-center gap-2",
-      "flex-none",
-      "px-4 py-3",
-    );
+    base.push("flex flex-row items-center gap-2", "flex-none", "px-4 py-3");
   } else if (props.role === "body") {
     base.push("flex-1 min-h-0", "p-4");
     if (props.scrollable) {

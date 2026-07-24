@@ -33,7 +33,15 @@ describe("resolveFieldGroup", () => {
     { id: "k8s_alias", display: "Kubernetes", fields: ["k8s_pod", "k8s_namespace"], group: "k8s" },
   ];
   const index = buildSemanticIndex(aliases);
-  const allFields = ["http_method", "http_status", "k8s_pod", "k8s_namespace", "body_raw", "body_size", "plain"];
+  const allFields = [
+    "http_method",
+    "http_status",
+    "k8s_pod",
+    "k8s_namespace",
+    "body_raw",
+    "body_size",
+    "plain",
+  ];
   const prefixes = discoverPrefixes(allFields);
 
   it("tier 1: returns semantic group for known alias field", () => {
@@ -107,7 +115,16 @@ describe("applyFieldGrouping", () => {
   const keyGroupSet = new Set<string>();
 
   function makeField(name: string, dataType = "Utf8", isInteresting = false) {
-    return { name, dataType, ftsKey: false, isSchemaField: true, showValues: true, isInterestingField: isInteresting, group: "", streams: [] };
+    return {
+      name,
+      dataType,
+      ftsKey: false,
+      isSchemaField: true,
+      showValues: true,
+      isInterestingField: isInteresting,
+      group: "",
+      streams: [],
+    };
   }
 
   it("returns labeled ordered list with group header rows injected", () => {
@@ -148,7 +165,17 @@ describe("applyFieldGrouping", () => {
   });
 
   it("skips label rows that are already in the input (no double-injection)", () => {
-    const labelRow = { name: "HTTP", label: true, group: "http", dataType: "", ftsKey: false, isSchemaField: false, showValues: false, isInterestingField: false, streams: [] };
+    const labelRow = {
+      name: "HTTP",
+      label: true,
+      group: "http",
+      dataType: "",
+      ftsKey: false,
+      isSchemaField: false,
+      showValues: false,
+      isInterestingField: false,
+      streams: [],
+    };
     const fields = [labelRow, makeField("http_method")];
     const result = applyFieldGrouping(fields, semanticIndex, keyFieldSet, keyGroupSet);
     const labelRows = result.filter((r: any) => r.label);
@@ -164,10 +191,30 @@ describe("applyFieldGrouping", () => {
 
 describe("applyCollapseFilter", () => {
   function field(name: string, group: string): any {
-    return { name, group, label: false, dataType: "Utf8", ftsKey: false, isSchemaField: true, showValues: true, isInterestingField: false, streams: [] };
+    return {
+      name,
+      group,
+      label: false,
+      dataType: "Utf8",
+      ftsKey: false,
+      isSchemaField: true,
+      showValues: true,
+      isInterestingField: false,
+      streams: [],
+    };
   }
   function labelRow(group: string): any {
-    return { name: group, group, label: true, dataType: "", ftsKey: false, isSchemaField: false, showValues: false, isInterestingField: false, streams: [] };
+    return {
+      name: group,
+      group,
+      label: true,
+      dataType: "",
+      ftsKey: false,
+      isSchemaField: false,
+      showValues: false,
+      isInterestingField: false,
+      streams: [],
+    };
   }
 
   const rows = [
@@ -248,14 +295,25 @@ describe("shouldApplyFieldGrouping", () => {
   });
 
   it("returns true when UDS is active regardless of field count", () => {
-    expect(shouldApplyFieldGrouping({ ...base, udsActive: true, udsFieldLimit: 5, totalSchemaFieldCount: 100 })).toBe(true);
+    expect(
+      shouldApplyFieldGrouping({
+        ...base,
+        udsActive: true,
+        udsFieldLimit: 5,
+        totalSchemaFieldCount: 100,
+      }),
+    ).toBe(true);
   });
 
   it("returns true when UDS limit set and field count is within limit", () => {
-    expect(shouldApplyFieldGrouping({ ...base, udsFieldLimit: 20, totalSchemaFieldCount: 15 })).toBe(true);
+    expect(
+      shouldApplyFieldGrouping({ ...base, udsFieldLimit: 20, totalSchemaFieldCount: 15 }),
+    ).toBe(true);
   });
 
   it("returns true when UDS limit set and field count exceeds limit (grouping no longer suppressed)", () => {
-    expect(shouldApplyFieldGrouping({ ...base, udsFieldLimit: 10, totalSchemaFieldCount: 50 })).toBe(true);
+    expect(
+      shouldApplyFieldGrouping({ ...base, udsFieldLimit: 10, totalSchemaFieldCount: 50 }),
+    ).toBe(true);
   });
 });

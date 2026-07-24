@@ -82,7 +82,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #top>
         <ControlButton
           data-test="workflow-palette-collapse-btn"
-          :title="workflowObj.showNodePalette ? t('pipeline.collapseNodes') : t('pipeline.openNodes')"
+          :title="
+            workflowObj.showNodePalette ? t('pipeline.collapseNodes') : t('pipeline.openNodes')
+          "
           @click="workflowObj.showNodePalette = !workflowObj.showNodePalette"
         >
           <!-- » chevrons; mirrored in place to « once the rail is open. -->
@@ -110,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        (the pipeline canvas has it on the container, so it inherits it there). -->
   <div
     v-if="isCanvasEmpty && !readOnly"
-    class="o2vf_node absolute top-32 left-1/2 -translate-x-1/2 z-10"
+    class="o2vf_node absolute top-32 left-1/2 z-10 -translate-x-1/2"
   >
     <!-- Scaled by the LIVE viewport zoom: real nodes are drawn inside
          `.vue-flow__viewport`, which carries the canvas transform, so an
@@ -122,16 +124,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          `transform-origin:0 0` (which scaled it toward the top-left). -->
     <div
       data-test="workflow-flow-start-node"
-      class="vue-flow__node vue-flow__node-input relative! origin-top! w-max whitespace-nowrap scale-[var(--ghost-zoom,1)] cursor-pointer!"
+      class="vue-flow__node vue-flow__node-input relative! w-max origin-top! scale-[var(--ghost-zoom,1)] cursor-pointer! whitespace-nowrap"
       :style="{ '--ghost-zoom': viewport.zoom }"
       @click="openTriggerPicker($event)"
     >
-      <FlowNodeCard
-        icon="add"
-        io-type="input"
-        :has-input="false"
-        :has-output="false"
-      >
+      <FlowNodeCard icon="add" io-type="input" :has-input="false" :has-output="false">
         <template #body>{{ t("workflow.chooseTrigger") }}</template>
       </FlowNodeCard>
     </div>
@@ -169,16 +166,13 @@ const {
   openTriggerPicker,
 } = useWorkflowCanvas();
 
-const { onNodesInitialized, setViewport, viewport, dimensions, findNode } =
-  useVueFlow();
+const { onNodesInitialized, setViewport, viewport, dimensions, findNode } = useVueFlow();
 
 const vueFlowRef = ref<any>(null);
 // Read-only inspection canvas (the Runs view) — disables node drag/connect and,
 // via WorkflowNode, the hover add/delete + click-to-edit. Run overlays stay.
 const readOnly = computed(() => workflowObj.readOnly);
-const isCanvasEmpty = computed(
-  () => workflowObj.currentSelectedWorkflow.nodes.length === 0,
-);
+const isCanvasEmpty = computed(() => workflowObj.currentSelectedWorkflow.nodes.length === 0);
 
 // Center the trigger horizontally once nodes have measured dimensions — keep
 // its Y (near the top) so the steps flow down. Runs once per editor mount.
@@ -186,9 +180,7 @@ let centered = false;
 onNodesInitialized(() => {
   if (centered) return;
   const nodes = workflowObj.currentSelectedWorkflow.nodes;
-  const trigger = nodes.find(
-    (n: any) => n.data?.node_type === "workflow_trigger",
-  );
+  const trigger = nodes.find((n: any) => n.data?.node_type === "workflow_trigger");
   if (!trigger) return;
   const nodeW = findNode(trigger.id)?.dimensions?.width;
   const paneW = dimensions.value?.width;

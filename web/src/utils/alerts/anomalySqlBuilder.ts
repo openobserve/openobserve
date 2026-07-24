@@ -32,10 +32,7 @@ const percentileMap: Record<string, number> = {
  * `approx_percentile_cont(field, percentile)` matching the regular alert
  * query builder behaviour.
  */
-export const toDetectionFunctionSql = (
-  rawFn: string,
-  field: string,
-): string => {
+export const toDetectionFunctionSql = (rawFn: string, field: string): string => {
   // API may return already-wrapped forms like "p90(duration)" or "avg(size)"
   const match = rawFn.match(/^(\w+)\((.+)\)$/);
   if (match) {
@@ -76,27 +73,16 @@ export const buildAnomalyPreviewSql = (config: any): string => {
     config.histogram_interval ||
     `${config.histogram_interval_value ?? 5}${config.histogram_interval_unit ?? "m"}`;
   const rawFn = config.detection_function || "count";
-  const fn = toDetectionFunctionSql(
-    rawFn,
-    config.detection_function_field || "*",
-  );
+  const fn = toDetectionFunctionSql(rawFn, config.detection_function_field || "*");
 
   const filterLines = (config.filters || [])
-    .filter(
-      (f: any) =>
-        f.field && (operatorNeedsValue(f.operator) ? f.value : true),
-    )
-    .map(
-      (f: any) =>
-        `  AND ${buildAnomalyFilterExpression(f.field, f.operator, f.value)}`,
-    );
+    .filter((f: any) => f.field && (operatorNeedsValue(f.operator) ? f.value : true))
+    .map((f: any) => `  AND ${buildAnomalyFilterExpression(f.field, f.operator, f.value)}`);
 
   const where = filterLines.length
     ? [
         "WHERE",
-        ...filterLines.map((l: string, i: number) =>
-          i === 0 ? l.replace(/^\s+AND /, "  ") : l,
-        ),
+        ...filterLines.map((l: string, i: number) => (i === 0 ? l.replace(/^\s+AND /, "  ") : l)),
       ].join("\n")
     : "";
 
@@ -107,8 +93,7 @@ export const buildAnomalyPreviewSql = (config: any): string => {
     autoSeasonality === "week"
       ? ",\n       date_part('hour', to_timestamp(_timestamp / 1000000)) AS hour,\n       date_part('dow', to_timestamp(_timestamp / 1000000)) AS dow"
       : ",\n       date_part('hour', to_timestamp(_timestamp / 1000000)) AS hour";
-  const seasonalGroup =
-    autoSeasonality === "week" ? ", hour, dow" : ", hour";
+  const seasonalGroup = autoSeasonality === "week" ? ", hour, dow" : ", hour";
 
   return [
     `SELECT histogram(_timestamp, '${interval}') AS time_bucket,`,

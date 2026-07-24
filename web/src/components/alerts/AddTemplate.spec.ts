@@ -117,37 +117,25 @@ describe("AddTemplate - body editor language", () => {
   it("remounts the body editor when the type flips (http → email)", async () => {
     const w = await mountComp();
     const mountsAfterInitial = editorMounts;
-    expect(w.findComponent({ name: "QueryEditor" }).props("language")).toBe(
-      "json",
-    );
+    expect(w.findComponent({ name: "QueryEditor" }).props("language")).toBe("json");
 
-    await w
-      .findComponent({ name: "AppTabs" })
-      .vm.$emit("update:activeTab", "email");
+    await w.findComponent({ name: "AppTabs" }).vm.$emit("update:activeTab", "email");
     await flushPromises();
 
-    expect(w.findComponent({ name: "QueryEditor" }).props("language")).toBe(
-      "markdown",
-    );
+    expect(w.findComponent({ name: "QueryEditor" }).props("language")).toBe("markdown");
     expect(editorMounts).toBe(mountsAfterInitial + 1);
   });
 
   it("remounts the body editor when the type flips back (email → http)", async () => {
     const w = await mountComp();
-    await w
-      .findComponent({ name: "AppTabs" })
-      .vm.$emit("update:activeTab", "email");
+    await w.findComponent({ name: "AppTabs" }).vm.$emit("update:activeTab", "email");
     await flushPromises();
     const mountsAfterEmail = editorMounts;
 
-    await w
-      .findComponent({ name: "AppTabs" })
-      .vm.$emit("update:activeTab", "http");
+    await w.findComponent({ name: "AppTabs" }).vm.$emit("update:activeTab", "http");
     await flushPromises();
 
-    expect(w.findComponent({ name: "QueryEditor" }).props("language")).toBe(
-      "json",
-    );
+    expect(w.findComponent({ name: "QueryEditor" }).props("language")).toBe("json");
     expect(editorMounts).toBe(mountsAfterEmail + 1);
   });
 
@@ -158,14 +146,10 @@ describe("AddTemplate - body editor language", () => {
     getForm(w).setFieldValue("body", "# hello");
     await flushPromises();
 
-    await w
-      .findComponent({ name: "AppTabs" })
-      .vm.$emit("update:activeTab", "email");
+    await w.findComponent({ name: "AppTabs" }).vm.$emit("update:activeTab", "email");
     await flushPromises();
 
-    expect(w.findComponent({ name: "QueryEditor" }).props("query")).toBe(
-      "# hello",
-    );
+    expect(w.findComponent({ name: "QueryEditor" }).props("query")).toBe("# hello");
   });
 });
 
@@ -189,26 +173,18 @@ describe("AddTemplate - rendering (create mode)", () => {
     expect(w.find('[data-test="add-template-name-input"]').exists()).toBe(true);
     expect(w.find('[data-test="add-template-submit-btn"]').exists()).toBe(true);
     expect(w.find('[data-test="add-template-cancel-btn"]').exists()).toBe(true);
-    expect(w.find('[data-test="add-template-body-input-title"]').exists()).toBe(
-      true,
-    );
+    expect(w.find('[data-test="add-template-body-input-title"]').exists()).toBe(true);
     expect(w.find('[data-test="template-body-editor"]').exists()).toBe(true);
   });
 
   it("hides the email title input for http (default) and shows it for email", async () => {
     const w = await mountComp();
-    expect(
-      w.find('[data-test="add-template-email-title-input"]').exists(),
-    ).toBe(false);
+    expect(w.find('[data-test="add-template-email-title-input"]').exists()).toBe(false);
 
     // Bridge: driving the tabs toggle updates the form discriminator → v-if.
-    await w
-      .findComponent({ name: "AppTabs" })
-      .vm.$emit("update:activeTab", "email");
+    await w.findComponent({ name: "AppTabs" }).vm.$emit("update:activeTab", "email");
     await nextTick();
-    expect(
-      w.find('[data-test="add-template-email-title-input"]').exists(),
-    ).toBe(true);
+    expect(w.find('[data-test="add-template-email-title-input"]').exists()).toBe(true);
   });
 
   it("Save button stays enabled (R3 — never disabled before submit)", async () => {
@@ -230,9 +206,7 @@ describe("AddTemplate - rendering (update mode)", () => {
 
   it("shows the update title when a template prop is provided", async () => {
     const w = await mountComp({ template: existingTemplate });
-    expect(w.find('[data-test="add-template-title"]').text()).toContain(
-      "Update",
-    );
+    expect(w.find('[data-test="add-template-title"]').text()).toContain("Update");
   });
 
   it("marks the form as updating (name becomes readonly)", async () => {
@@ -252,9 +226,7 @@ describe("AddTemplate - rendering (update mode)", () => {
     const w = await mountComp({ template: existingTemplate, isClone: true });
     expect((w.vm as any).isUpdatingTemplate).toBe(false);
     expect(getForm(w).state.values.name).toBe("my-template");
-    expect(w.find('[data-test="add-template-title"]').text()).toContain(
-      "Clone",
-    );
+    expect(w.find('[data-test="add-template-title"]').text()).toContain("Clone");
   });
 });
 
@@ -351,9 +323,7 @@ describe("AddTemplate - save payload parity", () => {
     const form = getForm(w);
     form.setFieldValue("name", "new-template");
     // Body is bridged from the Monaco editor's change handler.
-    await w
-      .findComponent({ name: "QueryEditor" })
-      .vm.$emit("update:query", '{"text":"alert"}');
+    await w.findComponent({ name: "QueryEditor" }).vm.$emit("update:query", '{"text":"alert"}');
 
     await submit(w);
 
@@ -437,9 +407,7 @@ describe("AddTemplate - http JSON-validity toast (Rule ④ side-effect)", () => 
     // guard blocked the actual create.
     expect(form.state.isValid).toBe(true);
     expect(templateService.create).not.toHaveBeenCalled();
-    expect(toast).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: "error" }),
-    );
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
   });
 
   it("does NOT run the JSON check for email templates (non-JSON body allowed)", async () => {

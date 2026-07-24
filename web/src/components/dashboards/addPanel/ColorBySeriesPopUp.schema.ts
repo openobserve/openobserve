@@ -40,6 +40,4 @@ export const makeColorBySeriesPopUpSchema = (t: (_key: string) => string) =>
     series: z.array(makeSeriesRowSchema(t)),
   });
 
-export type ColorBySeriesPopUpForm = z.infer<
-  ReturnType<typeof makeColorBySeriesPopUpSchema>
->;
+export type ColorBySeriesPopUpForm = z.infer<ReturnType<typeof makeColorBySeriesPopUpSchema>>;

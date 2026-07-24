@@ -26,8 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <CopyContent :content="fanoutContent" />
       <div class="italic">
         Tip: `vmagent` can duplicate writes by repeating the
-        <code>-remoteWrite.url</code> flag, so you can keep an existing VictoriaMetrics
-        destination while also forwarding metrics to OpenObserve.
+        <code>-remoteWrite.url</code> flag, so you can keep an existing VictoriaMetrics destination
+        while also forwarding metrics to OpenObserve.
       </div>
     </div>
 
@@ -92,4 +92,3 @@ export default defineComponent({
   },
 });
 </script>
-

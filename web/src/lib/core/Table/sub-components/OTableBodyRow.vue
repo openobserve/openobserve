@@ -8,14 +8,7 @@ const handledNavEvents = new WeakSet<KeyboardEvent>();
 
 <script setup lang="ts">
 import type { Row, Table } from "@tanstack/vue-table";
-import {
-  computed,
-  inject,
-  ref,
-  onMounted,
-  onBeforeUnmount,
-  useSlots,
-} from "vue";
+import { computed, inject, ref, onMounted, onBeforeUnmount, useSlots } from "vue";
 import OTableBodyCell from "./OTableBodyCell.vue";
 import OTableSelectCheckbox from "./OTableSelectCheckbox.vue";
 import OTableExpandButton from "./OTableExpandButton.vue";
@@ -54,11 +47,7 @@ const props = defineProps<{
   /** Enable hover-visible copy button on cells */
   enableCellCopy?: boolean;
   /** Per-cell inline style function */
-  getCellStyle?: (params: {
-    columnId: string;
-    row: any;
-    value: any;
-  }) => Record<string, any>;
+  getCellStyle?: (params: { columnId: string; row: any; value: any }) => Record<string, any>;
   /** When true, renders a drag handle grip icon as the first cell. */
   enableRowReorder?: boolean;
   /** Per-row predicate: when false, the drag handle is hidden for this row. */
@@ -131,22 +120,13 @@ const treeConnectorX = computed(() => {
   const halfChevron = 9; // 18px / 2
   const parentDepth = treeMeta.value?.depth ?? 0;
   return (
-    expansionWidth +
-    selectionWidth +
-    dragWidth +
-    cellPaddingLeft +
-    parentDepth * 16 +
-    halfChevron
+    expansionWidth + selectionWidth + dragWidth + cellPaddingLeft + parentDepth * 16 + halfChevron
   );
 });
 
 function onClick(event: MouseEvent) {
   const target = event.target as HTMLElement | null;
-  if (
-    target?.closest(
-      "button, a, input, select, textarea, label, [role='button']",
-    )
-  ) {
+  if (target?.closest("button, a, input, select, textarea, label, [role='button']")) {
     return;
   }
   emit("row-click", props.row.original, event);
@@ -185,20 +165,15 @@ const handleKeydown = (e: KeyboardEvent) => {
   if (e.key === "ArrowDown" || e.key === "ArrowUp") {
     const tr = rowRef.value?.closest("tr");
     if (!tr) return;
-    let sibling =
-      e.key === "ArrowDown" ? tr.nextElementSibling : tr.previousElementSibling;
+    let sibling = e.key === "ArrowDown" ? tr.nextElementSibling : tr.previousElementSibling;
     while (sibling && !sibling.matches("tr[data-test^='o2-table-row-']")) {
-      sibling =
-        e.key === "ArrowDown"
-          ? sibling.nextElementSibling
-          : sibling.previousElementSibling;
+      sibling = e.key === "ArrowDown" ? sibling.nextElementSibling : sibling.previousElementSibling;
     }
     if (sibling instanceof HTMLElement) {
       e.preventDefault();
       isHovered.value = false;
       if (sibling.hasAttribute("tabindex")) sibling.focus();
-      else
-        sibling.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
+      else sibling.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
     }
     return;
   }
@@ -206,22 +181,16 @@ const handleKeydown = (e: KeyboardEvent) => {
   // Enter triggers the row's click handler (same as a mouse click)
   if (e.key === "Enter") {
     e.preventDefault();
-    rowRef.value
-      ?.closest("tr")
-      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    rowRef.value?.closest("tr")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     return;
   }
 
   const action =
-    e.key === "Delete" || e.key === "Backspace"
-      ? "delete"
-      : ROW_ACTION_KEYS[e.key.toLowerCase()];
+    e.key === "Delete" || e.key === "Backspace" ? "delete" : ROW_ACTION_KEYS[e.key.toLowerCase()];
 
   if (!action) return;
 
-  const btn = rowRef.value?.querySelector<HTMLElement>(
-    `[data-row-action='${action}']`,
-  );
+  const btn = rowRef.value?.querySelector<HTMLElement>(`[data-row-action='${action}']`);
   if (btn) {
     e.preventDefault();
     btn.click();
@@ -259,7 +228,7 @@ function onRowBlur() {
       'transition-colors duration-150',
       clickable ? 'cursor-pointer' : '',
       'hover:bg-table-row-hover-bg',
-      clickable ? 'focus:outline-none focus-visible:bg-table-row-hover-bg' : '',
+      clickable ? 'focus-visible:bg-table-row-hover-bg focus:outline-none' : '',
       isRowSelected ? 'bg-table-row-selected-bg' : '',
       !isRowSelected && isStriped ? 'bg-table-row-striped-bg' : '',
       statusBarColor ? 'o2-table-row-with-status' : '',
@@ -283,7 +252,7 @@ function onRowBlur() {
       v-if="expansionEnabled"
       :class="[
         'w-4 min-w-4 px-0 text-center align-middle',
-        bordered ? 'border-b border-table-row-divider' : '',
+        bordered ? 'border-table-row-divider border-b' : '',
       ]"
       data-test="o2-table-expand-cell"
     >
@@ -300,10 +269,8 @@ function onRowBlur() {
       v-if="selectionEnabled"
       :class="[
         'text-left align-middle',
-        bordered ? 'border-b border-table-row-divider' : '',
-        isRowSelectable && !isRowSelectable(row.original)
-          ? 'cursor-not-allowed'
-          : '',
+        bordered ? 'border-table-row-divider border-b' : '',
+        isRowSelectable && !isRowSelectable(row.original) ? 'cursor-not-allowed' : '',
       ]"
       :style="{
         width: TABLE_CHECKBOX_COL_WIDTH + 'px',
@@ -328,13 +295,14 @@ function onRowBlur() {
       v-if="enableRowReorder"
       :class="[
         'w-4 min-w-4 px-0 text-center align-middle',
-        bordered ? 'border-b border-table-row-divider' : '',
+        bordered ? 'border-table-row-divider border-b' : '',
       ]"
       class="o2-table-drag-handle"
       data-test="o2-table-row-drag-handle"
     >
       <OIcon
-        name="drag-indicator" size="xs"
+        name="drag-indicator"
+        size="xs"
         :class="[rowDraggable === false ? 'invisible' : '']"
         class="text-text-secondary cursor-grab transition-opacity"
       />
@@ -384,7 +352,7 @@ function onRowBlur() {
       "
       :class="[
         'o2-table-tree-warning-cell relative',
-        bordered ? 'border-b border-table-row-divider' : '',
+        bordered ? 'border-table-row-divider border-b' : '',
       ]"
       :style="{ '--tree-connector-x': treeConnectorX + 'px' }"
     >
@@ -407,7 +375,7 @@ function onRowBlur() {
         (selectionEnabled ? 1 : 0) +
         (enableRowReorder ? 1 : 0)
       "
-      :class="bordered ? 'border-b border-table-row-divider' : ''"
+      :class="bordered ? 'border-table-row-divider border-b' : ''"
     >
       <slot name="expansion" :row="row.original" />
     </td>

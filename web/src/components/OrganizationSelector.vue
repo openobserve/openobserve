@@ -65,9 +65,7 @@ const filtered = computed<OrgOption[]>(() => {
   if (!searchQuery.value) return props.organizations;
   const q = searchQuery.value.toLowerCase();
   return props.organizations.filter(
-    (o) =>
-      o.label?.toLowerCase().includes(q) ||
-      o.identifier?.toLowerCase().includes(q),
+    (o) => o.label?.toLowerCase().includes(q) || o.identifier?.toLowerCase().includes(q),
   );
 });
 
@@ -139,13 +137,11 @@ const onSearchKeydown = (e: KeyboardEvent) => {
   if (!len) return;
   if (e.key === "ArrowDown") {
     e.preventDefault();
-    highlightedIndex.value =
-      highlightedIndex.value < len - 1 ? highlightedIndex.value + 1 : 0;
+    highlightedIndex.value = highlightedIndex.value < len - 1 ? highlightedIndex.value + 1 : 0;
     nextTick(scrollHighlightedIntoView);
   } else if (e.key === "ArrowUp") {
     e.preventDefault();
-    highlightedIndex.value =
-      highlightedIndex.value > 0 ? highlightedIndex.value - 1 : len - 1;
+    highlightedIndex.value = highlightedIndex.value > 0 ? highlightedIndex.value - 1 : len - 1;
     nextTick(scrollHighlightedIntoView);
   } else if (e.key === "Enter") {
     e.preventDefault();
@@ -164,9 +160,7 @@ watch(open, async (isOpen) => {
   virtualizer.value.measure();
   // Highlight the current org (fallback to first) and center it in view so it
   // never lands stuck at the bottom edge.
-  const activeIdx = filtered.value.findIndex(
-    (o) => o.identifier === props.current?.identifier,
-  );
+  const activeIdx = filtered.value.findIndex((o) => o.identifier === props.current?.identifier);
   highlightedIndex.value = activeIdx >= 0 ? activeIdx : 0;
   nextTick(() => scrollHighlightedIntoView("center"));
   const input = document.querySelector(
@@ -189,8 +183,7 @@ watch(filtered, (list) => {
   virtualizer.value.measure();
 });
 
-const isSelected = (org: OrgOption) =>
-  org.identifier === props.current?.identifier;
+const isSelected = (org: OrgOption) => org.identifier === props.current?.identifier;
 
 // Selection reuses the same tokens OSelect uses, so the menu is visually
 // consistent with every other dropdown in the app.
@@ -213,49 +206,36 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
           variant="outline-primary"
           size="xs"
           data-test="navbar-organizations-select-trigger"
-          class="w-56 text-text-body!"
-          :class="open ? 'ring-2 ring-inset ring-accent/25' : ''"
+          class="text-text-body! w-56"
+          :class="open ? 'ring-accent/25 ring-2 ring-inset' : ''"
         >
           <template #icon-left>
-            <OIcon
-              name="domain"
-              size="sm"
-              class="opacity-60 shrink-0"
-            />
+            <OIcon name="domain" size="sm" class="shrink-0 opacity-60" />
           </template>
-          <span class="truncate flex-1 min-w-0 text-left">{{
-            current?.label || ""
-          }}</span>
+          <span class="min-w-0 flex-1 truncate text-left">{{ current?.label || "" }}</span>
           <template #icon-right>
             <OIcon
               name="arrow-drop-down"
               size="sm"
-              class="opacity-70 shrink-0 transition-transform"
+              class="shrink-0 opacity-70 transition-transform"
               :class="open ? 'rotate-180' : ''"
             />
           </template>
         </OButton>
       </template>
 
-      <div
-        data-test="organization-menu-list"
-        class="flex flex-col w-94 max-w-[98vw]"
-      >
+      <div data-test="organization-menu-list" class="flex w-94 max-w-[98vw] flex-col">
         <!-- Header: title + count -->
-        <div
-          class="flex items-center justify-between gap-2 px-3 pt-2 pb-1.5"
-        >
-          <span class="text-compact font-semibold text-text-heading">
+        <div class="flex items-center justify-between gap-2 px-3 pt-2 pb-1.5">
+          <span class="text-compact text-text-heading font-semibold">
             {{ t("organization.header") }}
           </span>
           <span
             data-test="organization-menu-count"
-            class="shrink-0 text-2xs font-semibold leading-none px-2 py-1 rounded-full bg-select-item-hover-bg text-text-secondary"
+            class="text-2xs bg-select-item-hover-bg text-text-secondary shrink-0 rounded-full px-2 py-1 leading-none font-semibold"
           >
             {{
-              searchQuery
-                ? `${filtered.length} of ${organizations.length}`
-                : organizations.length
+              searchQuery ? `${filtered.length} of ${organizations.length}` : organizations.length
             }}
           </span>
         </div>
@@ -272,18 +252,14 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
           />
         </div>
 
-        <div
-          v-if="filtered.length"
-          class="mx-3 h-px bg-select-content-border"
-          aria-hidden="true"
-        />
+        <div v-if="filtered.length" class="bg-select-content-border mx-3 h-px" aria-hidden="true" />
 
         <!-- Virtualized list -->
         <div
           v-if="filtered.length"
           ref="scrollRef"
           data-test="organization-menu-table"
-          class="relative max-h-80 overflow-y-auto overflow-x-hidden pt-2 pb-1"
+          class="relative max-h-80 overflow-x-hidden overflow-y-auto pt-2 pb-1"
         >
           <div class="relative w-full" :style="{ height: `${totalSize}px` }">
             <div
@@ -291,7 +267,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
               :key="row.org.identifier"
               data-test="organization-menu-item-label-item-label"
               :data-test-org-identifier="row.org.identifier"
-              class="group absolute left-0 right-0 top-0 box-border flex items-center gap-2 px-3 rounded-default cursor-pointer transition-colors"
+              class="group rounded-default absolute top-0 right-0 left-0 box-border flex cursor-pointer items-center gap-2 px-3 transition-colors"
               :class="rowStateClass(row)"
               :style="{
                 transform: `translateY(${row.start}px)`,
@@ -305,15 +281,15 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
                    The name takes priority and is never truncated (it only clips
                    if it alone exceeds the whole row); the id yields, truncating
                    to whatever space is left. -->
-              <div class="flex items-baseline gap-2 min-w-0 flex-1">
+              <div class="flex min-w-0 flex-1 items-baseline gap-2">
                 <span
-                  class="flex-none max-w-full min-w-0 truncate text-compact font-medium leading-tight"
+                  class="text-compact max-w-full min-w-0 flex-none truncate leading-tight font-medium"
                 >
                   {{ row.org.label }}
                 </span>
                 <span
                   v-if="row.org.identifier && row.org.identifier !== row.org.label"
-                  class="shrink min-w-0 truncate text-2xs font-mono leading-tight text-text-secondary"
+                  class="text-2xs text-text-secondary min-w-0 shrink truncate font-mono leading-tight"
                 >
                   {{ row.org.identifier }}
                 </span>
@@ -326,10 +302,10 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
                 type="button"
                 data-test="organization-menu-item-copy-id"
                 :aria-label="`Copy organization ID ${row.org.identifier}`"
-                class="shrink-0 inline-flex items-center justify-center size-6 rounded-default transition hover:bg-select-item-selected-bg hover:text-select-item-selected-text"
+                class="rounded-default hover:bg-select-item-selected-bg hover:text-select-item-selected-text inline-flex size-6 shrink-0 items-center justify-center transition"
                 :class="
                   copiedId === row.org.identifier
-                    ? 'opacity-100 text-accent'
+                    ? 'text-accent opacity-100'
                     : row.index === highlightedIndex
                       ? 'text-text-secondary opacity-100'
                       : 'text-text-secondary opacity-0 focus-visible:opacity-100'
@@ -337,9 +313,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
                 @click.stop="copyId(row.org)"
               >
                 <OIcon
-                  :name="
-                    copiedId === row.org.identifier ? 'check' : 'content-copy'
-                  "
+                  :name="copiedId === row.org.identifier ? 'check' : 'content-copy'"
                   size="xs"
                 />
               </button>
@@ -351,7 +325,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
         <div
           v-else
           data-test="organization-menu-no-data"
-          class="w-full text-center py-7 text-compact text-text-secondary"
+          class="text-compact text-text-secondary w-full py-7 text-center"
         >
           No organizations found
         </div>

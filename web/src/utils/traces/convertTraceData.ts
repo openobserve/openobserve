@@ -24,8 +24,7 @@ export const convertTraceData = (props: any, timezone: string) => {
           show: true,
           fontsize: 12,
           formatter: (name: any) => {
-            if (name.axisDimension == "x")
-              return `${formatDate(new Date(name.value))}`;
+            if (name.axisDimension == "x") return `${formatDate(new Date(name.value))}`;
             else return `${name?.value?.toFixed(2)}ms`;
           },
         },
@@ -177,31 +176,33 @@ export const convertTraceServiceMapData = (
 
   if (enableMultiRootHandling && Array.isArray(data) && data.length > 1) {
     // Multiple root services - create a virtual root that doesn't affect layout
-    treeData = [{
-      name: "",
-      children: data,
-      symbol: 'none', // Completely hide the symbol
-      symbolSize: 1, // Minimal size to avoid layout calculation issues
-      label: {
-        show: false, // Hide the label
+    treeData = [
+      {
+        name: "",
+        children: data,
+        symbol: "none", // Completely hide the symbol
+        symbolSize: 1, // Minimal size to avoid layout calculation issues
+        label: {
+          show: false, // Hide the label
+        },
+        lineStyle: {
+          opacity: 0, // Hide connecting lines from virtual root
+          width: 0, // No line width
+        },
+        itemStyle: {
+          opacity: 0, // Make completely transparent
+        },
       },
-      lineStyle: {
-        opacity: 0, // Hide connecting lines from virtual root
-        width: 0, // No line width
-      },
-      itemStyle: {
-        opacity: 0, // Make completely transparent
-      },
-    }];
+    ];
 
     // Use orthogonal layout for better multi-root visualization
     layoutConfig = {
-      layout: 'orthogonal',
-      orient: 'LR', // Left to right layout
-      left: '5%',
-      right: '5%',
-      top: '5%',
-      bottom: '5%',
+      layout: "orthogonal",
+      orient: "LR", // Left to right layout
+      left: "5%",
+      right: "5%",
+      top: "5%",
+      bottom: "5%",
     };
   }
 
@@ -272,13 +273,9 @@ export const convertServiceGraphToTree = (
   // fallback below, mis-placing children (e.g. an agent's model drawn under the
   // wrong parent). Mirrors the same guard in computeTreeLayout.
   const nodesWithIncoming = new Set(
-    graphData.edges
-      .filter((e: any) => e.from != null)
-      .map((e: any) => e.to),
+    graphData.edges.filter((e: any) => e.from != null).map((e: any) => e.to),
   );
-  const rootNodes = graphData.nodes.filter(
-    (n: any) => !nodesWithIncoming.has(n.id),
-  );
+  const rootNodes = graphData.nodes.filter((n: any) => !nodesWithIncoming.has(n.id));
 
   // Adaptive layout: compute explicit x/y per node so we can use ECharts
   // `layout: 'none'`. Columns are sized by label width (no horizontal bleed) and
@@ -297,13 +294,8 @@ export const convertServiceGraphToTree = (
   // and a label needs a bit less than that pitch to clear its neighbour.
   // Number of leaf ROWS drives the height — count nodes with no children in the
   // spanning tree (parents stack between their kids, so they don't add rows).
-  const parentIds = new Set(
-    graphData.edges.map((e: any) => e.from).filter((f: any) => f != null),
-  );
-  const leafRows = Math.max(
-    1,
-    graphData.nodes.filter((n: any) => !parentIds.has(n.id)).length,
-  );
+  const parentIds = new Set(graphData.edges.map((e: any) => e.from).filter((f: any) => f != null));
+  const leafRows = Math.max(1, graphData.nodes.filter((n: any) => !parentIds.has(n.id)).length);
   // Usable vertical pixels: panel minus the top/bottom series insets (~4% each).
   const usableH = Math.max(120, canvasHeight * 0.92);
   // Pixels each leaf row gets after ECharts compresses the tree to fit the panel.
@@ -340,12 +332,9 @@ export const convertServiceGraphToTree = (
   // token matches); the light-mode values are the legacy Ant palette with no
   // exact token, so they stay as literals until the palette is unified.
   const getNodeColor = (errRate: number): string => {
-    if (errRate > 10)
-      return isDarkMode ? cssToken("--color-error-500", "#ef4444") : "#f5222d"; // Red — critical
-    if (errRate > 5)
-      return isDarkMode ? cssToken("--color-orange-500", "#f97316") : "#fa8c16"; // Orange — warning
-    if (errRate > 1)
-      return isDarkMode ? cssToken("--color-amber-400", "#fbbf24") : "#faad14"; // Yellow — degraded
+    if (errRate > 10) return isDarkMode ? cssToken("--color-error-500", "#ef4444") : "#f5222d"; // Red — critical
+    if (errRate > 5) return isDarkMode ? cssToken("--color-orange-500", "#f97316") : "#fa8c16"; // Orange — warning
+    if (errRate > 1) return isDarkMode ? cssToken("--color-amber-400", "#fbbf24") : "#faad14"; // Yellow — degraded
     return green;
   };
 
@@ -397,8 +386,7 @@ export const convertServiceGraphToTree = (
 
     // Node border: colored by this node's error rate relative to baseline
     const nodeErrorRate =
-      node.error_rate ??
-      (node.requests > 0 ? (node.errors / node.requests) * 100 : 0);
+      node.error_rate ?? (node.requests > 0 ? (node.errors / node.requests) * 100 : 0);
     const borderColor = getNodeColor(nodeErrorRate);
 
     // Tree edges are always neutral gray — color belongs on node borders only
@@ -413,12 +401,7 @@ export const convertServiceGraphToTree = (
       node.service_type === "agent" && !agentHighlight ? null : node.service_type;
 
     // Reuse the same SVG icon as graph view (circle + service-type icon)
-    const iconDataUrl = getServiceIconSvg(
-      node.id,
-      isDarkMode,
-      borderColor,
-      iconServiceType,
-    );
+    const iconDataUrl = getServiceIconSvg(node.id, isDarkMode, borderColor, iconServiceType);
 
     return {
       name: node.label || node.id,
@@ -429,9 +412,7 @@ export const convertServiceGraphToTree = (
       // padded 104-wide viewBox (vs 56) to give the radar-ping halo room to
       // expand, so the disc occupies a smaller fraction of the box; the 104/56
       // factor cancels that out and the ×1.3 on top is the visual emphasis.
-      symbolSize: isAgentNode
-        ? Math.round(nodeSymbolSize * 1.3 * (104 / 56))
-        : nodeSymbolSize,
+      symbolSize: isAgentNode ? Math.round(nodeSymbolSize * 1.3 * (104 / 56)) : nodeSymbolSize,
       lineStyle: {
         color: edgeColor,
         width: 2,
@@ -518,14 +499,10 @@ export const convertServiceGraphToTree = (
   };
 
   // Start with root nodes
-  let treeData = rootNodes
-    .map((node: any) => buildTree(node.id))
-    .filter((n: any) => n !== null);
+  let treeData = rootNodes.map((node: any) => buildTree(node.id)).filter((n: any) => n !== null);
 
   // Find unvisited nodes (disconnected components or cycles)
-  const unvisitedNodes = graphData.nodes.filter(
-    (n: any) => !globalVisited.has(n.id),
-  );
+  const unvisitedNodes = graphData.nodes.filter((n: any) => !globalVisited.has(n.id));
 
   // Add unvisited nodes as separate root trees
   if (unvisitedNodes.length > 0) {
@@ -546,18 +523,13 @@ export const convertServiceGraphToTree = (
           data: graphData.nodes.map((node: any) => ({
             name: node.label || node.id,
             value: 0,
-            symbolSize: Math.max(
-              40,
-              Math.min(80, Math.log10((node.requests || 0) + 1) * 20),
-            ),
+            symbolSize: Math.max(40, Math.min(80, Math.log10((node.requests || 0) + 1) * 20)),
             itemStyle: {
               color: isDarkMode ? "#1a1f2e" : "#ffffff",
               borderColor: "#9E9E9E",
               borderWidth: 4,
               shadowBlur: 10,
-              shadowColor: isDarkMode
-                ? "rgba(0, 0, 0, 0.3)"
-                : "rgba(0, 0, 0, 0.1)",
+              shadowColor: isDarkMode ? "rgba(0, 0, 0, 0.3)" : "rgba(0, 0, 0, 0.1)",
             },
           })),
           layout: "orthogonal",
@@ -757,10 +729,7 @@ const computeForceLayout = (
           ey = pv.y - pu.y;
         const len2 = ex * ex + ey * ey;
         if (len2 < 1) return;
-        const t = Math.max(
-          0,
-          Math.min(1, ((p.x - pu.x) * ex + (p.y - pu.y) * ey) / len2),
-        );
+        const t = Math.max(0, Math.min(1, ((p.x - pu.x) * ex + (p.y - pu.y) * ey) / len2));
         const cx = pu.x + t * ex,
           cy = pu.y + t * ey;
         const dx = p.x - cx,
@@ -877,9 +846,7 @@ const KIND_ICON_SVG: Record<string, string> = {
  * Return the raw SVG for a node's authoritative kind, or null when the node has
  * no inferred type (a real service) so the name-regex fallback runs.
  */
-export function iconSvgForType(
-  serviceType: string | undefined | null,
-): string | null {
+export function iconSvgForType(serviceType: string | undefined | null): string | null {
   if (!serviceType) return null;
   return KIND_ICON_SVG[serviceType] ?? null;
 }
@@ -935,9 +902,7 @@ const SERVICE_ICON_RULES: { regex: RegExp; svg: string }[] = [
   {
     // Clock / cog — scheduler, cron, background worker, job, consumer
     regex: /schedul|cron|worker|job|consumer|processor/,
-    svg:
-      `<circle cx="12" cy="12" r="10"/>` +
-      `<polyline points="12 6 12 12 16 14"/>`,
+    svg: `<circle cx="12" cy="12" r="10"/>` + `<polyline points="12 6 12 12 16 14"/>`,
   },
   {
     // Sliders — config, consul, etcd, feature flag, feature toggle
@@ -955,8 +920,7 @@ const SERVICE_ICON_RULES: { regex: RegExp; svg: string }[] = [
   },
   {
     // Activity pulse — load generator, traffic simulator, telemetry, monitoring
-    regex:
-      /load|generator|traffic|benchmark|prometheus|grafana|otel|telemetry|monitor/,
+    regex: /load|generator|traffic|benchmark|prometheus|grafana|otel|telemetry|monitor/,
     svg: `<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>`,
   },
   {
@@ -969,8 +933,7 @@ const SERVICE_ICON_RULES: { regex: RegExp; svg: string }[] = [
   // ── Data / storage ───────────────────────────────────────────────────────
   {
     // Database cylinder — any SQL/NoSQL/search engine
-    regex:
-      /database|elastic|opensearch|mongo|mysql|postgres|sqlite|oracle|cassandra|dynamo|\bdb\b/,
+    regex: /database|elastic|opensearch|mongo|mysql|postgres|sqlite|oracle|cassandra|dynamo|\bdb\b/,
     svg:
       `<ellipse cx="12" cy="5" rx="9" ry="3"/>` +
       `<path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>` +
@@ -1019,9 +982,7 @@ const SERVICE_ICON_RULES: { regex: RegExp; svg: string }[] = [
   {
     // Magnifier — search and query services
     regex: /search|quer/,
-    svg:
-      `<circle cx="11" cy="11" r="8"/>` +
-      `<line x1="21" y1="21" x2="16.65" y2="16.65"/>`,
+    svg: `<circle cx="11" cy="11" r="8"/>` + `<line x1="21" y1="21" x2="16.65" y2="16.65"/>`,
   },
   // ── AI / ML ──────────────────────────────────────────────────────────────
   {
@@ -1274,10 +1235,7 @@ function getServiceIconSvg(
  * icon with no circular border — suitable for small inline span badges.
  * Returns null when no rule matches (i.e. no specific tech is identifiable).
  */
-export function getSpanTechIconDataUrl(
-  name: string,
-  isDark: boolean,
-): string | null {
+export function getSpanTechIconDataUrl(name: string, isDark: boolean): string | null {
   const iconColor = isDark ? "#e4e7eb" : "#374151";
   const n = (name || "").toLowerCase().replace(/[-_]/g, " ");
   const matched = SERVICE_ICON_RULES.find(({ regex }) => regex.test(n));
@@ -1289,7 +1247,7 @@ export function getSpanTechIconDataUrl(
     matched.svg +
     `</svg>`;
 
-  return `data:image/svg+xml;base64,${btoa(encodeURIComponent(svg).replace(/%([0-9A-F]{2})/g, (_, p1) => String.fromCharCode(parseInt(p1, 16))))}`;  
+  return `data:image/svg+xml;base64,${btoa(encodeURIComponent(svg).replace(/%([0-9A-F]{2})/g, (_, p1) => String.fromCharCode(parseInt(p1, 16))))}`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1321,10 +1279,7 @@ export const convertServiceGraphToNetwork = (
   }
 
   // Build node metrics map using each node's own data from backend (authoritative source)
-  const nodeMetrics = new Map<
-    string,
-    { requests: number; errors: number; connections: number }
-  >();
+  const nodeMetrics = new Map<string, { requests: number; errors: number; connections: number }>();
 
   // Initialize metrics for all nodes using their own backend data
   graphData.nodes.forEach((node: any) => {
@@ -1351,10 +1306,7 @@ export const convertServiceGraphToNetwork = (
   // Validate that all nodes have valid IDs
   const validNodes = graphData.nodes.filter((node: any) => {
     if (!node || !node.id) {
-      console.warn(
-        "[convertServiceGraphToNetwork] Skipping node with invalid ID:",
-        node,
-      );
+      console.warn("[convertServiceGraphToNetwork] Skipping node with invalid ID:", node);
       return false;
     }
     return true;
@@ -1426,8 +1378,7 @@ export const convertServiceGraphToNetwork = (
       errors: 0,
       connections: 0,
     };
-    const errorRate =
-      metrics.requests > 0 ? (metrics.errors / metrics.requests) * 100 : 0;
+    const errorRate = metrics.requests > 0 ? (metrics.errors / metrics.requests) * 100 : 0;
 
     // Border color based on error rate (theme-aware). Dark-mode red/orange/yellow
     // resolve from the semantic token layer (exact matches); the healthy green
@@ -1440,8 +1391,7 @@ export const convertServiceGraphToNetwork = (
         borderColor = cssToken("--color-error-500", "#ef4444"); // Red (critical)
       else if (errorRate > 5)
         borderColor = cssToken("--color-orange-500", "#f97316"); // Orange (warning)
-      else if (errorRate > 1)
-        borderColor = cssToken("--color-amber-400", "#fbbf24"); // Yellow (degraded)
+      else if (errorRate > 1) borderColor = cssToken("--color-amber-400", "#fbbf24"); // Yellow (degraded)
     } else {
       // Light mode colors
       borderColor = "#52c41a"; // Green (healthy)
@@ -1453,10 +1403,7 @@ export const convertServiceGraphToNetwork = (
     }
 
     // Node size: scales with request volume like DataDog (70–110 px range)
-    const baseSymbolSize = Math.max(
-      70,
-      Math.min(110, Math.log10(metrics.requests + 1) * 28),
-    );
+    const baseSymbolSize = Math.max(70, Math.min(110, Math.log10(metrics.requests + 1) * 28));
     // Agent accent treatment (tint/size/ping) applies only when the Agent
     // Graph page asks for it; elsewhere an un-highlighted agent renders like any
     // other node — downgrade its kind to null so the icon builder skips the
@@ -1469,17 +1416,10 @@ export const convertServiceGraphToNetwork = (
     // entities. The 104/56 factor compensates for the agent symbol's padded
     // viewBox (see getServiceIconDataUrl) so the disc stays ≈1.3× a neighbour
     // while its radar-ping halo has room to expand.
-    const symbolSize = isAgentNode
-      ? Math.round(baseSymbolSize * 1.3 * (104 / 56))
-      : baseSymbolSize;
+    const symbolSize = isAgentNode ? Math.round(baseSymbolSize * 1.3 * (104 / 56)) : baseSymbolSize;
 
     // SVG symbol: circle with health-colored border + service-type icon
-    const iconDataUrl = getServiceIconSvg(
-      node.id,
-      isDarkMode,
-      borderColor,
-      iconServiceType,
-    );
+    const iconDataUrl = getServiceIconSvg(node.id, isDarkMode, borderColor, iconServiceType);
 
     // Use cached position if available
     const cachedPos = cachedPositions?.get(node.id);
@@ -1556,10 +1496,7 @@ export const convertServiceGraphToNetwork = (
   graphData.edges.forEach((edge: any) => {
     // Validate edge structure and node references
     if (!edge || !edge.from || !edge.to) {
-      console.warn(
-        "[convertServiceGraphToNetwork] Skipping edge with missing from/to:",
-        edge,
-      );
+      console.warn("[convertServiceGraphToNetwork] Skipping edge with missing from/to:", edge);
       return;
     }
 
@@ -1616,42 +1553,40 @@ export const convertServiceGraphToNetwork = (
     }
   });
 
-  const edges = Array.from(edgeMap.entries()).map(
-    ([edgeKey, edge]: [string, any]) => {
-      // Get the assigned curvature for this edge
-      const curveness = edgeCurvature.get(edgeKey) || 0;
+  const edges = Array.from(edgeMap.entries()).map(([edgeKey, edge]: [string, any]) => {
+    // Get the assigned curvature for this edge
+    const curveness = edgeCurvature.get(edgeKey) || 0;
 
-      const edgeColor = isDarkMode ? "#4a5568" : "#b0b7c3";
+    const edgeColor = isDarkMode ? "#4a5568" : "#b0b7c3";
 
-      return {
-        source: edge.from,
-        target: edge.to,
-        value: edge.total_requests || 0,
-        // Edge tooltips are handled by the mini chart overlay — disable ECharts native tooltip
-        tooltip: { show: false },
-        symbol: ["none", "arrow"],
-        symbolSize: [0, 10],
+    return {
+      source: edge.from,
+      target: edge.to,
+      value: edge.total_requests || 0,
+      // Edge tooltips are handled by the mini chart overlay — disable ECharts native tooltip
+      tooltip: { show: false },
+      symbol: ["none", "arrow"],
+      symbolSize: [0, 10],
+      lineStyle: {
+        width: 4,
+        color: edgeColor,
+        curveness: curveness,
+        type: "solid", // solid by default — no animation at rest
+        opacity: 0.6,
+      },
+      label: {
+        show: false,
+      },
+      emphasis: {
         lineStyle: {
+          type: "solid",
           width: 4,
+          opacity: 1,
           color: edgeColor,
-          curveness: curveness,
-          type: "solid", // solid by default — no animation at rest
-          opacity: 0.6,
         },
-        label: {
-          show: false,
-        },
-        emphasis: {
-          lineStyle: {
-            type: "solid",
-            width: 4,
-            opacity: 1,
-            color: edgeColor,
-          },
-        },
-      };
-    },
-  );
+      },
+    };
+  });
 
   // Determine if we should use force layout or fixed positions
   const hasPositions = cachedPositions && cachedPositions.size > 0;
@@ -1660,12 +1595,7 @@ export const convertServiceGraphToNetwork = (
   // Columns = call depth from root services; rows = nodes within each column.
   // Positions are mapped directly to canvas pixels so nodes fill the full space.
   if (normalizedLayoutType === "force" && !hasPositions) {
-    const positions = computeForceLayout(
-      nodes,
-      graphData.edges,
-      canvasWidth,
-      canvasHeight,
-    );
+    const positions = computeForceLayout(nodes, graphData.edges, canvasWidth, canvasHeight);
     nodes.forEach((node: any) => {
       const pos = positions.get(node.id);
       if (pos) {
@@ -1762,9 +1692,7 @@ export const convertServiceGraphToNetwork = (
           },
           itemStyle: {
             shadowBlur: 20,
-            shadowColor: isDarkMode
-              ? "rgba(0, 0, 0, 0.5)"
-              : "rgba(0, 0, 0, 0.3)",
+            shadowColor: isDarkMode ? "rgba(0, 0, 0, 0.5)" : "rgba(0, 0, 0, 0.3)",
           },
         },
         lineStyle: {

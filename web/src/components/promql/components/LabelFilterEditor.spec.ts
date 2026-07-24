@@ -19,7 +19,6 @@ import LabelFilterEditor from "./LabelFilterEditor.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 // Mock useDashboardPanelData composable
 vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: vi.fn(() => ({
@@ -92,9 +91,9 @@ describe("LabelFilterEditor", () => {
 
     it("should display layout name", () => {
       wrapper = createWrapper();
-      expect(
-        wrapper.find('[data-test="promql-labelfilter-editor-label"]').text(),
-      ).toBe("Label Filters");
+      expect(wrapper.find('[data-test="promql-labelfilter-editor-label"]').text()).toBe(
+        "Label Filters",
+      );
     });
 
     it("should render label filter items", () => {
@@ -140,9 +139,7 @@ describe("LabelFilterEditor", () => {
       const labels = [...mockLabels];
       wrapper = createWrapper({ labels });
 
-      const removeButton = wrapper.find(
-        '[data-test="promql-label-filter-remove-0"]',
-      );
+      const removeButton = wrapper.find('[data-test="promql-label-filter-remove-0"]');
       await removeButton.trigger("click");
 
       // Check that update:labels event was emitted with removed label
@@ -345,9 +342,7 @@ describe("LabelFilterEditor", () => {
       await wrapper.setProps({ metric: "" });
       await flushPromises();
 
-      expect(
-        wrapper.props("dashboardData").meta.promql.availableLabels,
-      ).toBeDefined();
+      expect(wrapper.props("dashboardData").meta.promql.availableLabels).toBeDefined();
     });
   });
 
@@ -355,15 +350,9 @@ describe("LabelFilterEditor", () => {
     it("should have proper data-test attributes", () => {
       wrapper = createWrapper();
 
-      expect(
-        wrapper.find('[data-test="promql-add-label-filter"]').exists(),
-      ).toBe(true);
-      expect(wrapper.find('[data-test="promql-label-filter-0"]').exists()).toBe(
-        true,
-      );
-      expect(
-        wrapper.find('[data-test="promql-label-filter-remove-0"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="promql-add-label-filter"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="promql-label-filter-0"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="promql-label-filter-remove-0"]').exists()).toBe(true);
     });
 
     it("should have tooltips on buttons", () => {

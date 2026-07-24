@@ -43,7 +43,7 @@ describe("parseDateRangeString", () => {
     it("rejects malformed JSON and objects missing the expected keys", () => {
       expect(parseDateRangeString('{"start_date":1721557986000000}')).toBeNull();
       expect(parseDateRangeString('{"startDate":"2026/07/21"}')).toBeNull();
-      expect(parseDateRangeString('{not valid json')).toBeNull();
+      expect(parseDateRangeString("{not valid json")).toBeNull();
       expect(
         parseDateRangeString('{"start_date":"not-a-number","end_date":1721565186000000}'),
       ).toBeNull();
@@ -52,11 +52,7 @@ describe("parseDateRangeString", () => {
 
   describe("ISO 8601 range", () => {
     it("with a Z offset, resolves straight to an instant (timezone-independent)", () => {
-      expect(
-        parseDateRangeString(
-          "2026-07-21T13:33:06Z - 2026-07-21T15:33:06Z",
-        ),
-      ).toEqual({
+      expect(parseDateRangeString("2026-07-21T13:33:06Z - 2026-07-21T15:33:06Z")).toEqual({
         type: "timestamp",
         startMicros: 1784640786000000,
         endMicros: 1784647986000000,
@@ -65,23 +61,17 @@ describe("parseDateRangeString", () => {
 
     it("with a numeric offset, resolves to the same instant as the equivalent Z time", () => {
       // 19:03:06+05:30 is the same instant as 13:33:06Z.
-      expect(
-        parseDateRangeString(
-          "2026-07-21T19:03:06+05:30 - 2026-07-21T21:03:06+05:30",
-        ),
-      ).toEqual({
-        type: "timestamp",
-        startMicros: 1784640786000000,
-        endMicros: 1784647986000000,
-      });
+      expect(parseDateRangeString("2026-07-21T19:03:06+05:30 - 2026-07-21T21:03:06+05:30")).toEqual(
+        {
+          type: "timestamp",
+          startMicros: 1784640786000000,
+          endMicros: 1784647986000000,
+        },
+      );
     });
 
     it("accepts an offset with no colon (+HHMM)", () => {
-      expect(
-        parseDateRangeString(
-          "2026-07-21T19:03:06+0530 - 2026-07-21T21:03:06+0530",
-        ),
-      ).toEqual({
+      expect(parseDateRangeString("2026-07-21T19:03:06+0530 - 2026-07-21T21:03:06+0530")).toEqual({
         type: "timestamp",
         startMicros: 1784640786000000,
         endMicros: 1784647986000000,
@@ -89,9 +79,7 @@ describe("parseDateRangeString", () => {
     });
 
     it("without an offset, resolves to the picker-timezone-dependent absolute shape", () => {
-      expect(
-        parseDateRangeString("2026-07-21T13:33:06 - 2026-07-21T15:33:06"),
-      ).toEqual({
+      expect(parseDateRangeString("2026-07-21T13:33:06 - 2026-07-21T15:33:06")).toEqual({
         type: "absolute",
         startDate: "2026/07/21",
         startTime: "13:33:06",
@@ -101,9 +89,7 @@ describe("parseDateRangeString", () => {
     });
 
     it("accepts a space instead of T, and defaults missing seconds/times", () => {
-      expect(
-        parseDateRangeString("2026-07-21 13:33 - 2026-07-21 15:33"),
-      ).toEqual({
+      expect(parseDateRangeString("2026-07-21 13:33 - 2026-07-21 15:33")).toEqual({
         type: "absolute",
         startDate: "2026/07/21",
         startTime: "13:33:00",
@@ -122,23 +108,21 @@ describe("parseDateRangeString", () => {
     it("rejects a pair that mixes offset and offset-less sides", () => {
       // One side is an unambiguous instant, the other isn't — genuinely
       // ambiguous, so this is a paste error rather than a guess.
-      expect(
-        parseDateRangeString("2026-07-21T13:33:06Z - 2026-07-21T15:33:06"),
-      ).toBeNull();
+      expect(parseDateRangeString("2026-07-21T13:33:06Z - 2026-07-21T15:33:06")).toBeNull();
     });
 
     it("rejects malformed ISO strings", () => {
       expect(parseDateRangeString("2026-7-21T13:33:06Z - 2026-07-22T13:33:06Z")).toBeNull();
-      expect(parseDateRangeString("2026-07-21T13:33:06+5:30 - 2026-07-22T13:33:06+5:30")).toBeNull();
+      expect(
+        parseDateRangeString("2026-07-21T13:33:06+5:30 - 2026-07-22T13:33:06+5:30"),
+      ).toBeNull();
     });
   });
 
   describe("human log format range (MMM DD, YYYY HH:mm:ss.SSS Z — matches the app's own display)", () => {
     it("with an offset, resolves straight to an instant", () => {
       expect(
-        parseDateRangeString(
-          "Jul 21, 2026 13:33:06.000 +0000 - Jul 21, 2026 15:33:06.000 +0000",
-        ),
+        parseDateRangeString("Jul 21, 2026 13:33:06.000 +0000 - Jul 21, 2026 15:33:06.000 +0000"),
       ).toEqual({
         type: "timestamp",
         startMicros: 1784640786000000,
@@ -147,33 +131,27 @@ describe("parseDateRangeString", () => {
     });
 
     it("without an offset, resolves to the picker-timezone-dependent absolute shape, keeping milliseconds", () => {
-      expect(
-        parseDateRangeString(
-          "Jul 21, 2026 13:33:06.500 - Jul 21, 2026 15:33:06.500",
-        ),
-      ).toEqual({
-        type: "absolute",
-        startDate: "2026/07/21",
-        startTime: "13:33:06.500",
-        endDate: "2026/07/21",
-        endTime: "15:33:06.500",
-      });
+      expect(parseDateRangeString("Jul 21, 2026 13:33:06.500 - Jul 21, 2026 15:33:06.500")).toEqual(
+        {
+          type: "absolute",
+          startDate: "2026/07/21",
+          startTime: "13:33:06.500",
+          endDate: "2026/07/21",
+          endTime: "15:33:06.500",
+        },
+      );
     });
 
     it("rejects a pair that mixes offset and offset-less sides", () => {
       expect(
-        parseDateRangeString(
-          "Jul 21, 2026 13:33:06 +0000 - Jul 21, 2026 15:33:06",
-        ),
+        parseDateRangeString("Jul 21, 2026 13:33:06 +0000 - Jul 21, 2026 15:33:06"),
       ).toBeNull();
     });
   });
 
   describe("absolute format (YYYY/MM/DD HH:MM:SS - YYYY/MM/DD HH:MM:SS)", () => {
     it("parses a full date-time range", () => {
-      expect(
-        parseDateRangeString("2026/07/21 13:33:06 - 2026/07/21 15:33:06"),
-      ).toEqual({
+      expect(parseDateRangeString("2026/07/21 13:33:06 - 2026/07/21 15:33:06")).toEqual({
         type: "absolute",
         startDate: "2026/07/21",
         startTime: "13:33:06",
@@ -193,9 +171,7 @@ describe("parseDateRangeString", () => {
     });
 
     it("parses a range spanning different dates", () => {
-      expect(
-        parseDateRangeString("2026/01/01 00:00:00 - 2026/12/31 23:59:59"),
-      ).toEqual({
+      expect(parseDateRangeString("2026/01/01 00:00:00 - 2026/12/31 23:59:59")).toEqual({
         type: "absolute",
         startDate: "2026/01/01",
         startTime: "00:00:00",
@@ -205,9 +181,7 @@ describe("parseDateRangeString", () => {
     });
 
     it("tolerates surrounding whitespace", () => {
-      expect(
-        parseDateRangeString("  2026/07/21 13:33:06 - 2026/07/21 15:33:06 "),
-      ).toEqual({
+      expect(parseDateRangeString("  2026/07/21 13:33:06 - 2026/07/21 15:33:06 ")).toEqual({
         type: "absolute",
         startDate: "2026/07/21",
         startTime: "13:33:06",
@@ -228,9 +202,7 @@ describe("parseDateRangeString", () => {
 
   describe("epoch timestamp pair (paste only)", () => {
     it("passes microseconds through unchanged", () => {
-      expect(
-        parseDateRangeString("1721557986000000 - 1721565186000000"),
-      ).toEqual({
+      expect(parseDateRangeString("1721557986000000 - 1721565186000000")).toEqual({
         type: "timestamp",
         startMicros: 1721557986000000,
         endMicros: 1721565186000000,
@@ -256,17 +228,13 @@ describe("parseDateRangeString", () => {
     it("yields identical micros across all three units for the same instant", () => {
       const secs = parseDateRangeString("1721557986 - 1721565186");
       const millis = parseDateRangeString("1721557986000 - 1721565186000");
-      const micros = parseDateRangeString(
-        "1721557986000000 - 1721565186000000",
-      );
+      const micros = parseDateRangeString("1721557986000000 - 1721565186000000");
       expect(secs).toEqual(millis);
       expect(millis).toEqual(micros);
     });
 
     it("tolerates surrounding whitespace", () => {
-      expect(
-        parseDateRangeString("  1721557986000000 - 1721565186000000  "),
-      ).toEqual({
+      expect(parseDateRangeString("  1721557986000000 - 1721565186000000  ")).toEqual({
         type: "timestamp",
         startMicros: 1721557986000000,
         endMicros: 1721565186000000,
@@ -276,9 +244,7 @@ describe("parseDateRangeString", () => {
     it("rejects out-of-range digit lengths and single values", () => {
       // 9 digits (too short) and 17 digits (too long) are not accepted.
       expect(parseDateRangeString("123456789 - 123456789")).toBeNull();
-      expect(
-        parseDateRangeString("12345678901234567 - 12345678901234567"),
-      ).toBeNull();
+      expect(parseDateRangeString("12345678901234567 - 12345678901234567")).toBeNull();
       expect(parseDateRangeString("1721557986000000")).toBeNull();
     });
   });
@@ -292,9 +258,7 @@ describe("parseDateRangeString", () => {
     });
 
     it("prefers the timestamp reading over absolute for pure digit pairs", () => {
-      const result = parseDateRangeString(
-        "1721557986000000 - 1721565186000000",
-      );
+      const result = parseDateRangeString("1721557986000000 - 1721565186000000");
       expect(result?.type).toBe("timestamp");
     });
   });
@@ -483,12 +447,8 @@ describe("parseSingleDateTime", () => {
   describe("invalid input", () => {
     it("returns null for ranges and unrecognized strings", () => {
       // A range string is not a single value.
-      expect(
-        parseSingleDateTime("2026/07/21 13:33:06 - 2026/07/21 15:33:06"),
-      ).toBeNull();
-      expect(
-        parseSingleDateTime("1721557986000000 - 1721565186000000"),
-      ).toBeNull();
+      expect(parseSingleDateTime("2026/07/21 13:33:06 - 2026/07/21 15:33:06")).toBeNull();
+      expect(parseSingleDateTime("1721557986000000 - 1721565186000000")).toBeNull();
       expect(parseSingleDateTime("")).toBeNull();
       expect(parseSingleDateTime("garbage")).toBeNull();
       expect(parseSingleDateTime("Past 2 Hours")).toBeNull();

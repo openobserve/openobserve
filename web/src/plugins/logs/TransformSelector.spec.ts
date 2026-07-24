@@ -24,14 +24,9 @@ import TransformSelector from "./TransformSelector.vue";
 // interpolation). Resolve that migrated namespace from the real en.json messages so
 // those assertions pass, while continuing to echo keys everywhere else.
 vi.mock("vue-i18n", async () => {
-  const enLocale = (await import("@/locales/languages/en-US.json")).default as Record<
-    string,
-    any
-  >;
+  const enLocale = (await import("@/locales/languages/en-US.json")).default as Record<string, any>;
   const resolve = (key: string, params?: Record<string, unknown>): string => {
-    const msg = key
-      .split(".")
-      .reduce<any>((o, k) => (o == null ? o : o[k]), enLocale);
+    const msg = key.split(".").reduce<any>((o, k) => (o == null ? o : o[k]), enLocale);
     if (typeof msg !== "string") return key;
     return msg.replace(/\{(\w+)\}/g, (_m: string, name: string) =>
       params && name in params ? String(params[name]) : `{${name}}`,
@@ -112,18 +107,23 @@ const mountComponent = (propsOverrides = {}) =>
   mount(TransformSelector, {
     global: {
       stubs: {
-        QBtnGroup: { template: '<div><slot /></div>' },
+        QBtnGroup: { template: "<div><slot /></div>" },
         QToggle: { template: '<input type="checkbox" />' },
         QTooltip: true,
-        QBtnDropdown: { template: '<div data-test="btn-dropdown"><slot /><slot name="default" /></div>' },
-        QList: { template: '<ul><slot /></ul>' },
-        QSelect: { template: '<select />' },
-        QInput: { template: '<input />' },
-        QIcon: { template: '<span />' },
-        QItem: { template: '<li><slot /></li>' },
-        QItemSection: { template: '<div><slot /></div>' },
-        QItemLabel: { template: '<span><slot /></span>' },
-        QBtn: { template: '<button :disabled="$attrs.disable" @click="$attrs.onClick?.($event)"><slot /></button>' },
+        QBtnDropdown: {
+          template: '<div data-test="btn-dropdown"><slot /><slot name="default" /></div>',
+        },
+        QList: { template: "<ul><slot /></ul>" },
+        QSelect: { template: "<select />" },
+        QInput: { template: "<input />" },
+        QIcon: { template: "<span />" },
+        QItem: { template: "<li><slot /></li>" },
+        QItemSection: { template: "<div><slot /></div>" },
+        QItemLabel: { template: "<span><slot /></span>" },
+        QBtn: {
+          template:
+            '<button :disabled="$attrs.disable" @click="$attrs.onClick?.($event)"><slot /></button>',
+        },
       },
     },
     props: {
@@ -441,7 +441,7 @@ describe("TransformSelector", () => {
       expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
           message: "testAction action applied successfully",
-        })
+        }),
       );
     });
 
@@ -553,7 +553,9 @@ describe("TransformSelector", () => {
       await flushPromises();
       const result = wrapper.vm.filteredFunctionOptions;
       expect(result.some((o: { name: string }) => o.name === "parseJSON")).toBe(true);
-      expect(result.every((o: { name: string }) => o.name.toLowerCase().includes("parse"))).toBe(true);
+      expect(result.every((o: { name: string }) => o.name.toLowerCase().includes("parse"))).toBe(
+        true,
+      );
     });
   });
 });

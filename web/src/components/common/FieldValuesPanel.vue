@@ -32,18 +32,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Filter mode toggle + selection count -->
     <div
       v-if="showMultiSelect"
-      class="filter-mode-bar flex items-center justify-between px-2 py-1 border-b border-card-glass-border"
+      class="filter-mode-bar border-card-glass-border flex items-center justify-between border-b px-2 py-1"
       data-test="field-values-panel-filter-mode-bar"
     >
-      <div class="flex items-center gap-1 ">
+      <div class="flex items-center gap-1">
         <span
           v-if="selectedValues.length > 0"
-          class="selection-count text-3! text-3xs font-medium text-accent"
+          class="selection-count text-3! text-3xs text-accent font-medium"
           data-test="field-values-panel-selection-count"
         >
           {{ selectedValues.length }} selected
         </span>
-        <span v-else class="selection-hint  text-3! text-3xs text-text-secondary">Select to filter</span>
+        <span v-else class="selection-hint text-3! text-3xs text-text-secondary"
+          >Select to filter</span
+        >
         <OButton
           v-if="selectedValues.length > 0"
           variant="ghost"
@@ -57,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
       <div
-        class="filter-mode-toggle flex border border-card-glass-border rounded-default overflow-hidden"
+        class="filter-mode-toggle border-card-glass-border rounded-default flex overflow-hidden border"
         data-test="field-values-panel-filter-mode-toggle"
       >
         <OButton
@@ -70,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="field-values-panel-include-mode-btn"
         >
           <!-- name="" → OIcon renders the slotted custom SVG -->
-          <OIcon name="" class="h-2.5! w-2.5! m-0.5!">
+          <OIcon name="" class="m-0.5! h-2.5! w-2.5!">
             <EqualIcon />
           </OIcon>
         </OButton>
@@ -83,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="setFilterMode('exclude')"
           data-test="field-values-panel-exclude-mode-btn"
         >
-          <OIcon name="" class="h-2.5! w-2.5! m-0.5!">
+          <OIcon name="" class="m-0.5! h-2.5! w-2.5!">
             <NotEqualIcon />
           </OIcon>
         </OButton>
@@ -93,10 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Scrollable values area -->
     <div class="max-h-64 overflow-y-auto">
       <!-- Loading state (only shown when there are no interim cached results) -->
-      <div
-        v-show="fieldValues?.isLoading && !displayValues.length"
-        class="relative pl-3 py-1 h-15"
-      >
+      <div v-show="fieldValues?.isLoading && !displayValues.length" class="relative h-15 py-1 pl-3">
         <!-- scrim off: this box is empty while loading, so there is nothing to
              dim — and the scrim is 70% of surface-base (white), which on this
              panel's grey surface just reads as a white block. -->
@@ -112,13 +111,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- No values found -->
       <div
         v-show="!displayValues.length && !fieldValues?.isLoading"
-        class="pl-3 py-1 text-sm text-o2-text-secondary"
+        class="text-o2-text-secondary py-1 pl-3 text-sm"
         data-test="field-values-panel-no-values-msg"
       >
         <template v-if="fieldValues?.errMsg">{{ fieldValues.errMsg }}</template>
         <template v-else>
           {{ t("search.fieldValuesEmpty") }}
-          <span class="block text-xs text-o2-text-muted mt-0.5">
+          <span class="text-o2-text-muted mt-0.5 block text-xs">
             {{ t("search.fieldValuesEmptyHint") }}
           </span>
         </template>
@@ -126,21 +125,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Selected values with no count data available (synthetic fallback) -->
       <div
-        v-if="displayValues.length > 0 && (displayValues[0] as any)?.synthetic && !fieldValues?.isLoading"
-        class="pl-3 pb-1 text-xs text-o2-text-secondary italic"
+        v-if="
+          displayValues.length > 0 &&
+          (displayValues[0] as any)?.synthetic &&
+          !fieldValues?.isLoading
+        "
+        class="text-o2-text-secondary pb-1 pl-3 text-xs italic"
         data-test="field-values-panel-no-count-msg"
       >
         No data in range — values from active filter
       </div>
 
       <!-- Field values list -->
-      <ul
-        class="flex flex-col m-0 p-0 list-none"
-        data-test="field-values-panel-values-list"
-      >
+      <ul class="m-0 flex list-none flex-col p-0" data-test="field-values-panel-values-list">
         <li v-for="value in displayValues" :key="value.key" class="py-1">
           <label
-            class="flex items-center gap-1 px-2 py-1 cursor-pointer hover:bg-muted/50"
+            class="hover:bg-muted/50 flex cursor-pointer items-center gap-1 px-2 py-1"
             :data-test="`logs-search-subfield-add-${fieldName}-${value.key}`"
           >
             <!-- Checkbox for multi-select — uses :model-value + @update to
@@ -158,19 +158,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
 
             <div
-              class="flex flex-row flex-wrap justify-between min-w-0 pl-1"
+              class="flex min-w-0 flex-row flex-wrap justify-between pl-1"
               :class="showMultiSelect ? 'w-[calc(100%-1.5rem)]' : 'w-full'"
             >
               <div
                 :title="value.key"
-                class="truncate pr-1 text-field-list-label-text text-3! w-[calc(100%-3.125rem)]"
+                class="text-field-list-label-text text-3! w-[calc(100%-3.125rem)] truncate pr-1"
               >
                 {{ value.label ?? value.key }}
               </div>
               <div
                 v-if="value.count != null"
                 :title="String(value.count)"
-                class="truncate text-right pr-0 text-3! contents"
+                class="text-3! contents truncate pr-0 text-right"
                 :class="showMultiSelect ? 'w-[3.125rem]' : ''"
               >
                 {{ formatLargeNumber(value.count) }}
@@ -184,10 +184,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- View more values / loading more indicator -->
     <div
       v-if="isLoadingMore || (fieldValues?.hasMore && !fieldValues?.isLoading)"
-      class="w-full flex justify-center border-t border-card-glass-border pt-1 px-1"
+      class="border-card-glass-border flex w-full justify-center border-t px-1 pt-1"
     >
       <button
-        class="inline-flex items-center gap-1 bg-transparent border-0 text-accent text-2xs font-[inherit] py-0.5 px-1 cursor-pointer rounded-default transition-opacity duration-150 hover:opacity-80 hover:bg-interactive-hover-bg disabled:opacity-50 disabled:cursor-default"
+        class="text-accent text-2xs rounded-default hover:bg-interactive-hover-bg inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent px-1 py-0.5 font-[inherit] transition-opacity duration-150 hover:opacity-80 disabled:cursor-default disabled:opacity-50"
         :disabled="isLoadingMore"
         @click="handleLoadMoreClick"
         :data-test="`log-search-subfield-load-more-${fieldName}`"
@@ -240,11 +240,7 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-  "add-multiple-search-terms": [
-    fieldName: string,
-    values: string[],
-    action: string,
-  ];
+  "add-multiple-search-terms": [fieldName: string, values: string[], action: string];
   "remove-field-filter": [fieldName: string];
   "load-more-values": [fieldName: string];
   "search-field-values": [fieldName: string, searchTerm: string];
@@ -303,15 +299,9 @@ watch(
 // synthesise the selected values as items so the user can see and deselect them
 // instead of seeing a contradictory "N selected / No values found" state.
 const displayValues = computed(() => {
-  if (
-    props.fieldValues?.isLoading &&
-    valueSearchTerm.value &&
-    cachedValues.value.length
-  ) {
+  if (props.fieldValues?.isLoading && valueSearchTerm.value && cachedValues.value.length) {
     const term = valueSearchTerm.value.toLowerCase();
-    return cachedValues.value.filter((v) =>
-      String(v.key).toLowerCase().includes(term),
-    );
+    return cachedValues.value.filter((v) => String(v.key).toLowerCase().includes(term));
   }
 
   const apiValues = props.fieldValues?.values || [];
@@ -334,9 +324,7 @@ const displayValues = computed(() => {
 
 // Show search box whenever there are values to search.
 const showValueSearch = computed(
-  () =>
-    cachedValues.value.length > 0 ||
-    (props.fieldValues?.values?.length ?? 0) > 0,
+  () => cachedValues.value.length > 0 || (props.fieldValues?.values?.length ?? 0) > 0,
 );
 
 watchDebounced(
@@ -404,12 +392,7 @@ const handleUserCheckboxChange = (value: CheckboxModelValue) => {
   if (newValues.length === 0) {
     emit("remove-field-filter", props.fieldName);
   } else {
-    emit(
-      "add-multiple-search-terms",
-      props.fieldName,
-      [...newValues],
-      filterMode.value,
-    );
+    emit("add-multiple-search-terms", props.fieldName, [...newValues], filterMode.value);
   }
 };
 
@@ -459,8 +442,7 @@ const reset = () => {
   selectedValues.value = allActiveValues.value;
   valueSearchTerm.value = "";
   cachedValues.value = [];
-  filterMode.value =
-    (props.activeExcludeValues?.length ?? 0) > 0 ? "exclude" : "include";
+  filterMode.value = (props.activeExcludeValues?.length ?? 0) > 0 ? "exclude" : "include";
   isLoadingMore.value = false;
 };
 

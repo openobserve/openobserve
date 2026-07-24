@@ -20,11 +20,7 @@ vi.mock("@/utils/theme", () => ({
   applyThemeColors: vi.fn(),
 }));
 
-import {
-  applyThemeForMode,
-  applyCurrentTheme,
-  bootstrapTheme,
-} from "./themeManager";
+import { applyThemeForMode, applyCurrentTheme, bootstrapTheme } from "./themeManager";
 import { applyThemeColors } from "@/utils/theme";
 import {
   CUSTOM_THEME_NAME,
@@ -76,9 +72,7 @@ describe("themeManager", () => {
       undefined,
     );
     // Cache refreshed to the current registry color.
-    expect(localStorage.getItem(THEME_STORAGE_KEYS.light.color)).toBe(
-      ocean.light.themeColor,
-    );
+    expect(localStorage.getItem(THEME_STORAGE_KEYS.light.color)).toBe(ocean.light.themeColor);
   });
 
   it("caches semantic colors for a predefined theme that defines them", () => {
@@ -93,21 +87,13 @@ describe("themeManager", () => {
   });
 
   it("uses the stored hex for a custom theme and does not rewrite the cache", () => {
-    localStorage.setItem(
-      THEME_STORAGE_KEYS.light.appliedName,
-      CUSTOM_THEME_NAME,
-    );
+    localStorage.setItem(THEME_STORAGE_KEYS.light.appliedName, CUSTOM_THEME_NAME);
     localStorage.setItem(THEME_STORAGE_KEYS.light.color, "#FF0000");
 
     const resolved = applyThemeForMode("light", storeWith());
 
     expect(resolved.source).toBe("custom");
-    expect(applyThemeColors).toHaveBeenCalledWith(
-      "#FF0000",
-      "light",
-      false,
-      undefined,
-    );
+    expect(applyThemeColors).toHaveBeenCalledWith("#FF0000", "light", false, undefined);
     expect(localStorage.getItem(THEME_STORAGE_KEYS.light.color)).toBe("#FF0000");
   });
 
@@ -135,9 +121,7 @@ describe("themeManager", () => {
     const def = getDefaultTheme();
     applyThemeForMode("light", storeWith());
     // No explicit selection, but the cache now reflects the default color.
-    expect(localStorage.getItem(THEME_STORAGE_KEYS.light.color)).toBe(
-      def.light.themeColor,
-    );
+    expect(localStorage.getItem(THEME_STORAGE_KEYS.light.color)).toBe(def.light.themeColor);
   });
 
   describe("bootstrapTheme", () => {
@@ -173,9 +157,7 @@ describe("themeManager", () => {
 
       bootstrapTheme();
 
-      expect(localStorage.getItem(THEME_STORAGE_KEYS.light.appliedName)).toBe(
-        "O2 Pulse",
-      );
+      expect(localStorage.getItem(THEME_STORAGE_KEYS.light.appliedName)).toBe("O2 Pulse");
       expect(applyThemeColors).toHaveBeenCalledWith(
         ocean.light.themeColor,
         "light",

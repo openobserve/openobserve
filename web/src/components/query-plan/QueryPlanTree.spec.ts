@@ -18,11 +18,7 @@ import { mount, VueWrapper } from "@vue/test-utils";
 import QueryPlanTree from "./QueryPlanTree.vue";
 import type { OperatorNode } from "@/utils/queryPlanParser";
 
-
-function makeNode(
-  name: string,
-  children: OperatorNode[] = [],
-): OperatorNode {
+function makeNode(name: string, children: OperatorNode[] = []): OperatorNode {
   return {
     name,
     fullText: name,
@@ -44,10 +40,7 @@ function makeRootNode(children: OperatorNode[]): OperatorNode {
   };
 }
 
-function mountTree(
-  tree: OperatorNode,
-  props: Record<string, unknown> = {},
-) {
+function mountTree(tree: OperatorNode, props: Record<string, unknown> = {}) {
   return mount(QueryPlanTree, {
     props: {
       tree,
@@ -93,9 +86,7 @@ describe("QueryPlanTree", () => {
     it("should render the operator name of the single child", () => {
       const tree = makeRootNode([makeNode("FilterExec")]);
       wrapper = mountTree(tree);
-      expect(
-        wrapper.find('[data-test="query-plan-node-operator-name"]').text(),
-      ).toBe("FilterExec");
+      expect(wrapper.find('[data-test="query-plan-node-operator-name"]').text()).toBe("FilterExec");
     });
   });
 
@@ -111,14 +102,9 @@ describe("QueryPlanTree", () => {
     });
 
     it("should render operator names for all children", () => {
-      const tree = makeRootNode([
-        makeNode("ProjectionExec"),
-        makeNode("FilterExec"),
-      ]);
+      const tree = makeRootNode([makeNode("ProjectionExec"), makeNode("FilterExec")]);
       wrapper = mountTree(tree);
-      const names = wrapper.findAll(
-        '[data-test="query-plan-node-operator-name"]',
-      );
+      const names = wrapper.findAll('[data-test="query-plan-node-operator-name"]');
       expect(names[0].text()).toBe("ProjectionExec");
       expect(names[1].text()).toBe("FilterExec");
     });
@@ -130,9 +116,7 @@ describe("QueryPlanTree", () => {
         makeNode("LastExec"),
       ]);
       wrapper = mountTree(tree);
-      const connectors = wrapper.findAll(
-        '[data-test="query-plan-node-tree-connector"]',
-      );
+      const connectors = wrapper.findAll('[data-test="query-plan-node-tree-connector"]');
       // first two → ├─, last one → └─
       expect(connectors[0].text()).toBe("├─");
       expect(connectors[1].text()).toBe("├─");
@@ -168,11 +152,7 @@ describe("QueryPlanTree", () => {
       wrapper = mountTree(tree);
       // The grandchild should be rendered inside the child's children container
       expect(
-        wrapper
-          .find(
-            '.children .plan-node [data-test="query-plan-node-operator-name"]',
-          )
-          .text(),
+        wrapper.find('.children .plan-node [data-test="query-plan-node-operator-name"]').text(),
       ).toBe("GrandchildExec");
     });
   });
@@ -184,9 +164,7 @@ describe("QueryPlanTree", () => {
       // Root children get parentPrefix="" so no tree-indent span should appear at top level
       expect(
         wrapper
-          .find(
-            '.tree-node > .plan-node > .node-line > [data-test="query-plan-node-tree-indent"]',
-          )
+          .find('.tree-node > .plan-node > .node-line > [data-test="query-plan-node-tree-indent"]')
           .exists(),
       ).toBe(false);
     });

@@ -1,6 +1,6 @@
 <script setup>
-import { BaseEdge, EdgeLabelRenderer, getBezierPath, useVueFlow } from '@vue-flow/core'
-import { computed } from 'vue'
+import { BaseEdge, EdgeLabelRenderer, getBezierPath, useVueFlow } from "@vue-flow/core";
+import { computed } from "vue";
 
 const props = defineProps({
   id: {
@@ -39,32 +39,30 @@ const props = defineProps({
     type: Object,
     required: false,
   },
-})
+});
 
-useVueFlow()
+useVueFlow();
 
-const path = computed(() => getBezierPath(props))
+const path = computed(() => getBezierPath(props));
 
-let clickTimeout = null
+let clickTimeout = null;
 </script>
 
 <script>
 export default {
   inheritAttrs: false,
-}
+};
 </script>
 
 <template>
   <!-- You can use the `BaseEdge` component to create your own custom edge more easily -->
-  <BaseEdge 
-    :id="id" 
-    :style="{ ...style, cursor: 'pointer', strokeDasharray: 'none' }" 
-    :path="path[0]" 
+  <BaseEdge
+    :id="id"
+    :style="{ ...style, cursor: 'pointer', strokeDasharray: 'none' }"
+    :path="path[0]"
     :marker-end="markerEnd"
   />
 
   <!-- Use the `EdgeLabelRenderer` to escape the SVG world of edges and render your own custom label in a `<div>` ctx -->
-  <EdgeLabelRenderer>
-  </EdgeLabelRenderer>
+  <EdgeLabelRenderer> </EdgeLabelRenderer>
 </template>
-

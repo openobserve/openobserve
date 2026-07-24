@@ -32,8 +32,8 @@ const alignClasses: Record<NonNullable<ButtonGroupProps["align"]>, string> = {
       props.orientation === 'vertical' ? 'flex-col' : 'flex-row',
       // Divider between sibling buttons
       props.orientation === 'horizontal'
-        ? 'divide-x divide-button-group-divider'
-        : 'divide-y divide-button-group-divider',
+        ? 'divide-button-group-divider divide-x'
+        : 'divide-button-group-divider divide-y',
       // First child: keep only the start-side radius (RTL-safe logical properties)
       props.orientation === 'horizontal'
         ? '[&>*:first-child]:rounded-e-none [&>*:last-child]:rounded-s-none'

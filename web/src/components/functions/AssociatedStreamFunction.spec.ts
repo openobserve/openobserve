@@ -20,7 +20,6 @@ import i18n from "@/locales";
 import { createRouter, createWebHistory } from "vue-router";
 import { createStore } from "vuex";
 
-
 // Hoist mocks so they are available when vi.mock factories are hoisted
 const {
   mockGetStreams,
@@ -107,8 +106,7 @@ describe("AssociatedStreamFunction", () => {
     inheritAttrs: false,
     props: ["open", "size", "persistent", "title", "subTitle", "showClose", "width"],
     emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-    template:
-      '<div data-test="o-drawer-stub" :data-open="open" :data-size="size"><slot /></div>',
+    template: '<div data-test="o-drawer-stub" :data-open="open" :data-size="size"><slot /></div>',
   };
 
   const globalStubs = {
@@ -507,12 +505,7 @@ describe("AssociatedStreamFunction", () => {
       await vm.deleteFunctionFromStream("func1");
       await flushPromises();
 
-      expect(mockRemoveStreamFunction).toHaveBeenCalledWith(
-        "test-org",
-        "stream1",
-        "logs",
-        "func1"
-      );
+      expect(mockRemoveStreamFunction).toHaveBeenCalledWith("test-org", "stream1", "logs", "func1");
     });
 
     it("should refresh stream functions after delete", async () => {
@@ -556,7 +549,7 @@ describe("AssociatedStreamFunction", () => {
         "stream1",
         "logs",
         "func1",
-        func
+        func,
       );
     });
 

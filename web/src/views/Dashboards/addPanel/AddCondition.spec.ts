@@ -107,10 +107,7 @@ describe("AddCondition.vue", () => {
       props: { ...defaultProps, ...props },
       global: {
         plugins: [i18n],
-        stubs: [
-          "CommonAutoComplete",
-          "SanitizedHtmlRenderer",
-        ],
+        stubs: ["CommonAutoComplete", "SanitizedHtmlRenderer"],
       },
       ...mountOptions,
     });
@@ -452,13 +449,7 @@ describe("AddCondition.vue", () => {
 
       const options = wrapper.vm.sortedFilteredListOptions;
       expect(Array.isArray(options)).toBe(true);
-      expect(options).toEqual([
-        "alpha",
-        "option1",
-        "option2",
-        "option3",
-        "zebra",
-      ]); // Sorted alphabetically
+      expect(options).toEqual(["alpha", "option1", "option2", "option3", "zebra"]); // Sorted alphabetically
     });
 
     it("should filter list options based on search term", async () => {

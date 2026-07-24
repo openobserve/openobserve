@@ -26,24 +26,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   CSS is allowed here per the redesign rules §5a).
 -->
 <template>
-  <div
-    v-if="toolCalls.length > 0"
-    class="thread-tools-thread"
-  >
+  <div v-if="toolCalls.length > 0" class="thread-tools-thread">
     <!-- One-way reveal: clicking shows the calls and removes the pill. -->
     <button v-if="!shown" class="tt-toggle" @click="shown = true">
       <span class="tt-zz"></span>
-      <span class="tt-pill border border-border-default bg-surface-base">
+      <span class="tt-pill border-border-default bg-surface-base border">
         <span class="tt-count text-text-secondary">
           {{ toolCalls.length }}
           {{
             toolCalls.length === 1
-              ? t('traces.threadToolCalls.toolCall')
-              : t('traces.threadToolCalls.toolCalls')
+              ? t("traces.threadToolCalls.toolCall")
+              : t("traces.threadToolCalls.toolCalls")
           }}
           · {{ formatDuration(totalToolDuration(toolCalls)) }}
         </span>
-        <span class="tt-link">{{ t('traces.threadToolCalls.showCalls') }}</span>
+        <span class="tt-link">{{ t("traces.threadToolCalls.showCalls") }}</span>
       </span>
       <span class="tt-zz"></span>
     </button>
@@ -66,11 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="flex-1" />
           <span
             class="thread-pill"
-            :class="
-              tool.span_status === 'ERROR'
-                ? 'thread-pill--error'
-                : 'thread-pill--ok'
-            "
+            :class="tool.span_status === 'ERROR' ? 'thread-pill--error' : 'thread-pill--ok'"
           >
             {{ tool.span_status === "ERROR" ? "ERROR" : "OK" }}
             · {{ formatDuration(tool.duration) }}
@@ -84,25 +77,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </button>
         </div>
 
-        <div v-if="expandedTools.has(tool.span_id)" class="thread-tool-body bg-surface-base border-t border-dashed border-border-default">
+        <div
+          v-if="expandedTools.has(tool.span_id)"
+          class="thread-tool-body bg-surface-base border-border-default border-t border-dashed"
+        >
           <div class="thread-tool-body__section">
-            <div class="thread-tool-body__label text-text-secondary">{{ t('traces.threadToolCalls.arguments') }}</div>
-            <pre class="thread-tool-body__pre bg-surface-base border border-border-default text-text-body">{{
-              formatToolPayload(getInputRaw(tool) || tool.tool_args)
-            }}</pre>
+            <div class="thread-tool-body__label text-text-secondary">
+              {{ t("traces.threadToolCalls.arguments") }}
+            </div>
+            <pre
+              class="thread-tool-body__pre bg-surface-base border-border-default text-text-body border"
+              >{{ formatToolPayload(getInputRaw(tool) || tool.tool_args) }}</pre
+            >
           </div>
           <div class="thread-tool-body__section">
             <div class="thread-tool-body__label text-text-secondary">
-              {{ t('traces.threadToolCalls.result') }}
-              <span v-if="tool.span_status === 'ERROR'" class="text-error-600">
-                · ERROR
-              </span>
+              {{ t("traces.threadToolCalls.result") }}
+              <span v-if="tool.span_status === 'ERROR'" class="text-error-600"> · ERROR </span>
             </div>
-            <pre class="thread-tool-body__pre bg-surface-base border border-border-default text-text-body">{{
-              formatToolPayload(getOutputRaw(tool)) ||
-              tool.status_message ||
-              t('traces.threadToolCalls.empty')
-            }}</pre>
+            <pre
+              class="thread-tool-body__pre bg-surface-base border-border-default text-text-body border"
+              >{{
+                formatToolPayload(getOutputRaw(tool)) ||
+                tool.status_message ||
+                t("traces.threadToolCalls.empty")
+              }}</pre
+            >
           </div>
         </div>
       </div>
@@ -219,7 +219,9 @@ function formatDuration(ns: number): string {
     padding: 0.5rem 1.125rem;
     border-radius: 0.625rem;
     box-shadow: 0 1px 0.125rem color-mix(in srgb, var(--color-black) 4%, transparent);
-    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+    transition:
+      box-shadow 0.15s ease,
+      border-color 0.15s ease;
   }
 
   .tt-toggle:hover .tt-pill {

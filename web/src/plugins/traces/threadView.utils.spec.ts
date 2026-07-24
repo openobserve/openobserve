@@ -74,12 +74,8 @@ describe("getModel", () => {
 describe("getInputRaw / getOutputRaw", () => {
   // gen_ai field wins over legacy.
   it("prefers gen_ai_input_messages and gen_ai_output_messages", () => {
-    expect(
-      getInputRaw({ gen_ai_input_messages: "[{...}]", llm_input: "ignored" }),
-    ).toBe("[{...}]");
-    expect(
-      getOutputRaw({ gen_ai_output_messages: "[]", llm_output: "ignored" }),
-    ).toBe("[]");
+    expect(getInputRaw({ gen_ai_input_messages: "[{...}]", llm_input: "ignored" })).toBe("[{...}]");
+    expect(getOutputRaw({ gen_ai_output_messages: "[]", llm_output: "ignored" })).toBe("[]");
   });
 
   // Falls back to legacy.
@@ -146,9 +142,7 @@ describe("hasLLMPayload", () => {
 
   // Object payloads — checks for any keys present.
   it("returns true for an object with at least one key", () => {
-    expect(hasLLMPayload({ gen_ai_input_messages: { messages: [] } })).toBe(
-      true,
-    );
+    expect(hasLLMPayload({ gen_ai_input_messages: { messages: [] } })).toBe(true);
   });
 
   it("returns false for an empty object", () => {
@@ -176,9 +170,7 @@ describe("classify", () => {
   // Vertex/ADK wrapper span: chat but no payload — should NOT
   // be classified as llm_turn (otherwise step counts double).
   it('classifies chat without payload as "other" (Vertex wrapper guard)', () => {
-    expect(
-      classify({ gen_ai_operation_name: "chat" }),
-    ).toBe("other");
+    expect(classify({ gen_ai_operation_name: "chat" })).toBe("other");
     expect(
       classify({
         gen_ai_operation_name: "chat",
@@ -202,9 +194,7 @@ describe("classify", () => {
 
   // Server span WITH a parent isn't the root.
   it("does NOT classify server span with parent as root", () => {
-    expect(
-      classify({ span_kind: "2", reference_parent_span_id: "abc" }),
-    ).toBe("other");
+    expect(classify({ span_kind: "2", reference_parent_span_id: "abc" })).toBe("other");
   });
 
   // Anything else → other.
@@ -266,10 +256,10 @@ describe("normalizeRole", () => {
 
   // Common SDK aliases that should map to the canonical set.
   it.each([
-    ["human", "user"],          // Anthropic SDK
-    ["model", "assistant"],     // Vertex / older Gemini
-    ["ai", "assistant"],        // LangChain
-    ["function", "tool"],       // OpenAI function-calling era
+    ["human", "user"], // Anthropic SDK
+    ["model", "assistant"], // Vertex / older Gemini
+    ["ai", "assistant"], // LangChain
+    ["function", "tool"], // OpenAI function-calling era
   ])('maps alias "%s" to "%s"', (input, expected) => {
     expect(normalizeRole(input)).toBe(expected);
   });
@@ -312,9 +302,7 @@ describe("extractContent", () => {
 
   // Older SDK form: {type:"text", content:"..."}
   it("handles legacy {type:text, content} parts", () => {
-    expect(
-      extractContent([{ type: "text", content: "x" }]),
-    ).toBe("x");
+    expect(extractContent([{ type: "text", content: "x" }])).toBe("x");
   });
 
   // Plain string elements inside an array (some SDKs do this).
@@ -324,9 +312,7 @@ describe("extractContent", () => {
 
   // Vertex/ADK shape: {parts: [{text}]} on the message envelope.
   it("recurses into Vertex/ADK parts arrays", () => {
-    expect(
-      extractContent({ parts: [{ text: "hi" }, { text: "there" }] }),
-    ).toBe("hi\nthere");
+    expect(extractContent({ parts: [{ text: "hi" }, { text: "there" }] })).toBe("hi\nthere");
   });
 
   // Vertex/ADK function_response.response.content payload — surface only
@@ -503,9 +489,7 @@ describe("messagesFromOutput", () => {
 
   // Anthropic-ish array of messages: parses straight through.
   it("parses an array of assistant messages", () => {
-    const json = JSON.stringify([
-      { role: "assistant", content: "hi" },
-    ]);
+    const json = JSON.stringify([{ role: "assistant", content: "hi" }]);
     const msgs = messagesFromOutput(json);
     expect(msgs.length).toBe(1);
     expect(msgs[0].content).toBe("hi");
@@ -564,28 +548,27 @@ describe("looksLikeAgentInjection", () => {
     "[function_call: do_thing]",
     "[function_response: ...]",
     "[tool result: success]",
-  ])('flags bracketed envelope: %s', (text) => {
+  ])("flags bracketed envelope: %s", (text) => {
     expect(looksLikeAgentInjection(text)).toBe(true);
   });
 
   // "For context:" prelude — agents paraphrasing prior turns.
-  it.each([
-    "For context: prior turn was X",
-    "for context - blah",
-  ])("flags 'For context' prelude: %s", (text) => {
-    expect(looksLikeAgentInjection(text)).toBe(true);
-  });
+  it.each(["For context: prior turn was X", "for context - blah"])(
+    "flags 'For context' prelude: %s",
+    (text) => {
+      expect(looksLikeAgentInjection(text)).toBe(true);
+    },
+  );
 
   // Agent quoting agent: "[agent_name] said: ..." — the regex requires
   // "said" to be immediately followed by `:` or `-` (no whitespace), so
   // `said -` (with a space) doesn't match.
-  it.each([
-    "[planner] said: do this",
-    "agent.x said: foo",
-    "[code-runner] said-bar",
-  ])('flags "agent said:" pattern: %s', (text) => {
-    expect(looksLikeAgentInjection(text)).toBe(true);
-  });
+  it.each(["[planner] said: do this", "agent.x said: foo", "[code-runner] said-bar"])(
+    'flags "agent said:" pattern: %s',
+    (text) => {
+      expect(looksLikeAgentInjection(text)).toBe(true);
+    },
+  );
 
   // Real human messages should NOT be flagged.
   it.each([
@@ -664,9 +647,7 @@ describe("buildTraceGroup", () => {
           { role: "system", content: "Be helpful." },
           { role: "user", content: "What is 2+2?" },
         ]),
-        gen_ai_output_messages: JSON.stringify([
-          { role: "assistant", content: "4" },
-        ]),
+        gen_ai_output_messages: JSON.stringify([{ role: "assistant", content: "4" }]),
         gen_ai_response_model: "gpt-4",
         gen_ai_usage_cost: 0.001,
         start_time: 1000,
@@ -689,17 +670,13 @@ describe("buildTraceGroup", () => {
       makeSpan({
         span_id: "turn-2",
         gen_ai_operation_name: "chat",
-        gen_ai_input_messages: JSON.stringify([
-          { role: "user", content: "B" },
-        ]),
+        gen_ai_input_messages: JSON.stringify([{ role: "user", content: "B" }]),
         start_time: 200,
       }),
       makeSpan({
         span_id: "turn-1",
         gen_ai_operation_name: "chat",
-        gen_ai_input_messages: JSON.stringify([
-          { role: "user", content: "A" },
-        ]),
+        gen_ai_input_messages: JSON.stringify([{ role: "user", content: "A" }]),
         start_time: 100,
       }),
     ];
@@ -714,9 +691,7 @@ describe("buildTraceGroup", () => {
       makeSpan({
         span_id: "turn-1",
         gen_ai_operation_name: "chat",
-        gen_ai_input_messages: JSON.stringify([
-          { role: "user", content: "x" },
-        ]),
+        gen_ai_input_messages: JSON.stringify([{ role: "user", content: "x" }]),
         start_time: 100,
       }),
       makeSpan({
@@ -735,10 +710,7 @@ describe("buildTraceGroup", () => {
     const g = buildTraceGroup(spans)!;
     expect(g.turns[0].toolCalls.length).toBe(2);
     // Sorted by start_time within the turn.
-    expect(g.turns[0].toolCalls.map((t) => t.span_id)).toEqual([
-      "tool-A",
-      "tool-B",
-    ]);
+    expect(g.turns[0].toolCalls.map((t) => t.span_id)).toEqual(["tool-A", "tool-B"]);
   });
 
   // Tool spans without a matching parent_id fall back to time-window
@@ -749,17 +721,13 @@ describe("buildTraceGroup", () => {
       makeSpan({
         span_id: "turn-1",
         gen_ai_operation_name: "chat",
-        gen_ai_input_messages: JSON.stringify([
-          { role: "user", content: "x" },
-        ]),
+        gen_ai_input_messages: JSON.stringify([{ role: "user", content: "x" }]),
         start_time: 100,
       }),
       makeSpan({
         span_id: "turn-2",
         gen_ai_operation_name: "chat",
-        gen_ai_input_messages: JSON.stringify([
-          { role: "user", content: "y" },
-        ]),
+        gen_ai_input_messages: JSON.stringify([{ role: "user", content: "y" }]),
         start_time: 200,
       }),
       // tool-X has no parent_id matching either turn but is timed
@@ -827,9 +795,7 @@ describe("buildTraceGroup", () => {
       makeSpan({
         span_id: "turn-1",
         gen_ai_operation_name: "chat",
-        gen_ai_input_messages: JSON.stringify([
-          { role: "user", content: "Q1" },
-        ]),
+        gen_ai_input_messages: JSON.stringify([{ role: "user", content: "Q1" }]),
         start_time: 100,
       }),
       makeSpan({
@@ -875,9 +841,7 @@ describe("buildTraceGroup", () => {
       makeSpan({
         span_id: "turn-1",
         gen_ai_operation_name: "chat",
-        gen_ai_input_messages: JSON.stringify([
-          { role: "user", content: "x" },
-        ]),
+        gen_ai_input_messages: JSON.stringify([{ role: "user", content: "x" }]),
         gen_ai_usage_cost: 0.5,
         start_time: 1000,
         end_time: 5000,
@@ -886,9 +850,7 @@ describe("buildTraceGroup", () => {
       makeSpan({
         span_id: "turn-2",
         gen_ai_operation_name: "chat",
-        gen_ai_input_messages: JSON.stringify([
-          { role: "user", content: "x" },
-        ]),
+        gen_ai_input_messages: JSON.stringify([{ role: "user", content: "x" }]),
         gen_ai_usage_cost: 0.25,
         start_time: 5000,
         end_time: 9000,
@@ -931,9 +893,7 @@ describe("buildTraceGroup", () => {
       makeSpan({
         span_id: "turn-1",
         gen_ai_operation_name: "chat",
-        gen_ai_input_messages: JSON.stringify([
-          { role: "user", content: "x" },
-        ]),
+        gen_ai_input_messages: JSON.stringify([{ role: "user", content: "x" }]),
         start_time: 1000,
         end_time: 2000,
         reference_parent_span_id: "root",
@@ -956,9 +916,7 @@ describe("buildTraceGroup", () => {
       makeSpan({
         span_id: "turn-1",
         gen_ai_operation_name: "chat",
-        gen_ai_input_messages: JSON.stringify([
-          { role: "user", content: "derived question" },
-        ]),
+        gen_ai_input_messages: JSON.stringify([{ role: "user", content: "derived question" }]),
         start_time: 100,
         reference_parent_span_id: "root",
       }),

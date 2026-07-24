@@ -43,8 +43,7 @@ export const useSearchPagination = () => {
       const { rowsPerPage } = searchObj.meta.resultGrid;
       const { currentPage } = searchObj.data.resultGrid;
 
-      if (searchObj.meta.jobId != "")
-        searchObj.meta.resultGrid.rowsPerPage = 100;
+      if (searchObj.meta.jobId != "") searchObj.meta.resultGrid.rowsPerPage = 100;
 
       let total = 0;
       let totalPages = 0;
@@ -83,13 +82,9 @@ export const useSearchPagination = () => {
     isPagination: boolean,
     appendResult: boolean = false,
   ) => {
-    if (
-      searchObj.meta.refreshInterval > 0 &&
-      window.location.pathname.includes("logs")
-    ) {
+    if (searchObj.meta.refreshInterval > 0 && window.location.pathname.includes("logs")) {
       searchObj.data.queryResults.from = response.content.results.from;
-      searchObj.data.queryResults.scan_size =
-        response.content.results.scan_size;
+      searchObj.data.queryResults.scan_size = response.content.results.scan_size;
       searchObj.data.queryResults.took = response.content.results.took;
       searchObj.data.queryResults.aggs = response.content.results.aggs;
       searchObj.data.queryResults.hits = response.content.results.hits;
@@ -101,31 +96,23 @@ export const useSearchPagination = () => {
       }
 
       if (appendResult) {
-        await chunkedAppend(
-          searchObj.data.queryResults.hits,
-          response.content.results.hits,
-        );
+        await chunkedAppend(searchObj.data.queryResults.hits, response.content.results.hits);
 
         searchObj.data.queryResults.total += response.content.results.total;
         searchObj.data.queryResults.took += response.content.results.took;
-        searchObj.data.queryResults.scan_size +=
-          response.content.results.scan_size;
+        searchObj.data.queryResults.scan_size += response.content.results.scan_size;
       } else {
         if (response.content?.streaming_aggs) {
           searchObj.data.queryResults = {
             ...response.content.results,
-            took:
-              (searchObj.data?.queryResults?.took || 0) +
-              response.content.results.took,
+            took: (searchObj.data?.queryResults?.took || 0) + response.content.results.took,
             scan_size:
-              (searchObj.data?.queryResults?.scan_size || 0) +
-              response.content.results.scan_size,
+              (searchObj.data?.queryResults?.scan_size || 0) + response.content.results.scan_size,
           };
         } else if (isPagination) {
           searchObj.data.queryResults.hits = response.content.results.hits;
           searchObj.data.queryResults.from = response.content.results.from;
-          searchObj.data.queryResults.scan_size =
-            response.content.results.scan_size;
+          searchObj.data.queryResults.scan_size = response.content.results.scan_size;
           searchObj.data.queryResults.took = response.content.results.took;
           searchObj.data.queryResults.total = response.content.results.total;
         } else {
@@ -146,20 +133,13 @@ export const useSearchPagination = () => {
     }
   };
 
-  const handlePageCountResponse = (
-    queryReq: any,
-    traceId: string,
-    response: any,
-  ) => {
+  const handlePageCountResponse = (queryReq: any, traceId: string, response: any) => {
     if (searchObj.data.queryResults.aggs == null) {
       searchObj.data.queryResults.aggs = [];
     }
 
     let regeneratePaginationFlag = false;
-    if (
-      response.content.results.hits.length !=
-      searchObj.meta.resultGrid.rowsPerPage
-    ) {
+    if (response.content.results.hits.length != searchObj.meta.resultGrid.rowsPerPage) {
       regeneratePaginationFlag = true;
     }
 
@@ -195,23 +175,14 @@ export const useSearchPagination = () => {
     searchObj.data.queryResults.pageCountTotal = undefined;
   };
 
-  const updatePageCountTotal = (
-    queryReq: any,
-    currentHits: number,
-    totalHits: number,
-  ) => {
+  const updatePageCountTotal = (queryReq: any, currentHits: number, totalHits: number) => {
     try {
       const shouldGetPageCountResult = shouldGetPageCount(queryReq);
 
       if (shouldGetPageCountResult && totalHits === queryReq.query.size) {
         searchObj.data.queryResults.pageCountTotal =
-          searchObj.meta.resultGrid.rowsPerPage *
-            searchObj.data.resultGrid.currentPage +
-          1;
-      } else if (
-        shouldGetPageCountResult &&
-        totalHits !== queryReq.query.size
-      ) {
+          searchObj.meta.resultGrid.rowsPerPage * searchObj.data.resultGrid.currentPage + 1;
+      } else if (shouldGetPageCountResult && totalHits !== queryReq.query.size) {
         searchObj.data.queryResults.pageCountTotal =
           searchObj.meta.resultGrid.rowsPerPage *
             Math.max(searchObj.data.resultGrid.currentPage - 1, 0) +
@@ -227,11 +198,10 @@ export const useSearchPagination = () => {
       const shouldGetPageCountResult = shouldGetPageCount(queryReq);
 
       if (shouldGetPageCountResult && totalHits === queryReq.query.size) {
-        searchObj.data.queryResults.hits =
-          searchObj.data.queryResults.hits.slice(
-            0,
-            searchObj.data.queryResults.hits.length - 1,
-          );
+        searchObj.data.queryResults.hits = searchObj.data.queryResults.hits.slice(
+          0,
+          searchObj.data.queryResults.hits.length - 1,
+        );
       }
     } catch (e: any) {
       console.error("Error while trimming page count extra hit", e);

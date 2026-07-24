@@ -48,9 +48,7 @@ describe("OFormToggleGroup", () => {
   it("reflects the field value (form → toggle): the active item is pressed", async () => {
     wrapper = mountForm({ defaultValues: { freq: "cron" } });
     await nextTick();
-    const pressed = wrapper
-      .findAll("button")
-      .find((b) => b.attributes("data-state") === "on");
+    const pressed = wrapper.findAll("button").find((b) => b.attributes("data-state") === "on");
     expect(pressed?.text()).toContain("Cron");
   });
 
@@ -68,9 +66,7 @@ describe("OFormToggleGroup", () => {
     await nextTick();
     (wrapper.vm as any).form.setFieldValue("freq", "cron");
     await nextTick();
-    const pressed = wrapper
-      .findAll("button")
-      .find((b) => b.attributes("data-state") === "on");
+    const pressed = wrapper.findAll("button").find((b) => b.attributes("data-state") === "on");
     expect(pressed?.text()).toContain("Cron");
   });
 

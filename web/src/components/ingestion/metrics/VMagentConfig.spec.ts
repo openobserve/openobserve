@@ -54,7 +54,7 @@ describe("VMagentConfig.vue", () => {
 
   it("generates OpenObserve remote write endpoint", () => {
     expect(wrapper.vm.singleTargetContent).toContain(
-      "https://test.example.com:5080/api/test-org/prometheus/api/v1/write"
+      "https://test.example.com:5080/api/test-org/prometheus/api/v1/write",
     );
   });
 
@@ -65,4 +65,3 @@ describe("VMagentConfig.vue", () => {
     expect(lines).toHaveLength(2);
   });
 });
-

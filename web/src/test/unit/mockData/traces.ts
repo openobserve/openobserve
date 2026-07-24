@@ -39,9 +39,7 @@ const treeSpan = (
 // the `traceTree` array TraceDetails builds — one entry per root span.
 export const patternTraceTrees = {
   // Baseline: single root, root service calls one downstream service
-  singleRoot: [
-    treeSpan("a1", "alertmanager", "", [treeSpan("q1", "querier", "a1", [], 80)], 100),
-  ],
+  singleRoot: [treeSpan("a1", "alertmanager", "", [treeSpan("q1", "querier", "a1", [], 80)], 100)],
   // Two root spans with distinct services, each with its own downstream call
   multiRootDistinctServices: [
     treeSpan("a1", "alertmanager", "", [treeSpan("q1", "querier", "a1", [], 80)], 100),

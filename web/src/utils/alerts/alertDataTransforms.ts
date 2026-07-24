@@ -280,7 +280,11 @@ export const detectConditionsVersion = (conditions: any): 0 | 1 | 2 => {
   if (!conditions) return 0;
 
   // Check for V2 structure (newest)
-  if (conditions.filterType === "group" && conditions.conditions && Array.isArray(conditions.conditions)) {
+  if (
+    conditions.filterType === "group" &&
+    conditions.conditions &&
+    Array.isArray(conditions.conditions)
+  ) {
     return 2;
   }
 
@@ -411,7 +415,7 @@ export const convertV1ToV2 = (v1Data: any): V2Group => {
  * In V2: Each condition has operator that determines how it connects to the NEXT item
  */
 export const convertV1BEToV2 = (v1BEData: any): V2Group => {
-  // we will check if v1bedata is there or not 
+  // we will check if v1bedata is there or not
   // if not we will return empty v2 format
   if (!v1BEData) {
     return {
@@ -430,8 +434,8 @@ export const convertV1BEToV2 = (v1BEData: any): V2Group => {
   }
 
   // Get the operator key (and/or)
-  // here we will get the toplevel operator like or / and 
-  // becuase based on that only v1 got built for example 
+  // here we will get the toplevel operator like or / and
+  // becuase based on that only v1 got built for example
   // {
   //   "or":[
   //     "cond1",
@@ -453,7 +457,7 @@ export const convertV1BEToV2 = (v1BEData: any): V2Group => {
   //      "c1"
   //   ]
   // }
-  // 
+  //
   // here also if we dont have that key we will return empty list
   const keys = Object.keys(v1BEData); //or / and
   if (keys.length === 0) {
@@ -466,7 +470,7 @@ export const convertV1BEToV2 = (v1BEData: any): V2Group => {
 
   const operatorKey = keys[0]; // "and" or "or" ["or"]
   // here we will get operator key and based on that we will extract all the condition and groups
-  // items will be after extracting 
+  // items will be after extracting
   // ["cond1", "cond2", "group1", "cond3", "group2"]
   //if only group is there
   // ["group1"]

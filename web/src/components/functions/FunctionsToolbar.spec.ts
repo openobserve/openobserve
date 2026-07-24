@@ -24,9 +24,7 @@ import { createStore } from "vuex";
 
 // The schema is a factory taking vue-i18n's `t`; use the real i18n so messages
 // resolve exactly as they do in the app.
-const addFunctionSchema = makeAddFunctionSchema((k: string) =>
-  i18n.global.t(k as never),
-);
+const addFunctionSchema = makeAddFunctionSchema((k: string) => i18n.global.t(k as never));
 
 describe("FunctionsToolbar", () => {
   let store: any;
@@ -164,12 +162,8 @@ describe("FunctionsToolbar", () => {
       },
     });
 
-    expect(
-      wrapper.find('[data-test="function-transform-type-vrl-radio"]').exists(),
-    ).toBe(false);
-    expect(
-      wrapper.find('[data-test="function-transform-type-js-radio"]').exists(),
-    ).toBe(false);
+    expect(wrapper.find('[data-test="function-transform-type-vrl-radio"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="function-transform-type-js-radio"]').exists()).toBe(false);
   });
 
   it("should emit test event when test button is clicked", async () => {

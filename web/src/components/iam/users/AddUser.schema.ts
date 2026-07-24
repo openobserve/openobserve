@@ -73,11 +73,7 @@ export const makeAddUserSchema = (
         });
       }
       // Role required when an admin assigns it to someone other than themselves.
-      if (
-        ctx.userRole !== "member" &&
-        ctx.loggedInUserEmail !== val.email &&
-        !val.role
-      ) {
+      if (ctx.userRole !== "member" && ctx.loggedInUserEmail !== val.email && !val.role) {
         zctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["role"],
@@ -105,8 +101,7 @@ export const makeAddUserSchema = (
 
     // ── Edit an existing user, changing the password ─────────────────────────
     if (ctx.beingUpdated && val.change_password) {
-      const needsOldPwd =
-        ctx.userRole === "member" || ctx.loggedInUserEmail === ctx.modelEmail;
+      const needsOldPwd = ctx.userRole === "member" || ctx.loggedInUserEmail === ctx.modelEmail;
       // old_password is required-only — never re-validated for length/strength
       // (it is an existing credential that may predate the strong policy).
       if (needsOldPwd && !val.old_password) {
@@ -132,11 +127,7 @@ export const makeAddUserSchema = (
     }
 
     // ── other_organization (root assigning to "other" org) ───────────────────
-    if (
-      !ctx.beingUpdated &&
-      ctx.userRole !== "member" &&
-      ctx.organization === "other"
-    ) {
+    if (!ctx.beingUpdated && ctx.userRole !== "member" && ctx.organization === "other") {
       if (!otherOrgRegex.test(val.other_organization)) {
         zctx.addIssue({
           code: z.ZodIssueCode.custom,

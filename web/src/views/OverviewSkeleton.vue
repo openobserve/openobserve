@@ -35,39 +35,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <section class="mb-5" :data-test="`overview-skeleton-${section}`">
     <!-- Every real section carries a title + count chip + View all -->
-    <div class="flex items-center justify-between mb-2 pl-1">
+    <div class="mb-2 flex items-center justify-between pl-1">
       <div class="flex items-center gap-2">
-        <OSkeleton class="w-28 h-4" />
-        <OSkeleton class="w-6 h-4" />
+        <OSkeleton class="h-4 w-28" />
+        <OSkeleton class="h-4 w-6" />
       </div>
-      <OSkeleton class="w-14 h-3" />
+      <OSkeleton class="h-3 w-14" />
     </div>
 
     <!-- INCIDENTS: joined rows inside one bordered container -->
     <div
       v-if="section === 'incidents'"
-      class="flex flex-col border border-[0.0625em] border-border-default rounded-default overflow-hidden"
+      class="border-border-default rounded-default flex flex-col overflow-hidden border border-[0.0625em]"
     >
       <div
         v-for="i in 2"
         :key="i"
-        class="flex items-center gap-3 py-2.5 px-3.5 bg-surface-base border-b-[0.0625em] border-b-border-default last:border-b-0"
+        class="bg-surface-base border-b-border-default flex items-center gap-3 border-b-[0.0625em] px-3.5 py-2.5 last:border-b-0"
       >
         <OSkeleton type="circle" class="w-4 shrink-0" />
-        <OSkeleton class="w-8 h-4 shrink-0" />
+        <OSkeleton class="h-4 w-8 shrink-0" />
         <OSkeleton class="h-4 max-w-[20em]" />
-        <OSkeleton class="w-12 h-3 shrink-0" />
+        <OSkeleton class="h-3 w-12 shrink-0" />
       </div>
     </div>
 
     <!-- SERVICES: scroll chevron + fixed-width cards -->
     <div v-else-if="section === 'services'" class="flex items-stretch gap-2">
-      <OSkeleton class="w-6 shrink-0 rounded-default" />
-      <div class="flex flex-row gap-2 flex-1 overflow-hidden">
+      <OSkeleton class="rounded-default w-6 shrink-0" />
+      <div class="flex flex-1 flex-row gap-2 overflow-hidden">
         <div
           v-for="i in 4"
           :key="i"
-          class="py-3 px-3.5 rounded-default border border-[0.0625em] border-border-default bg-surface-base basis-40 grow-0 shrink-0 min-w-40 max-w-40 flex flex-col gap-2"
+          class="rounded-default border-border-default bg-surface-base flex max-w-40 min-w-40 shrink-0 grow-0 basis-40 flex-col gap-2 border border-[0.0625em] px-3.5 py-3"
         >
           <OSkeleton class="h-4 max-w-[7em]" />
           <OSkeleton class="h-3 max-w-[4.5em]" />
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="i in 2"
         :key="i"
-        class="flex items-center gap-3 py-2.5 px-3.5 rounded-default border border-[0.0625em] border-border-default bg-surface-base"
+        class="rounded-default border-border-default bg-surface-base flex items-center gap-3 border border-[0.0625em] px-3.5 py-2.5"
       >
         <OSkeleton type="circle" class="w-4 shrink-0" />
         <OSkeleton class="h-4 max-w-[24em]" />
@@ -90,17 +90,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- RECENT EVENTS: joined compact rows -->
     <div
       v-else
-      class="flex flex-col gap-0 border border-[0.0625em] border-border-default rounded-default overflow-hidden bg-surface-base"
+      class="border-border-default rounded-default bg-surface-base flex flex-col gap-0 overflow-hidden border border-[0.0625em]"
     >
       <div
         v-for="i in 3"
         :key="i"
-        class="flex items-center gap-3 py-2 px-3.5 border-b border-b-[0.0625em] border-b-border-default last:border-b-0"
+        class="border-b-border-default flex items-center gap-3 border-b border-b-[0.0625em] px-3.5 py-2 last:border-b-0"
       >
-        <OSkeleton class="w-12 h-4 shrink-0" />
-        <OSkeleton class="w-[7.5em] h-3 shrink-0" />
+        <OSkeleton class="h-4 w-12 shrink-0" />
+        <OSkeleton class="h-3 w-[7.5em] shrink-0" />
         <OSkeleton class="h-3 flex-1" />
-        <OSkeleton class="w-8 h-3 shrink-0" />
+        <OSkeleton class="h-3 w-8 shrink-0" />
       </div>
     </div>
   </section>

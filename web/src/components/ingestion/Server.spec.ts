@@ -4,23 +4,22 @@ import Server from "@/components/ingestion/Server.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 // Mock services
 vi.mock("@/services/segment_analytics", () => ({
   default: {
-    track: vi.fn()
-  }
+    track: vi.fn(),
+  },
 }));
 
 vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn((imagePath: string) => `img:${imagePath}`),
-  verifyOrganizationStatus: vi.fn()
+  verifyOrganizationStatus: vi.fn(),
 }));
 
 vi.mock("@/aws-exports", () => ({
   default: {
-    API_ENDPOINT: "http://localhost:5080"
-  }
+    API_ENDPOINT: "http://localhost:5080",
+  },
 }));
 
 // Mock router
@@ -28,10 +27,10 @@ const mockRouter = {
   currentRoute: {
     value: {
       name: "servers",
-      query: {}
-    }
+      query: {},
+    },
   },
-  push: vi.fn()
+  push: vi.fn(),
 };
 
 vi.mock("vue-router", () => ({
@@ -41,7 +40,7 @@ vi.mock("vue-router", () => ({
 
 const mountOptions = {
   props: {
-    currOrgIdentifier: "test-org"
+    currOrgIdentifier: "test-org",
   },
   global: {
     plugins: [i18n],
@@ -50,8 +49,8 @@ const mountOptions = {
     },
     stubs: {
       DataSourceSidebarLayout: true,
-      'router-view': true
-    }
+      "router-view": true,
+    },
   },
 };
 
@@ -116,7 +115,7 @@ describe("Server Component", () => {
         global: mountOptions.global,
       });
 
-      expect(testWrapper.props('currOrgIdentifier')).toBe("");
+      expect(testWrapper.props("currOrgIdentifier")).toBe("");
       testWrapper.unmount();
     });
   });
@@ -371,7 +370,7 @@ describe("Server Component", () => {
       });
 
       expect(testWrapper2.exists()).toBe(true);
-      expect(testWrapper2.props('currOrgIdentifier')).toBe("test-org-2");
+      expect(testWrapper2.props("currOrgIdentifier")).toBe("test-org-2");
       testWrapper2.unmount();
     });
 
@@ -387,13 +386,20 @@ describe("Server Component", () => {
   describe("Return Object from Setup", () => {
     it("should return all required properties", () => {
       const expectedProps = [
-        't', 'store', 'router', 'config',
-        'currentUserEmail', 'currentOrgIdentifier', 'getImageURL',
-        'verifyOrganizationStatus', 'tabs', 'ingestTabType',
-        'serverTabs'
+        "t",
+        "store",
+        "router",
+        "config",
+        "currentUserEmail",
+        "currentOrgIdentifier",
+        "getImageURL",
+        "verifyOrganizationStatus",
+        "tabs",
+        "ingestTabType",
+        "serverTabs",
       ];
 
-      expectedProps.forEach(prop => {
+      expectedProps.forEach((prop) => {
         expect(wrapper.vm).toHaveProperty(prop);
       });
     });

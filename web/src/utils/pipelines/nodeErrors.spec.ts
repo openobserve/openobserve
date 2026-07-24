@@ -14,10 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import {
-  normalizeNodeErrorMessages,
-  formatNodeErrorText,
-} from "./nodeErrors";
+import { normalizeNodeErrorMessages, formatNodeErrorText } from "./nodeErrors";
 
 // The two shapes that coexist on the wire. `NodeErrors.errors` went from
 // HashSet<String> to HashSet<(String, Option<Value>)>, the column is untyped
@@ -49,16 +46,13 @@ describe("normalizeNodeErrorMessages", () => {
   it("handles a row that mixes both shapes", () => {
     // Not expected from the server, but the column is untyped — a partially
     // rewritten row must not take the whole dialog down.
-    expect(normalizeNodeErrorMessages(["boom", ["bang", null]])).toEqual([
-      "boom",
-      "bang",
-    ]);
+    expect(normalizeNodeErrorMessages(["boom", ["bang", null]])).toEqual(["boom", "bang"]);
   });
 
   it("drops unusable entries rather than rendering them", () => {
-    expect(
-      normalizeNodeErrorMessages([null, undefined, 42, {}, [], [null], ""] as any),
-    ).toEqual([]);
+    expect(normalizeNodeErrorMessages([null, undefined, 42, {}, [], [null], ""] as any)).toEqual(
+      [],
+    );
   });
 
   it("returns [] for missing / non-array input", () => {
@@ -70,12 +64,8 @@ describe("normalizeNodeErrorMessages", () => {
 
 describe("formatNodeErrorText", () => {
   it("joins messages with a blank line, for both shapes", () => {
-    expect(formatNodeErrorText({ errors: LEGACY, error_count: 2 })).toBe(
-      "boom\n\nbang",
-    );
-    expect(formatNodeErrorText({ errors: TUPLE, error_count: 2 })).toBe(
-      "boom\n\nbang",
-    );
+    expect(formatNodeErrorText({ errors: LEGACY, error_count: 2 })).toBe("boom\n\nbang");
+    expect(formatNodeErrorText({ errors: TUPLE, error_count: 2 })).toBe("boom\n\nbang");
   });
 
   it("appends the truncation tail when the server capped the list", () => {
@@ -95,22 +85,15 @@ describe("formatNodeErrorText", () => {
   });
 
   it("omits the tail when nothing is hidden", () => {
-    expect(formatNodeErrorText({ errors: LEGACY, error_count: 2 })).not.toContain(
-      "more errors",
-    );
+    expect(formatNodeErrorText({ errors: LEGACY, error_count: 2 })).not.toContain("more errors");
     // error_count lower than the list (shouldn't happen) must not produce
     // "and -1 more".
-    expect(formatNodeErrorText({ errors: LEGACY, error_count: 0 })).toBe(
-      "boom\n\nbang",
-    );
+    expect(formatNodeErrorText({ errors: LEGACY, error_count: 0 })).toBe("boom\n\nbang");
   });
 
   it("takes a custom tail formatter (i18n)", () => {
     expect(
-      formatNodeErrorText(
-        { errors: LEGACY, error_count: 4 },
-        (count) => `plus ${count} others`,
-      ),
+      formatNodeErrorText({ errors: LEGACY, error_count: 4 }, (count) => `plus ${count} others`),
     ).toBe("boom\n\nbang\n\nplus 2 others");
   });
 

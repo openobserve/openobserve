@@ -20,10 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        view — extraction can return up to 1,000 patterns and fetching all of them
        up front would be 1,000 searches. The bars show the TRUE time distribution
        from the tantivy histogram, so the sparkline matches the search histogram. -->
-  <div ref="rootEl" class="h-6 flex items-start gap-1">
+  <div ref="rootEl" class="flex h-6 items-start gap-1">
     <template v-if="displayBuckets.length">
       <div
-        class="relative flex items-end gap-px h-6"
+        class="relative flex h-6 items-end gap-px"
         :class="colorClass"
         role="img"
         :aria-label="ariaLabel"
@@ -35,31 +35,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              heights only convey shape, not magnitude — two sparklines can look
              identical while differing by orders of magnitude. -->
         <span
-          class="absolute inset-x-0 top-0 border-t border-dashed border-border-default opacity-60"
+          class="border-border-default absolute inset-x-0 top-0 border-t border-dashed opacity-60"
           aria-hidden="true"
         />
         <span
           v-for="(value, index) in displayBuckets"
           :key="index"
-          class="w-1 rounded-default bg-current shrink-0"
+          class="rounded-default w-1 shrink-0 bg-current"
           :class="[barHeightClass(value), value > 0 ? 'opacity-70' : 'opacity-25']"
         />
       </div>
       <span
-        class="text-2xs text-text-secondary tabular-nums leading-none shrink-0"
+        class="text-2xs text-text-secondary shrink-0 leading-none tabular-nums"
         :title="peakTitle"
         data-test="pattern-volume-peak"
-      >{{ peakLabel }}</span>
+        >{{ peakLabel }}</span
+      >
     </template>
     <div
       v-else-if="loading"
-      class="flex items-end gap-px h-6 animate-pulse text-text-muted"
+      class="text-text-muted flex h-6 animate-pulse items-end gap-px"
       data-test="pattern-volume-cell-loading"
     >
       <span
         v-for="i in 12"
         :key="i"
-        class="w-1 rounded-default bg-current opacity-30 shrink-0"
+        class="rounded-default w-1 shrink-0 bg-current opacity-30"
         :class="skeletonHeight(i)"
       />
     </div>
@@ -108,9 +109,7 @@ let observer: IntersectionObserver | null = null;
 // would sit on its skeleton forever.
 const hasBeenVisible = ref(false);
 
-const entry = computed<PatternVolumeEntry | undefined>(() =>
-  cache?.get(props.pattern),
-);
+const entry = computed<PatternVolumeEntry | undefined>(() => cache?.get(props.pattern));
 
 // Report the volume upward as it lands, and clear it when the cache is dropped
 // so the row never shows figures from a window that's no longer displayed.
@@ -173,17 +172,7 @@ onBeforeUnmount(() => {
  */
 const MAX_BARS = 27;
 
-const HEIGHT_CLASSES = [
-  "h-0.5",
-  "h-1",
-  "h-1.5",
-  "h-2",
-  "h-2.5",
-  "h-3",
-  "h-4",
-  "h-5",
-  "h-6",
-];
+const HEIGHT_CLASSES = ["h-0.5", "h-1", "h-1.5", "h-2", "h-2.5", "h-3", "h-4", "h-5", "h-6"];
 
 const loading = computed(() => !entry.value || entry.value.loading);
 
@@ -199,9 +188,7 @@ const displayBuckets = computed<number[]>(() => {
   return merged;
 });
 
-const maxValue = computed(() =>
-  displayBuckets.value.reduce((max, v) => Math.max(max, v), 0),
-);
+const maxValue = computed(() => displayBuckets.value.reduce((max, v) => Math.max(max, v), 0));
 
 /**
  * Time one drawn bar covers. When more buckets arrive than the cell can draw
@@ -216,9 +203,7 @@ const barSeconds = computed<number | null>(() => {
   return secs * chunk;
 });
 
-const totalEvents = computed(() =>
-  displayBuckets.value.reduce((sum, v) => sum + v, 0),
-);
+const totalEvents = computed(() => displayBuckets.value.reduce((sum, v) => sum + v, 0));
 
 const barHeightClass = (value: number): string => {
   if (maxValue.value <= 0 || value <= 0) return HEIGHT_CLASSES[0];
@@ -233,9 +218,7 @@ const barHeightClass = (value: number): string => {
 const skeletonHeight = (i: number): string =>
   HEIGHT_CLASSES[1 + ((i * 3) % (HEIGHT_CLASSES.length - 1))];
 
-const ariaLabel = computed(() =>
-  t("logs.patternList.volumeEvents", { count: totalEvents.value }),
-);
+const ariaLabel = computed(() => t("logs.patternList.volumeEvents", { count: totalEvents.value }));
 
 // The busiest bucket, labelling the dashed rule. Compact so it stays legible at
 // text-2xs; the exact figure is on hover.

@@ -97,7 +97,7 @@ describe("serviceStreamEnvs", () => {
         expect(groupEnvKey("container")).toBeNull();
       });
 
-      it('should return null when groupId is an empty string', () => {
+      it("should return null when groupId is an empty string", () => {
         expect(groupEnvKey("")).toBeNull();
       });
 

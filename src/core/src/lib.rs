@@ -70,7 +70,6 @@ pub mod stream;
 pub mod stream_utils;
 pub mod synthetics;
 pub mod system_settings;
-pub use tantivy_utils::index_builder as tantivy;
 pub mod tls;
 pub mod traces;
 #[cfg(feature = "cloud")]

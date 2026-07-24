@@ -1,13 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 export type DateTimeMode = "relative" | "absolute";
-export type RelativeUnit =
-  | "seconds"
-  | "minutes"
-  | "hours"
-  | "days"
-  | "weeks"
-  | "months";
+export type RelativeUnit = "seconds" | "minutes" | "hours" | "days" | "weeks" | "months";
 
 export interface DateTimeRangeProps {
   // ── Absolute mode values ──────────────────────────────────────
@@ -80,9 +74,7 @@ export interface DateTimeRangeRelativeValue {
   timezone: string;
 }
 
-export type DateTimeRangeValue =
-  | DateTimeRangeAbsoluteValue
-  | DateTimeRangeRelativeValue;
+export type DateTimeRangeValue = DateTimeRangeAbsoluteValue | DateTimeRangeRelativeValue;
 
 export interface DateTimeRangeEmits {
   (_e: "update:startDate", _value: string): void;

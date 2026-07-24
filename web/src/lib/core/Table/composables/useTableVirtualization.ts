@@ -43,8 +43,7 @@ export function useTableVirtualization(options: VirtualizationOptions) {
 
   const rowVirtualizerOptions = computed(() => ({
     count: rows.value.length,
-    getScrollElement: () =>
-      (scrollEl as HTMLElement | null) ?? parentRef.value,
+    getScrollElement: () => (scrollEl as HTMLElement | null) ?? parentRef.value,
     scrollMargin,
     estimateSize: (index: number) => {
       const row = rows.value[index];

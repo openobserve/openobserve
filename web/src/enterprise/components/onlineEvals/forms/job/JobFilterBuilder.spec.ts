@@ -32,24 +32,22 @@ describe("JobFilterBuilder", () => {
   // name the same destination the span copy always did.
   it("says what a matching trace goes on to enter", () => {
     const wrapper = mountBuilder();
-    expect(
-      wrapper.get('[data-test="job-condition-builder-title"]').text(),
-    ).toBe("Filter condition");
+    expect(wrapper.get('[data-test="job-condition-builder-title"]').text()).toBe(
+      "Filter condition",
+    );
 
-    const hint = wrapper
-      .get('[data-test="job-condition-builder-hint"]')
-      .text();
+    const hint = wrapper.get('[data-test="job-condition-builder-hint"]').text();
     expect(hint).toContain("sampling and scoring");
     expect(hint).not.toContain("eligible");
   });
 
   it("shows End Signal copy when used by completion settings", () => {
     const wrapper = mountBuilder("endSignal");
-    expect(
-      wrapper.get('[data-test="job-condition-builder-title"]').text(),
-    ).toBe("End signal (optional)");
-    expect(
-      wrapper.get('[data-test="job-condition-builder-hint"]').text(),
-    ).toContain("closes the trace immediately");
+    expect(wrapper.get('[data-test="job-condition-builder-title"]').text()).toBe(
+      "End signal (optional)",
+    );
+    expect(wrapper.get('[data-test="job-condition-builder-hint"]').text()).toContain(
+      "closes the trace immediately",
+    );
   });
 });

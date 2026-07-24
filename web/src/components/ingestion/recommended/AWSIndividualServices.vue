@@ -27,34 +27,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div class="mb-6">
-      <OTabs
-        v-model="activeCategory"
-        dense
-        data-test="aws-integration-category-tabs"
-      >
+      <OTabs v-model="activeCategory" dense data-test="aws-integration-category-tabs">
         <OTab name="all" :label="t('ingestion.awsSetup.categoryAll')" />
         <OTab name="logs" :label="t('ingestion.awsSetup.categoryLogs')" />
         <OTab name="metrics" :label="t('ingestion.awsSetup.categoryMetrics')" />
         <OTab name="security" :label="t('ingestion.awsSetup.categorySecurity')" />
-        <OTab
-          name="networking"
-          :label="t('ingestion.awsSetup.categoryNetworking')"
-        />
+        <OTab name="networking" :label="t('ingestion.awsSetup.categoryNetworking')" />
       </OTabs>
     </div>
 
-    <div
-      v-if="filteredIntegrations.length === 0"
-      class="text-center py-12 text-text-secondary"
-    >
-      <OIcon name="search-off" class="mb-2 w-12 h-12" />
+    <div v-if="filteredIntegrations.length === 0" class="text-text-secondary py-12 text-center">
+      <OIcon name="search-off" class="mb-2 h-12 w-12" />
       <div class="text-base">{{ t("ingestion.awsSetup.noResults") }}</div>
     </div>
 
     <!-- Responsive columns via Tailwind utilities — replaces a scoped-style
          block whose px media queries leaked to every page in the app. -->
     <div
-      class="integrations-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+      class="integrations-grid grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
       v-else
     >
       <AWSIntegrationTile
@@ -67,9 +57,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
-import OTab from '@/lib/navigation/Tabs/OTab.vue'
-import OSearchInput from '@/lib/forms/SearchInput/OSearchInput.vue'
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { defineComponent, ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
@@ -80,11 +70,12 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 export default defineComponent({
   name: "AWSIndividualServices",
   components: {
-    OTabs, OTab,
+    OTabs,
+    OTab,
     AWSIntegrationTile,
     OSearchInput,
     OIcon,
-},
+  },
   props: {
     initialSearch: {
       type: String,
@@ -98,21 +89,27 @@ export default defineComponent({
     const activeCategory = ref("all");
 
     // Watch for changes in route query parameter
-    watch(() => route.query.search, (newSearch) => {
-      if (newSearch && typeof newSearch === 'string') {
-        searchQuery.value = newSearch;
-      } else if (newSearch === undefined) {
-        // Clear search when query param is removed
-        searchQuery.value = "";
-      }
-    });
+    watch(
+      () => route.query.search,
+      (newSearch) => {
+        if (newSearch && typeof newSearch === "string") {
+          searchQuery.value = newSearch;
+        } else if (newSearch === undefined) {
+          // Clear search when query param is removed
+          searchQuery.value = "";
+        }
+      },
+    );
 
     // Watch for changes in initialSearch prop
-    watch(() => props.initialSearch, (newSearch) => {
-      if (newSearch !== undefined) {
-        searchQuery.value = newSearch;
-      }
-    });
+    watch(
+      () => props.initialSearch,
+      (newSearch) => {
+        if (newSearch !== undefined) {
+          searchQuery.value = newSearch;
+        }
+      },
+    );
 
     const filteredIntegrations = computed(() => {
       let filtered = [...awsIntegrations];
@@ -124,15 +121,13 @@ export default defineComponent({
           (integration) =>
             integration.displayName.toLowerCase().includes(query) ||
             integration.description.toLowerCase().includes(query) ||
-            integration.name.toLowerCase().includes(query)
+            integration.name.toLowerCase().includes(query),
         );
       }
 
       // Filter by category
       if (activeCategory.value !== "all") {
-        filtered = filtered.filter(
-          (integration) => integration.category === activeCategory.value
-        );
+        filtered = filtered.filter((integration) => integration.category === activeCategory.value);
       }
 
       // Sort by name

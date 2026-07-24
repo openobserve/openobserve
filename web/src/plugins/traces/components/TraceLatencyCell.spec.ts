@@ -34,7 +34,6 @@ vi.mock("@/composables/useTraces", () => ({
 
 import TraceLatencyCell from "./TraceLatencyCell.vue";
 
-
 describe("TraceLatencyCell", () => {
   let wrapper: VueWrapper;
 

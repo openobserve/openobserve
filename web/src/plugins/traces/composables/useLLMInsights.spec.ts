@@ -170,9 +170,7 @@ describe("useLLMInsights — fetchAll fires 2 parallel queries", () => {
     fetchAll("default", start, end);
 
     const calls = mockFetchQueryDataWithHttpStream.mock.calls;
-    const sparklineCall = calls.find(([p]: any) =>
-      p.queryReq.query.sql.includes("GROUP BY ts"),
-    );
+    const sparklineCall = calls.find(([p]: any) => p.queryReq.query.sql.includes("GROUP BY ts"));
     expect(sparklineCall).toBeTruthy();
     const sql: string = sparklineCall![0].queryReq.query.sql;
     expect(sql).toContain("histogram(_timestamp)");
@@ -190,17 +188,31 @@ describe("useLLMInsights — fetchAll resolves and populates KPI on success", ()
     const promise = fetchAll("default", 100, 200);
 
     // The mock keeps every fetch's callbacks; complete each in turn.
-    const allCallbacks = mockFetchQueryDataWithHttpStream.mock.calls.map(
-      ([, cbs]: any) => cbs,
-    );
+    const allCallbacks = mockFetchQueryDataWithHttpStream.mock.calls.map(([, cbs]: any) => cbs);
 
     // Histogram — two buckets that sum to the whole-window totals.
     allCallbacks[0].data(null, {
       content: {
         results: {
           hits: [
-            { ts: "1970-01-01T00:00:00", request_count: 60, trace_count: 15, error_count: 2, total_tokens: 30_000, total_cost: 0.73, p95_duration: 8_000 },
-            { ts: "1970-01-01T00:00:10", request_count: 40, trace_count: 10, error_count: 1, total_tokens: 20_000, total_cost: 0.5, p95_duration: 9_000 },
+            {
+              ts: "1970-01-01T00:00:00",
+              request_count: 60,
+              trace_count: 15,
+              error_count: 2,
+              total_tokens: 30_000,
+              total_cost: 0.73,
+              p95_duration: 8_000,
+            },
+            {
+              ts: "1970-01-01T00:00:10",
+              request_count: 40,
+              trace_count: 10,
+              error_count: 1,
+              total_tokens: 20_000,
+              total_cost: 0.5,
+              p95_duration: 9_000,
+            },
           ],
         },
       },
@@ -228,23 +240,28 @@ describe("useLLMInsights — fetchAll resolves and populates KPI on success", ()
   // The strip must NOT wait on the (slower) P95 query. `loading` clears the
   // moment the histogram lands, while `p95Loading` stays true until P95 does.
   it("clears `loading` when the histogram lands but keeps `p95Loading` until P95 resolves", async () => {
-    const { fetchAll, loading, p95Loading, kpi, hasLoadedOnce } =
-      useLLMInsights();
+    const { fetchAll, loading, p95Loading, kpi, hasLoadedOnce } = useLLMInsights();
     const promise = fetchAll("default", 100, 200);
 
     expect(loading.value).toBe(true);
     expect(p95Loading.value).toBe(true);
 
-    const allCallbacks = mockFetchQueryDataWithHttpStream.mock.calls.map(
-      ([, cbs]: any) => cbs,
-    );
+    const allCallbacks = mockFetchQueryDataWithHttpStream.mock.calls.map(([, cbs]: any) => cbs);
 
     // Histogram lands first — strip is ready, P95 still in flight.
     allCallbacks[0].data(null, {
       content: {
         results: {
           hits: [
-            { ts: "1970-01-01T00:00:00", request_count: 5, trace_count: 3, error_count: 0, total_tokens: 100, total_cost: 0.5, p95_duration: 0 },
+            {
+              ts: "1970-01-01T00:00:00",
+              request_count: 5,
+              trace_count: 3,
+              error_count: 0,
+              total_tokens: 100,
+              total_cost: 0.5,
+              p95_duration: 0,
+            },
           ],
         },
       },
@@ -270,20 +287,25 @@ describe("useLLMInsights — fetchAll resolves and populates KPI on success", ()
 
   // A P95 failure degrades that card to 0 without failing the whole strip.
   it("degrades P95 to 0 and leaves the strip intact when the P95 query fails", async () => {
-    const { fetchAll, kpi, error, p95Loading, hasLoadedOnce } =
-      useLLMInsights();
+    const { fetchAll, kpi, error, p95Loading, hasLoadedOnce } = useLLMInsights();
     const promise = fetchAll("default", 100, 200);
 
-    const allCallbacks = mockFetchQueryDataWithHttpStream.mock.calls.map(
-      ([, cbs]: any) => cbs,
-    );
+    const allCallbacks = mockFetchQueryDataWithHttpStream.mock.calls.map(([, cbs]: any) => cbs);
 
     // Histogram succeeds.
     allCallbacks[0].data(null, {
       content: {
         results: {
           hits: [
-            { ts: "1970-01-01T00:00:00", request_count: 5, trace_count: 3, error_count: 0, total_tokens: 100, total_cost: 0.5, p95_duration: 0 },
+            {
+              ts: "1970-01-01T00:00:00",
+              request_count: 5,
+              trace_count: 3,
+              error_count: 0,
+              total_tokens: 100,
+              total_cost: 0.5,
+              p95_duration: 0,
+            },
           ],
         },
       },
@@ -307,9 +329,7 @@ describe("useLLMInsights — fetchAll resolves and populates KPI on success", ()
     const { fetchAll, kpi } = useLLMInsights();
     const promise = fetchAll("default", 100, 200);
 
-    const allCallbacks = mockFetchQueryDataWithHttpStream.mock.calls.map(
-      ([, cbs]: any) => cbs,
-    );
+    const allCallbacks = mockFetchQueryDataWithHttpStream.mock.calls.map(([, cbs]: any) => cbs);
     // Histogram bucket with garbage.
     driveKpiHits(allCallbacks[0], { request_count: "not-a-number" } as any);
     allCallbacks[0].complete();
@@ -336,9 +356,7 @@ describe("useLLMInsights — fetchAll error path", () => {
     const { fetchAll, error, loading } = useLLMInsights();
     const promise = fetchAll("default", 100, 200);
 
-    const allCallbacks = mockFetchQueryDataWithHttpStream.mock.calls.map(
-      ([, cbs]: any) => cbs,
-    );
+    const allCallbacks = mockFetchQueryDataWithHttpStream.mock.calls.map(([, cbs]: any) => cbs);
     allCallbacks[0].error({ message: "schema error" });
     allCallbacks[1].complete();
 
@@ -353,9 +371,7 @@ describe("useLLMInsights — fetchAll error path", () => {
     const { fetchAll, error } = useLLMInsights();
     const promise = fetchAll("default", 100, 200);
 
-    const allCallbacks = mockFetchQueryDataWithHttpStream.mock.calls.map(
-      ([, cbs]: any) => cbs,
-    );
+    const allCallbacks = mockFetchQueryDataWithHttpStream.mock.calls.map(([, cbs]: any) => cbs);
     allCallbacks[0].error({});
     allCallbacks[1].complete();
 
@@ -372,9 +388,7 @@ describe("useLLMInsights — fetchAll error path", () => {
     const { fetchAll, hasLoadedOnce } = useLLMInsights();
     const promise = fetchAll("default", 100, 200);
 
-    const allCallbacks = mockFetchQueryDataWithHttpStream.mock.calls.map(
-      ([, cbs]: any) => cbs,
-    );
+    const allCallbacks = mockFetchQueryDataWithHttpStream.mock.calls.map(([, cbs]: any) => cbs);
     allCallbacks[0].error({ message: "x" });
     allCallbacks[1].complete();
 
@@ -396,9 +410,7 @@ describe("useLLMInsights — sparklines accumulation", () => {
     const { fetchAll, sparklines } = useLLMInsights();
     const promise = fetchAll("default", 100, 200);
 
-    const allCallbacks = mockFetchQueryDataWithHttpStream.mock.calls.map(
-      ([, cbs]: any) => cbs,
-    );
+    const allCallbacks = mockFetchQueryDataWithHttpStream.mock.calls.map(([, cbs]: any) => cbs);
     // Sparkline row (histogram = call 0)
     allCallbacks[0].data(null, {
       content: {
@@ -438,15 +450,29 @@ describe("useLLMInsights — sparklines accumulation", () => {
     const { fetchAll, sparklines } = useLLMInsights();
     const promise = fetchAll("default", 1, 20_000_000);
 
-    const cbs = mockFetchQueryDataWithHttpStream.mock.calls.map(
-      ([, c]: any) => c,
-    );
+    const cbs = mockFetchQueryDataWithHttpStream.mock.calls.map(([, c]: any) => c);
     cbs[0].data(null, {
       content: {
         results: {
           hits: [
-            { ts: "1970-01-01T00:00:00", request_count: 10, error_count: 2, total_tokens: 100, total_cost: 1, p95_duration: 1, trace_count: 10 },
-            { ts: "1970-01-01T00:00:10", request_count: 20, error_count: 0, total_tokens: 200, total_cost: 2, p95_duration: 2, trace_count: 20 },
+            {
+              ts: "1970-01-01T00:00:00",
+              request_count: 10,
+              error_count: 2,
+              total_tokens: 100,
+              total_cost: 1,
+              p95_duration: 1,
+              trace_count: 10,
+            },
+            {
+              ts: "1970-01-01T00:00:10",
+              request_count: 20,
+              error_count: 0,
+              total_tokens: 200,
+              total_cost: 2,
+              p95_duration: 2,
+              trace_count: 20,
+            },
           ],
         },
       },
@@ -467,15 +493,21 @@ describe("useLLMInsights — sparklines accumulation", () => {
     const { fetchAll, sparklines } = useLLMInsights();
     const promise = fetchAll("default", 100, 200);
 
-    const cbs = mockFetchQueryDataWithHttpStream.mock.calls.map(
-      ([, c]: any) => c,
-    );
+    const cbs = mockFetchQueryDataWithHttpStream.mock.calls.map(([, c]: any) => c);
     cbs[0].data(null, {
       content: {
         results: {
           hits: [
             // trace_count=0 → no traces in window → errorRate must be 0 (not NaN/Infinity)
-            { ts: "1970-01-01T00:00:00", request_count: 0, error_count: 0, total_tokens: 0, total_cost: 0, p95_duration: 0, trace_count: 0 },
+            {
+              ts: "1970-01-01T00:00:00",
+              request_count: 0,
+              error_count: 0,
+              total_tokens: 0,
+              total_cost: 0,
+              p95_duration: 0,
+              trace_count: 0,
+            },
           ],
         },
       },
@@ -510,7 +542,15 @@ describe("useLLMInsights — error rate is always [0%, 100%]", () => {
         results: {
           hits: [
             // All traces errored → 100%
-            { ts: "1970-01-01T00:00:00", request_count: 5, trace_count: 10, error_count: 10, total_tokens: 0, total_cost: 0, p95_duration: 0 },
+            {
+              ts: "1970-01-01T00:00:00",
+              request_count: 5,
+              trace_count: 10,
+              error_count: 10,
+              total_tokens: 0,
+              total_cost: 0,
+              p95_duration: 0,
+            },
           ],
         },
       },
@@ -531,7 +571,15 @@ describe("useLLMInsights — error rate is always [0%, 100%]", () => {
       content: {
         results: {
           hits: [
-            { ts: "1970-01-01T00:00:00", request_count: 50, trace_count: 50, error_count: 0, total_tokens: 0, total_cost: 0, p95_duration: 0 },
+            {
+              ts: "1970-01-01T00:00:00",
+              request_count: 50,
+              trace_count: 50,
+              error_count: 0,
+              total_tokens: 0,
+              total_cost: 0,
+              p95_duration: 0,
+            },
           ],
         },
       },
@@ -556,7 +604,9 @@ describe("useLLMInsights — error rate is always [0%, 100%]", () => {
     // produced error rates of thousands of percent on real environments.
     expect(sql).not.toMatch(/COUNT\(\*\)\s+FILTER\s*\(WHERE\s+span_status\s*=\s*'ERROR'\)/);
     // Must use trace-level distinct count instead.
-    expect(sql).toMatch(/approx_distinct\(trace_id\)\s+FILTER\s*\(WHERE\s+span_status\s*=\s*'ERROR'\)/);
+    expect(sql).toMatch(
+      /approx_distinct\(trace_id\)\s+FILTER\s*\(WHERE\s+span_status\s*=\s*'ERROR'\)/,
+    );
   });
 
   it("sparkline SQL uses approx_distinct(trace_id) FILTER for error_count", () => {
@@ -569,7 +619,9 @@ describe("useLLMInsights — error rate is always [0%, 100%]", () => {
     const sql: string = (sparkCall as any)[0].queryReq.query.sql;
 
     expect(sql).not.toMatch(/COUNT\(\*\)\s+FILTER\s*\(WHERE\s+span_status\s*=\s*'ERROR'\)/);
-    expect(sql).toMatch(/approx_distinct\(trace_id\)\s+FILTER\s*\(WHERE\s+span_status\s*=\s*'ERROR'\)/);
+    expect(sql).toMatch(
+      /approx_distinct\(trace_id\)\s+FILTER\s*\(WHERE\s+span_status\s*=\s*'ERROR'\)/,
+    );
   });
 
   it("whole-window P95 SQL is a lean, LLM-scoped query (no histogram)", () => {
@@ -578,9 +630,10 @@ describe("useLLMInsights — error rate is always [0%, 100%]", () => {
 
     // The P95 card comes from its own whole-window query — the one that
     // has approx_percentile but is NOT the bucketed histogram.
-    const p95Call = mockFetchQueryDataWithHttpStream.mock.calls.find(([p]: any) =>
-      p.queryReq.query.sql.includes("approx_percentile_cont(duration, 0.95)") &&
-      !p.queryReq.query.sql.includes("GROUP BY ts"),
+    const p95Call = mockFetchQueryDataWithHttpStream.mock.calls.find(
+      ([p]: any) =>
+        p.queryReq.query.sql.includes("approx_percentile_cont(duration, 0.95)") &&
+        !p.queryReq.query.sql.includes("GROUP BY ts"),
     );
     expect(p95Call).toBeTruthy();
     const sql: string = (p95Call as any)[0].queryReq.query.sql;
@@ -631,12 +684,8 @@ describe("useLLMInsights — cancelAll", () => {
     cancelAll();
     expect(mockCancelStreamQuery).toHaveBeenCalledTimes(2);
     // Verify both trace IDs were passed (order doesn't matter).
-    const traceIds = mockCancelStreamQuery.mock.calls.map(
-      (c) => (c[0] as any).trace_id,
-    );
-    expect(traceIds).toEqual(
-      expect.arrayContaining(["trace-1", "trace-2"]),
-    );
+    const traceIds = mockCancelStreamQuery.mock.calls.map((c) => (c[0] as any).trace_id);
+    expect(traceIds).toEqual(expect.arrayContaining(["trace-1", "trace-2"]));
     // Every cancel includes the org id from the (mocked) store.
     for (const [arg] of mockCancelStreamQuery.mock.calls) {
       expect((arg as any).org_id).toBe("test-org");
@@ -648,9 +697,7 @@ describe("useLLMInsights — cancelAll", () => {
     const { fetchAll, cancelAll } = useLLMInsights();
     fetchAll("default", 100, 200);
 
-    const cbs = mockFetchQueryDataWithHttpStream.mock.calls.map(
-      ([, c]: any) => c,
-    );
+    const cbs = mockFetchQueryDataWithHttpStream.mock.calls.map(([, c]: any) => c);
     cbs[0].complete();
     cbs[1].complete();
 
@@ -664,9 +711,7 @@ describe("useLLMInsights — cancelAll", () => {
     const { fetchAll, cancelAll } = useLLMInsights();
     const promise = fetchAll("default", 100, 200);
 
-    const cbs = mockFetchQueryDataWithHttpStream.mock.calls.map(
-      ([, c]: any) => c,
-    );
+    const cbs = mockFetchQueryDataWithHttpStream.mock.calls.map(([, c]: any) => c);
     cbs[0].error({ message: "x" });
     cbs[1].complete();
     await promise;
@@ -700,7 +745,9 @@ describe("useLLMInsights — SQL surface", () => {
     // Error count is trace-level: approx_distinct(trace_id) FILTER (WHERE span_status = 'ERROR').
     // Using COUNT(*) FILTER on all spans while dividing by LLM-only request_count
     // produced values >> 100% (e.g. 104350%) on real workloads.
-    expect(sql).toMatch(/approx_distinct\(trace_id\)\s+FILTER\s*\(WHERE\s+span_status\s*=\s*'ERROR'\)/);
+    expect(sql).toMatch(
+      /approx_distinct\(trace_id\)\s+FILTER\s*\(WHERE\s+span_status\s*=\s*'ERROR'\)/,
+    );
   });
 
   // Sparkline query bins by `histogram(_timestamp)` (no explicit interval —

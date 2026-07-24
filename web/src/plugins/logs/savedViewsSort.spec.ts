@@ -20,10 +20,7 @@ const v = (id: string, name: string) => ({ view_id: id, view_name: name });
 
 describe("sortSavedViews (saved-views quick dropdown ordering)", () => {
   it("sorts alphabetically, case-insensitively, when nothing is favorited", () => {
-    const out = sortSavedViews(
-      [v("1", "zebra"), v("2", "Apple"), v("3", "mango")],
-      [],
-    );
+    const out = sortSavedViews([v("1", "zebra"), v("2", "Apple"), v("3", "mango")], []);
     expect(out.map((x) => x.view_name)).toEqual(["Apple", "mango", "zebra"]);
   });
 
@@ -34,12 +31,7 @@ describe("sortSavedViews (saved-views quick dropdown ordering)", () => {
     );
     expect(out.map((x) => x.view_id)).toEqual(["3", "1", "2", "4"]);
     // Favorites: mango < zebra; rest: apple < kiwi.
-    expect(out.map((x) => x.view_name)).toEqual([
-      "mango",
-      "zebra",
-      "apple",
-      "kiwi",
-    ]);
+    expect(out.map((x) => x.view_name)).toEqual(["mango", "zebra", "apple", "kiwi"]);
   });
 
   it("does not mutate the input array", () => {

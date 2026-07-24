@@ -47,8 +47,7 @@ import type { Translator } from "./QueryConfig.schema";
 // via `createAlertSettingsSchema(t, isRealTime)`.
 
 /** True when the RAW input value is empty (unset). */
-const isBlank = (v: unknown): boolean =>
-  v === undefined || v === null || v === "";
+const isBlank = (v: unknown): boolean => v === undefined || v === null || v === "";
 
 /** silence ≥ 0 (required).
  *
@@ -125,9 +124,7 @@ export const createAlertSettingsSchema = (
     }),
     // With workflows in play the per-field `min(1)` can't express the rule (it
     // is cross-field), so it moves to the refinement below.
-    destinations: allowWorkflows
-      ? z.array(z.string()).optional()
-      : makeDestinationsSchema(t),
+    destinations: allowWorkflows ? z.array(z.string()).optional() : makeDestinationsSchema(t),
     workflows: z.array(z.string()).optional(),
     creates_incident: alertSettingsCreatesIncidentSchema,
   });
@@ -148,6 +145,4 @@ export const createAlertSettingsSchema = (
   });
 };
 
-export type AlertSettingsForm = z.infer<
-  ReturnType<typeof createAlertSettingsSchema>
->;
+export type AlertSettingsForm = z.infer<ReturnType<typeof createAlertSettingsSchema>>;

@@ -26,11 +26,7 @@ if (import.meta.env.DEV && !form) {
 </script>
 
 <template>
-  <component
-    v-if="form"
-    :is="form.Field"
-    :name="props.name"
-  >
+  <component v-if="form" :is="form.Field" :name="props.name">
     <template #default="{ field }">
       <!--
         Forward the whole typed props object rather than a hand-written prop
@@ -47,9 +43,7 @@ if (import.meta.env.DEV && !form) {
         :model-value="field.state.value"
         :error="field.state.meta.errors.length > 0"
         :error-message="
-          field.state.meta.errors.length > 0
-            ? firstFieldError(field.state.meta.errors)
-            : undefined
+          field.state.meta.errors.length > 0 ? firstFieldError(field.state.meta.errors) : undefined
         "
         @update:model-value="field.handleChange"
         @blur="field.handleBlur"

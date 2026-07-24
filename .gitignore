@@ -24,7 +24,10 @@ flamegraph.html
 /src/promql_service/data/
 /src/search/data/
 /.idea/
-/.vscode
+/.vscode/*
+!/.vscode/launch.json
+!/.vscode/settings.json
+!/.vscode/extensions.json
 /.env
 /.env*
 /integration-tests

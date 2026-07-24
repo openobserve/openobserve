@@ -29,11 +29,7 @@
  */
 
 import { PromqlStepId } from "@/components/promql/types";
-import type {
-  PromqlBuilderQuery,
-  PromqlLabelMatcher,
-  PromqlStep,
-} from "@/components/promql/types";
+import type { PromqlBuilderQuery, PromqlLabelMatcher, PromqlStep } from "@/components/promql/types";
 
 /** A filter as callers pass it in: label/value plus an optional operator. */
 interface FilterInput {
@@ -344,11 +340,9 @@ const O2_UNIT_MAP: Record<string, O2Unit> = {
 /* Small helpers                                                              */
 /* -------------------------------------------------------------------------- */
 
-const lower = (v: unknown): string =>
-  typeof v === "string" ? v.trim().toLowerCase() : "";
+const lower = (v: unknown): string => (typeof v === "string" ? v.trim().toLowerCase() : "");
 
-const segmentsOf = (metricName: string): string[] =>
-  lower(metricName).split("_").filter(Boolean);
+const segmentsOf = (metricName: string): string[] => lower(metricName).split("_").filter(Boolean);
 
 /** The trailing OpenMetrics member suffix, or "" for a bare name. */
 export function familySuffixOf(metricName: string): string {
@@ -413,8 +407,7 @@ export function resolveCardKind(
     case "bucket": {
       const evidence = pickTypeEvidence(own, fam);
       if (evidence === "gaugehistogram") return CARD_KIND.OTHER;
-      if (evidence === "exponentialhistogram")
-        return CARD_KIND.EXP_HISTOGRAM_FALLBACK;
+      if (evidence === "exponentialhistogram") return CARD_KIND.EXP_HISTOGRAM_FALLBACK;
       return CARD_KIND.CLASSIC_HISTOGRAM_BUCKETS;
     }
 
@@ -452,11 +445,7 @@ export function resolveCardKind(
       // permanently-empty gauge card — worse than admitting we cannot chart it.
       // (Phantom suppression normally removes these before they ever reach a
       // card; this is the backstop for when it cannot.)
-      if (
-        own === "histogram" ||
-        own === "exponentialhistogram" ||
-        own === "gaugehistogram"
-      ) {
+      if (own === "histogram" || own === "exponentialhistogram" || own === "gaugehistogram") {
         return CARD_KIND.OTHER;
       }
       return CARD_KIND.GAUGE;
@@ -569,9 +558,7 @@ function normalizeMatchers(
       return { label, operator, value: String(f.value ?? "") };
     })
     .sort((a, b) =>
-      a.label === b.label
-        ? a.value.localeCompare(b.value)
-        : a.label.localeCompare(b.label),
+      a.label === b.label ? a.value.localeCompare(b.value) : a.label.localeCompare(b.label),
     );
 }
 
@@ -598,11 +585,7 @@ export function builderLabelsOf(filters?: FiltersArg): PromqlLabelMatcher[] {
  * Only these can carry the extreme-value guard: `rate()` needs a range-vector
  * SELECTOR, so `rate((a and a > -Inf)[5m])` is not valid PromQL.
  */
-const RATE_FREE_KINDS = [
-  CARD_KIND.GAUGE,
-  CARD_KIND.SUMMARY_QUANTILES,
-  CARD_KIND.TIMESTAMP,
-];
+const RATE_FREE_KINDS = [CARD_KIND.GAUGE, CARD_KIND.SUMMARY_QUANTILES, CARD_KIND.TIMESTAMP];
 
 /**
  * Does this card kind's default query wrap its selector in `rate()`?
@@ -643,10 +626,7 @@ export function isRateBasedKind(cardKind: string): boolean {
  * @param {Array<{label: string, value: string, operator?: string}>} [filters]
  * @returns {string} PromQL
  */
-export function buildPresenceQuery(
-  streamName: string,
-  filters?: FiltersArg,
-): string {
+export function buildPresenceQuery(streamName: string, filters?: FiltersArg): string {
   return `count(${buildSelector(streamName, filters)})`;
 }
 
@@ -759,9 +739,7 @@ export function computeRateWindow(
 export const PANEL_RATE_WINDOW = "$__rate_interval";
 
 /** The window used when a caller supplies no time context. */
-const DEFAULT_RATE_WINDOW = formatPromDuration(
-  4 * DEFAULT_SCRAPE_INTERVAL_SECONDS,
-);
+const DEFAULT_RATE_WINDOW = formatPromDuration(4 * DEFAULT_SCRAPE_INTERVAL_SECONDS);
 
 /* -------------------------------------------------------------------------- */
 /* Rule set B — unit inference                                                 */
@@ -786,10 +764,7 @@ function lookupSegment(segment: string | undefined): UnitRule | null {
  * @param {{rated?: boolean}} [opts]
  * @returns {string} canonical unit id
  */
-export function inferUnit(
-  metricName: string,
-  opts?: { rated?: boolean },
-): string {
+export function inferUnit(metricName: string, opts?: { rated?: boolean }): string {
   const rated = !!opts?.rated;
   const parts = segmentsOf(metricName);
   const last = parts[parts.length - 1];
@@ -811,9 +786,7 @@ export function inferUnit(
 }
 
 /** Normalizes a declared unit onto a canonical id, or null if unrecognized. */
-export function normalizeDeclaredUnit(
-  declaredUnit: string | undefined,
-): string | null {
+export function normalizeDeclaredUnit(declaredUnit: string | undefined): string | null {
   const raw = typeof declaredUnit === "string" ? declaredUnit.trim() : "";
   if (!raw) return null;
   return DECLARED_UNIT_ALIASES[raw.toLowerCase()] ?? null;
@@ -845,8 +818,7 @@ function resolveUnit(
 
   const suffix = familySuffixOf(metricName);
   const rated =
-    cardKind === CARD_KIND.COUNTER_RATE ||
-    cardKind === CARD_KIND.EXP_HISTOGRAM_FALLBACK;
+    cardKind === CARD_KIND.COUNTER_RATE || cardKind === CARD_KIND.EXP_HISTOGRAM_FALLBACK;
 
   // Count members never inherit a declared/family observation unit: they count
   // events, so a family-declared `seconds` on X_count must still yield count/s.
@@ -880,11 +852,7 @@ function resolveUnit(
  * identical — `metricDefaults.builder.spec.ts` renders every builder descriptor
  * through the real query modeller and diffs it against `expr`.
  */
-const q = (
-  expr: string,
-  legendTemplate?: string,
-  builder?: PromqlBuilderQuery,
-): VariantQuery => {
+const q = (expr: string, legendTemplate?: string, builder?: PromqlBuilderQuery): VariantQuery => {
   const out: VariantQuery = { expr };
   if (legendTemplate !== undefined) out.legendTemplate = legendTemplate;
   if (builder !== undefined) out.builder = builder;
@@ -929,11 +897,7 @@ function resolveTopkLabel(labels: string[] | undefined): string | null {
   const excluded = new Set(["le", "quantile"]);
   const eligible = labels
     .filter(
-      (l) =>
-        typeof l === "string" &&
-        !l.startsWith("__") &&
-        !l.startsWith("_") &&
-        !excluded.has(l),
+      (l) => typeof l === "string" && !l.startsWith("__") && !l.startsWith("_") && !excluded.has(l),
     )
     .sort();
   if (eligible.includes("instance")) return "instance";
@@ -945,31 +909,15 @@ function resolveTopkLabel(labels: string[] | undefined): string | null {
  * Variants are card-kind aware: info/`_created`/GaugeHistogram cards get none,
  * and an ExponentialHistogram fallback gets only its count line.
  */
-function buildVariants(
-  cardKind: string,
-  ctx: BuildVariantsContext,
-): Variant[] {
-  const {
-    metricName,
-    base,
-    sel,
-    countSel,
-    w,
-    labels,
-    unit,
-    builderLabels,
-    builderSafe,
-  } = ctx;
+function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
+  const { metricName, base, sel, countSel, w, labels, unit, builderLabels, builderSafe } = ctx;
 
   /**
    * Builder state for one query, or `undefined` when this variant cannot be
    * expressed in the builder's vocabulary — which is the case whenever the
    * NaN guard has rewritten the selector into `(x and x > -Inf)`.
    */
-  const b = (
-    metric: string,
-    operations: PromqlStep[],
-  ): PromqlBuilderQuery | undefined =>
+  const b = (metric: string, operations: PromqlStep[]): PromqlBuilderQuery | undefined =>
     builderSafe ? { metric, labels: builderLabels, operations } : undefined;
 
   switch (cardKind) {
@@ -979,18 +927,14 @@ function buildVariants(
           id: "avg",
           footerLabel: "avg",
           label: "Average",
-          queries: [
-            q(`avg(${sel})`, metricName, b(metricName, [AGG(PromqlStepId.Avg)])),
-          ],
+          queries: [q(`avg(${sel})`, metricName, b(metricName, [AGG(PromqlStepId.Avg)]))],
           chartType: "line",
         },
         {
           id: "sum",
           footerLabel: "sum",
           label: "Sum",
-          queries: [
-            q(`sum(${sel})`, metricName, b(metricName, [AGG(PromqlStepId.Sum)])),
-          ],
+          queries: [q(`sum(${sel})`, metricName, b(metricName, [AGG(PromqlStepId.Sum)]))],
           chartType: "line",
         },
         {
@@ -1007,13 +951,7 @@ function buildVariants(
           id: "stddev",
           footerLabel: "stddev",
           label: "Std dev",
-          queries: [
-            q(
-              `stddev(${sel})`,
-              metricName,
-              b(metricName, [AGG(PromqlStepId.Stddev)]),
-            ),
-          ],
+          queries: [q(`stddev(${sel})`, metricName, b(metricName, [AGG(PromqlStepId.Stddev)]))],
           chartType: "line",
         },
         {
@@ -1026,11 +964,7 @@ function buildVariants(
           // any percentile without a query here is a checkbox that silently does
           // nothing (or worse, empties the subset and falls back to all of them).
           queries: GAUGE_PERCENTILES.map((p) =>
-            q(
-              `quantile(${p / 100}, ${sel})`,
-              `p${p}`,
-              b(metricName, [QUANTILE(p / 100)]),
-            ),
+            q(`quantile(${p / 100}, ${sel})`, `p${p}`, b(metricName, [QUANTILE(p / 100)])),
           ),
           chartType: "line",
           // Checked by default; the other offered percentiles start unchecked.
@@ -1093,11 +1027,7 @@ function buildVariants(
             q(
               `topk(5, sum by (${topkLabel}) (rate(${sel}[${w}])))`,
               `{${topkLabel}}`,
-              b(metricName, [
-                RATE(w),
-                AGG(PromqlStepId.Sum, [topkLabel]),
-                TOPK(5),
-              ]),
+              b(metricName, [RATE(w), AGG(PromqlStepId.Sum, [topkLabel]), TOPK(5)]),
             ),
           ],
           chartType: "line",
@@ -1134,11 +1064,7 @@ function buildVariants(
             q(
               `histogram_quantile(${p / 100}, sum by (le) (rate(${sel}[${w}])))`,
               `p${p}`,
-              b(metricName, [
-                RATE(w),
-                AGG(PromqlStepId.Sum, ["le"]),
-                HISTOGRAM_QUANTILE(p / 100),
-              ]),
+              b(metricName, [RATE(w), AGG(PromqlStepId.Sum, ["le"]), HISTOGRAM_QUANTILE(p / 100)]),
             ),
           ),
           chartType: "line",
@@ -1264,11 +1190,7 @@ function buildVariants(
             footerLabel: "buckets",
             label: "Buckets",
             queries: [
-              q(
-                `sum by (le) (${sel})`,
-                "{le}",
-                b(metricName, [AGG(PromqlStepId.Sum, ["le"])]),
-              ),
+              q(`sum by (le) (${sel})`, "{le}", b(metricName, [AGG(PromqlStepId.Sum, ["le"])])),
             ],
             chartType: "line",
             previewable: false,
@@ -1283,13 +1205,7 @@ function buildVariants(
             id: "avg",
             footerLabel: "avg",
             label: "Average",
-            queries: [
-              q(
-                `avg(${sel})`,
-                metricName,
-                b(metricName, [AGG(PromqlStepId.Avg)]),
-              ),
-            ],
+            queries: [q(`avg(${sel})`, metricName, b(metricName, [AGG(PromqlStepId.Avg)]))],
             chartType: "line",
           },
         ];
@@ -1306,9 +1222,7 @@ function buildVariants(
           id: "avg",
           footerLabel: "avg",
           label: "Average",
-          queries: [
-            q(`avg(${sel})`, metricName, b(metricName, [AGG(PromqlStepId.Avg)])),
-          ],
+          queries: [q(`avg(${sel})`, metricName, b(metricName, [AGG(PromqlStepId.Avg)]))],
           chartType: "line",
         },
       ];
@@ -1324,13 +1238,7 @@ function buildVariants(
           // for every such metric — true, and useless. What carries information
           // is how MANY of them there are: `count(kube_pod_container_info)` is
           // the number of containers, and its shape over time is what you want.
-          queries: [
-            q(
-              `count(${sel})`,
-              "count",
-              b(metricName, [AGG(PromqlStepId.Count)]),
-            ),
-          ],
+          queries: [q(`count(${sel})`, "count", b(metricName, [AGG(PromqlStepId.Count)]))],
           chartType: "line",
         },
         {
@@ -1429,15 +1337,10 @@ export function getMetricDefaults(
   // histogram-family base stream — gets the placeholder instead of a chart.
   const otherSuffix = familySuffixOf(metricName);
   const unsupported =
-    cardKind === CARD_KIND.OTHER &&
-    otherSuffix !== "gsum" &&
-    otherSuffix !== "gcount";
-  const previewable =
-    !!defaultVariant && defaultVariant.previewable !== false && !unsupported;
+    cardKind === CARD_KIND.OTHER && otherSuffix !== "gsum" && otherSuffix !== "gcount";
+  const previewable = !!defaultVariant && defaultVariant.previewable !== false && !unsupported;
 
-  const chartType = previewable
-    ? (defaultVariant?.chartType ?? "line")
-    : "none";
+  const chartType = previewable ? (defaultVariant?.chartType ?? "line") : "none";
 
   return {
     type: cardKind,
@@ -1465,9 +1368,7 @@ export function getMetricDefaults(
     // nothing meaningful to reconfigure. Info cards now do: count of series (the
     // default) or the label table itself.
     configurable:
-      cardKind !== CARD_KIND.TIMESTAMP &&
-      cardKind !== CARD_KIND.OTHER &&
-      variants.length > 1,
+      cardKind !== CARD_KIND.TIMESTAMP && cardKind !== CARD_KIND.OTHER && variants.length > 1,
 
     variants,
   };
@@ -1484,10 +1385,7 @@ export function resolveVariant(
   variantId: string,
   options?: { percentiles?: number[] },
 ) {
-  const variant =
-    defaults.variants.find((v) => v.id === variantId) ??
-    defaults.variants[0] ??
-    null;
+  const variant = defaults.variants.find((v) => v.id === variantId) ?? defaults.variants[0] ?? null;
   if (!variant) return null;
 
   let queries = variant.queries;

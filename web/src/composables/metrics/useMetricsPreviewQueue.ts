@@ -141,9 +141,7 @@ export function isCancelled(error: any): boolean {
   );
 }
 
-export function createPreviewQueue(
-  concurrency: number = PREVIEW_CONCURRENCY,
-): PreviewQueue {
+export function createPreviewQueue(concurrency: number = PREVIEW_CONCURRENCY): PreviewQueue {
   const cache = new Map<string, CacheEntry>();
   const waiting: PendingJob[] = [];
   const active = new Map<string, PendingJob>();
@@ -271,8 +269,11 @@ export function createPreviewQueue(
       fn: (signal: AbortSignal) => Promise<T>,
       opts?: string | RunOptions,
     ) {
-      const { owner, cache = true, refresh = false }: RunOptions =
-        typeof opts === "string" ? { owner: opts } : (opts ?? {});
+      const {
+        owner,
+        cache = true,
+        refresh = false,
+      }: RunOptions = typeof opts === "string" ? { owner: opts } : (opts ?? {});
 
       if (cache && !refresh) {
         const cached = cacheGet(key);
