@@ -51,15 +51,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="sessions-list-stream-selector"
         class="w-56 flex-shrink-0"
       >
-        <OSkeleton type="text" v-if="!streamsLoaded" class="w-full h-8.5" />
         <OSelect
-          v-else
-          v-model="activeStream"
+          :model-value="streamsLoaded ? activeStream : ''"
           :label="t('traces.sessionsList.streamLabel')"
           label-position="inside"
           :options="availableStreams.map((s) => ({ label: s, value: s }))"
           labelKey="label"
           valueKey="value"
+          :loading="!streamsLoaded"
+          :placeholder="streamsLoaded ? undefined : t('traces.sessionsList.loadingStreams')"
           class="w-full rounded-default"
           @update:model-value="onStreamChange"
         />
@@ -69,15 +69,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="sessions-list-agent-selector"
         class="w-56 flex-shrink-0"
       >
-        <OSkeleton type="text" v-if="!agentsLoaded" class="w-full h-8.5" />
         <OSelect
-          v-else
-          v-model="activeAgent"
+          :model-value="agentsLoaded ? activeAgent : ''"
           :label="t('traces.sessionsList.agent')"
           label-position="inside"
           :options="agentSelectOptions"
           labelKey="label"
           valueKey="value"
+          :loading="!agentsLoaded"
+          :placeholder="agentsLoaded ? undefined : t('traces.sessionsList.loadingAgents')"
           class="w-full rounded-default"
           @update:model-value="onAgentChange"
         />
@@ -247,7 +247,6 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import type { AcceptableValue } from "reka-ui";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -654,7 +653,8 @@ async function loadSessions(
 
 // Filter / pagination changes are deliberate user actions — force a re-fetch
 // so they bypass the "already loaded" cache guard.
-function onStreamChange() {
+function onStreamChange(val?: AcceptableValue | AcceptableValue[] | boolean) {
+  activeStream.value = typeof val === "string" ? val : "";
   currentPage.value = 1;
   loadSessions(undefined, undefined, true);
 }
@@ -670,7 +670,8 @@ function onFilterModeChange(
   loadSessions(undefined, undefined, true);
 }
 
-function onAgentChange() {
+function onAgentChange(val?: AcceptableValue | AcceptableValue[] | boolean) {
+  activeAgent.value = typeof val === "string" ? val : ALL_AGENTS_VALUE;
   currentPage.value = 1;
   loadSessions(undefined, undefined, true);
 }

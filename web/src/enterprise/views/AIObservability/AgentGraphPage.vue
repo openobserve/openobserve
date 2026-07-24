@@ -96,20 +96,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="agent-graph-agent-selector"
         class="w-80 shrink-0"
       >
-        <SkeletonBox
-          v-if="!agentsLoaded"
-          width="100%"
-          height="2.125rem"
-          :rounded="true"
-        />
         <OSelect
-          v-else
           v-model="activeAgentKey"
           :label="t('aiObservability.agentGraph.agent')"
           label-position="inside"
           :options="agentSelectOptions"
           labelKey="label"
           valueKey="value"
+          :loading="!agentsLoaded"
           class="w-full rounded-default"
         />
       </div>
@@ -208,7 +202,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 import useTraces from "@/composables/useTraces";
 import { getConsumableRelativeTime } from "@/utils/date";
 import genAiAgentMappingService, {
