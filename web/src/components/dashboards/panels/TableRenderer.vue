@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="table-wrapper relative h-full w-full" data-test="dashboard-table-renderer-wrapper">
     <OTable
       ref="tableRef"
+      :key="paginationMode"
       :data="sortedRows"
       :columns="otableColumns"
       sorting="server"
@@ -165,6 +166,14 @@ export default defineComponent({
     // fit-to-container (w-full/table-fixed) layout, so only opt pivot into the
     // natural-width + overflow path (QA #2239: pivot missing horizontal scroll).
     const isPivot = computed(() => ((props.data?.pivotHeaderLevels?.length as number) ?? 0) > 0);
+
+    // OTable's client pagination row model is attached once at table creation
+    // (TanStack captures it then), so a table first mounted with pagination OFF
+    // can't start slicing when pagination is toggled ON later — it shows the bar
+    // but renders every row and Next does nothing. Re-key the OTable on the
+    // pagination mode so toggling it rebuilds the table with the right row model
+    // (QA #2239: Add Panel pagination toggle doesn't paginate).
+    const paginationMode = computed(() => (props.showPagination ? "client" : "none"));
 
     const tableColumns = computed(() => (props.data?.columns as any[]) || []);
 
@@ -405,6 +414,7 @@ export default defineComponent({
       cellStyleFn,
       effectivePageSize,
       isPivot,
+      paginationMode,
       sortedRows,
       localSortBy,
       localSortOrder,

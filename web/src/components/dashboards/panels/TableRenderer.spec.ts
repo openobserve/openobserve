@@ -674,6 +674,31 @@ describe("TableRenderer", () => {
       await flushPromises();
       expect(table.getRowModel().rows.length).toBe(10);
     });
+
+    it("paginates when pagination is enabled AFTER mount (#2239 Add Panel toggle)", async () => {
+      const rows = Array.from({ length: 15 }, (_, i) => ({
+        timestamp: `t${i}`,
+        level: "INFO",
+        count: i,
+      }));
+      // Mounted with pagination OFF (the Add Panel default) — reproduces the
+      // captured-once bug where the client pagination row model was frozen as
+      // undefined, so enabling pagination showed the bar but never sliced.
+      wrapper = createWrapper({
+        showPagination: false,
+        rowsPerPage: 5,
+        data: { columns: mockTableData.columns, rows },
+      });
+      await flushPromises();
+      // all rows, no pagination
+      expect(wrapper.findComponent({ name: "OTable" }).vm.table.getRowModel().rows.length).toBe(15);
+
+      // User flips the "Pagination" toggle in the panel config. OTable is re-keyed
+      // on the pagination mode, so this rebuilds the table — re-query it.
+      await wrapper.setProps({ showPagination: true });
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "OTable" }).vm.table.getRowModel().rows.length).toBe(5);
+    });
   });
 
   // ── Reactivity ────────────────────────────────────────────────────────────
