@@ -9315,6 +9315,7 @@
       "installCmdHint": "Run this on the agent host. The token is baked in — replace <location-name> with your location. It won't be shown again.",
       "copyCmdBtn": "Copy command",
       "copyTokenBtn": "Copy token",
+      "copiedToast": "Token copied to clipboard",
       "disableDefaultBlocked": "The default token can't be disabled — rotate it first",
       "nameReserved": "'default' is reserved — use Rotate to replace the default token",
       "fetchError": "Failed to load tokens",

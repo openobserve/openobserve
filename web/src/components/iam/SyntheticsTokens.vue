@@ -112,7 +112,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-token="{ row }">
-            <span class="font-mono text-xs text-text-secondary">{{ row.token }}</span>
+            <div class="flex items-center gap-1 min-w-0">
+              <span class="font-mono text-xs text-text-secondary truncate">{{ row.token }}</span>
+              <OButton
+                variant="ghost"
+                size="icon-sm"
+                icon-left="content-copy"
+                :title="t('synthetics.tokens.copyTokenBtn')"
+                :data-test="`synthetics-token-${row.name}-copy`"
+                @click.stop="copyToken(row.token)"
+              />
+            </div>
           </template>
 
           <template #cell-status="{ row }">
@@ -479,7 +489,9 @@ export default defineComponent({
     };
 
     const copyToken = (token: string) => {
+      if (!token) return;
       copyToClipboard(token);
+      toast({ variant: "success", message: t("synthetics.tokens.copiedToast"), timeout: 2000 });
     };
 
     const copyCommand = () => {
