@@ -463,6 +463,16 @@ export default defineComponent({
   width: 1px;
   background: var(--color-border-default);
 }
+/* The row-field (e.g. _timestamp) header spans every level (rowspan), so a
+   short centered stub would float on the group→value boundary. This boundary
+   between the row-field column and the pivot values is the table's primary
+   separator, so draw it full-height instead of the resize-handle stub. */
+.table-wrapper :deep(thead th.o2-pivot-rowfield-th)::after {
+  top: 0;
+  bottom: 0;
+  height: auto;
+  transform: none;
+}
 
 /* Pivot table styles */
 .table-wrapper :deep(.pivot-total-row) {
