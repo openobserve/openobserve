@@ -7,7 +7,7 @@
       <div class="flex flex-row items-center pl-2">
         <div
           data-test="promql-builder-options-label"
-          class="flex min-w-24 items-center text-sm whitespace-nowrap"
+          class="flex min-w-24 items-center whitespace-nowrap"
         >
           <span
             class="rounded-default bg-text-secondary mr-1.5 h-2 w-2 shrink-0"

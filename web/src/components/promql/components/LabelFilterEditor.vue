@@ -3,7 +3,7 @@
     <div class="flex flex-row pl-2">
       <div
         data-test="promql-labelfilter-editor-label"
-        class="flex min-w-24 items-center text-sm whitespace-nowrap"
+        class="flex min-w-24 items-center whitespace-nowrap"
       >
         <span
           class="rounded-default bg-badge-orange-ol-text mr-1.5 h-2 w-2 shrink-0"
@@ -33,7 +33,7 @@
                   class="!ps-1 !pe-0"
                   :data-test="`promql-label-filter-${index}`"
                 >
-                  <span class="font-normal whitespace-nowrap">
+                  <span class="font-normal leading-normal whitespace-nowrap">
                     <template v-if="!label.label">
                       <span class="text-text-secondary">{{ computedLabel(label) }}</span>
                     </template>

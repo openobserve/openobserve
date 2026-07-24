@@ -23,7 +23,7 @@
             :data-test="`dashboard-add-condition-label-${conditionIndex}-${computedLabel(condition)}`"
             icon-right="arrow-drop-down"
           >
-            <span class="font-normal whitespace-nowrap"
+            <span class="font-normal leading-normal whitespace-nowrap"
               ><span class="text-text-body">{{ labelParts(condition).prefix }}</span
               ><span class="text-text-body">{{ labelParts(condition).field }}</span
               ><span v-if="labelParts(condition).op" class="text-text-secondary">{{

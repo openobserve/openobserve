@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <span
-    class="inline-flex items-center gap-1 leading-none font-normal"
+    class="inline-flex items-center gap-1 leading-normal font-normal"
     data-test="dashboard-axis-field-chip-label"
   >
     <span class="whitespace-nowrap"

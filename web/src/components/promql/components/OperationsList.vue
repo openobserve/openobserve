@@ -2,7 +2,7 @@
   <div class="flex flex-row pl-2">
     <div
       data-test="promql-operations-list-label"
-      class="flex min-w-24 items-center text-sm whitespace-nowrap"
+      class="flex min-w-24 items-center whitespace-nowrap"
     >
       <span
         class="rounded-default bg-badge-purple-ol-text mr-1.5 h-2 w-2 shrink-0"
