@@ -22,8 +22,8 @@ use anyhow::Result;
 use arrow_schema::{Field, Schema};
 use common::meta::{authz::Authz, stream::SchemaEvolution};
 use config::{
-    ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, SQL_FULL_TEXT_SEARCH_FIELDS,
-    SQL_SECONDARY_INDEX_SEARCH_FIELDS, TIMESTAMP_COL_NAME,
+    ALL_VALUES_COL_NAME, ID_COL_NAME, O2_INGEST_TS_COL_NAME, ORIGINAL_DATA_COL_NAME,
+    SQL_FULL_TEXT_SEARCH_FIELDS, SQL_SECONDARY_INDEX_SEARCH_FIELDS, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE_ID,
     get_config,
     ider::SnowflakeIdGenerator,
@@ -826,6 +826,11 @@ pub fn generate_schema_for_defined_schema_fields(
     let mut fields =
         check_schema_for_defined_schema_fields(stream_type, schema.schema(), fields.to_vec());
     fields.insert(TIMESTAMP_COL_NAME.to_string());
+    let is_llm_trace_stream = matches!(stream_type, StreamType::Traces)
+        && unwrap_stream_settings(schema.schema()).is_some_and(|settings| settings.is_llm_stream);
+    if is_llm_trace_stream {
+        fields.insert(O2_INGEST_TS_COL_NAME.to_string());
+    }
     fields.insert(cfg.common.column_all.to_string());
     if need_original || index_original_data {
         fields.insert(ID_COL_NAME.to_string());
@@ -1024,6 +1029,7 @@ mod tests {
         // are not persisted in defined_schema_fields
         let mut fields = vec![
             Field::new(TIMESTAMP_COL_NAME, DataType::Int64, true),
+            Field::new(O2_INGEST_TS_COL_NAME, DataType::Int64, true),
             Field::new(
                 get_config().common.column_all.as_str(),
                 DataType::Utf8,
@@ -1054,6 +1060,7 @@ mod tests {
             .map(|f| f.name().to_string())
             .collect();
         assert!(names.contains(&TIMESTAMP_COL_NAME.to_string()));
+        assert!(!names.contains(&O2_INGEST_TS_COL_NAME.to_string()));
         assert!(names.contains(&get_config().common.column_all));
         assert!(names.contains(&ID_COL_NAME.to_string()));
         assert!(names.contains(&ORIGINAL_DATA_COL_NAME.to_string()));
@@ -1061,6 +1068,62 @@ mod tests {
         assert!(names.contains(&"field0".to_string()));
         assert!(names.contains(&"field1".to_string()));
         assert!(!names.contains(&"field2".to_string()));
+    }
+
+    #[test]
+    fn test_generate_schema_for_defined_schema_fields_includes_ingest_ts_for_llm_traces() {
+        let mut fields = vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, true),
+            Field::new(O2_INGEST_TS_COL_NAME, DataType::Int64, true),
+        ];
+        for i in 0..15 {
+            fields.push(Field::new(format!("field{i}"), DataType::Utf8, true));
+        }
+        let schema_for = |is_llm_stream| {
+            let settings = StreamSettings {
+                is_llm_stream,
+                ..Default::default()
+            };
+            let metadata =
+                HashMap::from([("settings".to_string(), json::to_string(&settings).unwrap())]);
+            SchemaCache::new(Schema::new_with_metadata(fields.clone(), metadata))
+        };
+        let defined_fields = vec!["field0".to_string(), "field1".to_string()];
+
+        let non_llm_result = generate_schema_for_defined_schema_fields(
+            StreamType::Traces,
+            &schema_for(false),
+            &defined_fields,
+            false,
+            false,
+            false,
+        );
+        assert!(
+            non_llm_result
+                .schema()
+                .field_with_name(O2_INGEST_TS_COL_NAME)
+                .is_err()
+        );
+
+        let result = generate_schema_for_defined_schema_fields(
+            StreamType::Traces,
+            &schema_for(true),
+            &defined_fields,
+            false,
+            false,
+            false,
+        );
+        let names = result
+            .schema()
+            .fields()
+            .iter()
+            .map(|field| field.name().as_str())
+            .collect::<HashSet<_>>();
+
+        assert!(names.contains(O2_INGEST_TS_COL_NAME));
+        assert!(names.contains("field0"));
+        assert!(names.contains("field1"));
+        assert!(!names.contains("field2"));
     }
 
     #[test]
