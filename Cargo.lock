@@ -7361,9 +7361,11 @@ dependencies = [
  "openobserve-api-common",
  "openobserve-api-management",
  "openobserve-api-query",
+ "openobserve-builtins",
  "openobserve-cipher",
  "openobserve-core",
  "openobserve-mcp",
+ "openobserve-sourcemaps",
  "opentelemetry",
  "opentelemetry-proto",
  "parking_lot 0.12.5",
@@ -7434,6 +7436,7 @@ dependencies = [
  "o2_openfga",
  "openobserve-api-common",
  "openobserve-core",
+ "openobserve-org-storage",
  "regex",
  "reqwest 0.13.2",
  "sea-orm",
@@ -7492,6 +7495,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "openobserve-builtins"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "chrono",
+ "config",
+ "infra",
+ "log",
+ "reqwest 0.13.2",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "utoipa",
+]
+
+[[package]]
 name = "openobserve-cipher"
 version = "0.1.0"
 dependencies = [
@@ -7513,8 +7534,6 @@ dependencies = [
  "arrow-schema",
  "async-trait",
  "audit",
- "aws-config",
- "aws-credential-types",
  "aws-sdk-sns",
  "axum",
  "base64 0.22.1",
@@ -7522,15 +7541,12 @@ dependencies = [
  "chromiumoxide",
  "chrono",
  "common",
- "compaction",
  "config",
  "cron",
- "csv",
  "dashmap",
  "datafusion",
  "db",
  "enrichment",
- "enrichment-data",
  "flate2",
  "futures",
  "futures-util",
@@ -7544,17 +7560,14 @@ dependencies = [
  "jsonwebtoken",
  "lettre",
  "log",
- "maxminddb",
  "md5",
  "multer",
  "o2_dex",
  "o2_enterprise",
  "o2_openfga",
- "object_store",
  "opentelemetry",
  "opentelemetry-proto",
  "parking_lot 0.12.5",
- "parquet",
  "prometheus",
  "promql",
  "promql-parser",
@@ -7563,7 +7576,6 @@ dependencies = [
  "prost-wkt-types",
  "proto",
  "rand 0.10.1",
- "rayon",
  "rcgen",
  "regex",
  "reqwest 0.13.2",
@@ -7576,11 +7588,8 @@ dependencies = [
  "serde",
  "serde_json",
  "snap",
- "sourcemap",
  "stream",
  "svix-ksuid",
- "tantivy",
- "tantivy_utils",
  "thiserror 2.0.18",
  "tiktoken-rs",
  "time",
@@ -7594,10 +7603,8 @@ dependencies = [
  "utoipa",
  "version-compare",
  "vrl",
- "wal",
  "webpki-roots 1.0.6",
  "x509-parser",
- "zip 8.2.0",
 ]
 
 [[package]]
@@ -7607,6 +7614,7 @@ dependencies = [
  "anyhow",
  "arrow",
  "arrow-schema",
+ "async-trait",
  "audit",
  "bytes",
  "chrono",
@@ -7624,7 +7632,9 @@ dependencies = [
  "o2_dex",
  "o2_enterprise",
  "o2_openfga",
+ "openobserve-builtins",
  "openobserve-core",
+ "openobserve-org-storage",
  "prometheus",
  "promql-service",
  "proto",
@@ -7636,6 +7646,7 @@ dependencies = [
  "search_service",
  "serde_json",
  "stream",
+ "tantivy_utils",
  "tokio",
  "tonic",
  "transform",
@@ -7659,6 +7670,47 @@ dependencies = [
  "tokio",
  "url",
  "utoipa",
+]
+
+[[package]]
+name = "openobserve-org-storage"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "aws-config",
+ "aws-credential-types",
+ "bytes",
+ "chrono",
+ "config",
+ "hashbrown 0.16.1",
+ "infra",
+ "log",
+ "object_store",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "openobserve-sourcemaps"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "chrono",
+ "config",
+ "db",
+ "hashbrown 0.16.1",
+ "infra",
+ "log",
+ "o2_enterprise",
+ "proto",
+ "sea-orm",
+ "serde",
+ "sourcemap",
+ "tokio",
+ "tonic",
+ "zip 8.2.0",
 ]
 
 [[package]]
@@ -11225,7 +11277,6 @@ dependencies = [
  "common",
  "config",
  "db",
- "enrichment-data",
  "hashbrown 0.16.1",
  "infra",
  "log",

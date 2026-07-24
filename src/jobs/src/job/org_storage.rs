@@ -27,7 +27,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         return Err(e);
     }
 
-    let providers = match openobserve_core::org_storage_providers::get_provider_list().await {
+    let providers = match openobserve_org_storage::get_provider_list().await {
         Ok(v) => v,
         Err(e) => {
             log::error!("Error in setting up org level storage providers : {e}");
@@ -71,9 +71,7 @@ async fn test_storage_validity() {
                 "checking storage provider validity for org {}",
                 provider.org_id
             );
-            if let Err(e) =
-                openobserve_core::org_storage_providers::validate_provider(&provider).await
-            {
+            if let Err(e) = openobserve_org_storage::validate_provider(&provider).await {
                 // todo: bring error up to ui somehow
                 log::error!(
                     "error when validating provider for org {}, falling back to default storage : {e}",

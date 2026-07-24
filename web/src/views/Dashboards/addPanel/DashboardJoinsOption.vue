@@ -1,29 +1,25 @@
 <template>
-  <div
-    v-if="shouldShowJoins"
-    class="w-full"
-    data-test="dashboard-joins-container"
-  >
+  <div v-if="shouldShowJoins" class="w-full" data-test="dashboard-joins-container">
     <div class="flex flex-row pl-3">
-      <div
-        class="text-sm whitespace-nowrap flex items-center"
-        :class="labelWidthClass"
-      >
+      <div class="flex items-center text-sm whitespace-nowrap" :class="labelWidthClass">
         <span
-          class="w-2 h-2 rounded-default mr-1.5 shrink-0 bg-badge-teal-ol-text"
+          class="rounded-default bg-badge-teal-ol-text mr-1.5 h-2 w-2 shrink-0"
           aria-hidden="true"
         ></span>
         {{ t("panel.joins") }}
       </div>
-      <span class="flex items-center mx-0.5">:</span>
-      <div class="pl-0.5 flex flex-row items-center flex-wrap gap-2 min-h-8" data-test="dashboard-filter-layout">
+      <span class="mx-0.5 flex items-center">:</span>
+      <div
+        class="flex min-h-8 flex-row flex-wrap items-center gap-2 pl-0.5"
+        data-test="dashboard-filter-layout"
+      >
         <div
           v-for="(joinObj, index) in currentJoins"
           :key="index"
-          class="flex flex-row mr-2 my-0.5"
+          class="my-0.5 mr-2 flex flex-row"
         >
           <OButtonGroup
-            class="axis-field border border-border-default border-s-2 border-s-badge-teal-ol-border bg-surface-panel"
+            class="axis-field border-border-default border-s-badge-teal-ol-border bg-surface-panel border border-s-2"
             radius="sm"
             :divided="false"
           >
@@ -40,26 +36,23 @@
                     <LeftJoinTypeSvg
                       v-if="joinObj?.joinType === 'left'"
                       :shouldFill="true"
-                      class="h-5 w-5 shrink-0 text-text-secondary"
+                      class="text-text-secondary h-5 w-5 shrink-0"
                     />
                     <InnerJoinTypeSvg
                       v-else-if="joinObj?.joinType === 'inner'"
                       :shouldFill="true"
-                      class="h-5 w-5 shrink-0 text-text-secondary"
+                      class="text-text-secondary h-5 w-5 shrink-0"
                     />
                     <RightJoinTypeSvg
                       v-else-if="joinObj?.joinType === 'right'"
                       :shouldFill="true"
-                      class="h-5 w-5 shrink-0 text-text-secondary"
+                      class="text-text-secondary h-5 w-5 shrink-0"
                     />
-                    <span class="leading-none text-text-body">{{ joinObj?.stream }}</span>
+                    <span class="text-text-body leading-none">{{ joinObj?.stream }}</span>
                   </div>
                 </OButton>
               </template>
-              <div
-                class="p-0"
-                :data-test="`dashboard-join-menu-${index}`"
-              >
+              <div class="p-0" :data-test="`dashboard-join-menu-${index}`">
                 <AddJoinPopUp
                   v-model="currentJoins[index]"
                   :joinIndex="index"
@@ -70,7 +63,7 @@
             <OButton
               variant="ghost"
               size="icon-chip"
-              class="!w-4 -ms-1"
+              class="-ms-1 !w-4"
               :data-test="`dashboard-join-item-${index}-remove`"
               @click="handleRemoveJoin(index)"
               :aria-label="t('panel.removeJoin')"
@@ -181,14 +174,9 @@ export default defineComponent({
   },
 
   setup() {
-    const dashboardPanelDataPageKey = inject<string>(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
+    const dashboardPanelDataPageKey = inject<string>("dashboardPanelDataPageKey", "dashboard");
 
-    const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
 
     const { t } = useI18n();
 
@@ -200,9 +188,7 @@ export default defineComponent({
       const currentQuery = getCurrentQuery();
       if (!currentQuery) return false;
 
-      return !(
-        currentQuery.customQuery && dashboardPanelData.data.queryType === "sql"
-      );
+      return !(currentQuery.customQuery && dashboardPanelData.data.queryType === "sql");
     });
 
     /**
@@ -227,11 +213,7 @@ export default defineComponent({
         const queries = dashboardPanelData?.data?.queries;
         const currentIndex = dashboardPanelData?.layout?.currentQueryIndex ?? 0;
 
-        if (
-          !Array.isArray(queries) ||
-          currentIndex < 0 ||
-          currentIndex >= queries.length
-        ) {
+        if (!Array.isArray(queries) || currentIndex < 0 || currentIndex >= queries.length) {
           return undefined;
         }
 
@@ -381,4 +363,3 @@ export default defineComponent({
   },
 });
 </script>
-

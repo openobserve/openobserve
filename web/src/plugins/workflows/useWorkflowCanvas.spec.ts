@@ -56,12 +56,8 @@ const triggerNode = () => ({
   data: { label: "t1", node_type: "workflow_trigger" },
 });
 
-const mockRun = workflowService.getWorkflowRun as unknown as ReturnType<
-  typeof vi.fn
->;
-const mockTest = workflowService.testWorkflow as unknown as ReturnType<
-  typeof vi.fn
->;
+const mockRun = workflowService.getWorkflowRun as unknown as ReturnType<typeof vi.fn>;
+const mockTest = workflowService.testWorkflow as unknown as ReturnType<typeof vi.fn>;
 
 describe("loadWorkflowRun — history run response mapping", () => {
   beforeEach(() => {
@@ -148,9 +144,7 @@ describe("loadWorkflowRun — history run response mapping", () => {
         },
       });
       await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "r1" });
-      expect((workflowObj.testRun.result as any).ghostNodeIds).toEqual([
-        "deleted-node",
-      ]);
+      expect((workflowObj.testRun.result as any).ghostNodeIds).toEqual(["deleted-node"]);
     });
 
     it("also flags a ghost referenced only by node_map (no error)", async () => {
@@ -161,9 +155,7 @@ describe("loadWorkflowRun — history run response mapping", () => {
         },
       });
       await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "r2" });
-      expect((workflowObj.testRun.result as any).ghostNodeIds).toEqual([
-        "old-node",
-      ]);
+      expect((workflowObj.testRun.result as any).ghostNodeIds).toEqual(["old-node"]);
     });
 
     it("is empty when the graph still matches the run", async () => {
@@ -185,9 +177,7 @@ describe("loadWorkflowRun — history run response mapping", () => {
         },
       });
       await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "r4" });
-      expect((workflowObj.testRun.result as any).ghostNodeIds).toEqual([
-        "zombie",
-      ]);
+      expect((workflowObj.testRun.result as any).ghostNodeIds).toEqual(["zombie"]);
     });
   });
 
@@ -312,7 +302,6 @@ describe("executeTestRun — ran-node scope + badge state", () => {
   });
 });
 
-
 describe("trigger-first guard — palette adds are blocked until a trigger exists", () => {
   const { addNodeToEnd, onDrop } = useWorkflowCanvas();
 
@@ -326,9 +315,7 @@ describe("trigger-first guard — palette adds are blocked until a trigger exist
 
   it("addNodeToEnd (palette click) is blocked with a toast when no trigger exists", () => {
     addNodeToEnd("condition");
-    expect(mockToast).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: "warning" }),
-    );
+    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
     expect(workflowObj.dialog.show).toBe(false);
     expect(workflowObj.currentSelectedNodeData).toBeNull();
   });
@@ -336,9 +323,7 @@ describe("trigger-first guard — palette adds are blocked until a trigger exist
   it("onDrop (palette drag) is blocked with a toast when no trigger exists", () => {
     workflowObj.draggedNodeType = "function";
     onDrop({ clientX: 10, clientY: 10 } as any);
-    expect(mockToast).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: "warning" }),
-    );
+    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
     expect(workflowObj.dialog.show).toBe(false);
     expect(workflowObj.currentSelectedNodeData).toBeNull();
   });

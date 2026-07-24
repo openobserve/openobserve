@@ -62,7 +62,6 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   })),
 }));
 
-
 describe("OverrideConfig", () => {
   let wrapper: any;
 
@@ -134,29 +133,19 @@ describe("OverrideConfig", () => {
       wrapper = createWrapper();
 
       // Info tooltip button was removed from this component in config redesign (PR #10917).
-      expect(
-        wrapper
-          .find('[data-test="dashboard-addpanel-config-drilldown-info"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-addpanel-config-drilldown-info"]').exists()).toBe(
+        false,
+      );
     });
 
     it("should render add field override button", () => {
       wrapper = createWrapper();
 
       expect(
-        wrapper
-          .find(
-            '[data-test="dashboard-addpanel-config-override-config-add-btn"]',
-          )
-          .exists(),
+        wrapper.find('[data-test="dashboard-addpanel-config-override-config-add-btn"]').exists(),
       ).toBe(true);
       expect(
-        wrapper
-          .find(
-            '[data-test="dashboard-addpanel-config-override-config-add-btn"]',
-          )
-          .text(),
+        wrapper.find('[data-test="dashboard-addpanel-config-override-config-add-btn"]').text(),
       ).toBe("Configure column formatting");
     });
 
@@ -294,9 +283,7 @@ describe("OverrideConfig", () => {
       popup.vm.$emit("save", newConfig);
       await wrapper.vm.$nextTick();
 
-      expect(mockDashboardPanelData.data.config.override_config).toEqual(
-        newConfig,
-      );
+      expect(mockDashboardPanelData.data.config.override_config).toEqual(newConfig);
       expect(wrapper.vm.showOverrideConfigPopup).toBe(false);
     });
   });
@@ -313,9 +300,7 @@ describe("OverrideConfig", () => {
       wrapper.vm.showOverrideConfigPopup = true;
       wrapper.vm.saveOverrideConfigConfig(newOverrideConfig);
 
-      expect(mockDashboardPanelData.data.config.override_config).toEqual(
-        newOverrideConfig,
-      );
+      expect(mockDashboardPanelData.data.config.override_config).toEqual(newOverrideConfig);
       expect(wrapper.vm.showOverrideConfigPopup).toBe(false);
     });
 
@@ -387,9 +372,7 @@ describe("OverrideConfig", () => {
         mockDataWithoutOverrideConfig.data.config.override_config = [];
       }
 
-      expect(mockDataWithoutOverrideConfig.data.config.override_config).toEqual(
-        [],
-      );
+      expect(mockDataWithoutOverrideConfig.data.config.override_config).toEqual([]);
     });
 
     it("should not override existing override_config array", () => {
@@ -398,9 +381,7 @@ describe("OverrideConfig", () => {
 
       wrapper = createWrapper();
 
-      expect(mockDashboardPanelData.data.config.override_config).toEqual(
-        existingConfig,
-      );
+      expect(mockDashboardPanelData.data.config.override_config).toEqual(existingConfig);
     });
   });
 
@@ -409,9 +390,7 @@ describe("OverrideConfig", () => {
       wrapper = createWrapper();
 
       expect(wrapper.vm.dashboardPanelData).toBeDefined();
-      expect(
-        wrapper.vm.dashboardPanelData.data.config.override_config,
-      ).toBeDefined();
+      expect(wrapper.vm.dashboardPanelData.data.config.override_config).toBeDefined();
     });
 
     it("should work with injected dashboard panel data key", () => {
@@ -454,11 +433,7 @@ describe("OverrideConfig", () => {
 
       expect(wrapper.exists()).toBe(true);
       expect(
-        wrapper
-          .find(
-            '[data-test="dashboard-addpanel-config-override-config-add-btn"]',
-          )
-          .exists(),
+        wrapper.find('[data-test="dashboard-addpanel-config-override-config-add-btn"]').exists(),
       ).toBe(true);
     });
 
@@ -477,9 +452,7 @@ describe("OverrideConfig", () => {
         mockDataWithNullOverrideConfig.data.config.override_config = [];
       }
 
-      expect(
-        mockDataWithNullOverrideConfig.data.config.override_config,
-      ).toEqual([]);
+      expect(mockDataWithNullOverrideConfig.data.config.override_config).toEqual([]);
     });
 
     it("should handle component unmounting gracefully", () => {
@@ -555,9 +528,7 @@ describe("OverrideConfig", () => {
 
       // Verify final state
       expect(wrapper.vm.showOverrideConfigPopup).toBe(false);
-      expect(mockDashboardPanelData.data.config.override_config).toEqual(
-        newConfig,
-      );
+      expect(mockDashboardPanelData.data.config.override_config).toEqual(newConfig);
     });
 
     it("should handle dynamic field changes", async () => {
@@ -601,8 +572,18 @@ describe("OverrideConfig", () => {
 
     it("should include fields from the 2nd query, not just queries[0]", () => {
       mockDashboardPanelData.data.queries = [
-        { fields: { x: [{ alias: "svc", label: "Service" }], y: [{ alias: "cnt", label: "Count" }] } },
-        { fields: { x: [{ alias: "region", label: "Region" }], y: [{ alias: "errs", label: "Errors" }] } },
+        {
+          fields: {
+            x: [{ alias: "svc", label: "Service" }],
+            y: [{ alias: "cnt", label: "Count" }],
+          },
+        },
+        {
+          fields: {
+            x: [{ alias: "region", label: "Region" }],
+            y: [{ alias: "errs", label: "Errors" }],
+          },
+        },
       ];
 
       wrapper = createWrapper();
@@ -640,8 +621,18 @@ describe("OverrideConfig", () => {
 
     it("should de-duplicate columns sharing the same alias across queries", () => {
       mockDashboardPanelData.data.queries = [
-        { fields: { x: [{ alias: "svc", label: "Service" }], y: [{ alias: "cnt", label: "Count" }] } },
-        { fields: { x: [{ alias: "svc", label: "Service (q2)" }], y: [{ alias: "other", label: "Other" }] } },
+        {
+          fields: {
+            x: [{ alias: "svc", label: "Service" }],
+            y: [{ alias: "cnt", label: "Count" }],
+          },
+        },
+        {
+          fields: {
+            x: [{ alias: "svc", label: "Service (q2)" }],
+            y: [{ alias: "other", label: "Other" }],
+          },
+        },
       ];
 
       wrapper = createWrapper();
@@ -675,7 +666,12 @@ describe("OverrideConfig", () => {
 
     it("should ignore a query with missing fields object", () => {
       mockDashboardPanelData.data.queries = [
-        { fields: { x: [{ alias: "svc", label: "Service" }], y: [{ alias: "cnt", label: "Count" }] } },
+        {
+          fields: {
+            x: [{ alias: "svc", label: "Service" }],
+            y: [{ alias: "cnt", label: "Count" }],
+          },
+        },
         {}, // malformed / empty query
       ];
 

@@ -60,9 +60,7 @@ export function applyStackedChart(ctx: SQLContext): void {
       }
     },
   };
-  const stackedXAxisRotation = hasTimestampField
-    ? 0
-    : options.xAxis[0].axisLabel?.rotate || 0;
+  const stackedXAxisRotation = hasTimestampField ? 0 : options.xAxis[0].axisLabel?.rotate || 0;
   const stackedXAxisWidth = hasTimestampField
     ? 120
     : panelSchema.config?.axis_label_truncate_width || 120;

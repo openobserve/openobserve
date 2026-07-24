@@ -5,20 +5,9 @@ import type {
   ToggleGroupSlots,
   ToggleGroupContext,
 } from "./OToggleGroup.types";
-import {
-  ToggleGroupAnimatedKey,
-  TOGGLE_GROUP_CONTEXT_KEY,
-} from "./OToggleGroup.types";
+import { ToggleGroupAnimatedKey, TOGGLE_GROUP_CONTEXT_KEY } from "./OToggleGroup.types";
 import { ToggleGroupRoot, type AcceptableValue } from "reka-ui";
-import {
-  computed,
-  provide,
-  ref,
-  watch,
-  nextTick,
-  onMounted,
-  onBeforeUnmount,
-} from "vue";
+import { computed, provide, ref, watch, nextTick, onMounted, onBeforeUnmount } from "vue";
 
 const props = withDefaults(defineProps<ToggleGroupProps>(), {
   type: "single",
@@ -35,13 +24,9 @@ const slots = defineSlots<ToggleGroupSlots>();
 
 // reka-ui's ToggleGroupRoot omits `boolean` from its model type; our public API
 // allows it (boolean-valued groups round-trip fine), so narrow at the boundary.
-const rekaModelValue = computed(
-  () => props.modelValue as AcceptableValue | AcceptableValue[],
-);
+const rekaModelValue = computed(() => props.modelValue as AcceptableValue | AcceptableValue[]);
 
-const hasLabel = computed(
-  () => Boolean(slots.label) || props.label !== undefined,
-);
+const hasLabel = computed(() => Boolean(slots.label) || props.label !== undefined);
 
 // Sliding-selection indicator ------------------------------------------------
 // On by default for every single-select group (one active item to track). A
@@ -178,11 +163,7 @@ function clearDrag(): void {
 }
 
 function itemElFromEvent(e: DragEvent): HTMLElement | null {
-  return (
-    (e.target as HTMLElement | null)?.closest<HTMLElement>(
-      "[data-otoggle-value]",
-    ) ?? null
-  );
+  return (e.target as HTMLElement | null)?.closest<HTMLElement>("[data-otoggle-value]") ?? null;
 }
 
 function onItemDragStart(e: DragEvent): void {
@@ -218,8 +199,7 @@ function onItemDragOver(e: DragEvent): void {
 function onItemDrop(e: DragEvent): void {
   if (!props.reorderable) return;
   e.preventDefault();
-  const from =
-    draggingValue.value ?? e.dataTransfer?.getData("text/plain") ?? null;
+  const from = draggingValue.value ?? e.dataTransfer?.getData("text/plain") ?? null;
   const to = dropTargetValue.value;
   if (from != null && to != null && from !== to) {
     emit("reorder", { from, to, before: dropBefore.value });
@@ -265,8 +245,10 @@ provide(TOGGLE_GROUP_CONTEXT_KEY, context);
   <div v-if="hasLabel" :class="wrapperClasses">
     <span
       :class="[
-        'o-input-label text-compact select-none leading-tight',
-        disabled ? 'font-normal text-input-label-text-disabled' : 'font-medium text-input-label-text',
+        'o-input-label text-compact leading-tight select-none',
+        disabled
+          ? 'text-input-label-text-disabled font-normal'
+          : 'text-input-label-text font-medium',
       ]"
     >
       <slot name="label">{{ label }}</slot>
@@ -314,7 +296,7 @@ provide(TOGGLE_GROUP_CONTEXT_KEY, context);
       'relative inline-flex items-stretch',
       orientation === 'vertical' ? 'flex-col' : 'flex-row',
       'bg-toggle-track-bg rounded-default p-0.5',
-      'border border-toggle-border',
+      'border-toggle-border border',
     ]"
     v-bind="dragListeners"
     @update:model-value="

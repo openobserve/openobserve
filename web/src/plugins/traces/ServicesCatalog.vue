@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     ref="catalogContainerRef"
-    class="services-catalog h-full! flex flex-col bg-card-glass-bg px-2.5 relative overflow-hidden"
+    class="services-catalog bg-card-glass-bg relative flex h-full! flex-col overflow-hidden px-2.5"
   >
     <!-- Toolbar: stream selector (width-matched to the rail below) + search
          (width-matched to the table below) + status pills. The stream selector
@@ -26,92 +26,92 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          the toolbar columns line up with the body columns. -->
     <div class="flex items-center py-2.5">
       <!-- Stream selector — same 230px width as the left rail below it. -->
-      <div
-        data-test="services-catalog-stream-selector"
-        class="flex-shrink-0 w-rail"
-      >
+      <div data-test="services-catalog-stream-selector" class="w-rail flex-shrink-0">
         <OSelect
           :model-value="streamFilter"
           :options="availableStreams.map((s) => ({ label: s, value: s }))"
           labelKey="label"
           valueKey="value"
-          class="w-full rounded-default"
+          class="rounded-default w-full"
           :disabled="availableStreams.length === 0"
           @update:model-value="onStreamFilterChange"
         />
-        <OTooltip v-if="availableStreams.length === 0" :content="t('traces.servicesCatalog.noStreamsDetected')" />
+        <OTooltip
+          v-if="availableStreams.length === 0"
+          :content="t('traces.servicesCatalog.noStreamsDetected')"
+        />
       </div>
 
       <!-- Search + pills group — occupies the table's column (everything right
            of the rail). A left pad adds breathing room after the stream
            selector while the column's outer edge still aligns to the table. -->
-      <div class="flex-1 min-w-0 flex items-center gap-2 pl-2">
-      <!-- Search input — grows to fill, aligning to the table below. -->
-      <div class="flex-1 min-w-0">
-        <OSearchInput
-          v-model="filterText"
-          :placeholder="t('traces.servicesCatalog.filterPlaceholder')"
-          clearable
-          :debounce="300"
-          class="w-full!"
-          data-test="services-catalog-filter-input"
-        />
-      </div>
+      <div class="flex min-w-0 flex-1 items-center gap-2 pl-2">
+        <!-- Search input — grows to fill, aligning to the table below. -->
+        <div class="min-w-0 flex-1">
+          <OSearchInput
+            v-model="filterText"
+            :placeholder="t('traces.servicesCatalog.filterPlaceholder')"
+            clearable
+            :debounce="300"
+            class="w-full!"
+            data-test="services-catalog-filter-input"
+          />
+        </div>
 
-      <!-- Health-status pills, kept grouped on the right (search flexes to fill
+        <!-- Health-status pills, kept grouped on the right (search flexes to fill
            the gap). Entity totals are shown per-tab in the type rail, so no
            separate total pill here. -->
-      <div
-        v-if="!isLoading && services.length > 0"
-        class="flex items-center gap-2 flex-shrink-0"
-        data-test="services-catalog-status-pills"
-      >
-        <template v-if="statusCounts.critical > 0">
-          <div
-            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-default text-xs font-medium bg-[color-mix(in_srgb,var(--color-service-health-critical)_12%,transparent)] text-service-health-critical"
-            data-test="services-catalog-pill-critical"
-          >
-            <span>{{ statusCounts.critical }}</span>
-            <span>{{ t("traces.servicesCatalog.status.critical") }}</span>
-            <OTooltip>
-              <template #content>
-                {{ t("traces.servicesCatalog.status.critical") }}: &gt; 10%
-                {{ t("traces.servicesCatalog.legend.title").toLowerCase() }}
-              </template>
-            </OTooltip>
-          </div>
-        </template>
-        <template v-if="statusCounts.warning > 0">
-          <div
-            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-default text-xs font-medium bg-[color-mix(in_srgb,var(--color-service-health-warning)_12%,transparent)] text-service-health-warning"
-            data-test="services-catalog-pill-warning"
-          >
-            <span>{{ statusCounts.warning }}</span>
-            <span>{{ t("traces.servicesCatalog.status.warning") }}</span>
-            <OTooltip>
-              <template #content>
-                {{ t("traces.servicesCatalog.status.warning") }}: 5 – 10%
-                {{ t("traces.servicesCatalog.legend.title").toLowerCase() }}
-              </template>
-            </OTooltip>
-          </div>
-        </template>
-        <template v-if="statusCounts.degraded > 0">
-          <div
-            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-default text-xs font-medium bg-[color-mix(in_srgb,var(--color-service-health-degraded)_12%,transparent)] text-service-health-degraded"
-            data-test="services-catalog-pill-degraded"
-          >
-            <span>{{ statusCounts.degraded }}</span>
-            <span>{{ t("traces.servicesCatalog.status.degraded") }}</span>
-            <OTooltip>
-              <template #content>
-                {{ t("traces.servicesCatalog.status.degraded") }}: 1 – 5%
-                {{ t("traces.servicesCatalog.legend.title").toLowerCase() }}
-              </template>
-            </OTooltip>
-          </div>
-        </template>
-      </div>
+        <div
+          v-if="!isLoading && services.length > 0"
+          class="flex flex-shrink-0 items-center gap-2"
+          data-test="services-catalog-status-pills"
+        >
+          <template v-if="statusCounts.critical > 0">
+            <div
+              class="rounded-default text-service-health-critical inline-flex items-center gap-1.5 bg-[color-mix(in_srgb,var(--color-service-health-critical)_12%,transparent)] px-2.5 py-1 text-xs font-medium"
+              data-test="services-catalog-pill-critical"
+            >
+              <span>{{ statusCounts.critical }}</span>
+              <span>{{ t("traces.servicesCatalog.status.critical") }}</span>
+              <OTooltip>
+                <template #content>
+                  {{ t("traces.servicesCatalog.status.critical") }}: &gt; 10%
+                  {{ t("traces.servicesCatalog.legend.title").toLowerCase() }}
+                </template>
+              </OTooltip>
+            </div>
+          </template>
+          <template v-if="statusCounts.warning > 0">
+            <div
+              class="rounded-default text-service-health-warning inline-flex items-center gap-1.5 bg-[color-mix(in_srgb,var(--color-service-health-warning)_12%,transparent)] px-2.5 py-1 text-xs font-medium"
+              data-test="services-catalog-pill-warning"
+            >
+              <span>{{ statusCounts.warning }}</span>
+              <span>{{ t("traces.servicesCatalog.status.warning") }}</span>
+              <OTooltip>
+                <template #content>
+                  {{ t("traces.servicesCatalog.status.warning") }}: 5 – 10%
+                  {{ t("traces.servicesCatalog.legend.title").toLowerCase() }}
+                </template>
+              </OTooltip>
+            </div>
+          </template>
+          <template v-if="statusCounts.degraded > 0">
+            <div
+              class="rounded-default text-service-health-degraded inline-flex items-center gap-1.5 bg-[color-mix(in_srgb,var(--color-service-health-degraded)_12%,transparent)] px-2.5 py-1 text-xs font-medium"
+              data-test="services-catalog-pill-degraded"
+            >
+              <span>{{ statusCounts.degraded }}</span>
+              <span>{{ t("traces.servicesCatalog.status.degraded") }}</span>
+              <OTooltip>
+                <template #content>
+                  {{ t("traces.servicesCatalog.status.degraded") }}: 1 – 5%
+                  {{ t("traces.servicesCatalog.legend.title").toLowerCase() }}
+                </template>
+              </OTooltip>
+            </div>
+          </template>
+        </div>
       </div>
       <!-- Status legend -->
       <!-- <div
@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            toggle, then refresh). Wrapped in a real element with ml-2 because
            OTableColumnToggle's root is a reka-ui DropdownMenuRoot that renders
            no DOM node, so a fallthrough class on it would be dropped. -->
-      <div class="flex items-center gap-2 shrink-0 ml-2">
+      <div class="ml-2 flex shrink-0 items-center gap-2">
         <OTableColumnToggle
           :columns="tableColumns"
           :column-visibility="columnVisibility"
@@ -209,23 +209,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Body: left rail (entity-type filter) + table — mirrors the Dashboards
          folder-rail + table layout (panel bg + vertical separator, 230px). -->
-    <div class="flex flex-1 min-h-0">
+    <div class="flex min-h-0 flex-1">
       <!-- Left rail: the entity-type filter. Panel background + right border
            match FolderList.vue so the rail reads like the app's other left
            rails. The stream selector lives in the top toolbar alongside the
            search. -->
       <div
-        class="w-rail shrink-0 h-full bg-surface-panel border-r border-border-default flex flex-col gap-2 py-2 px-1.5"
+        class="w-rail bg-surface-panel border-border-default flex h-full shrink-0 flex-col gap-2 border-r px-1.5 py-2"
       >
         <!-- Entity-type filter: All / Services / Datastores / Queues /
              External / RPC. A vertical nav rail — same OTabs pattern as the
              Dashboards folder list, so the active row shows the tint + primary
              text the app's other left rails use. Row = label left, total +
              unhealthy badge right. -->
-        <div
-          v-if="!isLoading && services.length > 0"
-          class="catalog-type-filter overflow-y-auto"
-        >
+        <div v-if="!isLoading && services.length > 0" class="catalog-type-filter overflow-y-auto">
           <OTabs
             orientation="vertical"
             dense
@@ -240,22 +237,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="min-h-7"
               :data-test="`services-catalog-type-${cat}`"
             >
-              <div
-                class="w-full flex items-center justify-between flex-nowrap gap-2"
-              >
-                <span class="flex-1 min-w-0 truncate text-left">{{
+              <div class="flex w-full flex-nowrap items-center justify-between gap-2">
+                <span class="min-w-0 flex-1 truncate text-left">{{
                   t(`traces.servicesCatalog.types.${cat}`)
                 }}</span>
-                <span class="flex items-center gap-1 shrink-0">
-                  <span class="text-text-tertiary tabular-nums">{{
-                    categoryCounts[cat]
-                  }}</span>
+                <span class="flex shrink-0 items-center gap-1">
+                  <span class="text-text-tertiary tabular-nums">{{ categoryCounts[cat] }}</span>
                   <!-- Unhealthy count in a filled circle, colored by the tab's
                        worst status. Reads as "N problems", distinct from the
                        plain total to its left. Hover explains it. -->
                   <span
                     v-if="categoryUnhealthyCounts[cat] > 0"
-                    class="inline-flex items-center justify-center min-w-[1.05rem] h-[1.05rem] px-1 rounded-full text-3xs font-semibold leading-none text-white"
+                    class="text-3xs inline-flex h-[1.05rem] min-w-[1.05rem] items-center justify-center rounded-full px-1 leading-none font-semibold text-white"
                     :style="{ backgroundColor: tabStatusColorVar(cat) }"
                     :data-test="`services-catalog-type-unhealthy-${cat}`"
                   >
@@ -264,9 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :content="
                         t('traces.servicesCatalog.unhealthyTooltip', {
                           count: categoryUnhealthyCounts[cat],
-                          status: t(
-                            `traces.servicesCatalog.status.${categoryWorstStatus[cat]}`,
-                          ),
+                          status: t(`traces.servicesCatalog.status.${categoryWorstStatus[cat]}`),
                         })
                       "
                     />
@@ -281,13 +272,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Empty state (shown when not loading and no data) -->
       <div
         v-if="!isLoading && services.length === 0"
-        class="flex flex-col items-center justify-center flex-1"
+        class="flex flex-1 flex-col items-center justify-center"
         data-test="services-catalog-empty"
       >
         <ServicesCatalogNoDataState
-          @jump-to-stream-data="
-            (from, to) => emit('jump-to-stream-data', from, to)
-          "
+          @jump-to-stream-data="(from, to) => emit('jump-to-stream-data', from, to)"
         />
       </div>
 
@@ -295,8 +284,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            header, rows, in-frame toolbar and footer (count + "Showing X–Y of N"
            + records-per-page + pager) all match. OTable owns pagination, so we
            feed it the full sorted list and it paginates internally. -->
-      <div v-else class="flex-1 min-w-0 h-full">
-        <div class="h-full bg-card-glass-bg">
+      <div v-else class="h-full min-w-0 flex-1">
+        <div class="bg-card-glass-bg h-full">
           <OTable
             ref="oTableRef"
             :data="sortedServices"
@@ -346,7 +335,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :value="row.error_rate"
                 :max="columnMaxes.error_rate"
                 :label="formatPercent(row.error_rate)"
-                :variant="row.error_rate > 10 ? 'danger' : row.error_rate > 5 ? 'warning' : 'default'"
+                :variant="
+                  row.error_rate > 10 ? 'danger' : row.error_rate > 5 ? 'warning' : 'default'
+                "
                 :data-test="`services-catalog-error-rate-${row.service_name}`"
               />
             </template>
@@ -466,13 +457,11 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import ServicesCatalogNoDataState from "./ServicesCatalogNoDataState.vue";
 
 const { t } = useI18n();
-const { columnVisibility, setColumnVisibility } =
-  useExternalColumnToggle("services-catalog");
+const { columnVisibility, setColumnVisibility } = useExternalColumnToggle("services-catalog");
 const catalogContainerRef = ref<HTMLElement | null>(null);
 const { searchObj } = useTraces();
 const { getStreams } = useStreams();
-const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
-  useHttpStreaming();
+const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
 
 const emit = defineEmits<{
   "view-traces": [data: string | Record<string, any>];
@@ -515,13 +504,7 @@ type EntityCategory = "service" | "datastore" | "queue" | "external" | "rpc";
 // The type-filter selector additionally offers "all" (every category mixed).
 // "all" is a filter value only — a row is never classified as "all".
 type TypeFilter = "all" | EntityCategory;
-const CATEGORY_ORDER: EntityCategory[] = [
-  "service",
-  "datastore",
-  "queue",
-  "external",
-  "rpc",
-];
+const CATEGORY_ORDER: EntityCategory[] = ["service", "datastore", "queue", "external", "rpc"];
 // Tab order in the type filter: All first, then each concrete category.
 const TYPE_FILTER_ORDER: TypeFilter[] = ["all", ...CATEGORY_ORDER];
 
@@ -534,10 +517,7 @@ const TYPE_FILTER_ORDER: TypeFilter[] = ["all", ...CATEGORY_ORDER];
  * with `EntityCategory` exactly.
  */
 function categoryOf(row: ServiceRow): EntityCategory {
-  return classifyEntity(
-    Boolean(row.is_real_service),
-    row.infer_service_type,
-  ) as EntityCategory;
+  return classifyEntity(Boolean(row.is_real_service), row.infer_service_type) as EntityCategory;
 }
 
 const isLoading = ref(false);
@@ -719,12 +699,9 @@ const tableColumns = computed<OTableColumnDef<ServiceRow>[]>(() => [
 // Health pill counts are scoped to the active type tab so they reflect the
 // currently filtered set (e.g. "1 Degraded" among Datastores), not all entities.
 const statusCounts = computed(() => ({
-  critical: typeFilteredServices.value.filter((s) => s.status === "critical")
-    .length,
-  warning: typeFilteredServices.value.filter((s) => s.status === "warning")
-    .length,
-  degraded: typeFilteredServices.value.filter((s) => s.status === "degraded")
-    .length,
+  critical: typeFilteredServices.value.filter((s) => s.status === "critical").length,
+  warning: typeFilteredServices.value.filter((s) => s.status === "warning").length,
+  degraded: typeFilteredServices.value.filter((s) => s.status === "degraded").length,
 }));
 
 function colMax(key: keyof ServiceRow): number {
@@ -774,16 +751,12 @@ const categoryCounts = computed<Record<TypeFilter, number>>(() => {
 // Show "all" + Services always (so the default tab never disappears), plus any
 // concrete category that has at least one entity.
 const visibleTypeFilters = computed(() =>
-  TYPE_FILTER_ORDER.filter(
-    (c) => c === "all" || c === "service" || categoryCounts.value[c] > 0,
-  ),
+  TYPE_FILTER_ORDER.filter((c) => c === "all" || c === "service" || categoryCounts.value[c] > 0),
 );
 
 /** Rows belonging to a type-filter tab ("all" spans everything). */
 function rowsForFilter(filter: TypeFilter): ServiceRow[] {
-  return filter === "all"
-    ? services.value
-    : services.value.filter((s) => categoryOf(s) === filter);
+  return filter === "all" ? services.value : services.value.filter((s) => categoryOf(s) === filter);
 }
 
 // Worst health status present in each tab's entities. Drives the tab's color
@@ -892,9 +865,7 @@ const sortedServices = computed(() => {
   });
 });
 
-function deriveStatus(
-  errorRate: number,
-): "healthy" | "degraded" | "warning" | "critical" {
+function deriveStatus(errorRate: number): "healthy" | "degraded" | "warning" | "critical" {
   if (errorRate > 10) return "critical";
   if (errorRate > 5) return "warning";
   if (errorRate > 1) return "degraded";
@@ -968,10 +939,7 @@ async function loadServicesCatalog() {
   const streamName = streamFilter.value?.replaceAll('"', "");
   if (!streamName) return;
 
-  if (
-    availableStreams.value.length &&
-    !availableStreams.value.includes(streamName)
-  ) {
+  if (availableStreams.value.length && !availableStreams.value.includes(streamName)) {
     return;
   }
 
@@ -991,16 +959,9 @@ async function loadServicesCatalog() {
   if (hasInferColumns.value === null) {
     try {
       const org = searchObj.organizationIdentifier;
-      const schemaResponse = await streamService.schema(
-        org,
-        streamName,
-        "traces",
-      );
-      const schemaFields =
-        schemaResponse.data?.schema || schemaResponse.data?.fields || [];
-      hasInferColumns.value = schemaFields.some(
-        (f: any) => f.name === "infer_service_name",
-      );
+      const schemaResponse = await streamService.schema(org, streamName, "traces");
+      const schemaFields = schemaResponse.data?.schema || schemaResponse.data?.fields || [];
+      hasInferColumns.value = schemaFields.some((f: any) => f.name === "infer_service_name");
     } catch {
       // If schema check fails, default to false (use service_name only)
       hasInferColumns.value = false;
@@ -1068,9 +1029,7 @@ ORDER BY total_requests DESC`;
           response.type === "search_response_metadata"
         ) {
           const hits: any[] = response.content?.results?.hits ?? [];
-          const serviceMap = new Map(
-            services.value.map((s) => [s.service_name, s]),
-          );
+          const serviceMap = new Map(services.value.map((s) => [s.service_name, s]));
           for (const hit of hits) {
             const name = hit.service_name ?? "";
             serviceMap.set(name, {

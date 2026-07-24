@@ -80,9 +80,7 @@ describe("WorkflowAlertTrigger", () => {
     it("renders the intro and a read-only JSON editor", () => {
       const w = createWrapper();
       expect(w.find('[data-test="workflow-trigger-body"]').exists()).toBe(true);
-      expect(w.find('[data-test="workflow-trigger-structure"]').exists()).toBe(
-        true,
-      );
+      expect(w.find('[data-test="workflow-trigger-structure"]').exists()).toBe(true);
       expect(editor(w).exists()).toBe(true);
       expect(editor(w).props("language")).toBe("json");
       // Reference only — it must never become editable.
@@ -90,9 +88,7 @@ describe("WorkflowAlertTrigger", () => {
     });
 
     it("gives the editor a definite height (Monaco collapses without one)", () => {
-      const box = createWrapper().find(
-        '[data-test="workflow-trigger-structure"]',
-      );
+      const box = createWrapper().find('[data-test="workflow-trigger-structure"]');
       expect(box.classes().some((c: string) => /^h-\d/.test(c))).toBe(true);
     });
   });

@@ -57,23 +57,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     form-id="add-folder-dashboards-form"
     @click:secondary="showAddFolderDialog = false"
   >
-    <AddFolder
-      ref="addFolderRef"
-      @update:modelValue="updateFolderList"
-      :edit-mode="false"
-    />
+    <AddFolder ref="addFolderRef" @update:modelValue="updateFolderList" :edit-mode="false" />
   </ODialog>
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  onActivated,
-  ref,
-  watch,
-  computed,
-  type PropType,
-} from "vue";
+import { defineComponent, onActivated, ref, watch, computed, type PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import AddFolder from "../../components/dashboards/AddFolder.vue";

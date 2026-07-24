@@ -35,8 +35,8 @@ const alignClasses: Record<NonNullable<ButtonGroupProps["align"]>, string> = {
       // seamless single pill).
       props.divided
         ? props.orientation === 'horizontal'
-          ? 'divide-x divide-button-group-divider'
-          : 'divide-y divide-button-group-divider'
+          ? 'divide-button-group-divider divide-x'
+          : 'divide-button-group-divider divide-y'
         : '',
       // First child: keep only the start-side radius (RTL-safe logical properties)
       props.orientation === 'horizontal'

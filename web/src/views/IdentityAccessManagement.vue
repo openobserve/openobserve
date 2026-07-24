@@ -19,13 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        the chosen section renders its own page (header + table) to the right. -->
   <OPageLayout bleed :sidebar-width="230" data-test="iam-page">
     <template #sidebar>
-      <SectionRail
-        :groups="sectionGroups"
-        :active-key="activeSection"
-        :title="t('menu.iam')"
-      />
+      <SectionRail :groups="sectionGroups" :active-key="activeSection" :title="t('menu.iam')" />
     </template>
-    <section class="h-full min-w-0 min-h-0 overflow-y-auto">
+    <section class="h-full min-h-0 min-w-0 overflow-y-auto">
       <RouterView />
     </section>
   </OPageLayout>
@@ -34,10 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import SectionRail from "@/components/common/SectionRail.vue";
-import {
-  type SectionHubGroup,
-  type SectionHubItem,
-} from "@/components/common/SectionHub.vue";
+import { type SectionHubGroup, type SectionHubItem } from "@/components/common/SectionHub.vue";
 import { computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -70,7 +63,6 @@ const routeToIamTab: Record<string, string> = {
   invitations: "invitations",
 };
 const activeSection = computed(() => routeToIamTab[route.name as string] ?? "");
-
 
 const sectionGroups = computed<SectionHubGroup[]>(() => {
   const isEnt = config.isEnterprise == "true" || config.isCloud == "true";
@@ -180,7 +172,6 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
   return groups;
 });
 
-
 // The rail is always shown, so the IAM root has no standalone landing — send it
 // to the first section (Users, always available). Also: non-meta users can't use
 // the quota section — bounce them to Users too.
@@ -190,13 +181,9 @@ watch(
     if (name === "iam") {
       // .catch: in unit tests the mounted router may not register child routes;
       // a rejected navigation must not surface as an unhandled error.
-      Promise.resolve(
-        router.replace({ name: "users", query: orgQuery.value }),
-      ).catch(() => {});
+      Promise.resolve(router.replace({ name: "users", query: orgQuery.value })).catch(() => {});
     } else if (name === "quota" && !isMetaOrg.value) {
-      Promise.resolve(
-        router.push({ name: "users", query: orgQuery.value }),
-      ).catch(() => {});
+      Promise.resolve(router.push({ name: "users", query: orgQuery.value })).catch(() => {});
     }
   },
   { immediate: true },

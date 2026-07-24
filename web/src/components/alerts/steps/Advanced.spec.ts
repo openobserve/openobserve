@@ -80,8 +80,7 @@ function mountDescendant(initialRows: any[] = []) {
   return mount(makeDescendantHost(initialRows), globalCfg);
 }
 
-const hostForm = (host: any) =>
-  (host.findComponent({ name: "OForm" }).vm as any).form;
+const hostForm = (host: any) => (host.findComponent({ name: "OForm" }).vm as any).form;
 
 describe("Advanced — descendant (binds into ancestor OForm) mode", () => {
   it("does NOT render its own <OForm> — fields bind into the parent", () => {
@@ -95,9 +94,7 @@ describe("Advanced — descendant (binds into ancestor OForm) mode", () => {
     const host = mountDescendant([{ id: "1", key: "", value: "" }]);
     const parentForm = hostForm(host);
 
-    await host
-      .find('[data-test="alert-variables-key-input"] input')
-      .setValue("env");
+    await host.find('[data-test="alert-variables-key-input"] input').setValue("env");
     await flushPromises();
 
     expect(parentForm.state.values.context_attributes[0].key).toBe("env");
@@ -107,16 +104,13 @@ describe("Advanced — descendant (binds into ancestor OForm) mode", () => {
     const host = mountDescendant();
     const parentForm = hostForm(host);
 
-    expect(host.find('[data-test="alert-variables-add-btn"]').exists()).toBe(
-      true,
-    );
+    expect(host.find('[data-test="alert-variables-add-btn"]').exists()).toBe(true);
     await host.find('[data-test="alert-variables-add-btn"]').trigger("click");
     await flushPromises();
 
     expect(parentForm.state.values.context_attributes.length).toBe(1);
     // descendant mode is form-owned → no emit
-    expect(host.findComponent(Advanced).emitted("update:contextAttributes"))
-      .toBeFalsy();
+    expect(host.findComponent(Advanced).emitted("update:contextAttributes")).toBeFalsy();
   });
 
   it("typing description / row template writes into the PARENT form", async () => {
@@ -129,9 +123,7 @@ describe("Advanced — descendant (binds into ancestor OForm) mode", () => {
     await flushPromises();
     expect(parentForm.state.values.description).toBe("a description");
 
-    await host
-      .find('[data-test="add-alert-row-input-textarea"] textarea')
-      .setValue("row tmpl");
+    await host.find('[data-test="add-alert-row-input-textarea"] textarea').setValue("row tmpl");
     await flushPromises();
     expect(parentForm.state.values.row_template).toBe("row tmpl");
   });
@@ -196,31 +188,26 @@ describe("Advanced — descendant (binds into ancestor OForm) mode", () => {
     const renderedKeys = () =>
       host
         .findAllComponents(OFormInput)
-        .filter((c: any) =>
-          /^context_attributes\[\d+\]\.key$/.test(c.props("name")),
-        )
+        .filter((c: any) => /^context_attributes\[\d+\]\.key$/.test(c.props("name")))
         .map((c: any) => c.findComponent(OInput).props("modelValue"));
     const renderedValues = () =>
       host
         .findAllComponents(OFormInput)
-        .filter((c: any) =>
-          /^context_attributes\[\d+\]\.value$/.test(c.props("name")),
-        )
+        .filter((c: any) => /^context_attributes\[\d+\]\.value$/.test(c.props("name")))
         .map((c: any) => c.findComponent(OInput).props("modelValue"));
 
     expect(renderedKeys()).toEqual(["env", "region", "tier"]);
 
     // delete the MIDDLE row (index 1 = "region")
-    await host
-      .findAll('[data-test="alert-variables-delete-variable-btn"]')[1]
-      .trigger("click");
+    await host.findAll('[data-test="alert-variables-delete-variable-btn"]')[1].trigger("click");
     await flushPromises();
     await nextTick();
 
     // form data is correct...
-    expect(
-      parentForm.state.values.context_attributes.map((r: any) => r.key),
-    ).toEqual(["env", "tier"]);
+    expect(parentForm.state.values.context_attributes.map((r: any) => r.key)).toEqual([
+      "env",
+      "tier",
+    ]);
     // ...AND the RENDERED inputs shifted correctly (would be ["env",""] with a
     // stable-id :key — the exact bug this test guards against).
     expect(renderedKeys()).toEqual(["env", "tier"]);

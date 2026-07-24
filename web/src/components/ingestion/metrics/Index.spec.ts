@@ -4,7 +4,6 @@ import IngestMetrics from "@/components/ingestion/metrics/Index.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 // Mock services
 vi.mock("@/services/segment_analytics", () => ({
   default: {
@@ -57,12 +56,11 @@ function buildMountOptions() {
         store,
       },
       stubs: {
-        "OSplitter": {
-          template:
-            '<div><slot name="before"></slot><slot name="after"></slot></div>',
+        OSplitter: {
+          template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
         },
-        "OTabs": true,
-        "ORouteTab": true,
+        OTabs: true,
+        ORouteTab: true,
         "router-view": true,
       },
     },
@@ -136,12 +134,11 @@ describe("IngestMetrics Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            "OSplitter": {
-              template:
-                '<div><slot name="before"></slot><slot name="after"></slot></div>',
+            OSplitter: {
+              template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            "OTabs": true,
-            "ORouteTab": true,
+            OTabs: true,
+            ORouteTab: true,
             "router-view": true,
           },
         },
@@ -314,14 +311,11 @@ describe("IngestMetrics Component", () => {
       const mockContent = { innerText: "prometheus config snippet" };
       wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith(
-        "prometheus config snippet",
-        {
-          successMessage: "Content Copied Successfully!",
-          errorMessage: "Error while copy content.",
-          timeout: 5000,
-        },
-      );
+      expect(copyToClipboard).toHaveBeenCalledWith("prometheus config snippet", {
+        successMessage: "Content Copied Successfully!",
+        errorMessage: "Error while copy content.",
+        timeout: 5000,
+      });
     });
 
     it("should pass correct success options when copying", async () => {
@@ -452,9 +446,7 @@ describe("IngestMetrics Component", () => {
 
     it("should expose store state.selectedOrganization", () => {
       expect(wrapper.vm.store.state.selectedOrganization).toBeDefined();
-      expect(
-        wrapper.vm.store.state.selectedOrganization.identifier,
-      ).toBeDefined();
+      expect(wrapper.vm.store.state.selectedOrganization.identifier).toBeDefined();
     });
   });
 

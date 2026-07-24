@@ -25,20 +25,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   renderers look identical side by side during the incremental migration.
 -->
 <template>
-  <div
-    class="bg-card-glass-bg rounded-default flex flex-col border border-border-default"
-  >
-    <div class="flex items-baseline justify-between mb-1 p-page-edge">
+  <div class="bg-card-glass-bg rounded-default border-border-default flex flex-col border">
+    <div class="p-page-edge mb-1 flex items-baseline justify-between">
       <div>
-        <div
-          class="text-sm font-semibold text-text-heading"
-        >
+        <div class="text-text-heading text-sm font-semibold">
           {{ displayTitle }}
         </div>
-        <div
-          v-if="displaySubtitle"
-          class="text-2xs leading-normal mt-[0.1rem]"
-        >
+        <div v-if="displaySubtitle" class="text-2xs mt-[0.1rem] leading-normal">
           {{ displaySubtitle }}
         </div>
       </div>
@@ -48,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          panel lines up with the legacy ones in the same grid row. The renderer
          needs an explicit full size to fill the box — without it the echarts
          canvas collapses to a sliver. -->
-    <div class="llm-schema-panel__body w-full h-55 relative">
+    <div class="llm-schema-panel__body relative h-55 w-full">
       <PanelSchemaRenderer
         v-if="chartData"
         class="llm-schema-panel__renderer h-full w-full"
@@ -70,11 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
-import {
-  type LLMPanelDef,
-  renderPanelSql,
-  panelI18nKey,
-} from "./config/llmInsightsPanels";
+import { type LLMPanelDef, renderPanelSql, panelI18nKey } from "./config/llmInsightsPanels";
 import { buildLLMPanelSchema } from "./llmPanelSchema";
 
 interface Props {
@@ -101,9 +90,7 @@ const { t } = useI18n();
 
 // Title/subtitle come from the en.json `aiObservability.panels.<id>` copy.
 const displayTitle = computed(() => t(`${panelI18nKey(props.panel.id)}.title`));
-const displaySubtitle = computed(() =>
-  t(`${panelI18nKey(props.panel.id)}.subtitle`),
-);
+const displaySubtitle = computed(() => t(`${panelI18nKey(props.panel.id)}.subtitle`));
 
 // Fully-rendered SQL: stream substituted, agent predicate spliced. We swap the
 // templated `histogram(_timestamp, '{{interval}}')` for the auto-bucketing

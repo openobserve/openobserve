@@ -17,10 +17,7 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { ref } from "vue";
 import useRumSpanBuilder from "@/composables/rum/useRumSpanBuilder";
 import searchService from "@/services/search";
-import {
-  SPAN_KIND_CLIENT,
-  SPAN_KIND_UNSPECIFIED,
-} from "@/utils/traces/constants";
+import { SPAN_KIND_CLIENT, SPAN_KIND_UNSPECIFIED } from "@/utils/traces/constants";
 
 // ---------------------------------------------------------------------------
 // Module mocks — hoisted before any import is executed
@@ -81,9 +78,7 @@ function makeSearchResponse(hits: any[] = []) {
  */
 function makeRumStream(hasTraceIdField = true) {
   return {
-    schema: hasTraceIdField
-      ? [{ name: "_oo_trace_id" }, { name: "type" }]
-      : [{ name: "type" }],
+    schema: hasTraceIdField ? [{ name: "_oo_trace_id" }, { name: "type" }] : [{ name: "type" }],
   };
 }
 
@@ -197,9 +192,7 @@ function makeStaticAssetEvent(overrides: Record<string, any> = {}) {
 // Composable factory — creates a fresh instance per test
 // ---------------------------------------------------------------------------
 
-function makeSearchObj(
-  serviceNames: { service_name: string; count: number }[] = [],
-) {
+function makeSearchObj(serviceNames: { service_name: string; count: number }[] = []) {
   return {
     data: {
       traceDetails: {
@@ -211,10 +204,7 @@ function makeSearchObj(
   };
 }
 
-function buildComposable(
-  logStreamNames: string[] = ["_rumdata"],
-  searchObjOverride?: any,
-) {
+function buildComposable(logStreamNames: string[] = ["_rumdata"], searchObjOverride?: any) {
   const logStreams = ref(logStreamNames);
   const searchObj = searchObjOverride ?? makeSearchObj();
   return useRumSpanBuilder(logStreams, searchObj);
@@ -244,11 +234,7 @@ describe("useRumSpanBuilder", () => {
     it("should return empty result when _rumdata is not in logStreams", async () => {
       const { fetchRumEventsForTrace } = buildComposable(["other-stream"]);
 
-      const result = await fetchRumEventsForTrace(
-        "trace-abc",
-        1_000_000,
-        2_000_000,
-      );
+      const result = await fetchRumEventsForTrace("trace-abc", 1_000_000, 2_000_000);
 
       expect(result.tracedResources).toEqual([]);
       expect(result.viewEvents).toEqual([]);
@@ -270,11 +256,7 @@ describe("useRumSpanBuilder", () => {
       mockGetStream.mockResolvedValue(makeRumStream(false));
       const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
 
-      const result = await fetchRumEventsForTrace(
-        "trace-abc",
-        1_000_000,
-        2_000_000,
-      );
+      const result = await fetchRumEventsForTrace("trace-abc", 1_000_000, 2_000_000);
 
       expect(result.tracedResources).toEqual([]);
       expect(searchService.search).not.toHaveBeenCalled();
@@ -284,27 +266,17 @@ describe("useRumSpanBuilder", () => {
       mockGetStream.mockResolvedValue(null);
       const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
 
-      const result = await fetchRumEventsForTrace(
-        "trace-abc",
-        1_000_000,
-        2_000_000,
-      );
+      const result = await fetchRumEventsForTrace("trace-abc", 1_000_000, 2_000_000);
 
       expect(result.tracedResources).toEqual([]);
     });
 
     it("should return empty result when no traced resources are found", async () => {
       // First search (traced resources by _oo_trace_id) returns empty
-      vi.mocked(searchService.search).mockResolvedValueOnce(
-        makeSearchResponse([]),
-      );
+      vi.mocked(searchService.search).mockResolvedValueOnce(makeSearchResponse([]));
 
       const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
-      const result = await fetchRumEventsForTrace(
-        "trace-abc",
-        1_000_000,
-        2_000_000,
-      );
+      const result = await fetchRumEventsForTrace("trace-abc", 1_000_000, 2_000_000);
 
       expect(result.tracedResources).toEqual([]);
       // Only the first search should fire — the subsequent 3 should not
@@ -349,8 +321,8 @@ describe("useRumSpanBuilder", () => {
       const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
       await fetchRumEventsForTrace("trace'with'quotes", 1_000_000, 2_000_000);
 
-      const sql: string = vi.mocked(searchService.search).mock.calls[0][0]
-        .query.query.sql as string;
+      const sql: string = vi.mocked(searchService.search).mock.calls[0][0].query.query
+        .sql as string;
       expect(sql).not.toContain("'with'");
       expect(sql).toContain("tracewithquotes");
     });
@@ -361,8 +333,8 @@ describe("useRumSpanBuilder", () => {
       const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
       await fetchRumEventsForTrace("trace\\injection", 1_000_000, 2_000_000);
 
-      const sql: string = vi.mocked(searchService.search).mock.calls[0][0]
-        .query.query.sql as string;
+      const sql: string = vi.mocked(searchService.search).mock.calls[0][0].query.query
+        .sql as string;
       expect(sql).not.toContain("\\");
     });
   });
@@ -386,11 +358,7 @@ describe("useRumSpanBuilder", () => {
         .mockResolvedValueOnce(makeSearchResponse([allEvent]));
 
       const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
-      const result = await fetchRumEventsForTrace(
-        "trace-abc",
-        1_000_000,
-        2_000_000,
-      );
+      const result = await fetchRumEventsForTrace("trace-abc", 1_000_000, 2_000_000);
 
       expect(result.tracedResources).toHaveLength(1);
       expect(result.tracedResources[0]._oo_trace_id).toBe("trace-abc");
@@ -440,11 +408,7 @@ describe("useRumSpanBuilder", () => {
         .mockResolvedValueOnce(makeSearchResponse([makeResourceEvent()]));
 
       const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
-      const result = await fetchRumEventsForTrace(
-        "trace-abc",
-        1_000_000,
-        2_000_000,
-      );
+      const result = await fetchRumEventsForTrace("trace-abc", 1_000_000, 2_000_000);
 
       // 4 calls: tracedRes + viewEvents + actionEvents (empty array) + allViewEvents
       expect(searchService.search).toHaveBeenCalledTimes(4);
@@ -460,30 +424,18 @@ describe("useRumSpanBuilder", () => {
         .mockResolvedValueOnce(makeSearchResponse([]));
 
       const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
-      const result = await fetchRumEventsForTrace(
-        "trace-abc",
-        1_000_000,
-        2_000_000,
-      );
+      const result = await fetchRumEventsForTrace("trace-abc", 1_000_000, 2_000_000);
 
       // Should not throw; actionEvents defaults to []
       expect(result.actionEvents).toEqual([]);
     });
 
     it("should return empty result and not throw when search rejects", async () => {
-      vi.mocked(searchService.search).mockRejectedValueOnce(
-        new Error("Network error"),
-      );
-      const consoleSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
+      vi.mocked(searchService.search).mockRejectedValueOnce(new Error("Network error"));
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
-      const result = await fetchRumEventsForTrace(
-        "trace-abc",
-        1_000_000,
-        2_000_000,
-      );
+      const result = await fetchRumEventsForTrace("trace-abc", 1_000_000, 2_000_000);
 
       expect(result.tracedResources).toEqual([]);
       expect(consoleSpy).toHaveBeenCalled();
@@ -496,8 +448,8 @@ describe("useRumSpanBuilder", () => {
       const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
       await fetchRumEventsForTrace("trace-abc", 1_000_000, 2_000_000);
 
-      const sql: string = vi.mocked(searchService.search).mock.calls[0][0]
-        .query.query.sql as string;
+      const sql: string = vi.mocked(searchService.search).mock.calls[0][0].query.query
+        .sql as string;
       expect(sql).toContain("ORDER BY _timestamp");
     });
   });
@@ -520,12 +472,7 @@ describe("useRumSpanBuilder", () => {
       const traced = makeTracedResource();
       const { formatRumEventsAsSpans } = buildComposable();
 
-      const spans = formatRumEventsAsSpans(
-        [traced],
-        [view],
-        [],
-        [makeResourceEvent()],
-      );
+      const spans = formatRumEventsAsSpans([traced], [view], [], [makeResourceEvent()]);
 
       const viewSpan = spans.find((s) => s.span_id === "rum_view_view-1");
       expect(viewSpan).toBeDefined();
@@ -542,12 +489,7 @@ describe("useRumSpanBuilder", () => {
       const traced = makeTracedResource();
       const { formatRumEventsAsSpans } = buildComposable();
 
-      const spans = formatRumEventsAsSpans(
-        [traced],
-        [view1, view2],
-        [],
-        [makeResourceEvent()],
-      );
+      const spans = formatRumEventsAsSpans([traced], [view1, view2], [], [makeResourceEvent()]);
 
       const viewSpans = spans.filter((s) => s.rum_event_type === "view");
       expect(viewSpans).toHaveLength(1);
@@ -558,12 +500,7 @@ describe("useRumSpanBuilder", () => {
       const traced = makeTracedResource();
       const { formatRumEventsAsSpans } = buildComposable();
 
-      const spans = formatRumEventsAsSpans(
-        [traced],
-        [view],
-        [],
-        [makeResourceEvent()],
-      );
+      const spans = formatRumEventsAsSpans([traced], [view], [], [makeResourceEvent()]);
 
       const viewSpan = spans.find((s) => s.rum_event_type === "view");
       expect(viewSpan!.operation_name).toBe("View: HomePage");
@@ -574,12 +511,7 @@ describe("useRumSpanBuilder", () => {
       const traced = makeTracedResource();
       const { formatRumEventsAsSpans } = buildComposable();
 
-      const spans = formatRumEventsAsSpans(
-        [traced],
-        [view],
-        [],
-        [makeResourceEvent()],
-      );
+      const spans = formatRumEventsAsSpans([traced], [view], [], [makeResourceEvent()]);
 
       const viewSpan = spans.find((s) => s.rum_event_type === "view");
       expect(viewSpan!.operation_name).toBe("View: Unknown Page");
@@ -590,12 +522,7 @@ describe("useRumSpanBuilder", () => {
       const traced = makeTracedResource({ _oo_trace_id: "trace-xyz" });
       const { formatRumEventsAsSpans } = buildComposable();
 
-      const spans = formatRumEventsAsSpans(
-        [traced],
-        [view],
-        [],
-        [makeResourceEvent()],
-      );
+      const spans = formatRumEventsAsSpans([traced], [view], [], [makeResourceEvent()]);
 
       const viewSpan = spans.find((s) => s.rum_event_type === "view");
       expect(viewSpan!.trace_id).toBe("trace-xyz");
@@ -606,12 +533,7 @@ describe("useRumSpanBuilder", () => {
       const traced = makeTracedResource();
       const { formatRumEventsAsSpans } = buildComposable();
 
-      const spans = formatRumEventsAsSpans(
-        [traced],
-        [view],
-        [],
-        [makeResourceEvent()],
-      );
+      const spans = formatRumEventsAsSpans([traced], [view], [], [makeResourceEvent()]);
 
       const viewSpan = spans.find((s) => s.rum_event_type === "view");
       // duration = view_time_spent / 1000 = 4000
@@ -633,12 +555,7 @@ describe("useRumSpanBuilder", () => {
       const action = makeActionEvent({ date: 1_000_000 }); // within ±10 s of traced.date
       const { formatRumEventsAsSpans } = buildComposable();
 
-      const spans = formatRumEventsAsSpans(
-        [traced],
-        [view],
-        [action],
-        [makeResourceEvent()],
-      );
+      const spans = formatRumEventsAsSpans([traced], [view], [action], [makeResourceEvent()]);
 
       const actionSpan = spans.find((s) => s.span_id === "rum_action_action-1");
       expect(actionSpan).toBeDefined();
@@ -658,12 +575,7 @@ describe("useRumSpanBuilder", () => {
       });
       const { formatRumEventsAsSpans } = buildComposable();
 
-      const spans = formatRumEventsAsSpans(
-        [traced],
-        [view],
-        [farAction],
-        [makeResourceEvent()],
-      );
+      const spans = formatRumEventsAsSpans([traced], [view], [farAction], [makeResourceEvent()]);
 
       const collapsed = spans.find((s) => s._is_collapsed_group === true);
       expect(collapsed).toBeDefined();
@@ -684,17 +596,10 @@ describe("useRumSpanBuilder", () => {
       });
       const { formatRumEventsAsSpans } = buildComposable();
 
-      const spans = formatRumEventsAsSpans(
-        [traced],
-        [view],
-        [farAction],
-        [makeResourceEvent()],
-      );
+      const spans = formatRumEventsAsSpans([traced], [view], [farAction], [makeResourceEvent()]);
 
       // The parent action must appear as an individual span, not collapsed
-      const actionSpan = spans.find(
-        (s) => s.span_id === "rum_action_action-far",
-      );
+      const actionSpan = spans.find((s) => s.span_id === "rum_action_action-far");
       expect(actionSpan).toBeDefined();
       const collapsedSpan = spans.find((s) => s._is_collapsed_group === true);
       expect(collapsedSpan).toBeUndefined();
@@ -705,12 +610,7 @@ describe("useRumSpanBuilder", () => {
       const view = makeViewEvent();
       const { formatRumEventsAsSpans } = buildComposable();
 
-      const spans = formatRumEventsAsSpans(
-        [traced],
-        [view],
-        [],
-        [makeResourceEvent()],
-      );
+      const spans = formatRumEventsAsSpans([traced], [view], [], [makeResourceEvent()]);
 
       const actionSpans = spans.filter((s) => s.rum_event_type === "action");
       expect(actionSpans).toHaveLength(0);
@@ -732,9 +632,7 @@ describe("useRumSpanBuilder", () => {
       const resSpan = spans.find((s) => s.rum_event_type === "resource");
       expect(resSpan).toBeDefined();
       expect(resSpan!.span_kind).toBe(SPAN_KIND_CLIENT);
-      expect(resSpan!.operation_name).toBe(
-        "POST https://api.example.com/items",
-      );
+      expect(resSpan!.operation_name).toBe("POST https://api.example.com/items");
     });
 
     it("should use _oo_span_id as span_id when resource has a trace bridge", () => {
@@ -819,12 +717,7 @@ describe("useRumSpanBuilder", () => {
       });
       const { formatRumEventsAsSpans } = buildComposable();
 
-      const spans = formatRumEventsAsSpans(
-        [traced],
-        [makeViewEvent()],
-        [action],
-        [resource],
-      );
+      const spans = formatRumEventsAsSpans([traced], [makeViewEvent()], [action], [resource]);
 
       const resSpan = spans.find((s) => s.rum_event_type === "resource");
       expect(resSpan!.reference_parent_span_id).toBe("rum_action_action-1");
@@ -841,12 +734,7 @@ describe("useRumSpanBuilder", () => {
 
       // actionEvents contains action-999, not action-ghost
       const action = makeActionEvent({ action_id: "action-999" });
-      const spans = formatRumEventsAsSpans(
-        [traced],
-        [makeViewEvent()],
-        [action],
-        [resource],
-      );
+      const spans = formatRumEventsAsSpans([traced], [makeViewEvent()], [action], [resource]);
 
       const resSpan = spans.find((s) => s.rum_event_type === "resource");
       expect(resSpan!.reference_parent_span_id).toBe("rum_view_view-1");
@@ -868,9 +756,7 @@ describe("useRumSpanBuilder", () => {
       const errSpan = spans.find((s) => s.rum_event_type === "error");
       expect(errSpan).toBeDefined();
       expect(errSpan!.span_status).toBe("ERROR");
-      expect(errSpan!.operation_name).toBe(
-        "Error: TypeError: Cannot read property",
-      );
+      expect(errSpan!.operation_name).toBe("Error: TypeError: Cannot read property");
     });
 
     it("should fall back to error_type in operation_name when error_message is absent", () => {
@@ -920,12 +806,7 @@ describe("useRumSpanBuilder", () => {
       const traced = makeTracedResource();
       const { formatRumEventsAsSpans } = buildComposable();
 
-      const spans = formatRumEventsAsSpans(
-        [traced],
-        [],
-        [],
-        [makeResourceEvent()],
-      );
+      const spans = formatRumEventsAsSpans([traced], [], [], [makeResourceEvent()]);
 
       const errSpans = spans.filter((s) => s.rum_event_type === "error");
       expect(errSpans).toHaveLength(0);
@@ -1032,12 +913,7 @@ describe("useRumSpanBuilder", () => {
       const traced = makeTracedResource();
       const { formatRumEventsAsSpans } = buildComposable();
 
-      const spans = formatRumEventsAsSpans(
-        [traced],
-        [],
-        [],
-        [makeResourceEvent()],
-      );
+      const spans = formatRumEventsAsSpans([traced], [], [], [makeResourceEvent()]);
 
       const taskSpans = spans.filter((s) => s.rum_event_type === "long_task");
       expect(taskSpans).toHaveLength(0);
@@ -1060,12 +936,7 @@ describe("useRumSpanBuilder", () => {
       const apiCall = makeResourceEvent({ resource_type: "fetch" });
       const { formatRumEventsAsSpans } = buildComposable();
 
-      const spans = formatRumEventsAsSpans(
-        [traced],
-        [],
-        [],
-        [jsAsset, cssAsset, apiCall],
-      );
+      const spans = formatRumEventsAsSpans([traced], [], [], [jsAsset, cssAsset, apiCall]);
 
       // API call generates one resource span parented to view
       const apiSpans = spans.filter(
@@ -1096,9 +967,7 @@ describe("useRumSpanBuilder", () => {
         (s) => s.rum_event_type === "action" && s.span_id.startsWith("rum_"),
       );
       // Only legitimate action spans via buildActionSpans carry rum_action_ prefix
-      const actionSpan = spans.find(
-        (s) => s.span_id === "rum_action_action-1",
-      );
+      const actionSpan = spans.find((s) => s.span_id === "rum_action_action-1");
       expect(actionSpan).toBeDefined();
       expect(spuriousActionSpans).toHaveLength(1); // that IS the legitimate one
     });
@@ -1116,12 +985,7 @@ describe("useRumSpanBuilder", () => {
       const resource = makeResourceEvent({ date: 1_100_000, resource_type: "fetch" });
       const { formatRumEventsAsSpans } = buildComposable();
 
-      const spans = formatRumEventsAsSpans(
-        [traced],
-        [view],
-        [action],
-        [resource],
-      );
+      const spans = formatRumEventsAsSpans([traced], [view], [action], [resource]);
 
       for (let i = 1; i < spans.length; i++) {
         expect(spans[i]["_timestamp"] >= spans[i - 1]["_timestamp"]).toBe(true);
@@ -1158,9 +1022,7 @@ describe("useRumSpanBuilder", () => {
 
       formatRumEventsAsSpans([traced], [view], [], [makeResourceEvent()]);
 
-      const matching = serviceNames.filter(
-        (s) => s.service_name === "my-service",
-      );
+      const matching = serviceNames.filter((s) => s.service_name === "my-service");
       expect(matching).toHaveLength(1);
     });
 
@@ -1268,12 +1130,7 @@ describe("useRumSpanBuilder", () => {
 
       // actionEvents contains a different action — so plain-action-id won't match
       const action = makeActionEvent({ action_id: "other-action" });
-      const spans = formatRumEventsAsSpans(
-        [traced],
-        [],
-        [action],
-        [event],
-      );
+      const spans = formatRumEventsAsSpans([traced], [], [action], [event]);
 
       const resSpan = spans.find((s) => s.rum_event_type === "resource");
       expect(resSpan!.reference_parent_span_id).toBe("rum_view_view-1");

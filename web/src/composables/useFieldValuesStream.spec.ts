@@ -81,8 +81,7 @@ describe("useFieldValuesStream", () => {
     });
 
     it("fetchFieldValues, cancelFieldStream, resetFieldValues are functions", () => {
-      const { fetchFieldValues, cancelFieldStream, resetFieldValues } =
-        useFieldValuesStream();
+      const { fetchFieldValues, cancelFieldStream, resetFieldValues } = useFieldValuesStream();
       expect(typeof fetchFieldValues).toBe("function");
       expect(typeof cancelFieldStream).toBe("function");
       expect(typeof resetFieldValues).toBe("function");
@@ -164,7 +163,7 @@ describe("useFieldValuesStream", () => {
         expect.objectContaining({
           trace_id: "test-trace-123",
           org_id: "test-org",
-        })
+        }),
       );
     });
 
@@ -209,7 +208,7 @@ describe("useFieldValuesStream", () => {
           error: expect.any(Function),
           complete: expect.any(Function),
           reset: expect.any(Function),
-        })
+        }),
       );
     });
 
@@ -232,7 +231,7 @@ describe("useFieldValuesStream", () => {
       // If a traceId was registered, cancelFieldStream will call cancel
       cancelFieldStream("datacenter");
       expect(mockCancelStreamQuery).toHaveBeenCalledWith(
-        expect.objectContaining({ trace_id: "test-trace-123" })
+        expect.objectContaining({ trace_id: "test-trace-123" }),
       );
     });
   });

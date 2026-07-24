@@ -24,16 +24,16 @@ const makeStore = () => ({
 
 const makeVariablesData = (values: any[] = []) => ref({ values });
 
-const makePanelSchema = (queries: any[] = [{ query: "" }]) =>
-  ref({ queryType: "sql", queries });
+const makePanelSchema = (queries: any[] = [{ query: "" }]) => ref({ queryType: "sql", queries });
 
-const makeChartPanelRef = (offsetWidth = 1000) =>
-  ref({ offsetWidth });
+const makeChartPanelRef = (offsetWidth = 1000) => ref({ offsetWidth });
 
-const makeComposable = (overrides: {
-  variablesValues?: any[];
-  schemaQueries?: any[];
-} = {}) => {
+const makeComposable = (
+  overrides: {
+    variablesValues?: any[];
+    schemaQueries?: any[];
+  } = {},
+) => {
   const variablesData = makeVariablesData(overrides.variablesValues ?? []);
   const panelSchema = makePanelSchema(overrides.schemaQueries ?? [{ query: "" }]);
   const chartPanelRef = makeChartPanelRef();
@@ -126,9 +126,7 @@ describe("areDynamicVariablesStillLoading", () => {
 
   it("returns true when a dynamic_filters variable is loading", () => {
     const inst = makeComposable({
-      variablesValues: [
-        { type: "dynamic_filters", isLoading: true, value: [] },
-      ],
+      variablesValues: [{ type: "dynamic_filters", isLoading: true, value: [] }],
     });
     expect(inst.areDynamicVariablesStillLoading()).toBe(true);
   });
@@ -181,18 +179,14 @@ describe("areDependentVariablesStillLoadingWith", () => {
 describe("isAllRegularVariablesValuesSameWith", () => {
   it("returns true when scalar variable has same value as snapshot", () => {
     const inst = makeComposable();
-    inst.updateCurrentDependentVariablesData([
-      { name: "env", value: "prod", multiSelect: false },
-    ]);
+    inst.updateCurrentDependentVariablesData([{ name: "env", value: "prod", multiSelect: false }]);
     const newData = [{ name: "env", value: "prod", multiSelect: false }];
     expect(inst.isAllRegularVariablesValuesSameWith(newData)).toBe(true);
   });
 
   it("returns false when scalar variable value changes", () => {
     const inst = makeComposable();
-    inst.updateCurrentDependentVariablesData([
-      { name: "env", value: "prod", multiSelect: false },
-    ]);
+    inst.updateCurrentDependentVariablesData([{ name: "env", value: "prod", multiSelect: false }]);
     const newData = [{ name: "env", value: "staging", multiSelect: false }];
     expect(inst.isAllRegularVariablesValuesSameWith(newData)).toBe(false);
   });
@@ -208,9 +202,7 @@ describe("isAllRegularVariablesValuesSameWith", () => {
 
   it("returns false when multiSelect variable values differ", () => {
     const inst = makeComposable();
-    inst.updateCurrentDependentVariablesData([
-      { name: "env", value: ["prod"], multiSelect: true },
-    ]);
+    inst.updateCurrentDependentVariablesData([{ name: "env", value: ["prod"], multiSelect: true }]);
     const newData = [{ name: "env", value: ["prod", "dev"], multiSelect: true }];
     expect(inst.isAllRegularVariablesValuesSameWith(newData)).toBe(false);
   });
@@ -221,27 +213,21 @@ describe("isAllRegularVariablesValuesSameWith", () => {
 describe("isAllDynamicVariablesValuesSameWith", () => {
   it("returns true when dynamic variables are unchanged", () => {
     const inst = makeComposable();
-    inst.updateCurrentDynamicVariablesData([
-      { name: "k", value: "v", operator: "=" },
-    ]);
+    inst.updateCurrentDynamicVariablesData([{ name: "k", value: "v", operator: "=" }]);
     const newData = [{ name: "k", value: "v", operator: "=" }];
     expect(inst.isAllDynamicVariablesValuesSameWith(newData)).toBe(true);
   });
 
   it("returns false when dynamic variable value changes", () => {
     const inst = makeComposable();
-    inst.updateCurrentDynamicVariablesData([
-      { name: "k", value: "v1", operator: "=" },
-    ]);
+    inst.updateCurrentDynamicVariablesData([{ name: "k", value: "v1", operator: "=" }]);
     const newData = [{ name: "k", value: "v2", operator: "=" }];
     expect(inst.isAllDynamicVariablesValuesSameWith(newData)).toBe(false);
   });
 
   it("returns false when operator changes", () => {
     const inst = makeComposable();
-    inst.updateCurrentDynamicVariablesData([
-      { name: "k", value: "v", operator: "=" },
-    ]);
+    inst.updateCurrentDynamicVariablesData([{ name: "k", value: "v", operator: "=" }]);
     const newData = [{ name: "k", value: "v", operator: "!=" }];
     expect(inst.isAllDynamicVariablesValuesSameWith(newData)).toBe(false);
   });
@@ -313,24 +299,14 @@ describe("replaceQueryValue", () => {
 
   it("replaces a scalar variable in the query", () => {
     const inst = makeInstWithVar("env", "prod");
-    const { query } = inst.replaceQueryValue(
-      "SELECT * WHERE env=$env",
-      0,
-      300_000_000,
-      "sql",
-    );
+    const { query } = inst.replaceQueryValue("SELECT * WHERE env=$env", 0, 300_000_000, "sql");
     expect(query).toContain("prod");
     expect(query).not.toContain("$env");
   });
 
   it("replaces a multi-select variable using sql mode (comma-separated quoted values)", () => {
     const inst = makeInstWithVar("env", ["prod", "staging"], true);
-    const { query } = inst.replaceQueryValue(
-      "SELECT * WHERE env IN ($env)",
-      0,
-      300_000_000,
-      "sql",
-    );
+    const { query } = inst.replaceQueryValue("SELECT * WHERE env IN ($env)", 0, 300_000_000, "sql");
     expect(query).toContain("'prod'");
     expect(query).toContain("'staging'");
   });
@@ -356,12 +332,7 @@ describe("replaceQueryValue", () => {
       store: makeStore(),
       log,
     });
-    const { query } = inst.replaceQueryValue(
-      "SELECT * WHERE env=$env",
-      0,
-      300_000_000,
-      "sql",
-    );
+    const { query } = inst.replaceQueryValue("SELECT * WHERE env=$env", 0, 300_000_000, "sql");
     expect(query).toContain("_o2_all_");
   });
 
@@ -388,9 +359,7 @@ describe("ifPanelVariablesCompletedLoading", () => {
 
   it("returns false when a dynamic variable is still loading", () => {
     const inst = makeComposable({
-      variablesValues: [
-        { type: "dynamic_filters", isLoading: true, value: [] },
-      ],
+      variablesValues: [{ type: "dynamic_filters", isLoading: true, value: [] }],
     });
     expect(inst.ifPanelVariablesCompletedLoading()).toBe(false);
   });
@@ -423,9 +392,7 @@ describe("ifPanelVariablesCompletedLoading", () => {
 describe("variablesDataUpdated", () => {
   it("returns false when dynamic variables are still loading", () => {
     const inst = makeComposable({
-      variablesValues: [
-        { type: "dynamic_filters", isLoading: true, value: [] },
-      ],
+      variablesValues: [{ type: "dynamic_filters", isLoading: true, value: [] }],
     });
     expect(inst.variablesDataUpdated()).toBe(false);
   });
@@ -465,10 +432,7 @@ describe("variablesDataUpdated", () => {
 describe("applyDynamicVariables", () => {
   it("returns unchanged query when no dynamic_filters variables exist", async () => {
     const inst = makeComposable({ variablesValues: [] });
-    const { query } = await inst.applyDynamicVariables(
-      "SELECT * FROM logs",
-      "sql",
-    );
+    const { query } = await inst.applyDynamicVariables("SELECT * FROM logs", "sql");
     expect(query).toBe("SELECT * FROM logs");
   });
 
@@ -483,10 +447,7 @@ describe("applyDynamicVariables", () => {
         },
       ],
     });
-    const { query } = await inst.applyDynamicVariables(
-      "rate(metric[5m])",
-      "promql",
-    );
+    const { query } = await inst.applyDynamicVariables("rate(metric[5m])", "promql");
     // addLabelToPromQlQuery mock appends {env="prod"}
     expect(query).toContain("env");
   });
@@ -505,10 +466,7 @@ describe("applyDynamicVariables", () => {
         },
       ],
     });
-    const { metadata } = await inst.applyDynamicVariables(
-      "rate(metric[5m])",
-      "promql",
-    );
+    const { metadata } = await inst.applyDynamicVariables("rate(metric[5m])", "promql");
     expect(metadata).toHaveLength(2);
     expect(metadata.map((m: any) => m.name)).toContain("env");
     expect(metadata.map((m: any) => m.name)).toContain("region");

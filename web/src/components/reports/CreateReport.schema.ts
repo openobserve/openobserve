@@ -85,9 +85,7 @@ export const makeCreateReportSchema = (
       imagePreview: z.boolean().optional().default(false),
 
       // ── Dashboard field-array (one fixed, form-owned row) ────────────────
-      dashboards: z
-        .array(makeReportDashboardRowSchema(REQUIRED_MESSAGE))
-        .min(1, REQUIRED_MESSAGE),
+      dashboards: z.array(makeReportDashboardRowSchema(REQUIRED_MESSAGE)).min(1, REQUIRED_MESSAGE),
 
       // ── Frequency (OFormToggleGroup type + form-owned cron/custom inputs) ──
       frequencyType: z.string().optional().default("once"),
@@ -127,10 +125,7 @@ export const makeCreateReportSchema = (
         if (timerange.type === "relative" && !timerange.period) {
           addIssue(["dashboards", 0, "timerange"], REQUIRED_MESSAGE);
         }
-        if (
-          timerange.type === "absolute" &&
-          !(timerange.to && timerange.from)
-        ) {
+        if (timerange.type === "absolute" && !(timerange.to && timerange.from)) {
           addIssue(["dashboards", 0, "timerange"], REQUIRED_MESSAGE);
         }
       }
@@ -153,11 +148,8 @@ export const makeCreateReportSchema = (
             // 6-field check.
             if (cronStr.split(" ").length !== 6) {
               addIssue(["cron"], t("reports.validation.cronSixFields"));
-            } else if (
-              !isAboveMinRefreshInterval(intervalInSecs, zoConfig ?? {})
-            ) {
-              const minInterval =
-                Number(zoConfig?.min_auto_refresh_interval) || 1;
+            } else if (!isAboveMinRefreshInterval(intervalInSecs, zoConfig ?? {})) {
+              const minInterval = Number(zoConfig?.min_auto_refresh_interval) || 1;
               addIssue(
                 ["cron"],
                 t("reports.validation.cronMinInterval", {
@@ -183,10 +175,7 @@ export const makeCreateReportSchema = (
       // Both modes surface a required timezone select (cron runs the schedule in
       // that timezone). "Schedule Now" hides the field and auto-fills the browser
       // timezone at save, so it is not enforced here.
-      if (
-        val.selectedTimeTab === "scheduleLater" ||
-        val.frequencyType === "cron"
-      ) {
+      if (val.selectedTimeTab === "scheduleLater" || val.frequencyType === "cron") {
         if (!String(val.timezone ?? "").trim()) {
           addIssue(["timezone"], REQUIRED_MESSAGE);
         }
@@ -196,10 +185,7 @@ export const makeCreateReportSchema = (
       // Only the non-cron "Schedule Later" tab surfaces these inputs; cron /
       // "Schedule Now" set them programmatically at save. An empty value fails
       // the regex, so this ALSO makes both fields required on that tab.
-      if (
-        val.selectedTimeTab === "scheduleLater" &&
-        val.frequencyType !== "cron"
-      ) {
+      if (val.selectedTimeTab === "scheduleLater" && val.frequencyType !== "cron") {
         if (!reportDateRegex.test(String(val.date ?? ""))) {
           addIssue(["date"], t("reports.validation.dateFormat"));
         }

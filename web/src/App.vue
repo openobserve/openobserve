@@ -55,7 +55,7 @@ export default {
       () => store.state.theme,
       () => {
         initializeThemeColors();
-      }
+      },
     );
 
     /**
@@ -72,7 +72,7 @@ export default {
 
     return {
       store,
-    }
+    };
   },
 };
 </script>

@@ -96,12 +96,8 @@ const props = defineProps({
 });
 
 defineEmits(["delete:node"]);
-const {
-  pipelineObj,
-  deletePipelineNode,
-  checkIfDefaultDestinationNode,
-  openStepPicker,
-} = useDragAndDrop();
+const { pipelineObj, deletePipelineNode, checkIfDefaultDestinationNode, openStepPicker } =
+  useDragAndDrop();
 const showButtons = ref(false);
 let hideButtonsTimeout: number | null = null;
 
@@ -111,12 +107,10 @@ const getLastError = (): {
   node_errors?: Record<string, NodeErrorInfo>;
 } | null => {
   const pipeline: unknown = pipelineObj.currentSelectedPipeline;
-  if (!pipeline || typeof pipeline !== "object" || !("last_error" in pipeline))
-    return null;
+  if (!pipeline || typeof pipeline !== "object" || !("last_error" in pipeline)) return null;
   const lastError: unknown = pipeline.last_error;
   if (!lastError || typeof lastError !== "object") return null;
-  const nodeErrors =
-    "node_errors" in lastError ? lastError.node_errors : undefined;
+  const nodeErrors = "node_errors" in lastError ? lastError.node_errors : undefined;
   return { node_errors: nodeErrors as Record<string, NodeErrorInfo> };
 };
 
@@ -133,8 +127,7 @@ const hasNodeError = computed(() => {
 // Get error info for current node
 const getNodeErrorInfo = computed(() => {
   const lastError = getLastError();
-  if (!lastError || !lastError.node_errors || props.id === undefined)
-    return null;
+  if (!lastError || !lastError.node_errors || props.id === undefined) return null;
 
   const nodeError = lastError.node_errors[props.id];
   if (!nodeError) return null;
@@ -146,9 +139,7 @@ const getNodeErrorInfo = computed(() => {
   // and the backend read path is untyped passthrough, so neither is converted
   // server-side. formatNodeErrorText owns that reconciliation; a bare join()
   // here rendered the tuple shape as "msg,[object Object]".
-  return formatNodeErrorText(nodeError, (count) =>
-    t("pipeline.moreErrors", { count }),
-  );
+  return formatNodeErrorText(nodeError, (count) => t("pipeline.moreErrors", { count }));
 });
 
 // Edge color mapping for different node types.
@@ -171,11 +162,7 @@ const getNodeColor = (ioType: string | undefined) => {
 };
 
 // Function to update edge colors on node hover
-const updateEdgeColors = (
-  nodeId: string | undefined,
-  color: string | null,
-  reset = false,
-) => {
+const updateEdgeColors = (nodeId: string | undefined, color: string | null, reset = false) => {
   if (pipelineObj.currentSelectedPipeline?.edges) {
     pipelineObj.currentSelectedPipeline.edges.forEach((edge: PipelineEdge) => {
       if (edge.source === nodeId) {
@@ -208,10 +195,7 @@ const updateEdgeColors = (
 };
 
 // Node hover handlers
-const handleNodeHover = (
-  nodeId: string | undefined,
-  ioType: string | undefined,
-) => {
+const handleNodeHover = (nodeId: string | undefined, ioType: string | undefined) => {
   const color = getNodeColor(ioType);
   updateEdgeColors(nodeId, color, false);
 
@@ -338,8 +322,7 @@ const openCancelDialog = (id: string) => {
     props.data.node_type === "stream" &&
     checkIfDefaultDestinationNode(id)
   ) {
-    confirmDialogMeta.value.warningMessage =
-      defaultDestinationNodeWarningMessage;
+    confirmDialogMeta.value.warningMessage = defaultDestinationNodeWarningMessage;
   } else {
     confirmDialogMeta.value.warningMessage = "";
   }
@@ -376,8 +359,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
   // narrow through unknown to its runtime element shape.
   const nodeTypes = pipelineObj.nodeTypes as unknown as NodeType[];
   const node = nodeTypes.find(
-    (node: NodeType) =>
-      node.subtype === searchTerm && node.io_type === ioType,
+    (node: NodeType) => node.subtype === searchTerm && node.io_type === ioType,
   );
   return node ? node.icon : undefined;
 }
@@ -404,7 +386,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
       <template #body>
         <div
           v-if="data.node_type == 'function'"
-          class="flex text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
+          class="flex w-auto text-left text-sm! leading-[1.4]! font-bold! text-wrap text-ellipsis"
           align="left"
         >
           {{ data.name }} -
@@ -414,13 +396,13 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
         <template v-else-if="data.node_type == 'stream'">
           <div
             v-if="data.stream_name && data.stream_name.hasOwnProperty('label')"
-            class="flex text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
+            class="flex w-auto text-left text-sm! leading-[1.4]! font-bold! text-wrap text-ellipsis"
           >
             {{ data.stream_type }} - {{ streamNameLabel }}
           </div>
           <div
             v-else
-            class="flex text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
+            class="flex w-auto text-left text-sm! leading-[1.4]! font-bold! text-wrap text-ellipsis"
           >
             {{ data.stream_type }} - {{ data.stream_name }}
           </div>
@@ -428,25 +410,24 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
 
         <div
           v-else-if="data.node_type == 'query'"
-          class="flex text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
+          class="flex w-auto text-left text-sm! leading-[1.4]! font-bold! text-wrap text-ellipsis"
         >
           {{ data.stream_type }} - {{ data.stream_name }}
         </div>
 
         <div
           v-else-if="data.node_type == 'remote_stream'"
-          class="flex text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
+          class="flex w-auto text-left text-sm! leading-[1.4]! font-bold! text-wrap text-ellipsis"
         >
           {{ data.destination_name }}
         </div>
 
         <div
           v-else-if="data.node_type == 'condition'"
-          class="text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
+          class="w-auto text-left text-sm! leading-[1.4]! font-bold! text-wrap text-ellipsis"
         >
           {{ getTruncatedConditions(data.condition || data.conditions) }}
         </div>
-
       </template>
 
       <!-- Error badge (function nodes) + delete button, shared across types -->
@@ -454,14 +435,14 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
         <div
           v-if="data.node_type == 'function' && hasNodeError"
           data-test="pipeline-node-error-badge"
-          class="absolute -top-3 -right-3 w-5 h-5 bg-status-negative border-2 border-white rounded-full flex items-center justify-center cursor-pointer z-15 shadow-[0_0.125rem_0.375rem_color-mix(in_srgb,var(--color-status-negative)_50%,transparent)] transition-all duration-200 error-badge"
+          class="bg-status-negative error-badge absolute -top-3 -right-3 z-15 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border-2 border-white shadow-[0_0.125rem_0.375rem_color-mix(in_srgb,var(--color-status-negative)_50%,transparent)] transition-all duration-200"
           @click.stop="navigateToFunction(data.name)"
         >
           <OIcon name="error" size="sm" />
           <span
             data-test="pipeline-node-error-count"
             v-if="nodeErrorCount"
-            class="absolute -top-1.5 -right-1.5 bg-status-negative text-white text-3xs font-bold min-w-3.5 h-3.5 rounded-full flex items-center justify-center px-0.75 border-[0.09375rem] border-solid border-white shadow-[0_0.0625rem_0.1875rem_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
+            class="bg-status-negative text-3xs absolute -top-1.5 -right-1.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full border-[0.09375rem] border-solid border-white px-0.75 font-bold text-white shadow-[0_0.0625rem_0.1875rem_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
           >
             {{ nodeErrorCount }}
           </span>
@@ -476,7 +457,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
 
         <div
           v-show="showButtons"
-          class="absolute -top-7.5 right-0 flex gap-1.5 transition-all duration-300 z-10 pt-1.25 px-1.25 pb-2.5 node-action-buttons"
+          class="node-action-buttons absolute -top-7.5 right-0 z-10 flex gap-1.5 px-1.25 pt-1.25 pb-2.5 transition-all duration-300"
           :data-test="`pipeline-node-${io_type}-actions`"
           :style="{ '--node-color': getNodeColor(io_type) }"
           @mouseenter="handleActionButtonsEnter"
@@ -486,7 +467,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
             variant="ghost"
             size="icon"
             @click.stop="deleteNode(id)"
-            class="min-w-5! w-5! h-5! p-0! rounded-default! bg-surface-overlay/95! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! node-action-btn delete-btn"
+            class="rounded-default! bg-surface-overlay/95! node-action-btn delete-btn h-5! w-5! min-w-5! border! border-(--node-color)! p-0! text-(--node-color)! transition-all! duration-200!"
             :data-test="`pipeline-node-${io_type}-delete-btn`"
           >
             <OIcon name="delete" size="sm" />
@@ -503,11 +484,10 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
           </OButton>
         </div>
       </template>
-
     </FlowNodeCard>
   </div>
 
-  <confirm-dialog
+  <ConfirmDialog
     :title="confirmDialogMeta.title"
     :message="confirmDialogMeta.message"
     @update:ok="confirmDialogMeta.onConfirm()"

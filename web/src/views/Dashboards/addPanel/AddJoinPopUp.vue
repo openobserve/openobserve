@@ -14,18 +14,17 @@
 -->
 
 <template>
-  <div data-test="dashboard-join-pop-up" class="w-156 flex flex-col max-h-[54vh] overflow-hidden">
+  <div data-test="dashboard-join-pop-up" class="flex max-h-[54vh] w-156 flex-col overflow-hidden">
     <div class="flex min-h-0 flex-1 flex-col p-3">
       <div class="mb-2 flex items-start justify-between gap-4">
         <div class="flex min-w-0 flex-1 flex-col gap-1">
-          <div class="flex items-center gap-2 text-badge-teal-ol-text">
+          <div class="text-badge-teal-ol-text flex items-center gap-2">
             <LeftJoinSvg class="h-4" />
-            <span class="text-compact font-semibold">{{ t('dashboard.addJoinPopUp.join') }}</span>
+            <span class="text-compact font-semibold">{{ t("dashboard.addJoinPopUp.join") }}</span>
           </div>
-          <label
-            class="text-2xs font-semibold uppercase tracking-wider text-text-secondary"
-            >{{ t('dashboard.addJoinPopUp.joiningStream') }}</label
-          >
+          <label class="text-2xs text-text-secondary font-semibold tracking-wider uppercase">{{
+            t("dashboard.addJoinPopUp.joiningStream")
+          }}</label>
           <OSelect
             :model-value="mainStream"
             :options="[]"
@@ -37,33 +36,27 @@
         <div class="flex shrink-0 flex-col items-center gap-1">
           <label
             for="joinType"
-            class="text-2xs font-semibold uppercase tracking-wider text-text-secondary"
-            >{{ t('dashboard.addJoinPopUp.joinType') }}</label
+            class="text-2xs text-text-secondary font-semibold tracking-wider uppercase"
+            >{{ t("dashboard.addJoinPopUp.joinType") }}</label
           >
           <div class="flex items-center justify-center gap-1.5">
             <button
               v-for="option in joinTypeOptions"
               :key="option.type"
               type="button"
-              class="flex cursor-pointer flex-col items-center gap-0.5 rounded-default border px-2.5 py-1.5 transition-colors"
+              class="rounded-default flex cursor-pointer flex-col items-center gap-0.5 border px-2.5 py-1.5 transition-colors"
               :class="
                 localJoinType === option.type
                   ? 'border-badge-teal-ol-border bg-badge-teal-soft-bg text-badge-teal-ol-text'
-                  : 'border-transparent text-text-secondary hover:bg-surface-subtle'
+                  : 'text-text-secondary hover:bg-surface-subtle border-transparent'
               "
               :aria-pressed="localJoinType === option.type"
               :aria-label="option.ariaLabel"
               :data-test="`dashboard-join-type-${option.type}`"
               @click="handleJoinTypeChange(option.type)"
             >
-              <component
-                :is="option.icon"
-                :shouldFill="localJoinType === option.type"
-              />
-              <div
-                class="text-xs"
-                :class="localJoinType === option.type ? 'font-semibold' : ''"
-              >
+              <component :is="option.icon" :shouldFill="localJoinType === option.type" />
+              <div class="text-xs" :class="localJoinType === option.type ? 'font-semibold' : ''">
                 {{ option.label }}
               </div>
             </button>
@@ -71,14 +64,13 @@
         </div>
 
         <div class="flex min-w-0 flex-1 flex-col gap-1">
-          <div class="flex items-center gap-2 text-badge-teal-ol-text">
+          <div class="text-badge-teal-ol-text flex items-center gap-2">
             <RightJoinSvg class="h-4" />
-            <span class="text-compact font-semibold">{{ t('dashboard.addJoinPopUp.on') }}</span>
+            <span class="text-compact font-semibold">{{ t("dashboard.addJoinPopUp.on") }}</span>
           </div>
-          <label
-            class="text-2xs font-semibold uppercase tracking-wider text-text-secondary"
-            >{{ t('dashboard.addJoinPopUp.onStream') }}</label
-          >
+          <label class="text-2xs text-text-secondary font-semibold tracking-wider uppercase">{{
+            t("dashboard.addJoinPopUp.onStream")
+          }}</label>
           <OSelect
             v-model="modelValueModel.stream"
             :options="streamOptions"
@@ -89,45 +81,44 @@
       </div>
 
       <div class="flex items-center gap-4">
-        <div class="border-t border-border-default flex-1"></div>
-        <div
-          class="py-2 text-center text-xs text-text-secondary"
-          v-if="showJoinSummary"
-        >
-          {{ t('dashboard.addJoinPopUp.performing') }}
+        <div class="border-border-default flex-1 border-t"></div>
+        <div class="text-text-secondary py-2 text-center text-xs" v-if="showJoinSummary">
+          {{ t("dashboard.addJoinPopUp.performing") }}
           <span
-            class="inline-flex items-center rounded-default bg-badge-teal-soft-bg px-1.5 py-0.5 text-xs font-semibold text-badge-teal-ol-text"
-          >{{ joinTypeLabel }} {{ t('dashboard.addJoinPopUp.join') }}</span> {{ t('dashboard.addJoinPopUp.between') }}
-          <span class="font-semibold text-text-body">{{ mainStream }}</span> {{ t('dashboard.addJoinPopUp.and') }}
-          <span class="font-semibold text-text-body">{{ modelValue.stream }}</span>
+            class="rounded-default bg-badge-teal-soft-bg text-badge-teal-ol-text inline-flex items-center px-1.5 py-0.5 text-xs font-semibold"
+            >{{ joinTypeLabel }} {{ t("dashboard.addJoinPopUp.join") }}</span
+          >
+          {{ t("dashboard.addJoinPopUp.between") }}
+          <span class="text-text-body font-semibold">{{ mainStream }}</span>
+          {{ t("dashboard.addJoinPopUp.and") }}
+          <span class="text-text-body font-semibold">{{ modelValue.stream }}</span>
         </div>
-        <div class="border-t border-border-default flex-1"></div>
+        <div class="border-border-default flex-1 border-t"></div>
       </div>
 
       <div class="flex min-h-0 flex-1 flex-col">
         <div class="mb-2.5 shrink-0">
-          <h3 class="text-sm not-italic font-semibold leading-normal m-0">{{ t('dashboard.addJoinPopUp.joiningClause') }}</h3>
-          <p class="text-xs not-italic font-normal leading-normal mt-1 mb-0 mx-0 text-text-secondary">
-            {{ t('dashboard.addJoinPopUp.selectFieldsDescription') }}
+          <h3 class="m-0 text-sm leading-normal font-semibold not-italic">
+            {{ t("dashboard.addJoinPopUp.joiningClause") }}
+          </h3>
+          <p
+            class="text-text-secondary mx-0 mt-1 mb-0 text-xs leading-normal font-normal not-italic"
+          >
+            {{ t("dashboard.addJoinPopUp.selectFieldsDescription") }}
           </p>
         </div>
 
-        <div
-          class="flex-1 min-h-0 overflow-y-auto"
-          data-test="dashboard-join-clause-list"
-        >
+        <div class="min-h-0 flex-1 overflow-y-auto" data-test="dashboard-join-clause-list">
           <div
             v-for="(arg, argIndex) in modelValue.conditions"
             :key="argIndex + JSON.stringify(arg)"
-            class="mb-2 rounded-default border border-border-default bg-surface-panel p-2.5"
+            class="rounded-default border-border-default bg-surface-panel mb-2 border p-2.5"
           >
-            <div
-              class="mb-1.5 text-2xs font-semibold uppercase tracking-wider text-text-secondary"
-            >
-              {{ t('dashboard.addJoinPopUp.clause', { number: argIndex + 1 }) }}
+            <div class="text-2xs text-text-secondary mb-1.5 font-semibold tracking-wider uppercase">
+              {{ t("dashboard.addJoinPopUp.clause", { number: argIndex + 1 }) }}
             </div>
             <div class="flex items-center gap-2">
-              <div class="flex-1 min-w-0">
+              <div class="min-w-0 flex-1">
                 <StreamFieldSelect
                   :streams="getStreamsBasedJoinIndex()"
                   v-model="modelValueModel.conditions[argIndex].leftField"
@@ -143,7 +134,7 @@
                 />
               </div>
 
-              <div class="flex-1 min-w-0">
+              <div class="min-w-0 flex-1">
                 <StreamFieldSelect
                   :streams="rightFieldStreams"
                   v-model="modelValueModel.conditions[argIndex].rightField"
@@ -175,7 +166,7 @@
           data-test="dashboard-join-add-clause"
           @click="handleAddCondition(modelValue.conditions.length - 1)"
         >
-          {{ t('dashboard.addJoinPopUp.addClause') }}
+          {{ t("dashboard.addJoinPopUp.addClause") }}
         </OButton>
       </div>
     </div>
@@ -186,16 +177,7 @@
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import {
-  defineComponent,
-  watch,
-  onMounted,
-  inject,
-  ref,
-  computed,
-  markRaw,
-  PropType,
-} from "vue";
+import { defineComponent, watch, onMounted, inject, ref, computed, markRaw, PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useLoading } from "@/composables/useLoading";
@@ -311,14 +293,9 @@ export default defineComponent({
     const store = useStore();
     const { getStreams } = useStreams();
 
-    const dashboardPanelDataPageKey = inject<string>(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
+    const dashboardPanelDataPageKey = inject<string>("dashboardPanelDataPageKey", "dashboard");
 
-    const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
 
     // Same reference as props.modelValue; mutation targets its nested fields only.
     const modelValueModel = computed(() => props.modelValue);
@@ -347,9 +324,7 @@ export default defineComponent({
      */
     const joinTypeLabel = computed(() => {
       const joinType = props.modelValue.joinType;
-      return joinType
-        ? joinType.charAt(0).toUpperCase() + joinType.slice(1)
-        : "";
+      return joinType ? joinType.charAt(0).toUpperCase() + joinType.slice(1) : "";
     });
 
     /**
@@ -374,9 +349,8 @@ export default defineComponent({
      */
     const currentStreamType = computed(() => {
       try {
-        return dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.stream_type;
+        return dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields
+          ?.stream_type;
       } catch (error) {
         console.error("Error getting current stream type:", error);
         return undefined;
@@ -433,9 +407,7 @@ export default defineComponent({
     function getStreamsBasedJoinIndex(): StreamReference[] {
       try {
         const currentQuery =
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ];
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
 
         if (!currentQuery) return [];
 
@@ -463,10 +435,7 @@ export default defineComponent({
      */
     async function fetchStreamList(streamType: string): Promise<void> {
       try {
-        const response = (await getStreams(
-          streamType,
-          false,
-        )) as GetStreamsResponse;
+        const response = (await getStreams(streamType, false)) as GetStreamsResponse;
 
         streamOptions.value = response.list.map(
           (stream: StreamListEntry): StreamOption => ({

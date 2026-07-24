@@ -32,12 +32,8 @@ const addCipherKeySchema = makeAddCipherKeySchema((k: string) => i18n.global.t(k
 // name) to the PARENT OForm; all rules live in AddCipherKey.schema.ts. Mount it
 // inside a REAL OForm (store.type === "akeyless") to exercise the wiring.
 
-const akeylessDefaults = (
-  mutate: (v: AddCipherKeyForm) => void = () => {},
-): AddCipherKeyForm => {
-  const v = JSON.parse(
-    JSON.stringify(addCipherKeyDefaults()),
-  ) as AddCipherKeyForm;
+const akeylessDefaults = (mutate: (v: AddCipherKeyForm) => void = () => {}): AddCipherKeyForm => {
+  const v = JSON.parse(JSON.stringify(addCipherKeyDefaults())) as AddCipherKeyForm;
   v.name = "valid-key";
   v.key.store.type = "akeyless";
   v.key.store.akeyless.base_url = "https://api.akeyless.io";
@@ -76,8 +72,7 @@ describe("AddAkeylessType.vue", () => {
   let wrapper: any;
 
   const form = () => wrapper.findComponent({ name: "OForm" }).vm.form;
-  const has = (testId: string) =>
-    wrapper.find(`[data-test="${testId}"]`).exists();
+  const has = (testId: string) => wrapper.find(`[data-test="${testId}"]`).exists();
 
   afterEach(() => {
     if (wrapper) wrapper.unmount();
@@ -148,8 +143,7 @@ describe("AddAkeylessType.vue", () => {
       await form().handleSubmit();
       expect(form().state.isValid).toBe(false);
       expect(
-        (form().getFieldMeta("key.store.akeyless.base_url")?.errors ?? [])
-          .length,
+        (form().getFieldMeta("key.store.akeyless.base_url")?.errors ?? []).length,
       ).toBeGreaterThan(0);
     });
 

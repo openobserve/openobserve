@@ -14,7 +14,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <ODialog data-test="add-role-dialog"
+  <ODialog
+    data-test="add-role-dialog"
     :open="open"
     size="sm"
     :title="t('iam.addRole')"
@@ -110,10 +111,12 @@ const addRoleSchema = makeAddRoleSchema(t);
 // remounts fresh on open, so this typed computed re-seeds `:default-values` each
 // open (the optional `role` prop prefills the name; startFrom resets to "custom").
 // No local model / watch.
-const addRoleDefaults = computed((): AddRoleForm => ({
-  name: props.role?.name ?? "",
-  startFrom: "custom",
-}));
+const addRoleDefaults = computed(
+  (): AddRoleForm => ({
+    name: props.role?.name ?? "",
+    startFrom: "custom",
+  }),
+);
 
 // Plain async @submit handler — the validated `value` is the source of truth.
 // The schema validates the trimmed name; trim again here so the saved value

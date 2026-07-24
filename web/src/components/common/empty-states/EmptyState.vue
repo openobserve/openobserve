@@ -24,7 +24,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Slots: illustration | title | description | actions | extra
 -->
 <template>
-  <div class="relative w-full h-full overflow-hidden [--empty-dot:var(--color-grey-300)] dark:[--empty-dot:var(--color-grey-800)]">
+  <div
+    class="relative h-full w-full overflow-hidden [--empty-dot:var(--color-grey-300)] dark:[--empty-dot:var(--color-grey-800)]"
+  >
     <!--
       Decorative backdrop — subtle dot texture only (no color gradient).
       The dot colour comes from `--empty-dot` (set theme-aware on the parent).
@@ -34,26 +36,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     -->
     <div
       aria-hidden="true"
-      class="absolute inset-0 pointer-events-none bg-[radial-gradient(var(--empty-dot)_1.25px,transparent_1.25px)] bg-size-[1.875rem_1.875rem] [-webkit-mask-image:radial-gradient(ellipse_60%_62%_at_50%_44%,var(--color-black)_0%,transparent_70%)] mask-[radial-gradient(ellipse_60%_62%_at_50%_44%,var(--color-black)_0%,transparent_70%)]"
+      class="pointer-events-none absolute inset-0 bg-[radial-gradient(var(--empty-dot)_1.25px,transparent_1.25px)] mask-[radial-gradient(ellipse_60%_62%_at_50%_44%,var(--color-black)_0%,transparent_70%)] bg-size-[1.875rem_1.875rem] [-webkit-mask-image:radial-gradient(ellipse_60%_62%_at_50%_44%,var(--color-black)_0%,transparent_70%)]"
     />
 
     <!-- content -->
     <div
-      class="relative w-full h-full flex flex-col items-center justify-center gap-7 px-6 py-12 text-center"
+      class="relative flex h-full w-full flex-col items-center justify-center gap-7 px-6 py-12 text-center"
     >
       <div v-if="$slots.illustration" class="shrink-0">
         <slot name="illustration" />
       </div>
 
-      <div class="flex flex-col gap-2.5 max-w-xl">
-        <h2
-          class="text-2xl! font-semibold! text-text-heading tracking-[-0.01em]"
-        >
+      <div class="flex max-w-xl flex-col gap-2.5">
+        <h2 class="text-text-heading text-2xl! font-semibold! tracking-[-0.01em]">
           <slot name="title">{{ title }}</slot>
         </h2>
         <p
           v-if="description || $slots.description"
-          class="text-base text-text-secondary leading-relaxed"
+          class="text-text-secondary text-base leading-relaxed"
         >
           <slot name="description">{{ description }}</slot>
         </p>
@@ -62,32 +62,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Actions presented as a distinct, labelled section so the empty state
            reads as multiple structured elements (hero + "quick start" group)
            rather than one sparse centered block. -->
-      <div
-        v-if="$slots.actions"
-        class="w-full max-w-3xl flex flex-col items-center gap-4"
-      >
-        <div
-          v-if="actionsLabel"
-          class="flex items-center gap-3 w-full max-w-md"
-        >
-          <span class="h-px flex-1 bg-border-default" />
-          <span
-            class="text-2xs font-semibold text-text-secondary whitespace-nowrap"
-            >{{ actionsLabel }}</span
-          >
-          <span class="h-px flex-1 bg-border-default" />
+      <div v-if="$slots.actions" class="flex w-full max-w-3xl flex-col items-center gap-4">
+        <div v-if="actionsLabel" class="flex w-full max-w-md items-center gap-3">
+          <span class="bg-border-default h-px flex-1" />
+          <span class="text-2xs text-text-secondary font-semibold whitespace-nowrap">{{
+            actionsLabel
+          }}</span>
+          <span class="bg-border-default h-px flex-1" />
         </div>
-        <div
-          class="flex flex-wrap items-stretch justify-center gap-3"
-        >
+        <div class="flex flex-wrap items-stretch justify-center gap-3">
           <slot name="actions" />
         </div>
       </div>
 
-      <div
-        v-if="$slots.extra"
-        class="w-full flex flex-col items-center gap-3 pt-2"
-      >
+      <div v-if="$slots.extra" class="flex w-full flex-col items-center gap-3 pt-2">
         <slot name="extra" />
       </div>
     </div>
@@ -105,4 +93,3 @@ withDefaults(
   { title: "", description: "", actionsLabel: "" },
 );
 </script>
-

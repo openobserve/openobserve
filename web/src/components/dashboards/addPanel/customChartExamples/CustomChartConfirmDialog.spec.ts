@@ -19,7 +19,6 @@ import CustomChartConfirmDialog from "@/components/dashboards/addPanel/customCha
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 // Stub ODialog so tests are deterministic (no Portal/Reka teleport)
 // and so we can assert on the props the component forwards + emit
 // the click events the component listens to.

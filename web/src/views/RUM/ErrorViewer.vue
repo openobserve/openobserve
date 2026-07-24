@@ -15,21 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    data-test="error-viewer-container"
-    class="bg-card-glass-bg h-full overflow-y-auto"
-  >
+  <div data-test="error-viewer-container" class="bg-card-glass-bg h-full overflow-y-auto">
     <template v-if="isLoading.length">
-      <div
-        class="pb-4 flex items-center justify-center text-center h-[calc(100vh-12.5rem)]"
-      >
+      <div class="flex h-[calc(100vh-12.5rem)] items-center justify-center pb-4 text-center">
         <div>
-          <OSpinner
-            size="md"
-            class="mx-auto block"
-            data-test="error-viewer-loading-indicator"
-          />
-          <div class="text-center w-full">
+          <OSpinner size="md" class="mx-auto block" data-test="error-viewer-loading-indicator" />
+          <div class="w-full text-center">
             {{ t("rum.loadingErrorDetails") }}
           </div>
         </div>
@@ -42,10 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSeparator class="w-full" />
       <div class="px-page-edge py-2.5">
         <ErrorTags :error="errorDetails" />
-        <ErrorStackTrace
-          :error_stack="errorDetails.error_stack || []"
-          :error="errorDetails"
-        />
+        <ErrorStackTrace :error_stack="errorDetails.error_stack || []" :error="errorDetails" />
         <ErrorSessionReplay :error="errorDetails" />
         <TraceCorrelationCard
           v-if="errorTraceId"
@@ -74,7 +62,7 @@ import ErrorStackTrace from "@/components/rum/errorTracking/view/ErrorStackTrace
 import TraceCorrelationCard from "@/components/rum/correlation/TraceCorrelationCard.vue";
 import { useI18n } from "vue-i18n";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 const { t } = useI18n();
 
@@ -131,16 +119,11 @@ const getErrorLogs = () => {
       const errorIndex = res.data.hits.findIndex(
         (hit: any) => hit.error_id === errorDetails.value.error_id,
       );
-      errorDetails.value.events = res.data.hits.slice(
-        errorIndex,
-        errorIndex + 100,
-      );
-      errorDetails.value.events = errorDetails.value.events.map(
-        (event: any) => ({
-          ...event,
-          category: getErrorCategory(event),
-        }),
-      );
+      errorDetails.value.events = res.data.hits.slice(errorIndex, errorIndex + 100);
+      errorDetails.value.events = errorDetails.value.events.map((event: any) => ({
+        ...event,
+        category: getErrorCategory(event),
+      }));
     })
     .finally(() => isLoading.value.pop());
 };
@@ -149,9 +132,7 @@ const getErrorCategory = (row: any) => {
   if (row["type"] === "error") return row["error_type"] || "Error";
   else if (row["type"] === "resource") return row["resource_type"];
   else if (row["type"] === "view")
-    return row["view_loading_type"] === "route_change"
-      ? "Navigation"
-      : "Reload";
+    return row["view_loading_type"] === "route_change" ? "Navigation" : "Reload";
   else if (row["type"] === "action") return row["action_type"];
   else return row["type"];
 };
@@ -184,8 +165,7 @@ const getError = () => {
         errorDetails.value["category"] = [];
         // Prioritize error_stack (actual application error) over error_handling_stack (Vue internals)
         const errorStack =
-          errorDetails.value.error_stack ||
-          errorDetails.value.error_handling_stack;
+          errorDetails.value.error_stack || errorDetails.value.error_handling_stack;
         errorDetails.value.error_stack = errorStack.split("\n");
         // Keep the original stack for translation
         errorDetails.value.original_error_stack = errorDetails.value.error_stack;
@@ -197,4 +177,3 @@ const getError = () => {
   });
 };
 </script>
-

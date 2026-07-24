@@ -15,7 +15,7 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { nextTick } from 'vue';
+import { nextTick } from "vue";
 
 // Mock service_accounts service
 vi.mock("@/services/service_accounts", () => ({
@@ -23,27 +23,27 @@ vi.mock("@/services/service_accounts", () => ({
     list: vi.fn(),
     delete: vi.fn(),
     bulkDelete: vi.fn(),
-    refresh_token: vi.fn()
-  }
+    refresh_token: vi.fn(),
+  },
 }));
 
 // Mock usePermissions composable
 const mockServiceAccountsState = {
-  service_accounts_users: []
+  service_accounts_users: [],
 };
 
 vi.mock("@/composables/iam/usePermissions", () => ({
   default: () => ({
-    serviceAccountsState: mockServiceAccountsState
-  })
+    serviceAccountsState: mockServiceAccountsState,
+  }),
 }));
 
 // Mock aws-exports
 vi.mock("@/aws-exports", () => ({
   default: {
     isEnterprise: "true",
-    isCloud: false
-  }
+    isCloud: false,
+  },
 }));
 
 import ServiceAccountsList from "@/components/iam/serviceAccounts/ServiceAccountsList.vue";
@@ -89,7 +89,7 @@ describe("ServiceAccountsList Component", () => {
             last_name: "System",
             role: "SreAgent",
             is_system: true,
-            description: "System-managed SRE Agent service account for root cause analysis"
+            description: "System-managed SRE Agent service account for root cause analysis",
           },
           {
             email: "service1@example.com",
@@ -97,7 +97,7 @@ describe("ServiceAccountsList Component", () => {
             last_name: "",
             role: "ServiceAccount",
             is_system: false,
-            description: null
+            description: null,
           },
           {
             email: "service2@example.com",
@@ -105,16 +105,16 @@ describe("ServiceAccountsList Component", () => {
             last_name: "",
             role: "ServiceAccount",
             is_system: false,
-            description: null
-          }
-        ]
-      }
+            description: null,
+          },
+        ],
+      },
     });
 
     // Setup store state
     store.state.selectedOrganization = { identifier: "test-org", name: "Test Org" };
     store.state.userInfo = { email: "test@example.com" };
-    store.state.theme = 'light';
+    store.state.theme = "light";
 
     // Setup router mock with currentRoute
     mockRouter = {
@@ -123,9 +123,9 @@ describe("ServiceAccountsList Component", () => {
       currentRoute: {
         value: {
           query: {},
-          params: {}
-        }
-      }
+          params: {},
+        },
+      },
     };
 
     // Setup notify and dialog mocks
@@ -135,54 +135,73 @@ describe("ServiceAccountsList Component", () => {
     // Mock navigator.clipboard
     Object.assign(navigator, {
       clipboard: {
-        writeText: vi.fn().mockResolvedValue(undefined)
-      }
+        writeText: vi.fn().mockResolvedValue(undefined),
+      },
     });
 
     // Mock URL methods
-    global.URL.createObjectURL = vi.fn(() => 'blob:test-url');
+    global.URL.createObjectURL = vi.fn(() => "blob:test-url");
     global.URL.revokeObjectURL = vi.fn();
 
     wrapper = mount(ServiceAccountsList, {
       global: {
-        plugins: [
-          [{ platform }],
-          [i18n]
-        ],
-        provide: { 
+        plugins: [[{ platform }], [i18n]],
+        provide: {
           store,
-          platform
+          platform,
         },
         mocks: {
           $router: mockRouter,
-          $route: mockRouter.currentRoute.value
+          $route: mockRouter.currentRoute.value,
         },
         stubs: {
-          'router-link': true,
-          'router-view': true,
-          'AddServiceAccount': {
-            name: 'AddServiceAccount',
+          "router-link": true,
+          "router-view": true,
+          AddServiceAccount: {
+            name: "AddServiceAccount",
             template: '<div class="add-service-account-stub" v-if="open" />',
-            props: ['open', 'modelValue', 'isUpdated'],
-            emits: ['update:open', 'update:modelValue', 'updated'],
+            props: ["open", "modelValue", "isUpdated"],
+            emits: ["update:open", "update:modelValue", "updated"],
           },
-          'QTablePagination': true,
-          'NoData': true,
+          QTablePagination: true,
+          NoData: true,
           ODialog: {
-            name: 'ODialog',
+            name: "ODialog",
             template: '<div class="o-dialog-stub" v-if="open"><slot /></div>',
-            props: ['open', 'persistent', 'size', 'title', 'subTitle', 'showClose', 'width', 'primaryButtonLabel', 'secondaryButtonLabel', 'neutralButtonLabel'],
-            emits: ['update:open', 'click:primary', 'click:secondary', 'click:neutral'],
+            props: [
+              "open",
+              "persistent",
+              "size",
+              "title",
+              "subTitle",
+              "showClose",
+              "width",
+              "primaryButtonLabel",
+              "secondaryButtonLabel",
+              "neutralButtonLabel",
+            ],
+            emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
           },
           ODrawer: {
-            name: 'ODrawer',
+            name: "ODrawer",
             template: '<div class="o-drawer-stub" v-if="open"><slot /></div>',
-            props: ['open', 'persistent', 'size', 'title', 'subTitle', 'showClose', 'width', 'primaryButtonLabel', 'secondaryButtonLabel', 'neutralButtonLabel'],
-            emits: ['update:open', 'click:primary', 'click:secondary', 'click:neutral'],
+            props: [
+              "open",
+              "persistent",
+              "size",
+              "title",
+              "subTitle",
+              "showClose",
+              "width",
+              "primaryButtonLabel",
+              "secondaryButtonLabel",
+              "neutralButtonLabel",
+            ],
+            emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
           },
-        }
+        },
       },
-      attachTo: document.body
+      attachTo: document.body,
     });
 
     // Mock the router in wrapper.vm if needed
@@ -232,8 +251,8 @@ describe("ServiceAccountsList Component", () => {
       await flushPromises();
 
       const accounts = mockServiceAccountsState.service_accounts_users;
-      const sreAgent = accounts.find(acc => acc.is_system);
-      const userAccount = accounts.find(acc => !acc.is_system);
+      const sreAgent = accounts.find((acc) => acc.is_system);
+      const userAccount = accounts.find((acc) => !acc.is_system);
 
       expect(sreAgent).toBeDefined();
       expect(sreAgent.is_system).toBe(true);
@@ -267,7 +286,7 @@ describe("ServiceAccountsList Component", () => {
         email: "new-service@example.com",
         first_name: "New Service",
         is_system: false,
-        description: null
+        description: null,
       };
 
       wrapper.vm.isUpdated = false;
@@ -288,7 +307,7 @@ describe("ServiceAccountsList Component", () => {
     it("prevents deletion of system service accounts", () => {
       const sreAgentAccount = {
         email: "o2-sre-agent.org-test-org@openobserve.internal",
-        is_system: true
+        is_system: true,
       };
 
       // System accounts should not be deletable - this test verifies the UI logic
@@ -303,7 +322,7 @@ describe("ServiceAccountsList Component", () => {
 
     it("deletes user service account successfully", async () => {
       vi.mocked(service_accounts.delete).mockResolvedValue({
-        data: { code: 200 }
+        data: { code: 200 },
       });
 
       // confirmDeleteAction receives the row object directly (not wrapped in {row: ...})
@@ -323,7 +342,7 @@ describe("ServiceAccountsList Component", () => {
       await wrapper.vm.getServiceAccountsUsers();
       await flushPromises();
 
-      const sreAgent = mockServiceAccountsState.service_accounts_users.find(acc => acc.is_system);
+      const sreAgent = mockServiceAccountsState.service_accounts_users.find((acc) => acc.is_system);
       expect(sreAgent).toBeDefined();
       expect(sreAgent.is_system).toBe(true);
       expect(sreAgent.description).toContain("System-managed");
@@ -334,18 +353,21 @@ describe("ServiceAccountsList Component", () => {
     it("refreshes service token successfully for user accounts", async () => {
       const mockToken = "refreshed-token-789";
       vi.mocked(service_accounts.refresh_token).mockResolvedValue({
-        data: { token: mockToken }
+        data: { token: mockToken },
       });
 
       const row = {
         email: "service1@example.com",
         isLoading: false,
-        is_system: false
+        is_system: false,
       };
 
       await wrapper.vm.refreshServiceToken(row);
 
-      expect(service_accounts.refresh_token).toHaveBeenCalledWith("test-org", "service1@example.com");
+      expect(service_accounts.refresh_token).toHaveBeenCalledWith(
+        "test-org",
+        "service1@example.com",
+      );
       expect(wrapper.vm.serviceToken).toBe(mockToken);
     });
 
@@ -360,7 +382,7 @@ describe("ServiceAccountsList Component", () => {
     it("should handle system account token refresh restrictions", () => {
       const sreAgentRow = {
         email: "o2-sre-agent.org-test-org@openobserve.internal",
-        is_system: true
+        is_system: true,
       };
 
       // System accounts should have restricted token operations
@@ -376,10 +398,10 @@ describe("ServiceAccountsList Component", () => {
   describe("Clipboard Operations", () => {
     it("copies token to clipboard successfully", async () => {
       const token = "test-token-123";
-      
+
       try {
         await wrapper.vm.copyToClipboard(token);
-        
+
         expect(navigator.clipboard.writeText).toHaveBeenCalledWith(token);
         expect(notifyMock).toHaveBeenCalledWith({
           type: "positive",
@@ -395,10 +417,10 @@ describe("ServiceAccountsList Component", () => {
     it("handles clipboard copy error", async () => {
       const token = "test-token-123";
       navigator.clipboard.writeText.mockRejectedValue(new Error("Copy failed"));
-      
+
       try {
         await wrapper.vm.copyToClipboard(token);
-        
+
         expect(notifyMock).toHaveBeenCalledWith({
           type: "negative",
           message: "Error while copy content.",
@@ -414,7 +436,7 @@ describe("ServiceAccountsList Component", () => {
   describe("Data Fetching", () => {
     it("fetches service accounts successfully", async () => {
       const result = await wrapper.vm.getServiceAccountsUsers();
-      
+
       expect(service_accounts.list).toHaveBeenCalledWith("test-org");
       expect(result).toBeDefined();
     });
@@ -423,10 +445,10 @@ describe("ServiceAccountsList Component", () => {
       const mockError = {
         response: {
           status: 500,
-          data: { message: "Fetch failed" }
-        }
+          data: { message: "Fetch failed" },
+        },
       };
-      
+
       vi.mocked(service_accounts.list).mockRejectedValue(mockError);
 
       try {
@@ -446,7 +468,7 @@ describe("ServiceAccountsList Component", () => {
               last_name: "System",
               role: "SreAgent",
               is_system: true,
-              description: "System-managed SRE Agent service account"
+              description: "System-managed SRE Agent service account",
             },
             {
               email: "service1@example.com",
@@ -454,7 +476,7 @@ describe("ServiceAccountsList Component", () => {
               last_name: "",
               role: "ServiceAccount",
               is_system: false,
-              description: null
+              description: null,
             },
             {
               email: "service2@example.com",
@@ -462,10 +484,10 @@ describe("ServiceAccountsList Component", () => {
               last_name: "",
               role: "ServiceAccount",
               is_system: false,
-              description: null
-            }
-          ]
-        }
+              description: null,
+            },
+          ],
+        },
       });
 
       await wrapper.vm.getServiceAccountsUsers();
@@ -492,9 +514,9 @@ describe("ServiceAccountsList Component", () => {
       if (!term) return rows;
       const lowerTerm = term.toLowerCase();
       return rows.filter((row) =>
-        Object.values(row).some((val) =>
-          val != null && String(val).toLowerCase().includes(lowerTerm)
-        )
+        Object.values(row).some(
+          (val) => val != null && String(val).toLowerCase().includes(lowerTerm),
+        ),
       );
     };
 
@@ -506,7 +528,7 @@ describe("ServiceAccountsList Component", () => {
           last_name: "System",
           is_system: true,
           role: "SreAgent",
-          description: "System-managed SRE Agent"
+          description: "System-managed SRE Agent",
         },
         {
           email: "user1@example.com",
@@ -514,7 +536,7 @@ describe("ServiceAccountsList Component", () => {
           last_name: "Doe",
           is_system: false,
           role: "ServiceAccount",
-          description: null
+          description: null,
         },
         {
           email: "user2@example.com",
@@ -522,7 +544,7 @@ describe("ServiceAccountsList Component", () => {
           last_name: "Smith",
           is_system: false,
           role: "ServiceAccount",
-          description: null
+          description: null,
         },
         {
           email: "admin@example.com",
@@ -530,77 +552,56 @@ describe("ServiceAccountsList Component", () => {
           last_name: "User",
           is_system: false,
           role: "ServiceAccount",
-          description: null
-        }
+          description: null,
+        },
       ];
     });
 
     it("filters by email", () => {
-      const filtered = filterData(
-        mockServiceAccountsState.service_accounts_users,
-        "admin"
-      );
+      const filtered = filterData(mockServiceAccountsState.service_accounts_users, "admin");
       expect(filtered).toHaveLength(1);
       expect(filtered[0].email).toContain("admin");
     });
 
     it("filters by first name", () => {
-      const filtered = filterData(
-        mockServiceAccountsState.service_accounts_users,
-        "John"
-      );
+      const filtered = filterData(mockServiceAccountsState.service_accounts_users, "John");
       expect(filtered).toHaveLength(1);
       expect(filtered[0].first_name).toBe("John");
     });
 
     it("filters by last name", () => {
-      const filtered = filterData(
-        mockServiceAccountsState.service_accounts_users,
-        "Smith"
-      );
+      const filtered = filterData(mockServiceAccountsState.service_accounts_users, "Smith");
       expect(filtered).toHaveLength(1);
       expect(filtered[0].last_name).toBe("Smith");
     });
 
     it("filters by SRE Agent system account", () => {
-      const filtered = filterData(
-        mockServiceAccountsState.service_accounts_users,
-        "SRE"
-      );
+      const filtered = filterData(mockServiceAccountsState.service_accounts_users, "SRE");
       expect(filtered).toHaveLength(1);
       expect(filtered[0].first_name).toBe("SRE Agent");
       expect(filtered[0].is_system).toBe(true);
     });
 
     it("is case insensitive", () => {
-      const filtered = filterData(
-        mockServiceAccountsState.service_accounts_users,
-        "JANE"
-      );
+      const filtered = filterData(mockServiceAccountsState.service_accounts_users, "JANE");
       expect(filtered).toHaveLength(1);
       expect(filtered[0].first_name).toBe("Jane");
     });
 
     it("returns empty array for no matches", () => {
-      const filtered = filterData(
-        mockServiceAccountsState.service_accounts_users,
-        "nonexistent"
-      );
+      const filtered = filterData(mockServiceAccountsState.service_accounts_users, "nonexistent");
       expect(filtered).toHaveLength(0);
     });
 
     it("handles empty search term", () => {
-      const filtered = filterData(
-        mockServiceAccountsState.service_accounts_users,
-        ""
-      );
+      const filtered = filterData(mockServiceAccountsState.service_accounts_users, "");
       expect(filtered).toHaveLength(4); // Updated to include SRE Agent account
     });
 
     it("handles null/undefined fields", () => {
       const dataWithNulls = [
         { email: null, first_name: "Test", last_name: undefined, is_system: false },
-        { email: "test@example.com", first_name: null, last_name: "User", is_system: false }
+        { email: "test@example.com", first_name: null, last_name: "User", is_system: false },
       ];
 
       const filtered = filterData(dataWithNulls, "test");
@@ -609,17 +610,17 @@ describe("ServiceAccountsList Component", () => {
 
     it("can distinguish system vs user accounts in filtering", () => {
       const systemAccounts = mockServiceAccountsState.service_accounts_users.filter(
-        acc => acc.is_system
+        (acc) => acc.is_system,
       );
       const userAccounts = mockServiceAccountsState.service_accounts_users.filter(
-        acc => !acc.is_system
+        (acc) => !acc.is_system,
       );
 
       expect(systemAccounts).toHaveLength(1);
       expect(systemAccounts[0].role).toBe("SreAgent");
 
       expect(userAccounts).toHaveLength(3);
-      expect(userAccounts.every(acc => acc.role === "ServiceAccount")).toBe(true);
+      expect(userAccounts.every((acc) => acc.role === "ServiceAccount")).toBe(true);
     });
   });
 
@@ -675,18 +676,12 @@ describe("ServiceAccountsList Component", () => {
 
     it("downloadTokenAsFile triggers a text-file download of the token", () => {
       const createEl = vi.spyOn(document, "createElement");
-      const createObjUrl = vi
-        .spyOn(URL, "createObjectURL")
-        .mockReturnValue("blob:mock");
-      const revokeObjUrl = vi
-        .spyOn(URL, "revokeObjectURL")
-        .mockImplementation(() => {});
+      const createObjUrl = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:mock");
+      const revokeObjUrl = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
 
       wrapper.vm.downloadTokenAsFile("my-secret-token");
 
-      const anchor = createEl.mock.results.find(
-        (r) => r.value?.tagName === "A",
-      )?.value;
+      const anchor = createEl.mock.results.find((r) => r.value?.tagName === "A")?.value;
       expect(anchor).toBeTruthy();
       expect(anchor.download).toBe("service_account_token.txt");
       expect(createObjUrl).toHaveBeenCalled();
@@ -733,7 +728,7 @@ describe("ServiceAccountsList Component", () => {
       await flushPromises();
 
       const sreAgent = mockServiceAccountsState.service_accounts_users.find(
-        acc => acc.role === "SreAgent"
+        (acc) => acc.role === "SreAgent",
       );
 
       expect(sreAgent).toBeDefined();
@@ -746,7 +741,7 @@ describe("ServiceAccountsList Component", () => {
       const sreAgent = {
         email: "o2-sre-agent.org-test-org@openobserve.internal",
         is_system: true,
-        role: "SreAgent"
+        role: "SreAgent",
       };
 
       // Verify system account properties that should prevent modification
@@ -764,7 +759,7 @@ describe("ServiceAccountsList Component", () => {
       await flushPromises();
 
       const sreAgent = mockServiceAccountsState.service_accounts_users.find(
-        acc => acc.role === "SreAgent"
+        (acc) => acc.role === "SreAgent",
       );
 
       expect(sreAgent.role).toBe("SreAgent");
@@ -775,11 +770,20 @@ describe("ServiceAccountsList Component", () => {
 
     it("excludes system-managed rows from selection via isRowSelectable", () => {
       // Regular accounts are selectable…
-      expect(wrapper.vm.isRowSelectable({ email: "service1@example.com", is_system: false })).toBe(true);
+      expect(wrapper.vm.isRowSelectable({ email: "service1@example.com", is_system: false })).toBe(
+        true,
+      );
       // …system-managed accounts are not (checkbox disabled, excluded from select-all).
-      expect(wrapper.vm.isRowSelectable({ email: "o2-sre-agent.org-test-org@openobserve.internal", is_system: true })).toBe(false);
+      expect(
+        wrapper.vm.isRowSelectable({
+          email: "o2-sre-agent.org-test-org@openobserve.internal",
+          is_system: true,
+        }),
+      ).toBe(false);
       // Also caught by the email heuristic even if is_system is missing.
-      expect(wrapper.vm.isRowSelectable({ email: "o2-sre-agent.org-acme@openobserve.internal" })).toBe(false);
+      expect(
+        wrapper.vm.isRowSelectable({ email: "o2-sre-agent.org-acme@openobserve.internal" }),
+      ).toBe(false);
     });
   });
 
@@ -798,32 +802,32 @@ describe("ServiceAccountsList Component", () => {
       wrapper.vm.toBeRefreshed = { email: "service1@example.com" };
       await nextTick();
 
-      const confirmDialogs = wrapper.findAllComponents({ name: 'ConfirmDialog' });
-      const refreshDialog = confirmDialogs.find((d) => d.props('modelValue') === true);
+      const confirmDialogs = wrapper.findAllComponents({ name: "ConfirmDialog" });
+      const refreshDialog = confirmDialogs.find((d) => d.props("modelValue") === true);
       expect(refreshDialog).toBeDefined();
 
-      await refreshDialog.vm.$emit('update:cancel');
+      await refreshDialog.vm.$emit("update:cancel");
       expect(wrapper.vm.confirmRefresh).toBe(false);
     });
 
     it("invokes refreshServiceToken when ConfirmDialog emits update:ok on refresh dialog", async () => {
       vi.mocked(service_accounts.refresh_token).mockResolvedValue({
-        data: { token: "new-token-abc" }
+        data: { token: "new-token-abc" },
       });
       const row = { email: "service1@example.com", is_system: false, isLoading: false };
       wrapper.vm.confirmRefreshAction(row);
       await nextTick();
 
-      const confirmDialogs = wrapper.findAllComponents({ name: 'ConfirmDialog' });
-      const refreshDialog = confirmDialogs.find((d) => d.props('modelValue') === true);
+      const confirmDialogs = wrapper.findAllComponents({ name: "ConfirmDialog" });
+      const refreshDialog = confirmDialogs.find((d) => d.props("modelValue") === true);
       expect(refreshDialog).toBeDefined();
 
-      await refreshDialog.vm.$emit('update:ok');
+      await refreshDialog.vm.$emit("update:ok");
       await flushPromises();
 
       expect(service_accounts.refresh_token).toHaveBeenCalledWith(
         "test-org",
-        "service1@example.com"
+        "service1@example.com",
       );
       // After successful refresh, confirm dialog should be closed
       expect(wrapper.vm.confirmRefresh).toBe(false);
@@ -834,12 +838,12 @@ describe("ServiceAccountsList Component", () => {
       wrapper.vm.toBeRefreshed = { email: "service1@example.com" };
       await nextTick();
 
-      const confirmDialogs = wrapper.findAllComponents({ name: 'ConfirmDialog' });
-      const refreshDialog = confirmDialogs.find((d) => d.props('modelValue') === true);
+      const confirmDialogs = wrapper.findAllComponents({ name: "ConfirmDialog" });
+      const refreshDialog = confirmDialogs.find((d) => d.props("modelValue") === true);
       expect(refreshDialog).toBeDefined();
       // Verb-labeled, destructive — no hardcoded English / generic OK.
-      expect(refreshDialog.props('okLabel')).toBe('Rotate token');
-      expect(refreshDialog.props('okColor')).toBe('destructive');
+      expect(refreshDialog.props("okLabel")).toBe("Rotate token");
+      expect(refreshDialog.props("okColor")).toBe("destructive");
     });
   });
 
@@ -851,8 +855,8 @@ describe("ServiceAccountsList Component", () => {
 
       expect(wrapper.vm.confirmDelete).toBe(true);
 
-      const confirmDialogs = wrapper.findAllComponents({ name: 'ConfirmDialog' });
-      const openDialogs = confirmDialogs.filter((d) => d.props('modelValue') === true);
+      const confirmDialogs = wrapper.findAllComponents({ name: "ConfirmDialog" });
+      const openDialogs = confirmDialogs.filter((d) => d.props("modelValue") === true);
       expect(openDialogs.length).toBeGreaterThan(0);
     });
 
@@ -861,41 +865,38 @@ describe("ServiceAccountsList Component", () => {
       wrapper.vm.deleteUserEmailIdentifier = "service1@example.com";
       await nextTick();
 
-      const confirmDialogs = wrapper.findAllComponents({ name: 'ConfirmDialog' });
-      const deleteDialog = confirmDialogs.find((d) => d.props('modelValue') === true);
+      const confirmDialogs = wrapper.findAllComponents({ name: "ConfirmDialog" });
+      const deleteDialog = confirmDialogs.find((d) => d.props("modelValue") === true);
       expect(deleteDialog).toBeDefined();
 
-      await deleteDialog.vm.$emit('update:cancel');
+      await deleteDialog.vm.$emit("update:cancel");
       expect(wrapper.vm.confirmDelete).toBe(false);
     });
 
     it("invokes deleteUser when ConfirmDialog emits update:ok on delete dialog", async () => {
       vi.mocked(service_accounts.delete).mockResolvedValue({
-        data: { code: 200 }
+        data: { code: 200 },
       });
 
       const row = { email: "service1@example.com", is_system: false };
       wrapper.vm.confirmDeleteAction(row);
       await nextTick();
 
-      const confirmDialogs = wrapper.findAllComponents({ name: 'ConfirmDialog' });
-      const deleteDialog = confirmDialogs.find((d) => d.props('modelValue') === true);
+      const confirmDialogs = wrapper.findAllComponents({ name: "ConfirmDialog" });
+      const deleteDialog = confirmDialogs.find((d) => d.props("modelValue") === true);
       expect(deleteDialog).toBeDefined();
 
-      await deleteDialog.vm.$emit('update:ok');
+      await deleteDialog.vm.$emit("update:ok");
       await flushPromises();
 
-      expect(service_accounts.delete).toHaveBeenCalledWith(
-        "test-org",
-        "service1@example.com"
-      );
+      expect(service_accounts.delete).toHaveBeenCalledWith("test-org", "service1@example.com");
       // confirmDelete is set to false at the start of deleteUser
       expect(wrapper.vm.confirmDelete).toBe(false);
     });
 
     it("handles delete error (non-403) without rethrowing", async () => {
       vi.mocked(service_accounts.delete).mockRejectedValue({
-        response: { status: 500, data: { message: "Something failed" } }
+        response: { status: 500, data: { message: "Something failed" } },
       });
 
       const row = { email: "service1@example.com", is_system: false };
@@ -907,7 +908,7 @@ describe("ServiceAccountsList Component", () => {
 
     it("handles 403 delete error without rethrowing", async () => {
       vi.mocked(service_accounts.delete).mockRejectedValue({
-        response: { status: 403 }
+        response: { status: 403 },
       });
 
       const row = { email: "service1@example.com", is_system: false };
@@ -930,36 +931,33 @@ describe("ServiceAccountsList Component", () => {
       wrapper.vm.selectedAccounts = [{ email: "service1@example.com" }];
       await nextTick();
 
-      const confirmDialogs = wrapper.findAllComponents({ name: 'ConfirmDialog' });
-      const bulkDialog = confirmDialogs.find((d) => d.props('modelValue') === true);
+      const confirmDialogs = wrapper.findAllComponents({ name: "ConfirmDialog" });
+      const bulkDialog = confirmDialogs.find((d) => d.props("modelValue") === true);
       expect(bulkDialog).toBeDefined();
 
-      await bulkDialog.vm.$emit('update:cancel');
+      await bulkDialog.vm.$emit("update:cancel");
       expect(wrapper.vm.confirmBulkDelete).toBe(false);
     });
 
     it("invokes bulkDeleteServiceAccounts on ConfirmDialog update:ok and clears selection", async () => {
       vi.mocked(service_accounts.bulkDelete).mockResolvedValue({
-        data: { successful: ["service1@example.com"], unsuccessful: [] }
+        data: { successful: ["service1@example.com"], unsuccessful: [] },
       });
 
       wrapper.vm.selectedAccounts = [{ email: "service1@example.com" }];
       wrapper.vm.openBulkDeleteDialog();
       await nextTick();
 
-      const confirmDialogs = wrapper.findAllComponents({ name: 'ConfirmDialog' });
-      const bulkDialog = confirmDialogs.find(
-        (d) => d.props('modelValue') === true
-      );
+      const confirmDialogs = wrapper.findAllComponents({ name: "ConfirmDialog" });
+      const bulkDialog = confirmDialogs.find((d) => d.props("modelValue") === true);
       expect(bulkDialog).toBeDefined();
 
-      await bulkDialog.vm.$emit('update:ok');
+      await bulkDialog.vm.$emit("update:ok");
       await flushPromises();
 
-      expect(service_accounts.bulkDelete).toHaveBeenCalledWith(
-        "test-org",
-        { ids: ["service1@example.com"] }
-      );
+      expect(service_accounts.bulkDelete).toHaveBeenCalledWith("test-org", {
+        ids: ["service1@example.com"],
+      });
       expect(wrapper.vm.confirmBulkDelete).toBe(false);
       expect(wrapper.vm.selectedAccounts).toEqual([]);
     });
@@ -968,14 +966,11 @@ describe("ServiceAccountsList Component", () => {
       vi.mocked(service_accounts.bulkDelete).mockResolvedValue({
         data: {
           successful: ["a@example.com"],
-          unsuccessful: ["b@example.com"]
-        }
+          unsuccessful: ["b@example.com"],
+        },
       });
 
-      wrapper.vm.selectedAccounts = [
-        { email: "a@example.com" },
-        { email: "b@example.com" }
-      ];
+      wrapper.vm.selectedAccounts = [{ email: "a@example.com" }, { email: "b@example.com" }];
       await wrapper.vm.bulkDeleteServiceAccounts();
       await flushPromises();
 
@@ -985,7 +980,7 @@ describe("ServiceAccountsList Component", () => {
 
     it("calls bulkDelete with full failure without throwing", async () => {
       vi.mocked(service_accounts.bulkDelete).mockResolvedValue({
-        data: { successful: [], unsuccessful: ["a@example.com"] }
+        data: { successful: [], unsuccessful: ["a@example.com"] },
       });
 
       wrapper.vm.selectedAccounts = [{ email: "a@example.com" }];
@@ -998,26 +993,25 @@ describe("ServiceAccountsList Component", () => {
 
     it("filters out system accounts from bulk delete payload", async () => {
       vi.mocked(service_accounts.bulkDelete).mockResolvedValue({
-        data: { successful: ["service1@example.com"], unsuccessful: [] }
+        data: { successful: ["service1@example.com"], unsuccessful: [] },
       });
 
       wrapper.vm.selectedAccounts = [
         { email: "o2-sre-agent.org-test-org@openobserve.internal" },
-        { email: "service1@example.com" }
+        { email: "service1@example.com" },
       ];
 
       await wrapper.vm.bulkDeleteServiceAccounts();
       await flushPromises();
 
-      expect(service_accounts.bulkDelete).toHaveBeenCalledWith(
-        "test-org",
-        { ids: ["service1@example.com"] }
-      );
+      expect(service_accounts.bulkDelete).toHaveBeenCalledWith("test-org", {
+        ids: ["service1@example.com"],
+      });
     });
 
     it("handles bulk delete network error (non-403) without rethrowing", async () => {
       vi.mocked(service_accounts.bulkDelete).mockRejectedValue({
-        response: { status: 500, data: { message: "Bulk delete failed" } }
+        response: { status: 500, data: { message: "Bulk delete failed" } },
       });
 
       wrapper.vm.selectedAccounts = [{ email: "a@example.com" }];
@@ -1030,7 +1024,7 @@ describe("ServiceAccountsList Component", () => {
   describe("ODialog Migration - Show Token Dialog", () => {
     it("opens show-token dialog after successful refresh", async () => {
       vi.mocked(service_accounts.refresh_token).mockResolvedValue({
-        data: { token: "fresh-token-xyz" }
+        data: { token: "fresh-token-xyz" },
       });
 
       const row = { email: "service1@example.com", isLoading: false, is_system: false };
@@ -1046,28 +1040,28 @@ describe("ServiceAccountsList Component", () => {
       wrapper.vm.isShowToken = true;
       await nextTick();
 
-      const dialogs = wrapper.findAllComponents({ name: 'ODialog' });
+      const dialogs = wrapper.findAllComponents({ name: "ODialog" });
       const tokenDialog = dialogs.find(
-        (d) => d.props('open') === true && d.props('title') === 'Copy your token'
+        (d) => d.props("open") === true && d.props("title") === "Copy your token",
       );
       expect(tokenDialog).toBeDefined();
       // `persistent` may be received as boolean true or as "" (boolean attr)
-      const persistent = tokenDialog.props('persistent');
-      expect(persistent === true || persistent === '').toBe(true);
-      expect(tokenDialog.props('size')).toBe('md');
+      const persistent = tokenDialog.props("persistent");
+      expect(persistent === true || persistent === "").toBe(true);
+      expect(tokenDialog.props("size")).toBe("md");
     });
 
     it("closes show-token dialog when ODialog emits update:open false", async () => {
       wrapper.vm.isShowToken = true;
       await nextTick();
 
-      const dialogs = wrapper.findAllComponents({ name: 'ODialog' });
+      const dialogs = wrapper.findAllComponents({ name: "ODialog" });
       const tokenDialog = dialogs.find(
-        (d) => d.props('open') === true && d.props('title') === 'Copy your token'
+        (d) => d.props("open") === true && d.props("title") === "Copy your token",
       );
       expect(tokenDialog).toBeDefined();
 
-      await tokenDialog.vm.$emit('update:open', false);
+      await tokenDialog.vm.$emit("update:open", false);
       await nextTick();
       expect(wrapper.vm.isShowToken).toBe(false);
     });
@@ -1078,32 +1072,27 @@ describe("ServiceAccountsList Component", () => {
       wrapper.vm.showAddUserDialog = true;
       await nextTick();
 
-      const addSa = wrapper.findComponent({ name: 'AddServiceAccount' });
+      const addSa = wrapper.findComponent({ name: "AddServiceAccount" });
       expect(addSa.exists()).toBe(true);
-      expect(addSa.props('open')).toBe(true);
-      expect(addSa.props('isUpdated')).toBe(wrapper.vm.isUpdated);
+      expect(addSa.props("open")).toBe(true);
+      expect(addSa.props("isUpdated")).toBe(wrapper.vm.isUpdated);
     });
 
     it("invokes addMember on AddServiceAccount 'updated' emit and closes the drawer", async () => {
       wrapper.vm.showAddUserDialog = true;
       await nextTick();
 
-      const addSa = wrapper.findComponent({ name: 'AddServiceAccount' });
+      const addSa = wrapper.findComponent({ name: "AddServiceAccount" });
       expect(addSa.exists()).toBe(true);
 
       const data = {
         email: "newone@example.com",
         first_name: "New",
         last_name: "One",
-        organization: "test-org"
+        organization: "test-org",
       };
 
-      await addSa.vm.$emit(
-        'updated',
-        { code: 200, token: "tok-xyz" },
-        data,
-        "created"
-      );
+      await addSa.vm.$emit("updated", { code: 200, token: "tok-xyz" }, data, "created");
       await flushPromises();
 
       // showAddUserDialog should be closed after addMember runs
@@ -1126,9 +1115,9 @@ describe("ServiceAccountsList Component", () => {
     });
 
     it("renders OTabs with three tab panels (cURL, Header, Environment Variable)", () => {
-      const tokenDialog = wrapper.findAllComponents({ name: "ODialog" }).find(
-        (d) => d.props("title") === "Copy your token"
-      );
+      const tokenDialog = wrapper
+        .findAllComponents({ name: "ODialog" })
+        .find((d) => d.props("title") === "Copy your token");
       expect(tokenDialog).toBeDefined();
       // OTabs should render tab triggers for curl, header, env
       const dialogHtml = tokenDialog.html();
@@ -1138,9 +1127,9 @@ describe("ServiceAccountsList Component", () => {
     });
 
     it("renders cURL snippet with serviceToken and org identifier", () => {
-      const tokenDialog = wrapper.findAllComponents({ name: "ODialog" }).find(
-        (d) => d.props("title") === "Copy your token"
-      );
+      const tokenDialog = wrapper
+        .findAllComponents({ name: "ODialog" })
+        .find((d) => d.props("title") === "Copy your token");
       expect(tokenDialog).toBeDefined();
       const dialogHtml = tokenDialog.html();
       expect(dialogHtml).toContain("test-token-abc123");
@@ -1173,18 +1162,18 @@ describe("ServiceAccountsList Component", () => {
     });
 
     it("renders a download button in the token dialog (step 1)", () => {
-      const tokenDialog = wrapper.findAllComponents({ name: "ODialog" }).find(
-        (d) => d.props("title") === "Copy your token"
-      );
+      const tokenDialog = wrapper
+        .findAllComponents({ name: "ODialog" })
+        .find((d) => d.props("title") === "Copy your token");
       expect(tokenDialog).toBeDefined();
       const dialogHtml = tokenDialog.html();
       expect(dialogHtml).toContain("service-accounts-list-token-download-btn");
     });
 
     it("renders a copy button in the token dialog", () => {
-      const tokenDialog = wrapper.findAllComponents({ name: "ODialog" }).find(
-        (d) => d.props("title") === "Copy your token"
-      );
+      const tokenDialog = wrapper
+        .findAllComponents({ name: "ODialog" })
+        .find((d) => d.props("title") === "Copy your token");
       expect(tokenDialog).toBeDefined();
       // Copy button should still be present (data-test attribute)
       expect(tokenDialog.html()).toContain("service-accounts-list-token-copy-btn");
@@ -1204,16 +1193,16 @@ describe("ServiceAccountsList Component", () => {
       await nextTick();
 
       expect(wrapper.vm.tokenAccess).toBe(null);
-      expect(
-        wrapper.find('[data-test="service-accounts-token-access-summary"]').exists()
-      ).toBe(false);
+      expect(wrapper.find('[data-test="service-accounts-token-access-summary"]').exists()).toBe(
+        false,
+      );
       // The rotated account may have no permissions — the nudge + links stay.
-      expect(
-        wrapper.find('[data-test="service-accounts-list-token-next-step"]').exists()
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="service-accounts-list-token-add-to-role"]').exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="service-accounts-list-token-next-step"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="service-accounts-list-token-add-to-role"]').exists()).toBe(
+        true,
+      );
     });
 
     it("creation with nothing selected renders the grant hint and fallback links", async () => {
@@ -1244,12 +1233,12 @@ describe("ServiceAccountsList Component", () => {
       wrapper.vm.tokenAccessPending = true;
       await nextTick();
 
-      expect(
-        wrapper.find('[data-test="service-accounts-token-access-pending"]').exists()
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="service-accounts-token-access-summary"]').exists()
-      ).toBe(false);
+      expect(wrapper.find('[data-test="service-accounts-token-access-pending"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="service-accounts-token-access-summary"]').exists()).toBe(
+        false,
+      );
 
       wrapper.vm.tokenAccess = {
         assigned: { roles: ["editor"], groups: [] },
@@ -1258,9 +1247,9 @@ describe("ServiceAccountsList Component", () => {
       wrapper.vm.tokenAccessPending = false;
       await nextTick();
 
-      expect(
-        wrapper.find('[data-test="service-accounts-token-access-pending"]').exists()
-      ).toBe(false);
+      expect(wrapper.find('[data-test="service-accounts-token-access-pending"]').exists()).toBe(
+        false,
+      );
       const summary = wrapper.find('[data-test="service-accounts-token-access-summary"]');
       expect(summary.exists()).toBe(true);
       expect(summary.text()).toContain("Roles assigned: editor");
@@ -1277,12 +1266,12 @@ describe("ServiceAccountsList Component", () => {
       expect(summary.exists()).toBe(true);
       expect(summary.text()).toContain("Roles assigned: editor");
       expect(summary.text()).toContain("Added to user groups: pipelines");
-      expect(
-        wrapper.find('[data-test="service-accounts-list-token-add-to-role"]').exists()
-      ).toBe(false);
-      expect(
-        wrapper.find('[data-test="service-accounts-token-access-failed"]').exists()
-      ).toBe(false);
+      expect(wrapper.find('[data-test="service-accounts-list-token-add-to-role"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.find('[data-test="service-accounts-token-access-failed"]').exists()).toBe(
+        false,
+      );
     });
 
     it("creation with failed grants surfaces the failures and the retry hint", async () => {
@@ -1296,9 +1285,9 @@ describe("ServiceAccountsList Component", () => {
       expect(summary.text()).toContain("Could not assign roles: editor");
       expect(summary.text()).toContain("Could not add to user groups: pipelines");
       expect(summary.text()).toContain("grant these later");
-      expect(
-        wrapper.find('[data-test="service-accounts-token-access-failed"]').exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="service-accounts-token-access-failed"]').exists()).toBe(
+        true,
+      );
     });
 
     it("Add-to-Role link targets the roles route with the account prefilled", async () => {
@@ -1328,9 +1317,9 @@ describe("ServiceAccountsList Component", () => {
       wrapper.vm.revealToken("tok2", "svc2@example.com");
       await nextTick();
       expect(wrapper.vm.tokenAccess).toBe(null);
-      expect(
-        wrapper.find('[data-test="service-accounts-token-access-summary"]').exists()
-      ).toBe(false);
+      expect(wrapper.find('[data-test="service-accounts-token-access-summary"]').exists()).toBe(
+        false,
+      );
     });
   });
 
@@ -1388,18 +1377,14 @@ describe("ServiceAccountsList Component", () => {
     });
 
     it("renders a managed-by chip with tooltip for system rows", () => {
-      const sreAgentRow = mockServiceAccountsState.service_accounts_users.find(
-        (a) => a.is_system
-      );
+      const sreAgentRow = mockServiceAccountsState.service_accounts_users.find((a) => a.is_system);
       expect(sreAgentRow).toBeDefined();
       // System row should have managed-by badge visible in the rendered output
     });
 
     it("uses system-managed tooltip text for disabled checkbox", () => {
       // Checkbox on system rows should have a tooltip explaining why disabled
-      const sreAgent = mockServiceAccountsState.service_accounts_users.find(
-        (a) => a.is_system
-      );
+      const sreAgent = mockServiceAccountsState.service_accounts_users.find((a) => a.is_system);
       expect(sreAgent).toBeDefined();
     });
   });
@@ -1409,9 +1394,7 @@ describe("ServiceAccountsList Component", () => {
       // The subtitle should be visible
       const appPageHeader = wrapper.findComponent({ name: "OPageHeader" });
       if (appPageHeader.exists()) {
-        expect(appPageHeader.props("subtitle")).toBe(
-          "Programmatic access tokens for APIs"
-        );
+        expect(appPageHeader.props("subtitle")).toBe("Programmatic access tokens for APIs");
       }
     });
   });
@@ -1420,7 +1403,7 @@ describe("ServiceAccountsList Component", () => {
     it("has empty-state copy with title and CTA", async () => {
       // Set up the mock to return empty data
       vi.mocked(service_accounts.list).mockResolvedValueOnce({
-        data: { data: [] }
+        data: { data: [] },
       });
       await wrapper.vm.getServiceAccountsUsers();
       await flushPromises();
@@ -1442,9 +1425,7 @@ describe("ServiceAccountsList Component", () => {
       await flushPromises();
 
       // For non-system accounts, email should be displayed unmasked
-      const userAccount = mockServiceAccountsState.service_accounts_users.find(
-        (a) => !a.is_system
-      );
+      const userAccount = mockServiceAccountsState.service_accounts_users.find((a) => !a.is_system);
       if (userAccount) {
         // Email should be the full email, not masked
         expect(userAccount.email).toBe("service1@example.com");

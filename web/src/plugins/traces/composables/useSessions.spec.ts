@@ -213,9 +213,7 @@ describe("useSessions — fetchPage: field mapping", () => {
     const { fetchPage } = useSessions();
     await fetchPage("stream", 1000, 2000, 0, 25, filter);
 
-    expect(mockSessionsList).toHaveBeenCalledWith(
-      expect.objectContaining({ filter }),
-    );
+    expect(mockSessionsList).toHaveBeenCalledWith(expect.objectContaining({ filter }));
   });
 });
 

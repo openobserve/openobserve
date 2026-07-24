@@ -7,9 +7,7 @@
       @click="updateSortOption(null)"
       data-test="dashboard-sort-by-item-clear"
     >
-      <template #icon-left
-        ><OIcon name="block" size="sm"
-      /></template>
+      <template #icon-left><OIcon name="block" size="sm" /></template>
     </OButton>
     <OButton
       :active="fieldObj.sortBy === 'ASC'"
@@ -44,9 +42,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "SortByBtnGrp",
-  components: { OButtonGroup, AscSort, DescSort, OButton,
-    OIcon,
-},
+  components: { OButtonGroup, AscSort, DescSort, OButton, OIcon },
   props: {
     fieldObj: {
       type: Object,
@@ -54,13 +50,8 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
-    const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
 
     // same object reference as props.fieldObj; nested mutation is unchanged
     const fieldObjModel = computed(() => props.fieldObj);

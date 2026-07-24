@@ -17,7 +17,6 @@ import { describe, it, expect } from "vitest";
 import { sanitizeStreamName, sanitizeStaticPart } from "./pipelineCommonValidation";
 
 describe("pipelineCommonValidation", () => {
-
   describe("sanitizeStreamName", () => {
     describe("Basic functionality", () => {
       it("should sanitize simple alphanumeric string", () => {

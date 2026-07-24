@@ -450,7 +450,10 @@ describe("useVariablesManager", () => {
           type: "custom",
           scope: "global",
           value: "value1",
-          options: [{ label: "value1", value: "value1" }, { label: "value2", value: "value2" }],
+          options: [
+            { label: "value1", value: "value1" },
+            { label: "value2", value: "value2" },
+          ],
         },
         {
           name: "child",
@@ -496,7 +499,7 @@ describe("useVariablesManager", () => {
       expect(urlParams).toEqual(
         expect.objectContaining({
           "var-country": "USA",
-        })
+        }),
       );
     });
 
@@ -523,7 +526,7 @@ describe("useVariablesManager", () => {
       expect(urlParams).toEqual(
         expect.objectContaining({
           "var-region.t.tab-1": "CA",
-        })
+        }),
       );
     });
 
@@ -550,7 +553,7 @@ describe("useVariablesManager", () => {
       expect(urlParams).toEqual(
         expect.objectContaining({
           "var-status.p.panel-123": "200",
-        })
+        }),
       );
     });
 

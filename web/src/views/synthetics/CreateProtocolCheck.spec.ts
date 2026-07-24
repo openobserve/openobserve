@@ -100,7 +100,7 @@ const baseStubs = {
     inheritAttrs: true,
   },
   OIcon: {
-    template: '<span />',
+    template: "<span />",
     props: ["name", "size", "class"],
   },
   ODialog: {
@@ -110,16 +110,8 @@ const baseStubs = {
     inheritAttrs: true,
   },
   CheckConfigure: {
-    template:
-      '<div data-test="synthetics-check-configure"><slot name="type-config" /></div>',
-    props: [
-      "check",
-      "checkType",
-      "locations",
-      "destinations",
-      "folders",
-      "class",
-    ],
+    template: '<div data-test="synthetics-check-configure"><slot name="type-config" /></div>',
+    props: ["check", "checkType", "locations", "destinations", "folders", "class"],
   },
   CreateBrowserTestSkeleton: {
     template: '<div data-test="synthetics-loading-skeleton" />',
@@ -179,21 +171,15 @@ describe("CreateProtocolCheck", () => {
       await flushPromises();
 
       expect(wrapper.exists()).toBe(true);
-      expect(
-        wrapper.find('[data-test="synthetics-check-configure"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-check-configure"]').exists()).toBe(true);
     });
 
     it("should render the cancel and save buttons in the footer", async () => {
       wrapper = mountPage("http");
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="synthetics-create-cancel-btn"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="synthetics-create-save-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-create-cancel-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-create-save-btn"]').exists()).toBe(true);
     });
   });
 
@@ -202,36 +188,28 @@ describe("CreateProtocolCheck", () => {
       wrapper = mountPage("http");
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="synthetics-http-config"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-http-config"]').exists()).toBe(true);
     });
 
     it("should render TCP config when checkType is tcp", async () => {
       wrapper = mountPage("tcp");
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="synthetics-tcp-config"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-tcp-config"]').exists()).toBe(true);
     });
 
     it("should render TLS config when checkType is tls", async () => {
       wrapper = mountPage("tls");
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="synthetics-tls-config"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-tls-config"]').exists()).toBe(true);
     });
 
     it("should render SSH config when checkType is ssh", async () => {
       wrapper = mountPage("ssh");
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="synthetics-ssh-config"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-ssh-config"]').exists()).toBe(true);
     });
   });
 

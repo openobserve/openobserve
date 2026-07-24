@@ -48,8 +48,8 @@ vi.mock("@/utils/dashboard/datetimeStartPoint", () => ({
 
 // Mock dateTimeUtils: isTimeSeries returns true when the value is an ISO string
 vi.mock("@/utils/dashboard/dateTimeUtils", () => ({
-  isTimeSeries: vi.fn((arr: any[]) =>
-    typeof arr[0] === "string" && /\d{4}-\d{2}-\d{2}T/.test(arr[0]),
+  isTimeSeries: vi.fn(
+    (arr: any[]) => typeof arr[0] === "string" && /\d{4}-\d{2}-\d{2}T/.test(arr[0]),
   ),
 }));
 
@@ -270,9 +270,7 @@ describe("fillMissingValues", () => {
     // xAxisKeys = ["ts"], breakDownKeys = ["service"]
     // uniqueKey = "service" (first xAxisKeysWithoutTimeStamp is undefined, so falls to breakdown)
     // map key = "2024-01-15T10:00:00-frontend" → currentData found → pushed directly
-    const processedData = [
-      { ts: "2024-01-15T10:00:00", service: "frontend", value: 200 },
-    ];
+    const processedData = [{ ts: "2024-01-15T10:00:00", service: "frontend", value: 200 }];
     const result = fillMissingValues(
       processedData,
       makePanelSchema("stacked"),
@@ -297,9 +295,7 @@ describe("fillMissingValues", () => {
     // processedData has ts "2024-01-15T09:00:00" → map key "2024-01-15T09:00:00-backend"
     // format mock returns "2024-01-15T10:00:00" → lookup key "2024-01-15T10:00:00-backend" → not found
     // → null entry inserted with noValueConfigOption for non-time, non-uniqueKey fields
-    const processedData = [
-      { ts: "2024-01-15T09:00:00", service: "backend", value: 75 },
-    ];
+    const processedData = [{ ts: "2024-01-15T09:00:00", service: "backend", value: 75 }];
     const result = fillMissingValues(
       processedData,
       makePanelSchema("bar"),
@@ -343,11 +339,7 @@ describe("fillMissingValues", () => {
   });
 
   // Metadata array with a single chunk whose time_offset is explicit
-  const makeChunkMetaData = (
-    chunkStartMs: number,
-    chunkEndMs: number,
-    interval: number,
-  ) => [
+  const makeChunkMetaData = (chunkStartMs: number, chunkEndMs: number, interval: number) => [
     {
       histogram_interval: interval,
       time_offset: {
@@ -380,9 +372,7 @@ describe("fillMissingValues", () => {
 
     // The right-edge anchor is at binnedDate(userEnd) — with dateBin mock
     // returning the passed-in date, that formats to userEnd's ISO string.
-    const anchor = result.find(
-      (r: any) => r.ts === new Date(userEnd).toISOString().slice(0, 19),
-    );
+    const anchor = result.find((r: any) => r.ts === new Date(userEnd).toISOString().slice(0, 19));
     expect(anchor).toBeDefined();
     expect(anchor.value).toBe("fallback");
   });
@@ -409,9 +399,7 @@ describe("fillMissingValues", () => {
     );
 
     // The left-edge anchor is at binnedDate(userStart)
-    const anchor = result.find(
-      (r: any) => r.ts === new Date(userStart).toISOString().slice(0, 19),
-    );
+    const anchor = result.find((r: any) => r.ts === new Date(userStart).toISOString().slice(0, 19));
     expect(anchor).toBeDefined();
     expect(anchor.value).toBe("fallback");
   });
@@ -440,12 +428,8 @@ describe("fillMissingValues", () => {
     );
 
     const userEndIso = new Date(userEnd).toISOString().slice(0, 19);
-    const apiAnchor = result.find(
-      (r: any) => r.ts === userEndIso && r.service === "api",
-    );
-    const webAnchor = result.find(
-      (r: any) => r.ts === userEndIso && r.service === "web",
-    );
+    const apiAnchor = result.find((r: any) => r.ts === userEndIso && r.service === "api");
+    const webAnchor = result.find((r: any) => r.ts === userEndIso && r.service === "web");
     expect(apiAnchor).toBeDefined();
     expect(webAnchor).toBeDefined();
     // Anchor uses noValueConfigOption
@@ -477,12 +461,8 @@ describe("fillMissingValues", () => {
     );
 
     const userStartIso = new Date(userStart).toISOString().slice(0, 19);
-    const apiAnchor = result.find(
-      (r: any) => r.ts === userStartIso && r.service === "api",
-    );
-    const webAnchor = result.find(
-      (r: any) => r.ts === userStartIso && r.service === "web",
-    );
+    const apiAnchor = result.find((r: any) => r.ts === userStartIso && r.service === "api");
+    const webAnchor = result.find((r: any) => r.ts === userStartIso && r.service === "web");
     expect(apiAnchor).toBeDefined();
     expect(webAnchor).toBeDefined();
     expect(apiAnchor.value).toBe(0);
@@ -514,8 +494,8 @@ describe("fillMissingValues", () => {
       ["value"],
       [],
       [],
-      0,     // noValueConfigOption
-      true,  // loading = streaming
+      0, // noValueConfigOption
+      true, // loading = streaming
     );
 
     // Minute 0 has data
@@ -549,21 +529,17 @@ describe("fillMissingValues", () => {
       ["value"],
       [],
       [],
-      0,     // noValueConfigOption
-      true,  // loading = streaming
+      0, // noValueConfigOption
+      true, // loading = streaming
     );
 
     // Minute 3 should be filled with noValueConfigOption
-    const filledEntry = result.find(
-      (r: any) => r.ts === "2024-01-15T10:03:00",
-    );
+    const filledEntry = result.find((r: any) => r.ts === "2024-01-15T10:03:00");
     expect(filledEntry).toBeDefined();
     expect(filledEntry.value).toBe(0);
 
     // Minute 5 (userEnd) should also be filled — no clamping to actualMaxTime
-    const userEndEntry = result.find(
-      (r: any) => r.ts === "2024-01-15T10:05:00",
-    );
+    const userEndEntry = result.find((r: any) => r.ts === "2024-01-15T10:05:00");
     expect(userEndEntry).toBeDefined();
     expect(userEndEntry.value).toBe(0);
   });
@@ -756,10 +732,7 @@ describe("fillMissingValues", () => {
 
   it("handles multiple resultMetaData entries: uses first histogram_interval", () => {
     // Only the first resultMetaData's histogram_interval is used (line 56-58)
-    const multiMeta = [
-      { histogram_interval: 60 },
-      { histogram_interval: 120 },
-    ];
+    const multiMeta = [{ histogram_interval: 60 }, { histogram_interval: 120 }];
     const processedData = [{ ts: "2024-01-15T10:00:00", value: 42 }];
     const result = fillMissingValues(
       processedData,

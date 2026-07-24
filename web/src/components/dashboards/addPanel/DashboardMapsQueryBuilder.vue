@@ -17,22 +17,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div v-if="!promqlMode && dashboardPanelData.data.type == 'maps'">
     <!-- name container -->
-    <div class="pl-3 flex flex-row">
-      <div class="whitespace-nowrap min-w-20 flex items-center">
+    <div class="flex flex-row pl-3">
+      <div class="flex min-w-20 items-center whitespace-nowrap">
         <span
-          class="w-2 h-2 rounded-default mr-1.5 shrink-0 bg-badge-indigo-ol-text"
+          class="rounded-default bg-badge-indigo-ol-text mr-1.5 h-2 w-2 shrink-0"
           aria-hidden="true"
         ></span>
         {{ t("panel.mapname") }}
         <OIcon name="info-outline" size="sm" class="ml-1" />
-          <OTooltip :content="Hint" />
+        <OTooltip :content="Hint" />
       </div>
-      <span class="flex items-center ml-0.5 mr-0.5">:</span>
+      <span class="mr-0.5 ml-0.5 flex items-center">:</span>
       <div
-        class="axis-container flex-1 w-full flex flex-wrap items-center min-h-8 droppable border-transparent border-dashed border scroll"
+        class="axis-container droppable scroll flex min-h-8 w-full flex-1 flex-wrap items-center border border-dashed border-transparent"
         :class="{
-          'bg-[rgba(0,0,0,0.042)] border-white [border-style:dotted]': dashboardPanelData.meta.dragAndDrop.dragging,
-          'transition-colors duration-200 bg-field-list-row-hover-bg':
+          '[border-style:dotted] border-white bg-[rgba(0,0,0,0.042)]':
+            dashboardPanelData.meta.dragAndDrop.dragging,
+          'bg-field-list-row-hover-bg transition-colors duration-200':
             dashboardPanelData.meta.dragAndDrop.dragging &&
             dashboardPanelData.meta.dragAndDrop.currentDragArea == 'name',
         }"
@@ -43,21 +44,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-name-layout"
       >
         <OButtonGroup
-          class="axis-field overflow-hidden mr-2 my-0.5 border border-border-default border-s-2 border-s-badge-indigo-ol-border bg-surface-panel"
+          class="axis-field border-border-default border-s-badge-indigo-ol-border bg-surface-panel my-0.5 mr-2 overflow-hidden border border-s-2"
           radius="sm"
           :divided="false"
           v-if="
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields?.name
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+              ?.name
           "
           :draggable="true"
           @dragstart="
             onFieldDragStart(
               $event,
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields?.name,
+              dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+                ?.name,
               'name',
             )
           "
@@ -65,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="icon-chip"
-            class="cursor-grab !w-4"
+            class="!w-4 cursor-grab"
             :data-test="`dashboard-name-item-${nameLabel}-drag`"
           >
             <template #icon-left>
@@ -81,23 +80,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`dashboard-name-item-${nameLabel}`"
               >
                 <AxisFieldChipLabel :label="nameLabel" />
-                <template #icon-right><OIcon name="arrow-drop-down" size="sm"
-                /></template>
+                <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-maps-query-builder-dropdown w-[48.1875rem]! shadow-md overflow-hidden p-0 translate-y-2 rounded-none"
+              class="field-function-menu-popup dashboard-maps-query-builder-dropdown w-[48.1875rem]! translate-y-2 overflow-hidden rounded-none p-0 shadow-md"
               :data-test="`dashboard-name-item-${nameLabel}-menu`"
             >
-              <div class="pt-0.75 pr-4 pb-4 pl-4"
+              <div
+                class="pt-0.75 pr-4 pb-4 pl-4"
                 :style="{
                   width:
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].customQuery ||
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].fields.name.isDerived
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .customQuery ||
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .fields.name.isDerived
                       ? 'auto'
                       : '771px',
                 }"
@@ -106,15 +103,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="mr-1 mb-2">
                     <DynamicFunctionPopUp
                       v-model="
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.name
+                        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                          .fields.name
                       "
                       :allowAggregation="false"
                       :customQuery="
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].customQuery
+                        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                          .customQuery
                       "
                       :chartType="dashboardPanelData.data.type"
                     />
@@ -126,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="icon-chip"
-            class="!w-4 -ms-1"
+            class="-ms-1 !w-4"
             :data-test="`dashboard-name-item-${nameLabel}-remove`"
             @click="removeMapName()"
           >
@@ -134,11 +129,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="text-xs text-center flex-1 min-w-0 flex justify-center items-center whitespace-nowrap"
+          class="flex min-w-0 flex-1 items-center justify-center text-center text-xs whitespace-nowrap"
           v-if="
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.name == null
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+              .name == null
           "
         >
           <div>{{ Hint }}</div>
@@ -147,25 +141,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <OSeparator />
     <!-- value for maps container -->
-    <div class="pl-3 flex flex-row">
-      <div class="whitespace-nowrap min-w-20 flex items-center">
+    <div class="flex flex-row pl-3">
+      <div class="flex min-w-20 items-center whitespace-nowrap">
         <span
-          class="w-2 h-2 rounded-default mr-1.5 shrink-0 bg-badge-success-ol-text"
+          class="rounded-default bg-badge-success-ol-text mr-1.5 h-2 w-2 shrink-0"
           aria-hidden="true"
         ></span>
         {{ t("panel.mapvalue") }}
         <OIcon name="info-outline" size="sm" class="ml-1" />
-          <OTooltip :content="Hint" />
+        <OTooltip :content="Hint" />
       </div>
-      <span class="flex items-center ml-0.5 mr-0.5">:</span>
+      <span class="mr-0.5 ml-0.5 flex items-center">:</span>
       <div
-        class="axis-container flex-1 w-full flex flex-wrap items-center min-h-8 droppable border-transparent border-dashed border scroll"
+        class="axis-container droppable scroll flex min-h-8 w-full flex-1 flex-wrap items-center border border-dashed border-transparent"
         :class="{
-          'bg-[rgba(0,0,0,0.042)] border-white [border-style:dotted]': dashboardPanelData.meta.dragAndDrop.dragging,
-          'transition-colors duration-200 bg-field-list-row-hover-bg':
+          '[border-style:dotted] border-white bg-[rgba(0,0,0,0.042)]':
+            dashboardPanelData.meta.dragAndDrop.dragging,
+          'bg-field-list-row-hover-bg transition-colors duration-200':
             dashboardPanelData.meta.dragAndDrop.dragging &&
-            dashboardPanelData.meta.dragAndDrop.currentDragArea ==
-              'value_for_maps',
+            dashboardPanelData.meta.dragAndDrop.currentDragArea == 'value_for_maps',
         }"
         @dragend="onDragEnd()"
         @dragover="onDragOver($event, 'value_for_maps')"
@@ -174,21 +168,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-value_for_maps-layout"
       >
         <OButtonGroup
-          class="axis-field overflow-hidden mr-2 my-0.5 border border-border-default border-s-2 border-s-badge-success-ol-border bg-surface-panel"
+          class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel my-0.5 mr-2 overflow-hidden border border-s-2"
           radius="sm"
           :divided="false"
           v-if="
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields?.value_for_maps
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+              ?.value_for_maps
           "
           :draggable="true"
           @dragstart="
             onFieldDragStart(
               $event,
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields?.value_for_maps,
+              dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+                ?.value_for_maps,
               'value_for_maps',
             )
           "
@@ -196,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="icon-chip"
-            class="cursor-grab !w-4"
+            class="!w-4 cursor-grab"
             :data-test="`dashboard-value_for_maps-item-${valueLabel}-drag`"
           >
             <template #icon-left>
@@ -212,23 +204,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`dashboard-value_for_maps-item-${valueLabel}`"
               >
                 <AxisFieldChipLabel :label="valueLabel" />
-                <template #icon-right><OIcon name="arrow-drop-down" size="sm"
-                /></template>
+                <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-maps-query-builder-dropdown w-[48.1875rem]! shadow-md overflow-hidden p-0 translate-y-2 rounded-none"
+              class="field-function-menu-popup dashboard-maps-query-builder-dropdown w-[48.1875rem]! translate-y-2 overflow-hidden rounded-none p-0 shadow-md"
               :data-test="`dashboard-value_for_maps-item-${valueLabel}-menu`"
             >
-              <div class="pt-0.75 pr-4 pb-4 pl-4"
+              <div
+                class="pt-0.75 pr-4 pb-4 pl-4"
                 :style="{
                   width:
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].customQuery ||
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].fields.value_for_maps.isDerived
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .customQuery ||
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .fields.value_for_maps.isDerived
                       ? 'auto'
                       : '771px',
                 }"
@@ -237,15 +227,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="mr-1 mb-2">
                     <DynamicFunctionPopUp
                       v-model="
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.value_for_maps
+                        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                          .fields.value_for_maps
                       "
                       :allowAggregation="true"
                       :customQuery="
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].customQuery
+                        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                          .customQuery
                       "
                       :chartType="dashboardPanelData.data.type"
                     />
@@ -257,7 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="icon-chip"
-            class="!w-4 -ms-1"
+            class="-ms-1 !w-4"
             :data-test="`dashboard-value_for_maps-item-${valueLabel}-remove`"
             @click="removeMapValue()"
           >
@@ -265,11 +253,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="text-xs text-center flex-1 min-w-0 flex justify-center items-center whitespace-nowrap"
+          class="flex min-w-0 flex-1 items-center justify-center text-center text-xs whitespace-nowrap"
           v-if="
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.value_for_maps == null
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+              .value_for_maps == null
           "
         >
           <div>{{ Hint }}</div>
@@ -278,27 +265,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <template v-if="showJoinsAndFilters">
       <OSeparator />
-      <DashboardJoinsOption
-        :dashboardData="dashboardData"
-      ></DashboardJoinsOption>
+      <DashboardJoinsOption :dashboardData="dashboardData"></DashboardJoinsOption>
       <OSeparator />
       <!-- filters container -->
-      <DashboardFiltersOption
-        :dashboardData="dashboardData"
-      ></DashboardFiltersOption>
+      <DashboardFiltersOption :dashboardData="dashboardData"></DashboardFiltersOption>
     </template>
   </div>
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  reactive,
-  watch,
-  computed,
-  inject,
-} from "vue";
+import { defineComponent, ref, reactive, watch, computed, inject } from "vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
@@ -341,10 +317,7 @@ export default defineComponent({
       filter: false,
     });
 
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
 
     const {
       dashboardPanelData,
@@ -420,24 +393,18 @@ export default defineComponent({
         const dragElement = dashboardPanelData.meta.dragAndDrop.dragElement;
 
         const currentQueryField =
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields;
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields;
         if (targetAxis !== "f") {
           if (
             (targetAxis === "name" && currentQueryField.name) ||
-            (targetAxis === "value_for_maps" &&
-              currentQueryField.value_for_maps)
+            (targetAxis === "value_for_maps" && currentQueryField.value_for_maps)
           ) {
             const maxAllowedAxisFields = 1;
 
-            const errorMessage = t(
-              "dashboard.dashboardMapsQueryBuilder.maxFieldAllowed",
-              {
-                count: maxAllowedAxisFields,
-                axis: targetAxis.toUpperCase(),
-              },
-            );
+            const errorMessage = t("dashboard.dashboardMapsQueryBuilder.maxFieldAllowed", {
+              count: maxAllowedAxisFields,
+              axis: targetAxis.toUpperCase(),
+            });
 
             showErrorNotification(errorMessage);
             cleanupDraggingFields();
@@ -462,9 +429,7 @@ export default defineComponent({
         )?.value;
 
         if (!firstFieldTypeArg) {
-          showErrorNotification(
-            t("dashboard.dashboardMapsQueryBuilder.withoutFieldNotDrag"),
-          );
+          showErrorNotification(t("dashboard.dashboardMapsQueryBuilder.withoutFieldNotDrag"));
           cleanupDraggingFields();
           return;
         }
@@ -494,17 +459,12 @@ export default defineComponent({
     };
 
     const onDragEnter = (e: any, area: string, index: any) => {
-      if (
-        dashboardPanelData.meta.dragAndDrop.dragSource != "fieldList" &&
-        area === "f"
-      ) {
+      if (dashboardPanelData.meta.dragAndDrop.dragSource != "fieldList" && area === "f") {
         e.preventDefault();
         return;
       }
       dashboardPanelData.meta.dragAndDrop.targetDragIndex =
-        index != null && index >= 0
-          ? index
-          : dashboardPanelData.meta.dragAndDrop.targetDragIndex;
+        index != null && index >= 0 ? index : dashboardPanelData.meta.dragAndDrop.targetDragIndex;
       dashboardPanelData.meta.dragAndDrop.currentDragArea = area;
       e.preventDefault();
     };
@@ -529,20 +489,15 @@ export default defineComponent({
 
     const commonBtnLabel = (field: any) => {
       if (
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery
       ) {
         return field?.alias;
       }
       const label = buildSQLQueryFromInput(
         field,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.joins?.length
-          ? dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields?.stream
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.joins?.length
+          ? dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+              ?.stream
           : "",
       );
 
@@ -553,17 +508,14 @@ export default defineComponent({
 
     const nameLabel = computed(() => {
       const nameField =
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.name;
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.name;
       return commonBtnLabel(nameField);
     });
 
     const valueLabel = computed(() => {
       const valueField =
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.value_for_maps;
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+          .value_for_maps;
       return commonBtnLabel(valueField);
     });
 
@@ -572,12 +524,8 @@ export default defineComponent({
     // double border.
     const showJoinsAndFilters = computed(() => {
       const currentQuery =
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ];
-      return !(
-        currentQuery?.customQuery && dashboardPanelData.data.queryType === "sql"
-      );
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
+      return !(currentQuery?.customQuery && dashboardPanelData.data.queryType === "sql");
     });
 
     return {

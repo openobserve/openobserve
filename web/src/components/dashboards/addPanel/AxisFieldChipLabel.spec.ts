@@ -64,14 +64,10 @@ describe("AxisFieldChipLabel", () => {
       wrapper = mountLabel({
         label: "count(count(distinct(anomaly_id)))",
       });
-      const brackets = leafSpans(wrapper).filter(
-        (s) => s.text === "(" || s.text === ")",
-      );
+      const brackets = leafSpans(wrapper).filter((s) => s.text === "(" || s.text === ")");
       // opens: depth 0,1,2 → bracket-1,2,3 ; closes ascend back 2,1,0 → 3,2,1
       const depthClass = (s: { class: string }) =>
-        ["text-bracket-1", "text-bracket-2", "text-bracket-3"].find((c) =>
-          s.class.includes(c),
-        );
+        ["text-bracket-1", "text-bracket-2", "text-bracket-3"].find((c) => s.class.includes(c));
       expect(brackets.map(depthClass)).toEqual([
         "text-bracket-1",
         "text-bracket-2",

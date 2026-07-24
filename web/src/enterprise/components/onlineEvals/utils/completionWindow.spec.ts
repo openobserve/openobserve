@@ -162,10 +162,7 @@ describe("durationPartsFromSecs", () => {
     expect(Object.values(parts!).every((v) => typeof v === "number")).toBe(true);
   });
 
-  it.each(["", "   ", "0", "-60", "abc"])(
-    "has no duration to show for %s",
-    (value) => {
-      expect(durationPartsFromSecs(value)).toBeNull();
-    },
-  );
+  it.each(["", "   ", "0", "-60", "abc"])("has no duration to show for %s", (value) => {
+    expect(durationPartsFromSecs(value)).toBeNull();
+  });
 });

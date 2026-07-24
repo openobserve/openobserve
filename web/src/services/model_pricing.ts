@@ -38,7 +38,10 @@ const modelPricing = {
   refreshBuiltIn: (org_identifier: string) => {
     return http().post(`/api/${org_identifier}/llm/models/refresh-built-in`, {});
   },
-  test: (org_identifier: string, data: { model_name: string; usage?: Record<string, number>; timestamp?: number | null }) => {
+  test: (
+    org_identifier: string,
+    data: { model_name: string; usage?: Record<string, number>; timestamp?: number | null },
+  ) => {
     return http().post(`/api/${org_identifier}/llm/models/test`, data);
   },
 };

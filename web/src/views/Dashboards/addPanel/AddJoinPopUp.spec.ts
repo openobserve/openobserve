@@ -49,7 +49,6 @@ const i18n = createI18n({
   },
 });
 
-
 describe("AddJoinPopUp", () => {
   let wrapper: any;
   let store: any;
@@ -99,9 +98,7 @@ describe("AddJoinPopUp", () => {
   });
 
   it("renders correctly", () => {
-    expect(wrapper.find('[data-test="dashboard-join-pop-up"]').exists()).toBe(
-      true,
-    );
+    expect(wrapper.find('[data-test="dashboard-join-pop-up"]').exists()).toBe(true);
   });
 
   it("displays correct join type", () => {
@@ -150,9 +147,7 @@ describe("AddJoinPopUp", () => {
     expect(wrapper.props().modelValue.conditions.length).toBe(2);
 
     // Then remove one
-    const removeBtn = wrapper.find(
-      '[data-test="dashboard-join-condition-remove-0"]',
-    );
+    const removeBtn = wrapper.find('[data-test="dashboard-join-condition-remove-0"]');
     await removeBtn.trigger("click");
     expect(wrapper.props().modelValue.conditions.length).toBe(1);
   });
@@ -166,9 +161,7 @@ describe("AddJoinPopUp", () => {
   });
 
   it("handles stream selection change", async () => {
-    const selectElement = wrapper.find(
-      '[data-test="dashboard-config-panel-join-to"]',
-    );
+    const selectElement = wrapper.find('[data-test="dashboard-config-panel-join-to"]');
     expect(selectElement.exists()).toBe(true);
 
     // Test that changing stream updates modelValue
@@ -397,9 +390,7 @@ describe("AddJoinPopUp", () => {
     wrapper.vm.handleAddCondition(2);
     await wrapper.vm.$nextTick();
 
-    expect(wrapper.props().modelValue.conditions.length).toBeGreaterThan(
-      initialLength,
-    );
+    expect(wrapper.props().modelValue.conditions.length).toBeGreaterThan(initialLength);
   });
 
   it("verifies main stream prop is used correctly", () => {

@@ -45,9 +45,7 @@ const usePromqlSuggestions = () => {
       // Get start and end position from regex return object
       meta.label.position.start = curlyBracesRegexMatch.index || 0;
       meta.label.position.end =
-        (curlyBracesRegexMatch.index || 0) +
-        curlyBracesRegexMatch[1].length +
-        1;
+        (curlyBracesRegexMatch.index || 0) + curlyBracesRegexMatch[1].length + 1;
     }
     // Extract labels
     const labelsMatch = query.match(/\{(.+?)\}/);
@@ -58,9 +56,7 @@ const usePromqlSuggestions = () => {
       if (labelPairs?.length)
         labelPairs.forEach((pair) => {
           const matchResult = pair.match(/(\w+)="([^"]*)"/);
-          const [key, value] = matchResult
-            ? matchResult.slice(1)
-            : [null, null];
+          const [key, value] = matchResult ? matchResult.slice(1) : [null, null];
           if (key && value) labels[key] = value;
         });
     }
@@ -90,8 +86,8 @@ const usePromqlSuggestions = () => {
       labelMeta.hasLabels = true;
       labelMeta.isEmpty = !hasCurlyBraces[1].length;
       labelMeta.isFocused =
-        hasCurlyBraces.index <= (cursorIndex) &&
-        hasCurlyBraces.index + hasCurlyBraces[1].length >= (cursorIndex);
+        hasCurlyBraces.index <= cursorIndex &&
+        hasCurlyBraces.index + hasCurlyBraces[1].length >= cursorIndex;
     }
 
     if (hasCurlyBraces) {
@@ -122,11 +118,7 @@ const usePromqlSuggestions = () => {
       if (start <= cursorIndex && cursorIndex <= end) {
         if (cursorIndex - start < key.length) {
           labelMeta["focusOn"] = "label";
-        } else if (
-          key &&
-          value &&
-          cursorIndex - start < key.length + value.length
-        ) {
+        } else if (key && value && cursorIndex - start < key.length + value.length) {
           labelMeta["focusOn"] = "value";
         }
 
@@ -183,10 +175,7 @@ const usePromqlSuggestions = () => {
 
       const cursorIndex = autoCompleteData.value.position.cursorIndex;
 
-      const labelFocus: any = analyzeLabelFocus(
-        autoCompleteData.value.query,
-        cursorIndex
-      );
+      const labelFocus: any = analyzeLabelFocus(autoCompleteData.value.query, cursorIndex);
 
       if (cursorIndex === -1) return;
 
@@ -195,9 +184,7 @@ const usePromqlSuggestions = () => {
         return;
       }
 
-
-      if (!(labelFocus.focusOn === "value" || labelFocus.focusOn === "label"))
-        return;
+      if (!(labelFocus.focusOn === "value" || labelFocus.focusOn === "label")) return;
 
       let labelSuggestions: any;
 
@@ -220,7 +207,7 @@ const usePromqlSuggestions = () => {
           labelSuggestions = getLabelSuggestions(
             response.data.data,
             labelFocus,
-            formattedLabels.join(",")
+            formattedLabels.join(","),
           );
         })
         .finally(() => {
@@ -250,10 +237,7 @@ const usePromqlSuggestions = () => {
 
     if (meta.focusOn === "value")
       labels.forEach((label: any) => {
-        if (
-          label[meta.meta.label] &&
-          keywordLabels.indexOf(label[meta.meta.label]) === -1
-        ) {
+        if (label[meta.meta.label] && keywordLabels.indexOf(label[meta.meta.label]) === -1) {
           keywordLabels.push(label[meta.meta.label]);
           keywords.push({
             label: label[meta.meta.label],
@@ -267,15 +251,7 @@ const usePromqlSuggestions = () => {
 
   const updatePromqlKeywords = async (data: any[]) => {
     autoCompletePromqlKeywords.value = [];
-    const functions = [
-      "sum",
-      "avg_over_time",
-      "rate",
-      "avg",
-      "max",
-      "topk",
-      "histogram_quantile",
-    ];
+    const functions = ["sum", "avg_over_time", "rate", "avg", "max", "topk", "histogram_quantile"];
     if (!data.length) {
       functions.forEach((fun) => {
         autoCompletePromqlKeywords.value.push({

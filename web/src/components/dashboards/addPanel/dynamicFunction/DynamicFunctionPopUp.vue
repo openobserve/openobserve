@@ -7,21 +7,18 @@
       <!-- Property pane -->
       <div
         class="flex w-52 shrink-0 flex-col gap-3.5 p-3"
-        :class="fullMode ? 'border-e border-border-default' : ''"
+        :class="fullMode ? 'border-border-default border-e' : ''"
       >
-        <div
-          class="text-compact font-semibold"
-          data-test="dynamic-function-popup-property-label"
-        >
-          {{ t('dashboard.dynamicFunctionPopUp.property') }}
+        <div class="text-compact font-semibold" data-test="dynamic-function-popup-property-label">
+          {{ t("dashboard.dynamicFunctionPopUp.property") }}
         </div>
 
         <div class="flex flex-col gap-1">
           <div
-            class="text-2xs font-semibold text-text-secondary"
+            class="text-2xs text-text-secondary font-semibold"
             data-test="dynamic-function-popup-label-text"
           >
-            {{ t('dashboard.dynamicFunctionPopUp.label') }}
+            {{ t("dashboard.dynamicFunctionPopUp.label") }}
           </div>
           <OInput
             v-model="fields.label"
@@ -32,10 +29,8 @@
         </div>
 
         <div class="flex flex-col gap-1">
-          <div
-            class="text-2xs font-semibold text-text-secondary"
-          >
-            {{ t('dashboard.dynamicFunctionPopUp.alias') }}
+          <div class="text-2xs text-text-secondary font-semibold">
+            {{ t("dashboard.dynamicFunctionPopUp.alias") }}
           </div>
           <OInput
             v-model="fields.alias"
@@ -51,11 +46,8 @@
         </div>
 
         <div v-if="fullMode" class="flex flex-col gap-1">
-          <div
-            class="text-compact font-semibold"
-            data-test="dynamic-function-popup-sort-by-label"
-          >
-            {{ t('dashboard.dynamicFunctionPopUp.sortBy') }}
+          <div class="text-compact font-semibold" data-test="dynamic-function-popup-sort-by-label">
+            {{ t("dashboard.dynamicFunctionPopUp.sortBy") }}
           </div>
           <SortByBtnGrp :fieldObj="fields" />
         </div>
@@ -63,116 +55,104 @@
 
       <!-- Configuration pane. Rendered in fullMode, and also for table charts so
            the non-timestamp / JSON toggles stay reachable in custom-query/derived mode. -->
-      <div
-        v-if="fullMode || chartType === 'table'"
-        class="flex min-w-0 flex-1 flex-col p-3"
-      >
+      <div v-if="fullMode || chartType === 'table'" class="flex min-w-0 flex-1 flex-col p-3">
         <template v-if="fullMode">
-        <div class="mb-3 flex items-center justify-between gap-2">
-          <div class="text-compact font-semibold">
-            {{
-              fields.type === 'build'
-                ? t('dashboard.dynamicFunctionPopUp.configuration')
-                : t('dashboard.rawQueryBuilder.query')
-            }}
-          </div>
-          <OButtonGroup
-            data-test="dynamic-function-popup-tabs"
-            class="ms-auto shrink-0"
-          >
-            <OButton
-              :active="fields.type === 'build'"
-              variant="outline"
-              size="sm"
-              data-test="dynamic-function-popup-tab-build"
-              @click="setFieldType('build')"
-            >
-              {{ t('dashboard.dynamicFunctionPopUp.build') }}
-            </OButton>
-            <OButton
-              :active="fields.type === 'raw'"
-              variant="outline"
-              size="sm"
-              data-test="dynamic-function-popup-tab-raw"
-              @click="setFieldType('raw')"
-            >
-              {{ t('dashboard.dynamicFunctionPopUp.raw') }}
-            </OButton>
-          </OButtonGroup>
-        </div>
-
-        <!-- -m-1 p-1: padding so focus rings aren't clipped, margin keeps alignment -->
-        <div class="min-h-0 max-h-105 overflow-auto -m-1 p-1">
-          <SelectFunction
-            v-if="fields.type === 'build'"
-            v-model="fields"
-            data-test="dynamic-function-popup-select-function"
-            :allowAggregation="allowAggregation"
-          />
-          <RawQueryBuilder
-            v-else
-            v-model="fields"
-            data-test="dynamic-function-popup-raw-query-builder"
-          />
-        </div>
-
-        <div
-          v-if="allowAggregation"
-          class="mt-3 border-t border-border-default pt-3"
-        >
-          <div class="mb-2 flex items-baseline gap-2">
-            <span class="text-compact font-semibold">{{
-              t('dashboard.dynamicFunctionPopUp.having')
-            }}</span>
-            <span class="text-xs text-text-secondary">{{
-              t('dashboard.dynamicFunctionPopUp.havingHint')
-            }}</span>
-
-            <OButton
-              v-if="!isHavingFilterVisible()"
-              variant="outline"
-              size="sm"
-              class="ms-auto"
-              data-test="dynamic-function-popup-having-add-btn"
-              icon-left="add"
-              @click="toggleHavingFilter"
-            >
-              {{ t('dashboard.dynamicFunctionPopUp.add') }}
-            </OButton>
+          <div class="mb-3 flex items-center justify-between gap-2">
+            <div class="text-compact font-semibold">
+              {{
+                fields.type === "build"
+                  ? t("dashboard.dynamicFunctionPopUp.configuration")
+                  : t("dashboard.rawQueryBuilder.query")
+              }}
+            </div>
+            <OButtonGroup data-test="dynamic-function-popup-tabs" class="ms-auto shrink-0">
+              <OButton
+                :active="fields.type === 'build'"
+                variant="outline"
+                size="sm"
+                data-test="dynamic-function-popup-tab-build"
+                @click="setFieldType('build')"
+              >
+                {{ t("dashboard.dynamicFunctionPopUp.build") }}
+              </OButton>
+              <OButton
+                :active="fields.type === 'raw'"
+                variant="outline"
+                size="sm"
+                data-test="dynamic-function-popup-tab-raw"
+                @click="setFieldType('raw')"
+              >
+                {{ t("dashboard.dynamicFunctionPopUp.raw") }}
+              </OButton>
+            </OButtonGroup>
           </div>
 
-          <div
-            v-if="isHavingFilterVisible()"
-            class="flex items-center gap-2"
-          >
-            <div class="w-24 shrink-0">
-              <OSelect
-                v-model="getHavingCondition().operator"
-                :options="havingOperators"
-                data-test="dynamic-function-popup-having-operator"
-              />
+          <!-- -m-1 p-1: padding so focus rings aren't clipped, margin keeps alignment -->
+          <div class="-m-1 max-h-105 min-h-0 overflow-auto p-1">
+            <SelectFunction
+              v-if="fields.type === 'build'"
+              v-model="fields"
+              data-test="dynamic-function-popup-select-function"
+              :allowAggregation="allowAggregation"
+            />
+            <RawQueryBuilder
+              v-else
+              v-model="fields"
+              data-test="dynamic-function-popup-raw-query-builder"
+            />
+          </div>
+
+          <div v-if="allowAggregation" class="border-border-default mt-3 border-t pt-3">
+            <div class="mb-2 flex items-baseline gap-2">
+              <span class="text-compact font-semibold">{{
+                t("dashboard.dynamicFunctionPopUp.having")
+              }}</span>
+              <span class="text-text-secondary text-xs">{{
+                t("dashboard.dynamicFunctionPopUp.havingHint")
+              }}</span>
+
+              <OButton
+                v-if="!isHavingFilterVisible()"
+                variant="outline"
+                size="sm"
+                class="ms-auto"
+                data-test="dynamic-function-popup-having-add-btn"
+                icon-left="add"
+                @click="toggleHavingFilter"
+              >
+                {{ t("dashboard.dynamicFunctionPopUp.add") }}
+              </OButton>
             </div>
 
-            <div class="min-w-0 flex-1">
-              <OInput
-                v-model.number="getHavingCondition().value"
-                type="number"
-                :placeholder="t('dashboard.dynamicFunctionPopUp.value')"
-                data-test="dynamic-function-popup-having-value"
-              />
-            </div>
+            <div v-if="isHavingFilterVisible()" class="flex items-center gap-2">
+              <div class="w-24 shrink-0">
+                <OSelect
+                  v-model="getHavingCondition().operator"
+                  :options="havingOperators"
+                  data-test="dynamic-function-popup-having-operator"
+                />
+              </div>
 
-            <OButton
-              variant="outline"
-              size="icon"
-              class="shrink-0"
-              data-test="dynamic-function-popup-having-cancel-btn"
-              icon-left="close"
-              @click="cancelHavingFilter"
-            >
-            </OButton>
+              <div class="min-w-0 flex-1">
+                <OInput
+                  v-model.number="getHavingCondition().value"
+                  type="number"
+                  :placeholder="t('dashboard.dynamicFunctionPopUp.value')"
+                  data-test="dynamic-function-popup-having-value"
+                />
+              </div>
+
+              <OButton
+                variant="outline"
+                size="icon"
+                class="shrink-0"
+                data-test="dynamic-function-popup-having-cancel-btn"
+                icon-left="close"
+                @click="cancelHavingFilter"
+              >
+              </OButton>
+            </div>
           </div>
-        </div>
         </template>
 
         <div v-if="chartType === 'table'" class="mt-3 flex flex-col gap-1">
@@ -247,19 +227,13 @@ export default {
 
     // if functionName property is missing for build type, selected function Name will be None -> null
     // Ensure functionName property exists for build type fields
-    if (
-      fields.value &&
-      fields.value.type === "build" &&
-      !("functionName" in fields.value)
-    ) {
+    if (fields.value && fields.value.type === "build" && !("functionName" in fields.value)) {
       fields.value.functionName = null;
     }
 
     const store = useStore();
 
-    const fullMode = computed(
-      () => !props.customQuery && !fields.value?.isDerived,
-    );
+    const fullMode = computed(() => !props.customQuery && !fields.value?.isDerived);
 
     watch(
       () => fields.value,
@@ -316,9 +290,7 @@ export default {
     };
 
     const getHavingCondition = () => {
-      return (
-        fields.value.havingConditions?.[0] || { operator: null, value: null }
-      );
+      return fields.value.havingConditions?.[0] || { operator: null, value: null };
     };
 
     return {

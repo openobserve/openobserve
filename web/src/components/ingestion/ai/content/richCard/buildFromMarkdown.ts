@@ -33,8 +33,7 @@ import { parseFrontmatter } from "./parseFrontmatter";
 import { applySubs, applySubsMasked } from "@/components/ingestion/setupCard/subs";
 import { resolveAICardLogo } from "../index";
 
-const str = (v: unknown): string | undefined =>
-  typeof v === "string" ? v : undefined;
+const str = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined);
 
 /** Maps md `stream_type` to the detect streamType union (else traces). */
 const STREAM_TYPES: Record<string, "logs" | "metrics" | "traces"> = {
@@ -120,11 +119,7 @@ export function buildFromMarkdown(
       streamType: STREAM_TYPES[detect.stream_type] ?? "traces",
       // Only the two valid match modes pass through (else exact via undefined).
       match:
-        detect.match === "keyword"
-          ? "keyword"
-          : detect.match === "exact"
-            ? "exact"
-            : undefined,
+        detect.match === "keyword" ? "keyword" : detect.match === "exact" ? "exact" : undefined,
       streamName: str(detect.stream),
       filter: str(detect.filter) ?? "",
       modelLabel: str(detect.model_label),

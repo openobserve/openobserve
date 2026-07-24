@@ -37,7 +37,6 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
 
 import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
 
-
 const i18n = createI18n({
   legacy: false,
   locale: "en",
@@ -110,27 +109,19 @@ describe("DynamicFunctionPopUp", () => {
 
     it("should render property section", () => {
       wrapper = createWrapper();
-      const propertyLabel = wrapper.find(
-        '[data-test="dynamic-function-popup-property-label"]',
-      );
+      const propertyLabel = wrapper.find('[data-test="dynamic-function-popup-property-label"]');
       expect(propertyLabel.text()).toBe("Property");
     });
 
     it("should render label input", () => {
       wrapper = createWrapper();
-      expect(
-        wrapper.find('[data-test="dynamic-function-popup-label-input"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dynamic-function-popup-label-input"]').exists()).toBe(true);
     });
 
     it("should render alias input", () => {
       wrapper = createWrapper();
-      expect(
-        wrapper.find('[data-test="dynamic-function-popup-label-input"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="dynamic-function-popup-alias-input"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dynamic-function-popup-label-input"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dynamic-function-popup-alias-input"]').exists()).toBe(true);
     });
 
     it("should render tabs", () => {
@@ -190,9 +181,7 @@ describe("DynamicFunctionPopUp", () => {
     it("should update label on input", async () => {
       wrapper = createWrapper();
       // OInput renders a div wrapper; find the native input inside it
-      const nativeInput = wrapper.find(
-        '[data-test="dynamic-function-popup-label-input"] input',
-      );
+      const nativeInput = wrapper.find('[data-test="dynamic-function-popup-label-input"] input');
 
       await nativeInput.setValue("Updated Label");
       await flushPromises();
@@ -211,9 +200,7 @@ describe("DynamicFunctionPopUp", () => {
     it("should apply correct theme class to input", () => {
       wrapper = createWrapper({}, mockStoreDark);
       // OInput uses CSS tokens for dark-mode theming; the label input still renders
-      expect(
-        wrapper.find('[data-test="dynamic-function-popup-label-input"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dynamic-function-popup-label-input"]').exists()).toBe(true);
     });
   });
 
@@ -226,9 +213,7 @@ describe("DynamicFunctionPopUp", () => {
     it("should be disabled", () => {
       wrapper = createWrapper();
       // OInput renders a div wrapper; the disabled attr is on the native input inside
-      const nativeInput = wrapper.find(
-        '[data-test="dynamic-function-popup-alias-input"] input',
-      );
+      const nativeInput = wrapper.find('[data-test="dynamic-function-popup-alias-input"] input');
       expect(nativeInput.attributes("disabled")).toBeDefined();
     });
 
@@ -262,9 +247,7 @@ describe("DynamicFunctionPopUp", () => {
 
     it("should switch to Raw tab when raw button is clicked", async () => {
       wrapper = createWrapper();
-      await wrapper
-        .find('[data-test="dynamic-function-popup-tab-raw"]')
-        .trigger("click");
+      await wrapper.find('[data-test="dynamic-function-popup-tab-raw"]').trigger("click");
       await flushPromises();
       expect(wrapper.vm.fields.type).toBe("raw");
     });
@@ -278,9 +261,7 @@ describe("DynamicFunctionPopUp", () => {
         },
       });
 
-      await wrapper
-        .find('[data-test="dynamic-function-popup-tab-raw"]')
-        .trigger("click");
+      await wrapper.find('[data-test="dynamic-function-popup-tab-raw"]').trigger("click");
       await flushPromises();
 
       expect(wrapper.vm.fields.type).toBe("raw");
@@ -296,9 +277,7 @@ describe("DynamicFunctionPopUp", () => {
         },
       });
 
-      await wrapper
-        .find('[data-test="dynamic-function-popup-tab-build"]')
-        .trigger("click");
+      await wrapper.find('[data-test="dynamic-function-popup-tab-build"]').trigger("click");
       await flushPromises();
 
       expect(wrapper.vm.fields.type).toBe("build");
@@ -312,16 +291,12 @@ describe("DynamicFunctionPopUp", () => {
         modelValue: { ...defaultModelValue, isDerived: false },
         customQuery: false,
       });
-      expect(
-        wrapper
-          .find('[data-test="dynamic-function-popup-select-function"]')
-          .exists(),
-      ).toBe(true);
-      expect(
-        wrapper
-          .find('[data-test="dynamic-function-popup-raw-query-builder"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="dynamic-function-popup-select-function"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="dynamic-function-popup-raw-query-builder"]').exists()).toBe(
+        false,
+      );
     });
 
     it("should render Configuration label", () => {
@@ -343,27 +318,19 @@ describe("DynamicFunctionPopUp", () => {
   describe("Tab Panel - Raw", () => {
     it("should show RawQueryBuilder in raw mode", async () => {
       wrapper = createWrapper();
-      await wrapper
-        .find('[data-test="dynamic-function-popup-tab-raw"]')
-        .trigger("click");
+      await wrapper.find('[data-test="dynamic-function-popup-tab-raw"]').trigger("click");
       await flushPromises();
-      expect(
-        wrapper
-          .find('[data-test="dynamic-function-popup-raw-query-builder"]')
-          .exists(),
-      ).toBe(true);
-      expect(
-        wrapper
-          .find('[data-test="dynamic-function-popup-select-function"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="dynamic-function-popup-raw-query-builder"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="dynamic-function-popup-select-function"]').exists()).toBe(
+        false,
+      );
     });
 
     it("should pass modelValue to RawQueryBuilder", async () => {
       wrapper = createWrapper();
-      await wrapper
-        .find('[data-test="dynamic-function-popup-tab-raw"]')
-        .trigger("click");
+      await wrapper.find('[data-test="dynamic-function-popup-tab-raw"]').trigger("click");
       await flushPromises();
       const rawBuilder = wrapper.findComponent({ name: "RawQueryBuilder" });
       expect(rawBuilder.exists()).toBe(true);
@@ -380,9 +347,7 @@ describe("DynamicFunctionPopUp", () => {
       };
       wrapper = createWrapper({ modelValue: customValue });
 
-      await wrapper
-        .find('[data-test="dynamic-function-popup-tab-build"]')
-        .trigger("click");
+      await wrapper.find('[data-test="dynamic-function-popup-tab-build"]').trigger("click");
       await flushPromises();
 
       expect(wrapper.vm.fields.type).toBe("build");
@@ -397,9 +362,7 @@ describe("DynamicFunctionPopUp", () => {
       };
       wrapper = createWrapper({ modelValue: customValue });
 
-      await wrapper
-        .find('[data-test="dynamic-function-popup-tab-raw"]')
-        .trigger("click");
+      await wrapper.find('[data-test="dynamic-function-popup-tab-raw"]').trigger("click");
       await flushPromises();
 
       expect(wrapper.vm.fields.functionName).toBeNull();
@@ -416,9 +379,7 @@ describe("DynamicFunctionPopUp", () => {
       };
       wrapper = createWrapper({ modelValue: customValue });
 
-      await wrapper
-        .find('[data-test="dynamic-function-popup-tab-raw"]')
-        .trigger("click");
+      await wrapper.find('[data-test="dynamic-function-popup-tab-raw"]').trigger("click");
       await flushPromises();
 
       expect(wrapper.vm.fields.args).toHaveLength(1);
@@ -435,14 +396,10 @@ describe("DynamicFunctionPopUp", () => {
         modelValue: { ...defaultModelValue, isDerived: false },
         customQuery: false,
       });
-      expect(
-        wrapper
-          .find('[data-test="dynamic-function-popup-sort-by-label"]')
-          .exists(),
-      ).toBe(true);
-      expect(wrapper.findComponent({ name: "SortByBtnGrp" }).exists()).toBe(
+      expect(wrapper.find('[data-test="dynamic-function-popup-sort-by-label"]').exists()).toBe(
         true,
       );
+      expect(wrapper.findComponent({ name: "SortByBtnGrp" }).exists()).toBe(true);
     });
 
     it("should not show SortByBtnGrp when customQuery is true", () => {
@@ -450,14 +407,10 @@ describe("DynamicFunctionPopUp", () => {
         modelValue: { ...defaultModelValue, isDerived: false },
         customQuery: true,
       });
-      expect(
-        wrapper
-          .find('[data-test="dynamic-function-popup-sort-by-label"]')
-          .exists(),
-      ).toBe(false);
-      expect(wrapper.findComponent({ name: "SortByBtnGrp" }).exists()).toBe(
+      expect(wrapper.find('[data-test="dynamic-function-popup-sort-by-label"]').exists()).toBe(
         false,
       );
+      expect(wrapper.findComponent({ name: "SortByBtnGrp" }).exists()).toBe(false);
     });
 
     it("should not show SortByBtnGrp when isDerived is true", () => {
@@ -465,14 +418,10 @@ describe("DynamicFunctionPopUp", () => {
         modelValue: { ...defaultModelValue, isDerived: true },
         customQuery: false,
       });
-      expect(
-        wrapper
-          .find('[data-test="dynamic-function-popup-sort-by-label"]')
-          .exists(),
-      ).toBe(false);
-      expect(wrapper.findComponent({ name: "SortByBtnGrp" }).exists()).toBe(
+      expect(wrapper.find('[data-test="dynamic-function-popup-sort-by-label"]').exists()).toBe(
         false,
       );
+      expect(wrapper.findComponent({ name: "SortByBtnGrp" }).exists()).toBe(false);
     });
   });
 
@@ -484,21 +433,17 @@ describe("DynamicFunctionPopUp", () => {
 
     it("should show Add button when allowAggregation is true", () => {
       wrapper = createWrapper({ allowAggregation: true });
-      expect(
-        wrapper
-          .find('[data-test="dynamic-function-popup-having-add-btn"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dynamic-function-popup-having-add-btn"]').exists()).toBe(
+        true,
+      );
       expect(wrapper.text()).toContain("Filter on the aggregate");
     });
 
     it("should not show Add button when allowAggregation is false", () => {
       wrapper = createWrapper({ allowAggregation: false });
-      expect(
-        wrapper
-          .find('[data-test="dynamic-function-popup-having-add-btn"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="dynamic-function-popup-having-add-btn"]').exists()).toBe(
+        false,
+      );
     });
 
     it("should toggle having filter visibility when Add button is clicked", async () => {
@@ -506,18 +451,14 @@ describe("DynamicFunctionPopUp", () => {
 
       expect(wrapper.vm.isHavingFilterVisible()).toBe(false);
 
-      await wrapper
-        .find('[data-test="dynamic-function-popup-having-add-btn"]')
-        .trigger("click");
+      await wrapper.find('[data-test="dynamic-function-popup-having-add-btn"]').trigger("click");
       await flushPromises();
 
       expect(wrapper.vm.isHavingFilterVisible()).toBe(true);
       // Add button is replaced by the operator/value editors
-      expect(
-        wrapper
-          .find('[data-test="dynamic-function-popup-having-add-btn"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="dynamic-function-popup-having-add-btn"]').exists()).toBe(
+        false,
+      );
     });
 
     it("should add having condition on toggle", async () => {
@@ -533,22 +474,16 @@ describe("DynamicFunctionPopUp", () => {
     it("should cancel having filter when cancel button is clicked", async () => {
       wrapper = createWrapper({ allowAggregation: true });
 
-      await wrapper
-        .find('[data-test="dynamic-function-popup-having-add-btn"]')
-        .trigger("click");
+      await wrapper.find('[data-test="dynamic-function-popup-having-add-btn"]').trigger("click");
       await flushPromises();
 
-      await wrapper
-        .find('[data-test="dynamic-function-popup-having-cancel-btn"]')
-        .trigger("click");
+      await wrapper.find('[data-test="dynamic-function-popup-having-cancel-btn"]').trigger("click");
       await flushPromises();
 
       expect(wrapper.vm.fields.havingConditions).toEqual([]);
-      expect(
-        wrapper
-          .find('[data-test="dynamic-function-popup-having-add-btn"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dynamic-function-popup-having-add-btn"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should get having condition", async () => {
@@ -603,15 +538,11 @@ describe("DynamicFunctionPopUp", () => {
       });
 
       expect(
-        wrapper
-          .find('[data-test="dynamic-function-popup-treat-as-non-timestamp"]')
-          .exists(),
+        wrapper.find('[data-test="dynamic-function-popup-treat-as-non-timestamp"]').exists(),
       ).toBe(true);
-      expect(
-        wrapper
-          .find('[data-test="dynamic-function-popup-show-field-as-json"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dynamic-function-popup-show-field-as-json"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should still show table checkboxes in custom-query mode (non-fullMode)", () => {
@@ -622,15 +553,11 @@ describe("DynamicFunctionPopUp", () => {
       });
 
       expect(
-        wrapper
-          .find('[data-test="dynamic-function-popup-treat-as-non-timestamp"]')
-          .exists(),
+        wrapper.find('[data-test="dynamic-function-popup-treat-as-non-timestamp"]').exists(),
       ).toBe(true);
-      expect(
-        wrapper
-          .find('[data-test="dynamic-function-popup-show-field-as-json"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dynamic-function-popup-show-field-as-json"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should not show checkbox for non-table charts", () => {
@@ -641,15 +568,11 @@ describe("DynamicFunctionPopUp", () => {
       });
 
       expect(
-        wrapper
-          .find('[data-test="dynamic-function-popup-treat-as-non-timestamp"]')
-          .exists(),
+        wrapper.find('[data-test="dynamic-function-popup-treat-as-non-timestamp"]').exists(),
       ).toBe(false);
-      expect(
-        wrapper
-          .find('[data-test="dynamic-function-popup-show-field-as-json"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="dynamic-function-popup-show-field-as-json"]').exists()).toBe(
+        false,
+      );
     });
 
     it("should bind treatAsNonTimestamp value", () => {
@@ -712,18 +635,14 @@ describe("DynamicFunctionPopUp", () => {
   describe("Theme Support", () => {
     it("should apply light theme to inputs", () => {
       wrapper = createWrapper({}, mockStore);
-      const labelInput = wrapper.find(
-        '[data-test="dynamic-function-popup-label-input"]',
-      );
+      const labelInput = wrapper.find('[data-test="dynamic-function-popup-label-input"]');
       expect(labelInput.classes()).not.toContain("bg-gray-800");
     });
 
     it("should apply dark theme to inputs", () => {
       wrapper = createWrapper({}, mockStoreDark);
       // OInput uses CSS tokens for dark-mode theming; the element still renders
-      expect(
-        wrapper.find('[data-test="dynamic-function-popup-label-input"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dynamic-function-popup-label-input"]').exists()).toBe(true);
     });
 
     it("should access store theme", () => {
@@ -739,20 +658,14 @@ describe("DynamicFunctionPopUp", () => {
         modelValue: { ...defaultModelValue, isDerived: false },
       });
 
-      expect(
-        wrapper.find('[data-test="dynamic-function-popup-tabs"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="dynamic-function-popup-tabs"]').exists()).toBe(false);
       // Configuration pane is hidden but the Property pane remains
-      expect(
-        wrapper
-          .find('[data-test="dynamic-function-popup-select-function"]')
-          .exists(),
-      ).toBe(false);
-      expect(
-        wrapper
-          .find('[data-test="dynamic-function-popup-property-label"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dynamic-function-popup-select-function"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.find('[data-test="dynamic-function-popup-property-label"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should show tabs when customQuery is false", () => {
@@ -761,9 +674,7 @@ describe("DynamicFunctionPopUp", () => {
         modelValue: { ...defaultModelValue, isDerived: false },
       });
 
-      expect(
-        wrapper.find('[data-test="dynamic-function-popup-tabs"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dynamic-function-popup-tabs"]').exists()).toBe(true);
     });
 
     it("should hide tabs when field is derived", () => {
@@ -772,14 +683,10 @@ describe("DynamicFunctionPopUp", () => {
         modelValue: { ...defaultModelValue, isDerived: true },
       });
 
-      expect(
-        wrapper.find('[data-test="dynamic-function-popup-tabs"]').exists(),
-      ).toBe(false);
-      expect(
-        wrapper
-          .find('[data-test="dynamic-function-popup-property-label"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dynamic-function-popup-tabs"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="dynamic-function-popup-property-label"]').exists()).toBe(
+        true,
+      );
     });
   });
 
@@ -846,18 +753,14 @@ describe("DynamicFunctionPopUp", () => {
 
     it("should apply correct label styles", () => {
       wrapper = createWrapper();
-      const boldLabel = wrapper.find(
-        '[data-test="dynamic-function-popup-property-label"]',
-      );
+      const boldLabel = wrapper.find('[data-test="dynamic-function-popup-property-label"]');
       expect(boldLabel.exists()).toBe(true);
       expect(boldLabel.classes()).toContain("font-semibold");
     });
 
     it("should apply correct normal label styles", () => {
       wrapper = createWrapper();
-      const normalLabel = wrapper.find(
-        '[data-test="dynamic-function-popup-label-text"]',
-      );
+      const normalLabel = wrapper.find('[data-test="dynamic-function-popup-label-text"]');
       expect(normalLabel.exists()).toBe(true);
       // Micro-label styling: small secondary text (normal case, matching main)
       expect(normalLabel.classes()).toContain("font-semibold");
@@ -868,9 +771,7 @@ describe("DynamicFunctionPopUp", () => {
     it("should have edit-input class on inputs", () => {
       wrapper = createWrapper();
       // OInput applies w-full from the class prop on its outer div
-      const labelInput = wrapper.find(
-        '[data-test="dynamic-function-popup-label-input"]',
-      );
+      const labelInput = wrapper.find('[data-test="dynamic-function-popup-label-input"]');
       expect(labelInput.classes()).toContain("w-full");
     });
   });
@@ -879,36 +780,24 @@ describe("DynamicFunctionPopUp", () => {
     it("should render operator select when having filter visible", async () => {
       wrapper = createWrapper({ allowAggregation: true });
 
-      await wrapper
-        .find('[data-test="dynamic-function-popup-having-add-btn"]')
-        .trigger("click");
+      await wrapper.find('[data-test="dynamic-function-popup-having-add-btn"]').trigger("click");
       await flushPromises();
 
-      expect(
-        wrapper
-          .find('[data-test="dynamic-function-popup-having-operator"]')
-          .exists(),
-      ).toBe(true);
-      expect(
-        wrapper
-          .find('[data-test="dynamic-function-popup-having-cancel-btn"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dynamic-function-popup-having-operator"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="dynamic-function-popup-having-cancel-btn"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should render value input when having filter visible", async () => {
       wrapper = createWrapper({ allowAggregation: true });
 
-      await wrapper
-        .find('[data-test="dynamic-function-popup-having-add-btn"]')
-        .trigger("click");
+      await wrapper.find('[data-test="dynamic-function-popup-having-add-btn"]').trigger("click");
       await flushPromises();
 
-      expect(
-        wrapper
-          .find('[data-test="dynamic-function-popup-having-value"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dynamic-function-popup-having-value"]').exists()).toBe(true);
     });
 
     it("should update having condition operator", async () => {
@@ -942,17 +831,13 @@ describe("DynamicFunctionPopUp", () => {
 
       expect(wrapper.vm.fields.type).toBe("build");
 
-      await wrapper
-        .find('[data-test="dynamic-function-popup-tab-raw"]')
-        .trigger("click");
+      await wrapper.find('[data-test="dynamic-function-popup-tab-raw"]').trigger("click");
       await flushPromises();
 
       expect(wrapper.vm.fields.type).toBe("raw");
       expect(wrapper.vm.fields.functionName).toBeNull();
 
-      await wrapper
-        .find('[data-test="dynamic-function-popup-tab-build"]')
-        .trigger("click");
+      await wrapper.find('[data-test="dynamic-function-popup-tab-build"]').trigger("click");
       await flushPromises();
 
       expect(wrapper.vm.fields.type).toBe("build");

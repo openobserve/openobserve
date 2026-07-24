@@ -103,10 +103,13 @@ describe("WorkflowNode", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    setGraph([TRIGGER, CONDITION, FUNCTION, DESTINATION], [
-      { source: "t1", target: "c1" },
-      { source: "c1", target: "d1" },
-    ]);
+    setGraph(
+      [TRIGGER, CONDITION, FUNCTION, DESTINATION],
+      [
+        { source: "t1", target: "c1" },
+        { source: "c1", target: "d1" },
+      ],
+    );
     workflowObj.testRun = {
       show: false,
       input: "",
@@ -171,16 +174,12 @@ describe("WorkflowNode", () => {
   describe("node icon", () => {
     it('renders the pipeline node image as an "img:<url>" glyph', () => {
       wrapper = mountNode("f1", FUNCTION.data);
-      expect(card(wrapper).props("icon")).toBe(
-        "img:mock/images/pipeline/transform_function.png",
-      );
+      expect(card(wrapper).props("icon")).toBe("img:mock/images/pipeline/transform_function.png");
     });
 
     it("uses each type's own image", () => {
       wrapper = mountNode("d1", DESTINATION.data);
-      expect(card(wrapper).props("icon")).toBe(
-        "img:mock/images/pipeline/output_remote.png",
-      );
+      expect(card(wrapper).props("icon")).toBe("img:mock/images/pipeline/output_remote.png");
     });
 
     it('falls back to the "help" glyph for an unknown node_type', () => {
@@ -304,8 +303,7 @@ describe("WorkflowNode", () => {
       wrapper = mountNode("c1", CONDITION.data);
       await wrapper.trigger("mouseenter");
       expect(
-        wrapper.find('[data-test="workflow-node-condition-actions"]').element.style
-          .display,
+        wrapper.find('[data-test="workflow-node-condition-actions"]').element.style.display,
       ).not.toBe("none");
     });
 
@@ -316,14 +314,12 @@ describe("WorkflowNode", () => {
       await wrapper.trigger("mouseleave");
       // still visible immediately after leaving
       expect(
-        wrapper.find('[data-test="workflow-node-condition-actions"]').element.style
-          .display,
+        wrapper.find('[data-test="workflow-node-condition-actions"]').element.style.display,
       ).not.toBe("none");
       vi.advanceTimersByTime(200);
       await nextTick();
       expect(
-        wrapper.find('[data-test="workflow-node-condition-actions"]').element.style
-          .display,
+        wrapper.find('[data-test="workflow-node-condition-actions"]').element.style.display,
       ).toBe("none");
     });
 
@@ -359,8 +355,7 @@ describe("WorkflowNode", () => {
       vi.advanceTimersByTime(500);
       await nextTick();
       expect(
-        wrapper.find('[data-test="workflow-node-condition-actions"]').element.style
-          .display,
+        wrapper.find('[data-test="workflow-node-condition-actions"]').element.style.display,
       ).not.toBe("none");
     });
   });
@@ -369,9 +364,7 @@ describe("WorkflowNode", () => {
     it("tints this node's outgoing edges with its role colour on hover", async () => {
       wrapper = mountNode("c1", CONDITION.data);
       await wrapper.trigger("mouseenter");
-      const edge = workflowObj.currentSelectedWorkflow.edges.find(
-        (e: any) => e.source === "c1",
-      );
+      const edge = workflowObj.currentSelectedWorkflow.edges.find((e: any) => e.source === "c1");
       expect(edge.style).toMatchObject({ stroke: "#f59e0b", strokeWidth: 2 });
       expect(edge.markerEnd).toMatchObject({ color: "#f59e0b" });
     });
@@ -380,8 +373,7 @@ describe("WorkflowNode", () => {
       wrapper = mountNode("t1", TRIGGER.data);
       await wrapper.trigger("mouseenter");
       expect(
-        workflowObj.currentSelectedWorkflow.edges.find((e: any) => e.source === "t1")
-          .style.stroke,
+        workflowObj.currentSelectedWorkflow.edges.find((e: any) => e.source === "t1").style.stroke,
       ).toBe("#3b82f6");
       wrapper.unmount();
 
@@ -389,18 +381,14 @@ describe("WorkflowNode", () => {
       setGraph([DESTINATION], [{ source: "d1", target: "z1" }]);
       wrapper = mountNode("d1", DESTINATION.data);
       await wrapper.trigger("mouseenter");
-      expect(
-        workflowObj.currentSelectedWorkflow.edges[0].style.stroke,
-      ).toBe("#22c55e");
+      expect(workflowObj.currentSelectedWorkflow.edges[0].style.stroke).toBe("#22c55e");
     });
 
     it("resets the edge to the grey token on mouseleave", async () => {
       wrapper = mountNode("c1", CONDITION.data);
       await wrapper.trigger("mouseenter");
       await wrapper.trigger("mouseleave");
-      const edge = workflowObj.currentSelectedWorkflow.edges.find(
-        (e: any) => e.source === "c1",
-      );
+      const edge = workflowObj.currentSelectedWorkflow.edges.find((e: any) => e.source === "c1");
       expect(edge.style.stroke).toBe("var(--color-grey-500)");
       expect(edge.markerEnd.color).toBe("var(--color-grey-500)");
     });
@@ -408,22 +396,16 @@ describe("WorkflowNode", () => {
     it("leaves other nodes' edges untouched", async () => {
       wrapper = mountNode("c1", CONDITION.data);
       await wrapper.trigger("mouseenter");
-      const other = workflowObj.currentSelectedWorkflow.edges.find(
-        (e: any) => e.source === "t1",
-      );
+      const other = workflowObj.currentSelectedWorkflow.edges.find((e: any) => e.source === "t1");
       expect(other.style).toBeUndefined();
     });
 
     it("uses the reset grey for an unknown node type (no role colour)", async () => {
-      setGraph([{ id: "x1", data: { node_type: "not_a_type" } }], [
-        { source: "x1", target: "c1" },
-      ]);
+      setGraph([{ id: "x1", data: { node_type: "not_a_type" } }], [{ source: "x1", target: "c1" }]);
       wrapper = mountNode("x1", { node_type: "not_a_type" });
       await wrapper.trigger("mouseenter");
       // no meta -> ioType defaults to "default" -> amber
-      expect(workflowObj.currentSelectedWorkflow.edges[0].style.stroke).toBe(
-        "#f59e0b",
-      );
+      expect(workflowObj.currentSelectedWorkflow.edges[0].style.stroke).toBe("#f59e0b");
     });
 
     it("does not throw when the workflow has no edges", async () => {
@@ -437,18 +419,14 @@ describe("WorkflowNode", () => {
     it("does not offer delete on the trigger (it is fixed)", async () => {
       wrapper = mountNode("t1", TRIGGER.data);
       await wrapper.trigger("mouseenter");
-      const actions = wrapper.find(
-        '[data-test="workflow-node-workflow_trigger-actions"]',
-      );
+      const actions = wrapper.find('[data-test="workflow-node-workflow_trigger-actions"]');
       expect(actions.element.style.display).toBe("none");
     });
 
     it("opens the delete confirmation for a non-trigger node", async () => {
       wrapper = mountNode("c1", CONDITION.data);
       await wrapper.trigger("mouseenter");
-      await wrapper
-        .find('[data-test="workflow-node-condition-delete-btn"]')
-        .trigger("click");
+      await wrapper.find('[data-test="workflow-node-condition-delete-btn"]').trigger("click");
       expect(workflowObj.deleteConfirm).toEqual({ show: true, nodeId: "c1" });
       expect(toast).not.toHaveBeenCalled();
     });
@@ -543,9 +521,7 @@ describe("WorkflowNode", () => {
     it("renders the green tick for a node that ran clean", () => {
       setResult({ errors: {}, ranNodeIds: ["c1"], blockedNodeIds: [] });
       wrapper = mountNode("c1", CONDITION.data);
-      expect(
-        wrapper.find('[data-test="workflow-node-condition-test-ok"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="workflow-node-condition-test-ok"]').exists()).toBe(true);
     });
 
     it("renders the grey not-verified badge for a blocked (downstream-of-error) node", () => {
@@ -563,9 +539,7 @@ describe("WorkflowNode", () => {
         blockedNodeIds: [],
       });
       wrapper = mountNode("c1", CONDITION.data);
-      expect(
-        wrapper.find('[data-test="workflow-node-condition-test-error"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="workflow-node-condition-test-error"]').exists()).toBe(true);
       expect(wrapper.text()).toContain("boom");
       expect(wrapper.text()).toContain("bang");
     });
@@ -577,12 +551,10 @@ describe("WorkflowNode", () => {
         blockedNodeIds: ["c1"],
       });
       wrapper = mountNode("c1", CONDITION.data);
-      expect(
-        wrapper.find('[data-test="workflow-node-condition-test-error"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="workflow-node-condition-test-skipped"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="workflow-node-condition-test-error"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="workflow-node-condition-test-skipped"]').exists()).toBe(
+        false,
+      );
     });
 
     it("shows the error count only when there is more than one error", () => {
@@ -633,9 +605,7 @@ describe("WorkflowNode", () => {
         blockedNodeIds: [],
       });
       wrapper = mountNode("c1", CONDITION.data);
-      expect(
-        wrapper.find('[data-test="workflow-node-condition-test-error"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="workflow-node-condition-test-error"]').exists()).toBe(true);
       expect(wrapper.find(".wf-test-count").exists()).toBe(false);
     });
 
@@ -646,9 +616,7 @@ describe("WorkflowNode", () => {
         blockedNodeIds: [],
       });
       wrapper = mountNode("c1", CONDITION.data);
-      await wrapper
-        .find('[data-test="workflow-node-condition-test-error"]')
-        .trigger("click");
+      await wrapper.find('[data-test="workflow-node-condition-test-error"]').trigger("click");
       expect(workflowObj.testRun.resultDrawer).toEqual({
         show: true,
         nodeId: "c1",
@@ -658,9 +626,7 @@ describe("WorkflowNode", () => {
     it("the ok badge is not clickable (no drawer)", async () => {
       setResult({ errors: {}, ranNodeIds: ["c1"], blockedNodeIds: [] });
       wrapper = mountNode("c1", CONDITION.data);
-      await wrapper
-        .find('[data-test="workflow-node-condition-test-ok"]')
-        .trigger("click");
+      await wrapper.find('[data-test="workflow-node-condition-test-ok"]').trigger("click");
       expect(workflowObj.testRun.resultDrawer.show).toBe(false);
     });
 
@@ -669,9 +635,7 @@ describe("WorkflowNode", () => {
       expect(wrapper.find(".wf-test-badge").exists()).toBe(false);
       setResult({ errors: {}, ranNodeIds: ["c1"], blockedNodeIds: [] });
       await nextTick();
-      expect(
-        wrapper.find('[data-test="workflow-node-condition-test-ok"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="workflow-node-condition-test-ok"]').exists()).toBe(true);
     });
 
     it("renders no badge when ranNodeIds is missing from the result", () => {
@@ -689,9 +653,7 @@ describe("WorkflowNode", () => {
         blockedNodeIds: [],
       };
       wrapper = mountNode("c1", undefined);
-      expect(
-        wrapper.find('[data-test="workflow-node-undefined-test-ok"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="workflow-node-undefined-test-ok"]').exists()).toBe(true);
     });
 
     it("renders the skipped badge with an undefined type in its data-test", () => {
@@ -701,9 +663,9 @@ describe("WorkflowNode", () => {
         blockedNodeIds: ["c1"],
       };
       wrapper = mountNode("c1", undefined);
-      expect(
-        wrapper.find('[data-test="workflow-node-undefined-test-skipped"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="workflow-node-undefined-test-skipped"]').exists()).toBe(
+        true,
+      );
     });
 
     it("renders the error badge (and its drawer click) with an undefined type", async () => {
@@ -725,12 +687,8 @@ describe("WorkflowNode", () => {
     it("renders the delete button and the actions bar with an undefined type", async () => {
       wrapper = mountNode("c1", undefined);
       await wrapper.trigger("mouseenter");
-      expect(
-        wrapper.find('[data-test="workflow-node-undefined-actions"]').exists(),
-      ).toBe(true);
-      await wrapper
-        .find('[data-test="workflow-node-undefined-delete-btn"]')
-        .trigger("click");
+      expect(wrapper.find('[data-test="workflow-node-undefined-actions"]').exists()).toBe(true);
+      await wrapper.find('[data-test="workflow-node-undefined-delete-btn"]').trigger("click");
       expect(workflowObj.deleteConfirm).toEqual({ show: true, nodeId: "c1" });
     });
 

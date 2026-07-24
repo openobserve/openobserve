@@ -18,7 +18,6 @@ import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 vi.mock("@/services/search", () => ({
   default: {
     search: vi.fn().mockResolvedValue({ data: { hits: [] } }),
@@ -237,9 +236,7 @@ describe("QueryEditorDialog - onFunctionSelect", () => {
   it("emits update:vrlFunction so the parent form keeps the selection", async () => {
     const w = await mountComp({ savedFunctions: FUNCS });
     (w.vm as any).onFunctionSelect("myFn");
-    expect(w.emitted("update:vrlFunction")?.at(-1)).toEqual([
-      ".level = upcase(.level)",
-    ]);
+    expect(w.emitted("update:vrlFunction")?.at(-1)).toEqual([".level = upcase(.level)"]);
   });
 
   it("replaces the body when switching to a different function", async () => {
@@ -296,7 +293,11 @@ describe("QueryEditorDialog - buildMultiWindowQuery", () => {
     const w = await mountComp({
       multiTimeRange: [{ offSet: "1h" }],
     });
-    const result = (w.vm as any).buildMultiWindowQuery("SELECT count(*) FROM logs", false, 600000000);
+    const result = (w.vm as any).buildMultiWindowQuery(
+      "SELECT count(*) FROM logs",
+      false,
+      600000000,
+    );
     expect(result[0].sql).toBe("SELECT count(*) FROM logs");
   });
 
@@ -484,7 +485,7 @@ describe("QueryEditorDialog - ODrawer Migration", () => {
     expect(drawer.props("size")).toBe("full");
   });
 
-  it("renders ODrawer with :show-close=\"false\"", async () => {
+  it('renders ODrawer with :show-close="false"', async () => {
     const w = await mountWithDrawerStub();
     await flushPromises();
     const drawer = w.findComponent(ODrawerStub);
@@ -530,9 +531,7 @@ describe("QueryEditorDialog - ODrawer Migration", () => {
     await flushPromises();
     const drawer = w.findComponent(ODrawerStub);
     // the dialog card lives inside the drawer's default slot
-    expect(
-      drawer.find('[data-test="query-editor-dialog-card"]').exists(),
-    ).toBe(true);
+    expect(drawer.find('[data-test="query-editor-dialog-card"]').exists()).toBe(true);
   });
 
   it("renders ODrawer as the migration wrapper (migration completed)", async () => {

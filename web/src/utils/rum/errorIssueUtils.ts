@@ -16,8 +16,7 @@
 import { formatDistanceToNowStrict } from "date-fns";
 
 /** Escape a value for embedding inside single-quoted SQL string literals. */
-export const escapeSqlString = (value: string): string =>
-  value.replaceAll("'", "''");
+export const escapeSqlString = (value: string): string => value.replaceAll("'", "''");
 
 export interface IssueSignature {
   error_type?: string | null;
@@ -31,9 +30,7 @@ export interface IssueSignature {
  * joined key is collision-free.
  */
 export const issueKey = (row: IssueSignature): string =>
-  `${row.error_type ?? ""}\u0000${row.error_message ?? ""}\u0000${
-    row.error_handling ?? ""
-  }`;
+  `${row.error_type ?? ""}\u0000${row.error_message ?? ""}\u0000${row.error_handling ?? ""}`;
 
 export interface TopFrame {
   file: string;
@@ -50,9 +47,7 @@ const FRAME_TAIL = /([^\s()@]+?):(\d+)(?::\d+)?\)?$/;
  * e.g. "checkout.js:214". Lines without a dot-extension file segment
  * (like "<anonymous>") are skipped. Returns null when nothing parses.
  */
-export const parseTopFrame = (
-  stack?: string | null,
-): TopFrame | null => {
+export const parseTopFrame = (stack?: string | null): TopFrame | null => {
   if (!stack) return null;
   for (const rawLine of stack.split("\n")) {
     const match = rawLine.trim().match(FRAME_TAIL);
@@ -114,9 +109,7 @@ const DROP_FACTOR = 0.5;
 const RECENT_BUCKETS = 4;
 
 const average = (values: number[]): number =>
-  values.length
-    ? values.reduce((sum, value) => sum + value, 0) / values.length
-    : 0;
+  values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
 
 /**
  * Classify an issue's trend from its histogram buckets:
@@ -160,8 +153,7 @@ export const pickLatestDeploy = (
 ): DeployInfo | null => {
   const threshold = windowStart + bucketMicros;
   const candidates = deploys.filter(
-    (deploy) =>
-      deploy.firstSeen > threshold && deploy.firstSeen < windowEnd,
+    (deploy) => deploy.firstSeen > threshold && deploy.firstSeen < windowEnd,
   );
   if (!candidates.length) return null;
   return candidates.reduce((latest, deploy) =>
@@ -183,14 +175,8 @@ const DEPLOY_SPIKE_MIN_BASELINE = 1;
  * Returns null when below the caption threshold, when the pre-deploy
  * baseline is too thin to be meaningful, or when not computable.
  */
-export const computeDeploySpikeFactor = (
-  totals: number[],
-  deployIndex: number,
-): number | null => {
-  if (
-    deployIndex < DEPLOY_SPIKE_MIN_PRE_BUCKETS ||
-    deployIndex >= totals.length
-  ) {
+export const computeDeploySpikeFactor = (totals: number[], deployIndex: number): number | null => {
+  if (deployIndex < DEPLOY_SPIKE_MIN_PRE_BUCKETS || deployIndex >= totals.length) {
     return null;
   }
   const pre = average(totals.slice(0, deployIndex));

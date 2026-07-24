@@ -14,11 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import {
-  parseLe,
-  deaccumulateHistogramSeries,
-  HistogramSeriesInput,
-} from "./histogramBuckets";
+import { parseLe, deaccumulateHistogramSeries, HistogramSeriesInput } from "./histogramBuckets";
 
 describe("parseLe", () => {
   it("parses finite bounds", () => {

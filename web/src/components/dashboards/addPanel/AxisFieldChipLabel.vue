@@ -23,11 +23,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="inline-flex items-center gap-1 leading-none font-normal"
     data-test="dashboard-axis-field-chip-label"
   >
-    <span class="whitespace-nowrap"><span
-      v-for="(seg, i) in segments"
-      :key="i"
-      :class="seg.cls"
-    >{{ seg.text }}</span></span>
+    <span class="whitespace-nowrap"
+      ><span v-for="(seg, i) in segments" :key="i" :class="seg.cls">{{ seg.text }}</span></span
+    >
   </span>
 </template>
 
@@ -55,11 +53,7 @@ const props = withDefaults(
 );
 
 // Parentheses coloured by nesting depth, cycling 3 tokens (Monaco rainbow brackets).
-const BRACKET_CLASSES = [
-  "text-bracket-1",
-  "text-bracket-2",
-  "text-bracket-3",
-] as const;
+const BRACKET_CLASSES = ["text-bracket-1", "text-bracket-2", "text-bracket-3"] as const;
 
 // Split "stream.field" at its last dot into prefix + field. A trailing
 // truncation ellipsis is kept out of the dot search and re-appended to the field.
@@ -108,8 +102,7 @@ const segments = computed<Segment[]>(() => {
       // A word is a function iff the next non-whitespace token is "(".
       let j = i + 1;
       while (j < tokens.length && tokens[j].kind === "space") j++;
-      const isFn =
-        j < tokens.length && tokens[j].raw === "(" && !t.raw.includes(".");
+      const isFn = j < tokens.length && tokens[j].raw === "(" && !t.raw.includes(".");
       if (isFn) {
         out.push({ text: t.raw, cls: props.fnClass });
       } else {

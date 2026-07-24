@@ -27,10 +27,7 @@ export const wrapCsvValue = (val: any): string => {
 
   // Wrap in quotes if the value contains comma, quotes, or newlines
   const needsQuotes =
-    str.includes(",") ||
-    str.includes('"') ||
-    str.includes("\n") ||
-    str.includes("\r");
+    str.includes(",") || str.includes('"') || str.includes("\n") || str.includes("\r");
   return needsQuotes ? `"${str}"` : str;
 };
 
@@ -83,10 +80,7 @@ export function usePanelAlertCreation({
     contextMenuVisible.value = false;
   };
 
-  const handleCreateAlert = (selection: {
-    condition: string;
-    threshold: number;
-  }) => {
+  const handleCreateAlert = (selection: { condition: string; threshold: number }) => {
     hideContextMenu();
 
     // Prepare panel data to pass to alert creation
@@ -126,14 +120,8 @@ export function usePanelAlertCreation({
         // Extract from SQL to get the exact case (without quotes)
         if (sqlQuery) {
           // Look for pattern: aggregation_func(...) as "alias" or aggregation_func(...) as alias
-          const escapedAlias = aliasOrColumn.replace(
-            /[.*+?^${}()|[\]\\]/g,
-            "\\$&",
-          );
-          const regex = new RegExp(
-            `\\s+as\\s+(["']?${escapedAlias}["']?)(?:\\s|,|\\)|$)`,
-            "i",
-          );
+          const escapedAlias = aliasOrColumn.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          const regex = new RegExp(`\\s+as\\s+(["']?${escapedAlias}["']?)(?:\\s|,|\\)|$)`, "i");
           const match = sqlQuery.match(regex);
           if (match && match[1]) {
             // Strip quotes - the parser will add them back if needed
@@ -296,8 +284,7 @@ export function usePanelDownload({
           // Iterate through all datasets/arrays in the response
           data?.value?.forEach((dataset: any) => {
             // Skip if dataset is empty or not an array
-            if (!dataset || !Array.isArray(dataset) || dataset.length === 0)
-              return;
+            if (!dataset || !Array.isArray(dataset) || dataset.length === 0) return;
 
             dataset.forEach((row: any) => {
               flattenedData.push({
@@ -325,18 +312,12 @@ export function usePanelDownload({
           csvContent = [
             headers.join(","), // Headers row
             ...flattenedData.map((row: any) =>
-              headers
-                .map((header: any) => wrapCsvValue(row[header] ?? ""))
-                .join(","),
+              headers.map((header: any) => wrapCsvValue(row[header] ?? "")).join(","),
             ),
           ].join("\r\n");
         }
 
-        const status = downloadFile(
-          (title ?? "chart-export") + ".csv",
-          csvContent,
-          "text/csv",
-        );
+        const status = downloadFile((title ?? "chart-export") + ".csv", csvContent, "text/csv");
 
         if (status === true) {
           showPositiveNotification("Chart data downloaded as a CSV file", {
@@ -360,9 +341,7 @@ export function usePanelDownload({
         // Handle non-table charts
         // Use filteredData for PromQL to exclude hidden queries, otherwise use data
         const chartData =
-          panelSchema.value.queryType === "promql"
-            ? filteredData.value
-            : data.value;
+          panelSchema.value.queryType === "promql" ? filteredData.value : data.value;
 
         if (!chartData || !chartData.length) {
           showErrorNotification("No data available to download");
@@ -434,9 +413,7 @@ export function usePanelDownload({
 
       return [
         keys.join(","),
-        ...flattenedData.map((row) =>
-          keys.map((key) => wrapCsvValue(row[key] ?? "")).join(","),
-        ),
+        ...flattenedData.map((row) => keys.map((key) => wrapCsvValue(row[key] ?? "")).join(",")),
       ].join("\r\n");
     } else {
       const flattenedData: any[] = [];
@@ -454,9 +431,7 @@ export function usePanelDownload({
 
       return [
         headers.join(","),
-        ...flattenedData.map((row) =>
-          headers.map((h) => wrapCsvValue(row[h] ?? "")).join(","),
-        ),
+        ...flattenedData.map((row) => headers.map((h) => wrapCsvValue(row[h] ?? "")).join(",")),
       ].join("\r\n");
     }
   };

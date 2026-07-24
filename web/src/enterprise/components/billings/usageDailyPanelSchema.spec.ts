@@ -28,9 +28,7 @@ describe("usageDailyPanelSchema", () => {
       expect(sql).toContain(`FROM "${USAGE_STREAM_NAME}"`);
       expect(sql).toContain("org_id = 'org-x'");
       expect(sql).toContain('event as "breakdown_1"');
-      expect(sql).toContain(
-        "event IN ('Ingestion', 'Search', 'Pipeline', 'RemotePipeline')",
-      );
+      expect(sql).toContain("event IN ('Ingestion', 'Search', 'Pipeline', 'RemotePipeline')");
       expect(sql).toContain("GROUP BY x_axis_1, breakdown_1");
       expect(sql).toContain("ORDER BY x_axis_1 ASC");
     });

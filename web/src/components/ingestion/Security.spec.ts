@@ -4,17 +4,16 @@ import Security from "@/components/ingestion/Security.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 // Mock services
 vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn((path: string) => `mock-image-url-${path}`),
-  verifyOrganizationStatus: vi.fn()
+  verifyOrganizationStatus: vi.fn(),
 }));
 
 vi.mock("@/aws-exports", () => ({
   default: {
-    API_ENDPOINT: "http://localhost:5080"
-  }
+    API_ENDPOINT: "http://localhost:5080",
+  },
 }));
 
 // Mock router
@@ -22,10 +21,10 @@ const mockRouter = {
   currentRoute: {
     value: {
       name: "security",
-      query: {}
-    }
+      query: {},
+    },
   },
-  push: vi.fn()
+  push: vi.fn(),
 };
 
 vi.mock("vue-router", () => ({
@@ -39,14 +38,14 @@ describe("Security Component", () => {
   beforeEach(() => {
     // Reset mocks
     vi.clearAllMocks();
-    
+
     // Reset router state
     mockRouter.currentRoute.value.name = "security";
     mockRouter.currentRoute.value.query = {};
 
     wrapper = mount(Security, {
       props: {
-        currOrgIdentifier: "test-org"
+        currOrgIdentifier: "test-org",
       },
       global: {
         plugins: [i18n],
@@ -54,8 +53,8 @@ describe("Security Component", () => {
           store,
         },
         stubs: {
-          'router-view': true
-        }
+          "router-view": true,
+        },
       },
     });
   });
@@ -85,12 +84,12 @@ describe("Security Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'router-view': true
-          }
+            "router-view": true,
+          },
         },
       });
-      
-      expect(testWrapper.props('currOrgIdentifier')).toBe("");
+
+      expect(testWrapper.props("currOrgIdentifier")).toBe("");
       testWrapper.unmount();
     });
 
@@ -142,18 +141,18 @@ describe("Security Component", () => {
     it("should not redirect when route is not security", () => {
       mockRouter.currentRoute.value.name = "falco";
       mockRouter.push.mockClear();
-      
+
       const testWrapper = mount(Security, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'router-view': true
-          }
+            "router-view": true,
+          },
         },
       });
-      
+
       expect(mockRouter.push).not.toHaveBeenCalled();
       testWrapper.unmount();
     });
@@ -161,18 +160,18 @@ describe("Security Component", () => {
     it("should handle empty route gracefully", () => {
       mockRouter.currentRoute.value.name = "";
       mockRouter.push.mockClear();
-      
+
       const testWrapper = mount(Security, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'router-view': true
-          }
+            "router-view": true,
+          },
         },
       });
-      
+
       expect(mockRouter.push).not.toHaveBeenCalled();
       testWrapper.unmount();
     });
@@ -182,12 +181,12 @@ describe("Security Component", () => {
     it("should redirect to falco when route changes to security", async () => {
       mockRouter.currentRoute.value.name = "okta";
       mockRouter.push.mockClear();
-      
+
       // Change route to security and trigger update
       mockRouter.currentRoute.value.name = "security";
       wrapper.vm.$forceUpdate();
       await wrapper.vm.$nextTick();
-      
+
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "falco",
         query: {
@@ -199,10 +198,10 @@ describe("Security Component", () => {
     it("should not redirect when route is not security during update", async () => {
       mockRouter.currentRoute.value.name = "okta";
       mockRouter.push.mockClear();
-      
+
       wrapper.vm.$forceUpdate();
       await wrapper.vm.$nextTick();
-      
+
       expect(mockRouter.push).not.toHaveBeenCalled();
     });
   });
@@ -211,18 +210,18 @@ describe("Security Component", () => {
     it("should have all required security tabs", () => {
       const securityTabs = [
         "falco",
-        "osquery", 
+        "osquery",
         "okta",
         "jumpcloud",
         "openvpn",
         "office365",
-        "google-workspace"
+        "google-workspace",
       ];
 
       const tabList = wrapper.vm.securityTabs;
       expect(tabList).toHaveLength(7);
 
-      securityTabs.forEach(tabName => {
+      securityTabs.forEach((tabName) => {
         const tab = tabList.find((t: any) => t.name === tabName);
         expect(tab).toBeDefined();
       });
@@ -230,7 +229,7 @@ describe("Security Component", () => {
 
     it("should have correct falco tab configuration", () => {
       const falcoTab = wrapper.vm.securityTabs.find((tab: any) => tab.name === "falco");
-      
+
       expect(falcoTab).toBeDefined();
       expect(falcoTab.name).toBe("falco");
       expect(falcoTab.to.name).toBe("falco");
@@ -241,7 +240,7 @@ describe("Security Component", () => {
 
     it("should have correct osquery tab configuration", () => {
       const osqueryTab = wrapper.vm.securityTabs.find((tab: any) => tab.name === "osquery");
-      
+
       expect(osqueryTab).toBeDefined();
       expect(osqueryTab.name).toBe("osquery");
       expect(osqueryTab.to.name).toBe("osquery");
@@ -251,7 +250,7 @@ describe("Security Component", () => {
 
     it("should have correct okta tab configuration", () => {
       const oktaTab = wrapper.vm.securityTabs.find((tab: any) => tab.name === "okta");
-      
+
       expect(oktaTab).toBeDefined();
       expect(oktaTab.name).toBe("okta");
       expect(oktaTab.to.name).toBe("okta");
@@ -261,17 +260,19 @@ describe("Security Component", () => {
 
     it("should have correct jumpcloud tab configuration", () => {
       const jumpcloudTab = wrapper.vm.securityTabs.find((tab: any) => tab.name === "jumpcloud");
-      
+
       expect(jumpcloudTab).toBeDefined();
       expect(jumpcloudTab.name).toBe("jumpcloud");
       expect(jumpcloudTab.to.name).toBe("jumpcloud");
-      expect(jumpcloudTab.to.query.org_identifier).toBe(store.state.selectedOrganization.identifier);
+      expect(jumpcloudTab.to.query.org_identifier).toBe(
+        store.state.selectedOrganization.identifier,
+      );
       expect(jumpcloudTab.icon).toContain("mock-image-url-images/ingestion/jumpcloud.svg");
     });
 
     it("should have correct openvpn tab configuration", () => {
       const openvpnTab = wrapper.vm.securityTabs.find((tab: any) => tab.name === "openvpn");
-      
+
       expect(openvpnTab).toBeDefined();
       expect(openvpnTab.name).toBe("openvpn");
       expect(openvpnTab.to.name).toBe("openvpn");
@@ -281,21 +282,27 @@ describe("Security Component", () => {
 
     it("should have correct office365 tab configuration", () => {
       const office365Tab = wrapper.vm.securityTabs.find((tab: any) => tab.name === "office365");
-      
+
       expect(office365Tab).toBeDefined();
       expect(office365Tab.name).toBe("office365");
       expect(office365Tab.to.name).toBe("office365");
-      expect(office365Tab.to.query.org_identifier).toBe(store.state.selectedOrganization.identifier);
+      expect(office365Tab.to.query.org_identifier).toBe(
+        store.state.selectedOrganization.identifier,
+      );
       expect(office365Tab.icon).toContain("mock-image-url-images/ingestion/office-365.png");
     });
 
     it("should have correct google-workspace tab configuration", () => {
-      const gworkspaceTab = wrapper.vm.securityTabs.find((tab: any) => tab.name === "google-workspace");
-      
+      const gworkspaceTab = wrapper.vm.securityTabs.find(
+        (tab: any) => tab.name === "google-workspace",
+      );
+
       expect(gworkspaceTab).toBeDefined();
       expect(gworkspaceTab.name).toBe("google-workspace");
       expect(gworkspaceTab.to.name).toBe("google-workspace");
-      expect(gworkspaceTab.to.query.org_identifier).toBe(store.state.selectedOrganization.identifier);
+      expect(gworkspaceTab.to.query.org_identifier).toBe(
+        store.state.selectedOrganization.identifier,
+      );
       expect(gworkspaceTab.icon).toContain("mock-image-url-images/ingestion/google-workspace.png");
     });
   });
@@ -373,9 +380,9 @@ describe("Security Component", () => {
             plugins: [i18n],
             provide: { store },
             stubs: {
-              'router-view': true
-            }
-          }
+              "router-view": true,
+            },
+          },
         });
       }).not.toThrow();
     });
@@ -387,12 +394,12 @@ describe("Security Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'router-view': true
-          }
-        }
+            "router-view": true,
+          },
+        },
       });
 
-      expect(testWrapper.props('currOrgIdentifier')).toBe("");
+      expect(testWrapper.props("currOrgIdentifier")).toBe("");
       testWrapper.unmount();
     });
   });
@@ -415,13 +422,20 @@ describe("Security Component", () => {
   describe("Component Return Values", () => {
     it("should return all required properties from setup", () => {
       const expectedProperties = [
-        "t", "store", "router", "config",
-        "currentUserEmail", "currentOrgIdentifier", "getImageURL",
-        "verifyOrganizationStatus", "tabs", "ingestTabType",
-        "securityTabs"
+        "t",
+        "store",
+        "router",
+        "config",
+        "currentUserEmail",
+        "currentOrgIdentifier",
+        "getImageURL",
+        "verifyOrganizationStatus",
+        "tabs",
+        "ingestTabType",
+        "securityTabs",
       ];
 
-      expectedProperties.forEach(prop => {
+      expectedProperties.forEach((prop) => {
         expect(wrapper.vm[prop]).toBeDefined();
       });
     });

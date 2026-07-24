@@ -169,9 +169,7 @@ describe("stream service", () => {
 
       await stream.nameList(params.org_identifier, params.type, params.schema);
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/streams`,
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(`/api/${params.org_identifier}/streams`);
     });
 
     it("should make GET request with all parameters combined", async () => {
@@ -215,11 +213,7 @@ describe("stream service", () => {
 
       mockHttpInstance.get.mockResolvedValue({ data: { fields: [] } });
 
-      await stream.schema(
-        params.org_identifier,
-        params.stream_name,
-        params.type,
-      );
+      await stream.schema(params.org_identifier, params.stream_name, params.type);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         `/api/${params.org_identifier}/streams/${params.stream_name}/schema?type=${params.type}`,
@@ -235,11 +229,7 @@ describe("stream service", () => {
 
       mockHttpInstance.get.mockResolvedValue({ data: { fields: [] } });
 
-      await stream.schema(
-        params.org_identifier,
-        params.stream_name,
-        params.type,
-      );
+      await stream.schema(params.org_identifier, params.stream_name, params.type);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         `/api/${params.org_identifier}/streams/${params.stream_name}/schema`,
@@ -484,11 +474,7 @@ describe("stream service", () => {
 
       mockHttpInstance.delete.mockResolvedValue({ data: { success: true } });
 
-      await stream.delete(
-        params.org_identifier,
-        params.stream_name,
-        params.stream_type,
-      );
+      await stream.delete(params.org_identifier, params.stream_name, params.stream_type);
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
         `/api/${params.org_identifier}/streams/${params.stream_name}?type=${params.stream_type}&delete_all=true`,
@@ -575,36 +561,32 @@ describe("stream service", () => {
       const error = new Error("Network error");
       mockHttpInstance.get.mockRejectedValue(error);
 
-      await expect(stream.nameList("org123", "logs", false)).rejects.toThrow(
-        "Network error",
-      );
+      await expect(stream.nameList("org123", "logs", false)).rejects.toThrow("Network error");
     });
 
     it("should handle API errors gracefully for schema method", async () => {
       const error = new Error("Not found");
       mockHttpInstance.get.mockRejectedValue(error);
 
-      await expect(
-        stream.schema("org123", "test_stream", "logs"),
-      ).rejects.toThrow("Not found");
+      await expect(stream.schema("org123", "test_stream", "logs")).rejects.toThrow("Not found");
     });
 
     it("should handle API errors gracefully for updateSettings method", async () => {
       const error = new Error("Forbidden");
       mockHttpInstance.put.mockRejectedValue(error);
 
-      await expect(
-        stream.updateSettings("org123", "test_stream", "logs", {}),
-      ).rejects.toThrow("Forbidden");
+      await expect(stream.updateSettings("org123", "test_stream", "logs", {})).rejects.toThrow(
+        "Forbidden",
+      );
     });
 
     it("should handle API errors gracefully for delete method", async () => {
       const error = new Error("Internal server error");
       mockHttpInstance.delete.mockRejectedValue(error);
 
-      await expect(
-        stream.delete("org123", "test_stream", "logs"),
-      ).rejects.toThrow("Internal server error");
+      await expect(stream.delete("org123", "test_stream", "logs")).rejects.toThrow(
+        "Internal server error",
+      );
     });
 
     it("should handle API errors gracefully for fieldValues method", async () => {

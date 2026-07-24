@@ -33,6 +33,8 @@
     "lint:token-purity": "node scripts/check-token-purity.mjs",
     "lint:design": "node scripts/check-design-consistency.mjs",
     "lint:design:strict": "node scripts/check-design-consistency.mjs --strict",
+    "format": "prettier --write \"src/**/*.{ts,tsx,vue,js,json,scss,css,md}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,vue,js,json,scss,css,md}\"",
     "verify": "npm run type-check:app && npm run lint:ci && npm run lint:styles && npm run lint:tokens && npm run lint:token-purity && npm run lint:design:strict",
     "verify:all": "npm run verify && npm run test:coverage:check"
   },
@@ -142,6 +144,7 @@
     "postcss": "^8.5.10",
     "postcss-html": "^1.8.1",
     "prettier": "^3.7.4",
+    "prettier-plugin-tailwindcss": "^0.8.1",
     "rollup-plugin-analyzer": "^4.0.0",
     "rollup-plugin-visualizer": "^6.0.5",
     "sass": "^1.97.1",

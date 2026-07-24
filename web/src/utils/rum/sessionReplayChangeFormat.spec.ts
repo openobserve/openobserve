@@ -128,9 +128,7 @@ describe("sessionReplayChangeFormat", () => {
         [MEDIA_PLAYBACK_STATE, [1, 1]], // paused
       ]);
       const [out] = createRecordConverter().convert(record);
-      expect(out.data.node.childNodes[0].attributes.rr_mediaState).toBe(
-        "paused",
-      );
+      expect(out.data.node.childNodes[0].attributes.rr_mediaState).toBe("paused");
     });
 
     it("attaches adoptedStyleSheets to the document node", () => {
@@ -140,9 +138,7 @@ describe("sessionReplayChangeFormat", () => {
         [ATTACHED_STYLESHEETS, [0, 0]],
       ]);
       const [out] = createRecordConverter().convert(record);
-      expect(out.data.node.adoptedStyleSheets).toEqual([
-        { cssRules: [".a{}", ".b{}"] },
-      ]);
+      expect(out.data.node.adoptedStyleSheets).toEqual([{ cssRules: [".a{}", ".b{}"] }]);
     });
   });
 
@@ -151,9 +147,7 @@ describe("sessionReplayChangeFormat", () => {
       const converter = createRecordConverter();
       // Establish a document with body(1) containing div(2).
       converter.convert(
-        fullSnapshot([
-          [ADD_NODE, [null, "#document"], [1, "BODY"], [1, "DIV", ["id", "a"]]],
-        ]),
+        fullSnapshot([[ADD_NODE, [null, "#document"], [1, "BODY"], [1, "DIV", ["id", "a"]]]]),
       );
 
       const change = {
@@ -181,17 +175,13 @@ describe("sessionReplayChangeFormat", () => {
       expect(mutation.data.adds[0].node.id).toBe(3);
 
       expect(mutation.data.removes).toEqual([{ id: 2, parentId: 1 }]);
-      expect(mutation.data.attributes).toEqual([
-        { id: 1, attributes: { class: "x" } },
-      ]);
+      expect(mutation.data.attributes).toEqual([{ id: 1, attributes: { class: "x" } }]);
       expect(mutation.data.texts).toEqual([{ id: 3, value: "hi" }]);
     });
 
     it("emits scroll changes as separate incremental scroll records", () => {
       const converter = createRecordConverter();
-      converter.convert(
-        fullSnapshot([[ADD_NODE, [null, "#document"], [1, "BODY"]]]),
-      );
+      converter.convert(fullSnapshot([[ADD_NODE, [null, "#document"], [1, "BODY"]]]));
       const out = converter.convert({
         type: 12,
         timestamp: 3000,
@@ -209,18 +199,14 @@ describe("sessionReplayChangeFormat", () => {
     it("treats attribute deletion (single-element mutation) as null", () => {
       const converter = createRecordConverter();
       converter.convert(
-        fullSnapshot([
-          [ADD_NODE, [null, "#document"], [1, "DIV", ["hidden", ""]]],
-        ]),
+        fullSnapshot([[ADD_NODE, [null, "#document"], [1, "DIV", ["hidden", ""]]]]),
       );
       const out = converter.convert({
         type: 12,
         timestamp: 4000,
         data: [[ATTRIBUTE, [1, ["hidden"]]]],
       });
-      expect(out[0].data.attributes).toEqual([
-        { id: 1, attributes: { hidden: null } },
-      ]);
+      expect(out[0].data.attributes).toEqual([{ id: 1, attributes: { hidden: null } }]);
     });
   });
 
@@ -231,15 +217,9 @@ describe("sessionReplayChangeFormat", () => {
     });
 
     it("hasChangeFormatRecords detects new-format records", () => {
-      expect(hasChangeFormatRecords([{ type: 4 }, { type: 12, data: [] }])).toBe(
-        true,
-      );
-      expect(
-        hasChangeFormatRecords([{ type: 2, format: 1, data: [] }]),
-      ).toBe(true);
-      expect(
-        hasChangeFormatRecords([{ type: 2, data: { node: {} } }, { type: 3 }]),
-      ).toBe(false);
+      expect(hasChangeFormatRecords([{ type: 4 }, { type: 12, data: [] }])).toBe(true);
+      expect(hasChangeFormatRecords([{ type: 2, format: 1, data: [] }])).toBe(true);
+      expect(hasChangeFormatRecords([{ type: 2, data: { node: {} } }, { type: 3 }])).toBe(false);
     });
 
     it("convertRecords threads state and resets on each full snapshot", () => {

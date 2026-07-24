@@ -10,13 +10,11 @@
       :data-test="`dashboard-add-condition-logical-operator-${conditionIndex}`"
     />
     <OButtonGroup
-      class="axis-field shrink-0 border border-border-default border-s-2 border-s-text-body bg-surface-panel"
+      class="axis-field border-border-default border-s-text-body bg-surface-panel shrink-0 border border-s-2"
       radius="sm"
       :divided="false"
     >
-      <ODropdown
-        @update:open="(v: boolean) => v && loadFilterItem(condition.column)"
-      >
+      <ODropdown @update:open="(v: boolean) => v && loadFilterItem(condition.column)">
         <template #trigger>
           <OButton
             variant="ghost"
@@ -25,21 +23,14 @@
             :data-test="`dashboard-add-condition-label-${conditionIndex}-${computedLabel(condition)}`"
             icon-right="arrow-drop-down"
           >
-            <span class="whitespace-nowrap font-normal"
-              ><span class="text-text-body">{{
-                labelParts(condition).prefix
+            <span class="font-normal whitespace-nowrap"
+              ><span class="text-text-body">{{ labelParts(condition).prefix }}</span
+              ><span class="text-text-body">{{ labelParts(condition).field }}</span
+              ><span v-if="labelParts(condition).op" class="text-text-secondary">{{
+                labelParts(condition).op
               }}</span
-              ><span class="text-text-body">{{
-                labelParts(condition).field
-              }}</span
-              ><span
-                v-if="labelParts(condition).op"
-                class="text-text-secondary"
-                >{{ labelParts(condition).op }}</span
               ><template v-if="labelParts(condition).value"
-                ><span class="text-badge-blue-ol-text">{{
-                  labelParts(condition).valueOpen
-                }}</span
+                ><span class="text-badge-blue-ol-text">{{ labelParts(condition).valueOpen }}</span
                 ><span
                   :class="
                     labelParts(condition).valueIsNumber
@@ -57,10 +48,8 @@
         <div class="w-80">
           <div class="flex flex-col gap-2.5 p-3">
             <div class="flex flex-col gap-1">
-              <div
-                class="text-2xs font-semibold text-text-secondary"
-              >
-                {{ t('common.field') }}
+              <div class="text-2xs text-text-secondary font-semibold">
+                {{ t("common.field") }}
               </div>
               <div class="flex items-center gap-1.5">
                 <StreamFieldSelect
@@ -98,18 +87,12 @@
               </OTabs>
               <OSeparator />
               <!-- -mx-1 px-1: padding so the animated panels don't clip focus rings -->
-              <OTabPanels
-                v-model="conditionModel.type"
-                animated
-                class="-mx-1 px-1"
-              >
+              <OTabPanels v-model="conditionModel.type" animated class="-mx-1 px-1">
                 <OTabPanel name="condition">
                   <div class="flex flex-col gap-3 pt-3">
                     <div class="flex flex-col gap-1">
-                      <div
-                        class="text-2xs font-semibold text-text-secondary"
-                      >
-                        {{ t('common.operator') }}
+                      <div class="text-2xs text-text-secondary font-semibold">
+                        {{ t("common.operator") }}
                       </div>
                       <OSelect
                         v-model="conditionModel.operator"
@@ -119,17 +102,11 @@
                       />
                     </div>
                     <div
-                      v-if="
-                        !['Is Null', 'Is Not Null'].includes(
-                          condition.operator,
-                        )
-                      "
+                      v-if="!['Is Null', 'Is Not Null'].includes(condition.operator)"
                       class="flex flex-col gap-1"
                     >
-                      <div
-                        class="text-2xs font-semibold text-text-secondary"
-                      >
-                        {{ t('common.value') }}
+                      <div class="text-2xs text-text-secondary font-semibold">
+                        {{ t("common.value") }}
                       </div>
                       <OCombobox
                         v-model="conditionModel.value"
@@ -143,10 +120,8 @@
                 </OTabPanel>
                 <OTabPanel name="list">
                   <div class="flex flex-col gap-1 pt-3">
-                    <div
-                      class="text-2xs font-semibold text-text-secondary"
-                    >
-                      {{ t('common.selectFilter') }}
+                    <div class="text-2xs text-text-secondary font-semibold">
+                      {{ t("common.selectFilter") }}
                     </div>
                     <OSelect
                       v-model="conditionModel.values"
@@ -154,7 +129,9 @@
                       multiple
                       searchable
                       :error="condition.values?.length === 0"
-                      :error-message="condition.values?.length === 0 ? 'At least 1 item required' : ''"
+                      :error-message="
+                        condition.values?.length === 0 ? 'At least 1 item required' : ''
+                      "
                       data-test="dashboard-add-condition-list-tab"
                       class="o2-custom-select-dashboard"
                     />
@@ -168,7 +145,7 @@
       <OButton
         variant="ghost"
         size="icon-chip"
-        class="shrink-0 !w-4 -ms-1"
+        class="-ms-1 !w-4 shrink-0"
         @click="$emit('remove-condition')"
         data-test="dashboard-add-condition-remove"
       >
@@ -189,7 +166,7 @@ import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { type SelectModelValue } from "@/lib/forms/Select/OSelect.types";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { defineComponent, ref, computed, toRef, watch, inject } from "vue";
 import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
 import { useI18n } from "vue-i18n";
@@ -225,15 +202,9 @@ export default defineComponent({
     "conditionIndex",
   ],
   setup(props, { emit }) {
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
-    const {
-      getAllSelectedStreams,
-      getStreamNameFromStreamAlias,
-      dashboardPanelData,
-    } = useDashboardPanelData(dashboardPanelDataPageKey);
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+    const { getAllSelectedStreams, getStreamNameFromStreamAlias, dashboardPanelData } =
+      useDashboardPanelData(dashboardPanelDataPageKey);
     const { t } = useI18n();
     const searchTerm = ref("");
 
@@ -247,19 +218,14 @@ export default defineComponent({
         .find(
           (it: any) =>
             it.column == props?.condition?.column?.field &&
-            it.stream ==
-              getStreamNameFromStreamAlias(
-                props?.condition?.column?.streamAlias,
-              ),
+            it.stream == getStreamNameFromStreamAlias(props?.condition?.column?.streamAlias),
         )
         ?.value?.filter((option: any) =>
           option?.toLowerCase().includes(searchTerm.value.toLowerCase()),
         );
 
       // Sort options alphabetically
-      return options
-        ? options.sort((a: string, b: string) => a.localeCompare(b))
-        : [];
+      return options ? options.sort((a: string, b: string) => a.localeCompare(b)) : [];
     });
 
     const filterListFn = (search: any, update: any) => {
@@ -326,10 +292,7 @@ export default defineComponent({
       // the query editor's brackets, leaving the inner literal(s) to colour.
       const valueOpen = value.startsWith("(") ? "(" : "";
       const valueClose = value.endsWith(")") ? ")" : "";
-      const valueInner = value.slice(
-        valueOpen.length,
-        value.length - valueClose.length,
-      );
+      const valueInner = value.slice(valueOpen.length, value.length - valueClose.length);
       // A value is numeric when its inner content (no quotes/commas) is all
       // numbers → green like a number in the query; otherwise red (string).
       const bare = valueInner.replace(/['"]/g, "").trim();

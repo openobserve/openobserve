@@ -7,9 +7,7 @@ import { z } from "zod";
 
 export const roleNameRegex = /^[a-zA-Z0-9_]+$/;
 
-export const makeAddRoleSchema = (
-  t: (_key: string, _params?: Record<string, unknown>) => string,
-) =>
+export const makeAddRoleSchema = (t: (_key: string, _params?: Record<string, unknown>) => string) =>
   z.object({
     name: z
       .string()

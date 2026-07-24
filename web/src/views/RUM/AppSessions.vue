@@ -15,16 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="sessions_page flex flex-col flex-1 min-h-0 overflow-hidden">
+  <div class="sessions_page flex min-h-0 flex-1 flex-col overflow-hidden">
     <template v-if="isSessionReplayEnabled">
       <div>
-        <div
-          class="bg-card-glass-bg border-b border-border-default py-1.5 px-page-edge"
-        >
+        <div class="bg-card-glass-bg border-border-default px-page-edge border-b py-1.5">
           <div class="flex items-start gap-1">
             <!-- Query editor (flex-grow to fill available space) -->
-            <div class="flex-1 min-w-0 relative">
-              <query-editor
+            <div class="relative min-w-0 flex-1">
+              <QueryEditor
                 ref="sessionQueryEditorRef"
                 editor-id="session-replay-query-editor"
                 :class="[
@@ -46,17 +44,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <div
                 v-if="!sessionState.data.editorValue && !editorFocused"
-                class="query-editor-placeholder-overlay absolute top-0 left-0 right-0 bottom-0 flex items-start pt-0.75 pr-2 pb-0 pl-[2.15rem] pointer-events-none z-1 select-none"
+                class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start pt-0.75 pr-2 pb-0 pl-[2.15rem] select-none"
               >
-                <span class="query-editor-placeholder-typewriter">{{
-                  editorPlaceholder
-                }}</span>
+                <span class="query-editor-placeholder-typewriter">{{ editorPlaceholder }}</span>
               </div>
             </div>
 
             <!-- Controls on the right -->
-            <div class="flex items-start gap-1 shrink-0">
-              <syntax-guide />
+            <div class="flex shrink-0 items-start gap-1">
+              <SyntaxGuide />
               <DateTime
                 auto-apply
                 menu-align="end"
@@ -65,9 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   startTime: sessionState.data.datetime.startTime,
                   endTime: sessionState.data.datetime.endTime,
                 }"
-                :default-relative-time="
-                  sessionState.data.datetime.relativeTimePeriod
-                "
+                :default-relative-time="sessionState.data.datetime.relativeTimePeriod"
                 data-test="logs-search-bar-date-time-dropdown"
                 @on:date-change="updateDateChange"
               />
@@ -97,7 +91,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="shrink-0"
                 @click="runQuery"
               >
-                <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="rumSessionsRefresh" />
+                <OTooltip
+                  side="bottom"
+                  :content="t('common.refresh')"
+                  shortcut-id="rumSessionsRefresh"
+                />
               </OButton>
             </div>
             <!-- end controls -->
@@ -109,13 +107,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- end toolbar wrapper -->
 
       <OSplitter
-        class="logs-horizontal-splitter flex-1 min-h-0"
+        class="logs-horizontal-splitter min-h-0 flex-1"
         v-model="splitterModel"
         unit="px"
         :horizontal="false"
       >
         <template #before>
-          <div class="bg-surface-panel py-1 h-full overflow-auto border-r border-border-default">
+          <div class="bg-surface-panel border-border-default h-full overflow-auto border-r py-1">
             <SearchFieldList
               :fields="streamFields"
               :time-stamp="{
@@ -132,248 +130,234 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #after>
-          <div class="h-full flex flex-col min-h-0">
-      <!-- KPI summary strip -->
-      <div class="bg-card-glass-bg border-b border-border-default">
-        <SessionsMetricsStrip
-          :total="kpiMetrics.total"
-          :error-sessions="kpiMetrics.errorSessions"
-          :frustrated-sessions="kpiMetrics.frustratedSessions"
-          :bounced-sessions="kpiMetrics.bouncedSessions"
-          :bounce-base="kpiMetrics.bounceBase"
-          :avg-duration-ms="kpiMetrics.avgDurationMs"
-          :median-duration-ms="kpiMetrics.medianDurationMs"
-          :sessions-delta-pct="kpiDeltas?.sessionsPct ?? null"
-          :errors-delta="kpiDeltas?.errors ?? null"
-          :frustrated-delta="kpiDeltas?.frustrated ?? null"
-          :active-card="activeMetricCard"
-          @select="handleMetricSelect"
-        />
+          <div class="flex h-full min-h-0 flex-col">
+            <!-- KPI summary strip -->
+            <div class="bg-card-glass-bg border-border-default border-b">
+              <SessionsMetricsStrip
+                :total="kpiMetrics.total"
+                :error-sessions="kpiMetrics.errorSessions"
+                :frustrated-sessions="kpiMetrics.frustratedSessions"
+                :bounced-sessions="kpiMetrics.bouncedSessions"
+                :bounce-base="kpiMetrics.bounceBase"
+                :avg-duration-ms="kpiMetrics.avgDurationMs"
+                :median-duration-ms="kpiMetrics.medianDurationMs"
+                :sessions-delta-pct="kpiDeltas?.sessionsPct ?? null"
+                :errors-delta="kpiDeltas?.errors ?? null"
+                :frustrated-delta="kpiDeltas?.frustrated ?? null"
+                :active-card="activeMetricCard"
+                @select="handleMetricSelect"
+              />
 
-        <!-- One actionable insight for the current window, when one exists -->
-        <div v-if="topInsight" class="px-page-edge pb-2">
-          <SessionsInsightBanner
-            :insight="topInsight"
-            @apply="applyInsightFilter(topInsight)"
-            @filter="filterSessionsByInsightError(topInsight)"
-            @open-error-tracking="openInsightInErrorTracking(topInsight)"
-          />
-        </div>
+              <!-- One actionable insight for the current window, when one exists -->
+              <div v-if="topInsight" class="px-page-edge pb-2">
+                <SessionsInsightBanner
+                  :insight="topInsight"
+                  @apply="applyInsightFilter(topInsight)"
+                  @filter="filterSessionsByInsightError(topInsight)"
+                  @open-error-tracking="openInsightInErrorTracking(topInsight)"
+                />
+              </div>
 
-        <!-- Segment filters -->
-        <div
-          class="flex flex-wrap items-center gap-4 px-page-edge pb-2"
-          data-test="rum-app-sessions-segment-filters"
-        >
-          <OToggleGroup
-            :model-value="healthSegment"
-            type="single"
-            :label="t('rum.health')"
-            label-position="left"
-            @update:model-value="(v: any) => setHealthSegment(v)"
-          >
-            <OToggleGroupItem
-              value="all"
-              size="xs"
-              data-test="rum-app-sessions-health-all"
-              >{{ t("rum.all") }}</OToggleGroupItem
-            >
-            <OToggleGroupItem
-              value="errors"
-              size="xs"
-              data-test="rum-app-sessions-health-errors"
-              >{{ t("rum.withErrors") }} ·
-              {{ sessionsSummary.errorSessions }}</OToggleGroupItem
-            >
-            <OToggleGroupItem
-              value="frustrated"
-              size="xs"
-              data-test="rum-app-sessions-health-frustrated"
-              >{{ t("rum.frustrated") }} ·
-              {{ sessionsSummary.frustratedSessions }}</OToggleGroupItem
-            >
-            <OToggleGroupItem
-              value="clean"
-              size="xs"
-              data-test="rum-app-sessions-health-clean"
-              >{{ t("rum.clean") }} ·
-              {{ sessionsSummary.cleanSessions }}</OToggleGroupItem
-            >
-          </OToggleGroup>
-
-          <OToggleGroup
-            :model-value="typeSegment"
-            type="single"
-            :label="t('rum.type')"
-            label-position="left"
-            @update:model-value="(v: any) => setTypeSegment(v)"
-          >
-            <OToggleGroupItem
-              value="all"
-              size="xs"
-              data-test="rum-app-sessions-type-all"
-              >{{ t("rum.all") }}</OToggleGroupItem
-            >
-            <OToggleGroupItem
-              value="engaged"
-              size="xs"
-              data-test="rum-app-sessions-type-engaged"
-              >{{ t("rum.engaged") }} ·
-              {{ sessionsSummary.engagedSessions }}</OToggleGroupItem
-            >
-            <OToggleGroupItem
-              value="bounced"
-              size="xs"
-              data-test="rum-app-sessions-type-bounced"
-              >{{ t("rum.bounced") }} ·
-              {{ sessionsSummary.bouncedSessions }}</OToggleGroupItem
-            >
-          </OToggleGroup>
-
-          <OToggleGroup
-            :model-value="deviceSegment"
-            type="single"
-            :label="t('rum.device')"
-            label-position="left"
-            @update:model-value="(v: any) => setDeviceSegment(v)"
-          >
-            <OToggleGroupItem
-              value="all"
-              size="xs"
-              data-test="rum-app-sessions-device-all"
-              >{{ t("rum.all") }}</OToggleGroupItem
-            >
-            <OToggleGroupItem
-              value="desktop"
-              size="xs"
-              data-test="rum-app-sessions-device-desktop"
-              >{{ t("rum.desktop") }} ·
-              {{ sessionsSummary.deviceCounts.desktop }}</OToggleGroupItem
-            >
-            <OToggleGroupItem
-              value="mobile"
-              size="xs"
-              data-test="rum-app-sessions-device-mobile"
-              >{{ t("rum.mobile") }} ·
-              {{ sessionsSummary.deviceCounts.mobile }}</OToggleGroupItem
-            >
-            <OToggleGroupItem
-              value="tablet"
-              size="xs"
-              data-test="rum-app-sessions-device-tablet"
-              >{{ t("rum.tablet") }} ·
-              {{ sessionsSummary.deviceCounts.tablet }}</OToggleGroupItem
-            >
-          </OToggleGroup>
-        </div>
-      </div>
-
-            <div class="bg-card-glass-bg flex-1 min-h-0">
-                <OTable
-                  :data="tableRows"
-                  :columns="tableColumns"
-                  :column-visibility="columnVisibility"
-                  :loading="isLoading.length > 0"
-                  row-key="session_id"
-                  pagination="none"
-                  virtual-scroll
-                  :dense="false"
-                  :row-height="54"
-                  class="h-full"
-                  data-test="rum-sessions-table"
-                  row-class="cursor-pointer"
-                  :get-row-status-color="getSessionStatusColor"
-                  @row-click="handleRowClick"
-                  @scroll-end="handleScrollEnd"
-                  :show-global-filter="false"
-                  :default-columns="false"
+              <!-- Segment filters -->
+              <div
+                class="px-page-edge flex flex-wrap items-center gap-4 pb-2"
+                data-test="rum-app-sessions-segment-filters"
+              >
+                <OToggleGroup
+                  :model-value="healthSegment"
+                  type="single"
+                  :label="t('rum.health')"
+                  label-position="left"
+                  @update:model-value="(v: any) => setHealthSegment(v)"
                 >
-                  <template #empty>
-                    <div
-                      v-if="hasSegmentFilteredOutAllRows"
-                      class="flex flex-col items-center gap-2 py-8"
-                      data-test="rum-app-sessions-segment-empty"
+                  <OToggleGroupItem value="all" size="xs" data-test="rum-app-sessions-health-all">{{
+                    t("rum.all")
+                  }}</OToggleGroupItem>
+                  <OToggleGroupItem
+                    value="errors"
+                    size="xs"
+                    data-test="rum-app-sessions-health-errors"
+                    >{{ t("rum.withErrors") }} ·
+                    {{ sessionsSummary.errorSessions }}</OToggleGroupItem
+                  >
+                  <OToggleGroupItem
+                    value="frustrated"
+                    size="xs"
+                    data-test="rum-app-sessions-health-frustrated"
+                    >{{ t("rum.frustrated") }} ·
+                    {{ sessionsSummary.frustratedSessions }}</OToggleGroupItem
+                  >
+                  <OToggleGroupItem
+                    value="clean"
+                    size="xs"
+                    data-test="rum-app-sessions-health-clean"
+                    >{{ t("rum.clean") }} · {{ sessionsSummary.cleanSessions }}</OToggleGroupItem
+                  >
+                </OToggleGroup>
+
+                <OToggleGroup
+                  :model-value="typeSegment"
+                  type="single"
+                  :label="t('rum.type')"
+                  label-position="left"
+                  @update:model-value="(v: any) => setTypeSegment(v)"
+                >
+                  <OToggleGroupItem value="all" size="xs" data-test="rum-app-sessions-type-all">{{
+                    t("rum.all")
+                  }}</OToggleGroupItem>
+                  <OToggleGroupItem
+                    value="engaged"
+                    size="xs"
+                    data-test="rum-app-sessions-type-engaged"
+                    >{{ t("rum.engaged") }} ·
+                    {{ sessionsSummary.engagedSessions }}</OToggleGroupItem
+                  >
+                  <OToggleGroupItem
+                    value="bounced"
+                    size="xs"
+                    data-test="rum-app-sessions-type-bounced"
+                    >{{ t("rum.bounced") }} ·
+                    {{ sessionsSummary.bouncedSessions }}</OToggleGroupItem
+                  >
+                </OToggleGroup>
+
+                <OToggleGroup
+                  :model-value="deviceSegment"
+                  type="single"
+                  :label="t('rum.device')"
+                  label-position="left"
+                  @update:model-value="(v: any) => setDeviceSegment(v)"
+                >
+                  <OToggleGroupItem value="all" size="xs" data-test="rum-app-sessions-device-all">{{
+                    t("rum.all")
+                  }}</OToggleGroupItem>
+                  <OToggleGroupItem
+                    value="desktop"
+                    size="xs"
+                    data-test="rum-app-sessions-device-desktop"
+                    >{{ t("rum.desktop") }} ·
+                    {{ sessionsSummary.deviceCounts.desktop }}</OToggleGroupItem
+                  >
+                  <OToggleGroupItem
+                    value="mobile"
+                    size="xs"
+                    data-test="rum-app-sessions-device-mobile"
+                    >{{ t("rum.mobile") }} ·
+                    {{ sessionsSummary.deviceCounts.mobile }}</OToggleGroupItem
+                  >
+                  <OToggleGroupItem
+                    value="tablet"
+                    size="xs"
+                    data-test="rum-app-sessions-device-tablet"
+                    >{{ t("rum.tablet") }} ·
+                    {{ sessionsSummary.deviceCounts.tablet }}</OToggleGroupItem
+                  >
+                </OToggleGroup>
+              </div>
+            </div>
+
+            <div class="bg-card-glass-bg min-h-0 flex-1">
+              <OTable
+                :data="tableRows"
+                :columns="tableColumns"
+                :column-visibility="columnVisibility"
+                :loading="isLoading.length > 0"
+                row-key="session_id"
+                pagination="none"
+                virtual-scroll
+                :dense="false"
+                :row-height="54"
+                class="h-full"
+                data-test="rum-sessions-table"
+                row-class="cursor-pointer"
+                :get-row-status-color="getSessionStatusColor"
+                @row-click="handleRowClick"
+                @scroll-end="handleScrollEnd"
+                :show-global-filter="false"
+                :default-columns="false"
+              >
+                <template #empty>
+                  <div
+                    v-if="hasSegmentFilteredOutAllRows"
+                    class="flex flex-col items-center gap-2 py-8"
+                    data-test="rum-app-sessions-segment-empty"
+                  >
+                    <p>{{ t("rum.noMatchingSessions") }}</p>
+                    <OButton
+                      variant="outline"
+                      size="sm"
+                      data-test="rum-app-sessions-reset-segments-btn"
+                      @click="resetSegments"
                     >
-                      <p>{{ t("rum.noMatchingSessions") }}</p>
-                      <OButton
-                        variant="outline"
-                        size="sm"
-                        data-test="rum-app-sessions-reset-segments-btn"
-                        @click="resetSegments"
+                      {{ t("rum.resetFilters") }}
+                    </OButton>
+                  </div>
+                  <NoData v-else />
+                </template>
+                <template #cell-action_play>
+                  <OIcon
+                    name="play-circle-filled"
+                    size="md"
+                    class="session-play-icon text-icon-color hover:text-button-primary cursor-pointer"
+                  />
+                </template>
+                <template #cell-session="{ row }">
+                  <div class="flex min-w-0 flex-col justify-center gap-0.5">
+                    <OUserCell :value="row.user_email || 'Unknown'" class="truncate font-medium" />
+                    <div class="text-text-secondary flex items-center gap-1.5 text-xs">
+                      <span
+                        class="font-mono"
+                        :title="row.session_id"
+                        data-test="rum-app-sessions-session-id-text"
+                        >{{ shortSessionId(row.session_id) }}</span
                       >
-                        {{ t("rum.resetFilters") }}
-                      </OButton>
-                    </div>
-                    <NoData v-else />
-                  </template>
-                  <template #cell-action_play>
-                    <OIcon
-                      name="play-circle-filled"
-                      size="md"
-                      class="cursor-pointer session-play-icon text-icon-color hover:text-button-primary"
-                    />
-                  </template>
-                  <template #cell-session="{ row }">
-                    <div class="flex flex-col justify-center gap-0.5 min-w-0">
-                      <OUserCell
-                        :value="row.user_email || 'Unknown'"
-                        class="font-medium truncate"
+                      <span aria-hidden="true">·</span>
+                      <OTimeCell
+                        :value="row.zo_sql_timestamp"
+                        unit="us"
+                        :timezone="store.state.timezone"
                       />
-                      <div
-                        class="flex items-center gap-1.5 text-xs text-text-secondary"
-                      >
-                        <span
-                          class="font-mono"
-                          :title="row.session_id"
-                          data-test="rum-app-sessions-session-id-text"
-                        >{{ shortSessionId(row.session_id) }}</span>
-                        <span aria-hidden="true">·</span>
-                        <OTimeCell
-                          :value="row.zo_sql_timestamp"
-                          unit="us"
-                          :timezone="store.state.timezone"
-                        />
-                      </div>
                     </div>
-                  </template>
-                  <template #cell-activity="{ row }">
-                    <SessionActivitySparkline
-                      :session-id="row.session_id"
-                      :start-time="row.start_time"
-                      :end-time="row.end_time"
-                      :is-bounce="row.is_bounce"
-                      :has-frustration-field="
-                        !!schemaMapping['action_frustration_type']
-                      "
-                    />
-                  </template>
-                  <template #cell-health="{ row }">
-                    <SessionHealthCell
-                      :error-count="row.error_count || 0"
-                      :frustration-count="row.frustration_count || 0"
-                    />
-                  </template>
-                  <template #cell-location="{ row }">
-                    <SessionLocationColumn :column="row" />
-                  </template>
-                  <template #cell-duration="{ row }">
-                    <div class="flex flex-col items-end gap-0.5">
-                      <span class="tabular-nums font-medium">{{
-                        formatSessionDuration(row.time_spent)
-                      }}</span>
-                      <small
-                        v-if="row.is_bounce"
-                        class="text-status-warning-text"
-                        data-test="rum-app-sessions-bounced-text"
-                      >{{ t("rum.bounced").toLowerCase() }}</small>
-                      <small
-                        v-else-if="row.is_active"
-                        class="text-status-success-text"
-                        data-test="rum-app-sessions-active-text"
-                      >{{ t("rum.active") }}</small>
-                    </div>
-                  </template>
-                </OTable>
+                  </div>
+                </template>
+                <template #cell-activity="{ row }">
+                  <SessionActivitySparkline
+                    :session-id="row.session_id"
+                    :start-time="row.start_time"
+                    :end-time="row.end_time"
+                    :is-bounce="row.is_bounce"
+                    :has-frustration-field="!!schemaMapping['action_frustration_type']"
+                  />
+                </template>
+                <template #cell-health="{ row }">
+                  <SessionHealthCell
+                    :error-count="row.error_count || 0"
+                    :frustration-count="row.frustration_count || 0"
+                  />
+                </template>
+                <template #cell-location="{ row }">
+                  <SessionLocationColumn :column="row" />
+                </template>
+                <template #cell-duration="{ row }">
+                  <div class="flex flex-col items-end gap-0.5">
+                    <span class="font-medium tabular-nums">{{
+                      formatSessionDuration(row.time_spent)
+                    }}</span>
+                    <small
+                      v-if="row.is_bounce"
+                      class="text-status-warning-text"
+                      data-test="rum-app-sessions-bounced-text"
+                      >{{ t("rum.bounced").toLowerCase() }}</small
+                    >
+                    <small
+                      v-else-if="row.is_active"
+                      class="text-status-success-text"
+                      data-test="rum-app-sessions-active-text"
+                      >{{ t("rum.active") }}</small
+                    >
+                  </div>
+                </template>
+              </OTable>
             </div>
           </div>
         </template>
@@ -381,9 +365,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template v-else>
       <div class="bg-card-glass-bg">
-        <div class="p-4 enable-rum max-w-[64rem]">
+        <div class="enable-rum max-w-[64rem] p-4">
           <div class="pb-4">
-            <div class="text-left text-xl font-semibold font-bold pb-3">
+            <div class="pb-3 text-left text-xl font-bold font-semibold">
               {{ t("rum.discoverSessionTitle") }}
             </div>
             <div class="text-base font-medium">
@@ -408,21 +392,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import {
-  ref,
-  onMounted,
-  type Ref,
-  onBeforeMount,
-  defineAsyncComponent,
-  computed,
-} from "vue";
+import { ref, onMounted, type Ref, onBeforeMount, defineAsyncComponent, computed } from "vue";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
-import {
-  rangesFromServerError,
-  type SqlErrorRange,
-} from "@/utils/query/sqlDiagnostics";
+import { rangesFromServerError, type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import { useI18n } from "vue-i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
@@ -431,11 +405,7 @@ import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
-import {
-  durationFormatter,
-  b64DecodeUnicode,
-  b64EncodeUnicode,
-} from "@/utils/zincutils";
+import { durationFormatter, b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
 import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -449,20 +419,14 @@ import SessionHealthCell from "@/components/rum/sessionReplay/SessionHealthCell.
 import SessionsMetricsStrip from "@/components/rum/sessionReplay/SessionsMetricsStrip.vue";
 import SessionsInsightBanner from "@/components/rum/sessionReplay/SessionsInsightBanner.vue";
 import SessionActivitySparkline from "@/components/rum/sessionReplay/SessionActivitySparkline.vue";
-import {
-  holdActivityQueries,
-  releaseActivityQueries,
-} from "@/composables/useSessionActivity";
+import { holdActivityQueries, releaseActivityQueries } from "@/composables/useSessionActivity";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import useStreams from "@/composables/useStreams";
-import {
-  applyFilterTerm,
-  removeFieldCondition,
-} from "@/utils/traces/filterUtils";
+import { applyFilterTerm, removeFieldCondition } from "@/utils/traces/filterUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -485,12 +449,7 @@ type HealthSegment = "all" | "errors" | "frustrated" | "clean";
 type TypeSegment = "all" | "engaged" | "bounced";
 type DeviceSegment = "all" | "desktop" | "mobile" | "tablet";
 
-const HEALTH_SEGMENTS: HealthSegment[] = [
-  "all",
-  "errors",
-  "frustrated",
-  "clean",
-];
+const HEALTH_SEGMENTS: HealthSegment[] = ["all", "errors", "frustrated", "clean"];
 const TYPE_SEGMENTS: TypeSegment[] = ["all", "engaged", "bounced"];
 const DEVICE_SEGMENTS: DeviceSegment[] = ["all", "desktop", "mobile", "tablet"];
 
@@ -510,9 +469,7 @@ interface SessionInsight {
   rate?: number;
 }
 
-const QueryEditor = defineAsyncComponent(
-  () => import("@/components/CodeQueryEditor.vue"),
-);
+const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
 defineProps({
   isSessionReplayEnabled: {
@@ -596,10 +553,8 @@ const {
 const updateAutoComplete = (value: string) => {
   _sqlOnQueryChange();
   autoCompleteData.value.query = value;
-  autoCompleteData.value.cursorIndex =
-    sessionQueryEditorRef.value?.getCursorIndex?.();
-  autoCompleteData.value.popup.open =
-    sessionQueryEditorRef.value?.triggerAutoComplete;
+  autoCompleteData.value.cursorIndex = sessionQueryEditorRef.value?.getCursorIndex?.();
+  autoCompleteData.value.popup.open = sessionQueryEditorRef.value?.triggerAutoComplete;
   autoCompleteData.value.org = store.state.selectedOrganization.identifier;
   autoCompleteData.value.streamType = "logs";
   autoCompleteData.value.streamName = rumSessionStreamName;
@@ -649,8 +604,7 @@ const userDataSet = new Set([
   "resource_url",
 ]);
 
-const { columnVisibility, setColumnVisibility } =
-  useExternalColumnToggle("rum-sessions-list");
+const { columnVisibility, setColumnVisibility } = useExternalColumnToggle("rum-sessions-list");
 
 const tableColumns = [
   {
@@ -682,8 +636,7 @@ const tableColumns = [
     id: "health",
     // Sorts by "badness": errors dominate, frustrations break ties.
     header: t("rum.health"),
-    accessorFn: (row: any) =>
-      (row["error_count"] || 0) * 1000 + (row["frustration_count"] || 0),
+    accessorFn: (row: any) => (row["error_count"] || 0) * 1000 + (row["frustration_count"] || 0),
     sortable: true,
     hideable: true,
     size: 160,
@@ -749,15 +702,12 @@ const getStreamFields = () => {
           "resource_url",
           "session_id",
         ];
-        const priorityFieldsMap = new Map(
-          priorityFields.map((field, index) => [field, index]),
-        );
+        const priorityFieldsMap = new Map(priorityFields.map((field, index) => [field, index]));
 
         streamFields.value = [];
 
         stream.schema.forEach((field: any) => {
-          if (fieldsToVerify.has(field.name))
-            schemaMapping.value[field.name] = field;
+          if (fieldsToVerify.has(field.name)) schemaMapping.value[field.name] = field;
 
           if (userDataSet.has(field.name)) {
             streamFields.value.push({
@@ -798,10 +748,7 @@ const getSessions = () => {
   sessionState.data.sessions = {};
   sqlErrorRanges.value = [];
 
-  const interval = getTimeInterval(
-    dateTime.value.startTime,
-    dateTime.value.endTime,
-  );
+  const interval = getTimeInterval(dateTime.value.startTime, dateTime.value.endTime);
   const parsedQuery = parseQuery(sessionState.data.editorValue, false);
 
   const queryPayload: any = {
@@ -997,26 +944,21 @@ const getSessionTimeFromReplay = (req: any, sessionIds: string[]) => {
     .then((res) => {
       res.data.hits.forEach((hit: any) => {
         if (sessionState.data.sessions[hit.session_id]) {
-          sessionState.data.sessions[hit.session_id].start_time =
-            hit.start_time;
+          sessionState.data.sessions[hit.session_id].start_time = hit.start_time;
           sessionState.data.sessions[hit.session_id].end_time = hit.end_time;
           sessionState.data.sessions[hit.session_id].browser = hit.browser;
           sessionState.data.sessions[hit.session_id].os = hit.os;
-          sessionState.data.sessions[hit.session_id].device_family =
-            hit.device_family;
+          sessionState.data.sessions[hit.session_id].device_family = hit.device_family;
           sessionState.data.sessions[hit.session_id].ip = hit.ip;
           sessionState.data.sessions[hit.session_id].source = hit.source;
-          sessionState.data.sessions[hit.session_id].time_spent =
-            hit.end_time - hit.start_time;
+          sessionState.data.sessions[hit.session_id].time_spent = hit.end_time - hit.start_time;
         }
       });
       rows.value = Object.values(sessionState.data.sessions);
     })
     .catch((err) => {
       toast({
-        message:
-          err.response?.data?.message ||
-          "Error while fetching session replay data",
+        message: err.response?.data?.message || "Error while fetching session replay data",
         variant: "error",
       });
     })
@@ -1219,12 +1161,7 @@ const classifyDevice = (family?: string, os?: string): DeviceSegment => {
   const f = (family || "").toLowerCase();
   const o = (os || "").toLowerCase();
   if (f.includes("tablet") || f.includes("ipad")) return "tablet";
-  if (
-    f.includes("phone") ||
-    f.includes("mobile") ||
-    o === "ios" ||
-    o === "android"
-  )
+  if (f.includes("phone") || f.includes("mobile") || o === "ios" || o === "android")
     return "mobile";
   return "desktop";
 };
@@ -1244,15 +1181,10 @@ const sessionsSummary = computed(() => {
   const durations = all
     .map((row: any) => row.time_spent || 0)
     .sort((a: number, b: number) => a - b);
-  const errorSessions = all.filter(
-    (row: any) => (row.error_count || 0) > 0,
-  ).length;
-  const frustratedSessions = all.filter(
-    (row: any) => (row.frustration_count || 0) > 0,
-  ).length;
+  const errorSessions = all.filter((row: any) => (row.error_count || 0) > 0).length;
+  const frustratedSessions = all.filter((row: any) => (row.frustration_count || 0) > 0).length;
   const cleanSessions = all.filter(
-    (row: any) =>
-      !((row.error_count || 0) > 0) && !((row.frustration_count || 0) > 0),
+    (row: any) => !((row.error_count || 0) > 0) && !((row.frustration_count || 0) > 0),
   ).length;
   const bouncedSessions = all.filter((row: any) => row.is_bounce).length;
   const avgDurationMs = total
@@ -1289,11 +1221,9 @@ const sessionsSummary = computed(() => {
 // per-session data that only exists for fetched rows).
 const kpiMetrics = computed(() => ({
   total: windowTotals.value?.total ?? sessionsSummary.value.total,
-  errorSessions:
-    windowTotals.value?.errorSessions ?? sessionsSummary.value.errorSessions,
+  errorSessions: windowTotals.value?.errorSessions ?? sessionsSummary.value.errorSessions,
   frustratedSessions:
-    windowTotals.value?.frustratedSessions ??
-    sessionsSummary.value.frustratedSessions,
+    windowTotals.value?.frustratedSessions ?? sessionsSummary.value.frustratedSessions,
   bouncedSessions: sessionsSummary.value.bouncedSessions,
   bounceBase: sessionsSummary.value.total,
   avgDurationMs: sessionsSummary.value.avgDurationMs,
@@ -1319,10 +1249,7 @@ const MIN_CLUSTER_SESSIONS = 3;
 const MIN_SPIKE_ERROR_SESSIONS = 5;
 
 const topInsight = computed<SessionInsight | null>(() => {
-  if (
-    frustrationCluster.value &&
-    frustrationCluster.value.count >= MIN_CLUSTER_SESSIONS
-  )
+  if (frustrationCluster.value && frustrationCluster.value.count >= MIN_CLUSTER_SESSIONS)
     return frustrationCluster.value;
   if (errorCluster.value && errorCluster.value.count >= MIN_CLUSTER_SESSIONS)
     return errorCluster.value;
@@ -1339,8 +1266,7 @@ const topInsight = computed<SessionInsight | null>(() => {
     return {
       kind: "errorSpike",
       count: current.errorSessions,
-      rate:
-        Math.round((current.errorSessions / previous.errorSessions) * 10) / 10,
+      rate: Math.round((current.errorSessions / previous.errorSessions) * 10) / 10,
     };
   }
   return null;
@@ -1359,9 +1285,7 @@ const filterSessionsByInsightError = (insight: SessionInsight) => {
   const condition = `error_message='${escapeSqlString(insight.message)}'`;
   const existing = sessionState.data.editorValue.trim();
   if (!existing.includes(condition)) {
-    sessionState.data.editorValue = existing
-      ? `${existing} AND ${condition}`
-      : condition;
+    sessionState.data.editorValue = existing ? `${existing} AND ${condition}` : condition;
   }
   runQuery();
 };
@@ -1379,22 +1303,15 @@ const openInsightInErrorTracking = (insight: SessionInsight) => {
     query.to = date.endTime;
   }
   if (insight.message) {
-    query.query = b64EncodeUnicode(
-      `error_message='${escapeSqlString(insight.message)}'`,
-    );
+    query.query = b64EncodeUnicode(`error_message='${escapeSqlString(insight.message)}'`);
   }
   router.push({ name: "ErrorTracking", query });
 };
 
 const tableRows = computed(() =>
   enrichedRows.value.filter((row: any) => {
-    if (healthSegment.value === "errors" && !((row.error_count || 0) > 0))
-      return false;
-    if (
-      healthSegment.value === "frustrated" &&
-      !((row.frustration_count || 0) > 0)
-    )
-      return false;
+    if (healthSegment.value === "errors" && !((row.error_count || 0) > 0)) return false;
+    if (healthSegment.value === "frustrated" && !((row.frustration_count || 0) > 0)) return false;
     if (
       healthSegment.value === "clean" &&
       ((row.error_count || 0) > 0 || (row.frustration_count || 0) > 0)
@@ -1402,11 +1319,7 @@ const tableRows = computed(() =>
       return false;
     if (typeSegment.value === "bounced" && !row.is_bounce) return false;
     if (typeSegment.value === "engaged" && row.is_bounce) return false;
-    if (
-      deviceSegment.value !== "all" &&
-      row.device_type !== deviceSegment.value
-    )
-      return false;
+    if (deviceSegment.value !== "all" && row.device_type !== deviceSegment.value) return false;
     return true;
   }),
 );
@@ -1423,8 +1336,7 @@ const activeMetricCard = computed(() => {
 });
 
 const setHealthSegment = (value: HealthSegment | undefined | null) => {
-  healthSegment.value =
-    value && HEALTH_SEGMENTS.includes(value) ? value : "all";
+  healthSegment.value = value && HEALTH_SEGMENTS.includes(value) ? value : "all";
   updateUrlQueryParams();
 };
 
@@ -1434,8 +1346,7 @@ const setTypeSegment = (value: TypeSegment | undefined | null) => {
 };
 
 const setDeviceSegment = (value: DeviceSegment | undefined | null) => {
-  deviceSegment.value =
-    value && DEVICE_SEGMENTS.includes(value) ? value : "all";
+  deviceSegment.value = value && DEVICE_SEGMENTS.includes(value) ? value : "all";
   updateUrlQueryParams();
 };
 
@@ -1452,9 +1363,7 @@ const handleMetricSelect = (card: string) => {
   } else if (card === "errors") {
     setHealthSegment(healthSegment.value === "errors" ? "all" : "errors");
   } else if (card === "frustrated") {
-    setHealthSegment(
-      healthSegment.value === "frustrated" ? "all" : "frustrated",
-    );
+    setHealthSegment(healthSegment.value === "frustrated" ? "all" : "frustrated");
   } else if (card === "bounced") {
     setTypeSegment(typeSegment.value === "bounced" ? "all" : "bounced");
   }
@@ -1475,8 +1384,7 @@ const formatSessionDuration = (ms?: number) => {
 // so "error red" reads the same across modules.
 const getSessionStatusColor = (row: any) => {
   if ((row.error_count || 0) > 0) return "var(--color-severity-error-color)";
-  if ((row.frustration_count || 0) > 0)
-    return "var(--color-severity-warning-color)";
+  if ((row.frustration_count || 0) > 0) return "var(--color-severity-warning-color)";
   return undefined;
 };
 
@@ -1502,8 +1410,7 @@ const handleScrollEnd = () => {
 
 const handleCellClick = (payload: any) => {
   if (payload.columnName !== "action_play") return;
-  sessionState.data.selectedSession =
-    sessionState.data.sessions[payload.row.session_id];
+  sessionState.data.selectedSession = sessionState.data.sessions[payload.row.session_id];
   router.push({
     name: "SessionViewer",
     params: { id: payload.row.session_id },
@@ -1516,15 +1423,9 @@ const handleCellClick = (payload: any) => {
 
 const handleSidebarEvent = (event: string, value: any) => {
   if (event === "add-field") {
-    sessionState.data.editorValue = applyFilterTerm(
-      value,
-      sessionState.data.editorValue,
-    );
+    sessionState.data.editorValue = applyFilterTerm(value, sessionState.data.editorValue);
   } else if (event === "remove-field") {
-    sessionState.data.editorValue = removeFieldCondition(
-      sessionState.data.editorValue,
-      value,
-    );
+    sessionState.data.editorValue = removeFieldCondition(sessionState.data.editorValue, value);
   }
 };
 
@@ -1532,9 +1433,7 @@ const runQuery = () => {
   sessionState.data.resultGrid.currentPage = 0;
   sessionState.data.sessions = {};
   if (dateTime.value.valueType === "relative") {
-    const newDate = getConsumableRelativeTime(
-      dateTime.value.relativeTimePeriod,
-    );
+    const newDate = getConsumableRelativeTime(dateTime.value.relativeTimePeriod);
 
     if (newDate?.startTime && newDate?.endTime) {
       dateTime.value.startTime = newDate?.startTime;
@@ -1560,28 +1459,18 @@ function restoreUrlQueryParams() {
   }
 
   if (queryParams.query) {
-    sessionState.data.editorValue =
-      b64DecodeUnicode(queryParams.query as string) || "";
+    sessionState.data.editorValue = b64DecodeUnicode(queryParams.query as string) || "";
   }
 
-  if (
-    queryParams.health &&
-    HEALTH_SEGMENTS.includes(queryParams.health as HealthSegment)
-  ) {
+  if (queryParams.health && HEALTH_SEGMENTS.includes(queryParams.health as HealthSegment)) {
     healthSegment.value = queryParams.health as HealthSegment;
   }
 
-  if (
-    queryParams.session_type &&
-    TYPE_SEGMENTS.includes(queryParams.session_type as TypeSegment)
-  ) {
+  if (queryParams.session_type && TYPE_SEGMENTS.includes(queryParams.session_type as TypeSegment)) {
     typeSegment.value = queryParams.session_type as TypeSegment;
   }
 
-  if (
-    queryParams.device &&
-    DEVICE_SEGMENTS.includes(queryParams.device as DeviceSegment)
-  ) {
+  if (queryParams.device && DEVICE_SEGMENTS.includes(queryParams.device as DeviceSegment)) {
     deviceSegment.value = queryParams.device as DeviceSegment;
   }
 }
@@ -1616,6 +1505,11 @@ const getStarted = () => {
 };
 
 useShortcuts([
-  { id: "rumSessionsRefresh", handler: () => { if (!isInputFocused()) runQuery(); } },
+  {
+    id: "rumSessionsRefresh",
+    handler: () => {
+      if (!isInputFocused()) runQuery();
+    },
+  },
 ]);
 </script>

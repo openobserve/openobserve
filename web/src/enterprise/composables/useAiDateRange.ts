@@ -87,9 +87,7 @@ watch(state, (next) => {
  * absolute with null bounds). Callers should fall back to a sensible
  * default in that case.
  */
-export function resolveAiDateWindow(
-  s: AiDateState,
-): { startTime: number; endTime: number } | null {
+export function resolveAiDateWindow(s: AiDateState): { startTime: number; endTime: number } | null {
   if (s.valueType === "relative") {
     const period = s.relativeTimePeriod || DEFAULT_RELATIVE;
     const range = getConsumableRelativeTime(period);

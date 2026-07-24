@@ -3,27 +3,26 @@
     <div
       v-if="
         !(
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].customQuery && dashboardPanelData.data.queryType == 'sql'
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+            .customQuery && dashboardPanelData.data.queryType == 'sql'
         )
       "
-      class="pl-3 flex flex-row"
+      class="flex flex-row pl-3"
     >
       <div
-        class="text-sm whitespace-nowrap flex items-center"
+        class="flex items-center text-sm whitespace-nowrap"
         :class="labelWidthClass"
         data-test="dashboard-filter-layout-label"
       >
         <span
-          class="w-2 h-2 rounded-default mr-1.5 shrink-0 bg-text-body"
+          class="rounded-default bg-text-body mr-1.5 h-2 w-2 shrink-0"
           aria-hidden="true"
         ></span>
         {{ t("panel.filters") }}
       </div>
-      <span class="flex items-center mx-0.5" data-test="dashboard-filter-layout-separator">:</span>
+      <span class="mx-0.5 flex items-center" data-test="dashboard-filter-layout-separator">:</span>
       <div
-        class="pl-0.5 flex-wrap droppable scroll flex items-center min-h-9"
+        class="droppable scroll flex min-h-9 flex-wrap items-center pl-0.5"
         data-test="dashboard-filter-layout"
         :data-condition-count="conditionCount"
       >
@@ -70,10 +69,7 @@ export default defineComponent({
 
   setup(props) {
     const route = useRoute();
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
 
     const {
       dashboardPanelData,
@@ -86,9 +82,8 @@ export default defineComponent({
     const showAddMenu = ref(false);
 
     const topLevelGroup = computed(() => {
-      return dashboardPanelData?.data?.queries?.[
-        dashboardPanelData?.layout?.currentQueryIndex || 0
-      ]?.fields?.filter;
+      return dashboardPanelData?.data?.queries?.[dashboardPanelData?.layout?.currentQueryIndex || 0]
+        ?.fields?.filter;
     });
 
     /**
@@ -111,9 +106,7 @@ export default defineComponent({
     const addFilter = (filterType: string) => {
       showAddMenu.value = false;
       const currentQuery =
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ];
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
 
       if (filterType === "condition") {
         const firstOption = schemaOptions.value[0];
@@ -192,20 +185,13 @@ export default defineComponent({
 
     const removeGroup = (index: number) => {
       const currentQuery =
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ];
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
       currentQuery.fields?.filter?.splice(index, 1);
     };
 
-    const handleLogicalOperatorChange = (
-      index: number,
-      newOperator: string,
-    ) => {
+    const handleLogicalOperatorChange = (index: number, newOperator: string) => {
       const currentQuery =
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ];
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
       const item = currentQuery.fields?.filter.conditions[index];
 
       if (item) {
@@ -262,18 +248,13 @@ export default defineComponent({
       return filteredVars.map((it: any) => {
         let value;
         const operator =
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields?.filter?.conditions?.[index]?.operator || null;
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+            ?.filter?.conditions?.[index]?.operator || null;
 
         if (operator === "Contains" || operator === "Not Contains") {
-          value = it.multiSelect
-            ? "(" + "$" + "{" + it.name + "}" + ")"
-            : "$" + it.name;
+          value = it.multiSelect ? "(" + "$" + "{" + it.name + "}" + ")" : "$" + it.name;
         } else {
-          value = it.multiSelect
-            ? "(" + "$" + "{" + it.name + "}" + ")"
-            : "$" + it.name;
+          value = it.multiSelect ? "(" + "$" + "{" + it.name + "}" + ")" : "$" + it.name;
         }
 
         return {
@@ -284,12 +265,10 @@ export default defineComponent({
     };
 
     const schemaOptions = computed(() =>
-      selectedStreamFieldsBasedOnUserDefinedSchema?.value?.map(
-        (field: any) => ({
-          label: field.name,
-          value: field.name,
-        }),
-      ),
+      selectedStreamFieldsBasedOnUserDefinedSchema?.value?.map((field: any) => ({
+        label: field.name,
+        value: field.name,
+      })),
     );
 
     return {
@@ -311,4 +290,3 @@ export default defineComponent({
   },
 });
 </script>
-

@@ -18,37 +18,31 @@
     </div>
 
     <!-- Argument tree -->
-    <div class="w-full mt-2">
+    <div class="mt-2 w-full">
       <div class="w-full">
         <div
           v-for="(arg, argIndex) in argRows"
           :key="argIndex + '-' + arg.type"
-          class="w-full flex flex-col"
+          class="flex w-full flex-col"
         >
-          <div
-            class="flex"
-            :style="{ marginLeft: isChild ? '-48px' : '0px' }"
-          >
-            <div class="mr-1.5 relative w-2.5 min-h-12.5">
+          <div class="flex" :style="{ marginLeft: isChild ? '-48px' : '0px' }">
+            <div class="relative mr-1.5 min-h-12.5 w-2.5">
               <!-- Vertical Line using top & bottom instead of height -->
               <div
-                class="absolute top-0 w-px bg-accent opacity-50"
+                class="bg-accent absolute top-0 w-px opacity-50"
                 :style="{
-                  bottom:
-                    argIndex === fields.args.length - 1
-                      ? 'calc(100% - 32px)'
-                      : '0',
+                  bottom: argIndex === fields.args.length - 1 ? 'calc(100% - 32px)' : '0',
                   left: '5px',
                 }"
               ></div>
 
               <!-- SubTask Arrow -->
-              <div class="absolute top-7.5 left-1 text-text-secondary">
+              <div class="text-text-secondary absolute top-7.5 left-1">
                 <SubTaskArrow />
               </div>
             </div>
 
-            <div class="flex flex-col flex-1 min-w-0">
+            <div class="flex min-w-0 flex-1 flex-col">
               <div class="flex items-center gap-x-2">
                 <label :for="'arg-' + argIndex">{{
                   getParameterLabel(fields.functionName, argIndex)
@@ -60,10 +54,7 @@
                   v-model="fields.args[argIndex].type"
                   @update:model-value="onArgTypeChange(fields.args[argIndex])"
                   :options="
-                    getSupportedTypeBasedOnFunctionNameAndIndex(
-                      fields.functionName,
-                      argIndex,
-                    )
+                    getSupportedTypeBasedOnFunctionNameAndIndex(fields.functionName, argIndex)
                   "
                   icon-key="icon"
                   label-position="inside"
@@ -72,20 +63,14 @@
                   :data-test="`dashboard-function-dropdown-arg-type-selector-${argIndex}`"
                 >
                   <template #icon-left>
-                    <OIcon
-                      :name="getIconBasedOnArgType(fields.args[argIndex].type)"
-                      size="sm"
-                    />
+                    <OIcon :name="getIconBasedOnArgType(fields.args[argIndex].type)" size="sm" />
                   </template>
                   <!-- empty slot keeps the trigger icon-only -->
                   <template #trigger><span class="sr-only"></span></template>
                 </OSelect>
 
                 <!-- Field selector -->
-                <div
-                  class="w-52 flex-none"
-                  v-if="fields.args[argIndex]?.type === 'field'"
-                >
+                <div class="w-52 flex-none" v-if="fields.args[argIndex]?.type === 'field'">
                   <StreamFieldSelect
                     :streams="getAllSelectedStreams()"
                     v-model="fields.args[argIndex].value"
@@ -93,10 +78,7 @@
                   />
                 </div>
 
-                <div
-                  v-if="fields.args[argIndex]?.type === 'string'"
-                  class="w-52 flex-none"
-                >
+                <div v-if="fields.args[argIndex]?.type === 'string'" class="w-52 flex-none">
                   <OInput
                     type="text"
                     v-model="fields.args[argIndex].value"
@@ -169,7 +151,7 @@
       icon-left="add"
       :data-test="`dashboard-function-dropdown-add-argument-button`"
     >
-      {{ t('dashboard.selectFunction.add') }}
+      {{ t("dashboard.selectFunction.add") }}
     </OButton>
   </div>
 </template>
@@ -223,13 +205,8 @@ export default {
     }
 
     const { t } = useI18n();
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
-    const { getAllSelectedStreams } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+    const { getAllSelectedStreams } = useDashboardPanelData(dashboardPanelDataPageKey);
 
     const fields = ref(addMissingArgs(props.modelValue));
 
@@ -254,9 +231,7 @@ export default {
       let filteredFunctionsValidation = functionValidation;
       // if allowAggregation is false, filter out aggregation functions
       if (props.allowAggregation === false) {
-        filteredFunctionsValidation = filteredFunctionsValidation.filter(
-          (v) => !v.isAggregation,
-        );
+        filteredFunctionsValidation = filteredFunctionsValidation.filter((v) => !v.isAggregation);
       }
 
       // None is already included in functionValidation.json, just map all functions
@@ -274,9 +249,7 @@ export default {
         let filteredFunctionsValidation = functionValidation;
         // if allowAggregation is false, filter out aggregation functions
         if (props.allowAggregation === false) {
-          filteredFunctionsValidation = filteredFunctionsValidation.filter(
-            (v) => !v.isAggregation,
-          );
+          filteredFunctionsValidation = filteredFunctionsValidation.filter((v) => !v.isAggregation);
         }
 
         const searchVal = val?.toLowerCase();
@@ -294,9 +267,7 @@ export default {
     const onFunctionSearch = (val: string) => {
       let filteredFunctionsValidation = functionValidation;
       if (props.allowAggregation === false) {
-        filteredFunctionsValidation = filteredFunctionsValidation.filter(
-          (v) => !v.isAggregation,
-        );
+        filteredFunctionsValidation = filteredFunctionsValidation.filter((v) => !v.isAggregation);
       }
       const searchVal = val?.toLowerCase() ?? "";
       filteredFunctions.value = filteredFunctionsValidation
@@ -308,11 +279,7 @@ export default {
     };
 
     const getValidationForFunction = (functionName: string) => {
-      return (
-        functionValidation.find(
-          (v) => v.functionName === (functionName ?? null),
-        ) ?? {}
-      );
+      return functionValidation.find((v) => v.functionName === (functionName ?? null)) ?? {};
     };
 
     const canAddArgument = (functionName: string) => {
@@ -330,11 +297,7 @@ export default {
       const allowAddArgAt = funcValidation?.allowAddArgAt;
 
       // Determine the actual index based on allowAddArgAt
-      const adjustedIndex = getAdjustedIndex(
-        argsValidation,
-        argIndex,
-        allowAddArgAt,
-      );
+      const adjustedIndex = getAdjustedIndex(argsValidation, argIndex, allowAddArgAt);
 
       const minArg = argsValidation[adjustedIndex]?.min ?? 0;
       const functionTotalArgs = argsValidation.length;
@@ -344,9 +307,7 @@ export default {
     };
 
     const addArgument = () => {
-      const funcValidation: any = getValidationForFunction(
-        fields.value.functionName,
-      );
+      const funcValidation: any = getValidationForFunction(fields.value.functionName);
 
       const adjustedIndex = getAdjustedIndex(
         funcValidation?.args || [],
@@ -392,11 +353,7 @@ export default {
     };
 
     // Helper function to adjust the index based on allowAddArgAt
-    const getAdjustedIndex = (
-      argsValidation: any,
-      argIndex: number,
-      allowAddArgAt: any,
-    ) => {
+    const getAdjustedIndex = (argsValidation: any, argIndex: number, allowAddArgAt: any) => {
       const totalArgs = argsValidation.length;
 
       // Handle different cases for allowAddArgAt
@@ -435,11 +392,7 @@ export default {
       const allowAddArgAt = funcValidation?.allowAddArgAt;
 
       // Determine the actual index based on allowAddArgAt
-      const adjustedIndex = getAdjustedIndex(
-        argsValidation,
-        argIndex,
-        allowAddArgAt,
-      );
+      const adjustedIndex = getAdjustedIndex(argsValidation, argIndex, allowAddArgAt);
 
       // Return the type for the adjusted index, or an empty array if the index is out of bounds
       const types = argsValidation[adjustedIndex]?.type || [];
@@ -458,9 +411,7 @@ export default {
         const oldArgs = [...fields.value.args];
 
         // get the validation for the selected function
-        const funcValidation: any = getValidationForFunction(
-          fields.value.functionName,
-        );
+        const funcValidation: any = getValidationForFunction(fields.value.functionName);
 
         // rebuild fields.value.args based on funcValidation.args
         if (funcValidation) {
@@ -540,11 +491,7 @@ export default {
       const allowAddArgAt = funcValidation?.allowAddArgAt;
 
       // Determine the actual index based on allowAddArgAt
-      const adjustedIndex = getAdjustedIndex(
-        argsValidation,
-        argIndex,
-        allowAddArgAt,
-      );
+      const adjustedIndex = getAdjustedIndex(argsValidation, argIndex, allowAddArgAt);
 
       // Return the label from validation, or fallback to default
       return (

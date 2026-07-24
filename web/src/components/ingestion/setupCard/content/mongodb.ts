@@ -18,11 +18,7 @@
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
-import {
-  collectorInstallStep,
-  writeConfigVariants,
-  sharedToolIcons,
-} from "./otelShared";
+import { collectorInstallStep, writeConfigVariants, sharedToolIcons } from "./otelShared";
 
 // The receiver authenticates as a user with clusterMonitor. Name/password are
 // literal here and in the config so the two stay in lockstep.
@@ -134,8 +130,7 @@ export default function mongodbCard(subs: CardSubstitutions): RichCardContent {
       {
         id: "verify",
         title: "Verify Data in OpenObserve",
-        description:
-          "Hit Test below, or check Streams for the `mongodb_*` metrics.",
+        description: "Hit Test below, or check Streams for the `mongodb_*` metrics.",
         chip: { kind: "traces", label: "Metrics" },
         completeOn: "detect",
         detectionAnchor: true,

@@ -37,7 +37,6 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   })),
 }));
 
-
 const defaultFieldObj = {
   name: "testField",
   type: "string",
@@ -94,41 +93,31 @@ describe("SortByBtnGrp", () => {
       wrapper = createWrapper();
 
       expect(wrapper.text()).not.toContain("Sort By:");
-      expect(
-        wrapper.find('[data-test="dashboard-sort-by-btn-group"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-sort-by-btn-group"]').exists()).toBe(true);
     });
 
     it("should render button group", () => {
       wrapper = createWrapper();
 
-      expect(
-        wrapper.find('[data-test="dashboard-sort-by-btn-group"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-sort-by-btn-group"]').exists()).toBe(true);
     });
 
     it("should render clear sort button", () => {
       wrapper = createWrapper();
 
-      expect(
-        wrapper.find('[data-test="dashboard-sort-by-item-clear"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-sort-by-item-clear"]').exists()).toBe(true);
     });
 
     it("should render ascending sort button", () => {
       wrapper = createWrapper();
 
-      expect(
-        wrapper.find('[data-test="dashboard-sort-by-item-asc"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-sort-by-item-asc"]').exists()).toBe(true);
     });
 
     it("should render descending sort button", () => {
       wrapper = createWrapper();
 
-      expect(
-        wrapper.find('[data-test="dashboard-sort-by-item-desc"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-sort-by-item-desc"]').exists()).toBe(true);
     });
 
     it("should render sort icons", () => {
@@ -144,9 +133,7 @@ describe("SortByBtnGrp", () => {
       const fieldObjNoSort = { ...defaultFieldObj, sortBy: null };
       wrapper = createWrapper({ fieldObj: fieldObjNoSort });
 
-      const clearBtn = wrapper.find(
-        '[data-test="dashboard-sort-by-item-clear"]',
-      );
+      const clearBtn = wrapper.find('[data-test="dashboard-sort-by-item-clear"]');
       expect(clearBtn.classes()).toContain("bg-button-primary");
     });
 
@@ -170,9 +157,7 @@ describe("SortByBtnGrp", () => {
       const fieldObjAsc = { ...defaultFieldObj, sortBy: "ASC" };
       wrapper = createWrapper({ fieldObj: fieldObjAsc });
 
-      const clearBtn = wrapper.find(
-        '[data-test="dashboard-sort-by-item-clear"]',
-      );
+      const clearBtn = wrapper.find('[data-test="dashboard-sort-by-item-clear"]');
       const ascBtn = wrapper.find('[data-test="dashboard-sort-by-item-asc"]');
       const descBtn = wrapper.find('[data-test="dashboard-sort-by-item-desc"]');
 
@@ -187,9 +172,7 @@ describe("SortByBtnGrp", () => {
       const fieldObjAsc = { ...defaultFieldObj, sortBy: "ASC" };
       wrapper = createWrapper({ fieldObj: fieldObjAsc });
 
-      const clearBtn = wrapper.find(
-        '[data-test="dashboard-sort-by-item-clear"]',
-      );
+      const clearBtn = wrapper.find('[data-test="dashboard-sort-by-item-clear"]');
       await clearBtn.trigger("click");
 
       expect(wrapper.props("fieldObj").sortBy).toBe(null);
@@ -230,9 +213,7 @@ describe("SortByBtnGrp", () => {
       expect(wrapper.props("fieldObj").sortBy).toBe("DESC");
 
       // Clear sort
-      const clearBtn = wrapper.find(
-        '[data-test="dashboard-sort-by-item-clear"]',
-      );
+      const clearBtn = wrapper.find('[data-test="dashboard-sort-by-item-clear"]');
       await clearBtn.trigger("click");
       expect(wrapper.props("fieldObj").sortBy).toBe(null);
     });
@@ -304,9 +285,7 @@ describe("SortByBtnGrp", () => {
       const fieldObjAsc = { ...defaultFieldObj, sortBy: "ASC" };
       wrapper = createWrapper({ fieldObj: fieldObjAsc });
 
-      const clearBtn = wrapper.find(
-        '[data-test="dashboard-sort-by-item-clear"]',
-      );
+      const clearBtn = wrapper.find('[data-test="dashboard-sort-by-item-clear"]');
       const descBtn = wrapper.find('[data-test="dashboard-sort-by-item-desc"]');
 
       expect(clearBtn.classes()).not.toContain("bg-button-primary");
@@ -318,18 +297,14 @@ describe("SortByBtnGrp", () => {
     it("should have correct button properties", () => {
       wrapper = createWrapper();
 
-      const clearBtn = wrapper.find(
-        '[data-test="dashboard-sort-by-item-clear"]',
-      );
+      const clearBtn = wrapper.find('[data-test="dashboard-sort-by-item-clear"]');
       expect(clearBtn.exists()).toBe(true);
     });
 
     it("should have icon on clear button", () => {
       wrapper = createWrapper();
 
-      const clearBtn = wrapper.find(
-        '[data-test="dashboard-sort-by-item-clear"]',
-      );
+      const clearBtn = wrapper.find('[data-test="dashboard-sort-by-item-clear"]');
       // The clear button should exist and be part of the component
       expect(clearBtn.exists()).toBe(true);
     });
@@ -358,18 +333,14 @@ describe("SortByBtnGrp", () => {
       expect(wrapper.exists()).toBe(true);
 
       // Should treat undefined as falsy and highlight clear button
-      const clearBtn = wrapper.find(
-        '[data-test="dashboard-sort-by-item-clear"]',
-      );
+      const clearBtn = wrapper.find('[data-test="dashboard-sort-by-item-clear"]');
       expect(clearBtn.classes()).toContain("bg-button-primary");
     });
 
     it("should handle empty field object gracefully", () => {
       const emptyFieldObj = {};
 
-      const consoleWarnSpy = vi
-        .spyOn(console, "warn")
-        .mockImplementation(() => {});
+      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       wrapper = createWrapper({ fieldObj: emptyFieldObj });
 
@@ -390,9 +361,7 @@ describe("SortByBtnGrp", () => {
       const fieldObjNoSort = { ...defaultFieldObj, sortBy: null };
       wrapper = createWrapper({ fieldObj: fieldObjNoSort });
 
-      const clearBtn = wrapper.find(
-        '[data-test="dashboard-sort-by-item-clear"]',
-      );
+      const clearBtn = wrapper.find('[data-test="dashboard-sort-by-item-clear"]');
       expect(clearBtn.classes()).toContain("bg-button-primary");
 
       // Update the field object
@@ -416,13 +385,9 @@ describe("SortByBtnGrp", () => {
         });
 
         // Verify the correct button is highlighted
-        const clearBtn = wrapper.find(
-          '[data-test="dashboard-sort-by-item-clear"]',
-        );
+        const clearBtn = wrapper.find('[data-test="dashboard-sort-by-item-clear"]');
         const ascBtn = wrapper.find('[data-test="dashboard-sort-by-item-asc"]');
-        const descBtn = wrapper.find(
-          '[data-test="dashboard-sort-by-item-desc"]',
-        );
+        const descBtn = wrapper.find('[data-test="dashboard-sort-by-item-desc"]');
 
         if (sortOption === null) {
           expect(clearBtn.classes()).toContain("bg-button-primary");

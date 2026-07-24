@@ -35,9 +35,15 @@ export const makeDestinationSchema = (t: (_key: string) => string) =>
         .refine((val) => String(val ?? "").trim().length > 0, {
           message: t("pipeline.fieldRequired"),
         })
-        .refine((val) => !String(val ?? "").trim().endsWith("/"), {
-          message: t("pipeline.urlTrailingSlash"),
-        }),
+        .refine(
+          (val) =>
+            !String(val ?? "")
+              .trim()
+              .endsWith("/"),
+          {
+            message: t("pipeline.urlTrailingSlash"),
+          },
+        ),
 
       skip_tls_verify: z.boolean().optional().default(false),
 
@@ -139,9 +145,7 @@ export const makeDestinationSchema = (t: (_key: string) => string) =>
       // (do NOT trim).
       if (
         val.output_format === "stringseparated" &&
-        (val.separator === null ||
-          val.separator === undefined ||
-          val.separator === "")
+        (val.separator === null || val.separator === undefined || val.separator === "")
       ) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,

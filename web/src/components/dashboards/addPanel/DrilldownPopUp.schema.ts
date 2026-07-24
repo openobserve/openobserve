@@ -46,10 +46,7 @@ export const makeDrilldownPopUpSchema = (t: (_key: string) => string) =>
           tab: z.string().optional().default(""),
           passAllVariables: z.boolean().optional().default(true),
           // Dynamic array — kept loose (no per-row rules).
-          variables: z
-            .array(drilldownVariableRowSchema)
-            .optional()
-            .default([]),
+          variables: z.array(drilldownVariableRowSchema).optional().default([]),
         })
         // Fully-shaped default: zod v4's .default() returns the value as-is
         // (no inner-default fill), so it must match the output shape.
@@ -116,6 +113,4 @@ export const makeDrilldownPopUpSchema = (t: (_key: string) => string) =>
       }
     });
 
-export type DrilldownPopUpForm = z.infer<
-  ReturnType<typeof makeDrilldownPopUpSchema>
->;
+export type DrilldownPopUpForm = z.infer<ReturnType<typeof makeDrilldownPopUpSchema>>;

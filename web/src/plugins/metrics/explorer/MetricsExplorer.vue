@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   user searches, filters and drills down from there.
 -->
 <template>
-  <div class="flex flex-col h-full min-h-0 w-full" data-test="metrics-explorer">
+  <div class="flex h-full min-h-0 w-full flex-col" data-test="metrics-explorer">
     <!-- No page title: Metrics is an EXPLORE surface like Logs and Traces, so the
          first row is the toolbar — scope on the left, time on the right, like the
          Logs toolbar. -->
@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- `p-1.5`, the SAME padding the Logs and Traces toolbars use
          (SearchBar.vue:23 / traces SearchBar.vue:19), so the toolbars share geometry. -->
     <div
-      class="flex items-center gap-2 shrink-0 p-1.5 border-b border-border-default"
+      class="border-border-default flex shrink-0 items-center gap-2 border-b p-1.5"
       data-test="metrics-explorer-filter-bar"
     >
       <!-- Page mode toggle at the start of the toolbar — Explore (browse grid)
@@ -45,21 +45,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="metrics-explorer-mode"
         @update:model-value="setMode"
       >
-        <OToggleGroupItem
-          value="explore"
-          size="sm"
-          data-test="metrics-explorer-mode-explore"
-        >
+        <OToggleGroupItem value="explore" size="sm" data-test="metrics-explorer-mode-explore">
           <template #icon-left>
             <OIcon name="search" size="sm" class="shrink-0" />
           </template>
           {{ t("metrics.explorer.modeExplore") }}
         </OToggleGroupItem>
-        <OToggleGroupItem
-          value="visualize"
-          size="sm"
-          data-test="metrics-explorer-mode-visualize"
-        >
+        <OToggleGroupItem value="visualize" size="sm" data-test="metrics-explorer-mode-visualize">
           <!-- The wrench (`build`), matching the Logs toolbar's Visualize —
                Visualize is where you BUILD a chart, and the two pages must not
                name the same job with different glyphs. -->
@@ -68,11 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           {{ t("metrics.explorer.modeVisualize") }}
         </OToggleGroupItem>
-        <OToggleGroupItem
-          value="workspace"
-          size="sm"
-          data-test="metrics-explorer-mode-workspace"
-        >
+        <OToggleGroupItem value="workspace" size="sm" data-test="metrics-explorer-mode-workspace">
           <!-- `star-outline` (outline), not the filled `star`: a filled star is
                the card's ON state and on a tab would read as "already
                favourited" rather than "your favourites live here". -->
@@ -87,17 +75,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            filter-row`). This spacer is what pins the time cluster right. -->
       <div class="flex-1" />
 
-      <div class="flex items-center gap-2 shrink-0">
+      <div class="flex shrink-0 items-center gap-2">
         <DateTimePickerDashboard
           ref="dateTimePickerRef"
           v-model="selectedDate"
           @on:date-change="onDateChange"
         />
-        <AutoRefreshInterval
-          v-model="refreshInterval"
-          trigger
-          @trigger="onRefreshTick"
-        />
+        <AutoRefreshInterval v-model="refreshInterval" trigger @trigger="onRefreshTick" />
         <!-- Labeled Refresh button. In Visualize it re-runs the chart's query;
              in Explore/Workspace it refreshes the grid — so its
              disabled/loading state follows the grid only there. -->
@@ -111,10 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="() => onRefresh()"
         >
           {{ t("metrics.explorer.refresh") }}
-          <OTooltip
-            :content="t('metrics.explorer.refresh')"
-            shortcut-id="metricsRefresh"
-          />
+          <OTooltip :content="t('metrics.explorer.refresh')" shortcut-id="metricsRefresh" />
         </OButton>
         <ShareButton
           v-if="shareUrl"
@@ -139,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     -->
     <div
       v-if="isGridMode"
-      class="flex items-center gap-2 shrink-0 p-1.5 border-b border-border-default"
+      class="border-border-default flex shrink-0 items-center gap-2 border-b p-1.5"
       data-test="metrics-explorer-filter-row"
     >
       <!-- No "Filters" caption: the chips already read `action = accept_challenge`
@@ -161,21 +142,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- EXPLORE + FAVOURITES — the same browse grid. Favourites is that grid
          narrowed to the metrics you ♥'d, so the body is identical bar the facet
          panel (Explore only): the right column is the search row + grid. -->
-    <div v-if="isGridMode" class="flex flex-1 min-h-0">
+    <div v-if="isGridMode" class="flex min-h-0 flex-1">
       <!-- Facet panel — EXPLORE only. It is an editing control (filter by
            prefix/suffix/type); Workspace is a read-only lens viewer, so it shows
            just the grid (with the Views rail), no facets. -->
       <aside
         v-if="isExplore"
-        class="w-60 flex-none flex flex-col min-h-0 border-r border-border-default"
+        class="border-border-default flex min-h-0 w-60 flex-none flex-col border-r"
         :aria-label="t('metrics.explorer.railsAriaLabel')"
       >
         <!-- Panel header: the facet selector, stretched to fill the column.
              Clear does NOT live here (it collided with the tabs in a 240px
              column); it sits in each facet's search row below instead. -->
-        <div
-          class="shrink-0 flex items-center px-2 py-2"
-        >
+        <div class="flex shrink-0 items-center px-2 py-2">
           <!-- Natural, content-sized segmented control (not forced full-width —
                that fought the component and clumped the labels). The count sits
                in a FIXED-WIDTH slot that is always present (empty when there is
@@ -198,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="flex items-center gap-1">
                 <span>{{ rail.label }}</span>
                 <span
-                  class="w-4 shrink-0 text-right text-2xs font-semibold tabular-nums text-primary"
+                  class="text-2xs text-primary w-4 shrink-0 text-right font-semibold tabular-nums"
                   :data-test="`metrics-explorer-rail-count-${rail.id}`"
                   >{{ rail.count || "" }}</span
                 >
@@ -213,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <PrefixFilterPanel
           v-if="grid.activeRail.value === 'prefix'"
           mode="prefix"
-          class="flex-1 min-h-0 py-2"
+          class="min-h-0 flex-1 py-2"
           :facets="grid.prefixFacets.value"
           :selected="grid.selectedPrefixes.value"
           :has-selection="railHasSelection"
@@ -223,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <PrefixFilterPanel
           v-else-if="grid.activeRail.value === 'suffix'"
           mode="suffix"
-          class="flex-1 min-h-0 py-2"
+          class="min-h-0 flex-1 py-2"
           :facets="grid.suffixFacets.value"
           :selected="grid.selectedSuffixes.value"
           :has-selection="railHasSelection"
@@ -231,10 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @clear="clearActiveRail"
         />
 
-        <div
-          v-else-if="grid.activeRail.value === 'type'"
-          class="flex flex-col min-h-0 flex-1 py-2"
-        >
+        <div v-else-if="grid.activeRail.value === 'type'" class="flex min-h-0 flex-1 flex-col py-2">
           <!-- Type search — narrows the type LIST (mirrors the prefix/suffix
                rails). The flex-1/py-2 above match the PrefixFilterPanel wrapper
                (class="flex-1 min-h-0 py-2") so the search box sits at the exact
@@ -253,11 +229,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Always-present "Clear filters" row so the affordance is consistent
                across all three facets. Count + button always shown; button
                disabled when nothing is selected — no disappearing controls. -->
-          <div
-            class="flex items-center justify-between gap-2 px-3 pb-2"
-          >
-            <span class="text-xs text-text-secondary tabular-nums">
-              {{ t("metrics.explorer.facets.selectedCount", { count: grid.selectedTypes.value.size }) }}
+          <div class="flex items-center justify-between gap-2 px-3 pb-2">
+            <span class="text-text-secondary text-xs tabular-nums">
+              {{
+                t("metrics.explorer.facets.selectedCount", { count: grid.selectedTypes.value.size })
+              }}
             </span>
             <OButton
               variant="ghost-primary"
@@ -276,7 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OCheckboxGroup
             v-if="visibleTypeFacets.length"
             :model-value="selectedTypesArray"
-            class="px-3 pb-2 overflow-y-auto"
+            class="overflow-y-auto px-3 pb-2"
             @update:model-value="onSelectedTypesChange"
           >
             <OCheckbox
@@ -302,10 +278,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            is where the grid cards start, so the search bar is width-matched to
            the cards (not the full page), and the facet panel to its left runs
            the full height alongside it. -->
-      <div class="flex-1 min-w-0 flex flex-col min-h-0">
-        <div
-          class="flex items-center gap-2 px-3 py-2 border-b border-border-default"
-        >
+      <div class="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div class="border-border-default flex items-center gap-2 border-b px-3 py-2">
           <!-- The scope toggle lives INSIDE the field, the way the dashboard
                list's folder scope does: it is a property of the search — which
                metrics you are looking through — not another control beside it. -->
@@ -316,7 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :debounce="200"
             :placeholder="t('metrics.explorer.searchPlaceholder')"
             data-test="metrics-explorer-search"
-            class="flex-1 min-w-0"
+            class="min-w-0 flex-1"
           >
             <template #icon-right>
               <OToggleGroup
@@ -352,15 +326,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span
             aria-live="polite"
             data-test="metrics-explorer-count"
-            class="shrink-0 whitespace-nowrap text-xs text-text-secondary tabular-nums"
+            class="text-text-secondary shrink-0 text-xs whitespace-nowrap tabular-nums"
             >{{ resultCountLabel }}</span
           >
 
-          <OToggleGroup
-            v-model="sortModel"
-            type="single"
-            data-test="metrics-explorer-sort"
-          >
+          <OToggleGroup v-model="sortModel" type="single" data-test="metrics-explorer-sort">
             <OToggleGroupItem
               v-for="opt in sortOptions"
               :key="opt.value"
@@ -371,11 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
           </OToggleGroup>
 
-          <OToggleGroup
-            v-model="viewModel"
-            type="single"
-            data-test="metrics-explorer-view"
-          >
+          <OToggleGroup v-model="viewModel" type="single" data-test="metrics-explorer-view">
             <OToggleGroupItem
               v-for="opt in viewOptions"
               :key="opt.value"
@@ -411,127 +377,125 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <section
           ref="scrollRef"
-          class="flex-1 min-w-0 overflow-y-auto p-3"
+          class="min-w-0 flex-1 overflow-y-auto p-3"
           :class="gridVisible ? '' : 'flex flex-col items-center justify-center'"
           data-test="metrics-explorer-scroll"
         >
-        <div v-if="grid.loading.value" class="flex flex-col items-center justify-center gap-2.5 h-3/5 opacity-80">
-          <OSpinner size="lg" />
-          <span>{{ t("metrics.explorer.loading") }}</span>
-        </div>
+          <div
+            v-if="grid.loading.value"
+            class="flex h-3/5 flex-col items-center justify-center gap-2.5 opacity-80"
+          >
+            <OSpinner size="lg" />
+            <span>{{ t("metrics.explorer.loading") }}</span>
+          </div>
 
-        <OEmptyState
-          v-else-if="grid.loadError.value"
-          size="block"
-          preset="load-error"
-          :description="grid.loadError.value"
-          data-test="metrics-explorer-load-error"
-          @action="grid.loadStreams(true)"
-        />
+          <OEmptyState
+            v-else-if="grid.loadError.value"
+            size="block"
+            preset="load-error"
+            :description="grid.loadError.value"
+            data-test="metrics-explorer-load-error"
+            @action="grid.loadStreams(true)"
+          />
 
-        <!-- Zero metrics in the org — a "set up ingestion" state, not a filter
+          <!-- Zero metrics in the org — a "set up ingestion" state, not a filter
              miss. Keeps the metrics-specific heading and the docs link. -->
-        <OEmptyState
-          v-else-if="!grid.cards.value.length"
-          size="block"
-          preset="no-streams"
-          :title="t('metrics.explorer.noMetrics')"
-          :action-label="t('metrics.explorer.learnIngest')"
-          data-test="metrics-explorer-no-metrics"
-          @action="openIngestDocs"
-        />
+          <OEmptyState
+            v-else-if="!grid.cards.value.length"
+            size="block"
+            preset="no-streams"
+            :title="t('metrics.explorer.noMetrics')"
+            :action-label="t('metrics.explorer.learnIngest')"
+            data-test="metrics-explorer-no-metrics"
+            @action="openIngestDocs"
+          />
 
-        <!-- FAVOURITES with none added yet — the reason is not "filters hid
+          <!-- FAVOURITES with none added yet — the reason is not "filters hid
              everything", so show the right guidance (add one in Explore) and NO
              filter-clearing action. -->
-        <OEmptyState
-          v-else-if="isWorkspace && !grid.favorites.value.length"
-          size="block"
-          variant="create"
-          illustration="board"
-          :title="t('metrics.explorer.workspace.emptyScratchpadTitle')"
-          :description="t('metrics.explorer.workspace.emptyScratchpadDesc')"
-          data-test="metrics-workspace-empty-grid"
-        />
+          <OEmptyState
+            v-else-if="isWorkspace && !grid.favorites.value.length"
+            size="block"
+            variant="create"
+            illustration="board"
+            :title="t('metrics.explorer.workspace.emptyScratchpadTitle')"
+            :description="t('metrics.explorer.workspace.emptyScratchpadDesc')"
+            data-test="metrics-workspace-empty-grid"
+          />
 
-        <!-- Every remedy the hint names, as an action card — but only the ones
+          <!-- Every remedy the hint names, as an action card — but only the ones
              that would actually change anything right now: each card is gated
              on its own cause being active. "Clear all filters" is always last. -->
-        <OEmptyState
-          v-else-if="!visibleCards.length"
-          size="block"
-          preset="no-search-results"
-          :title="t('metrics.explorer.noMatch')"
-          :description="noMatchDescription"
-          :actions="noMatchActions"
-          data-test="metrics-explorer-no-match"
-          @action="onEmptyStateAction"
-        />
+          <OEmptyState
+            v-else-if="!visibleCards.length"
+            size="block"
+            preset="no-search-results"
+            :title="t('metrics.explorer.noMatch')"
+            :description="noMatchDescription"
+            :actions="noMatchActions"
+            data-test="metrics-explorer-no-match"
+            @action="onEmptyStateAction"
+          />
 
-        <!-- Virtualized by ROW: only visible rows exist in the DOM, so ECharts
+          <!-- Virtualized by ROW: only visible rows exist in the DOM, so ECharts
              instances are created and disposed along with them. -->
-        <div
-          v-else
-          class="relative w-full"
-          :style="{ height: `${virtualizer.getTotalSize()}px` }"
-        >
-          <!-- The row box owns the vertical rhythm: its height is exactly the
+          <div
+            v-else
+            class="relative w-full"
+            :style="{ height: `${virtualizer.getTotalSize()}px` }"
+          >
+            <!-- The row box owns the vertical rhythm: its height is exactly the
                virtualizer's estimate, and `pb-3` carves the gap out of it (the
                box is border-box). Cards stretch to fill what's left, so a row is
                always the height the virtualizer positioned it at — otherwise
                rows sit closer together than the cards are tall and visibly
                collide. -->
-          <div
-            v-for="row in virtualizer.getVirtualItems()"
-            :key="(row.key as string | number)"
-            class="absolute top-0 left-0 w-full pb-3"
-            :class="isGrid ? 'grid gap-3' : 'flex flex-col gap-3'"
-            :style="{
-              transform: `translateY(${row.start}px)`,
-              height: `${row.size}px`,
-              gridTemplateColumns: isGrid
-                ? `repeat(${columns}, minmax(0, 1fr))`
-                : undefined,
-            }"
-          >
-            <MetricCard
-              v-for="(card, offset) in rowsOfCards[row.index]"
-              :key="card.name"
-              :card="card"
-              :preview="grid.previews.value[card.name]"
-              :queries="queriesFor(card)"
-              :index="row.index * columns + offset"
-              :is-favorite="grid.favorites.value.includes(card.name)"
-              :time-range="grid.timeRange.value"
-              @visible="onCardVisible"
-              @hidden="onCardHidden"
-              @refresh="grid.refreshCard"
-              @select="onSelect"
-              @configure="onConfigure"
-              @toggle-favorite="grid.toggleFavorite($event.name)"
-              @zoom="onCardZoom"
-            />
+            <div
+              v-for="row in virtualizer.getVirtualItems()"
+              :key="row.key as PropertyKey"
+              class="absolute top-0 left-0 w-full pb-3"
+              :class="isGrid ? 'grid gap-3' : 'flex flex-col gap-3'"
+              :style="{
+                transform: `translateY(${row.start}px)`,
+                height: `${row.size}px`,
+                gridTemplateColumns: isGrid ? `repeat(${columns}, minmax(0, 1fr))` : undefined,
+              }"
+            >
+              <MetricCard
+                v-for="(card, offset) in rowsOfCards[row.index]"
+                :key="card.name"
+                :card="card"
+                :preview="grid.previews.value[card.name]"
+                :queries="queriesFor(card)"
+                :index="row.index * columns + offset"
+                :is-favorite="grid.favorites.value.includes(card.name)"
+                :time-range="grid.timeRange.value"
+                @visible="onCardVisible"
+                @hidden="onCardHidden"
+                @refresh="grid.refreshCard"
+                @select="onSelect"
+                @configure="onConfigure"
+                @toggle-favorite="grid.toggleFavorite($event.name)"
+                @zoom="onCardZoom"
+              />
+            </div>
           </div>
-        </div>
 
-        <div
-          v-if="grid.hasMore.value && visibleCards.length"
-          class="flex justify-center py-4"
-        >
-          <OButton
-            variant="outline"
-            size="sm"
-            :loading="grid.showingMore.value"
-            :disabled="grid.showingMore.value"
-            data-test="metrics-explorer-show-more"
-            @click="grid.showMore"
-          >
-            <!-- From the constant, not a literal: a hardcoded 9 here would go on
+          <div v-if="grid.hasMore.value && visibleCards.length" class="flex justify-center py-4">
+            <OButton
+              variant="outline"
+              size="sm"
+              :loading="grid.showingMore.value"
+              :disabled="grid.showingMore.value"
+              data-test="metrics-explorer-show-more"
+              @click="grid.showMore"
+            >
+              <!-- From the constant, not a literal: a hardcoded 9 here would go on
                  promising 9 after the increment changed, and reveal a different
                  number. -->
-            {{ showMoreLabel }}
-          </OButton>
-        </div>
+              {{ showMoreLabel }}
+            </OButton>
+          </div>
         </section>
       </div>
     </div>
@@ -544,7 +508,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="mode === 'visualize'"
       ref="visualizeRef"
       key="metrics-visualize"
-      class="flex-1 min-h-0"
+      class="min-h-0 flex-1"
       :selected-date-time="visualizeDateTime"
       :seed="visualizeSeed"
       @seed-consumed="visualizeSeed = null"
@@ -573,14 +537,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import {
-  computed,
-  defineComponent,
-  onBeforeUnmount,
-  onMounted,
-  ref,
-  watch,
-} from "vue";
+import { computed, defineComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { AcceptableValue } from "reka-ui";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
@@ -715,10 +672,7 @@ export default defineComponent({
     // `visibleCards.length > 0` implies not-loading, not-errored, and — in
     // Workspace — that favorites matched, so it's exactly the grid's own branch.
     const gridVisible = computed(
-      () =>
-        !grid.loading.value &&
-        !grid.loadError.value &&
-        visibleCards.value.length > 0,
+      () => !grid.loading.value && !grid.loadError.value && visibleCards.value.length > 0,
     );
 
     // Just the count. It used to append "· N no-data hidden", but the checkbox
@@ -798,9 +752,7 @@ export default defineComponent({
     const isWorkspace = computed(() => mode.value === "workspace");
     // Explore and Workspace share the grid + facet body (Workspace adds a views
     // rail); only Visualize swaps to the query workspace.
-    const isGridMode = computed(
-      () => mode.value === "explore" || mode.value === "workspace",
-    );
+    const isGridMode = computed(() => mode.value === "explore" || mode.value === "workspace");
     const setMode = (v: boolean | AcceptableValue | AcceptableValue[]) => {
       if (v !== "explore" && v !== "visualize" && v !== "workspace") return;
       // Pause BEFORE the mode flips, synchronously. The watcher below also keeps
@@ -843,10 +795,7 @@ export default defineComponent({
     const MAX_GRID_COLUMNS = 2;
     const columns = computed(() =>
       isGrid.value
-        ? Math.min(
-            MAX_GRID_COLUMNS,
-            Math.max(1, Math.floor(containerWidth.value / CARD_MIN_WIDTH)),
-          )
+        ? Math.min(MAX_GRID_COLUMNS, Math.max(1, Math.floor(containerWidth.value / CARD_MIN_WIDTH)))
         : 1,
     );
 
@@ -937,9 +886,7 @@ export default defineComponent({
           : grid.selectedTypes,
     );
 
-    const railHasSelection = computed(
-      () => activeRailSelection.value.value.size > 0,
-    );
+    const railHasSelection = computed(() => activeRailSelection.value.value.size > 0);
 
     const clearActiveRail = () => {
       activeRailSelection.value.value = new Set();
@@ -960,9 +907,7 @@ export default defineComponent({
       const hint = grid.showFavoritesOnly.value
         ? t("metrics.explorer.noMatchHintFavorites")
         : t("metrics.explorer.noMatchHint");
-      return grid.emptyHiddenCount.value
-        ? `${noDataHiddenLabel.value} ${hint}`
-        : hint;
+      return grid.emptyHiddenCount.value ? `${noDataHiddenLabel.value} ${hint}` : hint;
     });
 
     /**
@@ -1029,11 +974,7 @@ export default defineComponent({
     });
 
     const openIngestDocs = () => {
-      window.open(
-        "https://openobserve.ai/docs/user-guide/metrics/",
-        "_blank",
-        "noopener",
-      );
+      window.open("https://openobserve.ai/docs/user-guide/metrics/", "_blank", "noopener");
     };
 
     const onEmptyStateAction = (id?: string) => {
@@ -1125,15 +1066,11 @@ export default defineComponent({
     const dialogCard = ref<MetricCardModel | null>(null);
 
     const dialogDefaults = computed(() =>
-      dialogCard.value
-        ? grid.effectiveVariant(dialogCard.value).defaults
-        : null,
+      dialogCard.value ? grid.effectiveVariant(dialogCard.value).defaults : null,
     );
 
     const dialogColor = computed(() => {
-      const index = visibleCards.value.findIndex(
-        (c) => c.name === dialogCard.value?.name,
-      );
+      const index = visibleCards.value.findIndex((c) => c.name === dialogCard.value?.name);
       return cardColorForIndex(Math.max(0, index), isDark.value);
     });
 
@@ -1144,9 +1081,7 @@ export default defineComponent({
 
     /** Dialog tiles share the grid's scheduler, at a priority that outranks it. */
     const runDialogPreview = (expr: string) =>
-      dialogCard.value
-        ? grid.runDialogQuery(expr, dialogCard.value)
-        : Promise.resolve(null);
+      dialogCard.value ? grid.runDialogQuery(expr, dialogCard.value) : Promise.resolve(null);
 
     // Closing the dialog abandons whatever its tiles were still fetching.
     watch(dialogOpen, (open) => {
@@ -1157,10 +1092,7 @@ export default defineComponent({
       if (dialogCard.value) grid.cancelDialogQueries(exprs, dialogCard.value);
     });
 
-    const onApplyOverride = (payload: {
-      variantId: string;
-      options?: Record<string, any>;
-    }) => {
+    const onApplyOverride = (payload: { variantId: string; options?: Record<string, any> }) => {
       const card = dialogCard.value;
       if (!card) return;
       grid.setOverride(card.name, payload);
@@ -1244,11 +1176,7 @@ export default defineComponent({
       // card's type-aware panel data — so Visualize opens on the same query the
       // card charted (sum(rate(...)) for a counter, a quantile for a histogram),
       // not a blank editor.
-      visualizeSeed.value = buildPanelDataForCard(
-        card,
-        resolved,
-        defaults.bucketUnit,
-      );
+      visualizeSeed.value = buildPanelDataForCard(card, resolved, defaults.bucketUnit);
       // Through setMode so the grid is paused synchronously before it unmounts —
       // otherwise its teardown fires a first-time query per card on the way out.
       setMode("visualize");
@@ -1268,8 +1196,7 @@ export default defineComponent({
       if (f.selectedSuffixes) grid.selectedSuffixes.value = f.selectedSuffixes;
       if (f.selectedTypes) grid.selectedTypes.value = f.selectedTypes;
       // showFavoritesOnly is not restored from the URL — the mode drives it.
-      if (f.hideEmptyPanels !== undefined)
-        grid.hideEmptyPanels.value = f.hideEmptyPanels;
+      if (f.hideEmptyPanels !== undefined) grid.hideEmptyPanels.value = f.hideEmptyPanels;
       if (f.sortBy) grid.sortBy.value = f.sortBy;
       if (f.viewMode) grid.viewMode.value = f.viewMode;
       if (f.mode) mode.value = f.mode;
@@ -1302,13 +1229,7 @@ export default defineComponent({
     applyUrlState();
 
     /** Every URL key this page owns. Anything else rides along untouched. */
-    const MANAGED_PARAM_KEYS = [
-      ...EXPLORER_FILTER_PARAM_KEYS,
-      "period",
-      "from",
-      "to",
-      "refresh",
-    ];
+    const MANAGED_PARAM_KEYS = [...EXPLORER_FILTER_PARAM_KEYS, "period", "from", "to", "refresh"];
 
     /** The managed slice of the URL that the CURRENT state serializes to. */
     const managedFromState = (): Record<string, any> => {
@@ -1327,8 +1248,7 @@ export default defineComponent({
       const time: any = selectedDateToQueryParams(selectedDate.value);
       // The default window is recoverable from its absence, like the filters.
       if (time.period !== "15m") Object.assign(query, time);
-      if (refreshInterval.value)
-        query.refresh = refreshIntervalToLabel(refreshInterval.value);
+      if (refreshInterval.value) query.refresh = refreshIntervalToLabel(refreshInterval.value);
       return query;
     };
 
@@ -1372,9 +1292,8 @@ export default defineComponent({
       Object.assign(query, managedFromState());
 
       const changed =
-        Object.keys(query).some(
-          (k) => String(query[k]) !== String(route.query[k] ?? ""),
-        ) || Object.keys(route.query).some((k) => !(k in query));
+        Object.keys(query).some((k) => String(query[k]) !== String(route.query[k] ?? "")) ||
+        Object.keys(route.query).some((k) => !(k in query));
       if (changed) router.replace({ query }).catch(() => {});
     };
 
@@ -1449,9 +1368,7 @@ export default defineComponent({
           return rest;
         };
         if (isEqual(withoutMode(incoming), withoutMode(current))) {
-          mode.value =
-            (incoming.mode as "explore" | "visualize" | "workspace") ??
-            "explore";
+          mode.value = (incoming.mode as "explore" | "visualize" | "workspace") ?? "explore";
           return;
         }
 
@@ -1470,9 +1387,7 @@ export default defineComponent({
         if (f.labelFilters?.length) grid.ensureSchemas();
 
         selectedDate.value =
-          q.period || (q.from && q.to)
-            ? queryParamsToSelectedDate(q)
-            : defaultSelectedDate();
+          q.period || (q.from && q.to) ? queryParamsToSelectedDate(q) : defaultSelectedDate();
         refreshInterval.value =
           q.refresh != null
             ? refreshLabelToInterval(
@@ -1528,10 +1443,7 @@ export default defineComponent({
     const syncTimeRange = (opts?: { keepPreviews?: boolean }) => {
       const consumable = dateTimePickerRef.value?.getConsumableDateTime?.();
       if (!consumable) return;
-      grid.setTimeRange(
-        { start_time: consumable.startTime, end_time: consumable.endTime },
-        opts,
-      );
+      grid.setTimeRange({ start_time: consumable.startTime, end_time: consumable.endTime }, opts);
     };
 
     const refreshing = ref(false);
@@ -1600,9 +1512,7 @@ export default defineComponent({
       // why ViewDashboard.onDataZoom calls it too; the pair is the contract.
       dateTimePickerRef.value?.refresh?.();
       track("metrics_explorer_card_zoomed", {
-        window_seconds: Math.round(
-          (range.end.getTime() - range.start.getTime()) / 1000,
-        ),
+        window_seconds: Math.round((range.end.getTime() - range.start.getTime()) / 1000),
       });
     };
 
@@ -1797,11 +1707,7 @@ export default defineComponent({
         handler: () => {
           if (isInputFocused()) return;
           // Reuse ShareButton's short-URL + clipboard + toast flow.
-          document
-            .querySelector<HTMLElement>(
-              '[data-test="metrics-explorer-share-btn"]',
-            )
-            ?.click();
+          document.querySelector<HTMLElement>('[data-test="metrics-explorer-share-btn"]')?.click();
         },
       },
     ]);
@@ -1881,4 +1787,3 @@ export default defineComponent({
   },
 });
 </script>
-

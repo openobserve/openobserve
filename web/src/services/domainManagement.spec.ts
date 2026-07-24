@@ -38,18 +38,18 @@ vi.mock("vuex", () => ({
 
 describe("domainManagement Service", () => {
   let mockHttpInstance: any;
-  
+
   beforeEach(() => {
     // Reset all mocks before each test
     vi.clearAllMocks();
     vi.resetAllMocks();
-    
+
     // Create a mock HTTP instance
     mockHttpInstance = {
       get: vi.fn(),
       put: vi.fn(),
     };
-    
+
     // Make http() return our mock instance
     (http as any).mockReturnValue(mockHttpInstance);
   });
@@ -85,25 +85,19 @@ describe("domainManagement Service", () => {
 
       const result = await domainManagement.getDomainRestrictions(metaOrg);
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${metaOrg}/domain_management`
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(`/api/${metaOrg}/domain_management`);
       expect(result).toEqual(mockResponse);
     });
 
     it("should handle API errors gracefully", async () => {
       const metaOrg = "test-meta-org";
       const errorMessage = "Network error";
-      
+
       mockHttpInstance.get.mockRejectedValue(new Error(errorMessage));
 
-      await expect(
-        domainManagement.getDomainRestrictions(metaOrg)
-      ).rejects.toThrow(errorMessage);
+      await expect(domainManagement.getDomainRestrictions(metaOrg)).rejects.toThrow(errorMessage);
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${metaOrg}/domain_management`
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(`/api/${metaOrg}/domain_management`);
     });
 
     it("should handle empty response", async () => {
@@ -114,9 +108,7 @@ describe("domainManagement Service", () => {
 
       const result = await domainManagement.getDomainRestrictions(metaOrg);
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${metaOrg}/domain_management`
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(`/api/${metaOrg}/domain_management`);
       expect(result).toEqual(mockResponse);
     });
   });
@@ -137,14 +129,11 @@ describe("domainManagement Service", () => {
 
       mockHttpInstance.put.mockResolvedValue(mockResponse);
 
-      const result = await domainManagement.updateDomainRestrictions(
-        metaOrg,
-        domainData as any
-      );
+      const result = await domainManagement.updateDomainRestrictions(metaOrg, domainData as any);
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/${metaOrg}/domain_management`,
-        domainData
+        domainData,
       );
       expect(result).toEqual(mockResponse);
     });
@@ -161,16 +150,16 @@ describe("domainManagement Service", () => {
         ],
       };
       const errorMessage = "Update failed";
-      
+
       mockHttpInstance.put.mockRejectedValue(new Error(errorMessage));
 
       await expect(
-        domainManagement.updateDomainRestrictions(metaOrg, domainData as any)
+        domainManagement.updateDomainRestrictions(metaOrg, domainData as any),
       ).rejects.toThrow(errorMessage);
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/${metaOrg}/domain_management`,
-        domainData
+        domainData,
       );
     });
 
@@ -181,11 +170,7 @@ describe("domainManagement Service", () => {
           {
             domain: "company.com",
             allow_all_users: false,
-            allowed_emails: [
-              "admin@company.com",
-              "user1@company.com",
-              "user2@company.com",
-            ],
+            allowed_emails: ["admin@company.com", "user1@company.com", "user2@company.com"],
           },
           {
             domain: "partner.org",
@@ -200,12 +185,12 @@ describe("domainManagement Service", () => {
 
       const result = await domainManagement.updateDomainRestrictions(
         metaOrg,
-        complexDomainData as any
+        complexDomainData as any,
       );
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/${metaOrg}/domain_management`,
-        complexDomainData
+        complexDomainData,
       );
       expect(result).toEqual(mockResponse);
     });
@@ -219,12 +204,12 @@ describe("domainManagement Service", () => {
 
       const result = await domainManagement.updateDomainRestrictions(
         metaOrg,
-        emptyDomainData as any
+        emptyDomainData as any,
       );
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
         `/api/${metaOrg}/domain_management`,
-        emptyDomainData
+        emptyDomainData,
       );
       expect(result).toEqual(mockResponse);
     });
@@ -239,9 +224,7 @@ describe("domainManagement Service", () => {
 
       await domainManagement.getDomainRestrictions(metaOrg);
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${metaOrg}/domain_management`
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(`/api/${metaOrg}/domain_management`);
     });
 
     it("should handle undefined metaOrg parameter", async () => {
@@ -251,9 +234,7 @@ describe("domainManagement Service", () => {
 
       await domainManagement.getDomainRestrictions(metaOrg);
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${metaOrg}/domain_management`
-      );
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(`/api/${metaOrg}/domain_management`);
     });
   });
 });

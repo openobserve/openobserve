@@ -82,10 +82,7 @@ export const usePanelPromQLExecutor = (ctx: {
           if (!shouldFetchAnnotations()) {
             return [];
           }
-          const annotationList = await refreshAnnotations(
-            startISOTimestamp,
-            endISOTimestamp,
-          );
+          const annotationList = await refreshAnnotations(startISOTimestamp, endISOTimestamp);
           return annotationList || [];
         } catch (annotationError) {
           console.error("Failed to fetch annotations:", annotationError);
@@ -100,227 +97,229 @@ export const usePanelPromQLExecutor = (ctx: {
 
       // Process all queries in parallel using streaming
       await Promise.all(
-        panelSchema.value.queries.map(async (
-          it: {
-            query: string;
-            tabName?: string;
-            config: { step_value?: string; query_type?: string };
-          },
-          queryIndex: number,
-        ) => {
-          const { query: query1, metadata: metadata1 } = replaceQueryValue(
-            it.query,
-            startISOTimestamp,
-            endISOTimestamp,
-            panelSchema.value.queryType,
-          );
+        panelSchema.value.queries.map(
+          async (
+            it: {
+              query: string;
+              tabName?: string;
+              config: { step_value?: string; query_type?: string };
+            },
+            queryIndex: number,
+          ) => {
+            const { query: query1, metadata: metadata1 } = replaceQueryValue(
+              it.query,
+              startISOTimestamp,
+              endISOTimestamp,
+              panelSchema.value.queryType,
+            );
 
-          const { query: query2, metadata: metadata2 } =
-            await applyDynamicVariables(query1, panelSchema.value.queryType);
+            const { query: query2, metadata: metadata2 } = await applyDynamicVariables(
+              query1,
+              panelSchema.value.queryType,
+            );
 
-          const query = query2;
-          const metadata = {
-            originalQuery: it.query,
-            query: query,
-            startTime: startISOTimestamp,
-            endTime: endISOTimestamp,
-            queryType: panelSchema.value.queryType,
-            variables: [...(metadata1 || []), ...(metadata2 || [])],
-            tabName: it.tabName,
-          };
-
-          queryMetadata[queryIndex] = metadata;
-          // Don't initialize queryResults[queryIndex] yet - let it be undefined
-          // This way we can detect the first chunk properly
-
-          const { traceId } = generateTraceContext();
-
-          // "0" is not a step — it is the panel schema's way of saying "no step
-          // set, let the server decide", and it is what a dashboard panel
-          // carries by default. Normalising it to `undefined` here is safe: the
-          // fallback at the end sends "0" anyway.
-          const explicitStep = (value?: string) => {
-            const trimmed = value?.trim();
-            return trimmed && trimmed !== "0" ? trimmed : undefined;
-          };
-
-          const queryStepValue = explicitStep(it.config?.step_value);
-          const panelStepValue = explicitStep(
-            panelSchema.value.config?.step_value,
-          );
-
-          // A heatmap's cost is COLUMNS x ROWS, and `step: "0"` hands the column
-          // count to the backend — which returns ~300 points regardless of
-          // range. Against a multi-bucket histogram that is enough cells to make
-          // ECharts fall over. So a heatmap without an explicit step gets one
-          // that bounds the columns (applies to EVERY heatmap). An explicit
-          // `step_value` still wins.
-          const isHeatmap = panelSchema.value?.type === "heatmap";
-          const heatmapStepValue =
-            isHeatmap && !queryStepValue && !panelStepValue
-              ? `${computeStepSeconds(
-                  // MILLISECONDS. `usePanelDataLoader` builds these with
-                  // `new Date(...).getTime()`; only the request payload converts
-                  // to the microseconds the backend wants — these raw values
-                  // never are. Divide by 1000 (not 1e6) to get seconds.
-                  (endISOTimestamp - startISOTimestamp) / 1000,
-                  HEATMAP_MAX_COLUMNS,
-                )}s`
-              : undefined;
-
-          const payload = {
-            queryReq: {
+            const query = query2;
+            const metadata = {
+              originalQuery: it.query,
               query: query,
-              start_time: startISOTimestamp,
-              end_time: endISOTimestamp,
-              step: queryStepValue
-                ? queryStepValue
-                : panelStepValue
-                  ? panelStepValue
-                  : (heatmapStepValue ?? "0"),
-              query_type: it.config.query_type || "range", // Add query_type from config (default: range)
-            },
-            type: "promql" as const,
-            traceId: traceId,
-            org_id: store.state.selectedOrganization.identifier,
-            meta: {
-              dashboard_id: dashboardId?.value,
-              dashboard_name: dashboardName?.value,
-              folder_id: folderId?.value,
-              folder_name: folderName?.value,
-              panel_id: panelSchema.value.id,
-              panel_name: panelSchema.value.title,
-              run_id: runId?.value,
-              tab_id: tabId?.value,
-              tab_name: tabName?.value,
-            },
-          };
-
-          // if aborted, return
-          if (abortControllerRef?.signal?.aborted) {
-            // Set partial data flag on abort
-            state.isPartialData = true;
-            // Save current state to cache
-            saveCurrentStateToCache();
-            return;
-          }
-
-          // Get series limit from config
-          const maxSeries = store.state?.zoConfig?.max_dashboard_series ?? 100;
-
-          // Create chunk processor for efficient metric merging
-          const chunkProcessor = createPromQLChunkProcessor({
-            maxSeries,
-            enableLogging: false,
-          });
-
-          const handlePromQLResponse = (data: any, res: any) => {
-            if (res.type === "event_progress") {
-              state.loadingProgressPercentage = res?.content?.percent ?? 0;
-              state.isPartialData = true;
-            }
-            if (res?.type === "promql_metadata") {
-              // Store PromQL metadata (step in µs, trace_id, etc.)
-              if (!state.resultMetaData[queryIndex]) {
-                state.resultMetaData[queryIndex] = [];
-              }
-              state.resultMetaData[queryIndex][0] = {
-                ...(state.resultMetaData[queryIndex]?.[0] ?? {}),
-                ...res.content,
-              };
-            }
-            if (res?.type === "promql_response") {
-              const newData = res?.content?.results;
-
-              // Process chunk using extracted processor module
-              queryResults[queryIndex] = chunkProcessor.processChunk(
-                queryResults[queryIndex],
-                newData,
-              );
-
-              // Update state with accumulated results
-              state.data = markRaw([...queryResults]);
-              state.metadata = {
-                queries: queryMetadata,
-              };
-
-              // Clear error on successful response
-              state.errorDetail = {
-                message: "",
-                code: "",
-              };
-            }
-          };
-
-          const handlePromQLError = (data: any, err: any) => {
-            // Mark this query as completed (even with error)
-            completedQueries.add(queryIndex);
-
-            // parseSearchError unwraps the backend's internal error envelope
-            // ("Error during planning: ErrorCode# {...}") into a readable
-            // sentence; the raw `content.message` would show the envelope.
-            const parsed = parseSearchError(err, "Unknown error");
-
-            state.errorDetail = {
-              message: parsed.message,
-              code: parsed.code ?? "",
+              startTime: startISOTimestamp,
+              endTime: endISOTimestamp,
+              queryType: panelSchema.value.queryType,
+              variables: [...(metadata1 || []), ...(metadata2 || [])],
+              tabName: it.tabName,
             };
 
-            removeTraceId(traceId);
+            queryMetadata[queryIndex] = metadata;
+            // Don't initialize queryResults[queryIndex] yet - let it be undefined
+            // This way we can detect the first chunk properly
 
-            // Only mark loading as complete when ALL queries are done
-            if (completedQueries.size === panelSchema.value.queries.length) {
-              state.loading = false;
-              state.isOperationCancelled = false;
-              state.isPartialData = false;
-            }
-          };
+            const { traceId } = generateTraceContext();
 
-          const handlePromQLComplete = () => {
-            // Mark this query as completed
-            completedQueries.add(queryIndex);
+            // "0" is not a step — it is the panel schema's way of saying "no step
+            // set, let the server decide", and it is what a dashboard panel
+            // carries by default. Normalising it to `undefined` here is safe: the
+            // fallback at the end sends "0" anyway.
+            const explicitStep = (value?: string) => {
+              const trimmed = value?.trim();
+              return trimmed && trimmed !== "0" ? trimmed : undefined;
+            };
 
-            // Get statistics from chunk processor
-            const stats = chunkProcessor.getStats();
+            const queryStepValue = explicitStep(it.config?.step_value);
+            const panelStepValue = explicitStep(panelSchema.value.config?.step_value);
 
-            // Final update with complete results
-            state.data = markRaw([...queryResults]);
-            state.metadata = {
-              queries: queryMetadata,
-              // Add series limiting information for warning message
-              seriesLimiting: {
-                totalMetricsReceived: stats.totalMetricsReceived,
-                metricsStored: stats.metricsStored,
-                maxSeries,
+            // A heatmap's cost is COLUMNS x ROWS, and `step: "0"` hands the column
+            // count to the backend — which returns ~300 points regardless of
+            // range. Against a multi-bucket histogram that is enough cells to make
+            // ECharts fall over. So a heatmap without an explicit step gets one
+            // that bounds the columns (applies to EVERY heatmap). An explicit
+            // `step_value` still wins.
+            const isHeatmap = panelSchema.value?.type === "heatmap";
+            const heatmapStepValue =
+              isHeatmap && !queryStepValue && !panelStepValue
+                ? `${computeStepSeconds(
+                    // MILLISECONDS. `usePanelDataLoader` builds these with
+                    // `new Date(...).getTime()`; only the request payload converts
+                    // to the microseconds the backend wants — these raw values
+                    // never are. Divide by 1000 (not 1e6) to get seconds.
+                    (endISOTimestamp - startISOTimestamp) / 1000,
+                    HEATMAP_MAX_COLUMNS,
+                  )}s`
+                : undefined;
+
+            const payload = {
+              queryReq: {
+                query: query,
+                start_time: startISOTimestamp,
+                end_time: endISOTimestamp,
+                step: queryStepValue
+                  ? queryStepValue
+                  : panelStepValue
+                    ? panelStepValue
+                    : (heatmapStepValue ?? "0"),
+                query_type: it.config.query_type || "range", // Add query_type from config (default: range)
+              },
+              type: "promql" as const,
+              traceId: traceId,
+              org_id: store.state.selectedOrganization.identifier,
+              meta: {
+                dashboard_id: dashboardId?.value,
+                dashboard_name: dashboardName?.value,
+                folder_id: folderId?.value,
+                folder_name: folderName?.value,
+                panel_id: panelSchema.value.id,
+                panel_name: panelSchema.value.title,
+                run_id: runId?.value,
+                tab_id: tabId?.value,
+                tab_name: tabName?.value,
               },
             };
 
-            removeTraceId(traceId);
-
-            // Only mark loading as complete when ALL queries are done
-            if (completedQueries.size === panelSchema.value.queries.length) {
-              state.loading = false;
-              state.isOperationCancelled = false;
-              state.isPartialData = false;
-
-              // Save to cache after all queries complete
+            // if aborted, return
+            if (abortControllerRef?.signal?.aborted) {
+              // Set partial data flag on abort
+              state.isPartialData = true;
+              // Save current state to cache
               saveCurrentStateToCache();
+              return;
             }
-          };
 
-          const handlePromQLReset = () => {
-            // Reset handling if needed
-          };
+            // Get series limit from config
+            const maxSeries = store.state?.zoConfig?.max_dashboard_series ?? 100;
 
-          fetchQueryDataWithHttpStream(payload, {
-            data: handlePromQLResponse,
-            error: handlePromQLError,
-            complete: handlePromQLComplete,
-            reset: handlePromQLReset,
-          });
+            // Create chunk processor for efficient metric merging
+            const chunkProcessor = createPromQLChunkProcessor({
+              maxSeries,
+              enableLogging: false,
+            });
 
-          addTraceId(traceId);
-        }),
+            const handlePromQLResponse = (data: any, res: any) => {
+              if (res.type === "event_progress") {
+                state.loadingProgressPercentage = res?.content?.percent ?? 0;
+                state.isPartialData = true;
+              }
+              if (res?.type === "promql_metadata") {
+                // Store PromQL metadata (step in µs, trace_id, etc.)
+                if (!state.resultMetaData[queryIndex]) {
+                  state.resultMetaData[queryIndex] = [];
+                }
+                state.resultMetaData[queryIndex][0] = {
+                  ...(state.resultMetaData[queryIndex]?.[0] ?? {}),
+                  ...res.content,
+                };
+              }
+              if (res?.type === "promql_response") {
+                const newData = res?.content?.results;
+
+                // Process chunk using extracted processor module
+                queryResults[queryIndex] = chunkProcessor.processChunk(
+                  queryResults[queryIndex],
+                  newData,
+                );
+
+                // Update state with accumulated results
+                state.data = markRaw([...queryResults]);
+                state.metadata = {
+                  queries: queryMetadata,
+                };
+
+                // Clear error on successful response
+                state.errorDetail = {
+                  message: "",
+                  code: "",
+                };
+              }
+            };
+
+            const handlePromQLError = (data: any, err: any) => {
+              // Mark this query as completed (even with error)
+              completedQueries.add(queryIndex);
+
+              // parseSearchError unwraps the backend's internal error envelope
+              // ("Error during planning: ErrorCode# {...}") into a readable
+              // sentence; the raw `content.message` would show the envelope.
+              const parsed = parseSearchError(err, "Unknown error");
+
+              state.errorDetail = {
+                message: parsed.message,
+                code: parsed.code ?? "",
+              };
+
+              removeTraceId(traceId);
+
+              // Only mark loading as complete when ALL queries are done
+              if (completedQueries.size === panelSchema.value.queries.length) {
+                state.loading = false;
+                state.isOperationCancelled = false;
+                state.isPartialData = false;
+              }
+            };
+
+            const handlePromQLComplete = () => {
+              // Mark this query as completed
+              completedQueries.add(queryIndex);
+
+              // Get statistics from chunk processor
+              const stats = chunkProcessor.getStats();
+
+              // Final update with complete results
+              state.data = markRaw([...queryResults]);
+              state.metadata = {
+                queries: queryMetadata,
+                // Add series limiting information for warning message
+                seriesLimiting: {
+                  totalMetricsReceived: stats.totalMetricsReceived,
+                  metricsStored: stats.metricsStored,
+                  maxSeries,
+                },
+              };
+
+              removeTraceId(traceId);
+
+              // Only mark loading as complete when ALL queries are done
+              if (completedQueries.size === panelSchema.value.queries.length) {
+                state.loading = false;
+                state.isOperationCancelled = false;
+                state.isPartialData = false;
+
+                // Save to cache after all queries complete
+                saveCurrentStateToCache();
+              }
+            };
+
+            const handlePromQLReset = () => {
+              // Reset handling if needed
+            };
+
+            fetchQueryDataWithHttpStream(payload, {
+              data: handlePromQLResponse,
+              error: handlePromQLError,
+              complete: handlePromQLComplete,
+              reset: handlePromQLReset,
+            });
+
+            addTraceId(traceId);
+          },
+        ),
       );
 
       // Wait for annotations to complete and update state
