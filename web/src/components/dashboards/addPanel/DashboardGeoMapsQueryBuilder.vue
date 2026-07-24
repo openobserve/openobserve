@@ -29,10 +29,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <span class="flex items-center mx-0.5">:</span>
       <div
-        class="axis-container droppable flex-1 w-full flex flex-wrap items-center min-h-8 border-2 border-dashed border-transparent"
+        class="axis-container droppable flex-1 w-full flex flex-wrap items-center min-h-8 border border-dashed border-transparent"
         :class="{
           'bg-[rgba(0,0,0,0.042)] border-white border-dotted': dashboardPanelData.meta.dragAndDrop.dragging,
-          'transition-all duration-200 bg-field-list-row-hover-bg':
+          'transition-colors duration-200 bg-field-list-row-hover-bg':
             dashboardPanelData.meta.dragAndDrop.dragging &&
             dashboardPanelData.meta.dragAndDrop.currentDragArea == 'latitude',
         }"
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="text-xs text-center w-full flex justify-center items-center"
+          class="text-xs text-center flex-1 min-w-0 flex justify-center items-center whitespace-nowrap"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -155,10 +155,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <span class="flex items-center mx-0.5">:</span>
       <div
-        class="axis-container droppable flex-1 w-full flex flex-wrap items-center min-h-8 border-2 border-dashed border-transparent"
+        class="axis-container droppable flex-1 w-full flex flex-wrap items-center min-h-8 border border-dashed border-transparent"
         :class="{
           'bg-[rgba(0,0,0,0.042)] border-white border-dotted': dashboardPanelData.meta.dragAndDrop.dragging,
-          'transition-all duration-200 bg-field-list-row-hover-bg':
+          'transition-colors duration-200 bg-field-list-row-hover-bg':
             dashboardPanelData.meta.dragAndDrop.dragging &&
             dashboardPanelData.meta.dragAndDrop.currentDragArea == 'longitude',
         }"
@@ -256,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="text-xs text-center w-full flex justify-center items-center"
+          class="text-xs text-center flex-1 min-w-0 flex justify-center items-center whitespace-nowrap"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -281,10 +281,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <span class="flex items-center mx-0.5">:</span>
       <div
-        class="axis-container droppable flex-1 w-full flex flex-wrap items-center min-h-8 border-2 border-dashed border-transparent"
+        class="axis-container droppable flex-1 w-full flex flex-wrap items-center min-h-8 border border-dashed border-transparent"
         :class="{
           'bg-[rgba(0,0,0,0.042)] border-white border-dotted': dashboardPanelData.meta.dragAndDrop.dragging,
-          'transition-all duration-200 bg-field-list-row-hover-bg':
+          'transition-colors duration-200 bg-field-list-row-hover-bg':
             dashboardPanelData.meta.dragAndDrop.dragging &&
             dashboardPanelData.meta.dragAndDrop.currentDragArea == 'weight',
         }"
@@ -382,7 +382,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="text-xs text-center w-full flex justify-center items-center"
+          class="text-xs text-center flex-1 min-w-0 flex justify-center items-center whitespace-nowrap"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex

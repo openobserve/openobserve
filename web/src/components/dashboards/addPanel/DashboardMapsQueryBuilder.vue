@@ -29,10 +29,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <span class="flex items-center ml-0.5 mr-0.5">:</span>
       <div
-        class="axis-container flex-1 w-full flex flex-wrap items-center min-h-8 droppable border-transparent border-dashed border-2 scroll"
+        class="axis-container flex-1 w-full flex flex-wrap items-center min-h-8 droppable border-transparent border-dashed border scroll"
         :class="{
           'bg-[rgba(0,0,0,0.042)] border-white [border-style:dotted]': dashboardPanelData.meta.dragAndDrop.dragging,
-          'transition-all duration-200 bg-field-list-row-hover-bg':
+          'transition-colors duration-200 bg-field-list-row-hover-bg':
             dashboardPanelData.meta.dragAndDrop.dragging &&
             dashboardPanelData.meta.dragAndDrop.currentDragArea == 'name',
         }"
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="text-xs text-center w-full flex justify-center items-center"
+          class="text-xs text-center flex-1 min-w-0 flex justify-center items-center whitespace-nowrap"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -159,10 +159,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <span class="flex items-center ml-0.5 mr-0.5">:</span>
       <div
-        class="axis-container flex-1 w-full flex flex-wrap items-center min-h-8 droppable border-transparent border-dashed border-2 scroll"
+        class="axis-container flex-1 w-full flex flex-wrap items-center min-h-8 droppable border-transparent border-dashed border scroll"
         :class="{
           'bg-[rgba(0,0,0,0.042)] border-white [border-style:dotted]': dashboardPanelData.meta.dragAndDrop.dragging,
-          'transition-all duration-200 bg-field-list-row-hover-bg':
+          'transition-colors duration-200 bg-field-list-row-hover-bg':
             dashboardPanelData.meta.dragAndDrop.dragging &&
             dashboardPanelData.meta.dragAndDrop.currentDragArea ==
               'value_for_maps',
@@ -265,7 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="text-xs text-center w-full flex justify-center items-center"
+          class="text-xs text-center flex-1 min-w-0 flex justify-center items-center whitespace-nowrap"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex

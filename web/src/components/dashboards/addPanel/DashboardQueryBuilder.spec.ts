@@ -878,7 +878,9 @@ describe("DashboardQueryBuilder", () => {
       });
 
       const xAxis = wrapper.find('[data-test="dashboard-x-layout"]');
-      expect(xAxis.classes()).toContain("transition-all");
+      // Colours-only transition (not transition-all) so the drop-zone highlight
+      // fades without animating height/layout on add — avoids the add "bounce".
+      expect(xAxis.classes()).toContain("transition-colors");
     });
   });
 
