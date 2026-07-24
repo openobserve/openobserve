@@ -36,13 +36,7 @@ const pickerSubmit = vi.fn();
 vi.mock("@/components/flow/forms/FunctionPicker.vue", () => ({
   default: {
     name: "FunctionPicker",
-    props: [
-      "initialName",
-      "initialAfterFlatten",
-      "sampleEvents",
-      "language",
-      "defaultCode",
-    ],
+    props: ["initialName", "initialAfterFlatten", "sampleEvents", "language", "defaultCode"],
     emits: ["expand"],
     methods: {
       submit: (...args: any[]) => pickerSubmit(...args),
@@ -59,8 +53,7 @@ function createWrapper() {
   return mount(WorkflowFunction, { global: { plugins: [i18n, store] } });
 }
 
-const picker = (wrapper: any) =>
-  wrapper.findComponent({ name: "FunctionPicker" });
+const picker = (wrapper: any) => wrapper.findComponent({ name: "FunctionPicker" });
 
 describe("WorkflowFunction", () => {
   beforeEach(() => {

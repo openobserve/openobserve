@@ -30,9 +30,7 @@ export const makeImportDashboardSchema = (t: (_key: string) => string) =>
     jsonFiles: z.any().optional(),
   });
 
-export type ImportDashboardForm = z.infer<
-  ReturnType<typeof makeImportDashboardSchema>
->;
+export type ImportDashboardForm = z.infer<ReturnType<typeof makeImportDashboardSchema>>;
 
 export const importDashboardDefaults = (): ImportDashboardForm => ({
   url: "",

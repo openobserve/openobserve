@@ -14,9 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect } from "vitest";
-import detectCycleDefault, {
-  detectCycle,
-} from "@/composables/flow/detectCycle";
+import detectCycleDefault, { detectCycle } from "@/composables/flow/detectCycle";
 
 // Plain edge shape (pipelines / raw edges persisted on the pipeline object)
 const plain = (source: string, target: string) => ({ source, target });
@@ -140,9 +138,7 @@ describe("detectCycle", () => {
     });
 
     it("returns false when edges is undefined", () => {
-      expect(detectCycle(undefined as any, { source: "a", target: "b" })).toBe(
-        false,
-      );
+      expect(detectCycle(undefined as any, { source: "a", target: "b" })).toBe(false);
     });
 
     it("still detects a self-loop when edges is null", () => {
@@ -166,15 +162,11 @@ describe("detectCycle", () => {
     });
 
     it("returns false when connection.source is null", () => {
-      expect(detectCycle([plain("a", "b")], { source: null, target: "a" })).toBe(
-        false,
-      );
+      expect(detectCycle([plain("a", "b")], { source: null, target: "a" })).toBe(false);
     });
 
     it("returns false when connection.target is null", () => {
-      expect(detectCycle([plain("a", "b")], { source: "b", target: null })).toBe(
-        false,
-      );
+      expect(detectCycle([plain("a", "b")], { source: "b", target: null })).toBe(false);
     });
 
     it("skips edges missing a source", () => {
@@ -206,9 +198,7 @@ describe("detectCycle", () => {
   describe("realistic canvas scenarios", () => {
     it("allows a workflow trigger -> condition -> destination chain", () => {
       const edges = [plain("trigger", "condition")];
-      expect(
-        detectCycle(edges, { source: "condition", target: "destination" }),
-      ).toBe(false);
+      expect(detectCycle(edges, { source: "condition", target: "destination" })).toBe(false);
     });
 
     it("blocks wiring a destination back into the trigger", () => {
@@ -217,19 +207,12 @@ describe("detectCycle", () => {
         plain("condition", "function"),
         plain("function", "destination"),
       ];
-      expect(
-        detectCycle(edges, { source: "destination", target: "trigger" }),
-      ).toBe(true);
+      expect(detectCycle(edges, { source: "destination", target: "trigger" })).toBe(true);
     });
 
     it("blocks a mid-chain back edge (function -> condition)", () => {
-      const edges = [
-        plain("trigger", "condition"),
-        plain("condition", "function"),
-      ];
-      expect(
-        detectCycle(edges, { source: "function", target: "condition" }),
-      ).toBe(true);
+      const edges = [plain("trigger", "condition"), plain("condition", "function")];
+      expect(detectCycle(edges, { source: "function", target: "condition" })).toBe(true);
     });
 
     it("does not mutate the edges array passed in", () => {

@@ -54,7 +54,15 @@ function makeMockContext(overrides: Partial<any> = {}): any {
 
   return {
     options: {
-      xAxis: [{ data: ["Jan", "Feb", "Mar"], axisLabel: { rotate: 0, width: 120, margin: 5 }, axisTick: {}, nameGap: 25, name: "" }],
+      xAxis: [
+        {
+          data: ["Jan", "Feb", "Mar"],
+          axisLabel: { rotate: 0, width: 120, margin: 5 },
+          axisTick: {},
+          nameGap: 25,
+          name: "",
+        },
+      ],
       yAxis: [{ data: [], axisLabel: { width: 80 }, name: "" }],
       series: [],
       tooltip: { axisPointer: {}, textStyle: {} },
@@ -188,7 +196,12 @@ describe("applyLineAreaScatterBarChart - area-stacked (Branch A)", () => {
           trellis: { layout: "grid" },
           background: { value: { color: "#FFFFFF" } },
         },
-        queries: [{ fields: { y: [{ label: "Value" }], breakdown: [{ label: "Cat" }] }, customQuery: false }],
+        queries: [
+          {
+            fields: { y: [{ label: "Value" }], breakdown: [{ label: "Cat" }] },
+            customQuery: false,
+          },
+        ],
       },
       breakDownKeys: ["breakdown"],
     });
@@ -211,7 +224,12 @@ describe("applyLineAreaScatterBarChart - line with breakdown (Branch A)", () => 
           trellis: { layout: null },
           background: { value: { color: "#FFFFFF" } },
         },
-        queries: [{ fields: { y: [{ label: "Value" }], breakdown: [{ label: "Cat" }] }, customQuery: false }],
+        queries: [
+          {
+            fields: { y: [{ label: "Value" }], breakdown: [{ label: "Cat" }] },
+            customQuery: false,
+          },
+        ],
       },
       breakDownKeys: ["breakdown"],
     });
@@ -234,7 +252,12 @@ describe("applyLineAreaScatterBarChart - line with breakdown (Branch A)", () => 
           trellis: { layout: null },
           background: { value: { color: "#FFFFFF" } },
         },
-        queries: [{ fields: { y: [{ label: "Value" }], breakdown: [{ label: "Cat" }] }, customQuery: false }],
+        queries: [
+          {
+            fields: { y: [{ label: "Value" }], breakdown: [{ label: "Cat" }] },
+            customQuery: false,
+          },
+        ],
       },
       breakDownKeys: ["breakdown"],
     });
@@ -367,7 +390,12 @@ describe("applyLineAreaScatterBarChart - trellis behavior", () => {
           trellis: { layout: "grid" },
           background: { value: { color: "#FFFFFF" } },
         },
-        queries: [{ fields: { y: [{ label: "Value" }], breakdown: [{ label: "Cat" }] }, customQuery: false }],
+        queries: [
+          {
+            fields: { y: [{ label: "Value" }], breakdown: [{ label: "Cat" }] },
+            customQuery: false,
+          },
+        ],
       },
       breakDownKeys: ["breakdown"],
     });

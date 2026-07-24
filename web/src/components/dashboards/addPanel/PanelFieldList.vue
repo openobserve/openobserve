@@ -1,8 +1,8 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <template>
-  <div class="w-full h-full flex flex-col bg-surface-panel border-r border-border-default">
-    <div class="flex items-center justify-between shrink-0 my-3 px-page-edge">
+  <div class="bg-surface-panel border-border-default flex h-full w-full flex-col border-r">
+    <div class="px-page-edge my-3 flex shrink-0 items-center justify-between">
       <span class="text-base font-bold">{{ t("panel.fields") }}</span>
       <OButton
         variant="outline"
@@ -16,7 +16,7 @@
     </div>
     <OFieldList
       ref="fieldListRef"
-      class="flex-1 min-h-0"
+      class="min-h-0 flex-1"
       :fields="flattenGroupedFields"
       :search="dashboardPanelData.meta.stream.filterField"
       :search-placeholder="t('search.searchField')"
@@ -71,10 +71,10 @@
       <!-- Group header -->
       <template #group-header="{ row }">
         <div
-          class="h-7! w-[calc(100%+2*var(--spacing-page-edge))] shrink-0 -ml-page-edge px-page-edge flex justify-between items-center font-semibold text-xs cursor-default select-none bg-section-header-bg text-text-secondary"
+          class="-ml-page-edge px-page-edge bg-section-header-bg text-text-secondary flex h-7! w-[calc(100%+2*var(--spacing-page-edge))] shrink-0 cursor-default items-center justify-between text-xs font-semibold select-none"
           :title="row.groupName"
         >
-          <div class="flex-1 min-w-0">{{ row.groupName }}</div>
+          <div class="min-w-0 flex-1">{{ row.groupName }}</div>
         </div>
       </template>
 
@@ -95,14 +95,10 @@
           />
           <OFieldLabel :field="row" :show-type-icon="true" />
 
-
           <!-- Field actions -->
           <template #actions>
             <!-- Standard chart actions -->
-            <div
-              v-if="showStandardActions(row)"
-              class="flex items-center gap-0.5"
-            >
+            <div v-if="showStandardActions(row)" class="flex items-center gap-0.5">
               <OButton
                 variant="ghost-neutral"
                 size="chip"
@@ -110,7 +106,7 @@
                 data-test="dashboard-add-x-data"
                 @click.stop="addXAxisItem(row)"
               >
-                {{ dashboardPanelData.data.type != 'h-bar' ? '+X' : '+Y' }}
+                {{ dashboardPanelData.data.type != "h-bar" ? "+X" : "+Y" }}
               </OButton>
               <OButton
                 variant="ghost-neutral"
@@ -119,7 +115,7 @@
                 data-test="dashboard-add-y-data"
                 @click.stop="addYAxisItem(row)"
               >
-                {{ dashboardPanelData.data.type != 'h-bar' ? '+Y' : '+X' }}
+                {{ dashboardPanelData.data.type != "h-bar" ? "+Y" : "+X" }}
               </OButton>
               <OButton
                 v-if="dashboardPanelData.data.type == 'table'"
@@ -130,232 +126,204 @@
                 @click.stop="addBreakDownAxisItem(row)"
               >
                 +P
-          </OButton>
-          <OButton
-            v-if="
-              dashboardPanelData.data.type == 'area' ||
-              dashboardPanelData.data.type == 'bar' ||
-              dashboardPanelData.data.type == 'line' ||
-              dashboardPanelData.data.type == 'h-bar' ||
-              dashboardPanelData.data.type == 'h-stacked' ||
-              dashboardPanelData.data.type == 'scatter' ||
-              dashboardPanelData.data.type == 'area-stacked' ||
-              dashboardPanelData.data.type == 'stacked'
-            "
-            variant="ghost-neutral"
-            size="chip"
-            :disabled="isAddBreakdownNotAllowed"
-            data-test="dashboard-add-b-data"
-            @click.stop="addBreakDownAxisItem(row)"
-          >
-            +B
-          </OButton>
-          <OButton
-            v-if="dashboardPanelData.data.type == 'heatmap'"
-            variant="ghost-neutral"
-            size="chip"
-            :disabled="isAddZAxisNotAllowed"
-            data-test="dashboard-add-z-data"
-            @click.stop="addZAxisItem(row)"
-          >
-            +Z
-          </OButton>
-          <OButton
-            v-if="
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].customQuery == false
-            "
-            variant="ghost-neutral"
-            size="chip"
-            :disabled="
-              !!dashboardPanelData.meta.stream.vrlFunctionFieldList.find(
-                (vrlField: any) => vrlField.name == row.name,
-              )
-            "
-            data-test="dashboard-add-filter-data"
-            @click.stop="
-              addFilteredItem(row as { name: string; stream: string })
-            "
-          >
-            +F
-          </OButton>
-        </div>
+              </OButton>
+              <OButton
+                v-if="
+                  dashboardPanelData.data.type == 'area' ||
+                  dashboardPanelData.data.type == 'bar' ||
+                  dashboardPanelData.data.type == 'line' ||
+                  dashboardPanelData.data.type == 'h-bar' ||
+                  dashboardPanelData.data.type == 'h-stacked' ||
+                  dashboardPanelData.data.type == 'scatter' ||
+                  dashboardPanelData.data.type == 'area-stacked' ||
+                  dashboardPanelData.data.type == 'stacked'
+                "
+                variant="ghost-neutral"
+                size="chip"
+                :disabled="isAddBreakdownNotAllowed"
+                data-test="dashboard-add-b-data"
+                @click.stop="addBreakDownAxisItem(row)"
+              >
+                +B
+              </OButton>
+              <OButton
+                v-if="dashboardPanelData.data.type == 'heatmap'"
+                variant="ghost-neutral"
+                size="chip"
+                :disabled="isAddZAxisNotAllowed"
+                data-test="dashboard-add-z-data"
+                @click.stop="addZAxisItem(row)"
+              >
+                +Z
+              </OButton>
+              <OButton
+                v-if="
+                  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                    .customQuery == false
+                "
+                variant="ghost-neutral"
+                size="chip"
+                :disabled="
+                  !!dashboardPanelData.meta.stream.vrlFunctionFieldList.find(
+                    (vrlField: any) => vrlField.name == row.name,
+                  )
+                "
+                data-test="dashboard-add-filter-data"
+                @click.stop="addFilteredItem(row as { name: string; stream: string })"
+              >
+                +F
+              </OButton>
+            </div>
 
-        <!-- Geomap actions -->
-        <div
-          v-if="showGeomapActions(row)"
-          class="flex items-center gap-0.5"
-        >
-          <OButton
-            variant="ghost-neutral"
-            size="chip"
-            :disabled="
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields?.latitude != null
-            "
-            data-test="dashboard-add-latitude-data"
-            @click.stop="addLatitude(row)"
-          >
-            +Lat
-          </OButton>
-          <OButton
-            variant="ghost-neutral"
-            size="chip"
-            :disabled="
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields?.longitude != null
-            "
-            data-test="dashboard-add-longitude-data"
-            @click.stop="addLongitude(row)"
-          >
-            +Lng
-          </OButton>
-          <OButton
-            variant="ghost-neutral"
-            size="chip"
-            :disabled="
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields?.weight != null
-            "
-            data-test="dashboard-add-weight-data"
-            @click.stop="addWeight(row)"
-          >
-            +W
-          </OButton>
-          <OButton
-            v-if="
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].customQuery == false
-            "
-            variant="ghost-neutral"
-            size="chip"
-            :disabled="
-              !!dashboardPanelData.meta.stream.vrlFunctionFieldList.find(
-                (vrlField: any) => vrlField.name == row.name,
-              )
-            "
-            data-test="dashboard-add-filter-data"
-            @click.stop="
-              addFilteredItem(row as { name: string; stream: string })
-            "
-          >
-            +F
-          </OButton>
-        </div>
+            <!-- Geomap actions -->
+            <div v-if="showGeomapActions(row)" class="flex items-center gap-0.5">
+              <OButton
+                variant="ghost-neutral"
+                size="chip"
+                :disabled="
+                  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                    .fields?.latitude != null
+                "
+                data-test="dashboard-add-latitude-data"
+                @click.stop="addLatitude(row)"
+              >
+                +Lat
+              </OButton>
+              <OButton
+                variant="ghost-neutral"
+                size="chip"
+                :disabled="
+                  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                    .fields?.longitude != null
+                "
+                data-test="dashboard-add-longitude-data"
+                @click.stop="addLongitude(row)"
+              >
+                +Lng
+              </OButton>
+              <OButton
+                variant="ghost-neutral"
+                size="chip"
+                :disabled="
+                  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                    .fields?.weight != null
+                "
+                data-test="dashboard-add-weight-data"
+                @click.stop="addWeight(row)"
+              >
+                +W
+              </OButton>
+              <OButton
+                v-if="
+                  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                    .customQuery == false
+                "
+                variant="ghost-neutral"
+                size="chip"
+                :disabled="
+                  !!dashboardPanelData.meta.stream.vrlFunctionFieldList.find(
+                    (vrlField: any) => vrlField.name == row.name,
+                  )
+                "
+                data-test="dashboard-add-filter-data"
+                @click.stop="addFilteredItem(row as { name: string; stream: string })"
+              >
+                +F
+              </OButton>
+            </div>
 
-        <!-- Maps actions -->
-        <div
-          v-if="showMapsActions(row)"
-          class="flex items-center gap-0.5"
-        >
-          <OButton
-            variant="ghost-neutral"
-            size="chip"
-            :disabled="
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields?.name != null
-            "
-            data-test="dashboard-add-x-data"
-            @click.stop="addMapName(row)"
-          >
-            +N
-          </OButton>
-          <OButton
-            variant="ghost-neutral"
-            size="chip"
-            :disabled="
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields?.value_for_maps != null
-            "
-            data-test="dashboard-add-y-data"
-            @click.stop="addMapValue(row)"
-          >
-            +V
-          </OButton>
-          <OButton
-            variant="ghost-neutral"
-            size="chip"
-            data-test="dashboard-add-filter-data"
-            @click.stop="
-              addFilteredItem(row as { name: string; stream: string })
-            "
-          >
-            +F
-          </OButton>
-        </div>
+            <!-- Maps actions -->
+            <div v-if="showMapsActions(row)" class="flex items-center gap-0.5">
+              <OButton
+                variant="ghost-neutral"
+                size="chip"
+                :disabled="
+                  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                    .fields?.name != null
+                "
+                data-test="dashboard-add-x-data"
+                @click.stop="addMapName(row)"
+              >
+                +N
+              </OButton>
+              <OButton
+                variant="ghost-neutral"
+                size="chip"
+                :disabled="
+                  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                    .fields?.value_for_maps != null
+                "
+                data-test="dashboard-add-y-data"
+                @click.stop="addMapValue(row)"
+              >
+                +V
+              </OButton>
+              <OButton
+                variant="ghost-neutral"
+                size="chip"
+                data-test="dashboard-add-filter-data"
+                @click.stop="addFilteredItem(row as { name: string; stream: string })"
+              >
+                +F
+              </OButton>
+            </div>
 
-        <!-- Sankey actions -->
-        <div
-          v-if="showSankeyActions(row)"
-          class="flex items-center gap-0.5"
-        >
-          <OButton
-            variant="ghost-neutral"
-            size="chip"
-            :disabled="
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields?.source != null
-            "
-            data-test="dashboard-add-source-data"
-            @click.stop="addSource(row)"
-          >
-            +S
-          </OButton>
-          <OButton
-            variant="ghost-neutral"
-            size="chip"
-            :disabled="
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields?.target != null
-            "
-            data-test="dashboard-add-target-data"
-            @click.stop="addTarget(row)"
-          >
-            +T
-          </OButton>
-          <OButton
-            variant="ghost-neutral"
-            size="chip"
-            :disabled="
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields?.value != null
-            "
-            data-test="dashboard-add-value-data"
-            @click.stop="addValue(row)"
-          >
-            +V
-          </OButton>
-          <OButton
-            v-if="
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].customQuery == false
-            "
-            variant="ghost-neutral"
-            size="chip"
-            :disabled="
-              !!dashboardPanelData.meta.stream.vrlFunctionFieldList.find(
-                (vrlField: any) => vrlField.name == row.name,
-              )
-            "
-            data-test="dashboard-add-filter-data"
-            @click.stop="
-              addFilteredItem(row as { name: string; stream: string })
-            "
-          >
-            +F
-          </OButton>
-        </div>
+            <!-- Sankey actions -->
+            <div v-if="showSankeyActions(row)" class="flex items-center gap-0.5">
+              <OButton
+                variant="ghost-neutral"
+                size="chip"
+                :disabled="
+                  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                    .fields?.source != null
+                "
+                data-test="dashboard-add-source-data"
+                @click.stop="addSource(row)"
+              >
+                +S
+              </OButton>
+              <OButton
+                variant="ghost-neutral"
+                size="chip"
+                :disabled="
+                  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                    .fields?.target != null
+                "
+                data-test="dashboard-add-target-data"
+                @click.stop="addTarget(row)"
+              >
+                +T
+              </OButton>
+              <OButton
+                variant="ghost-neutral"
+                size="chip"
+                :disabled="
+                  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                    .fields?.value != null
+                "
+                data-test="dashboard-add-value-data"
+                @click.stop="addValue(row)"
+              >
+                +V
+              </OButton>
+              <OButton
+                v-if="
+                  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                    .customQuery == false
+                "
+                variant="ghost-neutral"
+                size="chip"
+                :disabled="
+                  !!dashboardPanelData.meta.stream.vrlFunctionFieldList.find(
+                    (vrlField: any) => vrlField.name == row.name,
+                  )
+                "
+                data-test="dashboard-add-filter-data"
+                @click.stop="addFilteredItem(row as { name: string; stream: string })"
+              >
+                +F
+              </OButton>
+            </div>
           </template>
         </OFieldRow>
       </template>
@@ -363,15 +331,8 @@
       <!-- Loading state -->
       <template #loading>
         <div class="flex flex-col">
-          <div
-            v-for="i in 6"
-            :key="i"
-            class="flex items-center gap-2 py-1"
-          >
-            <OSkeleton
-              type="rect"
-              class="w-3.5 h-3.5 rounded-default flex-shrink-0"
-            />
+          <div v-for="i in 6" :key="i" class="flex items-center gap-2 py-1">
+            <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 flex-shrink-0" />
             <OSkeleton type="text" class="flex-1" />
           </div>
         </div>
@@ -379,14 +340,11 @@
 
       <!-- Empty state -->
       <template #empty>
-        <div
-          class="text-center py-[0.725rem] flex items-center justify-center"
-        >
+        <div class="flex items-center justify-center py-[0.725rem] text-center">
           <OIcon name="info" size="xs" />
           <span class="pl-1.5">{{ t("search.noFieldFound") }}</span>
         </div>
       </template>
-
 
       <!-- After list: pagination -->
       <template #after-list="bottomProps">
@@ -410,14 +368,9 @@
           >
             <OIcon name="fast-rewind" size="sm" />
           </OButton>
-          <template
-            v-for="page in visiblePagesForTotal(bottomProps)"
-            :key="page"
-          >
+          <template v-for="page in visiblePagesForTotal(bottomProps)" :key="page">
             <OButton
-              :variant="
-                bottomProps.currentPage === page ? 'primary' : 'ghost'
-              "
+              :variant="bottomProps.currentPage === page ? 'primary' : 'ghost'"
               size="icon-panel"
               :data-test="`field-list-pagination-page-${page}`"
               @click="setPage(page)"
@@ -447,10 +400,7 @@ import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import useStreams from "@/composables/useStreams";
-import {
-  applyPromqlSeed,
-  metricsStreamsOf,
-} from "@/utils/dashboard/promqlSeed";
+import { applyPromqlSeed, metricsStreamsOf } from "@/utils/dashboard/promqlSeed";
 import { isAutoSeededQuery } from "@/utils/metrics/metricPanelSeed";
 import { buildTypeFilterBuckets } from "@/utils/metrics/metricFamily";
 import { BADGE_LABELS, getBadgeStyle } from "@/utils/metrics/metricPalette";
@@ -472,10 +422,7 @@ const props = defineProps<{
   hideAllFieldsSelection?: boolean;
 }>();
 
-const dashboardPanelDataPageKey: string = inject(
-  "dashboardPanelDataPageKey",
-  "dashboard",
-);
+const dashboardPanelDataPageKey: string = inject("dashboardPanelDataPageKey", "dashboard");
 
 const store = useStore();
 const { t } = useI18n();
@@ -544,28 +491,24 @@ const metricTypeBuckets = computed<Record<string, string>>(() => {
 
 const currentStreamType = computed(
   () =>
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-      ?.fields?.stream_type,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields
+      ?.stream_type,
 );
 
 const currentStream = computed(
   () =>
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-      ?.fields?.stream,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.stream,
 );
 
 function onStreamTypeChange(val: SelectModelValue) {
   const fields =
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-      .fields;
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields;
   fields.stream = "";
   fields.stream_type = val;
 }
 
 function onStreamChange(val: SelectModelValue) {
-  dashboardPanelData.data.queries[
-    dashboardPanelData.layout.currentQueryIndex
-  ].fields.stream = val;
+  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream = val;
 }
 
 // ── Stream type options ────────────────────────────────────────────────
@@ -581,8 +524,7 @@ const filteredStreams = ref<any[]>([]);
 const streamListLoading = ref(false);
 
 const currentQueryFields = () =>
-  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-    .fields;
+  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields;
 
 const isEditPanel = props.editMode;
 let initialStreamsLoaded = false;
@@ -651,11 +593,9 @@ if (isEditPanel) {
 }
 
 const onStreamSearch = (val: string) => {
-  filteredStreams.value = dashboardPanelData.meta.stream.streamResults.filter(
-    (stream: any) => {
-      return stream.name.toLowerCase().indexOf(val.toLowerCase()) > -1;
-    },
-  );
+  filteredStreams.value = dashboardPanelData.meta.stream.streamResults.filter((stream: any) => {
+    return stream.name.toLowerCase().indexOf(val.toLowerCase()) > -1;
+  });
 };
 
 watch(
@@ -682,21 +622,15 @@ const streamOptions = computed(() =>
       // Colour-coded from the SAME palette the Metrics Explorer badges use —
       // Counter blue, Gauge green, Histogram purple, Summary orange, Other grey —
       // so a type looks the same wherever you meet it.
-      badgeStyle: bucket
-        ? getBadgeStyle(bucket, isDark.value)
-        : undefined,
+      badgeStyle: bucket ? getBadgeStyle(bucket, isDark.value) : undefined,
     };
   }),
 );
 
-
 // ── Query stream tracking ──────────────────────────────────────────────
 
 const queryStreamTracking = ref<
-  Record<
-    number,
-    { stream: string | null | undefined; streamType: string | null | undefined }
-  >
+  Record<number, { stream: string | null | undefined; streamType: string | null | undefined }>
 >({});
 
 dashboardPanelData.data.queries.forEach((query: any, index: number) => {
@@ -712,10 +646,9 @@ watch(
   () => [
     dashboardPanelData.meta.stream.streamResults,
     dashboardPanelData.meta.stream.streamResultsType,
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-      ?.fields?.stream,
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-      ?.fields?.stream_type,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.stream,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields
+      ?.stream_type,
     dashboardPanelData.layout.currentQueryIndex,
   ],
   async (newValues) => {
@@ -732,10 +665,8 @@ watch(
     }
 
     const previousForThisQuery = queryStreamTracking.value[currentIndex];
-    const streamChangedForThisQuery =
-      previousForThisQuery.stream !== currentStream;
-    const streamTypeChangedForThisQuery =
-      previousForThisQuery.streamType !== currentStreamType;
+    const streamChangedForThisQuery = previousForThisQuery.stream !== currentStream;
+    const streamTypeChangedForThisQuery = previousForThisQuery.streamType !== currentStreamType;
 
     queryStreamTracking.value[currentIndex] = {
       stream: currentStream,
@@ -749,38 +680,33 @@ watch(
     const fields: any = dashboardPanelData.meta.stream.streamResults.find(
       (it: any) =>
         it.name ==
-          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-            .fields.stream &&
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+            .stream &&
         it.stream_type ==
-          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-            .fields.stream_type,
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+            .stream_type,
     );
 
     if (
       fields &&
-      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-        .fields.stream_type === dashboardPanelData.meta.stream.streamResultsType
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+        .stream_type === dashboardPanelData.meta.stream.streamResultsType
     ) {
       try {
         // On stream change in PromQL mode, re-seed the query for the new stream.
         // Metrics: custom + builder. Add Panel: PromQL custom only (builder
         // regenerates via DashboardQueryBuilder; SQL is excluded — promql-only block).
         const promqlQuery =
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ];
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
         const shouldResetPromqlQuery =
           promqlMode.value &&
           (dashboardPanelDataPageKey === "metrics" ||
-            (dashboardPanelDataPageKey === "dashboard" &&
-              promqlQuery?.customQuery));
+            (dashboardPanelDataPageKey === "dashboard" && promqlQuery?.customQuery));
         if (shouldResetPromqlQuery) {
           let parsedQuery = null;
           try {
             parsedQuery = parsePromQlQuery(
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].query,
+              dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query,
             );
           } catch (error: any) {
             console.error("Failed to parse PromQL query:", error);
@@ -789,9 +715,8 @@ watch(
 
           const metricName = parsedQuery?.metricName;
           const streamName =
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.stream;
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+              .stream;
 
           if (!streamName) {
             console.warn("Cannot update query: stream name is undefined");
@@ -814,9 +739,7 @@ watch(
             // DashboardQueryBuilder already does.
             const streams = metricsStreamsOf(dashboardPanelData);
             const slot =
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ];
+              dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
             const seedOpts = {
               chartType: dashboardPanelData.data.type,
               requireBuilder: !slot?.customQuery,
@@ -845,8 +768,7 @@ watch(
 
 watch(
   () => [
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-      .fields.stream_type,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream_type,
     dashboardPanelData.meta.stream.streamResults,
     dashboardPanelData.meta.stream.streamResultsType,
   ],
@@ -854,16 +776,15 @@ watch(
     if (
       dashboardPanelData.meta.stream.streamResults.length > 0 &&
       dashboardPanelData.meta.stream.streamResultsType ===
-        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-          .fields.stream_type
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+          .stream_type
     ) {
       const currentIndex = dashboardPanelData.layout.currentQueryIndex;
       const existingStream = dashboardPanelData.meta.stream.streamResults.find(
         (it: any) =>
           it.name ==
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.stream,
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+            .stream,
       );
       if (existingStream) {
         dashboardPanelData.data.queries[currentIndex].fields.stream =
@@ -886,8 +807,7 @@ const flattenGroupedFields = computed(() => {
   // Custom query fields (from a user-written SELECT) and VRL function output
   // fields aren't tied to any stream — give them their own visible section
   // headers so they don't render as orphan rows above the first stream group.
-  const customQueryFields =
-    dashboardPanelData.meta.stream.customQueryFields ?? [];
+  const customQueryFields = dashboardPanelData.meta.stream.customQueryFields ?? [];
   if (customQueryFields.length > 0) {
     flattenedFields.push({
       isGroup: true,
@@ -902,8 +822,7 @@ const flattenGroupedFields = computed(() => {
     });
   }
 
-  const vrlFunctionFields =
-    dashboardPanelData.meta.stream.vrlFunctionFieldList ?? [];
+  const vrlFunctionFields = dashboardPanelData.meta.stream.vrlFunctionFieldList ?? [];
   if (vrlFunctionFields.length > 0) {
     flattenedFields.push({
       isGroup: true,
@@ -979,9 +898,7 @@ const flattenGroupedFields = computed(() => {
   // to stop working after the field set grows (e.g. after switching query
   // tabs). Give every row a guaranteed-unique key (index-prefixed) instead.
   flattenedFields.forEach((row: any, i: number) => {
-    row._uid = `${i}:${
-      row.isGroup ? "g:" + row.groupName : (row.stream ?? "") + ":" + row.name
-    }`;
+    row._uid = `${i}:${row.isGroup ? "g:" + row.groupName : (row.stream ?? "") + ":" + row.name}`;
   });
 
   return flattenedFields;
@@ -990,14 +907,11 @@ const flattenGroupedFields = computed(() => {
 watch(
   () => ({
     stream:
-      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-        .fields.stream,
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream,
     streamType:
-      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-        .fields.stream_type,
-    joins:
-      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-        .joins,
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+        .stream_type,
+    joins: dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].joins,
   }),
   () => {
     updateGroupedFields();
@@ -1023,8 +937,7 @@ const customFieldNames = computed(() => {
 function isRowDragEnabled(row: FieldItem): boolean {
   if (hideAllFieldsSelection.value) return false;
   if (promqlMode.value) return false;
-  const currentQuery =
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
+  const currentQuery = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
   if (currentQuery.customQuery && !customFieldNames.value.has(row.name)) {
     return false;
   }
@@ -1065,8 +978,7 @@ function showStandardActions(row: FieldItem): boolean {
   if (promqlMode.value) return false;
   if (dashboardPanelDataPageKey === "logs") return false;
 
-  const currentQuery =
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
+  const currentQuery = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
   if (currentQuery.customQuery && !customFieldNames.value.has(row.name)) {
     return false;
   }
@@ -1089,8 +1001,7 @@ function showGeomapActions(row: FieldItem): boolean {
   if (promqlMode.value) return false;
   if (dashboardPanelDataPageKey === "logs") return false;
 
-  const currentQuery =
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
+  const currentQuery = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
   if (currentQuery.customQuery && !customFieldNames.value.has(row.name)) {
     return false;
   }
@@ -1103,8 +1014,7 @@ function showMapsActions(row: FieldItem): boolean {
   if (promqlMode.value) return false;
   if (dashboardPanelDataPageKey === "logs") return false;
 
-  const currentQuery =
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
+  const currentQuery = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
   if (currentQuery.customQuery && !customFieldNames.value.has(row.name)) {
     return false;
   }
@@ -1117,8 +1027,7 @@ function showSankeyActions(row: FieldItem): boolean {
   if (promqlMode.value) return false;
   if (dashboardPanelDataPageKey === "logs") return false;
 
-  const currentQuery =
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
+  const currentQuery = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
   if (currentQuery.customQuery && !customFieldNames.value.has(row.name)) {
     return false;
   }
@@ -1131,8 +1040,8 @@ function showSankeyActions(row: FieldItem): boolean {
 const getStreamList = async (stream_type: any) => {
   await getStreams(stream_type, false).then((res: any) => {
     const currentType =
-      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-        .fields.stream_type;
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+        .stream_type;
     if (stream_type !== currentType) return;
     dashboardPanelData.meta.stream.streamResults = res.list;
     dashboardPanelData.meta.stream.streamResultsType = stream_type;
@@ -1164,4 +1073,3 @@ function setPage(page: number) {
 
 defineExpose({ fieldListRef });
 </script>
-

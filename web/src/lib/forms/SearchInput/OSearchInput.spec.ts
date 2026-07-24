@@ -121,9 +121,7 @@ describe("OSearchInput", () => {
     // in the app an invisible, padded box on its right.
     wrapper = mount(OSearchInput, { props: { modelValue: "" } });
 
-    expect(
-      wrapper.findComponent(OInput).vm.$slots["icon-right"],
-    ).toBeUndefined();
+    expect(wrapper.findComponent(OInput).vm.$slots["icon-right"]).toBeUndefined();
   });
 
   it("should debounce update:modelValue when debounce is set", async () => {

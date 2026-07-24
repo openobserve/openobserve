@@ -30,21 +30,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <component
     :is="as"
-    class="bg-card-glass-bg rounded-default flex flex-col px-3.5 py-2.5 gap-1 border border-border-default transition-shadow duration-200 ease-in-out hover:shadow-md"
+    class="bg-card-glass-bg rounded-default border-border-default flex flex-col gap-1 border px-3.5 py-2.5 transition-shadow duration-200 ease-in-out hover:shadow-md"
     :data-test="dataTest"
   >
-    <div class="flex items-center justify-between gap-2 mb-1">
+    <div class="mb-1 flex items-center justify-between gap-2">
       <div
         class="min-w-0 truncate"
-        :class="labelClass || 'text-2xs font-semibold leading-normal text-text-secondary'"
+        :class="labelClass || 'text-2xs text-text-secondary leading-normal font-semibold'"
       >
         <slot name="label">{{ label }}</slot>
       </div>
       <span
         v-if="icon || $slots.icon"
-        class="inline-flex items-center justify-center shrink-0 rounded-default"
+        class="rounded-default inline-flex shrink-0 items-center justify-center"
         :class="[
-          iconSize === 'md' ? 'w-10 h-10' : 'w-6 h-6',
+          iconSize === 'md' ? 'h-10 w-10' : 'h-6 w-6',
           iconClass || 'bg-surface-subtle text-text-secondary',
         ]"
       >
@@ -58,10 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <slot name="value" />
     </div>
 
-    <div
-      v-if="$slots.trend"
-      class="text-3xs font-medium flex items-center gap-1"
-    >
+    <div v-if="$slots.trend" class="text-3xs flex items-center gap-1 font-medium">
       <slot name="trend" />
     </div>
 

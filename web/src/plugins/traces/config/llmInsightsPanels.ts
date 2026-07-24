@@ -28,11 +28,7 @@
  *   {{interval}}  — auto-selected histogram bucket width string ("5 minutes" etc.)
  */
 
-export type LLMPanelType =
-  | "stacked-area"
-  | "stacked-bar"
-  | "horizontal-bar"
-  | "table";
+export type LLMPanelType = "stacked-area" | "stacked-bar" | "horizontal-bar" | "table";
 
 export type LLMTableColumnFormat =
   | "time"
@@ -411,9 +407,7 @@ export function renderPanelSql(
   const clause = ` AND ${ctx.agentFilter} `;
   const tail = rendered.match(/\b(group\s+by|order\s+by|limit)\b/i);
   if (tail && tail.index !== undefined) {
-    return compactSql(
-      rendered.slice(0, tail.index) + clause + rendered.slice(tail.index),
-    );
+    return compactSql(rendered.slice(0, tail.index) + clause + rendered.slice(tail.index));
   }
   return compactSql(`${rendered}${clause}`);
 }

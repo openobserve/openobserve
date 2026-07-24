@@ -9,12 +9,7 @@
  * | info          | --color-timeline-dot-info        |
  * | muted         | --color-timeline-dot-muted       |
  */
-export type TimelineItemVariant =
-  | "primary"
-  | "success"
-  | "destructive"
-  | "info"
-  | "muted";
+export type TimelineItemVariant = "primary" | "success" | "destructive" | "info" | "muted";
 
 export interface TimelineItemProps {
   /** Header text rendered in bold above the subtitle. */

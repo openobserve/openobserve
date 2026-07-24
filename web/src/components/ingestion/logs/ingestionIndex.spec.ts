@@ -26,15 +26,15 @@ import i18n from "@/locales";
 // Mock services and utilities
 vi.mock("@/services/segment_analytics", () => ({
   default: {
-    track: vi.fn()
-  }
+    track: vi.fn(),
+  },
 }));
 
 vi.mock("@/aws-exports", () => ({
   default: {
     isCloud: "false",
-    enableAnalytics: "true"
-  }
+    enableAnalytics: "true",
+  },
 }));
 
 vi.mock("@/utils/zincutils", async (importOriginal) => {
@@ -43,7 +43,7 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
     ...actual,
     getImageURL: vi.fn((path: string) => `/mocked/path/${path}`),
     verifyOrganizationStatus: vi.fn(),
-    mergeRoutes: vi.fn((route1: any, route2: any) => [...(route1 || []), ...(route2 || [])])
+    mergeRoutes: vi.fn((route1: any, route2: any) => [...(route1 || []), ...(route2 || [])]),
   };
 });
 
@@ -57,12 +57,11 @@ const mockCopyToClipboardOptions = {
   timeout: 5000,
 };
 
-
 describe("IngestLogs Index Component", () => {
   let wrapper: any = null;
 
   const mockProps = {
-    currOrgIdentifier: "test-org"
+    currOrgIdentifier: "test-org",
   };
 
   beforeEach(() => {
@@ -75,8 +74,8 @@ describe("IngestLogs Index Component", () => {
           OTabs: true,
           ORouteTab: true,
           RouterView: true,
-        }
-      }
+        },
+      },
     });
 
     // Reset mocks
@@ -142,7 +141,7 @@ describe("IngestLogs Index Component", () => {
       // Test by directly checking computed property logic
       const isCloudTrue = "true";
       const showCloudResult = isCloudTrue === "true"; // This will be true
-      
+
       expect(showCloudResult).toBe(true);
     });
 
@@ -163,10 +162,7 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith(
-        "test content",
-        mockCopyToClipboardOptions,
-      );
+      expect(copyToClipboard).toHaveBeenCalledWith("test content", mockCopyToClipboardOptions);
     });
 
     it("should handle clipboard copy failure", () => {
@@ -202,10 +198,7 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith(
-        "",
-        mockCopyToClipboardOptions,
-      );
+      expect(copyToClipboard).toHaveBeenCalledWith("", mockCopyToClipboardOptions);
     });
 
     it("should handle content with whitespace", async () => {
@@ -213,10 +206,7 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith(
-        "  test content  ",
-        mockCopyToClipboardOptions,
-      );
+      expect(copyToClipboard).toHaveBeenCalledWith("  test content  ", mockCopyToClipboardOptions);
     });
 
     it("should handle content with special characters", async () => {
@@ -275,18 +265,18 @@ describe("IngestLogs Index Component", () => {
   describe("showUpdateDialogFn function", () => {
     it("should set confirmUpdate to true", () => {
       expect(wrapper.vm.confirmUpdate).toBe(false);
-      
+
       wrapper.vm.showUpdateDialogFn();
-      
+
       expect(wrapper.vm.confirmUpdate).toBe(true);
     });
 
     it("should toggle confirmUpdate correctly multiple times", () => {
       expect(wrapper.vm.confirmUpdate).toBe(false);
-      
+
       wrapper.vm.showUpdateDialogFn();
       expect(wrapper.vm.confirmUpdate).toBe(true);
-      
+
       wrapper.vm.confirmUpdate = false;
       wrapper.vm.showUpdateDialogFn();
       expect(wrapper.vm.confirmUpdate).toBe(true);
@@ -298,13 +288,13 @@ describe("IngestLogs Index Component", () => {
     it("should include all expected ingest routes", () => {
       const expectedRoutes = [
         "curl",
-        "fluentbit", 
+        "fluentbit",
         "fluentd",
         "vector",
         "syslogNg",
-        "loongcollector"
+        "loongcollector",
       ];
-      
+
       expect(wrapper.vm.ingestRoutes).toEqual(expectedRoutes);
     });
 
@@ -315,7 +305,7 @@ describe("IngestLogs Index Component", () => {
     it("should handle route checking logic", () => {
       const testRoutes = ["curl", "fluentbit", "vector"];
       const routeInList = testRoutes.includes("curl");
-      
+
       expect(routeInList).toBe(true);
     });
   });
@@ -354,12 +344,12 @@ describe("IngestLogs Index Component", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-            "router-view": true
-          }
-        }
+            "router-view": true,
+          },
+        },
       });
-      
-      expect(emptyPropWrapper.props('currOrgIdentifier')).toBe("");
+
+      expect(emptyPropWrapper.props("currOrgIdentifier")).toBe("");
       emptyPropWrapper.unmount();
     });
 
@@ -369,12 +359,12 @@ describe("IngestLogs Index Component", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-            "router-view": true
-          }
-        }
+            "router-view": true,
+          },
+        },
       });
-      
-      expect(defaultPropWrapper.props('currOrgIdentifier')).toBe("");
+
+      expect(defaultPropWrapper.props("currOrgIdentifier")).toBe("");
       defaultPropWrapper.unmount();
     });
 
@@ -382,7 +372,7 @@ describe("IngestLogs Index Component", () => {
       const initialTabs = wrapper.vm.ingestiontabs;
       wrapper.vm.ingestiontabs = "curl";
       await nextTick();
-      
+
       expect(wrapper.vm.ingestiontabs).toBe("curl");
       expect(wrapper.vm.ingestiontabs).not.toBe(initialTabs);
     });
@@ -391,7 +381,7 @@ describe("IngestLogs Index Component", () => {
       const testData = { key: "value" };
       wrapper.vm.rowData = testData;
       await nextTick();
-      
+
       expect(wrapper.vm.rowData).toEqual(testData);
     });
   });
@@ -406,7 +396,7 @@ describe("IngestLogs Index Component", () => {
     it("should call getImageURL with correct parameters", () => {
       const mockGetImageURL = wrapper.vm.getImageURL;
       const testPath = "images/test.png";
-      
+
       mockGetImageURL(testPath);
       expect(mockGetImageURL).toBeTruthy();
     });
@@ -429,10 +419,7 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith(
-        null,
-        mockCopyToClipboardOptions,
-      );
+      expect(copyToClipboard).toHaveBeenCalledWith(null, mockCopyToClipboardOptions);
     });
 
     it("should handle undefined content in copyToClipboardFn", async () => {
@@ -440,10 +427,7 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith(
-        undefined,
-        mockCopyToClipboardOptions,
-      );
+      expect(copyToClipboard).toHaveBeenCalledWith(undefined, mockCopyToClipboardOptions);
     });
 
     it("should handle missing innerText property", async () => {
@@ -451,10 +435,7 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith(
-        undefined,
-        mockCopyToClipboardOptions,
-      );
+      expect(copyToClipboard).toHaveBeenCalledWith(undefined, mockCopyToClipboardOptions);
     });
 
     it("should handle very long content", async () => {
@@ -463,17 +444,14 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith(
-        longContent,
-        mockCopyToClipboardOptions,
-      );
+      expect(copyToClipboard).toHaveBeenCalledWith(longContent, mockCopyToClipboardOptions);
     });
 
     it("should handle rapid successive calls to showUpdateDialogFn", () => {
       wrapper.vm.showUpdateDialogFn();
       wrapper.vm.showUpdateDialogFn();
       wrapper.vm.showUpdateDialogFn();
-      
+
       expect(wrapper.vm.confirmUpdate).toBe(true);
     });
   });
@@ -485,10 +463,7 @@ describe("IngestLogs Index Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith(
-        "test",
-        mockCopyToClipboardOptions,
-      );
+      expect(copyToClipboard).toHaveBeenCalledWith("test", mockCopyToClipboardOptions);
     });
 
     it("should handle component updates", async () => {
@@ -559,9 +534,7 @@ describe("IngestLogs Index Component", () => {
         },
       });
 
-      expect(pushSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "curl" }),
-      );
+      expect(pushSpy).toHaveBeenCalledWith(expect.objectContaining({ name: "curl" }));
       testWrapper.unmount();
     });
 

@@ -87,9 +87,7 @@ describe("FieldValuesPanel.vue", () => {
 
     it("renders the filter-values-container", () => {
       wrapper = createWrapper();
-      expect(
-        wrapper.find('[data-test="field-values-panel-container"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="field-values-panel-container"]').exists()).toBe(true);
     });
   });
 
@@ -131,9 +129,7 @@ describe("FieldValuesPanel.vue", () => {
       wrapper = createWrapper({
         fieldValues: { isLoading: true, values: [], errMsg: "" },
       });
-      const loading = wrapper.find(
-        '[data-test="field-values-panel-loading-indicator"]',
-      );
+      const loading = wrapper.find('[data-test="field-values-panel-loading-indicator"]');
       expect(loading.exists()).toBe(true);
       const wrapperEl = loading.element.parentElement as HTMLElement;
       expect(wrapperEl.classList.contains("relative")).toBe(true);
@@ -190,12 +186,10 @@ describe("FieldValuesPanel.vue", () => {
   describe("Values list rendering", () => {
     it("renders one list item per value", () => {
       wrapper = createWrapper({ fieldValues: buildFieldValues(3) });
-      const items = wrapper.findAll(
-        '[data-test="field-values-panel-container"] [data-test]',
-      );
+      const items = wrapper.findAll('[data-test="field-values-panel-container"] [data-test]');
       // 3 items — each has a data-test attribute for log-search-subfield-add
       const subfields = items.filter((el) =>
-        el.attributes("data-test")?.startsWith("logs-search-subfield-add-")
+        el.attributes("data-test")?.startsWith("logs-search-subfield-add-"),
       );
       expect(subfields.length).toBe(3);
     });
@@ -238,7 +232,7 @@ describe("FieldValuesPanel.vue", () => {
     it("does not render include/exclude buttons when showMultiSelect is false", () => {
       wrapper = createWrapper({ showMultiSelect: false, fieldValues: buildFieldValues(2) });
       expect(
-        wrapper.find('[data-test="log-search-subfield-list-equal-status-field-btn"]').exists()
+        wrapper.find('[data-test="log-search-subfield-list-equal-status-field-btn"]').exists(),
       ).toBe(false);
     });
   });
@@ -323,9 +317,7 @@ describe("FieldValuesPanel.vue", () => {
       wrapper = createWrapper({ showMultiSelect: true, fieldValues: buildFieldValues(3) });
       (wrapper.vm as any).selectedValues = ["value-1"];
       await nextTick();
-      const clearBtn = wrapper.find(
-        '[data-test="field-values-panel-clear-selection-btn"]'
-      );
+      const clearBtn = wrapper.find('[data-test="field-values-panel-clear-selection-btn"]');
       await clearBtn.trigger("click");
       expect((wrapper.vm as any).selectedValues).toEqual([]);
     });
@@ -347,9 +339,7 @@ describe("FieldValuesPanel.vue", () => {
         await nextTick();
         (wrapper.vm as any).selectedValues = ["value-1", "value-2"];
         await nextTick();
-        const includeBtn = wrapper.find(
-          '[data-test="field-values-panel-include-mode-btn"]'
-        );
+        const includeBtn = wrapper.find('[data-test="field-values-panel-include-mode-btn"]');
         await includeBtn.trigger("click");
         vi.runAllTimers();
         const emitted = wrapper.emitted("add-multiple-search-terms");
@@ -362,9 +352,7 @@ describe("FieldValuesPanel.vue", () => {
         // filterMode defaults to 'include'; set selectedValues then click exclude
         (wrapper.vm as any).selectedValues = ["value-1"];
         await nextTick();
-        const excludeBtn = wrapper.find(
-          '[data-test="field-values-panel-exclude-mode-btn"]'
-        );
+        const excludeBtn = wrapper.find('[data-test="field-values-panel-exclude-mode-btn"]');
         await excludeBtn.trigger("click");
         vi.runAllTimers();
         const emitted = wrapper.emitted("add-multiple-search-terms");
@@ -384,9 +372,7 @@ describe("FieldValuesPanel.vue", () => {
       await nextTick();
       (wrapper.vm as any).selectedValues = ["value-1"];
       await nextTick();
-      const includeBtn = wrapper.find(
-        '[data-test="field-values-panel-include-mode-btn"]'
-      );
+      const includeBtn = wrapper.find('[data-test="field-values-panel-include-mode-btn"]');
       await includeBtn.trigger("click");
       expect((wrapper.vm as any).selectedValues).toEqual(["value-1"]);
     });
@@ -420,9 +406,7 @@ describe("FieldValuesPanel.vue", () => {
       await nextTick();
       expect((wrapper.vm as any).selectedValues).toEqual(["value-1"]);
 
-      const includeBtn = wrapper.find(
-        '[data-test="field-values-panel-include-mode-btn"]'
-      );
+      const includeBtn = wrapper.find('[data-test="field-values-panel-include-mode-btn"]');
       await includeBtn.trigger("click");
       // filterMode was already 'include', no reactive change, no emit
       expect((wrapper.vm as any).selectedValues).toEqual(["value-1"]);
@@ -564,7 +548,7 @@ describe("FieldValuesPanel.vue", () => {
       await nextTick();
       // cachedValues should contain the new value
       expect((wrapper.vm as any).cachedValues).toEqual(
-        expect.arrayContaining([expect.objectContaining({ key: "new-val" })])
+        expect.arrayContaining([expect.objectContaining({ key: "new-val" })]),
       );
     });
   });

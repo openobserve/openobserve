@@ -165,7 +165,7 @@ describe("useSearchWebSocket", () => {
           close: vi.fn(),
           error: vi.fn(),
           reset: vi.fn(),
-        }
+        },
       );
 
       expect(traceId).toBe("trace-abc");
@@ -192,7 +192,7 @@ describe("useSearchWebSocket", () => {
           close: vi.fn(),
           error: vi.fn(),
           reset: vi.fn(),
-        }
+        },
       );
 
       expect(mockWsConnect).toHaveBeenCalled();
@@ -219,7 +219,7 @@ describe("useSearchWebSocket", () => {
           close: vi.fn(),
           error: vi.fn(),
           reset: vi.fn(),
-        }
+        },
       );
 
       expect(mockWsAddOpenHandler).toHaveBeenCalled();
@@ -242,7 +242,7 @@ describe("useSearchWebSocket", () => {
           org_id: "test-org",
           meta: {},
         },
-        null as any
+        null as any,
       );
 
       expect(result).toBe("");
@@ -260,8 +260,7 @@ describe("useSearchWebSocket", () => {
     });
 
     it("removes all handlers for a previously registered traceId", () => {
-      const { fetchQueryDataWithWebSocket, cleanUpListeners } =
-        useSearchWebSocket();
+      const { fetchQueryDataWithWebSocket, cleanUpListeners } = useSearchWebSocket();
       const traceId = "trace-cleanup";
 
       fetchQueryDataWithWebSocket(
@@ -279,7 +278,7 @@ describe("useSearchWebSocket", () => {
           close: vi.fn(),
           error: vi.fn(),
           reset: vi.fn(),
-        }
+        },
       );
 
       expect(() => cleanUpListeners(traceId)).not.toThrow();
@@ -295,7 +294,7 @@ describe("useSearchWebSocket", () => {
         cancelSearchQueryBasedOnRequestId({
           trace_id: "ghost-trace",
           org_id: "test-org",
-        })
+        }),
       ).not.toThrow();
     });
 
@@ -319,7 +318,7 @@ describe("useSearchWebSocket", () => {
           close: vi.fn(),
           error: vi.fn(),
           reset: vi.fn(),
-        }
+        },
       );
 
       cancelSearchQueryBasedOnRequestId({
@@ -377,16 +376,13 @@ describe("useSearchWebSocket", () => {
           close: vi.fn(),
           error: vi.fn(),
           reset: vi.fn(),
-        }
+        },
       );
 
       const message = { content: { trace_id: "trace-send" }, type: "search" };
       sendSearchMessageBasedOnRequestId(message);
 
-      expect(mockWsSendMessage).toHaveBeenCalledWith(
-        expect.anything(),
-        JSON.stringify(message)
-      );
+      expect(mockWsSendMessage).toHaveBeenCalledWith(expect.anything(), JSON.stringify(message));
     });
   });
 });

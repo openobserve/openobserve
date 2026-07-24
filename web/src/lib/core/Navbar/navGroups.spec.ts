@@ -1,12 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { describe, it, expect } from "vitest";
-import {
-  groupNavLinks,
-  NAV_GROUPS,
-  NAV_SUBNAV,
-  GATE_PREDICATES,
-} from "./navGroups";
+import { groupNavLinks, NAV_GROUPS, NAV_SUBNAV, GATE_PREDICATES } from "./navGroups";
 import type { NavGateContext } from "./ONavbar.types";
 import type { NavItem, RailEntry } from "./ONavbar.types";
 
@@ -19,9 +14,7 @@ const link = (name: string, extra: Partial<NavItem> = {}): NavItem => ({
 });
 
 function keysOf(entries: RailEntry[]): string[] {
-  return entries.map((e) =>
-    e.type === "group" ? `group:${e.key}` : `${e.type}:${e.item.name}`,
-  );
+  return entries.map((e) => (e.type === "group" ? `group:${e.key}` : `${e.type}:${e.item.name}`));
 }
 
 // Data now renders as a link+subnav group (clicking navigates to /streams).
@@ -45,9 +38,7 @@ describe("groupNavLinks", () => {
       link("settings"),
     ];
     // Output mirrors the input order exactly (no reordering).
-    expect(keysOf(groupNavLinks(input))).toEqual(
-      input.map((i) => `link:${i.name}`),
-    );
+    expect(keysOf(groupNavLinks(input))).toEqual(input.map((i) => `link:${i.name}`));
   });
 
   it("places the Data group right after Incidents when present", () => {
@@ -77,11 +68,7 @@ describe("groupNavLinks", () => {
     ]);
     // Data replaces `pipeline` (first absorbed); streams/ingestion are removed;
     // `dashboards` keeps its place after it.
-    expect(keysOf(entries)).toEqual([
-      "link:home",
-      "linkGroup:data",
-      "link:dashboards",
-    ]);
+    expect(keysOf(entries)).toEqual(["link:home", "linkGroup:data", "link:dashboards"]);
   });
 
   it("absorbs streams/pipeline/ingestion into Data", () => {
@@ -111,11 +98,7 @@ describe("groupNavLinks", () => {
   });
 
   it("keeps Alerts separate; Reports stays a link when Dashboards is absent", () => {
-    const entries = groupNavLinks([
-      link("home"),
-      link("alertList"),
-      link("reports"),
-    ]);
+    const entries = groupNavLinks([link("home"), link("alertList"), link("reports")]);
     expect(keysOf(entries)).toContain("link:alertList");
     // Dashboards absent → the Dashboards group has only Reports (1 child) so it
     // doesn't collapse; Reports stays a plain link.
@@ -131,11 +114,7 @@ describe("groupNavLinks", () => {
       link("alertList"),
     ]);
     // Reports is absorbed; the Dashboards tile takes the dashboards slot.
-    expect(keysOf(entries)).toEqual([
-      "link:home",
-      "linkGroup:dashboards",
-      "link:alertList",
-    ]);
+    expect(keysOf(entries)).toEqual(["link:home", "linkGroup:dashboards", "link:alertList"]);
     const dash = entries.find(
       (e): e is Extract<RailEntry, { type: "linkGroup" }> =>
         e.type === "linkGroup" && e.item.name === "dashboards",
@@ -201,9 +180,7 @@ describe("groupNavLinks", () => {
       link("settings"),
     ];
     const entries = groupNavLinks(input);
-    const surfaced = entries.flatMap((e) =>
-      e.type === "group" ? [] : [e.item.name],
-    );
+    const surfaced = entries.flatMap((e) => (e.type === "group" ? [] : [e.item.name]));
     expect(surfaced.sort()).toEqual(input.map((i) => i.name).sort());
   });
 
@@ -258,13 +235,15 @@ describe("GATE_PREDICATES", () => {
   it("storage is enterprise, and on cloud also requires org_storage_enabled", () => {
     expect(GATE_PREDICATES.storage(ctx({ isEnterprise: true }))).toBe(true); // self-hosted
     expect(GATE_PREDICATES.storage(ctx({ isEnterprise: true, isCloud: true }))).toBe(false);
-    expect(GATE_PREDICATES.storage(ctx({ isEnterprise: true, isCloud: true, orgStorage: true }))).toBe(true);
+    expect(
+      GATE_PREDICATES.storage(ctx({ isEnterprise: true, isCloud: true, orgStorage: true })),
+    ).toBe(true);
   });
 
   it("streamPipelines hides only when custom_hide_menus lists 'pipelines'", () => {
     expect(GATE_PREDICATES.streamPipelines(ctx())).toBe(true);
-    expect(
-      GATE_PREDICATES.streamPipelines(ctx({ hiddenMenus: new Set(["pipelines"]) })),
-    ).toBe(false);
+    expect(GATE_PREDICATES.streamPipelines(ctx({ hiddenMenus: new Set(["pipelines"]) }))).toBe(
+      false,
+    );
   });
 });

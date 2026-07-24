@@ -57,10 +57,7 @@ const makePanelData = (queryCount = 1) =>
       hiddenQueries: [] as number[],
     },
     meta: {
-      queryFields: {} as Record<
-        number,
-        { customQueryFields: any[]; vrlFunctionFieldList: any[] }
-      >,
+      queryFields: {} as Record<number, { customQueryFields: any[]; vrlFunctionFieldList: any[] }>,
       stream: {
         customQueryFields: [] as any[],
         vrlFunctionFieldList: [] as any[],
@@ -120,9 +117,7 @@ describe("meta.queryFields - per-query field cache", () => {
 
     it("should not create cache entry on data.queries", () => {
       getQueryFields(panelData, 0);
-      expect(panelData.data.queries[0]).not.toHaveProperty(
-        "customQueryFields",
-      );
+      expect(panelData.data.queries[0]).not.toHaveProperty("customQueryFields");
     });
 
     it("should handle multiple query indices independently", () => {
@@ -131,15 +126,9 @@ describe("meta.queryFields - per-query field cache", () => {
       getQueryFields(panelData, 1).customQueryFields = [{ name: "b" }];
       getQueryFields(panelData, 2).customQueryFields = [{ name: "c" }];
 
-      expect(panelData.meta.queryFields[0].customQueryFields[0].name).toBe(
-        "a",
-      );
-      expect(panelData.meta.queryFields[1].customQueryFields[0].name).toBe(
-        "b",
-      );
-      expect(panelData.meta.queryFields[2].customQueryFields[0].name).toBe(
-        "c",
-      );
+      expect(panelData.meta.queryFields[0].customQueryFields[0].name).toBe("a");
+      expect(panelData.meta.queryFields[1].customQueryFields[0].name).toBe("b");
+      expect(panelData.meta.queryFields[2].customQueryFields[0].name).toBe("c");
     });
 
     it("should initialize for non-existent high index", () => {
@@ -157,17 +146,13 @@ describe("meta.queryFields - per-query field cache", () => {
       const fields = [{ name: "x_axis_1", type: "" }];
       syncCustomQueryFields(panelData, fields);
 
-      expect(
-        panelData.meta.queryFields[0].customQueryFields,
-      ).toStrictEqual(fields);
+      expect(panelData.meta.queryFields[0].customQueryFields).toStrictEqual(fields);
       expect(panelData.meta.stream.customQueryFields).toStrictEqual(fields);
     });
 
     it("should not write to data.queries", () => {
       syncCustomQueryFields(panelData, [{ name: "test", type: "" }]);
-      expect(panelData.data.queries[0]).not.toHaveProperty(
-        "customQueryFields",
-      );
+      expect(panelData.data.queries[0]).not.toHaveProperty("customQueryFields");
     });
 
     it("should write to correct query index", () => {
@@ -175,9 +160,7 @@ describe("meta.queryFields - per-query field cache", () => {
       panelData.layout.currentQueryIndex = 2;
       syncCustomQueryFields(panelData, [{ name: "col_c", type: "" }]);
 
-      expect(
-        panelData.meta.queryFields[2].customQueryFields[0].name,
-      ).toBe("col_c");
+      expect(panelData.meta.queryFields[2].customQueryFields[0].name).toBe("col_c");
       // Other indices should not be affected
       expect(panelData.meta.queryFields[0]).toBeUndefined();
       expect(panelData.meta.queryFields[1]).toBeUndefined();
@@ -187,12 +170,8 @@ describe("meta.queryFields - per-query field cache", () => {
       syncCustomQueryFields(panelData, [{ name: "first", type: "" }]);
       syncCustomQueryFields(panelData, [{ name: "second", type: "" }]);
 
-      expect(
-        panelData.meta.queryFields[0].customQueryFields,
-      ).toHaveLength(1);
-      expect(
-        panelData.meta.queryFields[0].customQueryFields[0].name,
-      ).toBe("second");
+      expect(panelData.meta.queryFields[0].customQueryFields).toHaveLength(1);
+      expect(panelData.meta.queryFields[0].customQueryFields[0].name).toBe("second");
     });
 
     it("should clear fields when called with empty array", () => {
@@ -202,9 +181,7 @@ describe("meta.queryFields - per-query field cache", () => {
       ]);
       syncCustomQueryFields(panelData, []);
 
-      expect(
-        panelData.meta.queryFields[0].customQueryFields,
-      ).toHaveLength(0);
+      expect(panelData.meta.queryFields[0].customQueryFields).toHaveLength(0);
       expect(panelData.meta.stream.customQueryFields).toHaveLength(0);
     });
   });
@@ -229,12 +206,9 @@ describe("meta.queryFields - per-query field cache", () => {
       // Simulate tab switch to Q2
       const newIdx = 1;
       const queryFields = getQueryFields(panelData, newIdx);
-      panelData.meta.stream.customQueryFields =
-        queryFields.customQueryFields;
+      panelData.meta.stream.customQueryFields = queryFields.customQueryFields;
 
-      expect(
-        panelData.meta.stream.customQueryFields[0].name,
-      ).toBe("col_b");
+      expect(panelData.meta.stream.customQueryFields[0].name).toBe("col_b");
     });
 
     it("should restore vrlFunctionFieldList when switching tabs", () => {
@@ -249,22 +223,17 @@ describe("meta.queryFields - per-query field cache", () => {
 
       // Switch to Q2
       const queryFields = getQueryFields(panelData, 1);
-      panelData.meta.stream.vrlFunctionFieldList =
-        queryFields.vrlFunctionFieldList;
+      panelData.meta.stream.vrlFunctionFieldList = queryFields.vrlFunctionFieldList;
 
-      expect(
-        panelData.meta.stream.vrlFunctionFieldList[0].name,
-      ).toBe("vrl_b");
+      expect(panelData.meta.stream.vrlFunctionFieldList[0].name).toBe("vrl_b");
     });
 
     it("should handle missing meta.queryFields entry gracefully", () => {
       panelData.meta.queryFields = {};
 
       const queryFields = getQueryFields(panelData, 5);
-      panelData.meta.stream.customQueryFields =
-        queryFields.customQueryFields;
-      panelData.meta.stream.vrlFunctionFieldList =
-        queryFields.vrlFunctionFieldList;
+      panelData.meta.stream.customQueryFields = queryFields.customQueryFields;
+      panelData.meta.stream.vrlFunctionFieldList = queryFields.vrlFunctionFieldList;
 
       expect(panelData.meta.stream.customQueryFields).toEqual([]);
       expect(panelData.meta.stream.vrlFunctionFieldList).toEqual([]);
@@ -288,27 +257,17 @@ describe("meta.queryFields - per-query field cache", () => {
       for (let i = 0; i < 10; i++) {
         const idx = i % 3;
         const queryFields = getQueryFields(panelData, idx);
-        panelData.meta.stream.customQueryFields =
-          queryFields.customQueryFields;
-        panelData.meta.stream.vrlFunctionFieldList =
-          queryFields.vrlFunctionFieldList;
+        panelData.meta.stream.customQueryFields = queryFields.customQueryFields;
+        panelData.meta.stream.vrlFunctionFieldList = queryFields.vrlFunctionFieldList;
       }
 
       // End on Q1 (idx 0 after 10 iterations: 10 % 3 = 1, actually last iteration is i=9, 9%3=0)
-      expect(
-        panelData.meta.stream.customQueryFields[0].name,
-      ).toBe("a");
-      expect(
-        panelData.meta.stream.vrlFunctionFieldList[0].name,
-      ).toBe("vrl_a");
+      expect(panelData.meta.stream.customQueryFields[0].name).toBe("a");
+      expect(panelData.meta.stream.vrlFunctionFieldList[0].name).toBe("vrl_a");
 
       // Per-query caches should be unchanged
-      expect(
-        panelData.meta.queryFields[1].customQueryFields[0].name,
-      ).toBe("b");
-      expect(
-        panelData.meta.queryFields[2].vrlFunctionFieldList[0].name,
-      ).toBe("vrl_c");
+      expect(panelData.meta.queryFields[1].customQueryFields[0].name).toBe("b");
+      expect(panelData.meta.queryFields[2].vrlFunctionFieldList[0].name).toBe("vrl_c");
     });
 
     it("should preserve Q1 fields when switching to Q2 and back", () => {
@@ -326,17 +285,13 @@ describe("meta.queryFields - per-query field cache", () => {
       };
 
       // Switch to Q2
-      panelData.meta.stream.customQueryFields =
-        getQueryFields(panelData, 1).customQueryFields;
+      panelData.meta.stream.customQueryFields = getQueryFields(panelData, 1).customQueryFields;
       expect(panelData.meta.stream.customQueryFields).toHaveLength(0);
 
       // Switch back to Q1
-      panelData.meta.stream.customQueryFields =
-        getQueryFields(panelData, 0).customQueryFields;
+      panelData.meta.stream.customQueryFields = getQueryFields(panelData, 0).customQueryFields;
       expect(panelData.meta.stream.customQueryFields).toHaveLength(2);
-      expect(panelData.meta.stream.customQueryFields[0].name).toBe(
-        "x_axis_1",
-      );
+      expect(panelData.meta.stream.customQueryFields[0].name).toBe("x_axis_1");
     });
   });
 
@@ -350,12 +305,8 @@ describe("meta.queryFields - per-query field cache", () => {
       getQueryFields(panelData, panelData.data.queries.length - 1);
 
       expect(panelData.meta.queryFields[1]).toBeDefined();
-      expect(
-        panelData.meta.queryFields[1].customQueryFields,
-      ).toEqual([]);
-      expect(
-        panelData.meta.queryFields[1].vrlFunctionFieldList,
-      ).toEqual([]);
+      expect(panelData.meta.queryFields[1].customQueryFields).toEqual([]);
+      expect(panelData.meta.queryFields[1].vrlFunctionFieldList).toEqual([]);
     });
 
     it("should shift meta.queryFields indices after middle removal", () => {
@@ -380,19 +331,13 @@ describe("meta.queryFields - per-query field cache", () => {
       const newQueryFields: Record<number, any> = {};
       Object.keys(panelData.meta.queryFields).forEach((key) => {
         const i = Number(key);
-        if (i < 1)
-          newQueryFields[i] = panelData.meta.queryFields[i];
-        else if (i > 1)
-          newQueryFields[i - 1] = panelData.meta.queryFields[i];
+        if (i < 1) newQueryFields[i] = panelData.meta.queryFields[i];
+        else if (i > 1) newQueryFields[i - 1] = panelData.meta.queryFields[i];
       });
       panelData.meta.queryFields = newQueryFields;
 
-      expect(
-        panelData.meta.queryFields[0].customQueryFields[0].name,
-      ).toBe("a");
-      expect(
-        panelData.meta.queryFields[1].customQueryFields[0].name,
-      ).toBe("c");
+      expect(panelData.meta.queryFields[0].customQueryFields[0].name).toBe("a");
+      expect(panelData.meta.queryFields[1].customQueryFields[0].name).toBe("c");
       expect(panelData.meta.queryFields[2]).toBeUndefined();
     });
 
@@ -419,19 +364,13 @@ describe("meta.queryFields - per-query field cache", () => {
       const newQueryFields: Record<number, any> = {};
       Object.keys(panelData.meta.queryFields).forEach((key) => {
         const i = Number(key);
-        if (i < removeIndex)
-          newQueryFields[i] = panelData.meta.queryFields[i];
-        else if (i > removeIndex)
-          newQueryFields[i - 1] = panelData.meta.queryFields[i];
+        if (i < removeIndex) newQueryFields[i] = panelData.meta.queryFields[i];
+        else if (i > removeIndex) newQueryFields[i - 1] = panelData.meta.queryFields[i];
       });
       panelData.meta.queryFields = newQueryFields;
 
-      expect(
-        panelData.meta.queryFields[0].customQueryFields[0].name,
-      ).toBe("b");
-      expect(
-        panelData.meta.queryFields[1].customQueryFields[0].name,
-      ).toBe("c");
+      expect(panelData.meta.queryFields[0].customQueryFields[0].name).toBe("b");
+      expect(panelData.meta.queryFields[1].customQueryFields[0].name).toBe("c");
       expect(panelData.meta.queryFields[2]).toBeUndefined();
     });
 
@@ -454,16 +393,12 @@ describe("meta.queryFields - per-query field cache", () => {
       const newQueryFields: Record<number, any> = {};
       Object.keys(panelData.meta.queryFields).forEach((key) => {
         const i = Number(key);
-        if (i < removeIndex)
-          newQueryFields[i] = panelData.meta.queryFields[i];
-        else if (i > removeIndex)
-          newQueryFields[i - 1] = panelData.meta.queryFields[i];
+        if (i < removeIndex) newQueryFields[i] = panelData.meta.queryFields[i];
+        else if (i > removeIndex) newQueryFields[i - 1] = panelData.meta.queryFields[i];
       });
       panelData.meta.queryFields = newQueryFields;
 
-      expect(
-        panelData.meta.queryFields[0].customQueryFields[0].name,
-      ).toBe("a");
+      expect(panelData.meta.queryFields[0].customQueryFields[0].name).toBe("a");
       expect(panelData.meta.queryFields[1]).toBeUndefined();
     });
   });
@@ -484,12 +419,8 @@ describe("meta.queryFields - per-query field cache", () => {
       panelData.meta.stream.vrlFunctionFieldList = [];
       getQueryFields(panelData, 0).vrlFunctionFieldList = [];
 
-      expect(
-        panelData.meta.queryFields[0].customQueryFields,
-      ).toEqual([]);
-      expect(
-        panelData.meta.queryFields[0].vrlFunctionFieldList,
-      ).toEqual([]);
+      expect(panelData.meta.queryFields[0].customQueryFields).toEqual([]);
+      expect(panelData.meta.queryFields[0].vrlFunctionFieldList).toEqual([]);
       expect(panelData.meta.stream.customQueryFields).toEqual([]);
       expect(panelData.meta.stream.vrlFunctionFieldList).toEqual([]);
     });
@@ -511,16 +442,10 @@ describe("meta.queryFields - per-query field cache", () => {
       getQueryFields(panelData, 0).vrlFunctionFieldList = [];
 
       // Q1 cleared
-      expect(
-        panelData.meta.queryFields[0].customQueryFields,
-      ).toEqual([]);
+      expect(panelData.meta.queryFields[0].customQueryFields).toEqual([]);
       // Q2 untouched
-      expect(
-        panelData.meta.queryFields[1].customQueryFields[0].name,
-      ).toBe("col_b");
-      expect(
-        panelData.meta.queryFields[1].vrlFunctionFieldList[0].name,
-      ).toBe("vrl_b");
+      expect(panelData.meta.queryFields[1].customQueryFields[0].name).toBe("col_b");
+      expect(panelData.meta.queryFields[1].vrlFunctionFieldList[0].name).toBe("vrl_b");
     });
   });
 
@@ -544,16 +469,10 @@ describe("meta.queryFields - per-query field cache", () => {
       panelData.meta.stream.vrlFunctionFieldList = [];
 
       // Q1 VRL cleared, custom preserved
-      expect(
-        panelData.meta.queryFields[0].vrlFunctionFieldList,
-      ).toEqual([]);
-      expect(
-        panelData.meta.queryFields[0].customQueryFields[0].name,
-      ).toBe("col_a");
+      expect(panelData.meta.queryFields[0].vrlFunctionFieldList).toEqual([]);
+      expect(panelData.meta.queryFields[0].customQueryFields[0].name).toBe("col_a");
       // Q2 VRL untouched
-      expect(
-        panelData.meta.queryFields[1].vrlFunctionFieldList[0].name,
-      ).toBe("vrl_b");
+      expect(panelData.meta.queryFields[1].vrlFunctionFieldList[0].name).toBe("vrl_b");
     });
   });
 
@@ -593,12 +512,8 @@ describe("meta.queryFields - per-query field cache", () => {
     });
 
     it("should deduplicate case-insensitively", () => {
-      panelData.meta.stream.customQueryFields = [
-        { name: "MyField", type: "" },
-      ];
-      panelData.meta.stream.vrlFunctionFieldList = [
-        { name: "myfield", type: "Utf8" },
-      ];
+      panelData.meta.stream.customQueryFields = [{ name: "MyField", type: "" }];
+      panelData.meta.stream.vrlFunctionFieldList = [{ name: "myfield", type: "Utf8" }];
 
       const addedFieldNames = new Set<string>();
       const flattenedFields: any[] = [];
@@ -618,12 +533,8 @@ describe("meta.queryFields - per-query field cache", () => {
     });
 
     it("should not deduplicate when fields are different", () => {
-      panelData.meta.stream.customQueryFields = [
-        { name: "field_a", type: "" },
-      ];
-      panelData.meta.stream.vrlFunctionFieldList = [
-        { name: "field_b", type: "Utf8" },
-      ];
+      panelData.meta.stream.customQueryFields = [{ name: "field_a", type: "" }];
+      panelData.meta.stream.vrlFunctionFieldList = [{ name: "field_b", type: "Utf8" }];
 
       const addedFieldNames = new Set<string>();
       const flattenedFields: any[] = [];
@@ -661,9 +572,7 @@ describe("meta.queryFields - per-query field cache", () => {
 
       // Verify meta.queryFields has them
       for (let i = 0; i < 3; i++) {
-        expect(
-          panelData.meta.queryFields[i].customQueryFields[0].name,
-        ).toBe(`field_${i}`);
+        expect(panelData.meta.queryFields[i].customQueryFields[0].name).toBe(`field_${i}`);
       }
     });
 
@@ -671,12 +580,8 @@ describe("meta.queryFields - per-query field cache", () => {
       panelData = makePanelData(2);
 
       // Write VRL fields for both queries
-      getQueryFields(panelData, 0).vrlFunctionFieldList = [
-        { name: "vrl_0", type: "Utf8" },
-      ];
-      getQueryFields(panelData, 1).vrlFunctionFieldList = [
-        { name: "vrl_1", type: "Utf8" },
-      ];
+      getQueryFields(panelData, 0).vrlFunctionFieldList = [{ name: "vrl_0", type: "Utf8" }];
+      getQueryFields(panelData, 1).vrlFunctionFieldList = [{ name: "vrl_1", type: "Utf8" }];
 
       // Verify data.queries is clean
       panelData.data.queries.forEach((query: any) => {
@@ -704,14 +609,11 @@ describe("meta.queryFields - per-query field cache", () => {
 
       // Switch to Q3 (no cache)
       const queryFields = getQueryFields(panelData, 2);
-      panelData.meta.stream.customQueryFields =
-        queryFields.customQueryFields;
+      panelData.meta.stream.customQueryFields = queryFields.customQueryFields;
 
       expect(panelData.meta.stream.customQueryFields).toEqual([]);
       // Q1 cache untouched
-      expect(
-        panelData.meta.queryFields[0].customQueryFields[0].name,
-      ).toBe("col_a");
+      expect(panelData.meta.queryFields[0].customQueryFields[0].name).toBe("col_a");
     });
 
     it("should handle fields with null/undefined names", () => {
@@ -728,26 +630,14 @@ describe("meta.queryFields - per-query field cache", () => {
       panelData = makePanelData(3);
 
       // Simulate concurrent VRL field updates for all queries
-      getQueryFields(panelData, 0).vrlFunctionFieldList = [
-        { name: "vrl_0" },
-      ];
-      getQueryFields(panelData, 1).vrlFunctionFieldList = [
-        { name: "vrl_1" },
-      ];
-      getQueryFields(panelData, 2).vrlFunctionFieldList = [
-        { name: "vrl_2" },
-      ];
+      getQueryFields(panelData, 0).vrlFunctionFieldList = [{ name: "vrl_0" }];
+      getQueryFields(panelData, 1).vrlFunctionFieldList = [{ name: "vrl_1" }];
+      getQueryFields(panelData, 2).vrlFunctionFieldList = [{ name: "vrl_2" }];
 
       // Verify all independent
-      expect(
-        panelData.meta.queryFields[0].vrlFunctionFieldList[0].name,
-      ).toBe("vrl_0");
-      expect(
-        panelData.meta.queryFields[1].vrlFunctionFieldList[0].name,
-      ).toBe("vrl_1");
-      expect(
-        panelData.meta.queryFields[2].vrlFunctionFieldList[0].name,
-      ).toBe("vrl_2");
+      expect(panelData.meta.queryFields[0].vrlFunctionFieldList[0].name).toBe("vrl_0");
+      expect(panelData.meta.queryFields[1].vrlFunctionFieldList[0].name).toBe("vrl_1");
+      expect(panelData.meta.queryFields[2].vrlFunctionFieldList[0].name).toBe("vrl_2");
     });
 
     it("should handle 10+ queries without performance issues", () => {
@@ -755,28 +645,18 @@ describe("meta.queryFields - per-query field cache", () => {
 
       for (let i = 0; i < 10; i++) {
         panelData.layout.currentQueryIndex = i;
-        syncCustomQueryFields(panelData, [
-          { name: `custom_${i}`, type: "" },
-        ]);
-        getQueryFields(panelData, i).vrlFunctionFieldList = [
-          { name: `vrl_${i}`, type: "Utf8" },
-        ];
+        syncCustomQueryFields(panelData, [{ name: `custom_${i}`, type: "" }]);
+        getQueryFields(panelData, i).vrlFunctionFieldList = [{ name: `vrl_${i}`, type: "Utf8" }];
       }
 
       // Verify all 10 queries have independent caches
       for (let i = 0; i < 10; i++) {
-        expect(
-          panelData.meta.queryFields[i].customQueryFields[0].name,
-        ).toBe(`custom_${i}`);
-        expect(
-          panelData.meta.queryFields[i].vrlFunctionFieldList[0].name,
-        ).toBe(`vrl_${i}`);
+        expect(panelData.meta.queryFields[i].customQueryFields[0].name).toBe(`custom_${i}`);
+        expect(panelData.meta.queryFields[i].vrlFunctionFieldList[0].name).toBe(`vrl_${i}`);
       }
 
       // Shared meta should show last query's fields
-      expect(
-        panelData.meta.stream.customQueryFields[0].name,
-      ).toBe("custom_9");
+      expect(panelData.meta.stream.customQueryFields[0].name).toBe("custom_9");
     });
   });
 
@@ -784,10 +664,7 @@ describe("meta.queryFields - per-query field cache", () => {
 
   describe("buildAliasListForQuery", () => {
     // Simulate the function
-    const buildAliasListForQuery = (
-      pd: any,
-      queryIndex: number,
-    ): string[] => {
+    const buildAliasListForQuery = (pd: any, queryIndex: number): string[] => {
       const aliasList: string[] = [];
       const query = pd.data.queries[queryIndex];
       if (!query) return aliasList;
@@ -810,27 +687,20 @@ describe("meta.queryFields - per-query field cache", () => {
       ];
       specialFields.forEach((fieldName) => {
         const field = query?.fields?.[fieldName];
-        if (field?.alias && !field?.isDerived)
-          aliasList.push(field.alias);
+        if (field?.alias && !field?.isDerived) aliasList.push(field.alias);
       });
 
       const queryFields = pd.meta.queryFields[queryIndex];
       if (queryFields) {
-        queryFields.customQueryFields.forEach((it: any) =>
-          aliasList.push(it.name),
-        );
+        queryFields.customQueryFields.forEach((it: any) => aliasList.push(it.name));
       }
 
       return aliasList;
     };
 
     it("should include axis field aliases for builder mode", () => {
-      panelData.data.queries[0].fields.x = [
-        { alias: "x_axis_1", isDerived: false },
-      ];
-      panelData.data.queries[0].fields.y = [
-        { alias: "y_axis_1", isDerived: false },
-      ];
+      panelData.data.queries[0].fields.x = [{ alias: "x_axis_1", isDerived: false }];
+      panelData.data.queries[0].fields.y = [{ alias: "y_axis_1", isDerived: false }];
 
       const aliases = buildAliasListForQuery(panelData, 0);
       expect(aliases).toContain("x_axis_1");
@@ -839,18 +709,14 @@ describe("meta.queryFields - per-query field cache", () => {
 
     it("should include axis field aliases for custom mode too", () => {
       panelData.data.queries[0].customQuery = true;
-      panelData.data.queries[0].fields.x = [
-        { alias: "timestamp", isDerived: false },
-      ];
+      panelData.data.queries[0].fields.x = [{ alias: "timestamp", isDerived: false }];
 
       const aliases = buildAliasListForQuery(panelData, 0);
       expect(aliases).toContain("timestamp");
     });
 
     it("should exclude isDerived fields", () => {
-      panelData.data.queries[0].fields.x = [
-        { alias: "derived_field", isDerived: true },
-      ];
+      panelData.data.queries[0].fields.x = [{ alias: "derived_field", isDerived: true }];
 
       const aliases = buildAliasListForQuery(panelData, 0);
       expect(aliases).not.toContain("derived_field");

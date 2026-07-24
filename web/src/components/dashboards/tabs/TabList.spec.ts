@@ -32,13 +32,11 @@ vi.mock("vue-router", () => ({
 vi.mock("./AddTab.vue", () => ({
   default: {
     name: "AddTab",
-    template:
-      '<div v-if="open" data-test="add-tab-component">AddTab Component</div>',
+    template: '<div v-if="open" data-test="add-tab-component">AddTab Component</div>',
     props: ["dashboardId", "open"],
     emits: ["refresh", "update:open"],
   },
 }));
-
 
 describe("TabList", () => {
   let wrapper: VueWrapper<any>;
@@ -79,7 +77,7 @@ describe("TabList", () => {
           selectedTabId: selectedTabIdRef,
         },
         stubs: {
-          "OIcon": {
+          OIcon: {
             template: "<span data-test='OIcon'></span>",
           },
         },
@@ -99,9 +97,7 @@ describe("TabList", () => {
       wrapper = createWrapper();
 
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboard-tab-list"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="dashboard-tab-list"]').exists()).toBe(true);
     });
 
     it("should have correct component name", () => {
@@ -134,40 +130,26 @@ describe("TabList", () => {
       wrapper = createWrapper();
 
       // Test that all specific tabs exist
-      expect(wrapper.find('[data-test="dashboard-tab-tab1"]').exists()).toBe(
-        true,
-      );
-      expect(wrapper.find('[data-test="dashboard-tab-tab2"]').exists()).toBe(
-        true,
-      );
-      expect(wrapper.find('[data-test="dashboard-tab-tab3"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="dashboard-tab-tab1"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-tab-tab2"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-tab-tab3"]').exists()).toBe(true);
 
       // Test that tabs contain the expected content
-      expect(
-        wrapper.find('[data-test="dashboard-tab-tab1-name"]').text(),
-      ).toBe("First Tab");
-      expect(
-        wrapper.find('[data-test="dashboard-tab-tab2-name"]').text(),
-      ).toBe("Second Tab");
-      expect(
-        wrapper.find('[data-test="dashboard-tab-tab3-name"]').text(),
-      ).toContain("Very Long Tab");
+      expect(wrapper.find('[data-test="dashboard-tab-tab1-name"]').text()).toBe("First Tab");
+      expect(wrapper.find('[data-test="dashboard-tab-tab2-name"]').text()).toBe("Second Tab");
+      expect(wrapper.find('[data-test="dashboard-tab-tab3-name"]').text()).toContain(
+        "Very Long Tab",
+      );
     });
 
     it("should display tab names correctly", () => {
       wrapper = createWrapper();
 
-      expect(
-        wrapper.find('[data-test="dashboard-tab-tab1-name"]').text(),
-      ).toBe("First Tab");
-      expect(
-        wrapper.find('[data-test="dashboard-tab-tab2-name"]').text(),
-      ).toBe("Second Tab");
-      expect(
-        wrapper.find('[data-test="dashboard-tab-tab3-name"]').text(),
-      ).toBe("Very Long Tab Name That Should Be Truncated");
+      expect(wrapper.find('[data-test="dashboard-tab-tab1-name"]').text()).toBe("First Tab");
+      expect(wrapper.find('[data-test="dashboard-tab-tab2-name"]').text()).toBe("Second Tab");
+      expect(wrapper.find('[data-test="dashboard-tab-tab3-name"]').text()).toBe(
+        "Very Long Tab Name That Should Be Truncated",
+      );
     });
 
     it("should handle empty tabs array", () => {
@@ -449,7 +431,7 @@ describe("TabList", () => {
             selectedTabId: customSelectedTabIdRef,
           },
           stubs: {
-            "OIcon": {
+            OIcon: {
               template: "<span data-test='OIcon'></span>",
             },
           },
@@ -574,15 +556,9 @@ describe("TabList", () => {
     it("should have proper data-test attributes for testing", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.find('[data-test="dashboard-tab-list"]').exists()).toBe(
-        true,
-      );
-      expect(wrapper.find('[data-test="dashboard-tab-tab1"]').exists()).toBe(
-        true,
-      );
-      expect(
-        wrapper.find('[data-test="dashboard-tab-tab1-name"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-tab-list"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-tab-tab1"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-tab-tab1-name"]').exists()).toBe(true);
     });
 
     it("should have accessible add button when not in viewOnly mode", () => {

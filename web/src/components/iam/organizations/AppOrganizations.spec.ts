@@ -161,10 +161,10 @@ describe("AppOrganizations.vue", () => {
           plugins: [store, i18n],
         },
       });
-      
+
       const newConfig = { sso_enabled: true };
       await store.dispatch("setConfig", newConfig);
-      
+
       expect(wrapper.vm.store.state.zoConfig.sso_enabled).toBe(true);
     });
 
@@ -174,10 +174,10 @@ describe("AppOrganizations.vue", () => {
           plugins: [store, i18n],
         },
       });
-      
+
       const newConfig = { sso_enabled: true, version: "v0.3.0" };
       store.commit("setConfig", newConfig);
-      
+
       expect(wrapper.vm.store.state.zoConfig).toEqual(newConfig);
     });
 
@@ -188,7 +188,7 @@ describe("AppOrganizations.vue", () => {
           plugins: [customStore, i18n],
         },
       });
-      
+
       expect(wrapper.vm.store.state.zoConfig.sso_enabled).toBe(true);
     });
 
@@ -198,7 +198,7 @@ describe("AppOrganizations.vue", () => {
           plugins: [store, i18n],
         },
       });
-      
+
       expect(wrapper.vm.store.state.selectedOrganization).toBeDefined();
       expect(wrapper.vm.store.state.theme).toBeDefined();
     });
@@ -206,9 +206,13 @@ describe("AppOrganizations.vue", () => {
     it("should handle undefined zoConfig gracefully", () => {
       const storeWithoutConfig = createStore({
         state: { zoConfig: undefined },
-        mutations: { setConfig(state, payload) { state.zoConfig = payload; } },
+        mutations: {
+          setConfig(state, payload) {
+            state.zoConfig = payload;
+          },
+        },
       });
-      
+
       // Component will throw because watcher tries to access properties on undefined
       expect(() => {
         wrapper = mount(AppOrganizations, {
@@ -226,7 +230,7 @@ describe("AppOrganizations.vue", () => {
           plugins: [storeWithEmptyConfig, i18n],
         },
       });
-      
+
       expect(wrapper.vm.store.state.zoConfig).toEqual({
         sso_enabled: false,
         version: "v0.2.0",
@@ -240,13 +244,13 @@ describe("AppOrganizations.vue", () => {
           plugins: [store, i18n],
         },
       });
-      
+
       const initialConfig = wrapper.vm.store.state.zoConfig;
       const newConfig = { ...initialConfig, sso_enabled: true };
-      
+
       store.commit("setConfig", newConfig);
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.store.state.zoConfig.sso_enabled).toBe(true);
     });
 
@@ -256,7 +260,7 @@ describe("AppOrganizations.vue", () => {
           plugins: [store, i18n],
         },
       });
-      
+
       await store.dispatch("setConfig", { sso_enabled: true });
       expect(wrapper.vm.store.state.zoConfig.sso_enabled).toBe(true);
     });
@@ -302,13 +306,13 @@ describe("AppOrganizations.vue", () => {
           },
         },
       });
-      
+
       wrapper = mount(AppOrganizations, {
         global: {
           plugins: [store, customI18n],
         },
       });
-      
+
       expect(wrapper.vm.t("organization.header")).toBe("Organizaciones");
     });
 
@@ -317,13 +321,13 @@ describe("AppOrganizations.vue", () => {
         locale: "en",
         messages: { en: {} },
       });
-      
+
       wrapper = mount(AppOrganizations, {
         global: {
           plugins: [store, emptyI18n],
         },
       });
-      
+
       expect(typeof wrapper.vm.t).toBe("function");
     });
 
@@ -338,13 +342,13 @@ describe("AppOrganizations.vue", () => {
           },
         },
       });
-      
+
       wrapper = mount(AppOrganizations, {
         global: {
           plugins: [store, paramI18n],
         },
       });
-      
+
       expect(wrapper.vm.t("organization.welcome", { name: "User" })).toBe("Welcome User");
     });
 
@@ -354,13 +358,13 @@ describe("AppOrganizations.vue", () => {
           plugins: [store, i18n],
         },
       });
-      
+
       expect(wrapper.vm.t("organization.header")).toBe("Organizations");
-      
+
       await i18n.global.setLocaleMessage("en", {
         organization: { header: "Organizations Updated" },
       });
-      
+
       expect(wrapper.vm.t("organization.header")).toBe("Organizations Updated");
     });
 
@@ -369,7 +373,7 @@ describe("AppOrganizations.vue", () => {
         locale: "en",
         messages: { en: null },
       });
-      
+
       expect(() => {
         wrapper = mount(AppOrganizations, {
           global: {
@@ -390,13 +394,13 @@ describe("AppOrganizations.vue", () => {
           },
         },
       });
-      
+
       wrapper = mount(AppOrganizations, {
         global: {
           plugins: [store, pluralI18n],
         },
       });
-      
+
       expect(wrapper.vm.t("organization.count", 1)).toContain("1 organization");
     });
 
@@ -414,13 +418,13 @@ describe("AppOrganizations.vue", () => {
           },
         },
       });
-      
+
       wrapper = mount(AppOrganizations, {
         global: {
           plugins: [store, nestedI18n],
         },
       });
-      
+
       expect(wrapper.vm.t("organization.actions.create")).toBe("Create Organization");
     });
   });
@@ -453,10 +457,10 @@ describe("AppOrganizations.vue", () => {
           plugins: [store, i18n],
         },
       });
-      
+
       wrapper.vm.componentName = "DifferentComponent";
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.componentName).toBe("DifferentComponent");
     });
 
@@ -466,10 +470,10 @@ describe("AppOrganizations.vue", () => {
           plugins: [store, i18n],
         },
       });
-      
+
       wrapper.vm.loadComponent = true;
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.loadComponent).toBe(true);
     });
 
@@ -479,11 +483,11 @@ describe("AppOrganizations.vue", () => {
           plugins: [store, i18n],
         },
       });
-      
+
       const newComponentName = "TestComponent";
       wrapper.vm.componentName = newComponentName;
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.componentName).toBe(newComponentName);
     });
 
@@ -493,15 +497,15 @@ describe("AppOrganizations.vue", () => {
           plugins: [store, i18n],
         },
       });
-      
+
       wrapper.vm.loadComponent = true;
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.loadComponent).toBe(true);
-      
+
       wrapper.vm.loadComponent = false;
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.loadComponent).toBe(false);
     });
 
@@ -511,10 +515,10 @@ describe("AppOrganizations.vue", () => {
           plugins: [store, i18n],
         },
       });
-      
+
       wrapper.vm.componentName = undefined;
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.componentName).toBeUndefined();
     });
 
@@ -524,10 +528,10 @@ describe("AppOrganizations.vue", () => {
           plugins: [store, i18n],
         },
       });
-      
+
       wrapper.vm.componentName = null;
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.componentName).toBeNull();
     });
 
@@ -537,10 +541,10 @@ describe("AppOrganizations.vue", () => {
           plugins: [store, i18n],
         },
       });
-      
+
       wrapper.vm.componentName = "";
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.componentName).toBe("");
     });
 
@@ -550,15 +554,15 @@ describe("AppOrganizations.vue", () => {
           plugins: [store, i18n],
         },
       });
-      
+
       wrapper.vm.loadComponent = true;
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.loadComponent).toBe(true);
-      
+
       wrapper.vm.loadComponent = false;
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.loadComponent).toBe(false);
-      
+
       wrapper.vm.loadComponent = true;
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.loadComponent).toBe(true);
@@ -573,7 +577,7 @@ describe("AppOrganizations.vue", () => {
           plugins: [store, i18n],
         },
       });
-      
+
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.loadComponent).toBe(true);
     });
@@ -585,7 +589,7 @@ describe("AppOrganizations.vue", () => {
           plugins: [ssoEnabledStore, i18n],
         },
       });
-      
+
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.componentName).toBe("OrganizationsEnterprise");
     });
@@ -594,13 +598,13 @@ describe("AppOrganizations.vue", () => {
       vi.doMock("@/aws-exports", () => ({
         default: { isEnterprise: "true", isCloud: "false" },
       }));
-      
+
       wrapper = mount(AppOrganizations, {
         global: {
           plugins: [store, i18n],
         },
       });
-      
+
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.componentName).toBe("OrganizationsEnterprise");
     });
@@ -609,13 +613,13 @@ describe("AppOrganizations.vue", () => {
       vi.doMock("@/aws-exports", () => ({
         default: { isEnterprise: "false", isCloud: "true" },
       }));
-      
+
       wrapper = mount(AppOrganizations, {
         global: {
           plugins: [store, i18n],
         },
       });
-      
+
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.componentName).toBe("OrganizationsEnterprise");
     });
@@ -624,14 +628,14 @@ describe("AppOrganizations.vue", () => {
       vi.doMock("@/aws-exports", () => ({
         default: { isEnterprise: "true", isCloud: "false" },
       }));
-      
+
       const store = createMockStore({ sso_enabled: false });
       wrapper = mount(AppOrganizations, {
         global: {
           plugins: [store, i18n],
         },
       });
-      
+
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.componentName).toBe("OrganizationsEnterprise");
     });
@@ -640,14 +644,14 @@ describe("AppOrganizations.vue", () => {
       vi.doMock("@/aws-exports", () => ({
         default: { isEnterprise: "false", isCloud: "true" },
       }));
-      
+
       const store = createMockStore({ sso_enabled: false });
       wrapper = mount(AppOrganizations, {
         global: {
           plugins: [store, i18n],
         },
       });
-      
+
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.componentName).toBe("OrganizationsEnterprise");
     });
@@ -658,13 +662,13 @@ describe("AppOrganizations.vue", () => {
           plugins: [store, i18n],
         },
       });
-      
+
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.componentName).toBe("OrganizationsEnterprise");
-      
+
       store.commit("setConfig", { sso_enabled: true });
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.componentName).toBe("OrganizationsEnterprise");
     });
 
@@ -674,11 +678,11 @@ describe("AppOrganizations.vue", () => {
           plugins: [store, i18n],
         },
       });
-      
+
       store.commit("setConfig", { sso_enabled: false });
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.loadComponent).toBe(true);
-      
+
       store.commit("setConfig", { sso_enabled: true });
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.componentName).toBe("OrganizationsEnterprise");
@@ -688,14 +692,14 @@ describe("AppOrganizations.vue", () => {
       vi.doMock("@/aws-exports", () => ({
         default: { isEnterprise: "false", isCloud: "false" },
       }));
-      
+
       const store = createMockStore({ sso_enabled: false });
       wrapper = mount(AppOrganizations, {
         global: {
           plugins: [store, i18n],
         },
       });
-      
+
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.componentName).toBe("OrganizationsEnterprise");
       expect(wrapper.vm.loadComponent).toBe(true);
@@ -705,13 +709,13 @@ describe("AppOrganizations.vue", () => {
       vi.doMock("@/aws-exports", () => ({
         default: { isEnterprise: true, isCloud: "false" },
       }));
-      
+
       wrapper = mount(AppOrganizations, {
         global: {
           plugins: [store, i18n],
         },
       });
-      
+
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.componentName).toBe("OrganizationsEnterprise");
     });
@@ -720,13 +724,13 @@ describe("AppOrganizations.vue", () => {
       vi.doMock("@/aws-exports", () => ({
         default: { isEnterprise: undefined, isCloud: undefined },
       }));
-      
+
       wrapper = mount(AppOrganizations, {
         global: {
           plugins: [store, i18n],
         },
       });
-      
+
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.loadComponent).toBe(true);
     });
@@ -734,9 +738,13 @@ describe("AppOrganizations.vue", () => {
     it("should handle null zoConfig", async () => {
       const nullConfigStore = createStore({
         state: { zoConfig: null },
-        mutations: { setConfig(state, payload) { state.zoConfig = payload; } },
+        mutations: {
+          setConfig(state, payload) {
+            state.zoConfig = payload;
+          },
+        },
       });
-      
+
       // Component will throw because watcher tries to access properties on null
       expect(() => {
         wrapper = mount(AppOrganizations, {
@@ -753,7 +761,7 @@ describe("AppOrganizations.vue", () => {
           plugins: [store, i18n],
         },
       });
-      
+
       // The watcher should fire immediately due to immediate: true
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.loadComponent).toBe(true);
@@ -765,12 +773,12 @@ describe("AppOrganizations.vue", () => {
           plugins: [store, i18n],
         },
       });
-      
+
       // Rapid changes
       store.commit("setConfig", { sso_enabled: true });
       store.commit("setConfig", { sso_enabled: false });
       store.commit("setConfig", { sso_enabled: true });
-      
+
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.componentName).toBe("OrganizationsEnterprise");
       expect(wrapper.vm.loadComponent).toBe(true);
@@ -782,12 +790,12 @@ describe("AppOrganizations.vue", () => {
           plugins: [store, i18n],
         },
       });
-      
+
       const initialComponentName = wrapper.vm.componentName;
-      
+
       store.commit("setConfig", { sso_enabled: true, version: "v0.3.0" });
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.componentName).toBe(initialComponentName);
       expect(wrapper.vm.loadComponent).toBe(true);
     });
@@ -811,10 +819,10 @@ describe("AppOrganizations.vue", () => {
           plugins: [store, i18n],
         },
       });
-      
+
       wrapper.vm.loadComponent = false;
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.findComponent({ name: "OrganizationsEnterprise" }).exists()).toBe(false);
     });
 
@@ -824,10 +832,10 @@ describe("AppOrganizations.vue", () => {
           plugins: [store, i18n],
         },
       });
-      
+
       wrapper.vm.loadComponent = true;
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.html()).toContain("OrganizationsEnterprise Component");
     });
 
@@ -837,11 +845,11 @@ describe("AppOrganizations.vue", () => {
           plugins: [store, i18n],
         },
       });
-      
+
       wrapper.vm.loadComponent = true;
       wrapper.vm.componentName = "OrganizationsEnterprise";
       await wrapper.vm.$nextTick();
-      
+
       const dynamicComponent = wrapper.find("div > *");
       expect(dynamicComponent.exists()).toBe(true);
     });
@@ -852,11 +860,11 @@ describe("AppOrganizations.vue", () => {
           plugins: [store, i18n],
         },
       });
-      
+
       wrapper.vm.loadComponent = true;
       wrapper.vm.componentName = "OrganizationsEnterprise";
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.html()).toContain("OrganizationsEnterprise Component");
     });
 
@@ -866,7 +874,7 @@ describe("AppOrganizations.vue", () => {
           plugins: [store, i18n],
         },
       });
-      
+
       const rootDiv = wrapper.find("div");
       expect(rootDiv.exists()).toBe(true);
       expect(rootDiv.element.tagName).toBe("DIV");
@@ -878,11 +886,11 @@ describe("AppOrganizations.vue", () => {
           plugins: [store, i18n],
         },
       });
-      
+
       wrapper.vm.loadComponent = true;
       wrapper.vm.componentName = "NonExistentComponent";
       await wrapper.vm.$nextTick();
-      
+
       // Should not crash
       expect(wrapper.exists()).toBe(true);
     });
@@ -893,11 +901,11 @@ describe("AppOrganizations.vue", () => {
           plugins: [store, i18n],
         },
       });
-      
+
       wrapper.vm.loadComponent = true;
       wrapper.vm.componentName = "";
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.exists()).toBe(true);
     });
 
@@ -907,11 +915,11 @@ describe("AppOrganizations.vue", () => {
           plugins: [store, i18n],
         },
       });
-      
+
       wrapper.vm.loadComponent = true;
       wrapper.vm.componentName = null;
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.exists()).toBe(true);
     });
 
@@ -921,16 +929,16 @@ describe("AppOrganizations.vue", () => {
           plugins: [store, i18n],
         },
       });
-      
+
       wrapper.vm.loadComponent = true;
       await wrapper.vm.$nextTick();
-      
+
       wrapper.vm.loadComponent = false;
       await wrapper.vm.$nextTick();
-      
+
       wrapper.vm.loadComponent = true;
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.exists()).toBe(true);
     });
 
@@ -940,12 +948,12 @@ describe("AppOrganizations.vue", () => {
           plugins: [store, i18n],
         },
       });
-      
+
       const initialInstance = wrapper.vm;
-      
+
       wrapper.vm.loadComponent = true;
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm).toBe(initialInstance);
     });
   });
@@ -977,7 +985,7 @@ describe("AppOrganizations.vue", () => {
         state: { zoConfig: "invalid" },
         mutations: {},
       });
-      
+
       expect(() => {
         wrapper = mount(AppOrganizations, {
           global: {
@@ -993,7 +1001,7 @@ describe("AppOrganizations.vue", () => {
           plugins: [store, i18n],
         },
       });
-      
+
       expect(() => {
         wrapper.unmount();
       }).not.toThrow();
@@ -1005,13 +1013,13 @@ describe("AppOrganizations.vue", () => {
           plugins: [store, i18n],
         },
       });
-      
+
       // Multiple store updates
       for (let i = 0; i < 10; i++) {
         store.commit("setConfig", { sso_enabled: i % 2 === 0 });
         await wrapper.vm.$nextTick();
       }
-      
+
       expect(wrapper.vm.loadComponent).toBe(true);
       wrapper.unmount();
     });

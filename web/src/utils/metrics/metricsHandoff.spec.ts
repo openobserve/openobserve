@@ -34,17 +34,12 @@ function handoff(
   const card = cards.find((c) => c.name === metricName)!;
   const stream = streams.find((s) => s.name === metricName)!;
 
-  const defaults = getMetricDefaults(
-    card.name,
-    stream.metrics_meta?.metric_type,
-    undefined,
-    {
-      streamNames: new Set(streams.map((s) => s.name)),
-      familyType: card.familyType,
-      rateWindow: W,
-      labels: card.labels,
-    },
-  );
+  const defaults = getMetricDefaults(card.name, stream.metrics_meta?.metric_type, undefined, {
+    streamNames: new Set(streams.map((s) => s.name)),
+    familyType: card.familyType,
+    rateWindow: W,
+    labels: card.labels,
+  });
   const resolved = resolveVariant(defaults, variantId ?? defaults.variants[0].id, options)!;
   return buildPanelDataForCard(card, resolved, defaults.bucketUnit);
 }
@@ -101,11 +96,7 @@ describe("Select handoff", () => {
       meta("lat_seconds_count", "Counter"),
     ];
     const data = handoff(streams, "lat_seconds_bucket", "percentiles");
-    expect(data.queries.map((q: any) => q.config.promql_legend)).toEqual([
-      "p50",
-      "p90",
-      "p99",
-    ]);
+    expect(data.queries.map((q: any) => q.config.promql_legend)).toEqual(["p50", "p90", "p99"]);
   });
 
   it("empties the count-rate legend, which names the count stream it reads", () => {
@@ -120,21 +111,14 @@ describe("Select handoff", () => {
   });
 
   it("hands Min/Max off as TWO queries with independent legends", () => {
-    const data = handoff(
-      [meta("queue_depth", "Gauge")],
-      "queue_depth",
-      "minmax",
-    );
+    const data = handoff([meta("queue_depth", "Gauge")], "queue_depth", "minmax");
 
     expect(data.queries).toHaveLength(2);
     expect(data.queries.map((q: any) => q.query)).toEqual([
       "min(queue_depth{})",
       "max(queue_depth{})",
     ]);
-    expect(data.queries.map((q: any) => q.config.promql_legend)).toEqual([
-      "min",
-      "max",
-    ]);
+    expect(data.queries.map((q: any) => q.config.promql_legend)).toEqual(["min", "max"]);
     expect(data.config.show_legends).toBe(true);
   });
 
@@ -150,10 +134,7 @@ describe("Select handoff", () => {
 
     expect(data.type).toBe("line");
     expect(data.queries).toHaveLength(2);
-    expect(data.queries.map((q: any) => q.config.promql_legend)).toEqual([
-      "p50",
-      "p99",
-    ]);
+    expect(data.queries.map((q: any) => q.config.promql_legend)).toEqual(["p50", "p99"]);
     expect(data.queries[1].query).toBe(
       "histogram_quantile(0.99, sum by (le) (rate(lat_seconds_bucket{}[4m])))",
     );
@@ -192,9 +173,7 @@ describe("Select handoff", () => {
     expect(data.type).toBe("line");
     expect(data.queries[0].query).toBe("count(target_info{})");
     expect(data.queries[0].customQuery).toBe(false);
-    expect(data.queries[0].fields.promql_operations).toEqual([
-      { id: "count", params: [[]] },
-    ]);
+    expect(data.queries[0].fields.promql_operations).toEqual([{ id: "count", params: [[]] }]);
   });
 
   it("opens the label TABLE when that variant is the one in effect", () => {

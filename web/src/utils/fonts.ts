@@ -39,9 +39,7 @@ const readToken = (name: string, fallback: string): string => {
     return fallback;
   }
   try {
-    const value = getComputedStyle(document.documentElement)
-      .getPropertyValue(name)
-      .trim();
+    const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
     return value || fallback;
   } catch {
     return fallback;

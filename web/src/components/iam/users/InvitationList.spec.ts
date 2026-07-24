@@ -1,39 +1,39 @@
-import { describe, it, expect, afterEach, vi } from 'vitest';
-import { mount, flushPromises } from '@vue/test-utils';
-import i18n from '@/locales';
-import store from '@/test/unit/helpers/store';
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { mount, flushPromises } from "@vue/test-utils";
+import i18n from "@/locales";
+import store from "@/test/unit/helpers/store";
 
 const dismissToastMock = vi.fn();
-vi.mock('@/lib/feedback/Toast/useToast', () => ({
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(() => dismissToastMock),
 }));
 
-vi.mock('@/aws-exports', () => ({
-  default: { isCloud: 'false', isEnterprise: 'true' },
+vi.mock("@/aws-exports", () => ({
+  default: { isCloud: "false", isEnterprise: "true" },
 }));
 
 const mockInvitations = [
   {
-    token: 'tok-1',
-    org_id: 'org-1',
-    org_name: 'Org One',
-    role: 'Member',
-    inviter_id: 'admin@example.com',
+    token: "tok-1",
+    org_id: "org-1",
+    org_name: "Org One",
+    role: "Member",
+    inviter_id: "admin@example.com",
     // expires_at in microseconds: 30 days from now
     expires_at: (Date.now() + 30 * 24 * 60 * 60 * 1000) * 1000,
   },
   {
-    token: 'tok-2',
-    org_id: 'org-2',
-    org_name: 'Org Two',
-    role: 'Admin',
-    inviter_id: 'super@example.com',
+    token: "tok-2",
+    org_id: "org-2",
+    org_name: "Org Two",
+    role: "Admin",
+    inviter_id: "super@example.com",
     // expires in the past (expired)
     expires_at: (Date.now() - 5 * 24 * 60 * 60 * 1000) * 1000,
   },
 ];
 
-vi.mock('@/services/users', () => ({
+vi.mock("@/services/users", () => ({
   default: {
     getPendingInvites: vi.fn(async () => ({
       data: { data: mockInvitations },
@@ -41,47 +41,47 @@ vi.mock('@/services/users', () => ({
   },
 }));
 
-vi.mock('@/services/organizations', () => ({
+vi.mock("@/services/organizations", () => ({
   default: {
     process_subscription: vi.fn(async () => ({})),
     decline_subscription: vi.fn(async () => ({})),
     list: vi.fn(async () => ({
-      data: { data: [{ identifier: 'org-1', name: 'Org One' }] },
+      data: { data: [{ identifier: "org-1", name: "Org One" }] },
     })),
   },
 }));
 
-import InvitationList from '@/components/iam/users/InvitationList.vue';
-import usersService from '@/services/users';
-import organizationsService from '@/services/organizations';
+import InvitationList from "@/components/iam/users/InvitationList.vue";
+import usersService from "@/services/users";
+import organizationsService from "@/services/organizations";
 
 // Stub ODialog so tests are deterministic (no Portal/Reka teleport).
 // Exposes the props the component forwards and emits the click events
 // the component listens to.
 const ODialogStub = {
-  name: 'ODialog',
+  name: "ODialog",
   props: [
-    'open',
-    'size',
-    'title',
-    'subTitle',
-    'persistent',
-    'showClose',
-    'width',
-    'primaryButtonLabel',
-    'secondaryButtonLabel',
-    'neutralButtonLabel',
-    'primaryButtonVariant',
-    'secondaryButtonVariant',
-    'neutralButtonVariant',
-    'primaryButtonDisabled',
-    'secondaryButtonDisabled',
-    'neutralButtonDisabled',
-    'primaryButtonLoading',
-    'secondaryButtonLoading',
-    'neutralButtonLoading',
+    "open",
+    "size",
+    "title",
+    "subTitle",
+    "persistent",
+    "showClose",
+    "width",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+    "primaryButtonVariant",
+    "secondaryButtonVariant",
+    "neutralButtonVariant",
+    "primaryButtonDisabled",
+    "secondaryButtonDisabled",
+    "neutralButtonDisabled",
+    "primaryButtonLoading",
+    "secondaryButtonLoading",
+    "neutralButtonLoading",
   ],
-  emits: ['update:open', 'click:primary', 'click:secondary', 'click:neutral'],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
   template: `
     <div
       data-test="o-dialog-stub"
@@ -106,8 +106,8 @@ const ODialogStub = {
   `,
 };
 
-const node = document.createElement('div');
-node.setAttribute('id', 'invitation-list-test');
+const node = document.createElement("div");
+node.setAttribute("id", "invitation-list-test");
 document.body.appendChild(node);
 
 async function mountInvitationList(props = {}) {
@@ -118,15 +118,15 @@ async function mountInvitationList(props = {}) {
       stubs: {
         NoData: { template: '<div data-test="no-data-stub" />' },
         QTablePagination: {
-          props: ['scope', 'resultTotal', 'perPageOptions', 'position'],
-          emits: ['update:changeRecordPerPage'],
+          props: ["scope", "resultTotal", "perPageOptions", "position"],
+          emits: ["update:changeRecordPerPage"],
           template: '<div data-test="table-pagination-stub" />',
         },
         ODialog: ODialogStub,
       },
     },
     props: {
-      userEmail: 'user@example.com',
+      userEmail: "user@example.com",
       ...props,
     },
   });
@@ -139,71 +139,69 @@ afterEach(() => {
 });
 
 // 1. Rendering
-describe('InvitationList - rendering', () => {
-  it('mounts without errors', async () => {
+describe("InvitationList - rendering", () => {
+  it("mounts without errors", async () => {
     const wrapper = await mountInvitationList();
     expect(wrapper.exists()).toBe(true);
   });
 
-  it('renders the pending invitations title', async () => {
+  it("renders the pending invitations title", async () => {
     const wrapper = await mountInvitationList();
     // Title is passed as a prop to OPageHeader; verify the component mounts with the expected text
-    expect(wrapper.text()).toContain('Pending Invitations');
+    expect(wrapper.text()).toContain("Pending Invitations");
   });
 
-  it('renders both ODialog instances (accept + reject confirmations)', async () => {
+  it("renders both ODialog instances (accept + reject confirmations)", async () => {
     const wrapper = await mountInvitationList();
     const dialogs = wrapper.findAllComponents(ODialogStub);
     expect(dialogs.length).toBe(2);
   });
 
-  it('keeps both confirmation dialogs closed by default', async () => {
+  it("keeps both confirmation dialogs closed by default", async () => {
     const wrapper = await mountInvitationList();
     const dialogs = wrapper.findAllComponents(ODialogStub);
-    expect(dialogs[0].props('open')).toBe(false);
-    expect(dialogs[1].props('open')).toBe(false);
+    expect(dialogs[0].props("open")).toBe(false);
+    expect(dialogs[1].props("open")).toBe(false);
   });
 
   it('forwards size="xs" to both confirmation dialogs', async () => {
     const wrapper = await mountInvitationList();
     const dialogs = wrapper.findAllComponents(ODialogStub);
-    expect(dialogs[0].props('size')).toBe('xs');
-    expect(dialogs[1].props('size')).toBe('xs');
+    expect(dialogs[0].props("size")).toBe("xs");
+    expect(dialogs[1].props("size")).toBe("xs");
   });
 });
 
 // 2. fetchPendingInvitations on mount
-describe('InvitationList - fetchPendingInvitations', () => {
-  it('calls getPendingInvites on mount', async () => {
+describe("InvitationList - fetchPendingInvitations", () => {
+  it("calls getPendingInvites on mount", async () => {
     await mountInvitationList();
     expect(usersService.getPendingInvites).toHaveBeenCalled();
   });
 
-  it('populates invitations from API response', async () => {
+  it("populates invitations from API response", async () => {
     const wrapper = await mountInvitationList();
     expect((wrapper.vm as any).invitations.length).toBe(2);
   });
 
-  it('sets resultTotal to the number of invitations', async () => {
+  it("sets resultTotal to the number of invitations", async () => {
     const wrapper = await mountInvitationList();
     expect((wrapper.vm as any).resultTotal).toBe(2);
   });
 
   // Row numbering moved to OTable's built-in show-index (no '#' data field).
 
-  it('formats the expiry for each invitation', async () => {
+  it("formats the expiry for each invitation", async () => {
     const wrapper = await mountInvitationList();
     const invitations = (wrapper.vm as any).invitations;
     // First invitation is 30 days away — should NOT be "expired"
-    expect(invitations[0].expiry).not.toContain('expired');
+    expect(invitations[0].expiry).not.toContain("expired");
     // Second invitation is in the past — should indicate expired or days left
-    expect(typeof invitations[1].expiry).toBe('string');
+    expect(typeof invitations[1].expiry).toBe("string");
   });
 
-  it('handles API error gracefully without throwing', async () => {
-    vi.mocked(usersService.getPendingInvites).mockRejectedValueOnce(
-      new Error('Network error'),
-    );
+  it("handles API error gracefully without throwing", async () => {
+    vi.mocked(usersService.getPendingInvites).mockRejectedValueOnce(new Error("Network error"));
     const wrapper = await mountInvitationList();
     expect(wrapper.exists()).toBe(true);
     expect((wrapper.vm as any).invitations.length).toBe(0);
@@ -211,13 +209,13 @@ describe('InvitationList - fetchPendingInvitations', () => {
 });
 
 // 3. formatExpiry
-describe('InvitationList - formatExpiry', () => {
-  it('returns expired label for past date', async () => {
+describe("InvitationList - formatExpiry", () => {
+  it("returns expired label for past date", async () => {
     const wrapper = await mountInvitationList();
     const pastMicroseconds = (Date.now() - 10 * 24 * 60 * 60 * 1000) * 1000;
     const result = (wrapper.vm as any).formatExpiry(pastMicroseconds);
     // Should indicate expired (locale string)
-    expect(typeof result).toBe('string');
+    expect(typeof result).toBe("string");
     expect(result.length).toBeGreaterThan(0);
   });
 
@@ -226,83 +224,83 @@ describe('InvitationList - formatExpiry', () => {
     // Same day = 0 days left
     const todayMicroseconds = Date.now() * 1000;
     const result = (wrapper.vm as any).formatExpiry(todayMicroseconds);
-    expect(typeof result).toBe('string');
+    expect(typeof result).toBe("string");
     expect(result.length).toBeGreaterThan(0);
   });
 
-  it('returns days left for future date', async () => {
+  it("returns days left for future date", async () => {
     const wrapper = await mountInvitationList();
     const futureMicroseconds = (Date.now() + 15 * 24 * 60 * 60 * 1000) * 1000;
     const result = (wrapper.vm as any).formatExpiry(futureMicroseconds);
-    expect(typeof result).toBe('string');
+    expect(typeof result).toBe("string");
     expect(result.length).toBeGreaterThan(0);
   });
 
-  it('returns expired label for invalid date', async () => {
+  it("returns expired label for invalid date", async () => {
     const wrapper = await mountInvitationList();
     const result = (wrapper.vm as any).formatExpiry(NaN);
-    expect(typeof result).toBe('string');
+    expect(typeof result).toBe("string");
     expect(result.length).toBeGreaterThan(0);
   });
 });
 
 // 4. acceptInvitation
-describe('InvitationList - acceptInvitation', () => {
-  it('sets selectedInvitation to the given invitation', async () => {
+describe("InvitationList - acceptInvitation", () => {
+  it("sets selectedInvitation to the given invitation", async () => {
     const wrapper = await mountInvitationList();
-    const inv = { token: 'tok-1', org_name: 'Org One', org_id: 'org-1' };
+    const inv = { token: "tok-1", org_name: "Org One", org_id: "org-1" };
     (wrapper.vm as any).acceptInvitation(inv);
     expect((wrapper.vm as any).selectedInvitation).toEqual(inv);
   });
 
-  it('opens the confirmAccept dialog', async () => {
+  it("opens the confirmAccept dialog", async () => {
     const wrapper = await mountInvitationList();
-    const inv = { token: 'tok-1', org_name: 'Org One', org_id: 'org-1' };
+    const inv = { token: "tok-1", org_name: "Org One", org_id: "org-1" };
     (wrapper.vm as any).acceptInvitation(inv);
     expect((wrapper.vm as any).confirmAccept).toBe(true);
   });
 
-  it('propagates confirmAccept=true to the accept ODialog open prop', async () => {
+  it("propagates confirmAccept=true to the accept ODialog open prop", async () => {
     const wrapper = await mountInvitationList();
-    const inv = { token: 'tok-1', org_name: 'Org One', org_id: 'org-1' };
+    const inv = { token: "tok-1", org_name: "Org One", org_id: "org-1" };
     (wrapper.vm as any).acceptInvitation(inv);
     await flushPromises();
     const dialogs = wrapper.findAllComponents(ODialogStub);
     // The first dialog is the accept dialog
-    expect(dialogs[0].props('open')).toBe(true);
+    expect(dialogs[0].props("open")).toBe(true);
   });
 });
 
 // 5. rejectInvitation
-describe('InvitationList - rejectInvitation', () => {
-  it('sets selectedInvitation to the given invitation', async () => {
+describe("InvitationList - rejectInvitation", () => {
+  it("sets selectedInvitation to the given invitation", async () => {
     const wrapper = await mountInvitationList();
-    const inv = { token: 'tok-2', org_name: 'Org Two', org_id: 'org-2' };
+    const inv = { token: "tok-2", org_name: "Org Two", org_id: "org-2" };
     (wrapper.vm as any).rejectInvitation(inv);
     expect((wrapper.vm as any).selectedInvitation).toEqual(inv);
   });
 
-  it('opens the confirmReject dialog', async () => {
+  it("opens the confirmReject dialog", async () => {
     const wrapper = await mountInvitationList();
-    const inv = { token: 'tok-2', org_name: 'Org Two', org_id: 'org-2' };
+    const inv = { token: "tok-2", org_name: "Org Two", org_id: "org-2" };
     (wrapper.vm as any).rejectInvitation(inv);
     expect((wrapper.vm as any).confirmReject).toBe(true);
   });
 
-  it('propagates confirmReject=true to the reject ODialog open prop', async () => {
+  it("propagates confirmReject=true to the reject ODialog open prop", async () => {
     const wrapper = await mountInvitationList();
-    const inv = { token: 'tok-2', org_name: 'Org Two', org_id: 'org-2' };
+    const inv = { token: "tok-2", org_name: "Org Two", org_id: "org-2" };
     (wrapper.vm as any).rejectInvitation(inv);
     await flushPromises();
     const dialogs = wrapper.findAllComponents(ODialogStub);
     // The second dialog is the reject dialog
-    expect(dialogs[1].props('open')).toBe(true);
+    expect(dialogs[1].props("open")).toBe(true);
   });
 });
 
 // 6. confirmAcceptInvitation
-describe('InvitationList - confirmAcceptInvitation', () => {
-  it('does nothing when selectedInvitation is null', async () => {
+describe("InvitationList - confirmAcceptInvitation", () => {
+  it("does nothing when selectedInvitation is null", async () => {
     const wrapper = await mountInvitationList();
     (wrapper.vm as any).selectedInvitation = null;
     await (wrapper.vm as any).confirmAcceptInvitation();
@@ -311,82 +309,84 @@ describe('InvitationList - confirmAcceptInvitation', () => {
 
   it('calls process_subscription with token, "confirm", and org_id', async () => {
     const wrapper = await mountInvitationList();
-    const inv = { token: 'tok-1', org_name: 'Org One', org_id: 'org-1' };
+    const inv = { token: "tok-1", org_name: "Org One", org_id: "org-1" };
     (wrapper.vm as any).selectedInvitation = inv;
     await (wrapper.vm as any).confirmAcceptInvitation();
     expect(organizationsService.process_subscription).toHaveBeenCalledWith(
-      'tok-1',
-      'confirm',
-      'org-1',
+      "tok-1",
+      "confirm",
+      "org-1",
     );
   });
 
-  it('closes the confirmAccept dialog after invoking confirm', async () => {
+  it("closes the confirmAccept dialog after invoking confirm", async () => {
     const wrapper = await mountInvitationList();
-    const inv = { token: 'tok-1', org_name: 'Org One', org_id: 'org-1' };
+    const inv = { token: "tok-1", org_name: "Org One", org_id: "org-1" };
     (wrapper.vm as any).selectedInvitation = inv;
     (wrapper.vm as any).confirmAccept = true;
     await (wrapper.vm as any).confirmAcceptInvitation();
     expect((wrapper.vm as any).confirmAccept).toBe(false);
   });
 
-  it('refreshes organizations list after accepting', async () => {
+  it("refreshes organizations list after accepting", async () => {
     const wrapper = await mountInvitationList();
-    const inv = { token: 'tok-1', org_name: 'Org One', org_id: 'org-1' };
+    const inv = { token: "tok-1", org_name: "Org One", org_id: "org-1" };
     (wrapper.vm as any).selectedInvitation = inv;
     await (wrapper.vm as any).confirmAcceptInvitation();
     expect(organizationsService.list).toHaveBeenCalled();
   });
 
-  it('emits invitations-processed with accepted=true', async () => {
+  it("emits invitations-processed with accepted=true", async () => {
     const wrapper = await mountInvitationList();
-    const inv = { token: 'tok-1', org_name: 'Org One', org_id: 'org-1' };
+    const inv = { token: "tok-1", org_name: "Org One", org_id: "org-1" };
     (wrapper.vm as any).selectedInvitation = inv;
     await (wrapper.vm as any).confirmAcceptInvitation();
-    const emitted = wrapper.emitted('invitations-processed');
+    const emitted = wrapper.emitted("invitations-processed");
     expect(emitted).toBeTruthy();
     expect(emitted![0][0]).toMatchObject({ accepted: true });
   });
 
-  it('shows a negative notification when process_subscription fails', async () => {
+  it("shows a negative notification when process_subscription fails", async () => {
     vi.mocked(organizationsService.process_subscription).mockRejectedValueOnce(
-      new Error('server error'),
+      new Error("server error"),
     );
     const wrapper = await mountInvitationList();
-    const { toast } = await import('@/lib/feedback/Toast/useToast');
+    const { toast } = await import("@/lib/feedback/Toast/useToast");
     vi.mocked(toast).mockClear();
-    const inv = { token: 'tok-1', org_name: 'Org One', org_id: 'org-1' };
+    const inv = { token: "tok-1", org_name: "Org One", org_id: "org-1" };
     (wrapper.vm as any).selectedInvitation = inv;
     await (wrapper.vm as any).confirmAcceptInvitation();
-    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ message: 'Failed to accept invitation' }));
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "Failed to accept invitation" }),
+    );
   });
 
-  it('triggers confirmAcceptInvitation when the accept ODialog emits click:primary', async () => {
+  it("triggers confirmAcceptInvitation when the accept ODialog emits click:primary", async () => {
     const wrapper = await mountInvitationList();
-    const inv = { token: 'tok-1', org_name: 'Org One', org_id: 'org-1' };
+    const inv = { token: "tok-1", org_name: "Org One", org_id: "org-1" };
     (wrapper.vm as any).selectedInvitation = inv;
     (wrapper.vm as any).confirmAccept = true;
     await flushPromises();
 
     const dialogs = wrapper.findAllComponents(ODialogStub);
     // First dialog is the accept dialog
-    await dialogs[0].vm.$emit('click:primary');
+    await dialogs[0].vm.$emit("click:primary");
     await flushPromises();
 
     expect(organizationsService.process_subscription).toHaveBeenCalledWith(
-      'tok-1',
-      'confirm',
-      'org-1',
+      "tok-1",
+      "confirm",
+      "org-1",
     );
   });
 
-  it('closes the accept dialog when ODialog emits click:secondary (cancel)', async () => {
+  it("closes the accept dialog when ODialog emits click:secondary (cancel)", async () => {
     const wrapper = await mountInvitationList();
     (wrapper.vm as any).confirmAccept = true;
     await flushPromises();
 
     const dialogs = wrapper.findAllComponents(ODialogStub);
-    await dialogs[0].vm.$emit('click:secondary');
+    await dialogs[0].vm.$emit("click:secondary");
     await flushPromises();
 
     expect((wrapper.vm as any).confirmAccept).toBe(false);
@@ -395,32 +395,32 @@ describe('InvitationList - confirmAcceptInvitation', () => {
 });
 
 // 7. confirmRejectInvitation
-describe('InvitationList - confirmRejectInvitation', () => {
-  it('does nothing when selectedInvitation is null', async () => {
+describe("InvitationList - confirmRejectInvitation", () => {
+  it("does nothing when selectedInvitation is null", async () => {
     const wrapper = await mountInvitationList();
     (wrapper.vm as any).selectedInvitation = null;
     await (wrapper.vm as any).confirmRejectInvitation();
     expect(organizationsService.decline_subscription).not.toHaveBeenCalled();
   });
 
-  it('calls decline_subscription with the token', async () => {
+  it("calls decline_subscription with the token", async () => {
     const wrapper = await mountInvitationList();
-    const inv = { token: 'tok-2', org_name: 'Org Two', org_id: 'org-2' };
+    const inv = { token: "tok-2", org_name: "Org Two", org_id: "org-2" };
     (wrapper.vm as any).selectedInvitation = inv;
     await (wrapper.vm as any).confirmRejectInvitation();
-    expect(organizationsService.decline_subscription).toHaveBeenCalledWith('tok-2');
+    expect(organizationsService.decline_subscription).toHaveBeenCalledWith("tok-2");
   });
 
-  it('closes the confirmReject dialog after invoking confirm', async () => {
+  it("closes the confirmReject dialog after invoking confirm", async () => {
     const wrapper = await mountInvitationList();
-    const inv = { token: 'tok-2', org_name: 'Org Two', org_id: 'org-2' };
+    const inv = { token: "tok-2", org_name: "Org Two", org_id: "org-2" };
     (wrapper.vm as any).selectedInvitation = inv;
     (wrapper.vm as any).confirmReject = true;
     await (wrapper.vm as any).confirmRejectInvitation();
     expect((wrapper.vm as any).confirmReject).toBe(false);
   });
 
-  it('removes the rejected invitation from the list', async () => {
+  it("removes the rejected invitation from the list", async () => {
     const wrapper = await mountInvitationList();
     const inv = (wrapper.vm as any).invitations[0];
     (wrapper.vm as any).selectedInvitation = inv;
@@ -429,7 +429,7 @@ describe('InvitationList - confirmRejectInvitation', () => {
     expect((wrapper.vm as any).invitations.length).toBe(originalLength - 1);
   });
 
-  it('emits invitations-processed when no invitations remain after reject', async () => {
+  it("emits invitations-processed when no invitations remain after reject", async () => {
     // Seed with one invitation
     vi.mocked(usersService.getPendingInvites).mockResolvedValueOnce({
       data: { data: [mockInvitations[0]] },
@@ -439,25 +439,27 @@ describe('InvitationList - confirmRejectInvitation', () => {
     const inv = (wrapper.vm as any).invitations[0];
     (wrapper.vm as any).selectedInvitation = inv;
     await (wrapper.vm as any).confirmRejectInvitation();
-    const emitted = wrapper.emitted('invitations-processed');
+    const emitted = wrapper.emitted("invitations-processed");
     expect(emitted).toBeTruthy();
     expect(emitted![0][0]).toMatchObject({ accepted: false, hasMore: false });
   });
 
-  it('shows a negative notification when decline_subscription fails', async () => {
+  it("shows a negative notification when decline_subscription fails", async () => {
     vi.mocked(organizationsService.decline_subscription).mockRejectedValueOnce(
-      new Error('server error'),
+      new Error("server error"),
     );
     const wrapper = await mountInvitationList();
-    const { toast } = await import('@/lib/feedback/Toast/useToast');
+    const { toast } = await import("@/lib/feedback/Toast/useToast");
     vi.mocked(toast).mockClear();
     const inv = (wrapper.vm as any).invitations[0];
     (wrapper.vm as any).selectedInvitation = inv;
     await (wrapper.vm as any).confirmRejectInvitation();
-    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ message: 'Failed to reject invitation' }));
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "Failed to reject invitation" }),
+    );
   });
 
-  it('triggers confirmRejectInvitation when the reject ODialog emits click:primary', async () => {
+  it("triggers confirmRejectInvitation when the reject ODialog emits click:primary", async () => {
     const wrapper = await mountInvitationList();
     const inv = (wrapper.vm as any).invitations[0];
     (wrapper.vm as any).selectedInvitation = inv;
@@ -466,19 +468,19 @@ describe('InvitationList - confirmRejectInvitation', () => {
 
     const dialogs = wrapper.findAllComponents(ODialogStub);
     // Second dialog is the reject dialog
-    await dialogs[1].vm.$emit('click:primary');
+    await dialogs[1].vm.$emit("click:primary");
     await flushPromises();
 
     expect(organizationsService.decline_subscription).toHaveBeenCalledWith(inv.token);
   });
 
-  it('closes the reject dialog when ODialog emits click:secondary (cancel)', async () => {
+  it("closes the reject dialog when ODialog emits click:secondary (cancel)", async () => {
     const wrapper = await mountInvitationList();
     (wrapper.vm as any).confirmReject = true;
     await flushPromises();
 
     const dialogs = wrapper.findAllComponents(ODialogStub);
-    await dialogs[1].vm.$emit('click:secondary');
+    await dialogs[1].vm.$emit("click:secondary");
     await flushPromises();
 
     expect((wrapper.vm as any).confirmReject).toBe(false);

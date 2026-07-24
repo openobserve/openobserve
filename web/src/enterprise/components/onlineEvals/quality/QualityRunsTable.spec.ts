@@ -26,10 +26,7 @@ const OTableStub = defineComponent({
   `,
 });
 
-function run(
-  id: string,
-  overrides: Partial<QualityRunRow> = {},
-): QualityRunRow {
+function run(id: string, overrides: Partial<QualityRunRow> = {}): QualityRunRow {
   return {
     id,
     taskId: `task-${id}`,
@@ -102,13 +99,9 @@ describe("QualityRunsTable", () => {
     expect(table.props("sorting")).toBe("none");
     expect(table.props("totalCount")).toBe(42);
     expect(wrapper.get('[data-test="stub-row-count"]').text()).toBe("2");
-    expect(
-      wrapper.get('[data-test="quality-runs-filter-unhealthy"]').text(),
-    ).toContain("7");
+    expect(wrapper.get('[data-test="quality-runs-filter-unhealthy"]').text()).toContain("7");
 
-    await wrapper
-      .get('[data-test="quality-runs-filter-unhealthy"]')
-      .trigger("click");
+    await wrapper.get('[data-test="quality-runs-filter-unhealthy"]').trigger("click");
     expect(wrapper.emitted("filter-change")).toEqual([["unhealthy"]]);
 
     const reasoningColumn = (table.props("columns") as any[]).find(
@@ -156,12 +149,10 @@ describe("QualityRunsTable", () => {
     } as ScoreConfig);
 
     expect(
-      wrapper
-        .get('[data-test="quality-runs-filter-unhealthy"]')
-        .attributes("disabled"),
+      wrapper.get('[data-test="quality-runs-filter-unhealthy"]').attributes("disabled"),
     ).toBeDefined();
-    expect(
-      wrapper.get('[data-test="quality-runs-no-threshold"]').text(),
-    ).toContain("Set a healthy threshold");
+    expect(wrapper.get('[data-test="quality-runs-no-threshold"]').text()).toContain(
+      "Set a healthy threshold",
+    );
   });
 });

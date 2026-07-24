@@ -571,9 +571,7 @@ export const BUILD_PRESET: PanelEditorConfig = {
  * @param pageType - The page type
  * @returns The preset configuration
  */
-export function getPresetByPageType(
-  pageType: PanelEditorPageType,
-): PanelEditorConfig {
+export function getPresetByPageType(pageType: PanelEditorPageType): PanelEditorConfig {
   switch (pageType) {
     case "dashboard":
       return DASHBOARD_PRESET;
@@ -600,18 +598,12 @@ export function resolveConfig(props: PanelEditorProps): PanelEditorConfig {
   return {
     showQueryEditor: props.showQueryEditor ?? preset.showQueryEditor,
     showQueryBuilder: props.showQueryBuilder ?? preset.showQueryBuilder,
-    showVariablesSelector:
-      props.showVariablesSelector ?? preset.showVariablesSelector,
-    showLastRefreshedTime:
-      props.showLastRefreshedTime ?? preset.showLastRefreshedTime,
-    showOutdatedWarning:
-      props.showOutdatedWarning ?? preset.showOutdatedWarning,
-    showAddToDashboardButton:
-      props.showAddToDashboardButton ?? preset.showAddToDashboardButton,
-    showQueryTypeSelector:
-      props.showQueryTypeSelector ?? preset.showQueryTypeSelector,
-    showGeneratedQueryDisplay:
-      props.showGeneratedQueryDisplay ?? preset.showGeneratedQueryDisplay,
+    showVariablesSelector: props.showVariablesSelector ?? preset.showVariablesSelector,
+    showLastRefreshedTime: props.showLastRefreshedTime ?? preset.showLastRefreshedTime,
+    showOutdatedWarning: props.showOutdatedWarning ?? preset.showOutdatedWarning,
+    showAddToDashboardButton: props.showAddToDashboardButton ?? preset.showAddToDashboardButton,
+    showQueryTypeSelector: props.showQueryTypeSelector ?? preset.showQueryTypeSelector,
+    showGeneratedQueryDisplay: props.showGeneratedQueryDisplay ?? preset.showGeneratedQueryDisplay,
     hideChartPreview: props.hideChartPreview ?? preset.hideChartPreview,
   };
 }

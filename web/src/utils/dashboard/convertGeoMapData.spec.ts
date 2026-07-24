@@ -123,7 +123,7 @@ describe("convertGeoMapData", () => {
       ];
 
       expect(() => convertGeoMapData(panelSchema, mapData)).toThrow(
-        "All latitude values should be numeric value."
+        "All latitude values should be numeric value.",
       );
     });
 
@@ -148,7 +148,7 @@ describe("convertGeoMapData", () => {
       ];
 
       expect(() => convertGeoMapData(panelSchema, mapData)).toThrow(
-        "All longitude values should be numeric value."
+        "All longitude values should be numeric value.",
       );
     });
 
@@ -175,7 +175,7 @@ describe("convertGeoMapData", () => {
       ];
 
       expect(() => convertGeoMapData(panelSchema, mapData)).toThrow(
-        "All weight values should be numeric value."
+        "All weight values should be numeric value.",
       );
     });
   });
@@ -199,7 +199,7 @@ describe("convertGeoMapData", () => {
       config: {
         map_view: {
           lat: 40.7128,
-          lng: -74.0060,
+          lng: -74.006,
           zoom: 10,
         },
         unit: "bytes",
@@ -222,7 +222,7 @@ describe("convertGeoMapData", () => {
         [
           {
             lat: 40.7128,
-            lng: -74.0060,
+            lng: -74.006,
             weight: 100,
           },
           {
@@ -239,7 +239,7 @@ describe("convertGeoMapData", () => {
       expect(result.options).toBeDefined();
       expect(result.options.series).toHaveLength(1);
       expect(result.options.series[0].data).toHaveLength(2);
-      expect(result.options.series[0].data[0]).toEqual([-74.0060, 40.7128, 100]);
+      expect(result.options.series[0].data[0]).toEqual([-74.006, 40.7128, 100]);
       expect(result.options.series[0].data[1]).toEqual([-118.2437, 34.0522, 200]);
     });
 
@@ -249,7 +249,7 @@ describe("convertGeoMapData", () => {
         [
           {
             latitude: 40.7128,
-            longitude: -74.0060,
+            longitude: -74.006,
             weight: 100,
           },
           {
@@ -288,7 +288,7 @@ describe("convertGeoMapData", () => {
         config: {
           map_view: {
             lat: 40.7128,
-            lng: -74.0060,
+            lng: -74.006,
             zoom: 10,
           },
         },
@@ -297,7 +297,7 @@ describe("convertGeoMapData", () => {
         [
           {
             lat: 40.7128,
-            lng: -74.0060,
+            lng: -74.006,
           },
           {
             lat: null, // Should be filtered out
@@ -335,7 +335,7 @@ describe("convertGeoMapData", () => {
         config: {
           map_view: {
             lat: 40.7128,
-            lng: -74.0060,
+            lng: -74.006,
             zoom: 10,
           },
         },
@@ -344,7 +344,7 @@ describe("convertGeoMapData", () => {
         [
           {
             lat: 40.7128,
-            lng: -74.0060,
+            lng: -74.006,
             weight: null, // Should use weight_fixed
           },
         ],
@@ -375,7 +375,7 @@ describe("convertGeoMapData", () => {
         config: {
           map_view: {
             lat: 40.7128,
-            lng: -74.0060,
+            lng: -74.006,
             zoom: 10,
           },
         },
@@ -384,7 +384,7 @@ describe("convertGeoMapData", () => {
         [
           {
             latitude: 40.7128,
-            longitude: -74.0060,
+            longitude: -74.006,
             weight: null, // Should use weight_fixed
           },
         ],
@@ -417,7 +417,7 @@ describe("convertGeoMapData", () => {
         config: {
           map_view: {
             lat: 40.7128,
-            lng: -74.0060,
+            lng: -74.006,
             zoom: 10,
           },
           map_symbol_style: {
@@ -430,7 +430,7 @@ describe("convertGeoMapData", () => {
         [
           {
             lat: 40.7128,
-            lng: -74.0060,
+            lng: -74.006,
             weight: 100,
           },
         ],
@@ -461,7 +461,7 @@ describe("convertGeoMapData", () => {
         config: {
           map_view: {
             lat: 40.7128,
-            lng: -74.0060,
+            lng: -74.006,
             zoom: 10,
           },
           // No map_symbol_style specified - should use defaults
@@ -471,7 +471,7 @@ describe("convertGeoMapData", () => {
         [
           {
             lat: 40.7128,
-            lng: -74.0060,
+            lng: -74.006,
             weight: 100,
           },
         ],
@@ -505,7 +505,7 @@ describe("convertGeoMapData", () => {
         config: {
           map_view: {
             lat: 40.7128,
-            lng: -74.0060,
+            lng: -74.006,
             zoom: 10,
           },
           map_symbol_style: {
@@ -521,7 +521,7 @@ describe("convertGeoMapData", () => {
         [
           {
             lat: 40.7128,
-            lng: -74.0060,
+            lng: -74.006,
             weight: 150,
           },
           {
@@ -559,7 +559,7 @@ describe("convertGeoMapData", () => {
         config: {
           map_view: {
             lat: 40.7128,
-            lng: -74.0060,
+            lng: -74.006,
             zoom: 10,
           },
         },
@@ -600,7 +600,7 @@ describe("convertGeoMapData", () => {
         config: {
           map_view: {
             lat: 40.7128,
-            lng: -74.0060,
+            lng: -74.006,
             zoom: 10,
           },
         },
@@ -609,7 +609,7 @@ describe("convertGeoMapData", () => {
         [
           {
             lat1: 40.7128,
-            lng1: -74.0060,
+            lng1: -74.006,
           },
         ],
         [
@@ -645,7 +645,7 @@ describe("convertGeoMapData", () => {
         config: {
           map_view: {
             lat: 40.7128,
-            lng: -74.0060,
+            lng: -74.006,
             zoom: 10,
           },
           unit: "bytes",
@@ -657,7 +657,7 @@ describe("convertGeoMapData", () => {
         [
           {
             lat: 40.7128,
-            lng: -74.0060,
+            lng: -74.006,
             weight: 1024,
           },
         ],
@@ -672,7 +672,7 @@ describe("convertGeoMapData", () => {
 
       // Test the formatter function
       const mockParams = {
-        value: [-74.0060, 40.7128, 1024],
+        value: [-74.006, 40.7128, 1024],
         seriesName: "Layer 1",
       };
       const formattedResult = result.options.tooltip.formatter(mockParams);
@@ -700,7 +700,7 @@ describe("convertGeoMapData", () => {
         config: {
           map_view: {
             lat: 40.7128,
-            lng: -74.0060,
+            lng: -74.006,
             zoom: 10,
           },
         },
@@ -709,7 +709,7 @@ describe("convertGeoMapData", () => {
         [
           {
             lat: 40.7128,
-            lng: -74.0060,
+            lng: -74.006,
             // No weight data
           },
         ],
@@ -717,7 +717,7 @@ describe("convertGeoMapData", () => {
 
       // This should throw an error because weight.alias is undefined
       expect(() => convertGeoMapData(panelSchema, mapData)).toThrow(
-        "Cannot read properties of undefined (reading 'alias')"
+        "Cannot read properties of undefined (reading 'alias')",
       );
     });
 
@@ -740,7 +740,7 @@ describe("convertGeoMapData", () => {
         config: {
           map_view: {
             lat: 40.7128,
-            lng: -74.0060,
+            lng: -74.006,
             zoom: 10,
           },
         },
@@ -749,7 +749,7 @@ describe("convertGeoMapData", () => {
         [
           {
             latitude: 40.7128,
-            longitude: -74.0060,
+            longitude: -74.006,
             // No weight data
           },
         ],
@@ -765,7 +765,7 @@ describe("convertGeoMapData", () => {
   describe("Attempts to reach uncovered code paths", () => {
     // The symbolSize function (lines 191-206) has a bug - it references undefined minValue/maxValue
     // But we can still try to create tests that would theoretically call it
-    
+
     it("should handle scenario to potentially trigger symbolSize function - attempt 1", () => {
       // This is a carefully crafted test to try to work around the bug and reach the symbolSize function
       const panelSchema = {
@@ -786,7 +786,7 @@ describe("convertGeoMapData", () => {
         config: {
           map_view: {
             lat: 40.7128,
-            lng: -74.0060,
+            lng: -74.006,
             zoom: 10,
           },
           map_symbol_style: {
@@ -798,18 +798,18 @@ describe("convertGeoMapData", () => {
           },
         },
       };
-      
+
       // Create data that should pass all filters and create proper series data
       const mapData = [
         [
           {
             lat: 40.7128,
-            lng: -74.0060,
+            lng: -74.006,
             weight: 100,
           },
           {
             lat: 41.8781,
-            lng: -87.6298, 
+            lng: -87.6298,
             weight: 200,
           },
         ],
@@ -818,12 +818,12 @@ describe("convertGeoMapData", () => {
       try {
         const result = convertGeoMapData(panelSchema, mapData);
         expect(result).toBeDefined();
-        
+
         // If we get here, the function completed despite the bug
         if (result && result.options && result.options.series) {
           // Try to call the symbolSize function manually if it exists
           const series = result.options.series[0];
-          if (series && typeof series.symbolSize === 'function') {
+          if (series && typeof series.symbolSize === "function") {
             // This would trigger the symbolSize function code
             try {
               // This will likely throw an error due to undefined minValue/maxValue
@@ -859,7 +859,7 @@ describe("convertGeoMapData", () => {
         config: {
           map_view: {
             lat: 40.7128,
-            lng: -74.0060,
+            lng: -74.006,
             zoom: 10,
           },
           map_symbol_style: {
@@ -871,12 +871,12 @@ describe("convertGeoMapData", () => {
           },
         },
       };
-      
+
       const mapData = [
         [
           {
             latitude: 40.7128,
-            longitude: -74.0060,
+            longitude: -74.006,
             weight: 100,
           },
         ],
@@ -885,7 +885,7 @@ describe("convertGeoMapData", () => {
       // This might work better since it uses auto query format
       const result = convertGeoMapData(panelSchema, mapData);
       expect(result).toBeDefined();
-      
+
       // The result should have options even if the series data gets cleared later
       expect(result.options).toBeDefined();
     });
@@ -893,10 +893,10 @@ describe("convertGeoMapData", () => {
     it("should test normalizeValue function directly by importing it", () => {
       // This is to get coverage of the normalizeValue function
       // Since it's the first function in the file, we need to call it somehow
-      
+
       // We can't import it directly as it's not exported, but we can test it indirectly
       // by ensuring our tests create scenarios where it would be called
-      
+
       const panelSchema = {
         queries: [
           {
@@ -915,7 +915,7 @@ describe("convertGeoMapData", () => {
         config: {
           map_view: {
             lat: 40.7128,
-            lng: -74.0060,
+            lng: -74.006,
             zoom: 10,
           },
           map_symbol_style: {
@@ -924,12 +924,12 @@ describe("convertGeoMapData", () => {
           },
         },
       };
-      
+
       const mapData = [
         [
           {
             lat: 40.7128,
-            lng: -74.0060,
+            lng: -74.006,
             weight: 100,
           },
         ],
@@ -960,7 +960,7 @@ describe("convertGeoMapData", () => {
         config: {
           map_view: {
             lat: 40.7128,
-            lng: -74.0060,
+            lng: -74.006,
             zoom: 10,
           },
           map_symbol_style: {
@@ -969,12 +969,12 @@ describe("convertGeoMapData", () => {
           },
         },
       };
-      
+
       const mapData = [
         [
           {
             lat: 40.7128,
-            lng: -74.0060,
+            lng: -74.006,
             weight: 100,
           },
         ],
@@ -1002,17 +1002,17 @@ describe("convertGeoMapData", () => {
         config: {
           map_view: {
             lat: 40.7128,
-            lng: -74.0060,
+            lng: -74.006,
             zoom: 10,
           },
         },
       };
-      
+
       // Empty nested array - this should create empty series data
       const mapData = [[[]]];
 
       const result = convertGeoMapData(panelSchema, mapData);
-      
+
       // Due to the complex logic, this might return undefined (early return)
       // or an object with empty series
       if (result === undefined) {
@@ -1031,7 +1031,7 @@ describe("convertGeoMapData", () => {
               longitude: { alias: "lng" },
             },
             config: {
-              layer_type: "scatter", 
+              layer_type: "scatter",
               weight_fixed: 10,
             },
           },
@@ -1039,18 +1039,18 @@ describe("convertGeoMapData", () => {
         config: {
           map_view: {
             lat: 40.7128,
-            lng: -74.0060,
+            lng: -74.006,
             zoom: 10,
           },
         },
       };
-      
+
       // Mix of valid and invalid entries (some will be filtered out)
       const mapData = [
         [
-          { lat: 40.7128, lng: -74.0060 }, // Valid
-          { lat: null, lng: -118.2437 },   // Invalid - will be filtered
-          { lat: 34.0522, lng: null },     // Invalid - will be filtered
+          { lat: 40.7128, lng: -74.006 }, // Valid
+          { lat: null, lng: -118.2437 }, // Invalid - will be filtered
+          { lat: 34.0522, lng: null }, // Invalid - will be filtered
         ],
       ];
 

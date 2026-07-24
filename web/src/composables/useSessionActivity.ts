@@ -99,12 +99,7 @@ const useSessionActivity = () => {
     hasFrustrationField: boolean,
   ): Promise<SessionActivity | null> => {
     const durationMs = endTime - startTime;
-    if (
-      !sessionId ||
-      !/^[a-zA-Z0-9_-]+$/.test(sessionId) ||
-      !startTime ||
-      durationMs <= 0
-    ) {
+    if (!sessionId || !/^[a-zA-Z0-9_-]+$/.test(sessionId) || !startTime || durationMs <= 0) {
       return Promise.resolve(null);
     }
 
@@ -118,13 +113,9 @@ const useSessionActivity = () => {
       await gate;
       await acquireSlot();
       try {
-        const tsColumn =
-          store.state.zoConfig.timestamp_column || "_timestamp";
+        const tsColumn = store.state.zoConfig.timestamp_column || "_timestamp";
         const startUs = startTime * 1000;
-        const bucketUs = Math.max(
-          1,
-          Math.ceil((durationMs * 1000) / ACTIVITY_BUCKET_COUNT),
-        );
+        const bucketUs = Math.max(1, Math.ceil((durationMs * 1000) / ACTIVITY_BUCKET_COUNT));
         const frustrationExpr = hasFrustrationField
           ? "SUM(CASE WHEN type='action' AND action_frustration_type IS NOT NULL THEN 1 ELSE 0 END)"
           : "0";
@@ -184,10 +175,7 @@ const useSessionActivity = () => {
           maxEvents: Math.max(...buckets.map((b) => b.events)),
           totalEvents: buckets.reduce((sum, b) => sum + b.events, 0),
           totalErrors: buckets.reduce((sum, b) => sum + b.errors, 0),
-          totalFrustrations: buckets.reduce(
-            (sum, b) => sum + b.frustrations,
-            0,
-          ),
+          totalFrustrations: buckets.reduce((sum, b) => sum + b.frustrations, 0),
         };
 
         cache.set(key, activity);

@@ -22,9 +22,7 @@ import { chartColor } from "@/utils/chartTheme";
 vi.mock("./shared/dataProcessor", () => ({
   applyAggregation: vi.fn((values, aggregation) => {
     if (!values || values.length === 0) return 0;
-    const numericValues = values.map((v: any) =>
-      Array.isArray(v) ? parseFloat(v[1]) : v,
-    );
+    const numericValues = values.map((v: any) => (Array.isArray(v) ? parseFloat(v[1]) : v));
     if (aggregation === "last") return numericValues[numericValues.length - 1];
     if (aggregation === "avg") {
       const sum = numericValues.reduce((a: number, b: number) => a + b, 0);
@@ -95,12 +93,7 @@ describe("GaugeConverter", () => {
         queries: [{ config: {} }],
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series).toHaveLength(1);
       expect(result.series[0].type).toBe("gauge");
@@ -159,12 +152,7 @@ describe("GaugeConverter", () => {
         queries: [{ config: {} }],
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].data[0].value).toBe(30);
     });
@@ -196,12 +184,7 @@ describe("GaugeConverter", () => {
         queries: [{ config: {} }],
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].data[0].value).toBe(20);
     });
@@ -227,12 +210,7 @@ describe("GaugeConverter", () => {
         queries: [{ config: { min: 10, max: 200 } }],
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].min).toBe(10);
       expect(result.series[0].max).toBe(200);
@@ -259,12 +237,7 @@ describe("GaugeConverter", () => {
         queries: [{ config: {} }],
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].min).toBe(0);
       expect(result.series[0].max).toBe(100);
@@ -301,12 +274,7 @@ describe("GaugeConverter", () => {
         queries: [{ config: {} }],
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series).toHaveLength(3);
       expect(result.grid).toHaveLength(3);
@@ -336,12 +304,7 @@ describe("GaugeConverter", () => {
         queries: [{ config: {} }],
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].progress.show).toBe(true);
       expect(result.series[0].detail.valueAnimation).toBe(true);
@@ -372,12 +335,7 @@ describe("GaugeConverter", () => {
         queries: [{ config: {} }],
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       const formatted = result.series[0].data[0].detail.formatter(75);
       expect(formatted).toBe("75.0%");
@@ -404,12 +362,7 @@ describe("GaugeConverter", () => {
         queries: [{ config: {} }],
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.tooltip.show).toBe(true);
       expect(result.tooltip.trigger).toBe("item");
@@ -438,16 +391,9 @@ describe("GaugeConverter", () => {
         queries: [{ config: {} }],
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
-      expect(result.tooltip.textStyle.color).toBe(
-        chartColor("--color-tooltip-text"),
-      );
+      expect(result.tooltip.textStyle.color).toBe(chartColor("--color-tooltip-text"));
     });
 
     it("should configure tooltip for light theme", () => {
@@ -473,16 +419,9 @@ describe("GaugeConverter", () => {
         queries: [{ config: {} }],
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
-      expect(result.tooltip.textStyle.color).toBe(
-        chartColor("--color-tooltip-text"),
-      );
+      expect(result.tooltip.textStyle.color).toBe(chartColor("--color-tooltip-text"));
     });
 
     it("should format tooltip value", () => {
@@ -509,12 +448,7 @@ describe("GaugeConverter", () => {
         queries: [{ config: {} }],
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       const formatted = result.tooltip.valueFormatter(75);
       expect(formatted).toBe("75.00%");
@@ -541,12 +475,7 @@ describe("GaugeConverter", () => {
         queries: [{ config: {} }],
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].data[0].itemStyle.color).toBeDefined();
     });
@@ -577,12 +506,7 @@ describe("GaugeConverter", () => {
         queries: [{ config: {} }],
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].data[0].itemStyle.color).toBeUndefined();
     });
@@ -625,12 +549,7 @@ describe("GaugeConverter", () => {
         queries: [{ config: {} }],
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.grid).toHaveLength(4);
       // With 2 gauges per row, we should have 2 rows
@@ -658,12 +577,7 @@ describe("GaugeConverter", () => {
         queries: [{ config: {} }],
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.grid[0].width).toBe("100%");
       expect(result.grid[0].height).toBe("100%");
@@ -689,12 +603,7 @@ describe("GaugeConverter", () => {
         queries: [{}],
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result).toBeDefined();
     });
@@ -720,12 +629,7 @@ describe("GaugeConverter", () => {
         queries: [],
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].min).toBe(0);
       expect(result.series[0].max).toBe(100);
@@ -788,12 +692,7 @@ describe("GaugeConverter", () => {
         queries: [{ config: {} }],
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.dataset.source).toEqual([[]]);
     });

@@ -179,8 +179,8 @@ describe("FunctionPicker", () => {
   it("hides the After-Flattening toggle when showFlatten is false", async () => {
     const wrapper = createWrapper({ showFlatten: false });
     await flushPromises();
-    expect(
-      wrapper.find('[data-test="associate-function-after-flattening-toggle"]').exists(),
-    ).toBe(false);
+    expect(wrapper.find('[data-test="associate-function-after-flattening-toggle"]').exists()).toBe(
+      false,
+    );
   });
 });

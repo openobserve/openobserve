@@ -3,22 +3,22 @@
  * ORouteTab wraps OTab with Vue Router navigation.
  */
 
-import type { RouteLocationRaw } from 'vue-router'
+import type { RouteLocationRaw } from "vue-router";
 
 export interface ORouteTabProps {
   /** Unique identifier — must match v-model value on OTabs */
-  name: string | number
+  name: string | number;
   /** Display text label */
-  label?: string
+  label?: string;
   /** Material icon name */
-  icon?: string
+  icon?: string;
   /** Route to navigate to when clicked */
-  to?: RouteLocationRaw
+  to?: RouteLocationRaw;
   /** Prevents interaction */
-  disable?: boolean
+  disable?: boolean;
 }
 
 export interface ORouteTabSlots {
   /** Custom tab content (badge, icons, etc.) */
-  default?: () => unknown
+  default?: () => unknown;
 }

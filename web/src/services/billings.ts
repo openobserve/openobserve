@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
- 
 import http from "./http";
 
 const billings = {
@@ -36,24 +35,16 @@ const billings = {
     return http().get(`/api/${org_identifier}/billings/resume_subscription`);
   },
   get_hosted_url: (org_identifier: string, plan_name: string) => {
-    return http().get(
-      `/api/${org_identifier}/billings/hosted_subscription_url?plan=${plan_name}`
-    );
+    return http().get(`/api/${org_identifier}/billings/hosted_subscription_url?plan=${plan_name}`);
   },
   get_session_url: (org_identifier: string, customer_id: string) => {
-    return http().get(
-      `/api/${org_identifier}/billings/billing_portal?customer_id=${customer_id}`
-    );
+    return http().get(`/api/${org_identifier}/billings/billing_portal?customer_id=${customer_id}`);
   },
   retrieve_hosted_page: (org_identifier: string, hosted_page_id: string) => {
-    return http().get(
-      `/api/${org_identifier}/billings/hosted_page_status/${hosted_page_id}`
-    );
+    return http().get(`/api/${org_identifier}/billings/hosted_page_status/${hosted_page_id}`);
   },
   change_payment_detail: (org_identifier: string, hosted_page_id: string) => {
-    return http().get(
-      `/api/${org_identifier}/billings/change_payment_detail/${hosted_page_id}`
-    );
+    return http().get(`/api/${org_identifier}/billings/change_payment_detail/${hosted_page_id}`);
   },
   list_invoice_history: (org_identifier: string) => {
     return http().get(`/api/${org_identifier}/billings/invoices`);
@@ -62,7 +53,7 @@ const billings = {
     org_identifier: string,
     usage_date: string,
     data_type: string,
-    member?: string
+    member?: string,
   ) => {
     let url = `/api/${org_identifier}/billings/data_usage/${usage_date}?data_type=${data_type}`;
     if (member) {
@@ -70,7 +61,7 @@ const billings = {
     }
     return http().get(url);
   },
-  submit_new_user_info: async ( org_identifier: string, payload: any,) => {
+  submit_new_user_info: async (org_identifier: string, payload: any) => {
     return http().post(`/api/${org_identifier}/billings/new_user_attribution`, payload);
   },
   get_ai_usage: (org_identifier: string) => {
@@ -91,14 +82,10 @@ const billings = {
     });
   },
   accept_billing_group_invite: (org_identifier: string, token: string) => {
-    return http().post(
-      `/api/${org_identifier}/billing_group/invites/${token}/accept`
-    );
+    return http().post(`/api/${org_identifier}/billing_group/invites/${token}/accept`);
   },
   reject_billing_group_invite: (org_identifier: string, token: string) => {
-    return http().delete(
-      `/api/${org_identifier}/billing_group/invites/${token}/reject`
-    );
+    return http().delete(`/api/${org_identifier}/billing_group/invites/${token}/reject`);
   },
 };
 

@@ -17,9 +17,7 @@
 // `VITE_OPENOBSERVE_LLM_UI` env var. Visible by default; set the env
 // var to "false" to hide the LLM Observability UI.
 function readLLMUIFlag(): "true" | "false" {
-  return String(import.meta.env.VITE_OPENOBSERVE_LLM_UI) === "false"
-    ? "false"
-    : "true";
+  return String(import.meta.env.VITE_OPENOBSERVE_LLM_UI) === "false" ? "false" : "true";
 }
 
 const config = {

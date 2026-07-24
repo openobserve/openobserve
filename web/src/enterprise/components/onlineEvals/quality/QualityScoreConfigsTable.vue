@@ -1,8 +1,5 @@
 <template>
-  <section
-    class="flex min-h-0 flex-1 flex-col gap-2.5"
-    data-test="quality-score-configs-overview"
-  >
+  <section class="flex min-h-0 flex-1 flex-col gap-2.5" data-test="quality-score-configs-overview">
     <!-- The previous "waiting for scores" empty card (allZeroScores) is
          intentionally gone: as long as at least one score config exists,
          we render the table so the user sees the configured shapes. Each
@@ -27,7 +24,7 @@
         :column-visibility="defaultColumnVisibility"
         table-id="quality-score-configs-v2"
         width="100%"
-        class="w-full h-full"
+        class="h-full w-full"
         @row-click="(row: any) => $emit('select', row)"
       >
         <!-- Filter moved into the table toolbar so OTable's column chooser
@@ -37,7 +34,7 @@
             v-model="filter"
             :placeholder="t('onlineEvals.quality.overview.searchPlaceholder')"
             size="sm"
-            class="flex-1 min-w-0"
+            class="min-w-0 flex-1"
             data-test="quality-overview-filter-input"
           />
         </template>
@@ -60,10 +57,7 @@
         </template>
 
         <template #empty>
-          <div
-            class="flex items-center justify-center py-8"
-            data-test="quality-overview-empty"
-          >
+          <div class="flex items-center justify-center py-8" data-test="quality-overview-empty">
             <OEmptyState
               size="hero"
               preset="no-score-configs"
@@ -82,12 +76,10 @@
               type="qualityStatus"
               :value="row.status"
               :label="t(`onlineEvals.quality.overview.status.${row.status}`)"
-              :aria-label="
-                t(`onlineEvals.quality.overview.status.${row.status}`)
-              "
+              :aria-label="t(`onlineEvals.quality.overview.status.${row.status}`)"
             />
             <span
-              class="max-w-full truncate text-3xs text-text-secondary"
+              class="text-3xs text-text-secondary max-w-full truncate"
               :title="healthSummary(row)"
             >
               {{ healthSummary(row) }}
@@ -96,17 +88,13 @@
         </template>
 
         <template #cell-name="{ row }">
-          <div class="font-semibold text-text-heading">
+          <div class="text-text-heading font-semibold">
             {{ row.name }}
           </div>
         </template>
 
         <template #cell-type="{ row }">
-          <OTag
-            v-if="row.dataType !== 'unknown'"
-            type="evalDataType"
-            :value="row.dataType"
-          />
+          <OTag v-if="row.dataType !== 'unknown'" type="evalDataType" :value="row.dataType" />
           <span v-else class="text-text-secondary">—</span>
         </template>
 
@@ -127,7 +115,7 @@
             </span>
             <span
               v-if="row.qualityLabel"
-              class="mt-0.5 whitespace-normal text-3xs font-normal leading-tight text-text-secondary"
+              class="text-3xs text-text-secondary mt-0.5 leading-tight font-normal whitespace-normal"
             >
               {{ row.qualityLabel }}
             </span>
@@ -144,13 +132,11 @@
             <span
               v-for="scope in scopeItems(row)"
               :key="scope.id"
-              class="inline-flex items-center gap-1 rounded-full border border-border-default bg-surface-base px-1.5 py-0.5 text-3xs leading-none text-text-secondary [font-variant-numeric:tabular-nums]"
+              class="border-border-default bg-surface-base text-3xs text-text-secondary inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 leading-none [font-variant-numeric:tabular-nums]"
               :data-test="`quality-overview-scope-${scope.id}`"
             >
               <span>{{ t(`onlineEvals.quality.scopes.${scope.id}`) }}</span>
-              <span class="font-semibold text-text-heading">{{
-                formatCount(scope.count)
-              }}</span>
+              <span class="text-text-heading font-semibold">{{ formatCount(scope.count) }}</span>
             </span>
           </div>
           <span v-else class="text-text-secondary">—</span>
@@ -159,7 +145,7 @@
         <template #cell-volumeTrend="{ row }">
           <svg
             v-if="row.trendSparkline.length > 0"
-            class="w-full h-5"
+            class="h-5 w-full"
             :class="sparkClass(row.status)"
             viewBox="0 0 100 20"
             preserveAspectRatio="none"
@@ -176,7 +162,10 @@
         </template>
 
         <template #cell-updated="{ row }">
-          <span v-if="row.lastUpdatedMs" class="text-2xs text-text-secondary [font-variant-numeric:tabular-nums]">
+          <span
+            v-if="row.lastUpdatedMs"
+            class="text-2xs text-text-secondary [font-variant-numeric:tabular-nums]"
+          >
             {{ relativeTime(row.lastUpdatedMs) }}
           </span>
           <span v-else class="text-text-secondary">—</span>
@@ -237,17 +226,15 @@ const filteredRows = computed(() => {
   const q = filter.value.trim().toLowerCase();
   if (!q) return props.rows;
   return props.rows.filter(
-    (r) =>
-      r.name.toLowerCase().includes(q) ||
-      r.description.toLowerCase().includes(q),
+    (r) => r.name.toLowerCase().includes(q) || r.description.toLowerCase().includes(q),
   );
 });
 
 function sparkClass(status: string): string {
-  if (status === 'unhealthy' || status === 'warn') return 'text-status-warning-text';
-  if (status === 'healthy') return 'text-status-success-text';
-  if (status === 'noData') return 'text-text-secondary opacity-[0.55]';
-  return 'text-text-secondary';
+  if (status === "unhealthy" || status === "warn") return "text-status-warning-text";
+  if (status === "healthy") return "text-status-success-text";
+  if (status === "noData") return "text-text-secondary opacity-[0.55]";
+  return "text-text-secondary";
 }
 
 const defaultColumnVisibility = {

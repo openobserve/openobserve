@@ -56,13 +56,10 @@ describe("OTimelineItem", () => {
     expect(wrapper.find(".timeline-connector").exists()).toBe(true);
   });
 
-  it.each([
-    ["primary"],
-    ["success"],
-    ["destructive"],
-    ["info"],
-    ["muted"],
-  ] as const)("accepts variant=%s without throwing", (variant) => {
-    expect(() => mount(OTimelineItem, { props: { variant } })).not.toThrow();
-  });
+  it.each([["primary"], ["success"], ["destructive"], ["info"], ["muted"]] as const)(
+    "accepts variant=%s without throwing",
+    (variant) => {
+      expect(() => mount(OTimelineItem, { props: { variant } })).not.toThrow();
+    },
+  );
 });

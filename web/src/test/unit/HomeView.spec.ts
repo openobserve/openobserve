@@ -54,7 +54,6 @@ const mockRoute = {
   path: "/home",
 };
 
-
 describe("HomeView.vue", () => {
   let wrapper: any;
 
@@ -86,26 +85,22 @@ describe("HomeView.vue", () => {
   const createWrapper = () => {
     return mount(HomeView, {
       global: {
-        plugins: [
-          i18n,
-          store,
-        ],
+        plugins: [i18n, store],
         mocks: {
           $router: mockRouter,
           $route: mockRoute,
         },
         stubs: {
           "router-link": {
-            template: '<a><slot /></a>',
+            template: "<a><slot /></a>",
             props: ["to"],
           },
-          "OIcon": {
+          OIcon: {
             template: '<span class="OIcon-stub"></span>',
             props: ["name", "size"],
           },
           OButton: {
-            template:
-              '<button class="o-button-stub" @click="$emit(\'click\')"><slot /></button>',
+            template: '<button class="o-button-stub" @click="$emit(\'click\')"><slot /></button>',
             props: ["variant", "size", "ariaLabel", "title"],
           },
           OverviewTab: {
@@ -193,10 +188,7 @@ describe("HomeView.vue", () => {
     });
 
     it("should restore saved tab order from localStorage", () => {
-      localStorage.setItem(
-        "o2_home_tab_order",
-        JSON.stringify(["usage", "overview"]),
-      );
+      localStorage.setItem("o2_home_tab_order", JSON.stringify(["usage", "overview"]));
       wrapper = createWrapper();
       const ids = wrapper.vm.tabOrder.map((t: any) => t.id);
       expect(ids[0]).toBe("usage");
@@ -209,16 +201,12 @@ describe("HomeView.vue", () => {
     it("should render OverviewTab when overview tab is active", async () => {
       wrapper = createWrapper();
       // Set isEnterprise so overview tab exists
-      vi.mocked(
-        (await import("../../aws-exports")).default,
-      ).isEnterprise = "true";
+      vi.mocked((await import("../../aws-exports")).default).isEnterprise = "true";
       // Re-create wrapper with enterprise config
       wrapper.unmount();
       wrapper = createWrapper();
       // Find overview in tabOrder
-      const overviewTab = wrapper.vm.tabOrder.find(
-        (t: any) => t.id === "overview",
-      );
+      const overviewTab = wrapper.vm.tabOrder.find((t: any) => t.id === "overview");
       if (overviewTab) {
         wrapper.vm.activeHomeTab = "overview";
         await nextTick();
@@ -235,9 +223,7 @@ describe("HomeView.vue", () => {
 
     it("should show tab bar when multiple tabs exist", async () => {
       // Mock config to have multiple tabs
-      vi.mocked(
-        (await import("../../aws-exports")).default,
-      ).isEnterprise = "true";
+      vi.mocked((await import("../../aws-exports")).default).isEnterprise = "true";
       wrapper.unmount();
       wrapper = createWrapper();
       await nextTick();
@@ -272,31 +258,21 @@ describe("HomeView.vue", () => {
       wrapper.vm.onTabReorder({ from: "a", to: "b", before: false });
       const newOrder = wrapper.vm.tabOrder.map((t: any) => t.id);
       expect(newOrder).toEqual(["b", "a", "c"]);
-      expect(localStorage.getItem("o2_home_tab_order")).toBe(
-        JSON.stringify(["b", "a", "c"]),
-      );
+      expect(localStorage.getItem("o2_home_tab_order")).toBe(JSON.stringify(["b", "a", "c"]));
     });
 
     it("inserts a tab before the target when before=true", () => {
       wrapper = createWrapper();
       wrapper.vm.tabOrder = seed();
       wrapper.vm.onTabReorder({ from: "c", to: "a", before: true });
-      expect(wrapper.vm.tabOrder.map((t: any) => t.id)).toEqual([
-        "c",
-        "a",
-        "b",
-      ]);
+      expect(wrapper.vm.tabOrder.map((t: any) => t.id)).toEqual(["c", "a", "b"]);
     });
 
     it("ignores a reorder onto the same tab", () => {
       wrapper = createWrapper();
       wrapper.vm.tabOrder = seed();
       wrapper.vm.onTabReorder({ from: "a", to: "a", before: true });
-      expect(wrapper.vm.tabOrder.map((t: any) => t.id)).toEqual([
-        "a",
-        "b",
-        "c",
-      ]);
+      expect(wrapper.vm.tabOrder.map((t: any) => t.id)).toEqual(["a", "b", "c"]);
     });
   });
 
@@ -309,9 +285,7 @@ describe("HomeView.vue", () => {
       const tabs = wrapper.vm.tabOrder.map((t: any) => t.id);
       const targetTab = tabs.find((id: string) => id !== initialTab);
       if (targetTab) {
-        window.dispatchEvent(
-          new CustomEvent("o2:home-switch-tab", { detail: targetTab }),
-        );
+        window.dispatchEvent(new CustomEvent("o2:home-switch-tab", { detail: targetTab }));
         expect(wrapper.vm.activeHomeTab).toBe(targetTab);
       }
     });
@@ -319,9 +293,7 @@ describe("HomeView.vue", () => {
     it("should not switch tab when invalid tab is dispatched", () => {
       wrapper = createWrapper();
       const initialTab = wrapper.vm.activeHomeTab;
-      window.dispatchEvent(
-        new CustomEvent("o2:home-switch-tab", { detail: "nonexistent" }),
-      );
+      window.dispatchEvent(new CustomEvent("o2:home-switch-tab", { detail: "nonexistent" }));
       expect(wrapper.vm.activeHomeTab).toBe(initialTab);
     });
   });
@@ -379,7 +351,7 @@ describe("HomeView org home dashboard tab", () => {
         },
         stubs: {
           "router-link": {
-            template: '<a><slot /></a>',
+            template: "<a><slot /></a>",
             props: ["to"],
           },
           OIcon: {
@@ -387,8 +359,7 @@ describe("HomeView org home dashboard tab", () => {
             props: ["name", "size"],
           },
           OButton: {
-            template:
-              '<button class="o-button-stub" @click="$emit(\'click\')"><slot /></button>',
+            template: '<button class="o-button-stub" @click="$emit(\'click\')"><slot /></button>',
             props: ["variant", "size", "ariaLabel", "title"],
           },
           OverviewTab: {
@@ -421,18 +392,14 @@ describe("HomeView org home dashboard tab", () => {
     };
     wrapper = createWrapper();
     await wrapper.vm.$nextTick();
-    expect(
-      wrapper.find('[data-test="home-tab-dash:default:abc"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="home-tab-dash:default:abc"]').exists()).toBe(true);
   });
 
   it("renders no dashboard tab when homeDashboard is null", async () => {
     useHomeDashboard().homeDashboard.value = null;
     wrapper = createWrapper();
     await wrapper.vm.$nextTick();
-    expect(
-      wrapper.find('[data-test^="home-tab-dash:"]').exists(),
-    ).toBe(false);
+    expect(wrapper.find('[data-test^="home-tab-dash:"]').exists()).toBe(false);
   });
 
   it("renders PinnedDashboardTab when the dash: tab is active", async () => {
@@ -444,9 +411,7 @@ describe("HomeView org home dashboard tab", () => {
     wrapper = createWrapper();
     wrapper.vm.activeHomeTab = "dash:default:abc";
     await wrapper.vm.$nextTick();
-    expect(
-      wrapper.findComponent({ name: "PinnedDashboardTab" }).exists(),
-    ).toBe(true);
+    expect(wrapper.findComponent({ name: "PinnedDashboardTab" }).exists()).toBe(true);
   });
 
   it("clears the home dashboard and falls back to first tab on unavailable", async () => {
@@ -459,9 +424,7 @@ describe("HomeView org home dashboard tab", () => {
     wrapper = createWrapper();
     wrapper.vm.activeHomeTab = "dash:default:abc";
     await wrapper.vm.$nextTick();
-    wrapper
-      .findComponent({ name: "PinnedDashboardTab" })
-      .vm.$emit("unavailable", "abc");
+    wrapper.findComponent({ name: "PinnedDashboardTab" }).vm.$emit("unavailable", "abc");
     await wrapper.vm.$nextTick();
     expect(hd.homeDashboard.value).toBeNull();
     expect(wrapper.vm.activeHomeTab).not.toBe("dash:default:abc");
@@ -478,13 +441,9 @@ describe("HomeView org home dashboard tab", () => {
     wrapper.vm.activeHomeTab = "dash:default:abc";
     await wrapper.vm.$nextTick();
     toastSpy.mockClear();
-    wrapper
-      .findComponent({ name: "PinnedDashboardTab" })
-      .vm.$emit("unavailable", "abc");
+    wrapper.findComponent({ name: "PinnedDashboardTab" }).vm.$emit("unavailable", "abc");
     await wrapper.vm.$nextTick();
-    expect(toastSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: "error" }),
-    );
+    expect(toastSpy).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
   });
 
   it("re-syncs the home_dashboard setting when the pinned tab is activated", async () => {
@@ -501,10 +460,7 @@ describe("HomeView org home dashboard tab", () => {
     wrapper.vm.activeHomeTab = "dash:B:abc";
     await flushPromises();
     // load(org) re-reads the authoritative setting via getSetting(org, key).
-    expect(settingsService.getSetting).toHaveBeenCalledWith(
-      "test-org",
-      "home_dashboard",
-    );
+    expect(settingsService.getSetting).toHaveBeenCalledWith("test-org", "home_dashboard");
   });
 
   it("does NOT toast when the pin is closed deliberately via the ×", async () => {
@@ -518,9 +474,7 @@ describe("HomeView org home dashboard tab", () => {
     wrapper.vm.activeHomeTab = "usage";
     await wrapper.vm.$nextTick();
     toastSpy.mockClear();
-    await wrapper
-      .find('[data-test="home-tab-close-dash:default:abc"]')
-      .trigger("click");
+    await wrapper.find('[data-test="home-tab-close-dash:default:abc"]').trigger("click");
     await wrapper.vm.$nextTick();
     expect(hd.homeDashboard.value).toBeNull();
     expect(toastSpy).not.toHaveBeenCalled();
@@ -541,9 +495,7 @@ describe("HomeView org home dashboard tab", () => {
     wrapper.vm.activeHomeTab = "usage";
     await wrapper.vm.$nextTick();
 
-    const closeBtn = wrapper.find(
-      '[data-test="home-tab-close-dash:default:abc"]',
-    );
+    const closeBtn = wrapper.find('[data-test="home-tab-close-dash:default:abc"]');
     expect(closeBtn.exists()).toBe(true);
     await closeBtn.trigger("click");
     await wrapper.vm.$nextTick();

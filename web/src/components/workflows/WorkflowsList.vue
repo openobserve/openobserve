@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-if="currentRouteName === 'workflows'"
     data-test="workflows-list-page"
-    class="flex flex-col h-full min-h-0"
+    class="flex h-full min-h-0 flex-col"
   >
     <!-- OPageLayout owns the header now (it renders OPageHeader from these props
          and forwards #title/#actions), so there is no nested header component and
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
 
-      <div class="flex-1 min-h-0 overflow-hidden">
+      <div class="min-h-0 flex-1 overflow-hidden">
         <div class="card-container h-full">
           <OTable
             :frame="false"
@@ -80,12 +80,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :footer-title="t('workflow.header')"
             table-id="workflows-workflow-list"
             width="100%"
-            class="w-full h-full"
+            class="h-full w-full"
             @row-click="openRuns"
           >
             <template #toolbar>
-              <div class="flex items-center gap-2 w-full">
-                <div class="flex-1 min-w-0">
+              <div class="flex w-full items-center gap-2">
+                <div class="min-w-0 flex-1">
                   <OInput
                     data-test="workflow-list-search-input"
                     v-model="filterQuery"
@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #cell-actions="{ row }">
-              <div class="flex items-center actions-container">
+              <div class="actions-container flex items-center">
                 <OButton
                   :data-test="`workflow-list-${row.name}-pause-start-action`"
                   :data-row-action="row.enabled ? 'pause' : 'resume'"
@@ -183,10 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="hero"
                 preset="no-workflows"
                 :filtered="!!filterQuery"
-                @action="
-                  (id) =>
-                    id === 'clear-filters' ? (filterQuery = '') : openCreateEditor()
-                "
+                @action="(id) => (id === 'clear-filters' ? (filterQuery = '') : openCreateEditor())"
               />
             </template>
 
@@ -195,8 +192,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                    footer used to hardcode, so it renders unchanged. `mr-md` was
                    dropped — a Quasar-style class this repo does not generate, so
                    it never applied. -->
-              <div class="flex w-full justify-between items-center h-12">
-                <div class="o2-table-footer-title flex items-center w-50">
+              <div class="flex h-12 w-full items-center justify-between">
+                <div class="o2-table-footer-title flex w-50 items-center">
                   {{ resultTotal }} {{ t("workflow.header") }}
                 </div>
               </div>
@@ -252,9 +249,7 @@ const router = useRouter();
 const store = useStore();
 
 const currentRouteName = computed(() => router.currentRoute.value.name);
-const orgId = computed(
-  () => store.state.selectedOrganization.identifier as string,
-);
+const orgId = computed(() => store.state.selectedOrganization.identifier as string);
 
 const loading = ref(true);
 const filterQuery = ref("");
@@ -264,9 +259,7 @@ const filteredWorkflows = computed(() => {
   const q = filterQuery.value.trim().toLowerCase();
   if (!q) return workflows.value;
   return workflows.value.filter(
-    (w) =>
-      w.name?.toLowerCase().includes(q) ||
-      w.description?.toLowerCase().includes(q),
+    (w) => w.name?.toLowerCase().includes(q) || w.description?.toLowerCase().includes(q),
   );
 });
 
@@ -279,9 +272,7 @@ const resultTotal = computed(() => filteredWorkflows.value.length);
 // v1 has one kind (alert-fired); once B1 adds WorkflowTriggerParams.kind we can
 // map data.kind -> a per-kind label here.
 const triggerLabel = (wf: any): string => {
-  const triggerNode = (wf.nodes || []).find(
-    (n: any) => n.data?.node_type === "workflow_trigger",
-  );
+  const triggerNode = (wf.nodes || []).find((n: any) => n.data?.node_type === "workflow_trigger");
   if (!triggerNode) return "—";
   return t("workflow.triggerAlertFired");
 };
@@ -356,9 +347,7 @@ const getWorkflows = async () => {
   try {
     const response = await workflowService.listWorkflows(orgId.value);
     // list handler returns a bare array of Workflow.
-    const list = Array.isArray(response.data)
-      ? response.data
-      : (response.data?.list ?? []);
+    const list = Array.isArray(response.data) ? response.data : (response.data?.list ?? []);
     workflows.value = list.map((wf: any, index: number) => ({
       ...wf,
       "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
@@ -382,7 +371,6 @@ const openCreateEditor = () => {
     query: { org_identifier: orgId.value },
   });
 };
-
 
 // Hydrate the shared editor state from the row synchronously (pipeline pattern)
 // so the editor has the name + full graph immediately — no async re-fetch.

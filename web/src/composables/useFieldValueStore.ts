@@ -29,22 +29,16 @@ import { extractValuesFromHits } from "@/utils/fieldValueUtils";
 // ─── Configuration ────────────────────────────────────────────────────────────
 
 // Max unique values stored per field in IDB. Overridable via .env.
-const MAX_VALUES_PER_FIELD = Number(
-  (import.meta as any).env?.VITE_MAX_FIELD_VALUES ?? 50,
-);
+const MAX_VALUES_PER_FIELD = Number((import.meta as any).env?.VITE_MAX_FIELD_VALUES ?? 50);
 
 // Total IDB record cap across all orgs/streams/fields combined. Prevents the
 // browser's IndexedDB storage from growing forever. Overridable via .env.
-const MAX_FIELDS_STORED = Number(
-  (import.meta as any).env?.VITE_MAX_FIELDS_STORED ?? 5000,
-);
+const MAX_FIELDS_STORED = Number((import.meta as any).env?.VITE_MAX_FIELDS_STORED ?? 5000);
 
 // How long a field's values stay valid in IDB after the last write.
 // Sliding window — every new write resets the clock. Overridable via .env (unit: days).
 const FIELD_VALUE_TTL_MS =
-  Number((import.meta as any).env?.VITE_FIELD_VALUE_TTL_DAYS ?? 7) *
-  86400 *
-  1000;
+  Number((import.meta as any).env?.VITE_FIELD_VALUE_TTL_DAYS ?? 7) * 86400 * 1000;
 
 // ─── In-memory read cache ─────────────────────────────────────────────────────
 
@@ -126,9 +120,7 @@ export const captureFromValuesApi = (
   fieldName: string,
   entries: Array<{ key: string }>,
 ): void => {
-  const values = entries
-    .map((e) => String(e.key))
-    .filter((v) => v.length > 0 && v.length <= 200);
+  const values = entries.map((e) => String(e.key)).filter((v) => v.length > 0 && v.length <= 200);
 
   if (values.length === 0) return;
 
@@ -164,11 +156,7 @@ export const captureFromSearchHits = (
   if (!hits || hits.length === 0) return;
 
   scheduleWrite(async () => {
-    const extracted = extractValuesFromHits(
-      hits.slice(0, 100),
-      schemaFields,
-      MAX_VALUES_PER_FIELD,
-    );
+    const extracted = extractValuesFromHits(hits.slice(0, 100), schemaFields, MAX_VALUES_PER_FIELD);
 
     const entries = Object.entries(extracted).map(([field, values]) => ({
       key: makeKey(ctx, field),
@@ -179,11 +167,7 @@ export const captureFromSearchHits = (
     if (entries.length === 0) return;
 
     // Single transaction for all fields — N times cheaper than Promise.all(N writes)
-    await fieldValueDB.mergeMultipleValues(
-      entries,
-      MAX_VALUES_PER_FIELD,
-      FIELD_VALUE_TTL_MS,
-    );
+    await fieldValueDB.mergeMultipleValues(entries, MAX_VALUES_PER_FIELD, FIELD_VALUE_TTL_MS);
 
     // Invalidate read-cache for written keys so the next autocomplete read
     // returns fresh values instead of the pre-write stale cache entry

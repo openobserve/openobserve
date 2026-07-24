@@ -17,100 +17,99 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createStore } from "vuex";
 import AWSConfig from "./AWSConfig.vue";
-import { createI18n } from 'vue-i18n';
-import enUS from '@/locales/languages/en-US.json';
-import { nextTick } from 'vue';
+import { createI18n } from "vue-i18n";
+import enUS from "@/locales/languages/en-US.json";
+import { nextTick } from "vue";
 
 // Mock dependencies
-vi.mock('@/utils/zincutils', () => ({
-  getIngestionURL: vi.fn(() => 'http://localhost:5080'),
+vi.mock("@/utils/zincutils", () => ({
+  getIngestionURL: vi.fn(() => "http://localhost:5080"),
   getEndPoint: vi.fn((url) => ({
     url: url,
-    host: 'localhost',
-    port: '5080',
-    protocol: 'http',
-    tls: false
+    host: "localhost",
+    port: "5080",
+    protocol: "http",
+    tls: false,
   })),
   getImageURL: vi.fn((path) => `/assets/${path}`),
 }));
 
-vi.mock('../../../aws-exports', () => ({
+vi.mock("../../../aws-exports", () => ({
   default: {
-    API_ENDPOINT: 'http://localhost:5080',
-    REGION: 'us-east-1'
-  }
+    API_ENDPOINT: "http://localhost:5080",
+    REGION: "us-east-1",
+  },
 }));
 
 // Mock vue-router
-vi.mock('vue-router', () => ({
+vi.mock("vue-router", () => ({
   useRoute: vi.fn(() => ({
     query: {},
-    path: '/aws',
-    name: 'AWSConfig'
+    path: "/aws",
+    name: "AWSConfig",
   })),
   useRouter: vi.fn(() => ({
     push: vi.fn(),
-    replace: vi.fn()
-  }))
+    replace: vi.fn(),
+  })),
 }));
 
 // Mock CopyContent component to avoid its dependencies
-vi.mock('@/components/CopyContent.vue', () => ({
+vi.mock("@/components/CopyContent.vue", () => ({
   default: {
-    name: 'CopyContent',
-    props: ['content'],
-    template: '<div class="copy-content-mock">{{ content }}</div>'
-  }
+    name: "CopyContent",
+    props: ["content"],
+    template: '<div class="copy-content-mock">{{ content }}</div>',
+  },
 }));
 
 // Mock AWS component dependencies
-vi.mock('./AWSQuickSetup.vue', () => ({
+vi.mock("./AWSQuickSetup.vue", () => ({
   default: {
-    name: 'AWSQuickSetup',
-    template: '<div class="aws-quick-setup-mock">AWS Quick Setup</div>'
-  }
+    name: "AWSQuickSetup",
+    template: '<div class="aws-quick-setup-mock">AWS Quick Setup</div>',
+  },
 }));
 
-vi.mock('./AWSIndividualServices.vue', () => ({
+vi.mock("./AWSIndividualServices.vue", () => ({
   default: {
-    name: 'AWSIndividualServices',
-    props: ['initialSearch'],
-    template: '<div class="aws-individual-services-mock">AWS Individual Services</div>'
-  }
+    name: "AWSIndividualServices",
+    props: ["initialSearch"],
+    template: '<div class="aws-individual-services-mock">AWS Individual Services</div>',
+  },
 }));
 
 // Mock console.error to test error handling
-const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-
+const mockConsoleError = vi.spyOn(console, "error").mockImplementation(() => {});
 
 // Create mock store
 const mockStore = createStore({
   state: {
     selectedOrganization: {
       identifier: "test_org",
-      name: "Test Organization"
+      name: "Test Organization",
     },
     userInfo: {
       email: "test@example.com",
-      name: "Test User"
+      name: "Test User",
     },
     organizationData: {
-      organizationPasscode: "test_passcode_123"
-    }
+      organizationPasscode: "test_passcode_123",
+    },
   },
   getters: {},
   mutations: {},
-  actions: {}
+  actions: {},
 });
 
 // Create mock i18n
 // Real locale messages: the component renders t() keys, and several
 // assertions below check the resulting English text.
 const mockI18n = createI18n({
-  locale: 'en',
+  locale: "en",
   messages: {
-    en: enUS
-  }
+    en: enUS,
+  },
 });
 
 describe("AWSConfig", () => {
@@ -123,24 +122,24 @@ describe("AWSConfig", () => {
     // Reset mocks
     vi.clearAllMocks();
     mockConsoleError.mockClear();
-    
+
     // Get mock references
-    const zincUtilsMock = await import('@/utils/zincutils');
+    const zincUtilsMock = await import("@/utils/zincutils");
     mockGetIngestionURL = zincUtilsMock.getIngestionURL;
     mockGetEndPoint = zincUtilsMock.getEndPoint;
     mockGetImageURL = zincUtilsMock.getImageURL;
-    
+
     // Set up default mock returns
-    mockGetIngestionURL.mockReturnValue('http://localhost:5080');
+    mockGetIngestionURL.mockReturnValue("http://localhost:5080");
     mockGetEndPoint.mockReturnValue({
-      url: 'http://localhost:5080',
-      host: 'localhost',
-      port: '5080',
-      protocol: 'http',
-      tls: false
+      url: "http://localhost:5080",
+      host: "localhost",
+      port: "5080",
+      protocol: "http",
+      tls: false,
     });
-    mockGetImageURL.mockReturnValue('/assets/test.png');
-    
+    mockGetImageURL.mockReturnValue("/assets/test.png");
+
     wrapper = mount(AWSConfig, {
       props: {
         currOrgIdentifier: "test_org",
@@ -152,14 +151,14 @@ describe("AWSConfig", () => {
           store: mockStore,
         },
         mocks: {
-          $store: mockStore
-        }
+          $store: mockStore,
+        },
       },
     });
-    
+
     await nextTick();
   });
-  
+
   afterEach(() => {
     if (wrapper) {
       wrapper.unmount();
@@ -216,17 +215,17 @@ describe("AWSConfig", () => {
   // Test 8: Endpoint initialization
   it("should initialize endpoint object correctly", () => {
     expect(wrapper.vm.endpoint).toBeTruthy();
-    expect(typeof wrapper.vm.endpoint).toBe('object');
+    expect(typeof wrapper.vm.endpoint).toBe("object");
   });
 
   // Test 9: Endpoint structure validation
   it("should have correct endpoint structure", () => {
     const endpoint = wrapper.vm.endpoint;
-    expect(endpoint).toHaveProperty('url');
-    expect(endpoint).toHaveProperty('host');
-    expect(endpoint).toHaveProperty('port');
-    expect(endpoint).toHaveProperty('protocol');
-    expect(endpoint).toHaveProperty('tls');
+    expect(endpoint).toHaveProperty("url");
+    expect(endpoint).toHaveProperty("host");
+    expect(endpoint).toHaveProperty("port");
+    expect(endpoint).toHaveProperty("protocol");
+    expect(endpoint).toHaveProperty("tls");
   });
 
   // Test 10: getIngestionURL function call
@@ -236,31 +235,31 @@ describe("AWSConfig", () => {
 
   // Test 11: getEndPoint function call
   it("should call getEndPoint with ingestion URL", () => {
-    expect(mockGetEndPoint).toHaveBeenCalledWith('http://localhost:5080');
+    expect(mockGetEndPoint).toHaveBeenCalledWith("http://localhost:5080");
   });
 
   // Test 12: Content generation
   it("should generate AWS configuration content", () => {
     expect(wrapper.vm.content).toBeTruthy();
-    expect(typeof wrapper.vm.content).toBe('string');
+    expect(typeof wrapper.vm.content).toBe("string");
   });
 
   // Test 13: Content structure validation
   it("should contain HTTP endpoint in content", () => {
     const content = wrapper.vm.content;
-    expect(content).toContain('HTTP Endpoint:');
-    expect(content).toContain('http://localhost:5080/aws/test_org/default/_kinesis_firehose');
+    expect(content).toContain("HTTP Endpoint:");
+    expect(content).toContain("http://localhost:5080/aws/test_org/default/_kinesis_firehose");
   });
 
   // Test 14: Content access key validation
   it("should contain access key placeholder in content", () => {
     const content = wrapper.vm.content;
-    expect(content).toContain('Access Key: [BASIC_PASSCODE]');
+    expect(content).toContain("Access Key: [BASIC_PASSCODE]");
   });
 
   // Test 15: quick-setup panel is mounted
   it("should render AWSQuickSetup component", () => {
-    const quickSetup = wrapper.findComponent({ name: 'AWSQuickSetup' });
+    const quickSetup = wrapper.findComponent({ name: "AWSQuickSetup" });
     expect(quickSetup.exists()).toBe(true);
   });
 
@@ -268,66 +267,64 @@ describe("AWSConfig", () => {
   it("should display AWS Integrations heading", () => {
     const heading = wrapper.find('[data-test="aws-config-page-title"]');
     expect(heading.exists()).toBe(true);
-    expect(heading.text()).toBe('AWS Integrations');
+    expect(heading.text()).toBe("AWS Integrations");
   });
 
   // Test 17: Template description text
   it("should display integration description", () => {
     const description = wrapper.find('[data-test="aws-config-page-description"]');
     expect(description.exists()).toBe(true);
-    expect(description.text()).toContain('Set up AWS monitoring in one click');
+    expect(description.text()).toContain("Set up AWS monitoring in one click");
   });
 
   // Test 18: Integration section structure
   it("should have correct integration section structure", () => {
-    expect(wrapper.find('.mt-8').exists()).toBe(true);
-    expect(wrapper.find('.mb-4').exists()).toBe(true);
+    expect(wrapper.find(".mt-8").exists()).toBe(true);
+    expect(wrapper.find(".mb-4").exists()).toBe(true);
   });
 
   // Test 19: CopyContent component integration
   it("should render CopyContent component", () => {
-    const copyContent = wrapper.findComponent({ name: 'CopyContent' });
+    const copyContent = wrapper.findComponent({ name: "CopyContent" });
     expect(copyContent.exists()).toBe(true);
   });
 
   // Test 20: CopyContent content prop
   it("should pass content to CopyContent component", () => {
-    const copyContent = wrapper.findComponent({ name: 'CopyContent' });
-    expect(copyContent.props('content')).toBe(wrapper.vm.content);
+    const copyContent = wrapper.findComponent({ name: "CopyContent" });
+    expect(copyContent.props("content")).toBe(wrapper.vm.content);
   });
 
   // Test 21: Template structure
   it("should have correct template structure", () => {
-    expect(wrapper.find('.m-3').exists()).toBe(true);
-    expect(
-      wrapper.find('[data-test="aws-config-page-title"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find(".m-3").exists()).toBe(true);
+    expect(wrapper.find('[data-test="aws-config-page-title"]').exists()).toBe(true);
   });
 
   // Test 22: getImageURL function exposure
   it("should expose getImageURL function", () => {
     expect(wrapper.vm.getImageURL).toBeTruthy();
-    expect(typeof wrapper.vm.getImageURL).toBe('function');
+    expect(typeof wrapper.vm.getImageURL).toBe("function");
   });
 
   // Test 23: Endpoint URL property
   it("should have correct endpoint URL", () => {
-    expect(wrapper.vm.endpoint.url).toBe('http://localhost:5080');
+    expect(wrapper.vm.endpoint.url).toBe("http://localhost:5080");
   });
 
   // Test 24: Endpoint host property
   it("should have correct endpoint host", () => {
-    expect(wrapper.vm.endpoint.host).toBe('localhost');
+    expect(wrapper.vm.endpoint.host).toBe("localhost");
   });
 
   // Test 25: Endpoint port property
   it("should have correct endpoint port", () => {
-    expect(wrapper.vm.endpoint.port).toBe('5080');
+    expect(wrapper.vm.endpoint.port).toBe("5080");
   });
 
   // Test 26: Endpoint protocol property
   it("should have correct endpoint protocol", () => {
-    expect(wrapper.vm.endpoint.protocol).toBe('http');
+    expect(wrapper.vm.endpoint.protocol).toBe("http");
   });
 
   // Test 27: Endpoint TLS property
@@ -338,7 +335,7 @@ describe("AWSConfig", () => {
   // Test 28: Dynamic organization identifier in content
   it("should use organization identifier from store in content", () => {
     const content = wrapper.vm.content;
-    expect(content).toContain('/aws/test_org/');
+    expect(content).toContain("/aws/test_org/");
   });
 
   // Test 29: Props type validation
@@ -351,7 +348,7 @@ describe("AWSConfig", () => {
   // Test 30: Error handling for getIngestionURL failure
   it("should handle getIngestionURL error gracefully", async () => {
     mockGetIngestionURL.mockImplementationOnce(() => {
-      throw new Error('Network error');
+      throw new Error("Network error");
     });
 
     // Create a component that will trigger the error during setup
@@ -381,10 +378,10 @@ describe("AWSConfig", () => {
     errorWrapper.unmount();
   });
 
-  // Test 31: Error handling for getEndPoint failure  
+  // Test 31: Error handling for getEndPoint failure
   it("should handle getEndPoint error gracefully", async () => {
     mockGetEndPoint.mockImplementationOnce(() => {
-      throw new Error('Endpoint parsing error');
+      throw new Error("Endpoint parsing error");
     });
 
     // Create a component that will trigger the error during setup
@@ -431,7 +428,7 @@ describe("AWSConfig", () => {
   // Test 34: Content format validation
   it("should generate correctly formatted content", () => {
     const content = wrapper.vm.content;
-    const lines = content.split('\n');
+    const lines = content.split("\n");
 
     expect(lines.length).toBe(2); // Should have 2 lines
     expect(lines[0]).toMatch(/^HTTP Endpoint:/);
@@ -442,35 +439,35 @@ describe("AWSConfig", () => {
   it("should perform complete component initialization workflow", async () => {
     // Verify initialization sequence
     expect(mockGetIngestionURL).toHaveBeenCalled();
-    expect(mockGetEndPoint).toHaveBeenCalledWith('http://localhost:5080');
+    expect(mockGetEndPoint).toHaveBeenCalledWith("http://localhost:5080");
 
     // Verify data setup
     expect(wrapper.vm.endpoint).toEqual({
-      url: 'http://localhost:5080',
-      host: 'localhost',
-      port: '5080',
-      protocol: 'http',
-      tls: false
+      url: "http://localhost:5080",
+      host: "localhost",
+      port: "5080",
+      protocol: "http",
+      tls: false,
     });
 
     // Verify content generation
     const content = wrapper.vm.content;
-    expect(content).toContain('HTTP Endpoint: http://localhost:5080/aws/test_org/default/_kinesis_firehose');
-    expect(content).toContain('Access Key: [BASIC_PASSCODE]');
+    expect(content).toContain(
+      "HTTP Endpoint: http://localhost:5080/aws/test_org/default/_kinesis_firehose",
+    );
+    expect(content).toContain("Access Key: [BASIC_PASSCODE]");
 
     // Verify component rendering
-    const copyComponent = wrapper.findComponent({ name: 'CopyContent' });
+    const copyComponent = wrapper.findComponent({ name: "CopyContent" });
     expect(copyComponent.exists()).toBe(true);
-    expect(copyComponent.props('content')).toBe(content);
+    expect(copyComponent.props("content")).toBe(content);
 
     // Verify quick setup component (replaces integration grid)
-    const quickSetupComponent = wrapper.findComponent({ name: 'AWSQuickSetup' });
+    const quickSetupComponent = wrapper.findComponent({ name: "AWSQuickSetup" });
     expect(quickSetupComponent.exists()).toBe(true);
 
     // Verify template structure
-    expect(wrapper.find('.m-3').exists()).toBe(true);
-    expect(
-      wrapper.find('[data-test="aws-config-page-title"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find(".m-3").exists()).toBe(true);
+    expect(wrapper.find('[data-test="aws-config-page-title"]').exists()).toBe(true);
   });
 });

@@ -49,7 +49,7 @@ describe("useDragAndDrop", () => {
     vi.clearAllMocks();
     useDnD = useDragAndDrop();
     // Mock the global document
-    Object.defineProperty(global, 'document', {
+    Object.defineProperty(global, "document", {
       value: {
         body: {
           style: {},
@@ -150,7 +150,10 @@ describe("useDragAndDrop", () => {
 
       useDnD.onDragStart(mockEvent, mockNode);
 
-      expect(mockEvent.dataTransfer.setData).toHaveBeenCalledWith("application/vueflow", "function");
+      expect(mockEvent.dataTransfer.setData).toHaveBeenCalledWith(
+        "application/vueflow",
+        "function",
+      );
       expect(mockEvent.dataTransfer.effectAllowed).toBe("move");
       expect(useDnD.pipelineObj.draggedNode).toStrictEqual(mockNode);
       expect(useDnD.pipelineObj.isDragging).toBe(true);
@@ -273,10 +276,10 @@ describe("useDragAndDrop", () => {
     it("should handle drag state transitions", async () => {
       useDnD.pipelineObj.isDragging = true;
       await nextTick();
-      
+
       useDnD.pipelineObj.isDragging = false;
       await nextTick();
-      
+
       expect(useDnD.pipelineObj.isDragging).toBe(false);
     });
   });
@@ -294,7 +297,7 @@ describe("useDragAndDrop", () => {
       };
 
       useDnD.onDrop(mockEvent);
-      await new Promise(resolve => setTimeout(resolve, 10)); // Wait for async callback
+      await new Promise((resolve) => setTimeout(resolve, 10)); // Wait for async callback
 
       expect(useDnD.pipelineObj.currentSelectedNodeData).toBeTruthy();
       expect(useDnD.pipelineObj.currentSelectedNodeData.id).toBe("mock-uuid-123");
@@ -307,7 +310,7 @@ describe("useDragAndDrop", () => {
       useDnD.pipelineObj.draggedNode = { io_type: "input" };
 
       const mockEvent = { clientX: 100, clientY: 200 };
-      
+
       useDnD.onDrop(mockEvent);
 
       // When input restriction applies, function returns early but node data may still be created
@@ -322,7 +325,7 @@ describe("useDragAndDrop", () => {
       const offset = { x: 50, y: 25 };
 
       useDnD.onDrop(mockEvent, offset);
-      await new Promise(resolve => setTimeout(resolve, 10)); // Wait for async callback
+      await new Promise((resolve) => setTimeout(resolve, 10)); // Wait for async callback
 
       expect(useDnD.pipelineObj.currentSelectedNodeData.position).toEqual({
         x: 150,
@@ -337,7 +340,7 @@ describe("useDragAndDrop", () => {
       };
 
       useDnD.onDrop(mockEvent);
-      await new Promise(resolve => setTimeout(resolve, 10)); // Wait for async callback
+      await new Promise((resolve) => setTimeout(resolve, 10)); // Wait for async callback
 
       expect(useDnD.pipelineObj.dialog.show).toBe(true);
       expect(useDnD.pipelineObj.dialog.name).toBe("test-function");
@@ -349,7 +352,7 @@ describe("useDragAndDrop", () => {
       const mockEvent = { clientX: 100, clientY: 200 };
 
       useDnD.onDrop(mockEvent);
-      await new Promise(resolve => setTimeout(resolve, 10)); // Wait for async callback
+      await new Promise((resolve) => setTimeout(resolve, 10)); // Wait for async callback
 
       expect(useDnD.pipelineObj.currentSelectedNodeData.type).toBe("default");
       expect(useDnD.pipelineObj.currentSelectedNodeData.io_type).toBe("default");
@@ -359,8 +362,8 @@ describe("useDragAndDrop", () => {
   describe("onNodesChange", () => {
     it("should update hasInputNode when nodes change", () => {
       useDnD.pipelineObj.currentSelectedPipeline.nodes = [{ io_type: "input" }];
-      
-      useDnD.onNodesChange([{ type: 'add' }]);
+
+      useDnD.onNodesChange([{ type: "add" }]);
 
       expect(useDnD.pipelineObj.hasInputNode).toBe(true);
     });
@@ -374,14 +377,14 @@ describe("useDragAndDrop", () => {
   describe("onEdgesChange", () => {
     it("should set dirtyFlag when editing pipeline", () => {
       useDnD.pipelineObj.isEditPipeline = true;
-      
-      useDnD.onEdgesChange([{ type: 'remove', id: 'edge1' }]);
+
+      useDnD.onEdgesChange([{ type: "remove", id: "edge1" }]);
 
       expect(useDnD.pipelineObj.dirtyFlag).toBe(true);
     });
 
     it("should set edgesChange flag when changes exist", () => {
-      useDnD.onEdgesChange([{ type: 'add' }]);
+      useDnD.onEdgesChange([{ type: "add" }]);
 
       expect(useDnD.pipelineObj.edgesChange).toBe(true);
     });
@@ -389,15 +392,15 @@ describe("useDragAndDrop", () => {
     it("should not set dirtyFlag when not editing pipeline", () => {
       useDnD.pipelineObj.isEditPipeline = false;
       useDnD.pipelineObj.dirtyFlag = false;
-      
-      useDnD.onEdgesChange([{ type: 'remove', id: 'edge1' }]);
+
+      useDnD.onEdgesChange([{ type: "remove", id: "edge1" }]);
 
       expect(useDnD.pipelineObj.dirtyFlag).toBe(false);
     });
 
     it("should not set edgesChange for empty changes array", () => {
       useDnD.pipelineObj.edgesChange = false;
-      
+
       useDnD.onEdgesChange([]);
 
       expect(useDnD.pipelineObj.edgesChange).toBe(false);
@@ -444,7 +447,7 @@ describe("useDragAndDrop", () => {
         { id: "function1", type: "function" },
         { id: "function2", type: "function" },
       ];
-      
+
       const connection = {
         source: "function1",
         target: "function2",
@@ -574,7 +577,7 @@ describe("useDragAndDrop", () => {
       useDnD.pipelineObj.currentSelectedPipeline.edges = [
         { targetNode: { id: "node2" }, sourceNode: { id: "node1" } },
       ];
-      
+
       const connection = {
         source: "node1",
         target: "node2",
@@ -609,9 +612,9 @@ describe("useDragAndDrop", () => {
     it("should reject connection that creates cycle", () => {
       // Set up edges that would create a cycle
       useDnD.pipelineObj.currentSelectedPipeline.edges = [
-        { sourceNode: { id: "node2" }, targetNode: { id: "node1" } }
+        { sourceNode: { id: "node2" }, targetNode: { id: "node1" } },
       ];
-      
+
       const connection = {
         source: "node1",
         target: "node2",
@@ -707,7 +710,7 @@ describe("useDragAndDrop", () => {
       // Should create nodes and edges
       expect(useDnD.pipelineObj.currentSelectedPipeline.nodes.length).toBeGreaterThanOrEqual(1);
       expect(useDnD.pipelineObj.currentSelectedPipeline.edges.length).toBeGreaterThanOrEqual(0);
-      
+
       const outputNode = useDnD.pipelineObj.currentSelectedPipeline.nodes[1];
       expect(outputNode.type).toBe("output");
       expect(outputNode.io_type).toBe("output");
@@ -760,7 +763,7 @@ describe("useDragAndDrop", () => {
       const updatedNode = { id: "non-existent", data: { name: "updated" } };
 
       expect(() => useDnD.editNode(updatedNode)).not.toThrow();
-      
+
       expect(useDnD.pipelineObj.currentSelectedPipeline.nodes).toHaveLength(2);
     });
 
@@ -857,11 +860,7 @@ describe("useDragAndDrop", () => {
         ],
       };
       useDnD.pipelineObj.pipelineWithoutChange = {
-        nodes: [
-          { id: "node1" },
-          { id: "node2" },
-          { id: "node3" },
-        ],
+        nodes: [{ id: "node1" }, { id: "node2" }, { id: "node3" }],
       };
     });
 
@@ -885,9 +884,9 @@ describe("useDragAndDrop", () => {
         { id: "node1", io_type: "input" },
         { id: "node2", io_type: "function" },
       ];
-      
+
       useDnD.deletePipelineNode("node2");
-      
+
       expect(useDnD.pipelineObj.hasInputNode).toBe(true);
     });
 
@@ -929,7 +928,7 @@ describe("useDragAndDrop", () => {
       useDnD.deletePipelineNode("node1");
 
       const edgesWithNode1AsSource = useDnD.pipelineObj.currentSelectedPipeline.edges.filter(
-        (edge: any) => edge.source === "node1"
+        (edge: any) => edge.source === "node1",
       );
       expect(edgesWithNode1AsSource).toHaveLength(0);
     });
@@ -938,7 +937,7 @@ describe("useDragAndDrop", () => {
       useDnD.deletePipelineNode("node3");
 
       const edgesWithNode3AsTarget = useDnD.pipelineObj.currentSelectedPipeline.edges.filter(
-        (edge: any) => edge.target === "node3"
+        (edge: any) => edge.target === "node3",
       );
       expect(edgesWithNode3AsTarget).toHaveLength(0);
     });
@@ -960,7 +959,7 @@ describe("useDragAndDrop", () => {
 
     it("should reset pipeline to default state", () => {
       // Just proceed with reset
-      
+
       useDnD.resetPipelineData();
 
       expect(useDnD.pipelineObj.currentSelectedPipeline.name).toBe("");
@@ -991,9 +990,9 @@ describe("useDragAndDrop", () => {
 
     it("should create deep copies of default objects", () => {
       useDnD.resetPipelineData();
-      
+
       useDnD.pipelineObj.currentSelectedPipeline.name = "modified";
-      
+
       useDnD.resetPipelineData();
       expect(useDnD.pipelineObj.currentSelectedPipeline.name).toBe("");
     });
@@ -1003,21 +1002,23 @@ describe("useDragAndDrop", () => {
     it("should watch isDragging state", async () => {
       useDnD.pipelineObj.isDragging = true;
       await nextTick();
-      
+
       expect(useDnD.pipelineObj.isDragging).toBe(true);
-      
+
       useDnD.pipelineObj.isDragging = false;
       await nextTick();
-      
+
       expect(useDnD.pipelineObj.isDragging).toBe(false);
     });
 
     it("should maintain reactive state across function calls", () => {
       const initialState = useDnD.pipelineObj.isDragOver;
-      
+
       useDnD.onDragLeave();
-      expect(useDnD.pipelineObj.isDragOver).not.toBe(initialState || useDnD.pipelineObj.isDragOver === false);
-      
+      expect(useDnD.pipelineObj.isDragOver).not.toBe(
+        initialState || useDnD.pipelineObj.isDragOver === false,
+      );
+
       useDnD.pipelineObj.draggedNode = { io_type: "function" };
       useDnD.onDragOver({ preventDefault: vi.fn() });
       expect(useDnD.pipelineObj.isDragOver).toBe(true);
@@ -1031,15 +1032,15 @@ describe("useDragAndDrop", () => {
         data: { name: "test" },
       };
       useDnD.addNode({ name: "test-node" });
-      
+
       expect(useDnD.pipelineObj.currentSelectedPipeline.nodes).toHaveLength(1);
-      
+
       useDnD.editNode({ id: "test-id", data: { name: "updated-test" } });
-      
+
       expect(useDnD.pipelineObj.currentSelectedPipeline.nodes[0].data.name).toBe("updated-test");
-      
+
       useDnD.deletePipelineNode("test-id");
-      
+
       expect(useDnD.pipelineObj.currentSelectedPipeline.nodes).toHaveLength(0);
     });
   });
@@ -1060,7 +1061,7 @@ describe("useDragAndDrop", () => {
     it("should handle empty pipeline operations", () => {
       useDnD.pipelineObj.currentSelectedPipeline.nodes = [];
       useDnD.pipelineObj.currentSelectedPipeline.edges = [];
-      
+
       expect(() => useDnD.hasInputNodeFn()).not.toThrow();
       expect(() => useDnD.deletePipelineNode("non-existent")).not.toThrow();
       expect(() => useDnD.onNodesChange([])).not.toThrow();
@@ -1068,7 +1069,7 @@ describe("useDragAndDrop", () => {
 
     it("should handle null currentSelectedNodeData gracefully", () => {
       useDnD.pipelineObj.currentSelectedNodeData = null;
-      
+
       // This will throw because addNode expects currentSelectedNodeData to have properties
       expect(() => useDnD.addNode({ name: "test" })).toThrow();
     });
@@ -1080,16 +1081,14 @@ describe("useDragAndDrop", () => {
         sourceHandle: "output",
         targetHandle: "input",
       };
-      
+
       expect(() => useDnD.validateConnection(invalidConnection)).toThrow();
     });
 
     it("should handle circular references in detectCycle", () => {
-      const edges = [
-        { sourceNode: { id: "A" }, targetNode: { id: "B" } },
-      ];
+      const edges = [{ sourceNode: { id: "A" }, targetNode: { id: "B" } }];
       const circularConnection = { source: "B", target: "A" };
-      
+
       const result = useDnD.detectCycle(edges, circularConnection);
       expect(result).toBe(true);
     });
@@ -1101,27 +1100,27 @@ describe("useDragAndDrop", () => {
         dataTransfer: { setData: vi.fn(), effectAllowed: "" },
       };
       const node = { io_type: "function", subtype: "transform" };
-      
+
       useDnD.onDragStart(dragEvent, node);
       expect(useDnD.pipelineObj.isDragging).toBe(true);
-      
+
       const overEvent = {
         preventDefault: vi.fn(),
         dataTransfer: { dropEffect: "" },
       };
-      
+
       useDnD.onDragOver(overEvent);
       expect(useDnD.pipelineObj.isDragOver).toBe(true);
-      
+
       const dropEvent = { clientX: 150, clientY: 250 };
       useDnD.onDrop(dropEvent);
-      await new Promise(resolve => setTimeout(resolve, 10)); // Wait for async callback
-      
+      await new Promise((resolve) => setTimeout(resolve, 10)); // Wait for async callback
+
       expect(useDnD.pipelineObj.currentSelectedNodeData.position).toEqual({ x: 150, y: 250 });
       expect(useDnD.pipelineObj.dialog.show).toBe(true);
-      
+
       useDnD.addNode({ name: "transform-function", config: {} });
-      
+
       expect(useDnD.pipelineObj.currentSelectedPipeline.nodes).toHaveLength(1);
       expect(useDnD.pipelineObj.isEditNode).toBe(false);
     });
@@ -1130,50 +1129,50 @@ describe("useDragAndDrop", () => {
       // Start with clean pipeline
       useDnD.pipelineObj.currentSelectedPipeline.nodes = [];
       useDnD.pipelineObj.currentSelectedPipeline.edges = [];
-      
+
       useDnD.pipelineObj.currentSelectedNodeData = {
         id: "input-1",
         type: "input",
         data: { node_type: "stream" },
         position: { x: 0, y: 0 },
       };
-      
+
       useDnD.addNode({ stream_name: "logs", stream_type: "logs" });
-      
+
       // Input node creates auto output node
       expect(useDnD.pipelineObj.currentSelectedPipeline.nodes.length).toBeGreaterThanOrEqual(1);
       expect(useDnD.pipelineObj.currentSelectedPipeline.edges.length).toBeGreaterThanOrEqual(0);
-      
+
       useDnD.pipelineObj.currentSelectedNodeData = {
         id: "function-1",
         type: "function",
         data: { node_type: "function" },
         position: { x: 100, y: 100 },
       };
-      
+
       useDnD.addNode({ function_name: "transform", code: "test code" });
-      
+
       // Now should have 3 nodes total
       expect(useDnD.pipelineObj.currentSelectedPipeline.nodes).toHaveLength(3);
     });
 
     it("should maintain data consistency across operations", () => {
       expect(useDnD.pipelineObj.dirtyFlag).toBe(false);
-      
+
       useDnD.pipelineObj.isEditPipeline = true;
-      
+
       useDnD.pipelineObj.currentSelectedNodeData = {
         id: "test-node",
         data: { name: "test" },
       };
-      
+
       useDnD.addNode({ name: "test-function" });
-      
+
       expect(useDnD.pipelineObj.dirtyFlag).toBe(true);
 
       useDnD.pipelineObj.isEditNode = true;
       useDnD.addNode({ name: "updated-function" });
-      
+
       expect(useDnD.pipelineObj.dirtyFlag).toBe(true);
     });
   });
@@ -1247,32 +1246,32 @@ describe("useDragAndDrop", () => {
       useDnD.deletePipelineNode("node2");
 
       const remainingEdges = useDnD.pipelineObj.currentSelectedPipeline.edges;
-      const hasNode2 = remainingEdges.some((edge: any) => 
-        edge.source === "node2" || edge.target === "node2"
+      const hasNode2 = remainingEdges.some(
+        (edge: any) => edge.source === "node2" || edge.target === "node2",
       );
       expect(hasNode2).toBe(false);
     });
 
     it("should handle complex node updates", () => {
       useDnD.pipelineObj.currentSelectedPipeline.nodes = [
-        { 
-          id: "complex-node", 
+        {
+          id: "complex-node",
           type: "function",
-          data: { 
+          data: {
             name: "original",
             config: { param1: "value1" },
-            meta: { version: 1 }
-          }
-        }
+            meta: { version: 1 },
+          },
+        },
       ];
 
-      useDnD.editNode({ 
-        id: "complex-node", 
-        data: { 
+      useDnD.editNode({
+        id: "complex-node",
+        data: {
           name: "updated",
-          config: { param1: "new-value", param2: "value2" }
+          config: { param1: "new-value", param2: "value2" },
         },
-        newProperty: "test"
+        newProperty: "test",
       });
 
       const updatedNode = useDnD.pipelineObj.currentSelectedPipeline.nodes[0];

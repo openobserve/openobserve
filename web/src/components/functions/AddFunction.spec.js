@@ -2,22 +2,22 @@ import { flushPromises, mount } from "@vue/test-utils";
 import AddFunction from "./AddFunction.vue";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import i18n from "@/locales";
-import { nextTick } from 'vue';
-import * as vueRouter from 'vue-router';
+import { nextTick } from "vue";
+import * as vueRouter from "vue-router";
 
 // Mock the jsTransform service
 vi.mock("@/services/jstransform", () => ({
   default: {
     create: vi.fn(() => Promise.resolve({ data: { message: "Function created successfully" } })),
-    update: vi.fn(() => Promise.resolve({ data: { message: "Function updated successfully" } }))
+    update: vi.fn(() => Promise.resolve({ data: { message: "Function updated successfully" } })),
   },
 }));
 
 // Mock segment analytics
 vi.mock("@/services/segment_analytics", () => ({
   default: {
-    track: vi.fn()
-  }
+    track: vi.fn(),
+  },
 }));
 
 // Mock reodotdev analytics
@@ -26,41 +26,41 @@ vi.mock("@/services/reodotdev_analytics", () => ({
     track: vi.fn(),
     reoInit: vi.fn(),
     identify: vi.fn(),
-    isLoaded: false
-  })
+    isLoaded: false,
+  }),
 }));
 
 // Mock toast
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
-  toast: vi.fn(() => vi.fn())
+  toast: vi.fn(() => vi.fn()),
 }));
 
 // Mock vue-i18n
-vi.mock('vue-i18n', async (importOriginal) => {
+vi.mock("vue-i18n", async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
     useI18n: () => ({
-      t: (key) => key
-    })
+      t: (key) => key,
+    }),
   };
 });
 
 // Mock vue-router
-vi.mock('vue-router', () => ({
+vi.mock("vue-router", () => ({
   useRouter: vi.fn(() => ({
     push: vi.fn(() => Promise.resolve()),
     replace: vi.fn(() => Promise.resolve()),
-    resolve: vi.fn(() => ({ href: '/test-url' })),
+    resolve: vi.fn(() => ({ href: "/test-url" })),
     currentRoute: {
       value: {
         query: {},
-        path: '/functions',
-        name: "functionList"
-      }
-    }
+        path: "/functions",
+        name: "functionList",
+      },
+    },
   })),
-  onBeforeRouteLeave: vi.fn((fn) => fn)
+  onBeforeRouteLeave: vi.fn((fn) => fn),
 }));
 
 describe("AddFunction Component", () => {
@@ -74,32 +74,32 @@ describe("AddFunction Component", () => {
       state: {
         selectedOrganization: {
           id: "123",
-          identifier: "test-org"
+          identifier: "test-org",
         },
         userInfo: {
-          email: "test@example.com"
+          email: "test@example.com",
         },
-        theme: 'light',
+        theme: "light",
         isAiChatEnabled: false,
         zoConfig: {
-          ai_enabled: false
-        }
+          ai_enabled: false,
+        },
       },
-      dispatch: vi.fn()
+      dispatch: vi.fn(),
     };
 
     // Setup router mock
     mockRouter = {
       push: vi.fn(() => Promise.resolve()),
       replace: vi.fn(() => Promise.resolve()),
-      resolve: vi.fn(() => ({ href: '/test-url' })),
+      resolve: vi.fn(() => ({ href: "/test-url" })),
       currentRoute: {
         value: {
           query: {},
-          path: '/functions',
-          name: "functionList"
-        }
-      }
+          path: "/functions",
+          name: "functionList",
+        },
+      },
     };
     vi.mocked(vueRouter.useRouter).mockReturnValue(mockRouter);
 
@@ -109,11 +109,11 @@ describe("AddFunction Component", () => {
         plugins: [i18n],
         provide: {
           store: mockStore,
-          router: mockRouter
+          router: mockRouter,
         },
         mocks: {
           $router: mockRouter,
-          $store: mockStore
+          $store: mockStore,
         },
         stubs: {
           QForm: true,
@@ -130,19 +130,19 @@ describe("AddFunction Component", () => {
           TestFunction: true,
           ConfirmDialog: true,
           O2AIChat: true,
-          'query-editor': true
-        }
+          "query-editor": true,
+        },
       },
       props: {
         modelValue: {
           name: "",
           function: "",
           params: "row",
-          transType: "0"
+          transType: "0",
         },
         isUpdated: false,
-        heightOffset: 0
-      }
+        heightOffset: 0,
+      },
     });
 
     await flushPromises();
@@ -166,7 +166,7 @@ describe("AddFunction Component", () => {
         name: "",
         function: "",
         params: "row",
-        transType: "0"
+        transType: "0",
       });
     });
 
@@ -175,7 +175,7 @@ describe("AddFunction Component", () => {
         name: "testFunction",
         function: "function test() { return true; }",
         params: "row",
-        transType: "0"
+        transType: "0",
       };
       // Remount with new props to simulate prop change
       wrapper.unmount();
@@ -184,19 +184,19 @@ describe("AddFunction Component", () => {
           plugins: [i18n],
           provide: {
             store: mockStore,
-            router: mockRouter
+            router: mockRouter,
           },
           mocks: {
             $router: mockRouter,
-            $store: mockStore
+            $store: mockStore,
           },
-          stubs: wrapper.vm.$.appContext.app._context.components
+          stubs: wrapper.vm.$.appContext.app._context.components,
         },
         props: {
           modelValue: testData,
           isUpdated: false,
-          heightOffset: 0
-        }
+          heightOffset: 0,
+        },
       });
       await flushPromises();
       await nextTick();
@@ -236,14 +236,14 @@ describe("AddFunction Component", () => {
 
   describe("Theme Handling", () => {
     it("applies light theme correctly", () => {
-      mockStore.state.theme = 'light';
-      expect(wrapper.vm.store.state.theme).toBe('light');
+      mockStore.state.theme = "light";
+      expect(wrapper.vm.store.state.theme).toBe("light");
     });
 
     it("applies dark theme correctly", async () => {
-      mockStore.state.theme = 'dark';
+      mockStore.state.theme = "dark";
       await nextTick();
-      expect(wrapper.vm.store.state.theme).toBe('dark');
+      expect(wrapper.vm.store.state.theme).toBe("dark");
     });
   });
 
@@ -280,22 +280,23 @@ describe("AddFunction Component", () => {
       // Simulate unsaved changes
       wrapper.vm.formData.name = "changed";
       await nextTick();
-      window.dispatchEvent(new Event('beforeunload'));
+      window.dispatchEvent(new Event("beforeunload"));
       // We can't directly test the return value, but we can check that the event handler is present
-      expect(typeof window.onbeforeunload === 'function' || Object.prototype.hasOwnProperty.call(window, 'onbeforeunload')).toBe(true);
+      expect(
+        typeof window.onbeforeunload === "function" ||
+          Object.prototype.hasOwnProperty.call(window, "onbeforeunload"),
+      ).toBe(true);
     });
-
 
     // Remove direct call to $options.beforeRouteLeave, not testable unless exposed
     // Instead, test navigation effect via router mocks if needed
   });
 
   describe("Component Lifecycle", () => {
-
     it("removes beforeunload event listener on unmount", () => {
-      const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
+      const removeEventListenerSpy = vi.spyOn(window, "removeEventListener");
       wrapper.unmount();
-      expect(removeEventListenerSpy).toHaveBeenCalledWith('beforeunload', expect.any(Function));
+      expect(removeEventListenerSpy).toHaveBeenCalledWith("beforeunload", expect.any(Function));
     });
   });
 
@@ -332,23 +333,22 @@ describe("AddFunction Component", () => {
           plugins: [i18n],
           provide: {
             store: mockStore,
-            router: mockRouter
+            router: mockRouter,
           },
           mocks: {
             $router: mockRouter,
-            $store: mockStore
+            $store: mockStore,
           },
-          stubs: wrapper.vm.$.appContext.app._context.components
+          stubs: wrapper.vm.$.appContext.app._context.components,
         },
         props: {
           ...wrapper.props(),
-          heightOffset
-        }
+          heightOffset,
+        },
       });
       expect(wrapper.vm.heightOffset).toBe(heightOffset);
     });
   });
-
 
   describe("Component Events", () => {
     it("emits update:list event on successful save", async () => {
@@ -356,7 +356,7 @@ describe("AddFunction Component", () => {
         name: "testFunction",
         function: "test()",
         params: "row",
-        transType: "0"
+        transType: "0",
       };
       wrapper.vm.formData = testData;
       await wrapper.vm.$emit("update:list", testData);
@@ -387,22 +387,21 @@ describe("AddFunction Component", () => {
         title: "",
         message: "",
         onConfirm: vi.fn(),
-        data: null
+        data: null,
       };
     });
-
 
     it("emits cancel event directly when no unsaved changes", async () => {
       // Ensure no unsaved changes
       wrapper.vm.isFunctionDataChanged = false;
-      
+
       // Call cancelAddFunction
       await wrapper.vm.cancelAddFunction();
       await nextTick();
-      
+
       // Check if cancel event was emitted
       expect(wrapper.emitted()["cancel:hideform"]).toBeTruthy();
-      
+
       // Check that confirmation dialog was not shown
       expect(wrapper.vm.confirmDialogMeta.show).toBe(false);
     });
@@ -410,18 +409,18 @@ describe("AddFunction Component", () => {
     it("handles confirmation dialog confirm action", async () => {
       // Simulate unsaved changes
       wrapper.vm.isFunctionDataChanged = true;
-      
+
       // Call cancelAddFunction
       await wrapper.vm.cancelAddFunction();
       await nextTick();
-      
+
       // Simulate confirming the dialog
       await wrapper.vm.confirmDialogMeta.onConfirm();
       await nextTick();
-      
+
       // Check if cancel event was emitted
       expect(wrapper.emitted()["cancel:hideform"]).toBeTruthy();
-      
+
       // Check if dialog was reset
       expect(wrapper.vm.confirmDialogMeta.show).toBe(false);
       expect(wrapper.vm.confirmDialogMeta.title).toBe("");
@@ -435,13 +434,13 @@ describe("AddFunction Component", () => {
         title: "Test Title",
         message: "Test Message",
         onConfirm: vi.fn(),
-        data: { test: "data" }
+        data: { test: "data" },
       };
-      
+
       // Call reset function
       wrapper.vm.resetConfirmDialog();
       await nextTick();
-      
+
       // Check if all properties were reset
       expect(wrapper.vm.confirmDialogMeta.show).toBe(false);
       expect(wrapper.vm.confirmDialogMeta.title).toBe("");

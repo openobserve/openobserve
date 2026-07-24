@@ -18,7 +18,6 @@ import { mount } from "@vue/test-utils";
 import DashboardMapsQueryBuilder from "@/components/dashboards/addPanel/DashboardMapsQueryBuilder.vue";
 import i18n from "@/locales";
 
-
 // Mock the composables
 const mockDashboardPanelData = {
   data: {
@@ -128,7 +127,7 @@ describe("DashboardMapsQueryBuilder", () => {
           SanitizedHtmlRenderer: true,
           DashboardFiltersOption: true,
           DashboardJoinsOption: true,
-          "OIcon": true,
+          OIcon: true,
         },
         mocks: {
           $t: (key: string) => key,
@@ -193,9 +192,7 @@ describe("DashboardMapsQueryBuilder", () => {
       mockUseDashboardPanelData.promqlMode = false;
       wrapper = createWrapper();
 
-      expect(
-        wrapper.vm.$options.components.DashboardFiltersOption,
-      ).toBeDefined();
+      expect(wrapper.vm.$options.components.DashboardFiltersOption).toBeDefined();
     });
   });
 
@@ -210,9 +207,7 @@ describe("DashboardMapsQueryBuilder", () => {
       wrapper = createWrapper();
 
       expect(wrapper.vm.$options.components.DynamicFunctionPopUp).toBeDefined();
-      expect(
-        wrapper.vm.$options.components.DashboardFiltersOption,
-      ).toBeDefined();
+      expect(wrapper.vm.$options.components.DashboardFiltersOption).toBeDefined();
     });
   });
 
@@ -277,14 +272,11 @@ describe("DashboardMapsQueryBuilder", () => {
       mockDashboardPanelData.data.queries[0].fields.name = {
         type: "build",
         label: "Name",
-        args: [
-          { type: "field", value: { field: "name_field", streamAlias: "" } },
-        ],
+        args: [{ type: "field", value: { field: "name_field", streamAlias: "" } }],
       };
       wrapper = createWrapper();
 
-      const nameField =
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.name;
+      const nameField = wrapper.vm.dashboardPanelData.data.queries[0].fields.name;
       expect(nameField).toBeDefined();
       expect(nameField.args[0].value.field).toBe("name_field");
     });
@@ -295,8 +287,7 @@ describe("DashboardMapsQueryBuilder", () => {
       mockDashboardPanelData.data.queries[0].fields.name = null;
       wrapper = createWrapper();
 
-      const nameField =
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.name;
+      const nameField = wrapper.vm.dashboardPanelData.data.queries[0].fields.name;
       expect(nameField).toBe(null);
     });
 
@@ -306,9 +297,7 @@ describe("DashboardMapsQueryBuilder", () => {
       mockDashboardPanelData.data.queries[0].fields.name = {
         type: "build",
         label: "Name",
-        args: [
-          { type: "field", value: { field: "name_field", streamAlias: "" } },
-        ],
+        args: [{ type: "field", value: { field: "name_field", streamAlias: "" } }],
       };
       wrapper = createWrapper();
 
@@ -320,29 +309,22 @@ describe("DashboardMapsQueryBuilder", () => {
       mockDashboardPanelData.data.queries[0].fields.name = {
         type: "build",
         label: "Name",
-        args: [
-          { type: "field", value: { field: "name_field", streamAlias: "" } },
-        ],
+        args: [{ type: "field", value: { field: "name_field", streamAlias: "" } }],
       };
       wrapper = createWrapper();
 
-      expect(
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.name.label,
-      ).toBe("Name");
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.name.label).toBe("Name");
     });
 
     it("should have modifiable name field label", () => {
       mockDashboardPanelData.data.queries[0].fields.name = {
         type: "build",
         label: "Name",
-        args: [
-          { type: "field", value: { field: "name_field", streamAlias: "" } },
-        ],
+        args: [{ type: "field", value: { field: "name_field", streamAlias: "" } }],
       };
       wrapper = createWrapper();
 
-      const nameField =
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.name;
+      const nameField = wrapper.vm.dashboardPanelData.data.queries[0].fields.name;
       expect(nameField.label).toBe("Name");
 
       nameField.label = "New Name";
@@ -358,14 +340,11 @@ describe("DashboardMapsQueryBuilder", () => {
         type: "build",
         label: "Value",
         functionName: "sum",
-        args: [
-          { type: "field", value: { field: "value_field", streamAlias: "" } },
-        ],
+        args: [{ type: "field", value: { field: "value_field", streamAlias: "" } }],
       };
       wrapper = createWrapper();
 
-      const valueField =
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.value_for_maps;
+      const valueField = wrapper.vm.dashboardPanelData.data.queries[0].fields.value_for_maps;
       expect(valueField).toBeDefined();
       expect(valueField.args[0].value.field).toBe("value_field");
       expect(valueField.functionName).toBe("sum");
@@ -377,8 +356,7 @@ describe("DashboardMapsQueryBuilder", () => {
       mockDashboardPanelData.data.queries[0].fields.value_for_maps = null;
       wrapper = createWrapper();
 
-      const valueField =
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.value_for_maps;
+      const valueField = wrapper.vm.dashboardPanelData.data.queries[0].fields.value_for_maps;
       expect(valueField).toBe(null);
     });
 
@@ -388,9 +366,7 @@ describe("DashboardMapsQueryBuilder", () => {
       mockDashboardPanelData.data.queries[0].fields.value_for_maps = {
         type: "build",
         label: "Value",
-        args: [
-          { type: "field", value: { field: "value_field", streamAlias: "" } },
-        ],
+        args: [{ type: "field", value: { field: "value_field", streamAlias: "" } }],
       };
       wrapper = createWrapper();
 
@@ -402,16 +378,13 @@ describe("DashboardMapsQueryBuilder", () => {
       mockDashboardPanelData.data.queries[0].fields.value_for_maps = {
         type: "build",
         label: "Value",
-        args: [
-          { type: "field", value: { field: "value_field", streamAlias: "" } },
-        ],
+        args: [{ type: "field", value: { field: "value_field", streamAlias: "" } }],
       };
       wrapper = createWrapper();
 
-      expect(
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.value_for_maps
-          .label,
-      ).toBe("Value");
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.value_for_maps.label).toBe(
+        "Value",
+      );
     });
 
     it("should handle aggregation function for value_for_maps field", () => {
@@ -419,30 +392,24 @@ describe("DashboardMapsQueryBuilder", () => {
         type: "build",
         label: "Value",
         functionName: "count",
-        args: [
-          { type: "field", value: { field: "value_field", streamAlias: "" } },
-        ],
+        args: [{ type: "field", value: { field: "value_field", streamAlias: "" } }],
       };
       wrapper = createWrapper();
 
-      expect(
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.value_for_maps
-          .functionName,
-      ).toBe("count");
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.value_for_maps.functionName).toBe(
+        "count",
+      );
     });
 
     it("should have modifiable value_for_maps field label", () => {
       mockDashboardPanelData.data.queries[0].fields.value_for_maps = {
         type: "build",
         label: "Value",
-        args: [
-          { type: "field", value: { field: "value_field", streamAlias: "" } },
-        ],
+        args: [{ type: "field", value: { field: "value_field", streamAlias: "" } }],
       };
       wrapper = createWrapper();
 
-      const valueField =
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.value_for_maps;
+      const valueField = wrapper.vm.dashboardPanelData.data.queries[0].fields.value_for_maps;
       expect(valueField.label).toBe("Value");
 
       valueField.label = "New Value";
@@ -472,9 +439,7 @@ describe("DashboardMapsQueryBuilder", () => {
         mockDashboardPanelData.data.queries[0].fields.value_for_maps = {
           type: "build",
           label: "Value",
-          args: [
-            { type: "field", value: { field: "value_field", streamAlias: "" } },
-          ],
+          args: [{ type: "field", value: { field: "value_field", streamAlias: "" } }],
         };
         wrapper = createWrapper();
 
@@ -487,9 +452,7 @@ describe("DashboardMapsQueryBuilder", () => {
           type: "build",
           label: "Value",
           functionName: "sum",
-          args: [
-            { type: "field", value: { field: "value_field", streamAlias: "" } },
-          ],
+          args: [{ type: "field", value: { field: "value_field", streamAlias: "" } }],
         };
         wrapper = createWrapper();
 
@@ -522,12 +485,8 @@ describe("DashboardMapsQueryBuilder", () => {
         const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
         wrapper.vm.onDrop(mockEvent, "name");
 
-        expect(mockUseDashboardPanelData.addMapName).toHaveBeenCalledWith(
-          mockField,
-        );
-        expect(
-          mockUseDashboardPanelData.cleanupDraggingFields,
-        ).toHaveBeenCalled();
+        expect(mockUseDashboardPanelData.addMapName).toHaveBeenCalledWith(mockField);
+        expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
       });
 
       it("should add value_for_maps from field list", () => {
@@ -539,12 +498,8 @@ describe("DashboardMapsQueryBuilder", () => {
         const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
         wrapper.vm.onDrop(mockEvent, "value_for_maps");
 
-        expect(mockUseDashboardPanelData.addMapValue).toHaveBeenCalledWith(
-          mockField,
-        );
-        expect(
-          mockUseDashboardPanelData.cleanupDraggingFields,
-        ).toHaveBeenCalled();
+        expect(mockUseDashboardPanelData.addMapValue).toHaveBeenCalledWith(mockField);
+        expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
       });
 
       it("should add filtered item from field list", () => {
@@ -556,12 +511,8 @@ describe("DashboardMapsQueryBuilder", () => {
         const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
         wrapper.vm.onDrop(mockEvent, "f");
 
-        expect(mockUseDashboardPanelData.addFilteredItem).toHaveBeenCalledWith(
-          mockField,
-        );
-        expect(
-          mockUseDashboardPanelData.cleanupDraggingFields,
-        ).toHaveBeenCalled();
+        expect(mockUseDashboardPanelData.addFilteredItem).toHaveBeenCalledWith(mockField);
+        expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
       });
 
       it("should handle drag element not found", () => {
@@ -587,20 +538,14 @@ describe("DashboardMapsQueryBuilder", () => {
             },
           ],
         };
-        mockDashboardPanelData.meta.stream.selectedStreamFields = [
-          { name: "existing_field" },
-        ];
+        mockDashboardPanelData.meta.stream.selectedStreamFields = [{ name: "existing_field" }];
         wrapper = createWrapper();
 
         const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
         wrapper.vm.onDrop(mockEvent, "name");
 
-        expect(mockShowErrorNotification).toHaveBeenCalledWith(
-          "Max 1 field in NAME is allowed.",
-        );
-        expect(
-          mockUseDashboardPanelData.cleanupDraggingFields,
-        ).toHaveBeenCalled();
+        expect(mockShowErrorNotification).toHaveBeenCalledWith("Max 1 field in NAME is allowed.");
+        expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
       });
 
       it("should show error when max fields exceeded for value_for_maps", () => {
@@ -615,9 +560,7 @@ describe("DashboardMapsQueryBuilder", () => {
             },
           ],
         };
-        mockDashboardPanelData.meta.stream.selectedStreamFields = [
-          { name: "existing_field" },
-        ];
+        mockDashboardPanelData.meta.stream.selectedStreamFields = [{ name: "existing_field" }];
         wrapper = createWrapper();
 
         const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
@@ -626,23 +569,17 @@ describe("DashboardMapsQueryBuilder", () => {
         expect(mockShowErrorNotification).toHaveBeenCalledWith(
           "Max 1 field in VALUE_FOR_MAPS is allowed.",
         );
-        expect(
-          mockUseDashboardPanelData.cleanupDraggingFields,
-        ).toHaveBeenCalled();
+        expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
       });
 
       it("should move field between axes", () => {
         const fieldName = "test_field";
         const dragElement = {
-          args: [
-            { type: "field", value: { field: fieldName, streamAlias: "" } },
-          ],
+          args: [{ type: "field", value: { field: fieldName, streamAlias: "" } }],
         };
         mockDashboardPanelData.meta.dragAndDrop.dragSource = "name";
         mockDashboardPanelData.meta.dragAndDrop.dragElement = dragElement;
-        mockDashboardPanelData.meta.stream.selectedStreamFields = [
-          { name: fieldName },
-        ];
+        mockDashboardPanelData.meta.stream.selectedStreamFields = [{ name: fieldName }];
         wrapper = createWrapper();
 
         const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
@@ -650,23 +587,17 @@ describe("DashboardMapsQueryBuilder", () => {
 
         expect(mockUseDashboardPanelData.removeMapName).toHaveBeenCalled();
         expect(mockUseDashboardPanelData.addMapValue).toHaveBeenCalled();
-        expect(
-          mockUseDashboardPanelData.cleanupDraggingFields,
-        ).toHaveBeenCalled();
+        expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
       });
 
       it("should handle custom drag name from custom query fields", () => {
         const fieldName = "custom_field";
         const dragElement = {
-          args: [
-            { type: "field", value: { field: fieldName, streamAlias: "" } },
-          ],
+          args: [{ type: "field", value: { field: fieldName, streamAlias: "" } }],
         };
         mockDashboardPanelData.meta.dragAndDrop.dragSource = "name";
         mockDashboardPanelData.meta.dragAndDrop.dragElement = dragElement;
-        mockDashboardPanelData.meta.stream.customQueryFields = [
-          { name: fieldName },
-        ];
+        mockDashboardPanelData.meta.stream.customQueryFields = [{ name: fieldName }];
         wrapper = createWrapper();
 
         const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
@@ -674,9 +605,7 @@ describe("DashboardMapsQueryBuilder", () => {
 
         expect(mockUseDashboardPanelData.removeMapName).toHaveBeenCalled();
         expect(mockUseDashboardPanelData.addMapValue).toHaveBeenCalled();
-        expect(
-          mockUseDashboardPanelData.cleanupDraggingFields,
-        ).toHaveBeenCalled();
+        expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
       });
     });
 
@@ -688,9 +617,7 @@ describe("DashboardMapsQueryBuilder", () => {
         wrapper.vm.onFieldDragStart(mockEvent, "test_item", "name");
 
         expect(mockDashboardPanelData.meta.dragAndDrop.dragging).toBe(true);
-        expect(mockDashboardPanelData.meta.dragAndDrop.dragElement).toBe(
-          "test_item",
-        );
+        expect(mockDashboardPanelData.meta.dragAndDrop.dragElement).toBe("test_item");
         expect(mockDashboardPanelData.meta.dragAndDrop.dragSource).toBe("name");
       });
     });
@@ -702,9 +629,7 @@ describe("DashboardMapsQueryBuilder", () => {
         const mockEvent = { preventDefault: vi.fn() };
         wrapper.vm.onDragEnter(mockEvent, "value_for_maps", 1);
 
-        expect(mockDashboardPanelData.meta.dragAndDrop.currentDragArea).toBe(
-          "value_for_maps",
-        );
+        expect(mockDashboardPanelData.meta.dragAndDrop.currentDragArea).toBe("value_for_maps");
         expect(mockDashboardPanelData.meta.dragAndDrop.targetDragIndex).toBe(1);
         expect(mockEvent.preventDefault).toHaveBeenCalled();
       });
@@ -759,9 +684,7 @@ describe("DashboardMapsQueryBuilder", () => {
 
         wrapper.vm.onDragEnd();
 
-        expect(
-          mockUseDashboardPanelData.cleanupDraggingFields,
-        ).toHaveBeenCalled();
+        expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
       });
     });
   });
@@ -827,23 +750,18 @@ describe("DashboardMapsQueryBuilder", () => {
       wrapper = createWrapper();
 
       const nameContainer = wrapper.find('[data-test="dashboard-name-layout"]');
-      expect(nameContainer.classes()).toContain(
-        "bg-field-list-row-hover-bg",
-      );
+      expect(nameContainer.classes()).toContain("bg-field-list-row-hover-bg");
     });
 
     it("should not apply drop-entered class when drag area doesn't match", () => {
       mockDashboardPanelData.data.type = "maps";
       mockUseDashboardPanelData.promqlMode = false;
       mockDashboardPanelData.meta.dragAndDrop.dragging = true;
-      mockDashboardPanelData.meta.dragAndDrop.currentDragArea =
-        "value_for_maps";
+      mockDashboardPanelData.meta.dragAndDrop.currentDragArea = "value_for_maps";
       wrapper = createWrapper();
 
       const nameContainer = wrapper.find('[data-test="dashboard-name-layout"]');
-      expect(nameContainer.classes()).not.toContain(
-        "bg-field-list-row-hover-bg",
-      );
+      expect(nameContainer.classes()).not.toContain("bg-field-list-row-hover-bg");
     });
   });
 
@@ -874,9 +792,7 @@ describe("DashboardMapsQueryBuilder", () => {
         mockDashboardPanelData.data.queries[0].fields.value_for_maps = {
           type: "build",
           functionName: "count",
-          args: [
-            { type: "field", value: { field: "test_col", streamAlias: "" } },
-          ],
+          args: [{ type: "field", value: { field: "test_col", streamAlias: "" } }],
         };
         const result = wrapper.vm.valueLabel;
 
@@ -891,9 +807,7 @@ describe("DashboardMapsQueryBuilder", () => {
 
         mockDashboardPanelData.data.queries[0].fields.value_for_maps = {
           type: "build",
-          args: [
-            { type: "field", value: { field: "plain_col", streamAlias: "" } },
-          ],
+          args: [{ type: "field", value: { field: "plain_col", streamAlias: "" } }],
         };
         const result = wrapper.vm.valueLabel;
 
@@ -917,7 +831,6 @@ describe("DashboardMapsQueryBuilder", () => {
         mockDashboardPanelData.data.queryType === "sql";
       expect(shouldShow).toBe(false);
     });
-
   });
 
   describe("Error Handling", () => {
@@ -970,12 +883,8 @@ describe("DashboardMapsQueryBuilder", () => {
       };
       wrapper = createWrapper();
 
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.name).toBe(
-        null,
-      );
-      expect(
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.value_for_maps,
-      ).toBe(null);
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.name).toBe(null);
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.value_for_maps).toBe(null);
     });
   });
 
@@ -990,12 +899,8 @@ describe("DashboardMapsQueryBuilder", () => {
       const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
       wrapper.vm.onDrop(mockEvent, "name");
 
-      expect(mockUseDashboardPanelData.addMapName).toHaveBeenCalledWith(
-        mockField,
-      );
-      expect(
-        mockUseDashboardPanelData.cleanupDraggingFields,
-      ).toHaveBeenCalled();
+      expect(mockUseDashboardPanelData.addMapName).toHaveBeenCalledWith(mockField);
+      expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
 
       wrapper.vm.removeMapName();
       expect(mockUseDashboardPanelData.removeMapName).toHaveBeenCalled();
@@ -1007,9 +912,7 @@ describe("DashboardMapsQueryBuilder", () => {
         type: "build",
         label: "Value",
         functionName: "avg",
-        args: [
-          { type: "field", value: { field: "value_field", streamAlias: "" } },
-        ],
+        args: [{ type: "field", value: { field: "value_field", streamAlias: "" } }],
       };
       wrapper = createWrapper();
 
@@ -1052,14 +955,11 @@ describe("DashboardMapsQueryBuilder", () => {
       mockDashboardPanelData.data.queries[0].fields.name = {
         type: "build",
         label: "Test",
-        args: [
-          { type: "field", value: { field: "test_field", streamAlias: "" } },
-        ],
+        args: [{ type: "field", value: { field: "test_field", streamAlias: "" } }],
       };
       wrapper = createWrapper();
 
-      const nameField =
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.name;
+      const nameField = wrapper.vm.dashboardPanelData.data.queries[0].fields.name;
       nameField.label = "Updated Label";
 
       expect(nameField.label).toBe("Updated Label");

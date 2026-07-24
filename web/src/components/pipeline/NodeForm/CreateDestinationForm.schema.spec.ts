@@ -13,8 +13,7 @@ vi.mock("@/utils/zincutils", () => ({
 }));
 
 // i18n passthrough (the only key the schema uses is common.nameRequired).
-const t = (key: string) =>
-  key === "common.nameRequired" ? "Name is required" : key;
+const t = (key: string) => (key === "common.nameRequired" ? "Name is required" : key);
 
 const schema = makeDestinationSchema(t);
 
@@ -55,9 +54,7 @@ describe("CreateDestinationForm.schema", () => {
     });
 
     it("accepts a clean resource name", () => {
-      expect(errorPaths({ ...base(), name: "valid_name-1" })).not.toContain(
-        "name",
-      );
+      expect(errorPaths({ ...base(), name: "valid_name-1" })).not.toContain("name");
     });
   });
 
@@ -68,15 +65,11 @@ describe("CreateDestinationForm.schema", () => {
     });
 
     it("rejects a trailing slash", () => {
-      expect(errorPaths({ ...base(), url: "https://example.com/" })).toContain(
-        "url",
-      );
+      expect(errorPaths({ ...base(), url: "https://example.com/" })).toContain("url");
     });
 
     it("accepts a url with no trailing slash", () => {
-      expect(errorPaths({ ...base(), url: "https://example.com" })).not.toContain(
-        "url",
-      );
+      expect(errorPaths({ ...base(), url: "https://example.com" })).not.toContain("url");
     });
   });
 
@@ -137,9 +130,9 @@ describe("CreateDestinationForm.schema", () => {
     });
 
     it("accepts a path starting with /", () => {
-      expect(
-        errorPaths({ ...base(), url_endpoint: "/services/collector" }),
-      ).not.toContain("url_endpoint");
+      expect(errorPaths({ ...base(), url_endpoint: "/services/collector" })).not.toContain(
+        "url_endpoint",
+      );
     });
   });
 
@@ -149,9 +142,7 @@ describe("CreateDestinationForm.schema", () => {
     });
 
     it("requires output_format", () => {
-      expect(errorPaths({ ...base(), output_format: "" })).toContain(
-        "output_format",
-      );
+      expect(errorPaths({ ...base(), output_format: "" })).toContain("output_format");
     });
   });
 
@@ -181,9 +172,9 @@ describe("CreateDestinationForm.schema", () => {
     });
 
     it("is not required for non-esbulk formats", () => {
-      expect(
-        errorPaths({ ...base(), output_format: "json", esbulk_index: "" }),
-      ).not.toContain("esbulk_index");
+      expect(errorPaths({ ...base(), output_format: "json", esbulk_index: "" })).not.toContain(
+        "esbulk_index",
+      );
     });
   });
 

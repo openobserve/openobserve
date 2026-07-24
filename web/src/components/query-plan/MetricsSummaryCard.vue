@@ -15,40 +15,76 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard
-    data-test="metrics-summary-card"
-    class="bg-transparent shadow-none"
-  >
+  <OCard data-test="metrics-summary-card" class="bg-transparent shadow-none">
     <OCardSection role="body">
-      <div class="text-sm font-medium font-bold mb-3">{{ t("search.executionSummary") }}</div>
+      <div class="mb-3 text-sm font-bold font-medium">{{ t("search.executionSummary") }}</div>
       <div class="grid [grid-template-columns:repeat(auto-fit,minmax(11.25rem,1fr))] gap-4">
-        <div data-test="metrics-summary-card-item" class="flex items-center gap-3 p-[0.875rem_1rem] rounded-default bg-card-glass-bg border border-solid border-card-glass-border transition-[border-color,box-shadow] duration-200 hover:border-accent hover:shadow-[0_0.0625rem_0.1875rem_rgba(0,0,0,0.05)]">
-          <div data-test="metrics-summary-card-icon" class="shrink-0 text-text-secondary">
+        <div
+          data-test="metrics-summary-card-item"
+          class="rounded-default bg-card-glass-bg border-card-glass-border hover:border-accent flex items-center gap-3 border border-solid p-[0.875rem_1rem] transition-[border-color,box-shadow] duration-200 hover:shadow-[0_0.0625rem_0.1875rem_rgba(0,0,0,0.05)]"
+        >
+          <div data-test="metrics-summary-card-icon" class="text-text-secondary shrink-0">
             <OIcon name="schedule" size="md" />
           </div>
-          <div class="flex-1 min-w-0">
-            <div data-test="metrics-summary-card-label" class="text-xs font-semibold uppercase tracking-[0.04em] text-text-label mb-1">{{ t("search.totalTime") }}</div>
-            <div data-test="metrics-summary-card-value" class="text-xl font-bold text-accent whitespace-nowrap overflow-hidden text-ellipsis">{{ metrics.totalTime }}</div>
+          <div class="min-w-0 flex-1">
+            <div
+              data-test="metrics-summary-card-label"
+              class="text-text-label mb-1 text-xs font-semibold tracking-[0.04em] uppercase"
+            >
+              {{ t("search.totalTime") }}
+            </div>
+            <div
+              data-test="metrics-summary-card-value"
+              class="text-accent overflow-hidden text-xl font-bold text-ellipsis whitespace-nowrap"
+            >
+              {{ metrics.totalTime }}
+            </div>
           </div>
         </div>
 
-        <div data-test="metrics-summary-card-item" class="flex items-center gap-3 p-[0.875rem_1rem] rounded-default bg-card-glass-bg border border-solid border-card-glass-border transition-[border-color,box-shadow] duration-200 hover:border-accent hover:shadow-[0_0.0625rem_0.1875rem_rgba(0,0,0,0.05)]">
-          <div data-test="metrics-summary-card-icon" class="shrink-0 text-text-secondary">
+        <div
+          data-test="metrics-summary-card-item"
+          class="rounded-default bg-card-glass-bg border-card-glass-border hover:border-accent flex items-center gap-3 border border-solid p-[0.875rem_1rem] transition-[border-color,box-shadow] duration-200 hover:shadow-[0_0.0625rem_0.1875rem_rgba(0,0,0,0.05)]"
+        >
+          <div data-test="metrics-summary-card-icon" class="text-text-secondary shrink-0">
             <OIcon name="format-list-numbered" size="md" />
           </div>
-          <div class="flex-1 min-w-0">
-            <div data-test="metrics-summary-card-label" class="text-xs font-semibold uppercase tracking-[0.04em] text-text-label mb-1">{{ t("search.totalRows") }}</div>
-            <div data-test="metrics-summary-card-value" class="text-xl font-bold text-accent whitespace-nowrap overflow-hidden text-ellipsis">{{ metrics.totalRows }}</div>
+          <div class="min-w-0 flex-1">
+            <div
+              data-test="metrics-summary-card-label"
+              class="text-text-label mb-1 text-xs font-semibold tracking-[0.04em] uppercase"
+            >
+              {{ t("search.totalRows") }}
+            </div>
+            <div
+              data-test="metrics-summary-card-value"
+              class="text-accent overflow-hidden text-xl font-bold text-ellipsis whitespace-nowrap"
+            >
+              {{ metrics.totalRows }}
+            </div>
           </div>
         </div>
 
-        <div data-test="metrics-summary-card-item" class="flex items-center gap-3 p-[0.875rem_1rem] rounded-default bg-card-glass-bg border border-solid border-card-glass-border transition-[border-color,box-shadow] duration-200 hover:border-accent hover:shadow-[0_0.0625rem_0.1875rem_rgba(0,0,0,0.05)]">
-          <div data-test="metrics-summary-card-icon" class="shrink-0 text-text-secondary">
+        <div
+          data-test="metrics-summary-card-item"
+          class="rounded-default bg-card-glass-bg border-card-glass-border hover:border-accent flex items-center gap-3 border border-solid p-[0.875rem_1rem] transition-[border-color,box-shadow] duration-200 hover:shadow-[0_0.0625rem_0.1875rem_rgba(0,0,0,0.05)]"
+        >
+          <div data-test="metrics-summary-card-icon" class="text-text-secondary shrink-0">
             <OIcon name="memory" size="md" />
           </div>
-          <div class="flex-1 min-w-0">
-            <div data-test="metrics-summary-card-label" class="text-xs font-semibold uppercase tracking-[0.04em] text-text-label mb-1">{{ t("search.peakMemory") }}</div>
-            <div data-test="metrics-summary-card-value" class="text-xl font-bold text-accent whitespace-nowrap overflow-hidden text-ellipsis">{{ metrics.peakMemory }}</div>
+          <div class="min-w-0 flex-1">
+            <div
+              data-test="metrics-summary-card-label"
+              class="text-text-label mb-1 text-xs font-semibold tracking-[0.04em] uppercase"
+            >
+              {{ t("search.peakMemory") }}
+            </div>
+            <div
+              data-test="metrics-summary-card-value"
+              class="text-accent overflow-hidden text-xl font-bold text-ellipsis whitespace-nowrap"
+            >
+              {{ metrics.peakMemory }}
+            </div>
           </div>
         </div>
       </div>
@@ -83,4 +119,3 @@ export default defineComponent({
   },
 });
 </script>
-

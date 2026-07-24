@@ -70,9 +70,7 @@ export const makeScorerFormSchema = (t: (_key: string) => string) =>
       maxRetries: z.coerce
         .number(t("onlineEvals.scorer.validation.retriesInvalid"))
         .min(0, t("onlineEvals.scorer.validation.retriesInvalid")),
-      backoffStrategy: z
-        .enum(["exponential", "linear", "fixed"])
-        .default("exponential"),
+      backoffStrategy: z.enum(["exponential", "linear", "fixed"]).default("exponential"),
 
       // ── Remote auth ─────────────────────────────────────────────────────
       authType: z.enum(["", "bearer", "basic", "api_key"]).default(""),

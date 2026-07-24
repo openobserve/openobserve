@@ -13,20 +13,18 @@ defineSlots<IconSlots>();
 const isImgIcon = computed<boolean>(() => Boolean(props.name?.startsWith("img:")));
 
 /** The src path stripped of the `img:` prefix */
-const imgSrc = computed<string>(() =>
-  props.name?.startsWith("img:") ? props.name.slice(4) : "",
-);
+const imgSrc = computed<string>(() => (props.name?.startsWith("img:") ? props.name.slice(4) : ""));
 
 const iconComponent = computed(() => iconRegistry[props.name as keyof typeof iconRegistry]);
 
 // Maps semantic size tokens to Tailwind size utilities (width + height).
 // md = 24px matches the default OIcon rendering size.
 const sizeClasses: Record<NonNullable<IconProps["size"]>, string> = {
-  xs: "size-3",   // 12px
-  sm: "size-4",   // 16px
-  md: "size-6",   // 24px
-  lg: "size-8",   // 32px
-  xl: "size-10",  // 40px
+  xs: "size-3", // 12px
+  sm: "size-4", // 16px
+  md: "size-6", // 24px
+  lg: "size-8", // 32px
+  xl: "size-10", // 40px
 };
 
 /** Project rule: every bin/delete icon renders in the destructive (red) color
@@ -37,12 +35,12 @@ const sizeClasses: Record<NonNullable<IconProps["size"]>, string> = {
 const isDestructiveIcon = computed<boolean>(() =>
   Boolean(
     props.name &&
-      (props.name === "delete" ||
-        props.name === "delete-outline" ||
-        props.name === "delete-forever" ||
-        props.name === "delete-sweep" ||
-        props.name === "bin-line" ||
-        props.name === "bin-fill"),
+    (props.name === "delete" ||
+      props.name === "delete-outline" ||
+      props.name === "delete-forever" ||
+      props.name === "delete-sweep" ||
+      props.name === "bin-line" ||
+      props.name === "bin-fill"),
   ),
 );
 </script>
@@ -53,23 +51,14 @@ const isDestructiveIcon = computed<boolean>(() =>
     :class="[
       sizeClasses[size],
       isDestructiveIcon
-        ? 'text-error-500 rounded-default transition-colors hover:bg-error-100'
+        ? 'text-error-500 rounded-default hover:bg-error-100 transition-colors'
         : '',
     ]"
     :data-destructive-icon="isDestructiveIcon ? 'true' : undefined"
-    v-bind="
-      label
-        ? { role: 'img', 'aria-label': label }
-        : { 'aria-hidden': 'true' }
-    "
+    v-bind="label ? { role: 'img', 'aria-label': label } : { 'aria-hidden': 'true' }"
   >
     <!-- img: prefix → external image -->
-    <img
-      v-if="isImgIcon"
-      :src="imgSrc"
-      :alt="label || ''"
-      class="size-full object-contain"
-    />
+    <img v-if="isImgIcon" :src="imgSrc" :alt="label || ''" class="size-full object-contain" />
     <!-- Registry icon (Material Symbols, regular weight — the main-branch look). -->
     <component v-else-if="iconComponent" :is="iconComponent" class="size-full" />
     <slot />

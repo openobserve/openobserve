@@ -42,6 +42,4 @@ export const makeSavedFunctionSchema = (t: (_key: string) => string) =>
       }
     });
 
-export type SavedFunctionForm = z.infer<
-  ReturnType<typeof makeSavedFunctionSchema>
->;
+export type SavedFunctionForm = z.infer<ReturnType<typeof makeSavedFunctionSchema>>;

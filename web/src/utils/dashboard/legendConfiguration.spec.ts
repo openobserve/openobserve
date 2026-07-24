@@ -125,11 +125,7 @@ describe("legendConfiguration", () => {
     });
 
     it("should calculate height for multiple legend items", () => {
-      const seriesData = [
-        { name: "Series 1" },
-        { name: "Series 2" },
-        { name: "Series 3" },
-      ];
+      const seriesData = [{ name: "Series 1" }, { name: "Series 2" }, { name: "Series 3" }];
       const result = calculateBottomLegendHeight(3, 800, seriesData);
 
       expect(result).toBeGreaterThan(0);
@@ -158,7 +154,7 @@ describe("legendConfiguration", () => {
         chartHeight,
         legendConfig,
         gridConfig,
-        chartHeight
+        chartHeight,
       );
 
       expect(gridConfig.bottom).toBeDefined();
@@ -167,11 +163,7 @@ describe("legendConfiguration", () => {
     });
 
     it("should handle series with different name properties", () => {
-      const seriesData = [
-        { seriesName: "Series 1" },
-        { name: "Series 2" },
-        { other: "Series 3" },
-      ];
+      const seriesData = [{ seriesName: "Series 1" }, { name: "Series 2" }, { other: "Series 3" }];
       const result = calculateBottomLegendHeight(3, 800, seriesData);
 
       expect(result).toBeGreaterThan(0);
@@ -199,11 +191,7 @@ describe("legendConfiguration", () => {
     });
 
     it("should calculate width for multiple legend items", () => {
-      const seriesData = [
-        { name: "Series 1" },
-        { name: "Series 2" },
-        { name: "Series 3" },
-      ];
+      const seriesData = [{ name: "Series 1" }, { name: "Series 2" }, { name: "Series 3" }];
       const result = calculateRightLegendWidth(3, 800, 400, seriesData, false);
 
       expect(result).toBeGreaterThan(0);
@@ -230,10 +218,7 @@ describe("legendConfiguration", () => {
     });
 
     it("should handle series with seriesName property", () => {
-      const seriesData = [
-        { seriesName: "Series 1" },
-        { seriesName: "Series 2" },
-      ];
+      const seriesData = [{ seriesName: "Series 1" }, { seriesName: "Series 2" }];
       const result = calculateRightLegendWidth(2, 800, 400, seriesData, false);
 
       expect(result).toBeGreaterThan(0);
@@ -510,7 +495,9 @@ describe("legendConfiguration", () => {
         type: "line",
         config: { show_legends: true, legends_position: "bottom", legends_type: "plain" },
       };
-      const hoveredSeriesState = { value: { hoveredSeriesName: null, setHoveredSeriesName: vi.fn() } };
+      const hoveredSeriesState = {
+        value: { hoveredSeriesName: null, setHoveredSeriesName: vi.fn() },
+      };
 
       const result = createBaseLegendConfig(panelSchema, hoveredSeriesState);
 
@@ -526,7 +513,9 @@ describe("legendConfiguration", () => {
         type: "line",
         config: { show_legends: true, legends_position: "right", legends_type: "scroll" },
       };
-      const hoveredSeriesState = { value: { hoveredSeriesName: null, setHoveredSeriesName: vi.fn() } };
+      const hoveredSeriesState = {
+        value: { hoveredSeriesName: null, setHoveredSeriesName: vi.fn() },
+      };
 
       const result = createBaseLegendConfig(panelSchema, hoveredSeriesState);
 
@@ -543,7 +532,9 @@ describe("legendConfiguration", () => {
         type: "line",
         config: { show_legends: false },
       };
-      const hoveredSeriesState = { value: { hoveredSeriesName: null, setHoveredSeriesName: vi.fn() } };
+      const hoveredSeriesState = {
+        value: { hoveredSeriesName: null, setHoveredSeriesName: vi.fn() },
+      };
 
       const result = createBaseLegendConfig(panelSchema, hoveredSeriesState);
 
@@ -555,7 +546,9 @@ describe("legendConfiguration", () => {
         type: "line",
         config: { show_legends: true, trellis: { layout: "grid" } },
       };
-      const hoveredSeriesState = { value: { hoveredSeriesName: null, setHoveredSeriesName: vi.fn() } };
+      const hoveredSeriesState = {
+        value: { hoveredSeriesName: null, setHoveredSeriesName: vi.fn() },
+      };
 
       const result = createBaseLegendConfig(panelSchema, hoveredSeriesState);
 
@@ -567,7 +560,9 @@ describe("legendConfiguration", () => {
         type: "line",
         config: { show_legends: true },
       };
-      const hoveredSeriesState = { value: { hoveredSeriesName: null, setHoveredSeriesName: vi.fn() } };
+      const hoveredSeriesState = {
+        value: { hoveredSeriesName: null, setHoveredSeriesName: vi.fn() },
+      };
 
       const result = createBaseLegendConfig(panelSchema, hoveredSeriesState);
 
@@ -580,7 +575,9 @@ describe("legendConfiguration", () => {
         type: "line",
         config: { show_legends: true },
       };
-      const hoveredSeriesState = { value: { hoveredSeriesName: "Series 1", setHoveredSeriesName: vi.fn() } };
+      const hoveredSeriesState = {
+        value: { hoveredSeriesName: "Series 1", setHoveredSeriesName: vi.fn() },
+      };
 
       const result = createBaseLegendConfig(panelSchema, hoveredSeriesState);
 
@@ -916,7 +913,9 @@ describe("legendConfiguration", () => {
         },
       };
       const chartPanelRef = { value: { offsetWidth: 800, offsetHeight: 400 } };
-      const hoveredSeriesState = { value: { hoveredSeriesName: null, setHoveredSeriesName: vi.fn() } };
+      const hoveredSeriesState = {
+        value: { hoveredSeriesName: null, setHoveredSeriesName: vi.fn() },
+      };
       const options = { series: [] };
 
       applyLegendConfiguration(panelSchema, chartPanelRef, hoveredSeriesState, options);
@@ -934,7 +933,9 @@ describe("legendConfiguration", () => {
         },
       };
       const chartPanelRef = { value: { offsetWidth: 800, offsetHeight: 400 } };
-      const hoveredSeriesState = { value: { hoveredSeriesName: null, setHoveredSeriesName: vi.fn() } };
+      const hoveredSeriesState = {
+        value: { hoveredSeriesName: null, setHoveredSeriesName: vi.fn() },
+      };
       const options = { series: [{ name: "Series 1" }], grid: {} };
 
       applyLegendConfiguration(panelSchema, chartPanelRef, hoveredSeriesState, options);
@@ -953,7 +954,9 @@ describe("legendConfiguration", () => {
         },
       };
       const chartPanelRef = { value: { offsetWidth: 800, offsetHeight: 400 } };
-      const hoveredSeriesState = { value: { hoveredSeriesName: null, setHoveredSeriesName: vi.fn() } };
+      const hoveredSeriesState = {
+        value: { hoveredSeriesName: null, setHoveredSeriesName: vi.fn() },
+      };
       const options = { series: [{ name: "Series 1" }], grid: {} };
 
       applyLegendConfiguration(panelSchema, chartPanelRef, hoveredSeriesState, options);
@@ -972,7 +975,9 @@ describe("legendConfiguration", () => {
         },
       };
       const chartPanelRef = { value: { offsetWidth: 800, offsetHeight: 400 } };
-      const hoveredSeriesState = { value: { hoveredSeriesName: null, setHoveredSeriesName: vi.fn() } };
+      const hoveredSeriesState = {
+        value: { hoveredSeriesName: null, setHoveredSeriesName: vi.fn() },
+      };
       const options = { series: [{ data: [{ name: "Item 1" }], center: ["50%", "50%"] }] };
 
       applyLegendConfiguration(panelSchema, chartPanelRef, hoveredSeriesState, options);
@@ -990,7 +995,9 @@ describe("legendConfiguration", () => {
         },
       };
       const chartPanelRef = { value: { offsetWidth: 800, offsetHeight: 400 } };
-      const hoveredSeriesState = { value: { hoveredSeriesName: null, setHoveredSeriesName: vi.fn() } };
+      const hoveredSeriesState = {
+        value: { hoveredSeriesName: null, setHoveredSeriesName: vi.fn() },
+      };
       const options = { series: [{ data: [{ name: "Item 1" }], center: ["50%", "50%"] }] };
 
       applyLegendConfiguration(panelSchema, chartPanelRef, hoveredSeriesState, options);
@@ -1008,7 +1015,9 @@ describe("legendConfiguration", () => {
         },
       };
       const chartPanelRef = { value: { offsetWidth: 800, offsetHeight: 400 } };
-      const hoveredSeriesState = { value: { hoveredSeriesName: null, setHoveredSeriesName: vi.fn() } };
+      const hoveredSeriesState = {
+        value: { hoveredSeriesName: null, setHoveredSeriesName: vi.fn() },
+      };
       const options = { series: [{ name: "Series 1" }], grid: {} };
 
       applyLegendConfiguration(panelSchema, chartPanelRef, hoveredSeriesState, options);
@@ -1063,7 +1072,7 @@ describe("legendConfiguration", () => {
         { config: { show_legends: true, legends_position: "right", legends_type: "plain" } },
         100,
         50,
-        [{ name: "Series" }]
+        [{ name: "Series" }],
       );
 
       // For extreme small dimensions, available width might be 0 or negative due to legend width constraints
@@ -1082,10 +1091,7 @@ describe("legendConfiguration", () => {
           legends_type: "plain",
         },
       };
-      const seriesData = [
-        { name: "Series 1" },
-        { name: "Series 2" },
-      ];
+      const seriesData = [{ name: "Series 1" }, { name: "Series 2" }];
 
       // Calculate dimensions
       const dimensions = calculateChartDimensions(panelSchema, 800, 400, seriesData);

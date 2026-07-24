@@ -162,9 +162,7 @@ const defaultMockResponse = {
 // Mount factory — eliminates repeated global config
 // ---------------------------------------------------------------------------
 
-function mountDAG(
-  props: Record<string, unknown> = {},
-): VueWrapper {
+function mountDAG(props: Record<string, unknown> = {}): VueWrapper {
   return mount(TraceDAG, {
     props: {
       traceId: "test-trace-123",
@@ -249,9 +247,7 @@ describe("TraceDAG", () => {
   // -------------------------------------------------------------------------
   describe("Error Handling", () => {
     it("should display error message when fetch fails with a plain Error", async () => {
-      vi.mocked(searchService.getTraceDAG).mockRejectedValueOnce(
-        new Error("Network error"),
-      );
+      vi.mocked(searchService.getTraceDAG).mockRejectedValueOnce(new Error("Network error"));
       wrapper = mountDAG();
       await flushPromises();
 
@@ -358,9 +354,7 @@ describe("TraceDAG", () => {
       wrapper = mountDAG();
       await flushPromises();
 
-      const rootNode = (wrapper.vm.nodes as any[]).find(
-        (n) => n.id === "span-1",
-      );
+      const rootNode = (wrapper.vm.nodes as any[]).find((n) => n.id === "span-1");
       expect(rootNode.data.operation_name).toBe("GET /api");
       expect(rootNode.data.service_name).toBe("frontend");
       expect(rootNode.data.span_status).toBe("OK");
@@ -778,9 +772,7 @@ describe("TraceDAG", () => {
         "border-[var(--color-dag-node-generation)] bg-[color-mix(in_srgb,var(--color-dag-node-generation)_12%,var(--color-surface-base))]",
       );
       // No legacy hardcoded hex and no dark: variant may return.
-      const all = ALL_OBSERVATION_TYPES.map((t) =>
-        wrapper.vm.getObservationTypeClass(t),
-      ).join(" ");
+      const all = ALL_OBSERVATION_TYPES.map((t) => wrapper.vm.getObservationTypeClass(t)).join(" ");
       expect(all).not.toMatch(/#[0-9a-f]{3,8}\b/i);
       expect(all).not.toContain("dark:");
     });
@@ -789,10 +781,7 @@ describe("TraceDAG", () => {
       // The 14 node types are a data-viz palette: every type keeps a distinct
       // style, except 'span' which deliberately shares the neutral default.
       const byType = new Map(
-        ALL_OBSERVATION_TYPES.map((t) => [
-          t,
-          wrapper.vm.getObservationTypeClass(t),
-        ]),
+        ALL_OBSERVATION_TYPES.map((t) => [t, wrapper.vm.getObservationTypeClass(t)]),
       );
       // 16 inputs collapse to 14 suffixes (3 generation aliases, 2 agent
       // aliases); 'span' shares 'default', leaving 13 distinct styles.
@@ -801,58 +790,42 @@ describe("TraceDAG", () => {
     });
 
     it("should return the default node style for an unknown observation type", () => {
-      expect(wrapper.vm.getObservationTypeClass("totally_unknown")).toBe(
-        nodeStyle.default,
-      );
+      expect(wrapper.vm.getObservationTypeClass("totally_unknown")).toBe(nodeStyle.default);
     });
 
     // OTEL spec values → generation
     it.each(["chat", "text_completion", "generate_content"])(
       "should map '%s' to the generation node style",
       (input) => {
-        expect(wrapper.vm.getObservationTypeClass(input)).toBe(
-          nodeStyle.generation,
-        );
+        expect(wrapper.vm.getObservationTypeClass(input)).toBe(nodeStyle.generation);
       },
     );
 
     it("should map 'embeddings' to the embedding node style", () => {
-      expect(wrapper.vm.getObservationTypeClass("embeddings")).toBe(
-        nodeStyle.embedding,
-      );
+      expect(wrapper.vm.getObservationTypeClass("embeddings")).toBe(nodeStyle.embedding);
     });
 
     it.each(["invoke_agent", "create_agent"])(
       "should map '%s' to the agent node style",
       (input) => {
-        expect(wrapper.vm.getObservationTypeClass(input)).toBe(
-          nodeStyle.agent,
-        );
+        expect(wrapper.vm.getObservationTypeClass(input)).toBe(nodeStyle.agent);
       },
     );
 
     it("should map 'execute_tool' to the tool node style", () => {
-      expect(wrapper.vm.getObservationTypeClass("execute_tool")).toBe(
-        nodeStyle.tool,
-      );
+      expect(wrapper.vm.getObservationTypeClass("execute_tool")).toBe(nodeStyle.tool);
     });
 
     it("should map 'invoke_workflow' to the workflow node style", () => {
-      expect(wrapper.vm.getObservationTypeClass("invoke_workflow")).toBe(
-        nodeStyle.workflow,
-      );
+      expect(wrapper.vm.getObservationTypeClass("invoke_workflow")).toBe(nodeStyle.workflow);
     });
 
     it("should map 'retrieval' to the retriever node style", () => {
-      expect(wrapper.vm.getObservationTypeClass("retrieval")).toBe(
-        nodeStyle.retriever,
-      );
+      expect(wrapper.vm.getObservationTypeClass("retrieval")).toBe(nodeStyle.retriever);
     });
 
     it("should map 'chain' to the chain node style", () => {
-      expect(wrapper.vm.getObservationTypeClass("chain")).toBe(
-        nodeStyle.chain,
-      );
+      expect(wrapper.vm.getObservationTypeClass("chain")).toBe(nodeStyle.chain);
     });
 
     it("should map 'task' to the task node style", () => {
@@ -860,21 +833,15 @@ describe("TraceDAG", () => {
     });
 
     it("should map 'evaluator' to the evaluator node style", () => {
-      expect(wrapper.vm.getObservationTypeClass("evaluator")).toBe(
-        nodeStyle.evaluator,
-      );
+      expect(wrapper.vm.getObservationTypeClass("evaluator")).toBe(nodeStyle.evaluator);
     });
 
     it("should map 'rerank' to the rerank node style", () => {
-      expect(wrapper.vm.getObservationTypeClass("rerank")).toBe(
-        nodeStyle.rerank,
-      );
+      expect(wrapper.vm.getObservationTypeClass("rerank")).toBe(nodeStyle.rerank);
     });
 
     it("should map 'guardrail' to the guardrail node style", () => {
-      expect(wrapper.vm.getObservationTypeClass("guardrail")).toBe(
-        nodeStyle.guardrail,
-      );
+      expect(wrapper.vm.getObservationTypeClass("guardrail")).toBe(nodeStyle.guardrail);
     });
 
     it("should map 'span' to the span node style", () => {
@@ -882,18 +849,12 @@ describe("TraceDAG", () => {
     });
 
     it("should map 'event' to the event node style", () => {
-      expect(wrapper.vm.getObservationTypeClass("event")).toBe(
-        nodeStyle.event,
-      );
+      expect(wrapper.vm.getObservationTypeClass("event")).toBe(nodeStyle.event);
     });
 
     it("should be case-insensitive for known types", () => {
-      expect(wrapper.vm.getObservationTypeClass("CHAT")).toBe(
-        nodeStyle.generation,
-      );
-      expect(wrapper.vm.getObservationTypeClass("Execute_Tool")).toBe(
-        nodeStyle.tool,
-      );
+      expect(wrapper.vm.getObservationTypeClass("CHAT")).toBe(nodeStyle.generation);
+      expect(wrapper.vm.getObservationTypeClass("Execute_Tool")).toBe(nodeStyle.tool);
     });
   });
 
@@ -909,9 +870,7 @@ describe("TraceDAG", () => {
     });
 
     it("should return the default text style for an unknown observation type", () => {
-      expect(wrapper.vm.getObservationTypeTextClass("unknown")).toBe(
-        TEXT_STYLE_LITERAL_DEFAULT,
-      );
+      expect(wrapper.vm.getObservationTypeTextClass("unknown")).toBe(TEXT_STYLE_LITERAL_DEFAULT);
     });
 
     it("should build text styles as a 70/30 mix of the base token toward the primary text color", () => {
@@ -919,9 +878,9 @@ describe("TraceDAG", () => {
       expect(wrapper.vm.getObservationTypeTextClass("chat")).toBe(
         "text-[color-mix(in_srgb,var(--color-dag-node-generation)_70%,var(--color-text-heading))]",
       );
-      const all = ALL_OBSERVATION_TYPES.map((t) =>
-        wrapper.vm.getObservationTypeTextClass(t),
-      ).join(" ");
+      const all = ALL_OBSERVATION_TYPES.map((t) => wrapper.vm.getObservationTypeTextClass(t)).join(
+        " ",
+      );
       expect(all).not.toMatch(/#[0-9a-f]{3,8}\b/i);
       expect(all).not.toContain("dark:");
     });
@@ -945,17 +904,12 @@ describe("TraceDAG", () => {
       ["guardrail", textStyleFor("guardrail")],
       ["span", textStyleFor("default")],
       ["event", textStyleFor("event")],
-    ])(
-      "should map '%s' to '%s'",
-      (input, expected) => {
-        expect(wrapper.vm.getObservationTypeTextClass(input)).toBe(expected);
-      },
-    );
+    ])("should map '%s' to '%s'", (input, expected) => {
+      expect(wrapper.vm.getObservationTypeTextClass(input)).toBe(expected);
+    });
 
     it("should give each observation type its own distinct text token", () => {
-      const styles = ALL_OBSERVATION_TYPES.map((t) =>
-        wrapper.vm.getObservationTypeTextClass(t),
-      );
+      const styles = ALL_OBSERVATION_TYPES.map((t) => wrapper.vm.getObservationTypeTextClass(t));
       // Same collapse as the node map: 16 inputs → 13 distinct styles.
       expect(new Set(styles).size).toBe(13);
     });

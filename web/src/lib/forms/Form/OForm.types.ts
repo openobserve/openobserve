@@ -10,8 +10,7 @@ import type { InjectionKey, Ref } from "vue";
 export type FormContextValue = any;
 
 /** Provide/inject key for the OForm context. */
-export const FORM_CONTEXT_KEY: InjectionKey<FormContextValue> =
-  Symbol("OFormContext");
+export const FORM_CONTEXT_KEY: InjectionKey<FormContextValue> = Symbol("OFormContext");
 
 /**
  * Provide/inject key for the form submit state. An overlay (ODialog/ODrawer)
@@ -20,8 +19,7 @@ export const FORM_CONTEXT_KEY: InjectionKey<FormContextValue> =
  * lives outside the <form> and is linked only by `form-id` — shows its spinner
  * automatically with no per-form loading wiring.
  */
-export const FORM_SUBMIT_STATE_KEY: InjectionKey<Ref<boolean>> =
-  Symbol("OFormSubmitState");
+export const FORM_SUBMIT_STATE_KEY: InjectionKey<Ref<boolean>> = Symbol("OFormSubmitState");
 
 export interface OFormProps<T extends Record<string, unknown>> {
   /** Initial values for all fields in the form */

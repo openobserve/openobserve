@@ -34,9 +34,7 @@ describe("ODate", () => {
 
   it("should show error border styling when error prop is set", () => {
     wrapper = mount(ODate, { props: { errorMessage: "Required" } });
-    expect(wrapper.find('[role="group"]').attributes("aria-invalid")).toBe(
-      "true",
-    );
+    expect(wrapper.find('[role="group"]').attributes("aria-invalid")).toBe("true");
   });
 
   it("should render help text when no error", () => {

@@ -115,9 +115,7 @@ export const DEFAULT_LOGS_CONFIG = {
     showDetailTab: false,
     showTransformEditor: false, // by default function / actions editor should be hidden
     searchApplied: false,
-    toggleSourceWrap: useLocalWrapContent()
-      ? JSON.parse(useLocalWrapContent())
-      : false,
+    toggleSourceWrap: useLocalWrapContent() ? JSON.parse(useLocalWrapContent()) : false,
     histogramDirtyFlag: false,
     logsVisualizeDirtyFlag: false,
     sqlMode: false,
@@ -173,7 +171,12 @@ export const DEFAULT_LOGS_CONFIG = {
     errorDetail: "",
     errorCode: 0,
     filterErrMsg: "",
-    sqlSyntaxErrorRanges: [] as Array<{ startLine: number; endLine: number; column?: number; error: string }>,
+    sqlSyntaxErrorRanges: [] as Array<{
+      startLine: number;
+      endLine: number;
+      column?: number;
+      error: string;
+    }>,
     missingStreamMessage: "",
     additionalErrorMsg: "",
     savedViewFilterFields: "",

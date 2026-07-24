@@ -17,39 +17,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- src/components/PipelineFlow.vue -->
 <template>
   <div data-test="pipeline-flow-container" class="flex items-center justify-between">
-     <div data-test="pipeline-flow-unsaved-changes-warning-text" v-show="pipelineObj.dirtyFlag" class="text-status-warning-text border border-status-warning-text rounded-default flex items-center px-2 mr-3">
-      <OIcon name="info" class="mr-1 " size="sm" />
-     Unsaved changes detected. Click "Save" to preserve your updates.
-   </div>
+    <div
+      data-test="pipeline-flow-unsaved-changes-warning-text"
+      v-show="pipelineObj.dirtyFlag"
+      class="text-status-warning-text border-status-warning-text rounded-default mr-3 flex items-center border px-2"
+    >
+      <OIcon name="info" class="mr-1" size="sm" />
+      Unsaved changes detected. Click "Save" to preserve your updates.
+    </div>
 
-   <!-- Edge deletion help notification -->
-   <div v-if="showEdgeHelpNotification" class="edge-help-notification absolute top-5 left-1/2 -translate-x-1/2 z-1000 bg-surface-base text-text-body py-2.5 px-4 rounded-default text-sm shadow-[0_4px_20px_rgba(0,0,0,0.15)] border border-border-default flex items-center dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
-     <OIcon name="info" class="mr-1" size="sm" />
-     Press Backspace/Delete to remove the edge
-   </div>
+    <!-- Edge deletion help notification -->
+    <div
+      v-if="showEdgeHelpNotification"
+      class="edge-help-notification bg-surface-base text-text-body rounded-default border-border-default absolute top-5 left-1/2 z-1000 flex -translate-x-1/2 items-center border px-4 py-2.5 text-sm shadow-[0_4px_20px_rgba(0,0,0,0.15)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
+    >
+      <OIcon name="info" class="mr-1" size="sm" />
+      Press Backspace/Delete to remove the edge
+    </div>
+  </div>
 
- </div>
-
-    <VueFlow
+  <VueFlow
     @drop="onDrop"
     ref="vueFlowRef"
-      v-model:nodes="pipelineObj.currentSelectedPipeline.nodes"
-      v-model:edges="pipelineObj.currentSelectedPipeline.edges"
-      :connect-on-click="false"
-      @node-change="onNodeChange"
-      @nodes-change="onNodesChange"
-      @edges-change="onEdgesChange"
-      @edge-click="onEdgeClick"
-      @connect="onConnect"
-      @dragover="onDragOver"
-      :default-viewport="{ zoom: 0.8 }"
-      :min-zoom="0.2"
-      :max-zoom="4"
-      @dragleave="onDragLeave"
-      class="basic-flow"
-
-    >
-
+    v-model:nodes="pipelineObj.currentSelectedPipeline.nodes"
+    v-model:edges="pipelineObj.currentSelectedPipeline.edges"
+    :connect-on-click="false"
+    @node-change="onNodeChange"
+    @nodes-change="onNodesChange"
+    @edges-change="onEdgesChange"
+    @edge-click="onEdgeClick"
+    @connect="onConnect"
+    @dragover="onDragOver"
+    :default-viewport="{ zoom: 0.8 }"
+    :min-zoom="0.2"
+    :max-zoom="4"
+    @dragleave="onDragLeave"
+    class="basic-flow"
+  >
     <!-- <template #edge-button="buttonEdgeProps">
       <EdgeWithButton
         :id="buttonEdgeProps.id"
@@ -75,60 +79,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data="customEdgeProps.data"
         :marker-end="customEdgeProps.markerEnd"
         :style="customEdgeProps.style"
-        :is-in-view = false
+        :is-in-view="false"
       />
     </template>
-      <!-- Drag-over highlight: same role as OFile's drop target, so it shares
+    <!-- Drag-over highlight: same role as OFile's drop target, so it shares
            --color-file-drag-bg (theme-aware; the old raw blue had no dark step).
            Stays a binding because the fill is driven by isDragOver at runtime. -->
-      <DropzoneBackground
-        :style="{
-          backgroundColor: isDragOver
-            ? 'var(--color-file-drag-bg)'
-            : 'transparent',
-          transition: 'background-color 0.2s ease',
-        }"
-      >
-        <p v-if="isDragOver">Drop here</p>
-      </DropzoneBackground>
-      <template #node-input="{ id, data }">
-        <CustomNode :id="id" :data="data" io_type="input" />
-      </template>
-      <template #node-output="{ id, data }">
-        <CustomNode :id="id" :data="data" io_type="output" />
-      </template>
-      <template #node-default="{ id, data }">
-        <CustomNode :id="id" :data="data" io_type="default" />
-      </template>
-      <Controls
-      :showInteractive=false
-
-      class="controls-grp"
-        position="top-left">
-        <!-- Node-rail toggle. `#top` puts it ABOVE zoom-in / zoom-out / fit-view
+    <DropzoneBackground
+      :style="{
+        backgroundColor: isDragOver ? 'var(--color-file-drag-bg)' : 'transparent',
+        transition: 'background-color 0.2s ease',
+      }"
+    >
+      <p v-if="isDragOver">Drop here</p>
+    </DropzoneBackground>
+    <template #node-input="{ id, data }">
+      <CustomNode :id="id" :data="data" io_type="input" />
+    </template>
+    <template #node-output="{ id, data }">
+      <CustomNode :id="id" :data="data" io_type="output" />
+    </template>
+    <template #node-default="{ id, data }">
+      <CustomNode :id="id" :data="data" io_type="default" />
+    </template>
+    <Controls :showInteractive="false" class="controls-grp" position="top-left">
+      <!-- Node-rail toggle. `#top` puts it ABOVE zoom-in / zoom-out / fit-view
              (the default slot would append it below them). The glyph is a bare
              32x32 currentColor <svg>, exactly like Vue Flow's own control icons
              — an OIcon here rendered at a different weight and box, so it read
              as a foreign control in the stack. `.vue-flow__controls-button svg`
              does the sizing, so no width/height of our own. -->
-        <template #top>
-          <ControlButton
-            data-test="pipeline-node-sidebar-collapse-btn"
-            :title="pipelineObj.showNodePalette ? t('pipeline.collapseNodes') : t('pipeline.openNodes')"
-            @click="pipelineObj.showNodePalette = !pipelineObj.showNodePalette"
-          >
-            <!-- » chevrons; mirrored in place to « once the rail is open. -->
-            <svg viewBox="0 0 32 32">
-              <path
-                :transform="pipelineObj.showNodePalette ? 'translate(32,0) scale(-1,1)' : undefined"
-                d="M2 5.5 5.5 2 19.5 16 5.5 30 2 26.5 12.5 16ZM14.5 5.5 18 2 32 16 18 30 14.5 26.5 25 16Z"
-              />
-            </svg>
-          </ControlButton>
-        </template>
+      <template #top>
+        <ControlButton
+          data-test="pipeline-node-sidebar-collapse-btn"
+          :title="
+            pipelineObj.showNodePalette ? t('pipeline.collapseNodes') : t('pipeline.openNodes')
+          "
+          @click="pipelineObj.showNodePalette = !pipelineObj.showNodePalette"
+        >
+          <!-- » chevrons; mirrored in place to « once the rail is open. -->
+          <svg viewBox="0 0 32 32">
+            <path
+              :transform="pipelineObj.showNodePalette ? 'translate(32,0) scale(-1,1)' : undefined"
+              d="M2 5.5 5.5 2 19.5 16 5.5 30 2 26.5 12.5 16ZM14.5 5.5 18 2 32 16 18 30 14.5 26.5 25 16Z"
+            />
+          </svg>
+        </ControlButton>
+      </template>
     </Controls>
-    </VueFlow>
-    <!-- Empty-canvas start node. It is an OVERLAY, not a Vue Flow node: a real
+  </VueFlow>
+  <!-- Empty-canvas start node. It is an OVERLAY, not a Vue Flow node: a real
          node would land in `currentSelectedPipeline.nodes` and show up in save,
          validation and the dirty flag. It borrows `vue-flow__node-input` so it
          is chrome-for-chrome the same card a Stream/Query source renders as —
@@ -137,11 +137,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          first node belongs where a source lives, leaving the canvas below it
          free for the steps that follow. -->
 
-    <div
-      v-if="needsSource"
-      class="absolute top-32 left-1/2 -translate-x-1/2 z-10"
-    >
-      <!-- Scaled by the LIVE viewport zoom. Real nodes are drawn inside
+  <div v-if="needsSource" class="absolute top-32 left-1/2 z-10 -translate-x-1/2">
+    <!-- Scaled by the LIVE viewport zoom. Real nodes are drawn inside
            `.vue-flow__viewport`, which carries the canvas transform, so at the
            default 0.8 zoom this overlay — a sibling of that transform, not a
            child — rendered 1.25x larger than the node it stands in for.
@@ -152,23 +149,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            out of flow, collapsing the centring wrapper to zero width) and
            `transform-origin:0 0` (which scaled it toward the top-left). This
            card is positioned by us, so it needs neither. -->
-      <div
-        data-test="pipeline-flow-start-node"
-        class="vue-flow__node vue-flow__node-input relative! origin-top! w-max whitespace-nowrap scale-[var(--ghost-zoom,1)] cursor-pointer!"
-        :style="{ '--ghost-zoom': viewport.zoom }"
-        @click="openSourcePicker($event)"
-      >
-        <FlowNodeCard
-          icon="add"
-          io-type="input"
-          :has-input="false"
-          :has-output="false"
-        >
-          <template #body>{{ t("pipeline.chooseSource") }}</template>
-        </FlowNodeCard>
-      </div>
+    <div
+      data-test="pipeline-flow-start-node"
+      class="vue-flow__node vue-flow__node-input relative! w-max origin-top! scale-[var(--ghost-zoom,1)] cursor-pointer! whitespace-nowrap"
+      :style="{ '--ghost-zoom': viewport.zoom }"
+      @click="openSourcePicker($event)"
+    >
+      <FlowNodeCard icon="add" io-type="input" :has-input="false" :has-output="false">
+        <template #body>{{ t("pipeline.chooseSource") }}</template>
+      </FlowNodeCard>
     </div>
-    <!-- Add UI elements or buttons to interact with the methods -->
+  </div>
+  <!-- Add UI elements or buttons to interact with the methods -->
 </template>
 
 <script lang="ts">
@@ -176,7 +168,7 @@ import { ref, onMounted, watch, computed } from "vue";
 import type { Ref } from "vue";
 import { VueFlow, useVueFlow } from "@vue-flow/core";
 import type { VueFlowStore } from "@vue-flow/core";
-import { Controls, ControlButton } from '@vue-flow/controls'
+import { Controls, ControlButton } from "@vue-flow/controls";
 // import vueFlowConfig from "./vueFlowConfig";
 // Shared, token-driven canvas styling — the SAME file the workflow canvas
 // imports, so the two canvases cannot drift. It owns the vue-flow node chrome
@@ -197,8 +189,16 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 
 export default {
-  components: { VueFlow, CustomNode, OIcon, DropzoneBackground, Controls, ControlButton, FlowEdge, FlowNodeCard
-   },
+  components: {
+    VueFlow,
+    CustomNode,
+    OIcon,
+    DropzoneBackground,
+    Controls,
+    ControlButton,
+    FlowEdge,
+    FlowNodeCard,
+  },
   setup() {
     const { t } = useI18n();
     const {
@@ -234,60 +234,58 @@ export default {
     // one back. Keying off "no input node" (io_type/type "input", the same
     // source test hasInputNodeFn uses) covers both the empty canvas and the
     // source-deleted-mid-graph case.
-    const needsSource = computed(() =>
-      !pipelineObj.currentSelectedPipeline.nodes.some(
-        (n: any) => n.io_type === "input" || n.type === "input",
-      ),
+    const needsSource = computed(
+      () =>
+        !pipelineObj.currentSelectedPipeline.nodes.some(
+          (n: any) => n.io_type === "input" || n.type === "input",
+        ),
     );
     const showEdgeHelpNotification = ref(false);
     let notificationTimeout: ReturnType<typeof setTimeout> | null = null;
 
     // `viewport` is the live canvas transform; the empty-canvas start node
     // reads its zoom so it renders at the same scale as real nodes.
-    const { setViewport, viewport } = useVueFlow()
+    const { setViewport, viewport } = useVueFlow();
 
     // Handle edge click events
     const onEdgeClick = () => {
-
       // Clear any existing timeout
       if (notificationTimeout) {
-        clearTimeout(notificationTimeout)
-        notificationTimeout = null
+        clearTimeout(notificationTimeout);
+        notificationTimeout = null;
       }
 
       // Always show notification on edge click (even if already visible)
-      showEdgeHelpNotification.value = true
+      showEdgeHelpNotification.value = true;
 
       // Auto-hide notification after 3.5 seconds
       notificationTimeout = setTimeout(() => {
-        showEdgeHelpNotification.value = false
-        notificationTimeout = null
-      }, 3500)
-    }
+        showEdgeHelpNotification.value = false;
+        notificationTimeout = null;
+      }, 3500);
+    };
 
-
-
-
-    watch(() => pipelineObj.currentSelectedPipeline, () => {
-          if(pipelineObj.dirtyFlag){
-            pipelineObj.dirtyFlag = false;
-          }
-        });
+    watch(
+      () => pipelineObj.currentSelectedPipeline,
+      () => {
+        if (pipelineObj.dirtyFlag) {
+          pipelineObj.dirtyFlag = false;
+        }
+      },
+    );
     onMounted(async () => {
-        setTimeout(() => {
-          if (vueFlowRef.value && pipelineObj.currentSelectedPipeline.nodes.length > 4) {
-            vueFlowRef.value.fitView({ padding: 0.1});
-          }
-          else if(vueFlowRef.value){
-            vueFlowRef.value.fitView({ padding: 1});
-          }
-        }, 100);
-      });
+      setTimeout(() => {
+        if (vueFlowRef.value && pipelineObj.currentSelectedPipeline.nodes.length > 4) {
+          vueFlowRef.value.fitView({ padding: 0.1 });
+        } else if (vueFlowRef.value) {
+          vueFlowRef.value.fitView({ padding: 1 });
+        }
+      }, 100);
+    });
 
-
-function resetTransform() {
-  setViewport({ x: 0, y: 0, zoom: 1 })
-}
+    function resetTransform() {
+      setViewport({ x: 0, y: 0, zoom: 1 });
+    }
     const zoomIn = () => {
       if (vueFlowRef.value) vueFlowRef.value.zoomIn();
     };

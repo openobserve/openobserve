@@ -22,12 +22,31 @@ import Databricks from "./Databricks.vue";
 import databricksCard from "@/components/ingestion/setupCard/content/databricks";
 import { getDataSourceCard } from "@/components/ingestion/setupCard/registry";
 
-const mockEndpoint = ref({ url: "https://test.openobserve.ai", host: "h", port: 443, protocol: "https", tls: true });
-vi.mock("@/composables/useIngestion", () => ({ default: vi.fn(() => ({ endpoint: mockEndpoint })) }));
-vi.mock("@/components/ingestion/setupCard/SetupCardRenderer.vue", () => ({
-  default: { name: "SetupCardRenderer", props: ["content", "subs", "logoUrl", "logoUrlDark"], template: '<div data-test="rich-card-stub" />' },
+const mockEndpoint = ref({
+  url: "https://test.openobserve.ai",
+  host: "h",
+  port: 443,
+  protocol: "https",
+  tls: true,
+});
+vi.mock("@/composables/useIngestion", () => ({
+  default: vi.fn(() => ({ endpoint: mockEndpoint })),
 }));
-const mockStore = createStore({ state: { selectedOrganization: { identifier: "test-org" }, userInfo: { email: "t@e.com" }, organizationData: { organizationPasscode: "pc" }, theme: "light" } });
+vi.mock("@/components/ingestion/setupCard/SetupCardRenderer.vue", () => ({
+  default: {
+    name: "SetupCardRenderer",
+    props: ["content", "subs", "logoUrl", "logoUrlDark"],
+    template: '<div data-test="rich-card-stub" />',
+  },
+}));
+const mockStore = createStore({
+  state: {
+    selectedOrganization: { identifier: "test-org" },
+    userInfo: { email: "t@e.com" },
+    organizationData: { organizationPasscode: "pc" },
+    theme: "light",
+  },
+});
 const mockI18n = createI18n({ locale: "en", messages: { en: {} } });
 const SUBS = { url: "https://test.openobserve.ai", org: "test-org", token: "dGVzdEB0b2tlbg==" };
 
@@ -36,7 +55,11 @@ describe("databricksCard builder", () => {
     const card = databricksCard(SUBS);
     expect(card.provider.name).toBe("Databricks");
     expect(card.provider.metaBadges).toEqual(["Logs"]);
-    expect(card.detect).toMatchObject({ streamType: "logs", match: "keyword", streamName: "databricks" });
+    expect(card.detect).toMatchObject({
+      streamType: "logs",
+      match: "keyword",
+      streamName: "databricks",
+    });
     expect(card.steps.map((s) => s.id)).toEqual(["notebook", "verify"]);
     const code = card.steps.find((s) => s.id === "notebook")!.code!;
     expect(code.raw).toContain(`${SUBS.url}/api/${SUBS.org}/databricks_logs/_json`);
@@ -46,7 +69,9 @@ describe("databricksCard builder", () => {
 });
 describe("Databricks.vue", () => {
   let wrapper: VueWrapper<any>;
-  afterEach(() => { if (wrapper) wrapper.unmount(); });
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
   it("renders the shared card", () => {
     expect(getDataSourceCard("databricks", SUBS)?.provider.name).toBe("Databricks");
     wrapper = mount(Databricks, { global: { plugins: [mockStore, mockI18n] } });

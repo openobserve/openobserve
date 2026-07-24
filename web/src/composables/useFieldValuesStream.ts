@@ -42,8 +42,7 @@ export interface FieldValuesState {
  *     useFieldValuesStream();
  */
 const useFieldValuesStream = () => {
-  const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
-    useHttpStreaming();
+  const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
 
   // Public state: fieldName → { isLoading, values, hasMore, errMsg }
   const fieldValues: Ref<Record<string, FieldValuesState>> = ref({});
@@ -51,15 +50,11 @@ const useFieldValuesStream = () => {
   // Internal per-stream values for cross-stream aggregation:
   // fieldName → streamName → { values, hasMore }
   const streamFieldValues: Ref<
-    Record<
-      string,
-      Record<string, { values: FieldValueEntry[]; hasMore: boolean }>
-    >
+    Record<string, Record<string, { values: FieldValueEntry[]; hasMore: boolean }>>
   > = ref({});
 
   // Finalized values from previous "load more" pages (immutable during streaming)
-  const fieldValuesFinalizedValues: Ref<Record<string, FieldValueEntry[]>> =
-    ref({});
+  const fieldValuesFinalizedValues: Ref<Record<string, FieldValueEntry[]>> = ref({});
 
   // Cumulative size requested per field (grows on "load more")
   const fieldValuesCurrentSize: Ref<Record<string, number>> = ref({});
@@ -76,9 +71,7 @@ const useFieldValuesStream = () => {
 
   const removeTraceId = (field: string, traceId: string) => {
     if (traceIdMapper.value[field]) {
-      traceIdMapper.value[field] = traceIdMapper.value[field].filter(
-        (id) => id !== traceId,
-      );
+      traceIdMapper.value[field] = traceIdMapper.value[field].filter((id) => id !== traceId);
     }
   };
 
@@ -148,8 +141,7 @@ const useFieldValuesStream = () => {
       if (response.type !== "search_response_hits") return;
 
       if (!fieldValues.value[fieldName]) resetFieldValues(fieldName);
-      if (!streamFieldValues.value[fieldName])
-        streamFieldValues.value[fieldName] = {};
+      if (!streamFieldValues.value[fieldName]) streamFieldValues.value[fieldName] = {};
       if (!streamFieldValues.value[fieldName][streamName])
         streamFieldValues.value[fieldName][streamName] = {
           values: [],
@@ -186,13 +178,11 @@ const useFieldValuesStream = () => {
 
         // Aggregate values across all streams and sort by count descending.
         const aggregated: Record<string, number> = {};
-        Object.values(streamFieldValues.value[fieldName]).forEach(
-          ({ values }) => {
-            values.forEach(({ key, count }) => {
-              aggregated[key] = (aggregated[key] ?? 0) + count;
-            });
-          },
-        );
+        Object.values(streamFieldValues.value[fieldName]).forEach(({ values }) => {
+          values.forEach(({ key, count }) => {
+            aggregated[key] = (aggregated[key] ?? 0) + count;
+          });
+        });
 
         const aggregatedArray = Object.entries(aggregated)
           .map(([key, count]) => ({ key, count }))
@@ -200,8 +190,7 @@ const useFieldValuesStream = () => {
 
         // Merge with finalized values from previous pages.
         const finalized = fieldValuesFinalizedValues.value[fieldName] || [];
-        const currentSize =
-          fieldValuesCurrentSize.value[fieldName] || pageSize;
+        const currentSize = fieldValuesCurrentSize.value[fieldName] || pageSize;
 
         if (finalized.length > 0) {
           const finalizedKeys = new Set(finalized.map((v) => v.key));
@@ -217,8 +206,7 @@ const useFieldValuesStream = () => {
           fieldValues.value[fieldName].values = aggregatedArray;
         }
 
-        fieldValues.value[fieldName].hasMore =
-          aggregatedArray.length >= currentSize;
+        fieldValues.value[fieldName].hasMore = aggregatedArray.length >= currentSize;
       }
 
       fieldValues.value[fieldName].isLoading = false;

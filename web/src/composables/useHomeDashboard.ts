@@ -31,8 +31,7 @@ const homeDashboard: Ref<HomeDashboard | null> = ref(null);
 const isLoading = ref(false);
 
 export function useHomeDashboard() {
-  const isHome = (dashboardId: string) =>
-    homeDashboard.value?.dashboardId === dashboardId;
+  const isHome = (dashboardId: string) => homeDashboard.value?.dashboardId === dashboardId;
 
   const load = async (org: string) => {
     if (!org) return;
@@ -40,8 +39,7 @@ export function useHomeDashboard() {
     try {
       const res = await settings.getSetting(org, SETTING_KEY);
       const val = res?.data?.setting_value;
-      homeDashboard.value =
-        val && val.dashboardId ? (val as HomeDashboard) : null;
+      homeDashboard.value = val && val.dashboardId ? (val as HomeDashboard) : null;
     } catch {
       // Missing setting / 404 → no home dashboard for this org.
       homeDashboard.value = null;
@@ -91,18 +89,13 @@ export function useHomeDashboard() {
   // label. Fire-and-forget: a failed persist just leaves the fresh label for
   // this session and re-attempts on the next rename; never toast for it.
   const updateLabel = (org: string, dashboardId: string, label: string) => {
-    if (
-      homeDashboard.value?.dashboardId === dashboardId &&
-      homeDashboard.value.label !== label
-    ) {
+    if (homeDashboard.value?.dashboardId === dashboardId && homeDashboard.value.label !== label) {
       const updated = { ...homeDashboard.value, label };
       homeDashboard.value = updated;
       if (org) {
-        settings
-          .setOrgSetting(org, SETTING_KEY, updated, SETTING_CATEGORY)
-          .catch(() => {
-            /* label persist is best-effort; ref already shows the fresh label */
-          });
+        settings.setOrgSetting(org, SETTING_KEY, updated, SETTING_CATEGORY).catch(() => {
+          /* label persist is best-effort; ref already shows the fresh label */
+        });
       }
     }
   };

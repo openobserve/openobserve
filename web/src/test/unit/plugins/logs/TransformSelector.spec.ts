@@ -58,7 +58,6 @@ vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn((path) => `mocked-${path}`),
 }));
 
-
 describe("TransformSelector.vue", () => {
   let store: any;
 
@@ -94,7 +93,7 @@ describe("TransformSelector.vue", () => {
       global: {
         plugins: [store, i18n],
         stubs: {
-          "OIcon": { template: "<span class='OIcon' />" },
+          OIcon: { template: "<span class='OIcon' />" },
           ...options.stubs,
         },
         ...options.global,
@@ -133,7 +132,9 @@ describe("TransformSelector.vue", () => {
         },
       });
 
-      expect(wrapper.find('[data-test="logs-search-bar-show-query-toggle-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="logs-search-bar-show-query-toggle-btn"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should render save button", () => {
@@ -142,15 +143,20 @@ describe("TransformSelector.vue", () => {
         global: {
           plugins: [store, i18n],
           stubs: {
-            "OIcon": true,
+            OIcon: true,
             OButton: {
-              name: 'OButton',
-              template: '<button class="save-btn" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\', $event)"><slot /></button>',
-              props: ['variant', 'size', 'disabled'],
-              emits: ['click'],
+              name: "OButton",
+              template:
+                '<button class="save-btn" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\', $event)"><slot /></button>',
+              props: ["variant", "size", "disabled"],
+              emits: ["click"],
             },
             OButtonGroup: { template: '<div class="btn-group"><slot /></div>' },
-            ODropdown: { template: '<div><slot name="trigger" /><slot /></div>', props: ['open'], emits: ['update:open'] },
+            ODropdown: {
+              template: '<div><slot name="trigger" /><slot /></div>',
+              props: ["open"],
+              emits: ["update:open"],
+            },
           },
         },
       });
@@ -166,7 +172,7 @@ describe("TransformSelector.vue", () => {
         global: {
           plugins: [store, i18n],
           stubs: {
-            "OIcon": true,
+            OIcon: true,
           },
         },
       });
@@ -183,7 +189,7 @@ describe("TransformSelector.vue", () => {
         global: {
           plugins: [store, i18n],
           stubs: {
-            "OIcon": true,
+            OIcon: true,
           },
         },
       });
@@ -198,7 +204,7 @@ describe("TransformSelector.vue", () => {
         global: {
           plugins: [store, i18n],
           stubs: {
-            "OIcon": true,
+            OIcon: true,
           },
         },
       });
@@ -214,19 +220,20 @@ describe("TransformSelector.vue", () => {
         global: {
           plugins: [store, i18n],
           stubs: {
-            "OIcon": true,
+            OIcon: true,
             OButton: {
-              name: 'OButton',
-              template: '<button :data-test="$attrs[\'data-test\']" @click="$emit(\'click\', $event)"><slot /></button>',
-              props: ['variant', 'size', 'disabled'],
-              emits: ['click'],
+              name: "OButton",
+              template:
+                "<button :data-test=\"$attrs['data-test']\" @click=\"$emit('click', $event)\"><slot /></button>",
+              props: ["variant", "size", "disabled"],
+              emits: ["click"],
             },
             OButtonGroup: { template: '<div class="btn-group"><slot /></div>' },
             // ODropdown stub renders content directly (no portal/teleport)
             ODropdown: {
               template: '<div><slot name="trigger" /><slot /></div>',
-              props: ['open', 'side', 'align', 'sideOffset'],
-              emits: ['update:open'],
+              props: ["open", "side", "align", "sideOffset"],
+              emits: ["update:open"],
             },
           },
         },
@@ -244,7 +251,7 @@ describe("TransformSelector.vue", () => {
         global: {
           plugins: [store, i18n],
           stubs: {
-            "OIcon": true,
+            OIcon: true,
           },
         },
       });
@@ -259,18 +266,19 @@ describe("TransformSelector.vue", () => {
         global: {
           plugins: [store, i18n],
           stubs: {
-            "OIcon": true,
+            OIcon: true,
             OButton: {
-              name: 'OButton',
-              template: '<button :data-test="$attrs[\'data-test\']" @click="$emit(\'click\', $event)"><slot /></button>',
-              props: ['variant', 'size', 'disabled'],
-              emits: ['click'],
+              name: "OButton",
+              template:
+                "<button :data-test=\"$attrs['data-test']\" @click=\"$emit('click', $event)\"><slot /></button>",
+              props: ["variant", "size", "disabled"],
+              emits: ["click"],
             },
             OButtonGroup: { template: '<div class="btn-group"><slot /></div>' },
             ODropdown: {
               template: '<div><slot name="trigger" /><slot /></div>',
-              props: ['open'],
-              emits: ['update:open'],
+              props: ["open"],
+              emits: ["update:open"],
             },
           },
         },
@@ -293,7 +301,7 @@ describe("TransformSelector.vue", () => {
         global: {
           plugins: [store, i18n],
           stubs: {
-            "OIcon": true,
+            OIcon: true,
           },
         },
       });
@@ -309,7 +317,7 @@ describe("TransformSelector.vue", () => {
         global: {
           plugins: [store, i18n],
           stubs: {
-            "OIcon": true,
+            OIcon: true,
           },
         },
       });
@@ -333,7 +341,7 @@ describe("TransformSelector.vue", () => {
         global: {
           plugins: [store, i18n],
           stubs: {
-            "OIcon": true,
+            OIcon: true,
           },
         },
       });
@@ -352,7 +360,7 @@ describe("TransformSelector.vue", () => {
         global: {
           plugins: [store, i18n],
           stubs: {
-            "OIcon": true,
+            OIcon: true,
           },
         },
       });
@@ -370,7 +378,7 @@ describe("TransformSelector.vue", () => {
         global: {
           plugins: [store, i18n],
           stubs: {
-            "OIcon": true,
+            OIcon: true,
           },
         },
       });
@@ -389,7 +397,7 @@ describe("TransformSelector.vue", () => {
         global: {
           plugins: [store, i18n],
           stubs: {
-            "OIcon": true,
+            OIcon: true,
           },
         },
       });
@@ -408,7 +416,7 @@ describe("TransformSelector.vue", () => {
         global: {
           plugins: [store, i18n],
           stubs: {
-            "OIcon": true,
+            OIcon: true,
           },
         },
       });
@@ -424,7 +432,7 @@ describe("TransformSelector.vue", () => {
         global: {
           plugins: [store, i18n],
           stubs: {
-            "OIcon": true,
+            OIcon: true,
           },
         },
       });
@@ -443,7 +451,7 @@ describe("TransformSelector.vue", () => {
         global: {
           plugins: [store, i18n],
           stubs: {
-            "OIcon": true,
+            OIcon: true,
           },
         },
       });
@@ -462,7 +470,7 @@ describe("TransformSelector.vue", () => {
         global: {
           plugins: [store, i18n],
           stubs: {
-            "OIcon": true,
+            OIcon: true,
           },
         },
       });
@@ -483,7 +491,7 @@ describe("TransformSelector.vue", () => {
         global: {
           plugins: [store, i18n],
           stubs: {
-            "OIcon": true,
+            OIcon: true,
           },
         },
       });
@@ -503,7 +511,7 @@ describe("TransformSelector.vue", () => {
         global: {
           plugins: [store, i18n],
           stubs: {
-            "OIcon": true,
+            OIcon: true,
           },
         },
       });
@@ -529,20 +537,21 @@ describe("TransformSelector.vue", () => {
         global: {
           plugins: [darkStore, i18n],
           stubs: {
-            "OIcon": true,
+            OIcon: true,
             OButton: {
-              name: 'OButton',
-              template: '<button :data-test="$attrs[\'data-test\']" @click="$emit(\'click\', $event)"><slot /></button>',
-              props: ['variant', 'size', 'disabled'],
-              emits: ['click'],
+              name: "OButton",
+              template:
+                "<button :data-test=\"$attrs['data-test']\" @click=\"$emit('click', $event)\"><slot /></button>",
+              props: ["variant", "size", "disabled"],
+              emits: ["click"],
             },
             OButtonGroup: {
               template: '<div class="btn-group" :class="$attrs.class"><slot /></div>',
             },
             ODropdown: {
               template: '<div><slot name="trigger" /><slot /></div>',
-              props: ['open'],
-              emits: ['update:open'],
+              props: ["open"],
+              emits: ["update:open"],
             },
           },
         },
@@ -573,7 +582,7 @@ describe("TransformSelector.vue", () => {
         global: {
           plugins: [store, i18n],
           stubs: {
-            "OIcon": true,
+            OIcon: true,
           },
         },
       });
@@ -594,7 +603,7 @@ describe("TransformSelector.vue", () => {
         global: {
           plugins: [store, i18n],
           stubs: {
-            "OIcon": true,
+            OIcon: true,
           },
         },
       });
@@ -614,7 +623,7 @@ describe("TransformSelector.vue", () => {
         global: {
           plugins: [store, i18n],
           stubs: {
-            "OIcon": true,
+            OIcon: true,
           },
         },
       });
@@ -634,7 +643,7 @@ describe("TransformSelector.vue", () => {
         global: {
           plugins: [store, i18n],
           stubs: {
-            "OIcon": true,
+            OIcon: true,
           },
         },
       });
@@ -653,7 +662,7 @@ describe("TransformSelector.vue", () => {
         global: {
           plugins: [store, i18n],
           stubs: {
-            "OIcon": true,
+            OIcon: true,
           },
         },
       });

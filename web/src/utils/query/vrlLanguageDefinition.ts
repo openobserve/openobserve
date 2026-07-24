@@ -40,8 +40,7 @@ export const vrlLanguageDefinition = {
 
   // we include these common regular expressions
   symbols: /[=><!~?&%|+\-*/^.,:]+/,
-  escapes:
-    /\\(?:[abfnrtv\\"'$]|x[0-9A-Fa-f]{1,4}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8})/,
+  escapes: /\\(?:[abfnrtv\\"'$]|x[0-9A-Fa-f]{1,4}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8})/,
 
   // The main tokenizer for our languages
   tokenizer: {
@@ -71,10 +70,7 @@ export const vrlLanguageDefinition = {
       [/r'[^']+'/, { token: "regexp" /*log: 'root_r_string::\n\n$0'*/ }],
 
       // timestamps
-      [
-        /t'[^']+'/,
-        { token: "regexp" /*log: 'function_arg_r_string::\n\n$0'*/ },
-      ],
+      [/t'[^']+'/, { token: "regexp" /*log: 'function_arg_r_string::\n\n$0'*/ }],
 
       // field access, eg: .foo
       [
@@ -280,24 +276,12 @@ export const vrlLanguageDefinition = {
       // newline func(.foo)
       // [/(\.)/, { token: "entity" }],
       // r strings
-      [
-        /r'[^']+'/,
-        { token: "regexp" /*log: 'function_arg_r_string::\n\n$0'*/ },
-      ],
-      [
-        /t'[^']+'/,
-        { token: "regexp" /*log: 'function_arg_r_string::\n\n$0'*/ },
-      ],
+      [/r'[^']+'/, { token: "regexp" /*log: 'function_arg_r_string::\n\n$0'*/ }],
+      [/t'[^']+'/, { token: "regexp" /*log: 'function_arg_r_string::\n\n$0'*/ }],
       // s strings
       [/s'[^']+'/, { token: "string" /*log: 'root_s_string::\n\n$0'*/ }],
-      [
-        /\)/,
-        { token: "", /*log: 'end_off_function_arg::\n\n$0',*/ next: "@pop" },
-      ],
-      [
-        /[.[\],\\"%{}$:^\w]+/,
-        { token: "" /*log: 'function_arg_anything_else::\n\n$0'*/ },
-      ],
+      [/\)/, { token: "", /*log: 'end_off_function_arg::\n\n$0',*/ next: "@pop" }],
+      [/[.[\],\\"%{}$:^\w]+/, { token: "" /*log: 'function_arg_anything_else::\n\n$0'*/ }],
     ],
   },
 };

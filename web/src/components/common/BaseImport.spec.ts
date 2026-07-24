@@ -39,8 +39,7 @@ const globalConfig = {
       template: '<div class="monaco-editor-stub" data-test="query-editor-stub" />',
     },
     AppTabs: {
-      template:
-        '<div class="app-tabs-stub" :data-test="$attrs[\'data-test\']"><slot /></div>',
+      template: '<div class="app-tabs-stub" :data-test="$attrs[\'data-test\']"><slot /></div>',
       props: ["tabs", "activeTab"],
       emits: ["update:active-tab"],
     },
@@ -50,7 +49,8 @@ const globalConfig = {
       props: ["label", "disabled", "loading", "variant", "size", "type"],
     },
     OSplitter: {
-      template: '<div data-test="o-splitter-stub"><slot name="before" /><slot name="after" /></div>',
+      template:
+        '<div data-test="o-splitter-stub"><slot name="before" /><slot name="after" /></div>',
       props: ["modelValue", "limits", "horizontal"],
       emits: ["update:modelValue"],
     },
@@ -60,10 +60,14 @@ const globalConfig = {
       props: ["modelValue", "placeholder"],
     },
     OFile: {
-      template: '<div class="o-file-stub" :data-test="$attrs[\'data-test\']"><slot /><slot name="prepend" /><slot name="append" /><slot name="hint" /></div>',
+      template:
+        '<div class="o-file-stub" :data-test="$attrs[\'data-test\']"><slot /><slot name="prepend" /><slot name="append" /><slot name="hint" /></div>',
       props: ["modelValue", "label", "accept", "multiple", "bottomSlots"],
     },
-    OIcon: { template: '<i :data-test="$attrs[\'data-test\']" :class="name" />', props: ["name", "size"] },
+    OIcon: {
+      template: '<i :data-test="$attrs[\'data-test\']" :class="name" />',
+      props: ["name", "size"],
+    },
     OSeparator: { template: "<hr />" },
   },
   plugins: [i18n],
@@ -114,23 +118,17 @@ describe("BaseImport.vue", () => {
 
     it("renders back button with testPrefix-based data-test", () => {
       wrapper = createWrapper({ testPrefix: "alert" });
-      expect(
-        wrapper.find('[data-test="alert-import-back-btn"]').exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="alert-import-back-btn"]').exists()).toBe(true);
     });
 
     it("renders cancel button with testPrefix-based data-test", () => {
       wrapper = createWrapper({ testPrefix: "alert" });
-      expect(
-        wrapper.find('[data-test="alert-import-cancel-btn"]').exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="alert-import-cancel-btn"]').exists()).toBe(true);
     });
 
     it("renders import button with testPrefix-based data-test", () => {
       wrapper = createWrapper({ testPrefix: "alert" });
-      expect(
-        wrapper.find('[data-test="alert-import-json-btn"]').exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="alert-import-json-btn"]').exists()).toBe(true);
     });
 
     it("disables import button when isImporting is true", () => {
@@ -327,9 +325,7 @@ describe("BaseImport.vue", () => {
 
     it("output editor container fills its pane via flex instead of a fixed height", () => {
       wrapper = createWrapper();
-      const outputEditor = wrapper.find(
-        '[data-test="dashboard-import-output-editor"]',
-      );
+      const outputEditor = wrapper.find('[data-test="dashboard-import-output-editor"]');
       expect(outputEditor.exists()).toBe(true);
       // The pane fills the splitter height with flex (no brittle calc(100vh-Npx)).
       const classes = outputEditor.classes();

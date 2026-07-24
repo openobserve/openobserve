@@ -114,7 +114,8 @@ const COMPLEX_PATTERNS = {
   setOperations: /\b(UNION|INTERSECT|EXCEPT)\b/i,
 
   // Window functions
-  windowFunctions: /\b(OVER\s*\(|PARTITION\s+BY|ROW_NUMBER|RANK|DENSE_RANK|LAG|LEAD|FIRST_VALUE|LAST_VALUE|NTH_VALUE)\b/i,
+  windowFunctions:
+    /\b(OVER\s*\(|PARTITION\s+BY|ROW_NUMBER|RANK|DENSE_RANK|LAG|LEAD|FIRST_VALUE|LAST_VALUE|NTH_VALUE)\b/i,
 
   // Nested functions (e.g., ceil(count(field))) - function inside function
   nestedFunctions: /\w+\s*\(\s*\w+\s*\(/i,
@@ -243,10 +244,7 @@ function classifyField(field: ParsedField): "x" | "y" | "breakdown" {
  * @param streamType The stream type (default: 'logs')
  * @returns ParsedQuery object
  */
-export async function parseSQL(
-  query: string,
-  streamType: string = "logs",
-): Promise<ParsedQuery> {
+export async function parseSQL(query: string, streamType: string = "logs"): Promise<ParsedQuery> {
   // Default result for unparseable queries
   const defaultResult: ParsedQuery = {
     stream: "",

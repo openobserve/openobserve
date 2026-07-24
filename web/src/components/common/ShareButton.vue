@@ -27,7 +27,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <span v-if="showLabel" class="ml-1">{{ t("search.shareLink") }}</span>
     <OTooltip v-if="isWebUrlNotConfigured">
-      <template #content><OIcon name="warning" size="sm" class="mr-1" />{{ t("search.webUrlNotConfigured") }}</template>
+      <template #content
+        ><OIcon name="warning" size="sm" class="mr-1" />{{
+          t("search.webUrlNotConfigured")
+        }}</template
+      >
     </OTooltip>
     <OTooltip
       v-else-if="tooltip || !showLabel"
@@ -168,24 +172,23 @@ export default defineComponent({
             successMessage: t("search.linkCopiedSuccessfully"),
             errorMessage: t("search.errorCopyingLink"),
             timeout: 5000,
-          }).then((success: boolean) => {
-            if (success) {
-              emit("copy:success", { url: shortURL, type: "short" });
-            } else {
-              console.error("Failed to copy short URL:", shortURL);
-              emit("copy:error", { error: new Error("Copy failed"), type: "short" });
-            }
           })
-          .finally(() => {
-            // Clean up: clear store
-            store.commit("clearPendingShortURL");
-            isLoading.value = false;
-          });
+            .then((success: boolean) => {
+              if (success) {
+                emit("copy:success", { url: shortURL, type: "short" });
+              } else {
+                console.error("Failed to copy short URL:", shortURL);
+                emit("copy:error", { error: new Error("Copy failed"), type: "short" });
+              }
+            })
+            .finally(() => {
+              // Clean up: clear store
+              store.commit("clearPendingShortURL");
+              isLoading.value = false;
+            });
         } else if (attempts >= MAX_ATTEMPTS) {
           // Timeout: Stop polling after max attempts
-          console.warn(
-            "Polling timeout: Short URL not received within time limit",
-          );
+          console.warn("Polling timeout: Short URL not received within time limit");
           if (pollIntervalId) {
             clearInterval(pollIntervalId);
             pollIntervalId = null;
@@ -242,17 +245,18 @@ export default defineComponent({
                 successMessage: t("search.linkCopiedSuccessfully"),
                 errorMessage: t("search.errorCopyingLink"),
                 timeout: 5000,
-              }).then((success: boolean) => {
-                if (success) {
-                  emit("copy:success", { url: shortUrl, type: "short" });
-                } else {
-                  console.error("Failed to copy short URL:", shortUrl);
-                  emit("copy:error", { error: new Error("Copy failed"), type: "short" });
-                }
               })
-              .finally(() => {
-                isLoading.value = false;
-              });
+                .then((success: boolean) => {
+                  if (success) {
+                    emit("copy:success", { url: shortUrl, type: "short" });
+                  } else {
+                    console.error("Failed to copy short URL:", shortUrl);
+                    emit("copy:error", { error: new Error("Copy failed"), type: "short" });
+                  }
+                })
+                .finally(() => {
+                  isLoading.value = false;
+                });
             }
 
             emit("shorten:success", {
@@ -312,4 +316,3 @@ export default defineComponent({
   },
 });
 </script>
-

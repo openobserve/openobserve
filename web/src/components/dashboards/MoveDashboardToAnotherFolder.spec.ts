@@ -27,7 +27,7 @@ vi.mock("./SelectFolderDropdown.vue", () => ({
   default: {
     name: "SelectFolderDropdown",
     template:
-      '<div class="select-folder-dropdown" @click="$emit(\'folder-selected\', { label: \'Test Folder\', value: \'folder1\' })"></div>',
+      "<div class=\"select-folder-dropdown\" @click=\"$emit('folder-selected', { label: 'Test Folder', value: 'folder1' })\"></div>",
     props: ["activeFolderId"],
     emits: ["folder-selected"],
   },
@@ -122,14 +122,11 @@ const getMockUtils = async () => {
   const zincutils = await import("../../utils/zincutils");
   const useLoadingModule = await import("@/composables/useLoading");
   return {
-    moveDashboardToAnotherFolder: vi.mocked(
-      commons.moveDashboardToAnotherFolder,
-    ),
+    moveDashboardToAnotherFolder: vi.mocked(commons.moveDashboardToAnotherFolder),
     getImageURL: vi.mocked(zincutils.getImageURL),
     useLoading: vi.mocked(useLoadingModule.useLoading),
   };
 };
-
 
 describe("MoveDashboardToAnotherFolder", () => {
   let wrapper: any;
@@ -164,8 +161,7 @@ describe("MoveDashboardToAnotherFolder", () => {
     vi.clearAllMocks();
 
     // Reset mocked functions
-    const { moveDashboardToAnotherFolder, getImageURL, useLoading } =
-      await getMockUtils();
+    const { moveDashboardToAnotherFolder, getImageURL, useLoading } = await getMockUtils();
     moveDashboardToAnotherFolder.mockReset();
     getImageURL.mockReset().mockReturnValue("test-image-url");
     useLoading.mockImplementation((fn) => ({
@@ -274,15 +270,11 @@ describe("MoveDashboardToAnotherFolder", () => {
     });
 
     it("should render form body section", () => {
-      expect(
-        wrapper.find('[data-test="dashboard-folder-move-body"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-folder-move-body"]').exists()).toBe(true);
     });
 
     it("should render current folder input", () => {
-      const currentFolderInput = wrapper.find(
-        '[data-test="dashboard-folder-move-name"]',
-      );
+      const currentFolderInput = wrapper.find('[data-test="dashboard-folder-move-name"]');
       expect(currentFolderInput.exists()).toBe(true);
     });
 
@@ -404,10 +396,9 @@ describe("MoveDashboardToAnotherFolder", () => {
 
       await wrapper.vm.onSubmit.execute();
 
-      expect(mockUseNotifications.showErrorNotification).toHaveBeenCalledWith(
-        "Move failed",
-        { timeout: 2000 },
-      );
+      expect(mockUseNotifications.showErrorNotification).toHaveBeenCalledWith("Move failed", {
+        timeout: 2000,
+      });
     });
 
     it("should show default error message when no error message is provided", async () => {
@@ -440,10 +431,9 @@ describe("MoveDashboardToAnotherFolder", () => {
 
       await wrapper.vm.onSubmit.execute();
 
-      expect(mockUseNotifications.showErrorNotification).toHaveBeenCalledWith(
-        "Server error",
-        { timeout: 2000 },
-      );
+      expect(mockUseNotifications.showErrorNotification).toHaveBeenCalledWith("Server error", {
+        timeout: 2000,
+      });
     });
 
     it("should handle error without message property", async () => {
@@ -560,9 +550,7 @@ describe("MoveDashboardToAnotherFolder", () => {
     });
 
     it("should translate labels correctly", () => {
-      expect(wrapper.vm.t("dashboard.currentFolderLabel")).toBe(
-        "Current Folder",
-      );
+      expect(wrapper.vm.t("dashboard.currentFolderLabel")).toBe("Current Folder");
       expect(wrapper.vm.t("dashboard.cancel")).toBe("Cancel");
       expect(wrapper.vm.t("common.move")).toBe("Move");
     });
@@ -593,11 +581,7 @@ describe("MoveDashboardToAnotherFolder", () => {
         dashboardIds: ["dashboard1", "dashboard2", "dashboard3"],
       });
 
-      expect(wrapper.vm.dashboardIds).toEqual([
-        "dashboard1",
-        "dashboard2",
-        "dashboard3",
-      ]);
+      expect(wrapper.vm.dashboardIds).toEqual(["dashboard1", "dashboard2", "dashboard3"]);
     });
 
     it("should handle different activeFolderId", () => {
@@ -610,11 +594,7 @@ describe("MoveDashboardToAnotherFolder", () => {
 
     it("should declare expected emits including update:open", () => {
       wrapper = createWrapper();
-      expect(wrapper.vm.$options.emits).toEqual([
-        "updated",
-        "close",
-        "update:open",
-      ]);
+      expect(wrapper.vm.$options.emits).toEqual(["updated", "close", "update:open"]);
     });
   });
 
@@ -622,9 +602,7 @@ describe("MoveDashboardToAnotherFolder", () => {
     it("should handle missing active folder gracefully via optional chaining", () => {
       // The current template uses ?.name on the folder lookup, so a missing
       // folder should NOT throw — it just yields an undefined input value.
-      expect(() =>
-        createWrapper({ activeFolderId: "non-existent-folder" }),
-      ).not.toThrow();
+      expect(() => createWrapper({ activeFolderId: "non-existent-folder" })).not.toThrow();
     });
 
     it("should handle empty dashboard IDs array", () => {
@@ -652,12 +630,8 @@ describe("MoveDashboardToAnotherFolder", () => {
     });
 
     it("should expose required data-test hooks for tests", () => {
-      expect(
-        wrapper.find('[data-test="dashboard-folder-move-body"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="dashboard-folder-move-name"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-folder-move-body"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-folder-move-name"]').exists()).toBe(true);
     });
 
     it("should have the body container element", () => {
@@ -666,9 +640,7 @@ describe("MoveDashboardToAnotherFolder", () => {
     });
 
     it("should render disabled current folder input", () => {
-      const currentFolderInput = wrapper.find(
-        '[data-test="dashboard-folder-move-name"]',
-      );
+      const currentFolderInput = wrapper.find('[data-test="dashboard-folder-move-name"]');
       expect(currentFolderInput.exists()).toBe(true);
     });
   });
