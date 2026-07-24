@@ -1001,6 +1001,26 @@ pub async fn validator_gcp(req_data: &RequestData) -> Result<AuthValidationResul
     }
 }
 
+/// Extracts the RUM intake token, preferring the query param (browser RUM) over the
+/// request header (mobile RUM). The header path exists because the mobile SDK's native
+/// request factory appends its own query string to the intake URL and therefore cannot
+/// also carry `?oo-api-key=...` without producing a malformed double-`?` URL.
+/// Both the `oo-api-key` header/param and the legacy `o2-api-key` alias are accepted,
+/// query first. Returns `None` when neither source carries a token.
+fn extract_rum_token(
+    query: &std::collections::HashMap<String, String>,
+    headers: &HeaderMap,
+) -> Option<String> {
+    if let Some(token) = query.get("oo-api-key").or_else(|| query.get("o2-api-key")) {
+        return Some(token.clone());
+    }
+    headers
+        .get("oo-api-key")
+        .or_else(|| headers.get("o2-api-key"))
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_owned())
+}
+
 /// Validates RUM requests
 pub async fn validator_rum(req_data: &RequestData) -> Result<AuthValidationResult, AuthError> {
     // By the time this middleware runs, axum's nested router has already stripped
@@ -1028,8 +1048,8 @@ pub async fn validator_rum(req_data: &RequestData) -> Result<AuthValidationResul
             .into_owned()
             .collect();
 
-    let token = query.get("oo-api-key").or_else(|| query.get("o2-api-key"));
-    match token {
+    let token = extract_rum_token(&query, &req_data.headers);
+    match token.as_deref() {
         Some(token) => match validate_token(token, org_id_end_point[0]).await {
             Ok(_res) => {
                 // Get user from token to set user_id header
@@ -1249,6 +1269,86 @@ mod tests {
         infra::config::{ORG_USERS, USERS},
         meta::user::UserRequest,
     };
+
+    #[test]
+    fn extract_rum_token_prefers_query_over_header() {
+        let mut query = std::collections::HashMap::new();
+        query.insert("oo-api-key".to_string(), "query-token".to_string());
+        let mut headers = HeaderMap::new();
+        headers.insert("oo-api-key", "header-token".parse().unwrap());
+
+        assert_eq!(
+            extract_rum_token(&query, &headers).as_deref(),
+            Some("query-token")
+        );
+    }
+
+    #[test]
+    fn extract_rum_token_reads_oo_query_param() {
+        let mut query = std::collections::HashMap::new();
+        query.insert("oo-api-key".to_string(), "tok".to_string());
+
+        assert_eq!(
+            extract_rum_token(&query, &HeaderMap::new()).as_deref(),
+            Some("tok")
+        );
+    }
+
+    #[test]
+    fn extract_rum_token_reads_o2_query_alias() {
+        let mut query = std::collections::HashMap::new();
+        query.insert("o2-api-key".to_string(), "tok".to_string());
+
+        assert_eq!(
+            extract_rum_token(&query, &HeaderMap::new()).as_deref(),
+            Some("tok")
+        );
+    }
+
+    #[test]
+    fn extract_rum_token_falls_back_to_oo_header() {
+        let mut headers = HeaderMap::new();
+        headers.insert("oo-api-key", "header-token".parse().unwrap());
+
+        assert_eq!(
+            extract_rum_token(&std::collections::HashMap::new(), &headers).as_deref(),
+            Some("header-token")
+        );
+    }
+
+    #[test]
+    fn extract_rum_token_falls_back_to_o2_header_alias() {
+        let mut headers = HeaderMap::new();
+        headers.insert("o2-api-key", "header-token".parse().unwrap());
+
+        assert_eq!(
+            extract_rum_token(&std::collections::HashMap::new(), &headers).as_deref(),
+            Some("header-token")
+        );
+    }
+
+    #[test]
+    fn extract_rum_token_rejects_unrecognized_vendor_api_key_headers() {
+        // Only `oo-api-key` and the `o2-api-key` alias authenticate. Accepting any other
+        // vendor's API-key header would widen the auth surface to third-party clients, so
+        // upstream header names must never be honoured here.
+        let mut headers = HeaderMap::new();
+        headers.insert("x-vendor-api-key", "third-party-token".parse().unwrap());
+        headers.insert("api-key", "third-party-token".parse().unwrap());
+
+        assert_eq!(
+            extract_rum_token(&std::collections::HashMap::new(), &headers),
+            None
+        );
+    }
+
+    #[test]
+    fn extract_rum_token_returns_none_when_absent() {
+        assert_eq!(
+            extract_rum_token(&std::collections::HashMap::new(), &HeaderMap::new()),
+            None
+        );
+    }
 
     #[tokio::test]
     async fn test_validation_response_builder_from_db_user() {

@@ -336,6 +336,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </div>
                   </template>
+                  <template #cell-platform="{ row }">
+                    <OBadge
+                      :variant="isMobilePlatform(row.source) ? 'primary' : 'default'"
+                      size="sm"
+                      data-test="rum-app-sessions-platform-text"
+                    >{{ row.platform }}</OBadge>
+                  </template>
                   <template #cell-activity="{ row }">
                     <SessionActivitySparkline
                       :session-id="row.session_id"
@@ -408,9 +415,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+// Explicit name so <keep-alive :include> in RealUserMonitoring.vue matches this
+// view. Without it the name is inferred from the FILENAME, so renaming the file
+// would silently drop it from the cache and bring back the refetch-on-return.
+defineOptions({ name: "AppSessions" });
+
 import {
   ref,
   onMounted,
+  onBeforeUnmount,
+  onActivated,
+  onDeactivated,
   type Ref,
   onBeforeMount,
   defineAsyncComponent,
@@ -430,6 +445,7 @@ import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import {
   durationFormatter,
@@ -442,6 +458,7 @@ import { useStore } from "vuex";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import useSession from "@/composables/useSessionReplay";
+import { isMobileReplaySource } from "@/composables/rum/useMobileSessionReplay";
 import DateTime from "@/components/DateTime.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import SessionLocationColumn from "@/components/rum/sessionReplay/SessionLocationColumn.vue";
@@ -452,6 +469,7 @@ import SessionActivitySparkline from "@/components/rum/sessionReplay/SessionActi
 import {
   holdActivityQueries,
   releaseActivityQueries,
+  cancelPendingActivityQueries,
 } from "@/composables/useSessionActivity";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -670,6 +688,15 @@ const tableColumns = [
     meta: { align: "left", autoWidth: true },
   },
   {
+    id: "platform",
+    header: t("rum.platform"),
+    accessorFn: (row: any) => row["platform"] || "Browser",
+    sortable: true,
+    hideable: true,
+    size: 140,
+    meta: { align: "left" },
+  },
+  {
     id: "activity",
     header: t("rum.activity"),
     accessorFn: (row: any) => row["events"] || 0,
@@ -719,6 +746,40 @@ onMounted(async () => {
     await getStreamFields();
     getSessions();
   }
+});
+
+// Leaving the tab must free the searches it started. They are not cheap to abandon: the
+// server holds a slot in its per-user/per-org work-group concurrency queue until each
+// request completes, so an abandoned fan-out keeps starving the tab the user just moved
+// to — which then queues, gets cancelled, and surfaces as HTTP 429.
+function releaseInFlightSearches() {
+  inFlightLoad?.abort();
+  inFlightLoad = null;
+  cancelPendingActivityQueries();
+}
+
+onBeforeUnmount(releaseInFlightSearches);
+
+// This view is kept alive, so navigating to a session detail page DEACTIVATES it rather
+// than unmounting it — onBeforeUnmount does not run. Without this the searches started
+// here would keep holding work-group slots while the detail page runs its own.
+onDeactivated(releaseInFlightSearches);
+
+// Returning from a session detail page: show what is already on screen. The rows, the
+// KPI strip and the scroll position all survived in the cache, so re-querying would only
+// spend the user's search budget to repaint the same thing. Reload only when the last
+// attempt did not leave a usable result (first activation, or a failed/aborted load).
+// Vue fires onActivated on the FIRST mount as well as on every return from the cache.
+// onMounted already owns the initial load (it must await getStreamFields first), so the
+// first activation is skipped — otherwise entering the tab would fire the query chain
+// twice, which is exactly the duplicate load this page was just fixed for.
+let activatedBefore = false;
+onActivated(() => {
+  if (!activatedBefore) {
+    activatedBefore = true;
+    return;
+  }
+  if (!hasCompleteResult.value) getSessions();
 });
 
 const getStreamFields = () => {
@@ -794,9 +855,50 @@ const getStreamFields = () => {
   });
 };
 
+// One load fans out ~5 concurrent searches (page query + up to 4 window aggregates),
+// then a replay-times query, then activity sparklines. Entering the tab asks for that
+// load TWICE: onMounted calls getSessions(), and DateTime emits `on:date-change` from
+// its own onMounted, which lands in updateDateChange and calls it again. The dedupe
+// guard there cannot catch it — for a relative range DateTime recomputes startTime/
+// endTime to "now" on every emit, so the payload never equals the stored one.
+//
+// The server caps concurrent searches per user/org in a work-group queue; overflow
+// waits in that queue, and a queued search that is then cancelled surfaces as HTTP 429
+// (ErrorCodes::SearchCancelQuery maps to 429 — the "429 + auto cancel" is one event,
+// not two). Doubling the fan-out is what pushes a single tab open over the limit.
+//
+// So each load supersedes the previous one: abort whatever is still running before
+// starting. That collapses the duplicate entry load to a single live fan-out, and keeps
+// a genuine re-query (date change, refresh) correct — newest wins, rather than being
+// dropped by an "is something in flight?" guard.
+let inFlightLoad: AbortController | null = null;
+
+// True once a load has produced a usable result. Drives the keep-alive return path: the
+// view is cached now, so coming back from a session detail page must SHOW what was
+// already fetched rather than re-running the whole query chain.
+const hasCompleteResult = ref(false);
+
+// Aborting rejects every pending request; those are OUR cancellations, not failures, so
+// they must not raise error toasts or paint SQL error squiggles.
+function isAbortError(err: any): boolean {
+  return (
+    err?.code === "ERR_CANCELED" ||
+    err?.name === "CanceledError" ||
+    err?.name === "AbortError"
+  );
+}
+
 const getSessions = () => {
+  inFlightLoad?.abort();
+  const loadController = new AbortController();
+  inFlightLoad = loadController;
+  const signal = loadController.signal;
+
   sessionState.data.sessions = {};
   sqlErrorRanges.value = [];
+  // Aggregates are now stage 3, so clear the strip here rather than when they start —
+  // otherwise it keeps showing the PREVIOUS window's numbers while the new list loads.
+  clearWindowAggregates();
 
   const interval = getTimeInterval(
     dateTime.value.startTime,
@@ -850,19 +952,16 @@ const getSessions = () => {
     whereClause += " AND (" + sessionState.data.editorValue.trim() + ")";
   }
 
-  // Activity sparklines are the lowest-priority calls — hold them until the
-  // page query, replay query, and all window aggregates have settled.
+  // Activity sparklines are the lowest-priority calls — hold them until the session
+  // list and the window aggregates above it have finished.
   holdActivityQueries();
-
-  // Window-level aggregates (KPI totals, deltas, insights) run in parallel
-  // with the page query and share its WHERE clause + time range.
-  const aggregatesSettled = fetchWindowAggregates(req, whereClause);
 
   // Query 1: Get sessions with all metrics from _rumdata (supports usr_email, usr_id, session_id filters)
   req.query.sql = `
     SELECT
       min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp,
       min(type) as type,
+      min(source) as source,
       SUM(CASE WHEN type='error' THEN 1 ELSE 0 END) AS error_count,
       ${frustrationCountField},
       SUM(CASE WHEN type!='null' THEN 1 ELSE 0 END) AS events,
@@ -884,15 +983,22 @@ const getSessions = () => {
         org_identifier: store.state.selectedOrganization.identifier,
         query: req,
         page_type: "logs",
+        signal,
       },
       "RUM",
     )
     .then((res) => {
       const hits = res.data.hits;
 
+      hasCompleteResult.value = true;
       if (hits.length === 0) {
         rows.value = [];
-        return;
+        // Nothing matched the window and filter, so every follow-up query is answerable
+        // without asking the server: the aggregates share this exact WHERE clause and
+        // time range (they would return 0), and activity sparklines are per-row. Zero the
+        // KPI state directly instead of spending 4 more searches to be told the same.
+        clearWindowAggregates();
+        return "empty";
       }
 
       // Store all session data from _rumdata
@@ -902,6 +1008,7 @@ const getSessions = () => {
           zo_sql_timestamp: hit.zo_sql_timestamp,
           timestamp: hit.zo_sql_timestamp,
           type: hit.type,
+          source: hit.source,
           error_count: hit.error_count,
           frustration_count: hit.frustration_count || 0,
           events: hit.events || 0,
@@ -915,9 +1022,14 @@ const getSessions = () => {
       const sessionIds = hits.map((hit: any) => hit.session_id);
 
       // Query 2: Get start/end times from _sessionreplay
-      return getSessionTimeFromReplay(req, sessionIds);
+      return getSessionTimeFromReplay(req, sessionIds, signal);
     })
     .catch((err) => {
+      // A superseded load is not a failure — leave the rows and the editor alone so the
+      // load that replaced it can paint its own results.
+      if (isAbortError(err)) return;
+      // A failed load leaves nothing worth restoring, so allow a retry on re-activation.
+      hasCompleteResult.value = false;
       rows.value = [];
       toast({
         message: err.response?.data?.message || "Error while fetching sessions",
@@ -940,14 +1052,52 @@ const getSessions = () => {
       isLoading.value.pop();
     });
 
-  // Everything settled (success or failure) → let activity queries through.
-  Promise.allSettled([pageQuerySettled, aggregatesSettled]).finally(() => {
-    releaseActivityQueries();
-  });
+  // ── Staged loading ────────────────────────────────────────────────────────
+  // The server allows a user only O2_WORK_GROUP_USER_SHORT_MAX_CONCURRENCY concurrent
+  // searches — 4 by default. This page used to fire the page query and all four window
+  // aggregates AT ONCE: 5 concurrent, over the limit on a single clean load. The
+  // overflow waits in the work-group queue, and a queued search that is then cancelled
+  // is reported as HTTP 429 (ErrorCodes::SearchCancelQuery maps to 429).
+  //
+  // So the page loads in priority order instead, never exceeding the cap:
+  //   1. session list      (1 search)  — what the user actually came for
+  //   2. replay start/end  (1 search)  — chained inside the page query, completes the rows
+  //   3. window aggregates (<=4)       — KPI strip and insight banner above the table
+  //   4. activity sparklines           — already capped at 4 concurrent internally
+  //
+  // Each stage waits for the previous one, so the KPI strip fills in a moment after the
+  // table rather than competing with it for slots.
+  pageQuerySettled
+    .then((outcome) => {
+      // Nothing above the table to fill when there were no sessions, or when a newer
+      // load has already replaced this one.
+      if (outcome === "empty" || inFlightLoad !== loadController) return;
+      return fetchWindowAggregates(req, whereClause, signal);
+    })
+    .finally(() => {
+      // Stage 4 last. Gate the release on still being the current load rather than on
+      // `signal.aborted`: holdActivityQueries() is a no-op while the gate is already
+      // held, so if a superseded load released it here, the load that replaced it would
+      // run its aggregates with activity queries competing for the same 4 slots. The
+      // newer load owns the gate and will release it when its own stages finish.
+      if (inFlightLoad === loadController) releaseActivityQueries();
+    });
 };
 
+// Reset the KPI strip and insight banner to an explicit empty state without querying.
+function clearWindowAggregates() {
+  windowTotals.value = null;
+  previousWindowTotals.value = null;
+  frustrationCluster.value = null;
+  errorCluster.value = null;
+}
+
 // Query 2: Get start/end times from _sessionreplay for the sessions
-const getSessionTimeFromReplay = (req: any, sessionIds: string[]) => {
+const getSessionTimeFromReplay = (
+  req: any,
+  sessionIds: string[],
+  signal?: AbortSignal,
+) => {
   if (sessionIds.length === 0) {
     rows.value = [];
     isLoading.value.pop();
@@ -991,6 +1141,7 @@ const getSessionTimeFromReplay = (req: any, sessionIds: string[]) => {
         org_identifier: store.state.selectedOrganization.identifier,
         query: req,
         page_type: "logs",
+        signal,
       },
       "RUM",
     )
@@ -1013,6 +1164,7 @@ const getSessionTimeFromReplay = (req: any, sessionIds: string[]) => {
       rows.value = Object.values(sessionState.data.sessions);
     })
     .catch((err) => {
+      if (isAbortError(err)) return;
       toast({
         message:
           err.response?.data?.message ||
@@ -1042,13 +1194,14 @@ const buildAggregateReq = (
   return clone;
 };
 
-const runAggregateQuery = (req: any) =>
+const runAggregateQuery = (req: any, signal?: AbortSignal) =>
   searchService
     .search(
       {
         org_identifier: store.state.selectedOrganization.identifier,
         query: req,
         page_type: "logs",
+        signal,
       },
       "RUM",
     )
@@ -1056,11 +1209,12 @@ const runAggregateQuery = (req: any) =>
 
 // Returns a promise that settles when ALL aggregate queries finish — used to
 // release the activity-sparkline gate so those queries go last.
-const fetchWindowAggregates = (baseReq: any, whereClause: string) => {
-  windowTotals.value = null;
-  previousWindowTotals.value = null;
-  frustrationCluster.value = null;
-  errorCluster.value = null;
+const fetchWindowAggregates = (
+  baseReq: any,
+  whereClause: string,
+  signal?: AbortSignal,
+) => {
+  clearWindowAggregates();
 
   const pending: Promise<unknown>[] = [];
 
@@ -1089,7 +1243,7 @@ const fetchWindowAggregates = (baseReq: any, whereClause: string) => {
   });
 
   pending.push(
-    runAggregateQuery(buildAggregateReq(baseReq, summarySql))
+    runAggregateQuery(buildAggregateReq(baseReq, summarySql), signal)
       .then((hits) => {
         windowTotals.value = hits.length ? toTotals(hits[0]) : null;
       })
@@ -1106,6 +1260,7 @@ const fetchWindowAggregates = (baseReq: any, whereClause: string) => {
           startTime: baseReq.query.start_time - windowLengthUs,
           endTime: baseReq.query.start_time,
         }),
+        signal,
       )
         .then((hits) => {
           previousWindowTotals.value = hits.length ? toTotals(hits[0]) : null;
@@ -1131,7 +1286,7 @@ const fetchWindowAggregates = (baseReq: any, whereClause: string) => {
       ORDER BY sessions_count DESC
       LIMIT 1`;
     pending.push(
-      runAggregateQuery(buildAggregateReq(baseReq, clusterSql))
+      runAggregateQuery(buildAggregateReq(baseReq, clusterSql), signal)
         .then((hits) => {
           frustrationCluster.value = hits.length
             ? {
@@ -1161,7 +1316,7 @@ const fetchWindowAggregates = (baseReq: any, whereClause: string) => {
       ORDER BY sessions_count DESC
       LIMIT 1`;
     pending.push(
-      runAggregateQuery(buildAggregateReq(baseReq, errorSql))
+      runAggregateQuery(buildAggregateReq(baseReq, errorSql), signal)
         .then((hits) => {
           errorCluster.value = hits.length
             ? {
@@ -1229,12 +1384,33 @@ const classifyDevice = (family?: string, os?: string): DeviceSegment => {
   return "desktop";
 };
 
+// The SDK `source` field identifies the platform that produced the session.
+// Browser RUM omits it (or sends "browser"); mobile RUM sends the platform slug.
+const PLATFORM_LABELS: Record<string, string> = {
+  browser: "Browser",
+  "react-native": "React Native",
+  ios: "iOS",
+  android: "Android",
+  flutter: "Flutter",
+};
+const classifySource = (source?: string): string => {
+  const s = (source || "").toLowerCase();
+  if (!s) return PLATFORM_LABELS.browser;
+  return PLATFORM_LABELS[s] || source || PLATFORM_LABELS.browser;
+};
+
+// A session is "mobile" when its SDK source is a mobile platform (react-native/
+// ios/android/flutter) — reuses the same predicate the replay player uses.
+const isMobilePlatform = (source?: string): boolean =>
+  isMobileReplaySource(source);
+
 const enrichedRows = computed(() =>
   rows.value.map((row: any) => ({
     ...row,
     is_bounce: (row.events ?? 0) <= 1 || (row.time_spent ?? 0) < BOUNCE_MAX_MS,
     is_active: !!row.end_time && Date.now() - row.end_time <= ACTIVE_WINDOW_MS,
     device_type: classifyDevice(row.device_family, row.os),
+    platform: classifySource(row.source),
   })),
 );
 

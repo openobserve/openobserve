@@ -77,6 +77,28 @@ const acquireSlot = () =>
     }
   });
 
+// Every in-flight/queued activity request for the current view. Sparklines are the
+// highest-VOLUME queries on the sessions page (one per visible row, and the table is
+// virtualized), so abandoning them on navigation is what leaves the server's work-group
+// queue full for whichever tab the user opens next.
+let viewController = new AbortController();
+
+/**
+ * Abort every activity query started for the current view and reset the throttle, so a
+ * view that unmounts stops occupying search slots. Safe to call when nothing is pending.
+ * The result cache is deliberately NOT cleared — a session's activity within its own
+ * start/end never changes, so returning to the page should still hit the cache.
+ */
+export const cancelPendingActivityQueries = () => {
+  viewController.abort();
+  viewController = new AbortController();
+  // Queued callers are about to reject; drop them so they never take a slot, and reset
+  // the counter that their (now-skipped) releaseSlot() calls would otherwise leave high.
+  queryWaiters.length = 0;
+  activeQueries = 0;
+  inFlight.clear();
+};
+
 const releaseSlot = () => {
   activeQueries--;
   queryWaiters.shift()?.();
@@ -114,9 +136,26 @@ const useSessionActivity = () => {
     const pending = inFlight.get(key);
     if (pending) return pending;
 
+    // Captured per request: cancelPendingActivityQueries() swaps in a fresh controller,
+    // so a request started before the cancel must keep observing the one it was issued
+    // under, not whichever is current when it finally reaches the network.
+    const controller = viewController;
+
     const promise = (async () => {
       await gate;
+      // Both early exits must clear the in-flight entry themselves — they return before
+      // the try/finally that normally does it, and leaving a settled promise cached
+      // would make a later mount await a result that never arrives.
+      if (controller.signal.aborted) {
+        inFlight.delete(key);
+        return null;
+      }
       await acquireSlot();
+      if (controller.signal.aborted) {
+        releaseSlot();
+        inFlight.delete(key);
+        return null;
+      }
       try {
         const tsColumn =
           store.state.zoConfig.timestamp_column || "_timestamp";
@@ -159,6 +198,7 @@ const useSessionActivity = () => {
             org_identifier: store.state.selectedOrganization.identifier,
             query: req,
             page_type: "logs",
+            signal: controller.signal,
           },
           "RUM",
         );

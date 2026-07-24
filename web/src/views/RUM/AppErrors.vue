@@ -223,11 +223,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+// Explicit name so <keep-alive :include> in RealUserMonitoring.vue matches this
+// view. Without it the name is inferred from the FILENAME, so renaming the file
+// would silently drop it from the cache and bring back the refetch-on-return.
+defineOptions({ name: "AppErrors" });
+
 import {
   computed,
   nextTick,
   onBeforeMount,
   onMounted,
+  onBeforeUnmount,
+  onActivated,
+  onDeactivated,
   ref,
   type Ref,
   defineAsyncComponent,
@@ -354,6 +362,7 @@ const {
   isLoadingChart,
   isLoadingKpis,
   fetchAll,
+  cancelAll,
   fetchTrend,
   lastQueryError,
 } = useErrorIssuesData();
@@ -570,6 +579,32 @@ onMounted(async () => {
   isMounted.value = true;
   await getStreamFields();
   runQuery();
+});
+
+// Leaving the tab frees the searches it started. Error tracking fans out 5 concurrent
+// searches per load plus a trend fetch per visible row; abandoning them leaves the
+// server's per-user work-group queue full, so the next tab's queries queue behind them
+// and come back cancelled as HTTP 429.
+onBeforeUnmount(() => {
+  cancelAll();
+});
+
+// This view is kept alive, so leaving it DEACTIVATES rather than unmounts —
+// onBeforeUnmount does not fire and its searches would keep holding work-group slots.
+onDeactivated(() => {
+  cancelAll();
+});
+
+// Returning from an error detail page shows the issues already fetched instead of
+// re-running the five-query chain. onActivated also fires on the first mount, where
+// onMounted already owns the initial load, so that first call is skipped.
+let activatedBefore = false;
+onActivated(() => {
+  if (!activatedBefore) {
+    activatedBefore = true;
+    return;
+  }
+  if (!issues.value?.length) runQuery();
 });
 
 

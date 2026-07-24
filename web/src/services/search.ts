@@ -35,6 +35,7 @@ const search = {
       tab_name,
       is_ui_histogram,
       validate,
+      signal,
     }: {
       org_identifier: string;
       query: any;
@@ -51,6 +52,15 @@ const search = {
       tab_name?: string;
       is_ui_histogram?: boolean;
       validate?: boolean;
+      /**
+       * Aborts the request. Callers that leave a view mid-query should pass one and
+       * abort on unmount: an abandoned search still occupies a slot in the server's
+       * work-group concurrency queue until it completes, and queries that queue behind
+       * a full group and are then cancelled come back as HTTP 429
+       * (ErrorCodes::SearchCancelQuery maps to 429). Optional, so existing callers are
+       * unaffected.
+       */
+      signal?: AbortSignal;
     },
     search_type: string = "ui",
     is_multi_stream_search: boolean = false,
@@ -75,7 +85,9 @@ const search = {
     if (is_ui_histogram) url += `&is_ui_histogram=${is_ui_histogram}`;
     if (is_multi_stream_search) url += `&is_multi_stream_search=${is_multi_stream_search}`;
     if (validate) url += `&validate=${validate}`;
-    const axiosConfig =
+    // Built once and reused by every post() branch below, so the signal reaches the
+    // multi-stream and aggs paths too — not just the default one.
+    const baseAxiosConfig =
       page_type === "traces"
         ? {
             transformResponse: [
@@ -88,6 +100,12 @@ const search = {
               },
             ],
           }
+        : undefined;
+    // Only materialise a config object when there is something to put in it, so callers
+    // passing neither a traces transform nor a signal keep the previous `undefined`.
+    const axiosConfig =
+      signal || baseAxiosConfig
+        ? { ...(baseAxiosConfig ?? {}), ...(signal ? { signal } : {}) }
         : undefined;
     if (typeof query.query.sql != "string") {
       url = `/api/${org_identifier}/_search_multi?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;

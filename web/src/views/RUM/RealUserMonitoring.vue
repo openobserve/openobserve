@@ -53,26 +53,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OPageHeader>
       <router-view v-slot="{ Component }">
-        <template v-if="$route.meta.keepAlive">
-          <keep-alive
-            class="flex-1 min-h-0 flex flex-col"
-          >
+        <!--
+          ONE keep-alive, always rendered. It must NOT sit inside a v-if on
+          $route.meta.keepAlive: <keep-alive> holds its cache in its OWN instance, so
+          toggling the element destroys the cache along with it. Navigating
+          Sessions -> SessionViewer (meta.keepAlive false) tore the whole thing down,
+          and coming back built a fresh, empty one — which is why returning from a
+          session detail page re-ran every query instead of showing the list already
+          fetched. `include` decides what is retained; the element itself stays put.
+        -->
+        <div class="flex-1 min-h-0 flex flex-col">
+          <keep-alive :include="CACHED_RUM_VIEWS">
             <component
               :is="Component"
               :isRumEnabled="isRumEnabled"
               :isSessionReplayEnabled="isSessionReplayEnabled"
             />
           </keep-alive>
-        </template>
-        <template v-else>
-          <div class="flex-1 min-h-0 flex flex-col">
-            <component
-              :is="Component"
-              :isRumEnabled="isRumEnabled"
-              :isSessionReplayEnabled="isSessionReplayEnabled"
-            />
-          </div>
-        </template>
+        </div>
       </router-view>
     </template>
     <template v-else>
@@ -150,6 +148,25 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
 import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
+
+/**
+ * COMPONENT names (not route names) that <keep-alive> retains — the RUM views whose
+ * route sets `meta.keepAlive: true`. Keep the two in sync.
+ *
+ * Deliberately NOT derived from `$route.meta.keepAlive` at render time: that flag
+ * describes the route being entered, and using it to conditionally render the
+ * <keep-alive> element is what destroyed the cache on every visit to a detail page.
+ *
+ * SessionViewer and UploadSourceMaps are absent on purpose — both are keyed by a route
+ * param, so a cached instance would be reused for a different id.
+ */
+const CACHED_RUM_VIEWS = [
+  "AppSessions",
+  "AppErrors",
+  "ErrorViewer",
+  "SourceMaps",
+  "AppPerformance",
+];
 
 const router = useRouter();
 const store = useStore();
