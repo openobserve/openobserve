@@ -6,7 +6,10 @@
 
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
-/** Semantic colour of a stat. Maps to one icon-chip + value colour pair. */
+/** Semantic colour of a stat. Maps to one icon-chip + value colour pair.
+ *  `blue` / `teal` / `purple` are the decorative tones that mirror the OTag
+ *  badge groups (scorerType, evalDataType, …), so a stat tile can match the
+ *  chip colour of the same value exactly. */
 export type StatTone =
   | "success"
   | "warning"
@@ -14,6 +17,9 @@ export type StatTone =
   | "primary"
   | "info"
   | "orange"
+  | "blue"
+  | "teal"
+  | "purple"
   | "neutral";
 
 /** Optional delta shown beside the value (e.g. "▲ 12%"). */

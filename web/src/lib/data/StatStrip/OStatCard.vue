@@ -74,6 +74,23 @@ const TONES: Record<StatTone, { chip: string; value: string; bar: string }> = {
     value: "text-icon-chip-orange-text",
     bar: "bg-icon-chip-orange-text",
   },
+  // Decorative tones — reuse the OTag badge-soft tokens so a stat tile matches
+  // the chip colour of the same value (scorerType, evalDataType, …) exactly.
+  blue: {
+    chip: "bg-badge-blue-soft-bg text-badge-blue-soft-text",
+    value: "text-badge-blue-soft-text",
+    bar: "bg-badge-blue-soft-text",
+  },
+  teal: {
+    chip: "bg-badge-teal-soft-bg text-badge-teal-soft-text",
+    value: "text-badge-teal-soft-text",
+    bar: "bg-badge-teal-soft-text",
+  },
+  purple: {
+    chip: "bg-badge-purple-soft-bg text-badge-purple-soft-text",
+    value: "text-badge-purple-soft-text",
+    bar: "bg-badge-purple-soft-text",
+  },
   neutral: {
     chip: "bg-surface-subtle text-text-secondary",
     value: "text-text-heading",
