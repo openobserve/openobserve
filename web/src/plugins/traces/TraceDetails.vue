@@ -139,6 +139,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip :content="t('traces.reviewAndApplyFilters')" />
             </OButton>
 
+            <OButton
+              v-if="canManualEvaluate"
+              data-test="trace-details-evaluate-trace-btn"
+              variant="primary"
+              size="xs"
+              icon-left="play-circle"
+              @click="openTraceEvaluation"
+            >
+              {{ t("onlineEvals.manualEvaluation.titles.trace") }}
+            </OButton>
+
             <!-- Share button -->
             <ShareButton
               v-if="showShareButton"
@@ -588,7 +599,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :activeTab="sidebarActiveTab"
                   :selected-log-streams="searchObj.data.traceDetails.selectedLogStreams"
                   :show-log-stream-selector="showLogStreamSelector"
+                  :show-evaluate-button="canManualEvaluate"
                   @view-logs="redirectToLogs"
+                  @evaluate="openSpanEvaluation"
                   @close="closeSidebar"
                   @open-trace="openTraceLink"
                   @add-filter="addFilterFromSidebar"
@@ -647,7 +660,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :activeTab="sidebarActiveTab"
                   :selected-log-streams="searchObj.data.traceDetails.selectedLogStreams"
                   :show-log-stream-selector="showLogStreamSelector"
+                  :show-evaluate-button="canManualEvaluate"
                   @view-logs="redirectToLogs"
+                  @evaluate="openSpanEvaluation"
                   @close="closeSidebar"
                   @open-trace="openTraceLink"
                   @add-filter="addFilterFromSidebar"
@@ -671,8 +686,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :search-query="searchQuery"
                 :parent-mode="mode"
                 :service-streams-enabled="serviceStreamsEnabled"
+                :show-evaluate-button="canManualEvaluate"
                 :base-trace-position="baseTracePosition"
                 @view-logs="redirectToLogs"
+                @evaluate="openSpanEvaluation"
                 @close="closeSidebar"
                 @select-span="updateSelectedSpan"
                 @add-filter="addFilterFromSidebar"
@@ -720,7 +737,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :activeTab="sidebarActiveTab"
                   :selected-log-streams="searchObj.data.traceDetails.selectedLogStreams"
                   :show-log-stream-selector="showLogStreamSelector"
+                  :show-evaluate-button="canManualEvaluate"
                   @view-logs="redirectToLogs"
+                  @evaluate="openSpanEvaluation"
                   @close="closeSidebar"
                   @open-trace="openTraceLink"
                   @add-filter="addFilterFromSidebar"
@@ -791,6 +810,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <CodeQueryEditor v-model:query="localEditorValue" language="sql" class="h-full w-full" />
       </div>
     </ODrawer>
+
+    <ManualEvaluationDialog
+      v-if="manualEvaluationTarget"
+      :open="manualEvaluationOpen"
+      :org-id="effectiveOrgIdentifier"
+      :stream="effectiveStreamName"
+      :target-scope="manualEvaluationTarget.targetScope"
+      :target-id="manualEvaluationTarget.targetId"
+      :start-time="manualEvaluationTarget.startTime"
+      :end-time="manualEvaluationTarget.endTime"
+      :trace-id="manualEvaluationTarget.traceId"
+      :session-id="manualEvaluationTarget.sessionId"
+      @update:open="updateManualEvaluationOpen"
+    />
   </div>
 </template>
 
@@ -877,6 +910,21 @@ const FlameGraphView = defineAsyncComponent(() => import("@/components/traces/Fl
 
 // Import ThreadView (LLM Thread tab)
 const ThreadView = defineAsyncComponent(() => import("./ThreadView.vue"));
+const ManualEvaluationDialog = defineAsyncComponent(
+  () =>
+    import(
+      "@/enterprise/components/onlineEvals/ManualEvaluationDialog.vue"
+    ),
+);
+
+interface ManualEvaluationTarget {
+  targetScope: "span" | "trace";
+  targetId: string;
+  startTime: number;
+  endTime: number;
+  traceId?: string;
+  sessionId?: string;
+}
 
 /**
  * Tab definitions for the trace detail views. The order here is the *default*
@@ -1044,6 +1092,7 @@ export default defineComponent({
     OTooltip,
     OSearchInput,
     OSelect,
+    ManualEvaluationDialog,
   },
 
   emits: ["searchQueryUpdated", "close", "spanSelected"],
@@ -1430,6 +1479,14 @@ export default defineComponent({
       return spans.some((span: any) => isLLMTrace(span));
     });
 
+    const hasPreviewableSpans = computed(() => {
+      const spans = effectiveSpanList.value;
+      if (!spans || spans.length === 0) return false;
+      return spans.some((span: Record<string, unknown>) =>
+        hasTracePreview(span),
+      );
+    });
+
     // Computed properties for new header
     const errorSpansCount = computed(() => {
       const spans = effectiveSpanList.value;
@@ -1449,6 +1506,94 @@ export default defineComponent({
       if (!spans || spans.length === 0) return 0;
       return Math.min(...spans.map((span: any) => span.start_time));
     });
+
+    const traceEvaluationRange = computed(() => {
+      const spans = effectiveSpanList.value ?? [];
+      const starts = spans
+        .map((span: any) => Number(span.start_time))
+        .filter((value: number) => Number.isFinite(value) && value >= 0);
+      const ends = spans
+        .map((span: any) => Number(span.end_time))
+        .filter((value: number) => Number.isFinite(value) && value >= 0);
+      if (starts.length > 0 && ends.length > 0) {
+        // Raw nanosecond timestamps exceed JavaScript's exact integer range.
+        // A one-microsecond guard on each side prevents rounding from excluding
+        // the boundary spans while keeping the worker window trace-specific.
+        return {
+          startTime: Math.max(
+            0,
+            Math.floor(Math.min(...starts) / 1_000) - 1,
+          ),
+          endTime: Math.ceil(Math.max(...ends) / 1_000) + 1,
+        };
+      }
+      return {
+        startTime: effectiveTimeRange.value.from,
+        endTime: effectiveTimeRange.value.to,
+      };
+    });
+
+    const canManualEvaluate = computed(() => {
+      const range = traceEvaluationRange.value;
+      return (
+        props.mode === "standalone" &&
+        hasPreviewableSpans.value &&
+        (config.isEnterprise === "true" || config.isCloud === "true") &&
+        Boolean(store.state.zoConfig?.online_evals_enabled) &&
+        Boolean(effectiveOrgIdentifier.value) &&
+        Boolean(effectiveStreamName.value) &&
+        Boolean(effectiveTraceId.value) &&
+        Number.isFinite(range.startTime) &&
+        Number.isFinite(range.endTime) &&
+        range.endTime > range.startTime
+      );
+    });
+
+    const manualEvaluationOpen = ref(false);
+    const manualEvaluationTarget = ref<ManualEvaluationTarget | null>(null);
+
+    const openTraceEvaluation = () => {
+      const range = traceEvaluationRange.value;
+      manualEvaluationTarget.value = {
+        targetScope: "trace",
+        targetId: effectiveTraceId.value,
+        traceId: effectiveTraceId.value,
+        sessionId: resolveSessionId(effectiveSpanList.value) || undefined,
+        ...range,
+      };
+      manualEvaluationOpen.value = true;
+    };
+
+    const openSpanEvaluation = (span: Record<string, unknown>) => {
+      const startNs = Number(span.start_time);
+      const endNs = Number(span.end_time);
+      const range =
+        Number.isFinite(startNs) && Number.isFinite(endNs) && endNs > startNs
+          ? {
+              startTime: Math.max(0, Math.floor(startNs / 1_000) - 1),
+              endTime: Math.ceil(endNs / 1_000) + 1,
+            }
+          : traceEvaluationRange.value;
+      manualEvaluationTarget.value = {
+        targetScope: "span",
+        targetId: String(span.span_id ?? ""),
+        traceId: String(span.trace_id ?? effectiveTraceId.value),
+        sessionId:
+          String(
+            span.session_id ??
+              span.gen_ai_conversation_id ??
+              resolveSessionId(effectiveSpanList.value) ??
+              "",
+          ) || undefined,
+        ...range,
+      };
+      manualEvaluationOpen.value = true;
+    };
+
+    const updateManualEvaluationOpen = (open: boolean) => {
+      manualEvaluationOpen.value = open;
+      if (!open) manualEvaluationTarget.value = null;
+    };
 
     /** Which tabs this trace can show, independent of ordering. */
     const isTraceTabVisible = (value: TraceTabValue) => {
@@ -2858,10 +3003,17 @@ export default defineComponent({
       startDagResize,
       // LLM traces check
       hasLLMSpans,
+      hasPreviewableSpans,
       // New header computed properties
       errorSpansCount,
       rootServiceName,
       traceStartTime,
+      canManualEvaluate,
+      manualEvaluationOpen,
+      manualEvaluationTarget,
+      openTraceEvaluation,
+      openSpanEvaluation,
+      updateManualEvaluationOpen,
       formatTimestamp,
       // FlameGraph data
       flatSpans,

@@ -155,6 +155,35 @@ describe("mutation endpoints return response.data directly", () => {
     expect(mockPost).toHaveBeenCalledWith("/api/org-1/eval_jobs/j1/pause", {});
   });
 
+  it("jobs.manualEval posts the target with its authoritative time range", async () => {
+    mockPost.mockResolvedValue({
+      data: {
+        jobId: "j1",
+        targetScope: "trace",
+        targetId: "trace-1",
+        tasksCreated: 2,
+      },
+    });
+    const payload = {
+      targetId: "trace-1",
+      traceId: "trace-1",
+      startTime: 1_000,
+      endTime: 2_000,
+    };
+
+    const result = await onlineEvalsService.jobs.manualEval(
+      "org-1",
+      "j1",
+      payload,
+    );
+
+    expect(result.tasksCreated).toBe(2);
+    expect(mockPost).toHaveBeenCalledWith(
+      "/api/org-1/eval_jobs/j1/manual_eval",
+      payload,
+    );
+  });
+
   it("providers.delete calls DELETE on the resource path", async () => {
     mockDelete.mockResolvedValue({});
     await onlineEvalsService.providers.delete("org-1", "p1");

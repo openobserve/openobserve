@@ -1658,6 +1658,7 @@ describe("TraceDetailsSidebar", async () => {
           span: mockLLMSpan,
           baseTracePosition: mockBaseTracePosition,
           searchQuery: "",
+          showEvaluateButton: true,
         },
         global: {
           plugins: [i18n, router],
@@ -1693,6 +1694,31 @@ describe("TraceDetailsSidebar", async () => {
       // The preview tab appears in the tab bar for LLM spans (v-if="isLLMSpan")
       const previewTab = llmWrapper.find('[data-test="trace-details-sidebar-tabs-preview"]');
       expect(previewTab.exists()).toBe(true);
+    });
+
+    it("shows evaluation whenever the Preview tab is available", () => {
+      expect(
+        llmWrapper
+          .find('[data-test="trace-details-sidebar-evaluate-span-btn"]')
+          .exists(),
+      ).toBe(true);
+    });
+
+    it("hides evaluation with the Preview tab for an ordinary span", () => {
+      const ordinaryWrapper = mountSidebar({ showEvaluateButton: true });
+
+      expect(
+        ordinaryWrapper
+          .find('[data-test="trace-details-sidebar-tabs-preview"]')
+          .exists(),
+      ).toBe(false);
+      expect(
+        ordinaryWrapper
+          .find('[data-test="trace-details-sidebar-evaluate-span-btn"]')
+          .exists(),
+      ).toBe(false);
+
+      ordinaryWrapper.unmount();
     });
 
     it("should render the input LLMContentRenderer when llm_input has content", () => {

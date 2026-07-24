@@ -140,8 +140,10 @@
         :stream-name="streamName"
         :service-streams-enabled="serviceStreamsEnabled"
         :parent-mode="parentMode"
+        :show-evaluate-button="showEvaluateButton"
         :active-tab="sidebarActiveTab"
         @view-logs="$emit('view-logs')"
+        @evaluate="$emit('evaluate', $event)"
         @close="closeSidebar"
         @select-span="handleSelectSpan"
         @open-trace="$emit('open-trace')"
@@ -180,6 +182,7 @@ export interface Props {
   searchQuery: string;
   parentMode: string;
   serviceStreamsEnabled: boolean;
+  showEvaluateButton?: boolean;
   baseTracePosition: any;
 }
 
@@ -189,6 +192,7 @@ const props = withDefaults(defineProps<Props>(), {
   searchQuery: "",
   parentMode: "standalone",
   serviceStreamsEnabled: false,
+  showEvaluateButton: false,
   spanMap: () => ({}),
   baseTracePosition: () => ({}),
 });
@@ -196,6 +200,7 @@ const props = withDefaults(defineProps<Props>(), {
 // Emits
 const emit = defineEmits<{
   "view-logs": [];
+  evaluate: [span: EnrichedSpan];
   close: [];
   "select-span": [spanId: string];
   "add-filter": [payload: { field: string; value: string; operator: "=" | "!=" }];

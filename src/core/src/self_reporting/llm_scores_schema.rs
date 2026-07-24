@@ -27,6 +27,22 @@ use dashmap::DashSet;
 
 static INITIALIZED_ORGS: Lazy<DashSet<String>> = Lazy::new(DashSet::new);
 
+fn expected_llm_scores_schema() -> Result<arrow_schema::Schema> {
+    let sample = config::utils::json::to_value(&LlmScoreRecord::init_for_reflection())?;
+    // Log ingestion flattens nested values before schema inference. Mirror that
+    // here so optional scalar fields are initialized even when metadata is JSON.
+    let sample = config::utils::flatten::flatten(sample)?;
+    let sample = sample
+        .as_object()
+        .ok_or_else(|| anyhow::anyhow!("Failed to convert LlmScoreRecord to JSON object"))?;
+
+    Ok(config::utils::schema::infer_json_schema_from_map(
+        llm_scores::LLM_SCORES_STREAM,
+        StreamType::Logs,
+        std::iter::once(sample),
+    )?)
+}
+
 pub async fn ensure_llm_scores_stream_initialized(org_id: &str) -> Result<()> {
     if !INITIALIZED_ORGS.insert(org_id.to_string()) {
         return Ok(());
@@ -47,17 +63,7 @@ async fn initialize_llm_scores_stream_schema(org_id: &str) -> Result<()> {
 
     log::info!("[LLM-SCORES] Creating _llm_scores stream schema for {org_id}/{stream_name}");
 
-    let sample = LlmScoreRecord::init_for_reflection();
-    let json_value = config::utils::json::to_value(&sample)?;
-    let json_map = json_value
-        .as_object()
-        .ok_or_else(|| anyhow::anyhow!("Failed to convert LlmScoreRecord to JSON object"))?;
-
-    let expected_schema = config::utils::schema::infer_json_schema_from_map(
-        stream_name,
-        stream_type,
-        std::iter::once(json_map),
-    )?;
+    let expected_schema = expected_llm_scores_schema()?;
 
     if infra::schema::get(org_id, stream_name, stream_type)
         .await
@@ -148,5 +154,14 @@ mod tests {
         assert!(!obj.contains_key("target_agent_name"));
         assert!(!obj.contains_key("target_agent_id"));
         assert!(obj.contains_key("_timestamp"));
+    }
+
+    #[test]
+    fn test_llm_score_reflection_schema_has_all_value_fields() {
+        let schema = expected_llm_scores_schema().unwrap();
+
+        assert!(schema.field_with_name("value_numeric").is_ok());
+        assert!(schema.field_with_name("value_categorical").is_ok());
+        assert!(schema.field_with_name("value_boolean").is_ok());
     }
 }

@@ -1,7 +1,16 @@
 <template>
   <div
-    class="bg-card-glass-bg rounded-default border-border-default flex flex-col gap-1 border px-3.5 pt-2.5 pb-2.5 transition-shadow duration-200 ease-in-out hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
+    :class="[
+      'bg-card-glass-bg rounded-default border-border-default flex flex-col gap-1 border px-3.5 pt-2.5 pb-2.5 transition-shadow duration-200 ease-in-out hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]',
+      clickable &&
+        'cursor-pointer hover:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1',
+    ]"
     :data-test="`quality-kpi-${kpi.id}`"
+    :role="clickable ? 'button' : undefined"
+    :tabindex="clickable ? 0 : undefined"
+    @click="activate"
+    @keydown.enter.prevent="activate"
+    @keydown.space.prevent="activate"
   >
     <div class="flex flex-col gap-1">
       <!-- Label + a metric icon in a soft corner tile — same KPI-card pattern
@@ -57,9 +66,12 @@
         v-if="kpi.value != null"
         class="text-3xs flex items-center gap-1 font-medium"
         :class="{
-          'text-status-success-text': (delta != null ? trendSentiment : 'neutral') === 'good',
-          'text-error-600': (delta != null ? trendSentiment : 'neutral') === 'bad',
-          'text-text-muted': (delta != null ? trendSentiment : 'neutral') === 'neutral',
+          'text-status-success-text':
+            (delta != null ? trendSentiment : 'neutral') === 'good',
+          'text-error-600':
+            (delta != null ? trendSentiment : 'neutral') === 'bad',
+          'text-text-muted':
+            (delta != null ? trendSentiment : 'neutral') === 'neutral',
         }"
       >
         <template v-if="delta != null">
@@ -92,11 +104,20 @@ import type { KpiCard } from "../composables/useQualityData";
 const props = defineProps<{
   kpi: KpiCard;
   delta: number | null;
+  clickable?: boolean;
+}>();
+
+const emit = defineEmits<{
+  (event: "activate"): void;
 }>();
 
 const { t } = useI18n();
 
 const scopes = ["span", "trace", "session"] as const;
+
+function activate() {
+  if (props.clickable) emit("activate");
+}
 
 const ICONS: Record<KpiCard["id"], string> = {
   scoreResults: "fact-check",

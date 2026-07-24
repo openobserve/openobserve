@@ -7903,6 +7903,32 @@
       "activateError": "Failed to activate job",
       "pauseError": "Failed to pause job"
     },
+    "manualEvaluation": {
+      "titles": {
+        "span": "Evaluate span",
+        "trace": "Evaluate trace",
+        "session": "Evaluate session"
+      },
+      "targetLabels": {
+        "span": "Span ID",
+        "trace": "Trace ID",
+        "session": "Session ID"
+      },
+      "scopes": {
+        "span": "span",
+        "trace": "trace",
+        "session": "session"
+      },
+      "description": "Choose an Eval Job to run against this target. The evaluation worker will load the source telemetry from this page's time range.",
+      "jobLabel": "Eval Job",
+      "jobPlaceholder": "Select an Eval Job",
+      "jobRequired": "Select an Eval Job",
+      "noCompatibleJobs": "No {scope} Eval Jobs use the {stream} trace stream.",
+      "loadJobsError": "Failed to load Eval Jobs.",
+      "run": "Run evaluation",
+      "queued": "Queued {count} evaluation task(s).",
+      "runError": "Failed to queue the evaluation."
+    },
     "tabs": {
       "quality": "Quality",
       "jobs": "Eval Jobs",
@@ -8618,23 +8644,6 @@
         "samplingAll": "Evaluate every match",
         "samplingRate": "Random sample by rate",
         "samplingCount": "First N matches",
-        "manualSection": "Manual Evaluation",
-        "manualHelp": "Queue this job's scorers for one explicit target. Manual runs bypass automatic sampling and record the reason on the score metadata.",
-        "manualTargetIdLabel": "Target ID",
-        "manualSpanIdLabel": "Span ID",
-        "manualSpanIdPlaceholder": "span_id",
-        "manualTraceIdLabel": "Trace ID",
-        "manualTraceIdPlaceholder": "trace_id",
-        "manualSessionIdLabel": "Session ID",
-        "manualSessionIdPlaceholder": "session_id",
-        "manualReasonLabel": "Reason",
-        "manualReasonPlaceholder": "Why are you re-running this target?",
-        "manualVariablesLabel": "Variables JSON",
-        "manualVariablesObjectError": "Variables must be a JSON object",
-        "manualTargetRequired": "Target ID is required",
-        "manualSubmit": "Run Manual Eval",
-        "manualSuccess": "Queued {count} evaluation task(s)",
-        "manualError": "Manual evaluation failed",
         "metadataSection": "Metadata",
         "versionLabel": "Version",
         "pipelineLabel": "Pipeline ID",
