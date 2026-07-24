@@ -31,8 +31,7 @@ use common::meta::{
 #[cfg(feature = "cloud")]
 use config::meta::self_reporting::usage::is_reserved_self_reporting_stream;
 use config::{
-    ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME, SIZE_IN_MB, TIMESTAMP_COL_NAME, get_config,
-    is_local_disk_storage, is_uds_internal_column,
+    SIZE_IN_MB, TIMESTAMP_COL_NAME, get_config, is_local_disk_storage,
     meta::{
         promql,
         promql::get_metadata_from_schema as get_prom_metadata_from_schema,
@@ -43,12 +42,10 @@ use config::{
     },
     utils::{flatten::format_label_name, json, time::now_micros, util::get_distinct_stream_name},
 };
-#[cfg(feature = "enterprise")]
-use config::{META_ORG_ID, meta::self_reporting::usage::USAGE_STREAM};
 #[cfg(feature = "vectorscan")]
 use db::re_pattern::process_association_changes;
 use db::{self, distinct_values, enrichment_table};
-use hashbrown::{HashMap, HashSet};
+use hashbrown::HashMap;
 use infra::{
     cache::stats,
     schema::{
@@ -58,7 +55,6 @@ use infra::{
     },
     table::distinct_values::{DistinctFieldRecord, OriginType, check_field_use},
 };
-use itertools::chain;
 #[cfg(feature = "vectorscan")]
 use o2_enterprise::enterprise::re_patterns::PATTERN_MANAGER;
 
@@ -379,231 +375,35 @@ pub async fn save_stream_settings(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-    mut settings: StreamSettings,
+    settings: StreamSettings,
 ) -> Result<HttpResponse, Error> {
-    let cfg = config::get_config();
-    // check if we are allowed to ingest
-    if db::compact::retention::is_deleting_stream(org_id, stream_type, stream_name, None) {
-        return Ok((
-            http::StatusCode::BAD_REQUEST,
-            [(
-                ERROR_HEADER,
-                format!("stream [{stream_name}] is being deleted"),
-            )],
-            Json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST,
-                format!("stream [{stream_name}] is being deleted"),
-            )),
-        )
-            .into_response());
-    }
-
-    // only allow setting user defined schema for supported stream
-    if !stream_type.support_uds() && !settings.defined_schema_fields.is_empty() {
-        return Ok(MetaHttpResponse::bad_request(format!(
-            "stream type [{stream_type}] don't support user defined schema"
-        )));
-    }
-
-    // check stroage type is compliance
-    if settings.data_retention > 0
-        && settings.data_retention < 30
-        && settings.storage_type.is_compliance()
+    let saved = match schema::save_stream_settings(org_id, stream_name, stream_type, settings).await
     {
-        return Ok(MetaHttpResponse::bad_request(
-            "data_retention must be at least 30 days when storage_type is compliance",
-        ));
-    }
-    #[cfg(feature = "enterprise")]
-    if org_id == META_ORG_ID && stream_name == USAGE_STREAM && settings.data_retention < 32 {
-        // _meta org, usage stream can't be set to less than 32 days
-        settings.data_retention = 0;
-    }
-
-    // if index_original_data is true, store_original_data must be true
-    if settings.index_original_data {
-        settings.store_original_data = true;
-    }
-
-    // index_original_data & index_all_values only can open one at a time
-    if settings.index_original_data && settings.index_all_values {
-        return Ok(MetaHttpResponse::bad_request(
-            "index_original_data & index_all_values cannot be true at the same time",
-        ));
-    }
-
-    let Ok(schema) = infra::schema::get(org_id, stream_name, stream_type).await else {
-        return Ok(MetaHttpResponse::not_found("stream not found"));
+        Ok(saved) => saved,
+        Err(schema::StreamSettingsError::StreamDeleting(message)) => {
+            return Ok((
+                http::StatusCode::BAD_REQUEST,
+                [(ERROR_HEADER, message.clone())],
+                Json(MetaHttpResponse::error(
+                    http::StatusCode::BAD_REQUEST,
+                    message,
+                )),
+            )
+                .into_response());
+        }
+        Err(schema::StreamSettingsError::BadRequest(message)) => {
+            return Ok(MetaHttpResponse::bad_request(message));
+        }
+        Err(schema::StreamSettingsError::NotFound(message)) => {
+            return Ok(MetaHttpResponse::not_found(message));
+        }
     };
-    let schema_fields = schema
-        .fields()
-        .iter()
-        .map(|f| (f.name(), f))
-        .collect::<HashMap<_, _>>();
-
-    // Dedup + fold bloom into index. Single place where the stored shape gets
-    // normalized; both direct-save callers and the update path (via this
-    // function at the end) flow through here.
-    normalize_stream_settings(&mut settings);
-
-    // check for user defined schema
-    if !settings.defined_schema_fields.is_empty() {
-        // check fields with stream type
-        let fields = schema::check_schema_for_defined_schema_fields(
-            stream_type,
-            &schema,
-            settings.defined_schema_fields.to_vec(),
-        );
-        // remove the fields that are not in the new schema
-        let mut fields: Vec<_> = fields.into_iter().collect();
-        fields.sort();
-        fields.dedup();
-        fields.retain(|field| schema_fields.contains_key(field));
-        settings.defined_schema_fields = fields;
-    }
-    // internal columns are implicit in the UDS and don't count toward the limit
-    let uds_user_fields = settings
-        .defined_schema_fields
-        .iter()
-        .filter(|field| !is_uds_internal_column(field))
-        .count();
-    if uds_user_fields > cfg.limit.user_defined_schema_max_fields {
-        return Ok(MetaHttpResponse::bad_request(format!(
-            "user defined schema fields count exceeds the limit: {}",
-            cfg.limit.user_defined_schema_max_fields
-        )));
-    }
-
-    // Check the fields are not reserved
-    let fts_set: HashSet<_> = settings.full_text_search_keys.iter().cloned().collect();
-    let index_set: HashSet<_> = settings.index_fields.iter().cloned().collect();
-    let bloom_set: HashSet<_> = settings.bloom_filter_fields.iter().cloned().collect();
-    let pk_set: HashSet<_> = settings
-        .partition_keys
-        .iter()
-        .map(|p| p.field.clone())
-        .collect();
-
-    // ---- 1. Reserved columns (raw lists) ----
-    let strict_reserved: [&str; 2] = [TIMESTAMP_COL_NAME, cfg.common.column_all.as_str()];
-    let no_search_reserved: [&str; 2] = [ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME];
-    for &r in chain(strict_reserved.iter(), no_search_reserved.iter()) {
-        if index_set.contains(r) {
-            return Ok(MetaHttpResponse::bad_request(format!(
-                "field [{r}] is reserved and cannot be used for secondary index"
-            )));
-        }
-        if bloom_set.contains(r) {
-            return Ok(MetaHttpResponse::bad_request(format!(
-                "field [{r}] is reserved and cannot be used for bloom filter"
-            )));
-        }
-        if pk_set.contains(r) {
-            return Ok(MetaHttpResponse::bad_request(format!(
-                "field [{r}] is reserved and cannot be used as partition key"
-            )));
-        }
-    }
-    for &r in &strict_reserved {
-        // FTS is explicitly allowed for these — they hold human-readable content.
-        if fts_set.contains(r) {
-            return Ok(MetaHttpResponse::bad_request(format!(
-                "field [{r}] is reserved and cannot be used for full text search"
-            )));
-        }
-    }
-
-    // ---- 2. FTS ∩ Index = ∅ (resolved) ----
-    if let Some(name) = fts_set.intersection(&index_set).next() {
-        return Ok(MetaHttpResponse::bad_request(format!(
-            "field [{name}] cannot be both full text search and secondary index — choose one"
-        )));
-    }
-    // ---- 3. FTS ∩ Bloom = ∅ (resolved) ----
-    if let Some(name) = fts_set.intersection(&bloom_set).next() {
-        return Ok(MetaHttpResponse::bad_request(format!(
-            "field [{name}] cannot be both full text search and bloom filter"
-        )));
-    }
-    // ---- 4. Bloom ⊆ Index (raw) ----
-    if let Some(name) = bloom_set.difference(&index_set).next() {
-        return Ok(MetaHttpResponse::bad_request(format!(
-            "bloom filter field [{name}] must also be a secondary index field"
-        )));
-    }
-    // ---- 5. Partition keys disjoint from FTS / Index / Bloom (resolved) ----
-    if let Some(name) = pk_set.intersection(&fts_set).next() {
-        return Ok(MetaHttpResponse::bad_request(format!(
-            "partition key [{name}] cannot also be a full text search field"
-        )));
-    }
-    if let Some(name) = pk_set.intersection(&index_set).next() {
-        return Ok(MetaHttpResponse::bad_request(format!(
-            "partition key [{name}] cannot also be a secondary index field"
-        )));
-    }
-    if let Some(name) = pk_set.intersection(&bloom_set).next() {
-        return Ok(MetaHttpResponse::bad_request(format!(
-            "partition key [{name}] cannot also be a bloom filter field"
-        )));
-    }
-
-    // check if the partition key is a full text search field
-    for key in settings.partition_keys.iter() {
-        if fts_set.contains(&key.field) {
-            return Ok(MetaHttpResponse::bad_request(format!(
-                "field [{}] can't be used for partition key",
-                key.field
-            )));
-        }
-    }
-
-    // we need to keep the old partition information, because the hash bucket num can't be changed
-    // get old settings and then update partition_keys
-    let mut old_partition_keys = unwrap_stream_settings(&schema)
-        .unwrap_or_default()
-        .partition_keys;
-    // first disable all old partition keys
-    for v in old_partition_keys.iter_mut() {
-        v.disabled = true;
-    }
-    // then update new partition keys
-    for v in settings.partition_keys.iter() {
-        if let Some(old_field) = old_partition_keys.iter_mut().find(|k| k.field == v.field) {
-            if old_field.types != v.types {
-                return Ok(MetaHttpResponse::bad_request(format!(
-                    "field [{}] partition types can't be changed",
-                    v.field
-                )));
-            }
-            old_field.disabled = v.disabled;
-        } else {
-            old_partition_keys.push(v.clone());
-        }
-    }
-    settings.partition_keys = old_partition_keys;
-
-    for range in settings.extended_retention_days.iter() {
-        if range.start > range.end {
-            return Ok(MetaHttpResponse::bad_request(
-                "start day should be less than end day",
-            ));
-        }
-    }
-
-    let mut metadata = schema.metadata.clone();
-    metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
-    if !metadata.contains_key("created_at") {
-        metadata.insert("created_at".to_string(), now_micros().to_string());
-    }
-    db::schema::update_setting(org_id, stream_name, stream_type, metadata)
-        .await
-        .unwrap();
+    let settings = saved.settings;
 
     // skip metadata, as we should never do distinct values stream for
     // metadata streams
     if matches!(stream_type, StreamType::Logs | StreamType::Traces)
-        && let Some(original_settings) = unwrap_stream_settings(&schema)
+        && let Some(original_settings) = saved.previous_settings
     {
         let existing = original_settings.data_retention;
         let new = settings.data_retention;
@@ -1308,80 +1108,6 @@ pub async fn update_fields_type(
     Ok(())
 }
 
-/// Make `settings` internally consistent before validation / persistence.
-/// Three normalizations, all in-place:
-///
-/// 1. **Dedup** each of `full_text_search_keys`, `index_fields`, `bloom_filter_fields`, and
-///    `partition_keys`, preserving first-occurrence order. Matches the silent dedup the update path
-///    has always done on `.add` lists, so a user re-adding the same field is a no-op rather than an
-///    error.
-/// 2. **Enforce `bloom ⊆ index`** by folding any bloom-only field into `index_fields` (and bumping
-///    `index_updated_at` plus the per-field timestamps if anything was added). Bloom is built by
-///    walking the tantivy term dict, so a bloom field that isn't in `index_fields` would silently
-///    produce no `.bf`; auto-folding here keeps the stored shape consistent with the runtime
-///    invariant.
-/// 3. **Prune `index_fields_updated_at`** to fields still present in `full_text_search_keys` or
-///    `index_fields`, so removed fields don't leave stale timestamps behind (a later re-add must
-///    stamp a fresh time, because files written in the gap lack that field's index).
-///
-/// Called by [`save_stream_settings`] just before [`validate_stream_settings`],
-/// and by [`validate_update_pre_flight`] on its simulated state so both paths
-/// validate the same normalized shape.
-fn normalize_stream_settings(settings: &mut StreamSettings) {
-    // 1. dedup
-    dedup_preserve_order(&mut settings.full_text_search_keys);
-    dedup_preserve_order(&mut settings.index_fields);
-    dedup_preserve_order(&mut settings.bloom_filter_fields);
-    dedup_preserve_order(&mut settings.defined_schema_fields);
-    let mut seen: HashSet<String> = HashSet::new();
-    settings
-        .partition_keys
-        .retain(|p| seen.insert(p.field.clone()));
-    seen.clear();
-    settings
-        .distinct_value_fields
-        .retain(|d| seen.insert(d.name.clone()));
-    seen.clear();
-    settings
-        .extended_retention_days
-        .retain(|r| seen.insert(r.to_string()));
-    seen.clear();
-    settings.cross_links.retain(|c| seen.insert(c.to_string()));
-
-    // 2. bloom ⊆ index
-    let missing_index: Vec<String> = settings
-        .bloom_filter_fields
-        .iter()
-        .filter(|f| !settings.index_fields.contains(f))
-        .cloned()
-        .collect();
-    if !missing_index.is_empty() {
-        let now = now_micros();
-        for field in missing_index.iter() {
-            settings.index_fields_updated_at.insert(field.clone(), now);
-        }
-        settings.index_fields.extend(missing_index);
-    }
-
-    // 3. prune per-field timestamps of fields no longer indexed
-    if !settings.index_fields_updated_at.is_empty() {
-        let indexed: HashSet<String> = settings
-            .full_text_search_keys
-            .iter()
-            .chain(settings.index_fields.iter())
-            .cloned()
-            .collect();
-        settings
-            .index_fields_updated_at
-            .retain(|field, _| indexed.contains(field));
-    }
-}
-
-fn dedup_preserve_order(v: &mut Vec<String>) {
-    let mut seen: HashSet<String> = HashSet::new();
-    v.retain(|s| seen.insert(s.clone()));
-}
-
 pub async fn get_stream_retention(
     org_id: &str,
     stream_type: StreamType,
@@ -1401,36 +1127,6 @@ mod tests {
     use arrow_schema::{DataType, Field};
 
     use super::*;
-
-    #[test]
-    fn test_normalize_stream_settings_index_fields_updated_at() {
-        let mut settings = StreamSettings {
-            index_fields: vec!["a".to_string()],
-            bloom_filter_fields: vec!["b".to_string()],
-            ..Default::default()
-        };
-        settings
-            .index_fields_updated_at
-            .insert("a".to_string(), 100);
-        settings
-            .index_fields_updated_at
-            .insert("removed".to_string(), 200);
-
-        normalize_stream_settings(&mut settings);
-
-        // bloom-only field folded into index_fields and stamped
-        assert!(settings.index_fields.contains(&"b".to_string()));
-        assert!(
-            settings
-                .index_fields_updated_at
-                .get("b")
-                .is_some_and(|v| *v > 0)
-        );
-        // entry of a field no longer indexed is pruned
-        assert!(!settings.index_fields_updated_at.contains_key("removed"));
-        // entry of a still-indexed field is preserved
-        assert_eq!(settings.index_fields_updated_at.get("a"), Some(&100));
-    }
 
     #[test]
     fn test_stream_res() {

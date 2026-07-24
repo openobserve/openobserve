@@ -33,7 +33,7 @@ use config::{
             BUCKET_LABEL, EXEMPLARS_LABEL, HASH_LABEL, METADATA_LABEL, NAME_LABEL, QUANTILE_LABEL,
             VALUE_LABEL,
         },
-        stream::StreamType,
+        stream::{StreamSettings, StreamType},
     },
     metrics,
     utils::{
@@ -43,6 +43,8 @@ use config::{
         time::now_micros,
     },
 };
+#[cfg(feature = "enterprise")]
+use config::{META_ORG_ID, meta::self_reporting::usage::USAGE_STREAM};
 use hashbrown::HashSet;
 use infra::schema::{
     STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS, SchemaCache,
@@ -72,6 +74,331 @@ pub fn get_request_columns_limit_error(stream_name: &str, num_fields: usize) -> 
         "Got {num_fields} columns for stream {stream_name}, only {} columns accept. Data discarded. You can adjust ingestion columns limit by setting the environment variable ZO_COLS_PER_RECORD_LIMIT=<max_columns>",
         get_config().limit.req_cols_per_record_limit
     )
+}
+
+#[derive(Debug)]
+pub enum StreamSettingsError {
+    StreamDeleting(String),
+    BadRequest(String),
+    NotFound(String),
+}
+
+impl std::fmt::Display for StreamSettingsError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::StreamDeleting(message) | Self::BadRequest(message) | Self::NotFound(message) => {
+                f.write_str(message)
+            }
+        }
+    }
+}
+
+impl std::error::Error for StreamSettingsError {}
+
+pub struct SavedStreamSettings {
+    pub settings: StreamSettings,
+    pub previous_settings: Option<StreamSettings>,
+}
+
+/// Validate, normalize, and persist stream settings stored in schema metadata.
+///
+/// This is the canonical settings write path for both the stream service and schema
+/// auto-evolution. Callers should only publish the returned settings to local caches after this
+/// function succeeds.
+pub async fn save_stream_settings(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    mut settings: StreamSettings,
+) -> std::result::Result<SavedStreamSettings, StreamSettingsError> {
+    validate_stream_settings(org_id, stream_name, stream_type, &mut settings)?;
+    let schema = infra::schema::get(org_id, stream_name, stream_type)
+        .await
+        .map_err(|_| StreamSettingsError::NotFound("stream not found".to_string()))?;
+    persist_stream_settings(org_id, stream_name, stream_type, &schema, settings).await
+}
+
+async fn save_stream_settings_with_schema(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    schema: &Schema,
+    mut settings: StreamSettings,
+) -> std::result::Result<SavedStreamSettings, StreamSettingsError> {
+    validate_stream_settings(org_id, stream_name, stream_type, &mut settings)?;
+    persist_stream_settings(org_id, stream_name, stream_type, schema, settings).await
+}
+
+/// Settings-level validation that does not need the stored schema. Runs before the schema fetch
+/// so invalid settings are rejected as bad-request even when the stream doesn't exist.
+fn validate_stream_settings(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    settings: &mut StreamSettings,
+) -> std::result::Result<(), StreamSettingsError> {
+    if db::compact::retention::is_deleting_stream(org_id, stream_type, stream_name, None) {
+        return Err(StreamSettingsError::StreamDeleting(format!(
+            "stream [{stream_name}] is being deleted"
+        )));
+    }
+
+    if !stream_type.support_uds() && !settings.defined_schema_fields.is_empty() {
+        return Err(StreamSettingsError::BadRequest(format!(
+            "stream type [{stream_type}] don't support user defined schema"
+        )));
+    }
+
+    if settings.data_retention > 0
+        && settings.data_retention < 30
+        && settings.storage_type.is_compliance()
+    {
+        return Err(StreamSettingsError::BadRequest(
+            "data_retention must be at least 30 days when storage_type is compliance".to_string(),
+        ));
+    }
+
+    #[cfg(feature = "enterprise")]
+    if org_id == META_ORG_ID && stream_name == USAGE_STREAM && settings.data_retention < 32 {
+        settings.data_retention = 0;
+    }
+
+    if settings.index_original_data {
+        settings.store_original_data = true;
+    }
+    if settings.index_original_data && settings.index_all_values {
+        return Err(StreamSettingsError::BadRequest(
+            "index_original_data & index_all_values cannot be true at the same time".to_string(),
+        ));
+    }
+
+    Ok(())
+}
+
+async fn persist_stream_settings(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    schema: &Schema,
+    mut settings: StreamSettings,
+) -> std::result::Result<SavedStreamSettings, StreamSettingsError> {
+    let cfg = get_config();
+    let schema_fields = schema
+        .fields()
+        .iter()
+        .map(|field| field.name())
+        .collect::<HashSet<_>>();
+    let previous_settings = unwrap_stream_settings(schema);
+
+    normalize_stream_settings(&mut settings);
+
+    if !settings.defined_schema_fields.is_empty() {
+        let fields = check_schema_for_defined_schema_fields(
+            stream_type,
+            schema,
+            std::mem::take(&mut settings.defined_schema_fields),
+        );
+        let mut fields = fields.into_iter().collect::<Vec<_>>();
+        fields.sort_unstable();
+        fields.retain(|field| schema_fields.contains(field));
+        settings.defined_schema_fields = fields;
+    }
+
+    let uds_user_fields = settings
+        .defined_schema_fields
+        .iter()
+        .filter(|field| !is_uds_internal_column(field))
+        .count();
+    if uds_user_fields > cfg.limit.user_defined_schema_max_fields {
+        return Err(StreamSettingsError::BadRequest(format!(
+            "user defined schema fields count exceeds the limit: {}",
+            cfg.limit.user_defined_schema_max_fields
+        )));
+    }
+
+    let fts_set = settings
+        .full_text_search_keys
+        .iter()
+        .cloned()
+        .collect::<HashSet<_>>();
+    let index_set = settings
+        .index_fields
+        .iter()
+        .cloned()
+        .collect::<HashSet<_>>();
+    let bloom_set = settings
+        .bloom_filter_fields
+        .iter()
+        .cloned()
+        .collect::<HashSet<_>>();
+    let pk_set = settings
+        .partition_keys
+        .iter()
+        .map(|partition| partition.field.clone())
+        .collect::<HashSet<_>>();
+
+    let strict_reserved = [TIMESTAMP_COL_NAME, cfg.common.column_all.as_str()];
+    let no_search_reserved = [ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME];
+    for &reserved in strict_reserved.iter().chain(no_search_reserved.iter()) {
+        if index_set.contains(reserved) {
+            return Err(StreamSettingsError::BadRequest(format!(
+                "field [{reserved}] is reserved and cannot be used for secondary index"
+            )));
+        }
+        if bloom_set.contains(reserved) {
+            return Err(StreamSettingsError::BadRequest(format!(
+                "field [{reserved}] is reserved and cannot be used for bloom filter"
+            )));
+        }
+        if pk_set.contains(reserved) {
+            return Err(StreamSettingsError::BadRequest(format!(
+                "field [{reserved}] is reserved and cannot be used as partition key"
+            )));
+        }
+    }
+    for &reserved in &strict_reserved {
+        if fts_set.contains(reserved) {
+            return Err(StreamSettingsError::BadRequest(format!(
+                "field [{reserved}] is reserved and cannot be used for full text search"
+            )));
+        }
+    }
+
+    if let Some(name) = fts_set.intersection(&index_set).next() {
+        return Err(StreamSettingsError::BadRequest(format!(
+            "field [{name}] cannot be both full text search and secondary index — choose one"
+        )));
+    }
+    if let Some(name) = fts_set.intersection(&bloom_set).next() {
+        return Err(StreamSettingsError::BadRequest(format!(
+            "field [{name}] cannot be both full text search and bloom filter"
+        )));
+    }
+    if let Some(name) = bloom_set.difference(&index_set).next() {
+        return Err(StreamSettingsError::BadRequest(format!(
+            "bloom filter field [{name}] must also be a secondary index field"
+        )));
+    }
+    if let Some(name) = pk_set.intersection(&fts_set).next() {
+        return Err(StreamSettingsError::BadRequest(format!(
+            "partition key [{name}] cannot also be a full text search field"
+        )));
+    }
+    if let Some(name) = pk_set.intersection(&index_set).next() {
+        return Err(StreamSettingsError::BadRequest(format!(
+            "partition key [{name}] cannot also be a secondary index field"
+        )));
+    }
+    if let Some(name) = pk_set.intersection(&bloom_set).next() {
+        return Err(StreamSettingsError::BadRequest(format!(
+            "partition key [{name}] cannot also be a bloom filter field"
+        )));
+    }
+
+    let mut old_partition_keys = previous_settings
+        .as_ref()
+        .map(|previous| previous.partition_keys.clone())
+        .unwrap_or_default();
+    for partition in &mut old_partition_keys {
+        partition.disabled = true;
+    }
+    for partition in &settings.partition_keys {
+        if let Some(old_partition) = old_partition_keys
+            .iter_mut()
+            .find(|old| old.field == partition.field)
+        {
+            if old_partition.types != partition.types {
+                return Err(StreamSettingsError::BadRequest(format!(
+                    "field [{}] partition types can't be changed",
+                    partition.field
+                )));
+            }
+            old_partition.disabled = partition.disabled;
+        } else {
+            old_partition_keys.push(partition.clone());
+        }
+    }
+    settings.partition_keys = old_partition_keys;
+
+    if settings
+        .extended_retention_days
+        .iter()
+        .any(|range| range.start > range.end)
+    {
+        return Err(StreamSettingsError::BadRequest(
+            "start day should be less than end day".to_string(),
+        ));
+    }
+
+    let mut metadata = schema.metadata.clone();
+    metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
+    if !metadata.contains_key("created_at") {
+        metadata.insert("created_at".to_string(), now_micros().to_string());
+    }
+    db::schema::update_setting(org_id, stream_name, stream_type, metadata)
+        .await
+        .unwrap();
+
+    Ok(SavedStreamSettings {
+        settings,
+        previous_settings,
+    })
+}
+
+/// Make stream settings internally consistent before validation and persistence.
+fn normalize_stream_settings(settings: &mut StreamSettings) {
+    dedup_preserve_order(&mut settings.full_text_search_keys);
+    dedup_preserve_order(&mut settings.index_fields);
+    dedup_preserve_order(&mut settings.bloom_filter_fields);
+    dedup_preserve_order(&mut settings.defined_schema_fields);
+
+    let mut seen = HashSet::new();
+    settings
+        .partition_keys
+        .retain(|partition| seen.insert(partition.field.clone()));
+    seen.clear();
+    settings
+        .distinct_value_fields
+        .retain(|field| seen.insert(field.name.clone()));
+    seen.clear();
+    settings
+        .extended_retention_days
+        .retain(|range| seen.insert(range.to_string()));
+    seen.clear();
+    settings
+        .cross_links
+        .retain(|link| seen.insert(link.to_string()));
+
+    let missing_index = settings
+        .bloom_filter_fields
+        .iter()
+        .filter(|field| !settings.index_fields.contains(field))
+        .cloned()
+        .collect::<Vec<_>>();
+    if !missing_index.is_empty() {
+        let now = now_micros();
+        for field in &missing_index {
+            settings.index_fields_updated_at.insert(field.clone(), now);
+        }
+        settings.index_fields.extend(missing_index);
+    }
+
+    if !settings.index_fields_updated_at.is_empty() {
+        let indexed = settings
+            .full_text_search_keys
+            .iter()
+            .chain(settings.index_fields.iter())
+            .cloned()
+            .collect::<HashSet<_>>();
+        settings
+            .index_fields_updated_at
+            .retain(|field, _| indexed.contains(field));
+    }
+}
+
+fn dedup_preserve_order(values: &mut Vec<String>) {
+    let mut seen = HashSet::new();
+    values.retain(|value| seen.insert(value.clone()));
 }
 
 pub async fn check_for_schema(
@@ -407,32 +734,28 @@ pub async fn handle_diff_schema(
             }
         }
 
-        defined_schema_fields = uds_fields.into_iter().collect::<Vec<_>>();
-        stream_setting.defined_schema_fields = defined_schema_fields.clone();
-        final_schema.metadata.insert(
-            "settings".to_string(),
-            json::to_string(&stream_setting).unwrap(),
-        );
-
-        // Persist the automatically enabled UDS settings at the schema layer. This deliberately
-        // bypasses the HTTP-facing stream service so schema evolution does not depend on a
-        // higher-level service crate.
-        if !final_schema.metadata.contains_key("created_at") {
-            final_schema
-                .metadata
-                .insert("created_at".to_string(), now_micros().to_string());
-        }
-        if let Err(e) = db::schema::update_setting(
+        let mut candidate_settings = stream_setting.clone();
+        candidate_settings.defined_schema_fields = uds_fields.into_iter().collect();
+        match save_stream_settings_with_schema(
             org_id,
             stream_name,
             stream_type,
-            final_schema.metadata.clone(),
+            &final_schema,
+            candidate_settings,
         )
         .await
         {
-            log::error!(
-                "persist auto UDS settings [{org_id}/{stream_type}/{stream_name}] error: {e}"
-            );
+            Ok(saved) => {
+                stream_setting = saved.settings;
+                defined_schema_fields = stream_setting.defined_schema_fields.clone();
+                final_schema.metadata.insert(
+                    "settings".to_string(),
+                    json::to_string(&stream_setting).unwrap(),
+                );
+            }
+            Err(e) => {
+                log::warn!("skip auto UDS settings [{org_id}/{stream_type}/{stream_name}]: {e}");
+            }
         }
     }
 
@@ -660,6 +983,34 @@ mod tests {
     use arrow_schema::DataType;
 
     use super::*;
+
+    #[test]
+    fn test_normalize_stream_settings_index_fields_updated_at() {
+        let mut settings = StreamSettings {
+            index_fields: vec!["a".to_string(), "a".to_string()],
+            bloom_filter_fields: vec!["b".to_string(), "b".to_string()],
+            ..Default::default()
+        };
+        settings
+            .index_fields_updated_at
+            .insert("a".to_string(), 100);
+        settings
+            .index_fields_updated_at
+            .insert("removed".to_string(), 200);
+
+        normalize_stream_settings(&mut settings);
+
+        assert_eq!(settings.index_fields, vec!["a", "b"]);
+        assert_eq!(settings.bloom_filter_fields, vec!["b"]);
+        assert!(
+            settings
+                .index_fields_updated_at
+                .get("b")
+                .is_some_and(|value| *value > 0)
+        );
+        assert!(!settings.index_fields_updated_at.contains_key("removed"));
+        assert_eq!(settings.index_fields_updated_at.get("a"), Some(&100));
+    }
 
     #[test]
     fn test_generate_schema_for_defined_schema_fields_includes_internal_columns() {

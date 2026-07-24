@@ -1157,4 +1157,110 @@ mod tests {
         assert_eq!(stats_owned.doc_num, stats_ref.doc_num);
         assert_eq!(stats_owned.file_num, stats_ref.file_num);
     }
+
+    // ── calculate_files_size ──────────────────────────────────────────────────
+
+    fn create_test_file_key(
+        id: i64,
+        key: &str,
+        records: i64,
+        original_size: i64,
+        compressed_size: i64,
+        index_size: i64,
+    ) -> FileKey {
+        FileKey {
+            id,
+            account: "test_account".to_string(),
+            key: key.to_string(),
+            meta: FileMeta {
+                min_ts: 1000,
+                max_ts: 2000,
+                records,
+                original_size,
+                compressed_size,
+                index_size,
+                flattened: false,
+                bloom_ver: 0,
+            },
+            deleted: false,
+            selection: None,
+            row_group_size: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_calculate_files_size_empty() {
+        let files: Vec<FileKey> = vec![];
+        let stats = calculate_files_size(&files).await.unwrap();
+        assert_eq!(stats.files, 0);
+        assert_eq!(stats.records, 0);
+        assert_eq!(stats.original_size, 0);
+        assert_eq!(stats.compressed_size, 0);
+        assert_eq!(stats.idx_scan_size, 0);
+    }
+
+    #[tokio::test]
+    async fn test_calculate_files_size_single_file() {
+        let files = vec![create_test_file_key(
+            1,
+            "file1.parquet",
+            100,
+            10000,
+            5000,
+            500,
+        )];
+        let stats = calculate_files_size(&files).await.unwrap();
+        assert_eq!(stats.files, 1);
+        assert_eq!(stats.records, 100);
+        assert_eq!(stats.original_size, 10000);
+        assert_eq!(stats.compressed_size, 5000);
+        assert_eq!(stats.idx_scan_size, 500);
+    }
+
+    #[tokio::test]
+    async fn test_calculate_files_size_multiple_files() {
+        let files = vec![
+            create_test_file_key(1, "file1.parquet", 100, 10000, 5000, 500),
+            create_test_file_key(2, "file2.parquet", 200, 20000, 10000, 1000),
+            create_test_file_key(3, "file3.parquet", 300, 30000, 15000, 1500),
+        ];
+        let stats = calculate_files_size(&files).await.unwrap();
+        assert_eq!(stats.files, 3);
+        assert_eq!(stats.records, 600);
+        assert_eq!(stats.original_size, 60000);
+        assert_eq!(stats.compressed_size, 30000);
+        assert_eq!(stats.idx_scan_size, 3000);
+    }
+
+    #[tokio::test]
+    async fn test_calculate_files_size_with_zero_values() {
+        let files = vec![
+            create_test_file_key(1, "file1.parquet", 0, 0, 0, 0),
+            create_test_file_key(2, "file2.parquet", 100, 10000, 5000, 500),
+        ];
+        let stats = calculate_files_size(&files).await.unwrap();
+        assert_eq!(stats.files, 2);
+        assert_eq!(stats.records, 100);
+        assert_eq!(stats.original_size, 10000);
+        assert_eq!(stats.compressed_size, 5000);
+        assert_eq!(stats.idx_scan_size, 500);
+    }
+
+    #[tokio::test]
+    async fn test_calculate_files_size_large_values() {
+        let files = vec![create_test_file_key(
+            1,
+            "large_file.parquet",
+            1000000,
+            10000000000,
+            5000000000,
+            500000000,
+        )];
+        let stats = calculate_files_size(&files).await.unwrap();
+        assert_eq!(stats.files, 1);
+        assert_eq!(stats.records, 1000000);
+        assert_eq!(stats.original_size, 10000000000);
+        assert_eq!(stats.compressed_size, 5000000000);
+        assert_eq!(stats.idx_scan_size, 500000000);
+    }
 }
