@@ -1,8 +1,6 @@
 {
   "totals": {
-    "rawVarInComponent": 539,
-    "darkMechanism": 2,
-    "unscopedStyle": 1
+    "rawVarInComponent": 539
   },
   "files": {
     "components/CodeQueryEditor.vue": {
@@ -22,9 +20,6 @@
     },
     "components/TenstackTable.vue": {
       "rawVarInComponent": 3
-    },
-    "components/ThemeSwitcher.vue": {
-      "darkMechanism": 1
     },
     "components/alerts/AddAlert.vue": {
       "rawVarInComponent": 1
@@ -209,9 +204,6 @@
     "plugins/traces/metrics/TracesAnalysisDashboard.vue": {
       "rawVarInComponent": 1
     },
-    "utils/logs/convertLogData.ts": {
-      "darkMechanism": 1
-    },
     "views/Dashboards/DashboardSettings.vue": {
       "rawVarInComponent": 3
     },
@@ -222,7 +214,6 @@
       "rawVarInComponent": 5
     },
     "views/Dashboards/ViewDashboard.vue": {
-      "unscopedStyle": 1,
       "rawVarInComponent": 1
     },
     "views/HomeView.vue": {

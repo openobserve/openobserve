@@ -77,10 +77,30 @@ const TS_HEX_ALLOWLIST = [
 // chartTheme are the JS *consumption* seams; themeManager is the theme *applier* — it
 // resolves store.state.theme into the mode to apply (upstream of every token, so it
 // cannot consume a token without circularity).
+//   • ThemeSwitcher.vue is the toggle control itself. A theme switch cannot be written
+//     without naming "dark" — the `darkMode` flag OR a `theme === 'dark'` compare both
+//     trip the regex — so it is the one canonical home for that decision, not the
+//     fragmentation the category targets.
+//   • convertLogData.ts reads --color-theme-accent to paint an ECharts canvas bar.
+//     applyThemeColors (utils/theme.ts) sets that token inline on document.body in dark
+//     mode and on document.documentElement in light, so the consumer must know which
+//     element carries it — a var() cannot resolve on a <canvas>.
 const DARK_SEAM_ALLOWLIST = [
   "composables/useTheme.ts",
   "utils/chartTheme.ts",
   "utils/themeManager.ts",
+  "components/ThemeSwitcher.vue",
+  "utils/logs/convertLogData.ts",
+];
+
+// Files allowed to keep an UNSCOPED <style> block. An unscoped block leaks globally,
+// so it is debt by default — but a few blocks legitimately must reach past the
+// component's own subtree, which a `scoped` block physically cannot do:
+//   • ViewDashboard.vue: its @media print / fullscreen rules target external ancestors
+//     (.o2-app-root, main, .o2-content-scroll, .scroll) that live outside the SFC, so
+//     the block is unscoped on purpose (carries a keep(complex-state) note).
+const UNSCOPED_STYLE_ALLOWLIST = [
+  "views/Dashboards/ViewDashboard.vue",
 ];
 
 // Files allowed to carry a literal font stack. Email markup renders inside a mail
@@ -217,12 +237,23 @@ function countFile(file, rel) {
   const isSpec = rel.includes(".spec.");
 
   if (isVue) {
+    // Per-category sanctioned exceptions (same idiom as the .ts allowlists): a file may
+    // carry ONE specific bypass for a reason the category cannot express, while every
+    // OTHER category still applies to it in full.
+    //   • darkMechanism  → DARK_SEAM_ALLOWLIST (ThemeSwitcher is the toggle control; it
+    //     cannot be written without a dark flag / a `theme === 'dark'` compare).
+    //   • unscopedStyle  → UNSCOPED_STYLE_ALLOWLIST (a block whose selectors must reach
+    //     external ancestors — print / fullscreen — physically cannot be scoped).
+    const skip = (k) =>
+      (k === "darkMechanism" && DARK_SEAM_ALLOWLIST.some((p) => rel.endsWith(p))) ||
+      (k === "unscopedStyle" && UNSCOPED_STYLE_ALLOWLIST.some((p) => rel.endsWith(p)));
     // A component `shape="rounded"` prop (BadgeShape = "pill" | "rounded" |
     // "square") is a first-class API value, NOT a bare Tailwind `rounded` radius
     // class — strip these prop bindings before scanning so bareRounded doesn't
     // false-match them. Real `class="… rounded …"` violations are untouched.
     const scan = text.replace(/:?\bshape=(["'])[^"']*\1/g, "");
     for (const [k, re] of Object.entries(WHOLE)) {
+      if (skip(k)) continue;
       const n = (scan.match(re) || []).length;
       if (n) counts[k] = n;
     }
