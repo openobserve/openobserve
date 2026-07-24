@@ -1169,11 +1169,11 @@ impl AlertExt for Alert {
                 .as_ref()
                 .map_or(format!("{}/{}", self.org_id, self.name), |v| v.to_string());
 
-            let metadata: HashMap<String, String> = vec![
-                ("org_id", self.org_id.clone()),
-                ("stream_type", self.stream_type.to_string()),
-                ("stream_name", self.stream_name.clone()),
-                ("alert_name", self.name.clone()),
+            let metadata: HashMap<String, Value> = vec![
+                ("org_id", self.org_id.clone().into()),
+                ("stream_type", self.stream_type.to_string().into()),
+                ("stream_name", self.stream_name.clone().into()),
+                ("alert_name", self.name.clone().into()),
                 (
                     "alert_type",
                     if self.is_real_time {
@@ -1181,18 +1181,15 @@ impl AlertExt for Alert {
                     } else {
                         "scheduled"
                     }
-                    .to_string(),
+                    .into(),
                 ),
-                ("alert_period", self.trigger_condition.period.to_string()),
+                ("alert_period", self.trigger_condition.period.into()),
                 (
                     "alert_operator",
-                    self.trigger_condition.operator.to_string(),
+                    self.trigger_condition.operator.to_string().into(),
                 ),
-                (
-                    "alert_threshold",
-                    self.trigger_condition.threshold.to_string(),
-                ),
-                ("alert_count", rows.len().to_string()),
+                ("alert_threshold", self.trigger_condition.threshold.into()),
+                ("alert_count", rows.len().into()),
                 (
                     "alert_start_time",
                     start_time
@@ -1203,9 +1200,9 @@ impl AlertExt for Alert {
                                     .num_microseconds()
                                     .unwrap(),
                         )
-                        .to_string(),
+                        .into(),
                 ),
-                ("alert_end_time", rows_end_time.to_string()),
+                ("alert_end_time", rows_end_time.into()),
             ]
             .into_iter()
             .map(|(k, v)| (k.to_string(), v))

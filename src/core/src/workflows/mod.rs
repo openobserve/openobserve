@@ -79,7 +79,7 @@ pub struct WorkflowTrigger {
     pub trigger_type: WorkflowTriggerType,
     pub org_id: String,
     pub workflow_id: String,
-    pub metadata: HashMap<String, String>,
+    pub metadata: HashMap<String, Value>,
     pub run_id: String,
     pub origin_cluster: String,
 }
@@ -580,7 +580,7 @@ pub async fn send_workflow_trigger(
     source_id: String,
     trigger_type: WorkflowTriggerType,
     workflow_id: &str,
-    metadata: HashMap<String, String>,
+    metadata: HashMap<String, Value>,
     data: &[Value],
 ) -> Result<(), anyhow::Error> {
     let o2_cfg = get_o2_config();
