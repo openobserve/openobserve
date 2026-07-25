@@ -6,6 +6,7 @@
 // (at your option) any later version.
 
 import http from "./http";
+import { RETENTION_MS } from "@/plugins/traces/versionCompare/constants";
 
 export const GEN_AI_AGENT_MAPPING_DEFAULTS_URL =
   "https://raw.githubusercontent.com/openobserve/sdr_patterns/main/gen_ai_agent_mappings.json";
@@ -24,6 +25,8 @@ export interface GenAiAgentListItem {
   source_stream_type: string;
   env?: string | null;
   version?: string | null;
+  first_seen?: number | null;
+  last_seen?: number | null;
 }
 
 export interface GenAiAgentListResponse {
@@ -100,6 +103,8 @@ const genAiAgentMappingService = {
           source_stream_type: agent.source_stream_type,
           env: typeof agent.env === "string" ? agent.env : null,
           version: typeof agent.version === "string" ? agent.version : null,
+          first_seen: typeof agent.first_seen === "number" ? agent.first_seen : null,
+          last_seen: typeof agent.last_seen === "number" ? agent.last_seen : null,
         })),
     };
   },
@@ -113,6 +118,28 @@ const genAiAgentMappingService = {
       normalizeConfig(config),
     );
     return normalizeConfig(response.data);
+  },
+  // Wide-window (retention-scoped) version enumeration for the version-compare
+  // slot pickers. Deliberately ignores the page date-picker window: a baseline
+  // version's last_seen may predate the page window, and it must still appear
+  // as a selectable compare slot. UNIT CONTRACT: `nowMicros` is epoch
+  // MICROSECONDS (= Date.now() * 1000). RETENTION_MS is milliseconds, so it is
+  // multiplied by 1000 here to convert to microseconds before subtracting.
+  listVersionsForCompare: async (
+    orgIdentifier: string,
+    agentName: string,
+    env: string | null,
+    nowMicros: number,
+  ): Promise<GenAiAgentListItem[]> => {
+    const start = nowMicros - RETENTION_MS * 1000;
+    const response = await genAiAgentMappingService.listAgents(orgIdentifier, start, nowMicros);
+    return response.agents.filter(
+      (agent) =>
+        agent.name === agentName &&
+        (env === null || agent.env === env) &&
+        agent.version !== null &&
+        agent.version !== undefined,
+    );
   },
   clearRegistry: async (orgIdentifier: string): Promise<ClearGenAiAgentRegistryResponse> => {
     const response = await http().delete(`/api/${orgIdentifier}/settings/gen_ai/agent_registry`);
