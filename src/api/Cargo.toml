@@ -76,6 +76,7 @@ openobserve-api-common.workspace = true
 openobserve-mcp.workspace = true
 usage_reporting.workspace = true
 axum.workspace = true
+axum-server.workspace = true
 axum-extra.workspace = true
 tower.workspace = true
 tower-http.workspace = true
@@ -88,13 +89,10 @@ bytes.workspace = true
 chrono.workspace = true
 openobserve-cipher = { workspace = true, optional = true }
 datafusion.workspace = true
-arrow.workspace = true
-arrow-flight.workspace = true
 arrow-schema.workspace = true
 flate2.workspace = true
 futures.workspace = true
 hashbrown.workspace = true
-http-auth-basic.workspace = true
 itertools.workspace = true
 log.workspace = true
 o2_dex = { workspace = true, optional = true }
@@ -103,7 +101,6 @@ o2_openfga = { workspace = true, optional = true }
 o2_ratelimit = { workspace = true, optional = true }
 opentelemetry.workspace = true
 opentelemetry-proto.workspace = true
-parking_lot.workspace = true
 prost.workspace = true
 proto.workspace = true
 rand.workspace = true
@@ -119,9 +116,7 @@ tikv-jemalloc-sys = { workspace = true, optional = true }
 jemalloc_pprof = { workspace = true, optional = true }
 pprof = { workspace = true, optional = true }
 tokio.workspace = true
-tonic.workspace = true
 tracing.workspace = true
-tracing-opentelemetry.workspace = true
 url.workspace = true
 utoipa.workspace = true
 utoipa-swagger-ui.workspace = true
@@ -130,9 +125,7 @@ infra.workspace = true
 ingester.workspace = true
 zip.workspace = true
 futures-util.workspace = true
-tokio-stream.workspace = true
 mime.workspace = true
-flight.workspace = true
 async-stream.workspace = true
 
 [dev-dependencies]
