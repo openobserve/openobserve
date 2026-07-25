@@ -29,4 +29,18 @@ describe("buildCompareResult", () => {
       { durations: durs, costs: durs }, { durations: durs, costs: durs }, disjointWin, 3);
     expect(r.metrics.every(m => m.associative)).toBe(true);
   });
+  it("empty raw-sample with traceCount>=MIN_SAMPLE yields insufficient p50/p95/cost, not a confident nochange", () => {
+    const r = buildCompareResult(kpi(500, 10, 50), kpi(500, 8, 45),
+      { durations: [], costs: [] }, { durations: [], costs: [] }, disjointWin, 5);
+    expect(r.enoughSample).toBe(true);
+    for (const key of ["p50", "p95", "cost"] as const) {
+      const m = r.metrics.find(x => x.key === key)!;
+      expect(m.verdict).toBe("insufficient");
+      expect(m.ci).toBeNull();
+    }
+    // errorRate rides KPI aggregates (not raw samples) — unaffected by empty samples.
+    const errRate = r.metrics.find(m => m.key === "errorRate")!;
+    expect(errRate.verdict).not.toBe("insufficient");
+    expect(errRate.ci).not.toBeNull();
+  });
 });

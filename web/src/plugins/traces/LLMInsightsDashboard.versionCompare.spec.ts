@@ -271,6 +271,69 @@ describe("LLMInsightsDashboard — compare mode surfaces", () => {
   });
 });
 
+describe("LLMInsightsDashboard — sameWallClock shared window (C1)", () => {
+  it("passes the page window as sharedWindow and re-runs on date-picker change while in sameWallClock", async () => {
+    const wrapper = mountDashboard();
+    await flushPromises();
+    await flushPromises();
+    await (wrapper.vm as any).loadInsights();
+    await flushPromises();
+
+    const btn = wrapper.find('[data-test="llm-insights-compare-entry"]');
+    await btn.trigger("click");
+    await flushPromises();
+    await flushPromises();
+
+    const compareView = wrapper.findComponent({ name: "VersionCompareView" });
+    await compareView.vm.$emit("run", {
+      a: AGENT_V15,
+      b: AGENT_V14,
+      align: "sameWallClock",
+    });
+    await flushPromises();
+    await flushPromises();
+
+    expect((wrapper.vm as any).versionCompare.windows.value).not.toBeNull();
+    const callsBefore = mockFetchAll.mock.calls.length;
+
+    await wrapper.setProps({ startTime: 1_700_000_500_000_000, endTime: 1_700_001_500_000_000 });
+    await flushPromises();
+    await flushPromises();
+
+    expect(mockFetchAll.mock.calls.length).toBeGreaterThan(callsBefore);
+  });
+
+  it("does NOT re-run on date-picker change when align is sinceRollout", async () => {
+    const wrapper = mountDashboard();
+    await flushPromises();
+    await flushPromises();
+    await (wrapper.vm as any).loadInsights();
+    await flushPromises();
+
+    const btn = wrapper.find('[data-test="llm-insights-compare-entry"]');
+    await btn.trigger("click");
+    await flushPromises();
+    await flushPromises();
+
+    const compareView = wrapper.findComponent({ name: "VersionCompareView" });
+    await compareView.vm.$emit("run", {
+      a: AGENT_V15,
+      b: AGENT_V14,
+      align: "sinceRollout",
+    });
+    await flushPromises();
+    await flushPromises();
+
+    const callsBefore = mockFetchAll.mock.calls.length;
+
+    await wrapper.setProps({ startTime: 1_700_000_500_000_000, endTime: 1_700_001_500_000_000 });
+    await flushPromises();
+    await flushPromises();
+
+    expect(mockFetchAll.mock.calls.length).toBe(callsBefore);
+  });
+});
+
 describe("LLMInsightsDashboard — date-picker disabled contract (compareDateDisabled)", () => {
   it("is false before entering compare mode", async () => {
     const wrapper = mountDashboard();

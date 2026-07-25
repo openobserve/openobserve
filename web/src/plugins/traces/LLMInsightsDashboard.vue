@@ -85,6 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :result="versionCompare.result.value"
       :sparklines-a="versionCompare.sparklinesA.value"
       :sparklines-b="versionCompare.sparklinesB.value"
+      :sampled-note="versionCompare.sampledNote.value"
       class="flex-1 overflow-y-auto pb-3"
       data-test="llm-insights-compare-view"
       @exit="exitCompareMode"
@@ -488,8 +489,27 @@ async function onCompareRun(payload: {
   compareAlign.value = payload.align;
   versionCompare.align.value = payload.align;
   versionCompare.setPair(payload.a, payload.b);
-  await versionCompare.run(effectiveStream.value, payload.manual);
+  const sharedWindow =
+    payload.align === "sameWallClock"
+      ? { start: props.startTime, end: props.endTime }
+      : undefined;
+  await versionCompare.run(effectiveStream.value, payload.manual, sharedWindow);
 }
+
+// sameWallClock re-runs the compare whenever the page date-picker changes —
+// in this align mode the shared page window IS the query window for both
+// arms, so a picker change must re-fetch rather than silently going stale.
+watch(
+  [() => props.startTime, () => props.endTime],
+  async () => {
+    if (!compareMode.value || compareAlign.value !== "sameWallClock") return;
+    if (!versionCompare.windows.value) return;
+    await versionCompare.run(effectiveStream.value, undefined, {
+      start: props.startTime,
+      end: props.endTime,
+    });
+  },
+);
 
 // --- Panel result cache (the dashboards IndexedDB cache) --------------------
 // PanelSchemaRenderer restores a panel's data from IndexedDB on mount and skips
@@ -933,7 +953,7 @@ watch(loading, (isLoading, wasLoading) => {
   if (wasLoading && !isLoading) lastRunAt.value = Date.now();
 });
 
-defineExpose({ refresh, lastRunAt, loading, compareDateDisabled });
+defineExpose({ refresh, lastRunAt, loading, compareDateDisabled, versionCompare });
 
 onMounted(() => {
   // Only kick off the stream-list load here. The insights fetch is driven by the

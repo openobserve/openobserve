@@ -7805,7 +7805,9 @@
         "associativeLower": "B is lower than A — the environments differ, so this is associative, not proof B caused it.",
         "causalRegressed": "B regressed vs A under the same wall-clock window.",
         "causalImproved": "B improved vs A under the same wall-clock window.",
-        "insufficient": "Not enough samples yet for a confident verdict — treat this delta as indicative only."
+        "insufficient": "Not enough samples yet for a confident verdict — treat this delta as indicative only.",
+        "methodNewcombe": "Wilson/Newcombe proportion CI",
+        "methodBootstrap": "bootstrap resampling"
       }
     },
     "overlayChart": {
@@ -7961,6 +7963,7 @@
       "entry": "Compare versions…",
       "entryDisabledHint": "Needs at least 2 versions of this agent to compare",
       "datePickerDisabled": "Windows are per-version in this mode",
+      "sampledNote": "Latency & cost intervals are computed from up to {cap} randomly-sampled traces per version.",
       "manual": {
         "startA": "A start",
         "endA": "A end",

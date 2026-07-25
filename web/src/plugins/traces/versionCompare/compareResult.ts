@@ -22,6 +22,13 @@ export function buildCompareResult(
   const nA = kpiA.traceCount, nB = kpiB.traceCount;
   const enoughSample = nA >= MIN_SAMPLE && nB >= MIN_SAMPLE;
   const associative = windows.mode !== "sameWallClock";
+  // A raw-sample fetch can come back empty (network hiccup, transient error
+  // swallowed upstream into `{durations:[],costs:[]}`) even when traceCount
+  // clears MIN_SAMPLE. Bootstrap CIs over an empty array degenerate to delta
+  // 0 / CI [0,0] — a confident "nochange" that isn't earned. Gate the
+  // bootstrap-backed metrics on sample presence, independent of enoughSample.
+  const hasDurationSamples = samplesA.durations.length > 0 && samplesB.durations.length > 0;
+  const hasCostSamples = samplesA.costs.length > 0 && samplesB.costs.length > 0;
   const hoursA = Math.max(1e-9, (windows.a.end - windows.a.start) / 3_600_000_000);
   const hoursB = Math.max(1e-9, (windows.b.end - windows.b.start) / 3_600_000_000);
 
@@ -39,9 +46,9 @@ export function buildCompareResult(
   const metrics: MetricResult[] = [
     { key: "volume", a: volA, b: volB, deltaPct: pct(volA, volB), ci: null, verdict: "nochange", flagged: false, associative },
     { key: "errorRate", a: errRateA, b: errRateB, deltaPct: pct(errRateA, errRateB), ci: errCI, verdict: classifyVerdict(errCI, "up-worse", enoughSample), flagged: true, associative },
-    { key: "p50", a: percentile(samplesA.durations, 0.5), b: percentile(samplesB.durations, 0.5), deltaPct: null, ci: p50CI, verdict: classifyVerdict(p50CI, "up-worse", enoughSample), flagged: true, associative },
-    { key: "p95", a: percentile(samplesA.durations, 0.95), b: percentile(samplesB.durations, 0.95), deltaPct: null, ci: p95CI, verdict: classifyVerdict(p95CI, "up-worse", enoughSample), flagged: true, associative },
-    { key: "cost", a: costPerA, b: costPerB, deltaPct: pct(costPerA, costPerB), ci: costCI, verdict: classifyVerdict(costCI, "up-worse", enoughSample), flagged: true, associative },
+    { key: "p50", a: percentile(samplesA.durations, 0.5), b: percentile(samplesB.durations, 0.5), deltaPct: null, ci: hasDurationSamples ? p50CI : null, verdict: hasDurationSamples ? classifyVerdict(p50CI, "up-worse", enoughSample) : "insufficient", flagged: true, associative },
+    { key: "p95", a: percentile(samplesA.durations, 0.95), b: percentile(samplesB.durations, 0.95), deltaPct: null, ci: hasDurationSamples ? p95CI : null, verdict: hasDurationSamples ? classifyVerdict(p95CI, "up-worse", enoughSample) : "insufficient", flagged: true, associative },
+    { key: "cost", a: costPerA, b: costPerB, deltaPct: pct(costPerA, costPerB), ci: hasCostSamples ? costCI : null, verdict: hasCostSamples ? classifyVerdict(costCI, "up-worse", enoughSample) : "insufficient", flagged: true, associative },
     { key: "p99", a: percentile(samplesA.durations, 0.99), b: percentile(samplesB.durations, 0.99), deltaPct: null, ci: null, verdict: "nochange", flagged: false, associative },
   ];
   metrics.forEach(m => { if (m.deltaPct === null && m.ci) m.deltaPct = pct(m.a, m.b); });

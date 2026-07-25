@@ -21,6 +21,7 @@
 // concurrently, then assembles a CompareResult via buildCompareResult.
 
 import { ref, computed, type Ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
@@ -57,6 +58,7 @@ function isSameVariant(
  */
 export function useVersionCompare() {
   const store = useStore();
+  const { t } = useI18n();
   const { fetchQueryDataWithHttpStream } = useHttpStreaming();
 
   const armA = useLLMInsights();
@@ -140,6 +142,7 @@ export function useVersionCompare() {
   async function run(
     stream: string,
     manualWindows?: { a?: { start: number; end: number }; b?: { start: number; end: number } },
+    sharedWindow?: { start: number; end: number },
   ): Promise<void> {
     if (!a.value || !b.value) return;
 
@@ -181,15 +184,24 @@ export function useVersionCompare() {
     if (manualWindows?.b) resolved.b = manualWindows.b;
     windows.value = resolved;
 
+    // sameWallClock: both arms query the SAME page window (when supplied) so
+    // the comparison is a true wall-clock overlay, not each arm's disjoint
+    // natural lifetime. The resolver's `resolved` windows are still stored on
+    // `windows.value` for display (VersionWindowCard etc.); only the actual
+    // fetch/sample calls below are redirected to the shared window.
+    const useShared = align.value === "sameWallClock" && !!sharedWindow;
+    const queryA = useShared ? (sharedWindow as { start: number; end: number }) : resolved.a;
+    const queryB = useShared ? (sharedWindow as { start: number; end: number }) : resolved.b;
+
     const runner = makeRunner();
 
     const fetchAPromise = armA
-      .fetchAll(stream, resolved.a.start, resolved.a.end, va)
+      .fetchAll(stream, queryA.start, queryA.end, va)
       .catch((e: any) => {
         armA.error.value = e?.message || "Failed to fetch version A";
       });
     const fetchBPromise = armB
-      .fetchAll(stream, resolved.b.start, resolved.b.end, vb)
+      .fetchAll(stream, queryB.start, queryB.end, vb)
       .catch((e: any) => {
         armB.error.value = e?.message || "Failed to fetch version B";
       });
@@ -200,8 +212,8 @@ export function useVersionCompare() {
     const sampleAPromise = fetchRawSample(
       stream,
       filterA,
-      resolved.a.start,
-      resolved.a.end,
+      queryA.start,
+      queryA.end,
       runner,
     ).catch((e: any) => {
       armA.error.value = armA.error.value || e?.message || "Failed to fetch sample A";
@@ -210,8 +222,8 @@ export function useVersionCompare() {
     const sampleBPromise = fetchRawSample(
       stream,
       filterB,
-      resolved.b.start,
-      resolved.b.end,
+      queryB.start,
+      queryB.end,
       runner,
     ).catch((e: any) => {
       armB.error.value = armB.error.value || e?.message || "Failed to fetch sample B";
@@ -233,6 +245,11 @@ export function useVersionCompare() {
       resolved,
       1,
     );
+
+    // Sample-cap disclosure: latency/cost intervals only ever see up to
+    // SAMPLE_CAP randomly-sampled traces per arm, regardless of traceCount —
+    // surface that so the numbers aren't mistaken for exhaustive.
+    sampledNote.value = t("aiObservability.versionCompare.sampledNote", { cap: SAMPLE_CAP });
   }
 
   return {

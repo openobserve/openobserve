@@ -116,7 +116,10 @@ function tooltipText(metric: MetricResult): string {
     upper: metric.ci.upper.toFixed(4),
   });
   const method = t("aiObservability.deltaStrip.tooltip.method", {
-    method: metric.key === "errorRate" ? "Wilson/Newcombe proportion CI" : "bootstrap resampling",
+    method:
+      metric.key === "errorRate"
+        ? t("aiObservability.deltaStrip.methodNewcombe")
+        : t("aiObservability.deltaStrip.methodBootstrap"),
   });
   const verdictText = verdictWording(metric);
   return [verdictText, range, method].filter(Boolean).join(" ");

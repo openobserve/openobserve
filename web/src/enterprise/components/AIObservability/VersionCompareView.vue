@@ -123,6 +123,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <VersionDeltaStrip v-if="result" :result="result" />
+      <span
+        v-if="sampledNote"
+        class="text-xs text-text-muted"
+        data-test="version-compare-sampled-note"
+      >
+        {{ sampledNote }}
+      </span>
 
       <VersionOverlayChart
         v-if="windows"
@@ -160,6 +167,7 @@ const props = defineProps<{
   result: CompareResult | null;
   sparklinesA: LLMSparklineSeries | null;
   sparklinesB: LLMSparklineSeries | null;
+  sampledNote?: string | null;
 }>();
 
 const emit = defineEmits<{
