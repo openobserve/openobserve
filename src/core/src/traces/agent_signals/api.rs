@@ -162,7 +162,21 @@ struct ArmAggregate {
 /// unit-testable without a search round-trip.
 fn aggregate_cost_hits(hits: &[serde_json::Value]) -> ArmAggregate {
     let mut agg = ArmAggregate::default();
+    // Dedup by window `_timestamp`: the rollup can write duplicate rows for the
+    // same window (multi-alert-manager offset race, or a reset overlapping an
+    // already-processed window), and merging duplicates would double-count.
+    // Hits arrive `_timestamp DESC`, so the FIRST row seen for a timestamp is
+    // the newest ingest — keep it, skip the rest.
+    let mut seen_windows: std::collections::HashSet<i64> = std::collections::HashSet::new();
     for hit in hits {
+        // Rows without a parseable _timestamp are treated as distinct (fall back
+        // to a per-row sentinel so we never silently drop them).
+        let ts = hit.get("_timestamp").and_then(|v| v.as_i64());
+        if let Some(ts) = ts
+            && !seen_windows.insert(ts)
+        {
+            continue; // duplicate window row — already counted the newest
+        }
         if let Some(s) = hit.get("latency_sketch").and_then(|v| v.as_str())
             && !s.is_empty()
         {
@@ -205,9 +219,17 @@ async fn fetch_arm_aggregate(org_id: &str, arm: &CompareArm) -> ArmAggregate {
         ));
     }
 
+    // Select `_timestamp` so the fold can dedup to ONE row per rollup window.
+    // The rollup stamps every row of a window at its window-end `ts`, so a
+    // window that was double-processed (e.g. multiple alert-managers racing the
+    // offset-ownership handoff, or a reset that overlapped an already-processed
+    // window) produces duplicate rows sharing a `_timestamp`. Merging all of
+    // them would double-count that window's latency/cost — so dedup by
+    // `_timestamp` (keep the newest ingest) before merging.
     let sql = format!(
-        "SELECT latency_sketch, cost, cost_sqsum, cost_n FROM \"{stream_name}\" \
+        "SELECT _timestamp, latency_sketch, cost, cost_sqsum, cost_n FROM \"{stream_name}\" \
          WHERE _timestamp >= {} AND _timestamp < {} AND {filters} \
+         ORDER BY _timestamp DESC \
          LIMIT 10000",
         arm.start_time, arm.end_time
     );
@@ -366,6 +388,23 @@ mod compare_tests {
         assert!((agg.cost_sum - 3.5).abs() < 1e-9);
         assert!((agg.cost_sqsum - 6.25).abs() < 1e-9);
         assert_eq!(agg.cost_n, 8);
+    }
+
+    #[test]
+    fn aggregate_cost_hits_dedups_duplicate_window_rows_by_timestamp() {
+        // Two rows share _timestamp=1000 (a double-processed window: multi
+        // alert-manager race / reset overlap). Only the FIRST (newest ingest,
+        // since input is _timestamp DESC) must count — no double-counting.
+        let hits = vec![
+            serde_json::json!({ "_timestamp": 2000, "latency_sketch": "w2", "cost": 5.0, "cost_sqsum": 25.0, "cost_n": 10 }),
+            serde_json::json!({ "_timestamp": 1000, "latency_sketch": "w1_new", "cost": 3.0, "cost_sqsum": 9.0, "cost_n": 6 }),
+            serde_json::json!({ "_timestamp": 1000, "latency_sketch": "w1_dup", "cost": 3.0, "cost_sqsum": 9.0, "cost_n": 6 }),
+        ];
+        let agg = aggregate_cost_hits(&hits);
+        // window 1000 counted ONCE (the newest, "w1_new"), window 2000 once.
+        assert_eq!(agg.sketches, vec!["w2".to_string(), "w1_new".to_string()]);
+        assert!((agg.cost_sum - 8.0).abs() < 1e-9, "cost not double-counted: {}", agg.cost_sum);
+        assert_eq!(agg.cost_n, 16, "n not double-counted");
     }
 
     #[test]
