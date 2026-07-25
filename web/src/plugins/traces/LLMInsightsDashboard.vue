@@ -521,9 +521,19 @@ watch(
 // so a stale comparison never lingers under a different agent's picker (the
 // user re-enters compare for the new agent). Version alone is NOT an identity
 // change (it's the very dimension being compared) and must not trigger this.
-watch([selectedAgentName, selectedEnv], () => {
-  if (compareMode.value) exitCompareMode();
-});
+//
+// The ORGANIZATION is also an identity dimension: every agent/version selection
+// is org-scoped, so switching orgs while comparing leaves the picker pointed at
+// an agent that may not exist in the new org. The compare endpoint then returns
+// `insufficient` for that phantom agent, the view drops to the slow raw-sample
+// bootstrap fallback, and the KPI cards render STALE cross-org numbers. Reset on
+// org change too, so the compare view never queries an agent from another org.
+watch(
+  [selectedAgentName, selectedEnv, () => store.state.selectedOrganization?.identifier],
+  () => {
+    if (compareMode.value) exitCompareMode();
+  },
+);
 
 // --- Panel result cache (the dashboards IndexedDB cache) --------------------
 // PanelSchemaRenderer restores a panel's data from IndexedDB on mount and skips
