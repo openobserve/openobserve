@@ -15,179 +15,106 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPageLayout
-    data-test="ai-agent-graph-page"
+  <AiPageShell
+    data-test="ai-agent-graph"
     :title="t('aiObservability.nav.agentGraph')"
     :subtitle="t('aiObservability.subtitle.agentGraph')"
     icon="hub"
-    bleed
-    :scroll="false"
+    :date-state="dateState"
+    :last-run-at="graphLastRunAt"
+    :is-loading="isGraphLoading"
+    @date-change="onDateChange"
+    @refresh="refresh"
   >
-      <template #actions>
-        <date-time
-          ref="dateTimeRef"
-          auto-apply
-          menu-align="end"
-          :default-type="dateState.valueType"
-          :default-absolute-time="{
-            startTime: dateState.startTime ?? 0,
-            endTime: dateState.endTime ?? 0,
-          }"
-          :default-relative-time="dateState.relativeTimePeriod ?? ''"
-          data-test="ai-agent-graph-date-time"
-          class="h-8"
-          @on:date-change="onDateChange"
-        />
-        <!-- Last-refresh + refresh control, consistent with LLM Insights /
-             Sessions / Agent Behavior page headers. -->
-        <div
-          class="inline-flex items-center border border-border-default rounded-default px-1 h-8 overflow-hidden"
-        >
-          <ORefreshButton
-            :last-run-at="graphLastRunAt"
-            :loading="isGraphLoading"
-            :disabled="isGraphLoading"
-            data-test="ai-agent-graph-refresh-btn"
-            @click="refresh"
-          />
-        </div>
-      </template>
-
     <!-- Scope control — same Stream/Agent pattern as LLM Insights, so the two
          AI pages read as one product. Stream tab picks a trace stream; Agent
          tab picks a discovered agent and the graph follows its source_stream.
          Lives in OPageLayout's #subnav (which draws the full-bleed divider). -->
     <template #subnav>
-    <div class="flex items-center gap-3 px-page-edge py-2">
-      <OToggleGroup
-        :model-value="filterMode"
-        type="single"
-        data-test="agent-graph-filter-mode"
-        @update:model-value="onFilterModeChange"
+      <!-- Shared scope control. #subnav already draws the full-bleed divider
+           (bordered:false). allAgents:false → agent picker falls back to the
+           plain agent label. Graph's version-agnostic hint rides in the #badges
+           slot; its viz-type + layout controls ride in #trailing. -->
+      <AiScopeBar
+        v-model:filter-mode="filterMode"
+        v-model:active-stream="activeStream"
+        v-model:selected-env="selectedEnv"
+        v-model:selected-agent-name="selectedAgentName"
+        v-model:selected-version="selectedVersion"
+        data-test="agent-graph"
+        :bordered="false"
+        :stream-option-tooltip="true"
+        :show-version="false"
+        :labels="{
+          agent: t('aiObservability.agentGraph.agent'),
+          stream: t('aiObservability.agentGraph.stream'),
+          streamLabel: t('aiObservability.agentGraph.stream'),
+          allAgents: t('aiObservability.agentGraph.agent'),
+        }"
+        :stream-select-options="streamSelectOptions"
+        :envs="envs"
+        :agent-names="agentNames"
+        :versions="versions"
+        :selected-stream-count="selectedStreamCount"
+        :streams-loaded="true"
+        :agents-loaded="agentsLoaded"
+        @filter-mode-change="onFilterModeChange"
       >
-        <OToggleGroupItem value="agent" size="sm">{{
-          t("aiObservability.agentGraph.agent")
-        }}</OToggleGroupItem>
-        <OToggleGroupItem value="stream" size="sm">{{
-          t("aiObservability.agentGraph.stream")
-        }}</OToggleGroupItem>
-      </OToggleGroup>
-
-      <div
-        v-if="filterMode === 'stream'"
-        data-test="agent-graph-stream-selector"
-        class="w-64 shrink-0"
-      >
-        <OSelect
-          v-model="activeStream"
-          :label="t('aiObservability.agentGraph.stream')"
-          label-position="inside"
-          :options="streamSelectOptions"
-          labelKey="label"
-          valueKey="value"
-          option-tooltip
-          class="w-full rounded-default"
-        />
-      </div>
-      <!-- Agent count for the selected stream — beside the picker, consistent
-           with the env/version scope chips beside the agent picker. -->
-      <StreamAgentCountBadge
-        v-if="filterMode === 'stream' && activeStream"
-        :count="selectedStreamCount"
-        data-test="agent-graph-stream-count"
-      />
-      <div
-        v-else
-        data-test="agent-graph-agent-selector"
-        class="w-64 shrink-0"
-      >
-        <OSelect
-          v-model="activeAgentKey"
-          :label="t('aiObservability.agentGraph.agent')"
-          label-position="inside"
-          :options="agentSelectOptions"
-          labelKey="label"
-          valueKey="value"
-          :loading="!agentsLoaded"
-          class="w-full rounded-default"
-        >
-          <!-- On selection show the agent NAME only; env/version are badges. The
-               classes mirror OSelect's default label span so the agent picker
-               is visually identical to the stream picker (inside-label sizing). -->
-          <template #trigger>
-            <span
-              class="flex-1 text-start truncate text-xs leading-4"
-              :class="
-                selectedAgent ? 'text-select-text' : 'text-select-placeholder'
-              "
-            >
-              {{ selectedAgent?.name || t("aiObservability.agentGraph.agent") }}
-            </span>
-          </template>
-        </OSelect>
-      </div>
-      <!-- Scope chips: which env/version variant of the agent is in view. Only in
-           Agent mode — Stream mode isn't scoped to one agent variant. -->
-      <span
-        v-if="filterMode === 'agent' && selectedAgent"
-        class="inline-flex items-center gap-1"
-      >
-        <OAgentBadges
-          :env="selectedAgent.env"
-          :version="selectedAgent.version"
-          data-test="agent-graph-scope-badges"
-        />
-        <!-- The version chip is informational here: topology is version-agnostic
-             (scoped by env, not version). Surface that with a hint icon so users
-             don't expect the graph to change when they switch versions. -->
-        <OTooltip
-          v-if="selectedAgent.version"
-          :content="t('aiObservability.agentGraph.versionAgnosticHint')"
-        >
+        <!-- Version-agnostic hint. Agent Graph hides the cascade's Version
+             dropdown (topology is the same across versions), so this info
+             affordance beside the cascade explains why version isn't a scope
+             here and points to version comparison. Graph-only (rides the
+             #badges slot no other page passes). -->
+        <template #badges>
           <OIcon
-            name="info"
+            name="info-outline"
             size="sm"
-            class="text-text-muted cursor-help"
+            class="text-text-secondary shrink-0"
             data-test="agent-graph-version-agnostic-hint"
-          />
-        </OTooltip>
-      </span>
-
-      <!-- Agent Graph's OWN visualization + layout selection. Kept fully
-           independent of the Traces Service Graph tab (its own state + distinct
-           localStorage keys), so the two surfaces don't share a type. Same
-           control shape as the Traces SearchBar toolbar for consistency. -->
-      <div class="ml-auto flex items-center gap-2 shrink-0">
-        <OToggleGroup
-          :model-value="vizType"
-          type="single"
-          data-test="agent-graph-viz-type"
-          @update:model-value="onVizTypeChange"
-        >
-          <OToggleGroupItem value="tree" size="sm">
-            <template #icon-left>
-              <OIcon name="git-branch" size="sm" />
-            </template>
-            {{ t("traces.treeView") }}
-          </OToggleGroupItem>
-          <OToggleGroupItem value="graph" size="sm">
-            <template #icon-left>
-              <OIcon name="share" size="sm" class="shrink-0" />
-            </template>
-            {{ t("traces.graphView") }}
-          </OToggleGroupItem>
-        </OToggleGroup>
-        <OSelect
-          v-model="layoutType"
-          :options="layoutOptions"
-          :searchable="false"
-          data-test="agent-graph-layout-type"
-          class="w-[7.5rem] min-h-8! h-8!"
-          :disabled="vizType === 'graph'"
-          @update:model-value="onLayoutTypeChange"
-        />
-      </div>
-    </div>
+          >
+            <OTooltip
+              :content="t('aiObservability.agentGraph.versionAgnosticHint')"
+              max-width="300px"
+            />
+          </OIcon>
+        </template>
+        <!-- Agent Graph's OWN visualization + layout selection. Kept fully
+             independent of the Traces Service Graph tab (its own state + distinct
+             localStorage keys), so the two surfaces don't share a type. Same
+             control shape as the Traces SearchBar toolbar for consistency. -->
+        <template #trailing>
+          <div class="ml-auto flex items-center gap-2 shrink-0">
+            <OToggleGroup
+              :model-value="vizType"
+              type="single"
+              data-test="agent-graph-viz-type"
+              @update:model-value="onVizTypeChange"
+            >
+              <OToggleGroupItem value="tree" size="sm">
+                <template #icon-left>
+                  <OIcon name="git-branch" size="sm" />
+                </template>
+                {{ t("traces.treeView") }}
+              </OToggleGroupItem>
+              <OToggleGroupItem value="graph" size="sm">
+                <template #icon-left>
+                  <OIcon name="share" size="sm" class="shrink-0" />
+                </template>
+                {{ t("traces.graphView") }}
+              </OToggleGroupItem>
+            </OToggleGroup>
+            <OSelect
+              v-model="layoutType"
+              :options="layoutOptions"
+              :searchable="false"
+              data-test="agent-graph-layout-type"
+              class="w-[7.5rem] min-h-8! h-8!"
+              :disabled="vizType === 'graph'"
+              @update:model-value="onLayoutTypeChange"
+            />
+          </div>
+        </template>
+      </AiScopeBar>
     </template>
 
     <!-- Gate the graph until the effective stream is genuinely resolved.
@@ -201,6 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="graphReady"
       ref="graphRef"
       :stream-filter="effectiveStream"
+      :time-range="timeRange"
       :agent-id="filterMode === 'agent' ? (selectedAgent?.id ?? null) : null"
       :agent-name="filterMode === 'agent' ? (selectedAgent?.name ?? null) : null"
       :agent-env="filterMode === 'agent' ? (selectedAgent?.env ?? null) : null"
@@ -232,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OSpinner />
     </div>
-  </OPageLayout>
+  </AiPageShell>
 </template>
 
 <script setup lang="ts">
@@ -240,15 +168,13 @@ import { defineAsyncComponent, ref, computed, onMounted } from "vue";
 import type { AcceptableValue } from "reka-ui";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import DateTime from "@/components/DateTime.vue";
-import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import AiPageShell from "@/enterprise/components/AIObservability/AiPageShell.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import useTraces from "@/composables/useTraces";
@@ -257,13 +183,10 @@ import genAiAgentMappingService, {
   type GenAiAgentListItem,
 } from "@/services/gen-ai-agent-mapping.service";
 import { agentOptionKey } from "@/plugins/traces/llmAgentFilter";
-import {
-  buildAgentSelectOptions,
-  buildStreamSelectOptions,
-} from "@/plugins/traces/agentOptionFormat";
-import OAgentBadges from "@/components/shared/OAgentBadges.vue";
-import StreamAgentCountBadge from "@/components/shared/StreamAgentCountBadge.vue";
-import { useAiDateRange } from "@/enterprise/composables/useAiDateRange";
+import AiScopeBar from "@/enterprise/components/AIObservability/AiScopeBar.vue";
+import { useAiDateController } from "@/enterprise/composables/useAiDateController";
+import { useChildRefresh } from "@/enterprise/composables/useChildRefresh";
+import { useAgentScope } from "@/enterprise/composables/useAgentScope";
 
 defineOptions({ name: "AIAgentGraphPage" });
 
@@ -273,15 +196,20 @@ const { searchObj } = useTraces();
 
 // Shared AI-module date range — the same singleton LLM Insights / Sessions /
 // Agent Behavior use, so picking a time on any AI tab lands on all of them.
-const { state: dateState } = useAiDateRange();
-// Resolved absolute window (µs) the graph + agent-list queries read.
-const timeRange = ref({ startTime: 0, endTime: 0 });
+// Agent Graph has no from/to/period URL sync (urlSync:false), matching its
+// prior behavior of resolving from shared state only. `timeRange` is the
+// resolved absolute window (µs) the graph + agent-list queries read.
+const {
+  dateState,
+  timeRange,
+  applyRelative,
+  onDateChange: onDateStateChange,
+  mountResolve,
+} = useAiDateController({ urlSync: false });
 
 const ServiceGraph = defineAsyncComponent(
   () => import("@/plugins/traces/ServiceGraph.vue"),
 );
-
-const DEFAULT_RELATIVE = "15m";
 
 // Default scope is "agent" — the AI module is agent-centric (agents load on
 // mount, so the default is ready on first paint).
@@ -334,81 +262,84 @@ function onLayoutTypeChange(value: SelectModelValue) {
 // Graph child ref + header refresh state. ServiceGraph exposes
 // { refresh, loading, lastRunAt }.
 const graphRef = ref<any>(null);
-const isRefreshing = ref(false);
-const graphLastRunAt = computed<number | null>(
-  () => graphRef.value?.lastRunAt ?? null,
-);
-const isGraphLoading = computed(
-  () => isRefreshing.value || graphRef.value?.loading || false,
-);
-
-async function refresh() {
-  if (isRefreshing.value) return;
-  isRefreshing.value = true;
-  try {
-    // Re-anchor a relative window first so "last 15m" refreshes to now.
+// Header refresh state derived off the graph child. onBeforeRefresh re-anchors a
+// relative window first so "last 15m" refreshes to now, then delegates to the
+// graph's exposed refresh().
+const {
+  lastRunAt: graphLastRunAt,
+  isLoading: isGraphLoading,
+  refresh,
+} = useChildRefresh(graphRef, {
+  onBeforeRefresh: () => {
     if (
       dateState.value.valueType === "relative" &&
       dateState.value.relativeTimePeriod
     ) {
       applyRelative(dateState.value.relativeTimePeriod);
     }
-    await graphRef.value?.refresh?.();
-  } finally {
-    isRefreshing.value = false;
-  }
-}
+  },
+});
 
+// Graph owns its `agents`/`agentsLoaded` refs and its from-agents
+// `availableStreams` computed (its Stream picker is derived from agent-bearing
+// streams, not from all trace streams). Its own reconciling `loadAgents`
+// (evict-stale-key + evict-stale-stream + default-both) also stays page-local.
+// These are injected INTO useAgentScope purely to obtain the shared derived
+// computeds (agentSelectOptions/streamSelectOptions/selectedStreamCount/
+// selectedAgent/effectiveStream); Graph does NOT use the composable's loadAgents.
 const agents = ref<GenAiAgentListItem[]>([]);
 const agentsLoaded = ref(false);
-const activeAgentKey = ref<string>("");
 
 // Stream-scoped identity, mirroring LLM Insights — same-named agents in
 // different streams (or different env/version) don't collide.
 const agentKey = (a: GenAiAgentListItem) => agentOptionKey(a);
 
-const agentSelectOptions = computed(() =>
-  buildAgentSelectOptions(agents.value, t),
-);
-
 // Streams offered in the Stream picker are ONLY those that actually carry agent
 // data — i.e. the distinct source_streams of discovered agents. A trace stream
 // with services but no agents (e.g. `introspection`) has nothing agent-related
 // to show here, so it must not appear. Derived from the agents list rather than
-// from all trace streams for exactly this reason.
+// from all trace streams for exactly this reason. Passed into useAgentScope,
+// which only READS it (streamSelectOptions/selectedStreamCount).
 const availableStreams = computed(() => [
   ...new Set(agents.value.map((a) => a.source_stream)),
 ]);
 
-// Stream picker options: the stream name annotated with how many agents it
-// contains, e.g. "sre_agent_traces_production (2 agents)". The count makes it
-// clear a stream holds multiple agents and disambiguates otherwise similar (or
-// truncated) stream names. `value` stays the bare stream name. The full stream
-// name is kept in `title` so a truncated label still reveals itself on hover.
-const streamSelectOptions = computed(() =>
-  buildStreamSelectOptions(availableStreams.value, agents.value),
-);
-const selectedStreamCount = computed(
-  () =>
-    streamSelectOptions.value.find((o) => o.value === activeStream.value)
-      ?.agentCount ?? 0,
-);
-
-const selectedAgent = computed<GenAiAgentListItem | null>(
-  () => agents.value.find((a) => agentKey(a) === activeAgentKey.value) ?? null,
-);
-
-// The stream the graph queries: the picked stream, or the SELECTED agent's
-// source_stream. In agent mode with no agent selected there is NO valid stream —
-// it must be empty, NOT `activeStream` ("default"). Falling back to "default"
-// here was the bug: with no agent selected (e.g. no agents in the window) the
-// graph rendered the whole `default` trace stream's service topology instead of
-// an agent-scoped graph.
-const effectiveStream = computed(() =>
-  filterMode.value === "agent"
-    ? (selectedAgent.value?.source_stream ?? "")
-    : activeStream.value,
-);
+// Shared derived scope computeds from useAgentScope. `activeAgent` (the
+// composable's single selection ref) replaces Graph's former `activeAgentKey`;
+// Graph's `loadAgents` reconciliation writes into it. `allAgents:false` → no
+// All-Agents entry, matching Graph's first-agent-default behavior. Graph's own
+// `agents`/`agentsLoaded` refs and from-agents `availableStreams` computed are
+// injected, so the composable reads Graph's data and never loads on its own.
+const {
+  activeAgent,
+  streamSelectOptions,
+  selectedStreamCount,
+  selectedAgent,
+  effectiveStream,
+  envs,
+  agentNames,
+  versions,
+  selectedEnv,
+  selectedAgentName,
+  selectedVersion,
+} = useAgentScope({
+  filterMode,
+  activeStream,
+  agents,
+  agentsLoaded,
+  availableStreams,
+  orgId: () => store.state.selectedOrganization?.identifier,
+  getWindow: () => {
+    const w = effectiveWindow();
+    return { start: w.startTime, end: w.endTime };
+  },
+  allAgents: false,
+  cascade: true,
+  // Graph is version-agnostic: it hides the Version dropdown, so the cascade
+  // must resolve an agent from env + name alone (auto-pick the first version).
+  versionAgnostic: true,
+  t,
+});
 
 // Whether there is simply nothing agent-related to graph in the current org /
 // time window. There are no agents at all → both modes have nothing to show
@@ -459,15 +390,17 @@ async function loadAgents() {
     agents.value = res.agents ?? [];
     // Reconcile the selection against the fresh list. Reloading (e.g. after a
     // time-range change) can return a different or empty set, which would
-    // otherwise leave `activeAgentKey` pointing at an agent no longer present —
+    // otherwise leave `activeAgent` pointing at an agent no longer present —
     // the dropdown then shows a stale name while the graph has no agent. Clear a
     // now-invalid key, and auto-select the first agent when none is selected.
+    // `activeAgent` is useAgentScope's selection ref (Graph keeps its OWN richer
+    // reconciliation here rather than the composable's key-only clamp).
     const keys = new Set(agents.value.map((a) => agentKey(a)));
-    if (activeAgentKey.value && !keys.has(activeAgentKey.value)) {
-      activeAgentKey.value = "";
+    if (activeAgent.value && !keys.has(activeAgent.value)) {
+      activeAgent.value = "";
     }
-    if (!activeAgentKey.value && agents.value.length) {
-      activeAgentKey.value = agentKey(agents.value[0]);
+    if (!activeAgent.value && agents.value.length) {
+      activeAgent.value = agentKey(agents.value[0]);
     }
     // Same reconciliation for the Stream picker, whose options are the distinct
     // agent-bearing source_streams (availableStreams). Clear a now-absent
@@ -480,55 +413,25 @@ async function loadAgents() {
     }
   } catch {
     agents.value = [];
-    activeAgentKey.value = "";
+    activeAgent.value = "";
     activeStream.value = "";
   } finally {
     agentsLoaded.value = true;
   }
 }
 
-function applyRelative(period: string) {
-  const range = getConsumableRelativeTime(period);
-  if (!range) return;
-  timeRange.value = { startTime: range.startTime, endTime: range.endTime };
-  dateState.value = {
-    valueType: "relative",
-    relativeTimePeriod: period,
-    startTime: null,
-    endTime: null,
-  };
-}
-
+// Date-only state update is owned by useAiDateController; the page's extra
+// effect on a date change is to reload the agent list for the new window.
 function onDateChange(value: any) {
-  if (value?.valueType === "relative" && value.relativeTimePeriod) {
-    applyRelative(value.relativeTimePeriod);
-  } else {
-    dateState.value = {
-      valueType: "absolute",
-      relativeTimePeriod: null,
-      startTime: value.startTime,
-      endTime: value.endTime,
-    };
-    timeRange.value = { startTime: value.startTime, endTime: value.endTime };
-  }
+  onDateStateChange(value);
   loadAgents();
 }
 
 onMounted(() => {
   // Resolve the shared range to an absolute window on mount (re-anchoring a
   // relative range to "now"), so the graph and agent list query the same window
-  // the other AI tabs use.
-  if (
-    dateState.value.valueType === "relative" ||
-    !dateState.value.startTime
-  ) {
-    applyRelative(dateState.value.relativeTimePeriod || DEFAULT_RELATIVE);
-  } else {
-    timeRange.value = {
-      startTime: dateState.value.startTime,
-      endTime: dateState.value.endTime ?? 0,
-    };
-  }
+  // the other AI tabs use. urlSync:false → no URL read, resolve from shared state.
+  mountResolve();
   loadAgents();
 });
 </script>

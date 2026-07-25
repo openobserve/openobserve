@@ -479,6 +479,17 @@ export default defineComponent({
       type: String as PropType<string | null>,
       default: null,
     },
+    // Optional external time window (Agent Graph page owns its own date picker
+    // via useAiDateController). When set it drives the topology query instead of
+    // the shared traces store's `searchObj.data.datetime` — otherwise the page's
+    // date selection and the graph's query window would be two disconnected
+    // clocks, and the graph would show "No service graph data" for a window that
+    // actually has topology. Undefined = fall back to the shared traces store
+    // (the Traces Service Graph tab, driven by the SearchBar toolbar).
+    timeRange: {
+      type: Object as PropType<{ startTime: number; endTime: number } | undefined>,
+      default: undefined,
+    },
   },
   emits: ["view-traces", "request:stream-change", "jump-to-stream-data"],
   setup(props, { emit, expose }) {
@@ -1568,7 +1579,12 @@ export default defineComponent({
           throw new Error(t("traces.serviceGraph.noOrganizationSelected"));
         }
 
-        const { startTime, endTime } = getEffectiveTimeRange(searchObj.data.datetime);
+        // Prefer the parent-supplied window (Agent Graph page's date picker); fall
+        // back to the shared traces datetime (Traces Service Graph tab).
+        const { startTime, endTime } =
+          props.timeRange && props.timeRange.startTime && props.timeRange.endTime
+            ? props.timeRange
+            : getEffectiveTimeRange(searchObj.data.datetime);
 
         // Topology, node kinds, edges and latency all come from the
         // pre-aggregated _o2_service_graph stream via /topology/current. The
@@ -1737,6 +1753,17 @@ export default defineComponent({
       () => searchObj.data.datetime,
       () => {
         loadServiceGraph();
+      },
+      { deep: true },
+    );
+
+    // Watch the parent-supplied window (Agent Graph page's date picker) — reload
+    // when it changes, so the graph tracks that page's date selection rather than
+    // the disconnected shared traces datetime.
+    watch(
+      () => props.timeRange,
+      () => {
+        if (props.timeRange) loadServiceGraph();
       },
       { deep: true },
     );

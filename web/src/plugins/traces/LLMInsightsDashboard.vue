@@ -26,88 +26,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          hidden when no streams are available. Padding lives on the toolbar +
          scroll area (not the root) so the scrollbar hugs the content-area edge
          instead of floating inside a padded box. -->
-    <div
+    <!-- Shared scope control — left-aligned Stream/Agent bar directly under the
+         header, matching Agent Graph / Agent Behavior / Sessions so every AI page
+         places its scope selector the same way. The outer guard (no bar until we
+         know there ARE streams) stays here, wrapping the component. agentSkeleton
+         holds a picker-shaped skeleton until the agents list first lands;
+         solidAgentTrigger keeps the "All Agents" empty state in solid text. -->
+    <AiScopeBar
       v-if="availableStreams.length > 0"
-      class="flex items-center gap-3 px-page-edge py-2 border-b border-border-default"
-    >
-      <!-- Scope control — left-aligned Stream/Agent bar directly under the
-           header, matching Agent Graph / Agent Behavior / Sessions so every AI
-           page places its scope selector the same way. Switching mode and
-           choosing the value are one motion. On the Agent tab the stream +
-           trace filter are derived from the agents API (agent.source_stream). -->
-      <OToggleGroup
-        :model-value="filterMode"
-        type="single"
-        data-test="llm-insights-filter-mode"
-        @update:model-value="onFilterModeChange"
-      >
-        <OToggleGroupItem value="agent" size="sm">{{ t('traces.lLMInsightsDashboard.agent') }}</OToggleGroupItem>
-        <OToggleGroupItem value="stream" size="sm">{{ t('traces.lLMInsightsDashboard.stream') }}</OToggleGroupItem>
-      </OToggleGroup>
-
-      <!-- Picker: Stream tab → stream picker; Agent tab → agent picker. -->
-      <div
-        v-if="filterMode === 'stream'"
-        data-test="llm-insights-stream-selector"
-        class="w-64 flex-shrink-0"
-      >
-        <OSelect
-          v-model="activeStream"
-          :label="t('traces.sessionsList.streamLabel')"
-          label-position="inside"
-          :options="streamSelectOptions"
-          labelKey="label"
-          valueKey="value"
-          class="w-full rounded-default"
-          @update:model-value="onStreamChange"
-        />
-      </div>
-      <!-- Agent count for the selected stream — beside the picker, consistent
-           with the env/version scope chips beside the agent picker. -->
-      <StreamAgentCountBadge
-        v-if="filterMode === 'stream' && activeStream"
-        :count="selectedStreamCount"
-        data-test="llm-insights-stream-count"
-      />
-      <div
-        v-else
-        data-test="llm-insights-agent-selector"
-        class="w-64 flex-shrink-0"
-      >
-        <!-- Hold a picker-shaped skeleton until the agents list lands the first
-             time, so the dropdown doesn't flash an empty "Agent" picker before
-             its options exist. -->
-        <OSkeleton type="text" v-if="!agentsLoaded" class="w-full h-8.5" />
-        <OSelect
-          v-else
-          v-model="activeAgent"
-          :label="t('traces.lLMInsightsDashboard.agent')"
-          label-position="inside"
-          :options="agentSelectOptions"
-          labelKey="label"
-          valueKey="value"
-          class="w-full rounded-default"
-          @update:model-value="onAgentChange"
-        >
-          <!-- On selection show the agent NAME only (or All Agents); env/version
-               are badges. Classes mirror OSelect's default label span. -->
-          <template #trigger>
-            <span
-              class="flex-1 text-start truncate text-xs leading-4 text-select-text"
-            >
-              {{ selectedAgent ? selectedAgent.name : t("traces.allAgents") }}
-            </span>
-          </template>
-        </OSelect>
-      </div>
-      <!-- Scope chips: env/version — only in Agent mode with a specific agent. -->
-      <OAgentBadges
-        v-if="filterMode === 'agent' && selectedAgent"
-        :env="selectedAgent.env"
-        :version="selectedAgent.version"
-        data-test="llm-insights-scope-badges"
-      />
-    </div>
+      v-model:filter-mode="filterMode"
+      v-model:active-stream="activeStream"
+      v-model:selected-env="selectedEnv"
+      v-model:selected-agent-name="selectedAgentName"
+      v-model:selected-version="selectedVersion"
+      data-test="llm-insights"
+      all-agents
+      agent-skeleton
+      :labels="{
+        agent: t('traces.lLMInsightsDashboard.agent'),
+        stream: t('traces.lLMInsightsDashboard.stream'),
+        streamLabel: t('traces.sessionsList.streamLabel'),
+        allAgents: t('traces.allAgents'),
+      }"
+      :stream-select-options="streamSelectOptions"
+      :envs="envs"
+      :agent-names="agentNames"
+      :versions="versions"
+      :selected-stream-count="selectedStreamCount"
+      :streams-loaded="true"
+      :agents-loaded="agentsLoaded"
+      @filter-mode-change="onFilterModeChange"
+      @stream-change="onStreamChange"
+    />
 
     <!-- Full-page skeleton only until the stream list is known. Once we have a
          stream, we fall through to the content so the trend/table panels mount
@@ -309,26 +259,15 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
-import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { LLM_INSIGHTS_PANELS } from "./config/llmInsightsPanels";
 import { kpiCache, selectionKey } from "./llmInsightsCache";
 import useStreams from "@/composables/useStreams";
 import genAiAgentMappingService, {
   type GenAiAgentListItem,
 } from "@/services/gen-ai-agent-mapping.service";
-import {
-  ALL_AGENTS_VALUE,
-  agentOptionKey,
-  buildAgentTraceFilter,
-} from "./llmAgentFilter";
-import {
-  buildAgentSelectOptions,
-  buildStreamSelectOptions,
-} from "./agentOptionFormat";
-import OAgentBadges from "@/components/shared/OAgentBadges.vue";
-import StreamAgentCountBadge from "@/components/shared/StreamAgentCountBadge.vue";
+import { buildAgentTraceFilter } from "./llmAgentFilter";
+import { useAgentScope } from "@/enterprise/composables/useAgentScope";
+import AiScopeBar from "@/enterprise/components/AIObservability/AiScopeBar.vue";
 
 const { getStreams } = useStreams();
 const { t } = useI18n();
@@ -373,8 +312,11 @@ const {
 const activeStream = ref<string>(
   urlStream || localStorage.getItem(STREAM_LS_KEY) || props.streamName || "",
 );
+// Persists the RESOLVED agent NAME of the cascade selection (was the old single
+// `activeAgent` key). On reload we re-seed the cascade from it (see
+// `pendingAgentName` + `selectAgentByName`), so the last-picked agent is
+// remembered exactly as before — via the cascade, not the retired `activeAgent`.
 const AGENT_LS_KEY = "llmInsights_agentFilter";
-const activeAgent = ref<string>(localStorage.getItem(AGENT_LS_KEY) || ALL_AGENTS_VALUE);
 const agents = ref<GenAiAgentListItem[]>([]);
 // True once the agents API has resolved at least once — lets us tell "agents
 // not loaded yet" apart from "this window genuinely has no agents".
@@ -395,49 +337,51 @@ const MODE_LS_KEY = "llmInsights_filterMode";
 const filterMode = ref<"stream" | "agent">(
   urlType === "stream" ? "stream" : "agent",
 );
-// An agent name from the URL we still need to resolve to a concrete agent once
-// the agents list loads (the URL carries the readable name, not the internal
-// stream-scoped key).
+// Agent NAME to seed the cascade with once the list loads: the URL `?agent=`
+// deep-link first, else the persisted last selection. Resolved into
+// selectedEnv/AgentName/Version via `selectAgentByName`, then cleared. (The URL
+// carries the readable name, not the internal stream-scoped key.)
 const pendingAgentName = ref<string | null>(
-  filterMode.value === "agent" && urlAgentName ? urlAgentName : null,
+  filterMode.value === "agent"
+    ? urlAgentName || localStorage.getItem(AGENT_LS_KEY) || null
+    : null,
 );
 
-// Agent-tab dropdown: individual agents only (no "All Agents" — whole-stream
-// viewing lives on the Stream tab). Keyed by stream-scoped identity (spec §8),
-// not display name, so same-named agents in different streams don't collide.
-const agentSelectOptions = computed(() =>
-  buildAgentSelectOptions(agents.value, t, { includeAllAgents: true }),
-);
-const streamSelectOptions = computed(() =>
-  buildStreamSelectOptions(availableStreams.value, agents.value),
-);
-const selectedStreamCount = computed(
-  () =>
-    streamSelectOptions.value.find((o) => o.value === activeStream.value)
-      ?.agentCount ?? 0,
-);
-
-// The full agent object behind the current selection (null when none).
-const selectedAgent = computed<GenAiAgentListItem | null>(() => {
-  if (activeAgent.value === ALL_AGENTS_VALUE) return null;
-  return (
-    agents.value.find((a) => agentOptionKey(a) === activeAgent.value) ?? null
-  );
+// Shared derived scope computeds come from useAgentScope. LLM Insights injects
+// its OWN refs so the composable only produces the derived outputs:
+// `agents`/`agentsLoaded` are the useLLMInsights refs (survive remount);
+// `availableStreams` is LLM's trace-stream list. Agent selection now flows
+// through the Env→Agent→Version cascade (selectedEnv/AgentName/Version →
+// selectedAgent), so the old single `activeAgent` ref is gone. The `?agent=`
+// deep-link and last-selection restore seed the cascade via `selectAgentByName`
+// (see loadInsights). `agentFilterClause` stays page-local (LLM's trace-filter
+// builder). Injected refs are the SAME instances the page owns.
+const {
+  streamSelectOptions,
+  selectedStreamCount,
+  selectedAgent,
+  effectiveStream,
+  effectiveAgent,
+  envs,
+  agentNames,
+  versions,
+  selectedEnv,
+  selectedAgentName,
+  selectedVersion,
+  selectAgentByName,
+} = useAgentScope({
+  filterMode,
+  activeStream,
+  agents,
+  agentsLoaded,
+  availableStreams,
+  orgId: () => store.state.selectedOrganization?.identifier,
+  getWindow: () => ({ start: props.startTime, end: props.endTime }),
+  allAgents: true,
+  cascade: true,
+  t,
 });
 
-// The effective stream + agent the whole dashboard queries on:
-//  - Stream tab → the picked stream, no agent.
-//  - Agent tab  → the selected agent's source stream + the agent itself
-//    (→ direct canonical-agent filter). Deriving the stream from the agent is the whole
-//    point: we don't ask the user to pick a stream AND an agent separately.
-const effectiveStream = computed(() =>
-  filterMode.value === "agent"
-    ? (selectedAgent.value?.source_stream ?? "")
-    : activeStream.value,
-);
-const effectiveAgent = computed<GenAiAgentListItem | null>(() =>
-  filterMode.value === "agent" ? selectedAgent.value : null,
-);
 const agentFilterClause = computed(() =>
   buildAgentTraceFilter(effectiveAgent.value, effectiveStream.value),
 );
@@ -586,7 +530,14 @@ async function loadAgents(startTime?: number, endTime?: number) {
   const orgId = store.state.selectedOrganization?.identifier;
   const start = startTime ?? props.startTime;
   const end = endTime ?? props.endTime;
-  if (!orgId || !start || !end) return;
+  // No org/window yet (pre-resolve mount): mark loaded with an empty list rather
+  // than returning early — otherwise `agentsLoaded` never flips and the cascade
+  // is stuck behind its loading skeleton forever.
+  if (!orgId || !start || !end) {
+    agents.value = [];
+    agentsLoaded.value = true;
+    return;
+  }
   const windowKey = `${start}-${end}`;
   if (agentsLoaded.value && agentsLoadedWindow === windowKey) return;
   try {
@@ -604,16 +555,12 @@ async function loadAgents(startTime?: number, endTime?: number) {
         `${agent.source_stream}::${agent.name}::${start}-${end}`,
       );
     }
-    if (
-      activeAgent.value !== ALL_AGENTS_VALUE &&
-      !agents.value.some((agent) => agentOptionKey(agent) === activeAgent.value)
-    ) {
-      activeAgent.value = ALL_AGENTS_VALUE;
-    }
+    // The cascade selection is reconciled against the fresh list by
+    // useAgentScope's watcher (invalid env/name/version fall back / clear), so
+    // there is no page-local selection to clamp here anymore.
   } catch (e) {
     console.warn("Failed to load GenAI agents", e);
     agents.value = [];
-    activeAgent.value = ALL_AGENTS_VALUE;
   } finally {
     agentsLoaded.value = true;
   }
@@ -770,21 +717,23 @@ async function loadInsights(
       // agents list must be loaded first — await it here. (Agents API is only
       // ever hit on the Agent tab.)
       await loadAgents(start, end);
-      // Resolve an agent name carried in the URL to its concrete (stream-scoped)
-      // selection now that the list exists.
+      // Seed the cascade from a carried-over agent NAME (URL `?agent=` deep-link,
+      // else the persisted last selection) now that the list exists. On a match
+      // this pins env→name→version so `selectedAgent` resolves; then clear it.
       if (pendingAgentName.value) {
-        const match = agents.value.find(
-          (a) => a.name === pendingAgentName.value,
-        );
-        if (match) activeAgent.value = agentOptionKey(match);
+        selectAgentByName(pendingAgentName.value);
         pendingAgentName.value = null;
       }
       // Default to the first agent when nothing valid is selected (fresh entry
       // to the tab, or the previously-picked agent is gone for this window).
+      // Seeding by name resolves the whole cascade.
       if (!selectedAgent.value && agents.value.length > 0) {
-        activeAgent.value = agentOptionKey(agents.value[0]);
+        selectAgentByName(agents.value[0].name);
       }
-      localStorage.setItem(AGENT_LS_KEY, activeAgent.value);
+      // Persist the resolved agent NAME so a reload restores the same selection.
+      if (selectedAgent.value?.name) {
+        localStorage.setItem(AGENT_LS_KEY, selectedAgent.value.name);
+      }
     } else {
       // Agents API is only relevant on the Agent tab — don't touch it in Stream
       // mode. The list loads lazily when the user switches to the Agent tab.
@@ -846,10 +795,22 @@ function onStreamChange() {
   loadInsights();
 }
 
-function onAgentChange() {
-  switching.value = true;
-  loadInsights();
-}
+// Agent selection now flows through the Env→Agent→Version cascade: changing any
+// dropdown re-resolves `selectedAgent` (via useAgentScope's reconciler). Reload
+// insights whenever that resolved agent changes while in Agent mode, mirroring
+// the former @agent-change handler. Keyed on the agent's stream-scoped identity +
+// version so a same-named agent in a different stream/version still reloads.
+watch(
+  () => {
+    const a = selectedAgent.value;
+    return a ? `${a.source_stream}::${a.name}::${a.env ?? ""}::${a.version ?? ""}` : "";
+  },
+  () => {
+    if (filterMode.value !== "agent") return;
+    switching.value = true;
+    loadInsights();
+  },
+);
 
 // Parent calls this on Run Query / Refresh / date-range change, passing
 // the freshly computed start/end so we don't have to wait for Vue's

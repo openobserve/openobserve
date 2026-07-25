@@ -1,0 +1,116 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+<!--
+  AiPageShell — the ONE page header shared by every AI Observability page
+  (Sessions, Agent Graph, Agent Behavior, LLM Insights). It reproduces today's
+  per-page OPageLayout header EXACTLY — same markup, same class strings, same
+  `data-test` pattern — parameterizing only what differs between pages:
+
+    - `dataTest`  — the page prefix. Every page today derives its header
+                    data-test values as `${prefix}-page`, `${prefix}-date-time`,
+                    `${prefix}-refresh-btn` (e.g. Behavior = `ai-agent-behavior`,
+                    Sessions = `ai-sessions`, Graph = `ai-agent-graph`, LLM =
+                    `ai-llm-insights`). Passing the bare prefix reproduces all
+                    three unchanged.
+    - `title` / `subtitle` / `icon` — resolved header content (each page owns
+                    its own i18n keys / icon).
+    - `dateState` — the shared useAiDateRange() state bound to the picker.
+    - `lastRunAt` / `isLoading` — drive the refresh control.
+
+  The default slot is the page body; `#subnav` is the scope bar / tabs strip.
+  `date-change` / `refresh` are forwarded so each page wires its own effects.
+-->
+<template>
+  <OPageLayout
+    :data-test="`${dataTest}-page`"
+    :title="title"
+    :subtitle="subtitle"
+    :icon="icon"
+    bleed
+    :scroll="false"
+  >
+    <template #actions>
+      <date-time
+        ref="dateTimeRef"
+        auto-apply
+        menu-align="end"
+        :default-type="dateState.valueType"
+        :default-absolute-time="{
+          startTime: dateState.startTime ?? 0,
+          endTime: dateState.endTime ?? 0,
+        }"
+        :default-relative-time="dateState.relativeTimePeriod ?? ''"
+        :data-test="`${dataTest}-date-time`"
+        class="h-8"
+        @on:date-change="$emit('date-change', $event)"
+      />
+      <!-- Last-refresh + refresh control, consistent across every AI page
+           header. -->
+      <div
+        class="inline-flex items-center border border-border-default rounded-default px-1 h-8 overflow-hidden"
+      >
+        <ORefreshButton
+          :last-run-at="lastRunAt"
+          :loading="isLoading"
+          :disabled="isLoading"
+          :data-test="`${dataTest}-refresh-btn`"
+          @click="$emit('refresh')"
+        />
+      </div>
+    </template>
+
+    <template #subnav><slot name="subnav" /></template>
+    <slot />
+  </OPageLayout>
+</template>
+
+<script setup lang="ts">
+import { ref } from "vue";
+import type { AiDateState } from "@/enterprise/composables/useAiDateRange";
+import DateTime from "@/components/DateTime.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+
+defineProps<{
+  /** Page prefix — the header derives `${dataTest}-page`,
+      `${dataTest}-date-time`, `${dataTest}-refresh-btn` from it, reproducing
+      each page's existing data-test values unchanged. */
+  dataTest: string;
+  /** Resolved page title (each page passes its own t(...) value). */
+  title: string;
+  /** Resolved page subtitle. */
+  subtitle: string;
+  /** OPageHeader icon name. */
+  icon: string;
+  /** Shared AI date-range state (useAiDateRange().state) bound to the picker. */
+  dateState: AiDateState;
+  /** Epoch-ms of the last refresh, shown on the refresh control (or null). */
+  lastRunAt: number | null;
+  /** Whether a refresh is in flight — disables + spins the refresh control. */
+  isLoading: boolean;
+}>();
+
+defineEmits<{
+  (e: "date-change", payload: unknown): void;
+  (e: "refresh"): void;
+}>();
+
+// Exposed for parity with the per-page usage, which held a `dateTimeRef` to
+// the picker. Pages that need the imperative handle can access it via a
+// template ref on the shell's forwarded picker.
+const dateTimeRef = ref<InstanceType<typeof DateTime> | null>(null);
+defineExpose({ dateTimeRef });
+</script>

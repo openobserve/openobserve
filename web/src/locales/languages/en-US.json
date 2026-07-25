@@ -6475,6 +6475,8 @@
   },
   "traces": {
     "agentDefaultVariant": "default",
+    "agentNoEnv": "(No env)",
+    "agentNoVersion": "(No version)",
     "allAgents": "All Agents",
     "agentCountBadgeSingular": "{count} agent",
     "agentCountBadgePlural": "{count} agents",
@@ -7808,8 +7810,12 @@
       "scorers": "Create and manage the scorers that grade LLM outputs",
       "scoreConfigs": "Configure the scoring rubrics used by your evaluations"
     },
+    "scope": {
+      "env": "Env",
+      "agent": "Agent",
+      "version": "Version"
+    },
     "agentGraph": {
-      "allAgents": "All agents",
       "stream": "Stream",
       "agent": "Agent",
       "noAgentsTitle": "No agents found",

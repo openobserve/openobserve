@@ -32,81 +32,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          header, matching Agent Graph / Agent Behavior / LLM Insights so every
          AI page places its scope selector identically. Sits above the table
          rather than inside the OTable toolbar. -->
-    <div
+    <!-- Shared scope control. The outer guard (no bar until we know there ARE
+         streams) stays here, wrapping the component. Sessions' original bar mixed
+         its data-test prefix — `sessions-list-*` for the toggle/pickers but
+         `sessions-*` for the count/badges — so those two are passed explicitly to
+         stay byte-identical. solidAgentTrigger keeps the "All Agents" empty state
+         in solid text (Sessions never dimmed it). -->
+    <AiScopeBar
       v-if="!(streamsLoaded && availableStreams.length === 0)"
-      class="flex items-center gap-3 px-page-edge py-2 border-b border-border-default"
-    >
-      <OToggleGroup
-        :model-value="filterMode"
-        type="single"
-        data-test="sessions-list-filter-mode"
-        @update:model-value="onFilterModeChange"
-      >
-        <OToggleGroupItem value="agent" size="sm">{{ t('traces.sessionsList.agent') }}</OToggleGroupItem>
-        <OToggleGroupItem value="stream" size="sm">{{ t('traces.sessionsList.stream') }}</OToggleGroupItem>
-      </OToggleGroup>
-
-      <div
-        v-if="filterMode === 'stream'"
-        data-test="sessions-list-stream-selector"
-        class="w-64 flex-shrink-0"
-      >
-        <OSkeleton type="text" v-if="!streamsLoaded" class="w-full h-8.5" />
-        <OSelect
-          v-else
-          v-model="activeStream"
-          :label="t('traces.sessionsList.streamLabel')"
-          label-position="inside"
-          :options="streamSelectOptions"
-          labelKey="label"
-          valueKey="value"
-          class="w-full rounded-default"
-          @update:model-value="onStreamChange"
-        />
-      </div>
-      <!-- Agent count for the selected stream — beside the picker, consistent
-           with the env/version scope chips beside the agent picker. -->
-      <StreamAgentCountBadge
-        v-if="filterMode === 'stream' && activeStream"
-        :count="selectedStreamCount"
-        data-test="sessions-stream-count"
-      />
-      <div
-        v-else
-        data-test="sessions-list-agent-selector"
-        class="w-64 flex-shrink-0"
-      >
-        <OSelect
-          v-model="activeAgent"
-          :label="t('traces.sessionsList.agent')"
-          label-position="inside"
-          :options="agentSelectOptions"
-          labelKey="label"
-          valueKey="value"
-          :loading="!agentsLoaded"
-          class="w-full rounded-default"
-          @update:model-value="onAgentChange"
-        >
-          <!-- On selection show the agent NAME only (or All Agents); env/version
-               are badges. Classes mirror OSelect's default label span. -->
-          <template #trigger>
-            <span
-              class="flex-1 text-start truncate text-xs leading-4 text-select-text"
-            >
-              {{ selectedAgent ? selectedAgent.name : t("traces.allAgents") }}
-            </span>
-          </template>
-        </OSelect>
-      </div>
-      <!-- Scope chips: env/version of the scoped agent — only in Agent mode and
-           when a specific agent (not All Agents) is selected. -->
-      <OAgentBadges
-        v-if="filterMode === 'agent' && selectedAgent"
-        :env="selectedAgent.env"
-        :version="selectedAgent.version"
-        data-test="sessions-scope-badges"
-      />
-    </div>
+      v-model:filter-mode="filterMode"
+      v-model:active-stream="activeStream"
+      v-model:selected-env="selectedEnv"
+      v-model:selected-agent-name="selectedAgentName"
+      v-model:selected-version="selectedVersion"
+      data-test="sessions-list"
+      count-data-test="sessions-stream-count"
+      all-agents
+      show-stream-skeleton
+      :labels="{
+        agent: t('traces.sessionsList.agent'),
+        stream: t('traces.sessionsList.stream'),
+        streamLabel: t('traces.sessionsList.streamLabel'),
+        allAgents: t('traces.allAgents'),
+      }"
+      :stream-select-options="streamSelectOptions"
+      :envs="envs"
+      :agent-names="agentNames"
+      :versions="versions"
+      :selected-stream-count="selectedStreamCount"
+      :streams-loaded="streamsLoaded"
+      :agents-loaded="agentsLoaded"
+      @filter-mode-change="onFilterModeChange"
+      @stream-change="onStreamChange"
+    />
 
     <!-- Streams exist: OTable owns the data surface (column chooser, server-side
          pagination footer, column resize, empty/error body). The scope control
@@ -255,35 +213,21 @@ import { useI18n } from "vue-i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
-import useStreams from "@/composables/useStreams";
+import { useLlmTraceStreams } from "@/enterprise/composables/useLlmTraceStreams";
+import { useAgentScope } from "@/enterprise/composables/useAgentScope";
 import { useSessions, type SessionRow } from "./composables/useSessions";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import type { AcceptableValue } from "reka-ui";
-import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import genAiAgentMappingService, {
-  type GenAiAgentListItem,
-} from "@/services/gen-ai-agent-mapping.service";
-import {
-  ALL_AGENTS_VALUE,
-  agentOptionKey,
-  buildAgentSessionFilter,
-} from "./llmAgentFilter";
+import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
+import { buildAgentSessionFilter } from "./llmAgentFilter";
 import {
   splitNumberWithUnit,
   splitDuration,
 } from "./llmInsightsDashboard.utils";
-import {
-  buildAgentSelectOptions,
-  buildStreamSelectOptions,
-} from "./agentOptionFormat";
-import OAgentBadges from "@/components/shared/OAgentBadges.vue";
-import StreamAgentCountBadge from "@/components/shared/StreamAgentCountBadge.vue";
+import AiScopeBar from "@/enterprise/components/AIObservability/AiScopeBar.vue";
 
 interface Props {
   streamName: string;
@@ -305,7 +249,6 @@ const { t } = useI18n();
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
-const { getStreams } = useStreams();
 const {
   sessions,
   total,
@@ -326,27 +269,36 @@ const urlType = typeof route.query.type === "string" ? route.query.type : "";
 const urlStream = typeof route.query.stream === "string" ? route.query.stream : "";
 const urlAgentName = typeof route.query.agent === "string" ? route.query.agent : "";
 
-const availableStreams = ref<string[]>([]);
-const streamsLoaded = ref(false);
 const activeStream = ref<string>(
   urlStream || localStorage.getItem(STREAM_LS_KEY) || props.streamName || "",
 );
+// Trace-stream loading is shared with the other AI pages via
+// useLlmTraceStreams. availableStreams/streamsLoaded/ensureStreamsLoaded are
+// byte-identical to the previous inline versions.
+const { availableStreams, streamsLoaded, ensureStreamsLoaded } =
+  useLlmTraceStreams(activeStream);
 const MODE_LS_KEY = "sessionsList_filterMode";
+// Persists the RESOLVED agent NAME of the cascade selection (was the old single
+// `activeAgent` key). On reload we re-seed the cascade from it (see
+// `pendingAgentName` + `selectAgentByName`), so the last-picked agent is
+// remembered exactly as before — just via the cascade, not the retired
+// `activeAgent` ref.
 const AGENT_LS_KEY = "sessionsList_agentFilter";
-// Default scope is "agent" — the AI module is agent-centric. Explicit choices
-// still win (URL `?type=`, then saved localStorage preference); the agent
-// default applies only when neither is present.
 // Default scope is ALWAYS "agent" — every AI page lands on Agent for consistency.
 // Only an explicit `?type=stream` URL param overrides it (a stale saved
 // preference must not silently land on Stream).
 const filterMode = ref<"stream" | "agent">(
   urlType === "stream" ? "stream" : "agent",
 );
-const activeAgent = ref<string>(localStorage.getItem(AGENT_LS_KEY) || ALL_AGENTS_VALUE);
 // `agents` / `agentsLoaded` are module-scoped (see useSessions) so the agent
 // picker keeps its options — and stays off its skeleton — across a remount.
+// Agent NAME to seed the cascade with once the list loads: the URL `?agent=`
+// deep-link first, else the persisted last selection. Resolved into
+// selectedEnv/AgentName/Version via `selectAgentByName`, then cleared.
 const pendingAgentName = ref<string | null>(
-  filterMode.value === "agent" && urlAgentName ? urlAgentName : null,
+  filterMode.value === "agent"
+    ? urlAgentName || localStorage.getItem(AGENT_LS_KEY) || null
+    : null,
 );
 
 // Server-side pagination (1-indexed). OTable owns the footer controls in
@@ -357,36 +309,45 @@ const pendingAgentName = ref<string | null>(
 // (TablePaginationControls) so the AI module stays consistent.
 const rowsPerPageOptions = [20, 50, 100, 250, 500];
 
-const agentSelectOptions = computed(() =>
-  buildAgentSelectOptions(agents.value, t, { includeAllAgents: true }),
-);
-const streamSelectOptions = computed(() =>
-  buildStreamSelectOptions(availableStreams.value, agents.value),
-);
-const selectedStreamCount = computed(
-  () =>
-    streamSelectOptions.value.find((o) => o.value === activeStream.value)
-      ?.agentCount ?? 0,
-);
-
-const selectedAgent = computed<GenAiAgentListItem | null>(() => {
-  if (activeAgent.value === ALL_AGENTS_VALUE) return null;
-  return agents.value.find((agent) => agentOptionKey(agent) === activeAgent.value) ?? null;
+// Shared derived scope computeds come from useAgentScope. Sessions injects its
+// OWN refs so the composable only produces the derived outputs: `agents`/
+// `agentsLoaded` are module-scoped (from useSessions, survive remount);
+// `availableStreams` is Sessions' trace-stream list. Agent selection now flows
+// through the Env→Agent→Version cascade (selectedEnv/AgentName/Version →
+// selectedAgent), so the old single `activeAgent` ref is gone. The `?agent=`
+// deep-link and last-selection restore seed the cascade via `selectAgentByName`
+// (see loadSessions). `agentFilterClause` stays page-local (Sessions' session-
+// filter builder). Injected refs are the SAME instances the page owns, so
+// module scoping is unchanged.
+const {
+  streamSelectOptions,
+  selectedStreamCount,
+  selectedAgent,
+  effectiveStream,
+  effectiveAgent,
+  agentEmpty,
+  envs,
+  agentNames,
+  versions,
+  selectedEnv,
+  selectedAgentName,
+  selectedVersion,
+  selectAgentByName,
+} = useAgentScope({
+  filterMode,
+  activeStream,
+  agents,
+  agentsLoaded,
+  availableStreams,
+  orgId: () => store.state.selectedOrganization?.identifier,
+  getWindow: () => ({ start: props.startTime, end: props.endTime }),
+  allAgents: true,
+  cascade: true,
+  t,
 });
 
-const effectiveStream = computed(() =>
-  filterMode.value === "agent"
-    ? (selectedAgent.value?.source_stream ?? "")
-    : activeStream.value,
-);
-const effectiveAgent = computed<GenAiAgentListItem | null>(() =>
-  filterMode.value === "agent" ? selectedAgent.value : null,
-);
 const agentFilterClause = computed(() =>
   buildAgentSessionFilter(effectiveAgent.value, effectiveStream.value),
-);
-const agentEmpty = computed(
-  () => filterMode.value === "agent" && agentsLoaded.value && agents.value.length === 0,
 );
 
 // `instrument` is the only action id the preset emits. Send the user to
@@ -528,36 +489,6 @@ function formatTokens(n: number): string {
 }
 
 
-// Load the trace-stream list at most once per mount. Both the initial mount
-// and the (parent-driven) session load await the SAME promise, so a load can
-// neither race ahead of the stream list nor trigger a second stream fetch.
-let streamsPromise: Promise<void> | null = null;
-function ensureStreamsLoaded(): Promise<void> {
-  if (!streamsPromise) streamsPromise = loadTraceStreams();
-  return streamsPromise;
-}
-
-async function loadTraceStreams() {
-  streamsLoaded.value = false;
-  try {
-    const res: any = await getStreams("traces", false, false);
-    const list = res?.list || [];
-    const llmStreams = list.filter(
-      (stream: any) => stream?.settings?.is_llm_stream !== false,
-    );
-    availableStreams.value = llmStreams.map((stream: any) => stream.name);
-    if (!availableStreams.value.includes(activeStream.value)) {
-      activeStream.value = availableStreams.value[0] || "";
-    }
-  } catch (e) {
-    console.error("Error loading trace streams:", e);
-    availableStreams.value = [];
-    activeStream.value = "";
-  } finally {
-    streamsLoaded.value = true;
-  }
-}
-
 async function loadAgents(startTime?: number, endTime?: number) {
   const orgId = store.state.selectedOrganization?.identifier;
   const start = startTime ?? props.startTime;
@@ -567,16 +498,12 @@ async function loadAgents(startTime?: number, endTime?: number) {
   try {
     const agentList = await genAiAgentMappingService.listAgents(orgId, start, end);
     agents.value = agentList.agents;
-    if (
-      activeAgent.value !== ALL_AGENTS_VALUE &&
-      !agents.value.some((agent) => agentOptionKey(agent) === activeAgent.value)
-    ) {
-      activeAgent.value = ALL_AGENTS_VALUE;
-    }
+    // The cascade selection is reconciled against the fresh list by
+    // useAgentScope's watcher (invalid env/name/version fall back / clear), so
+    // there is no page-local selection to clamp here anymore.
   } catch (e) {
     console.warn("Failed to load GenAI agents", e);
     agents.value = [];
-    activeAgent.value = ALL_AGENTS_VALUE;
   } finally {
     agentsLoaded.value = true;
   }
@@ -636,15 +563,24 @@ async function loadSessions(
   // Agents API is only relevant in Agent mode — don't touch it in Stream mode.
   if (filterMode.value === "agent") {
     await loadAgents(start, end);
+    // Seed the cascade from a carried-over agent NAME (URL `?agent=` deep-link,
+    // else the persisted last selection) now that the list exists. On a match
+    // this pins env→name→version so `selectedAgent` resolves; then it's a
+    // one-shot, so clear it.
     if (pendingAgentName.value) {
-      const match = agents.value.find((agent) => agent.name === pendingAgentName.value);
-      if (match) activeAgent.value = agentOptionKey(match);
+      selectAgentByName(pendingAgentName.value);
       pendingAgentName.value = null;
     }
+    // Fall back to the first agent when nothing valid is selected (fresh entry,
+    // or the previously-picked agent is gone for this window). Seeding by name
+    // resolves the whole cascade.
     if (!selectedAgent.value && agents.value.length > 0) {
-      activeAgent.value = agentOptionKey(agents.value[0]);
+      selectAgentByName(agents.value[0].name);
     }
-    localStorage.setItem(AGENT_LS_KEY, activeAgent.value);
+    // Persist the resolved agent NAME so a reload restores the same selection.
+    if (selectedAgent.value?.name) {
+      localStorage.setItem(AGENT_LS_KEY, selectedAgent.value.name);
+    }
   } else {
     localStorage.setItem(STREAM_LS_KEY, activeStream.value);
   }
@@ -685,10 +621,22 @@ function onFilterModeChange(
   loadSessions(undefined, undefined, true);
 }
 
-function onAgentChange() {
-  currentPage.value = 1;
-  loadSessions(undefined, undefined, true);
-}
+// Agent selection now flows through the Env→Agent→Version cascade: changing any
+// dropdown re-resolves `selectedAgent` (via useAgentScope's reconciler). Re-fetch
+// whenever that resolved agent changes while in Agent mode, mirroring the former
+// @agent-change handler. Keyed on the agent's stream-scoped identity + version so
+// a same-named agent in a different stream/version still triggers a reload.
+watch(
+  () => {
+    const a = selectedAgent.value;
+    return a ? `${a.source_stream}::${a.name}::${a.env ?? ""}::${a.version ?? ""}` : "";
+  },
+  () => {
+    if (filterMode.value !== "agent") return;
+    currentPage.value = 1;
+    loadSessions(undefined, undefined, true);
+  },
+);
 
 // Single handler for OTable's server pagination footer. A page-size change
 // resets to the first page (the old offset may be out of range under the new

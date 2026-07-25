@@ -127,7 +127,22 @@ vi.mock("@/lib/core/ToggleGroup/OToggleGroupItem.vue", () => ({
 }));
 
 vi.mock("@/lib/core/Icon/OIcon.vue", () => ({
-  default: { name: "OIcon", template: `<i class="o-icon" />` },
+  default: {
+    name: "OIcon",
+    props: ["name", "size"],
+    // inheritAttrs (default true) lands data-test on the root <i>; also expose
+    // the icon name + slot so the version-agnostic hint (icon + tooltip) is
+    // assertable.
+    template: `<i class="o-icon" :data-name="name"><slot /></i>`,
+  },
+}));
+
+vi.mock("@/lib/overlay/Tooltip/OTooltip.vue", () => ({
+  default: {
+    name: "OTooltip",
+    props: ["content", "maxWidth", "side"],
+    template: `<span class="o-tooltip" :data-content="content" />`,
+  },
 }));
 
 vi.mock("@/lib/core/RefreshButton/ORefreshButton.vue", () => ({
@@ -222,6 +237,32 @@ describe("AgentGraphPage — agent-mode stream gating", () => {
     const sg = wrapper.find('[data-test="service-graph-stub"]');
     expect(sg.attributes("data-viz")).toBe("graph");
     expect(sg.attributes("data-layout")).toBe("force");
+  });
+
+  it("hides the cascade Version dropdown (version-agnostic) and shows the version-agnostic hint", async () => {
+    mockListAgents.mockResolvedValue({ agents: [AGENT] });
+
+    const wrapper = await mountPage();
+
+    // Version dropdown is suppressed on the Graph (topology is version-agnostic).
+    expect(
+      wrapper.find('[data-test="agent-graph-cascade-version"]').exists(),
+    ).toBe(false);
+    // Env + Agent dropdowns still render.
+    expect(
+      wrapper.find('[data-test="agent-graph-cascade-env"]').exists(),
+    ).toBe(true);
+    expect(
+      wrapper.find('[data-test="agent-graph-cascade-agent"]').exists(),
+    ).toBe(true);
+    // The version-agnostic hint (info icon + tooltip) rides beside the cascade.
+    const hint = wrapper.find(
+      '[data-test="agent-graph-version-agnostic-hint"]',
+    );
+    expect(hint.exists()).toBe(true);
+    expect(hint.find(".o-tooltip").attributes("data-content")).toBe(
+      "aiObservability.agentGraph.versionAgnosticHint",
+    );
   });
 
   it("Stream picker offers ONLY the distinct source_streams of discovered agents (not agentless streams)", async () => {
