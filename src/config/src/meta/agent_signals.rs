@@ -202,6 +202,18 @@ pub struct AgentSignalRecord {
     pub errors: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub p95_latency_ns: Option<u64>,
+    /// Base64(0x01-tag + bincode(DDSketch)) of the latency distribution (microseconds)
+    /// for this (agent,env,version) window. Merged across windows at version-compare
+    /// time to read percentiles without scanning raw spans.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub latency_sketch: Option<String>,
+    /// Sum of squared per-span cost — for a Welch mean-difference CI on cost/trace.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cost_sqsum: Option<f64>,
+    /// True cost-observation count (COUNT(gen_ai_usage_cost)) — distinct from
+    /// `count`, which is error-count. The Welch denominator for cost.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cost_n: Option<u64>,
 }
 
 impl AgentSignalRecord {
@@ -239,6 +251,9 @@ mod tests {
             tokens: None,
             errors: None,
             p95_latency_ns: None,
+            latency_sketch: None,
+            cost_sqsum: None,
+            cost_n: None,
         }
     }
 
@@ -278,10 +293,16 @@ mod tests {
             tokens: None,
             errors: None,
             p95_latency_ns: None,
+            latency_sketch: Some("AQ==".into()),
+            cost_sqsum: Some(1.5),
+            cost_n: Some(10),
         };
         let v = r.to_json();
         assert_eq!(v["gen_ai_agent_env"], "prod");
         assert_eq!(v["gen_ai_agent_version"], "2.1");
+        // New sketch/cost-moment fields serialize when present.
+        assert_eq!(v["latency_sketch"], "AQ==");
+        assert_eq!(v["cost_n"], 10);
     }
 
     fn valid_taxonomy() -> AgentSignalsTaxonomy {
