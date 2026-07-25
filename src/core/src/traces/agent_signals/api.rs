@@ -128,3 +128,249 @@ pub async fn get_agent_signals(
 ) -> HttpResponse {
     MetaHttpResponse::forbidden("Not Supported")
 }
+
+/// One arm (A or B) of a version-compare request.
+#[derive(Debug, Clone, Deserialize)]
+pub struct CompareArm {
+    pub agent_name: String,
+    pub env: Option<String>,
+    pub version: Option<String>,
+    pub start_time: i64,
+    pub end_time: i64,
+}
+
+/// Request body for the version-compare sketch-merge endpoint.
+#[derive(Debug, Clone, Deserialize)]
+pub struct CompareRequest {
+    pub a: CompareArm,
+    pub b: CompareArm,
+}
+
+/// Aggregated per-arm inputs collected from the `_agent_signals` cost rows:
+/// the per-window `latency_sketch` blobs (to be merged) and the summed cost
+/// moments (additive across windows).
+#[derive(Debug, Default, Clone, PartialEq)]
+struct ArmAggregate {
+    sketches: Vec<String>,
+    cost_sum: f64,
+    cost_sqsum: f64,
+    cost_n: u64,
+}
+
+/// Pure helper: fold a set of `_agent_signals` cost-pass hits into an
+/// [`ArmAggregate`]. Extracted so the summation/collection logic is
+/// unit-testable without a search round-trip.
+fn aggregate_cost_hits(hits: &[serde_json::Value]) -> ArmAggregate {
+    let mut agg = ArmAggregate::default();
+    for hit in hits {
+        if let Some(s) = hit.get("latency_sketch").and_then(|v| v.as_str())
+            && !s.is_empty()
+        {
+            agg.sketches.push(s.to_string());
+        }
+        if let Some(c) = hit.get("cost").and_then(|v| v.as_f64()) {
+            agg.cost_sum += c;
+        }
+        if let Some(c) = hit.get("cost_sqsum").and_then(|v| v.as_f64()) {
+            agg.cost_sqsum += c;
+        }
+        if let Some(n) = hit.get("cost_n").and_then(|v| v.as_u64()) {
+            agg.cost_n += n;
+        }
+    }
+    agg
+}
+
+#[cfg(feature = "enterprise")]
+async fn fetch_arm_aggregate(org_id: &str, arm: &CompareArm) -> ArmAggregate {
+    use config::meta::stream::StreamType;
+
+    let stream_name = "_agent_signals";
+
+    let mut filters = format!(
+        "org_id = '{}' AND signal_type = 'cost' AND agent_name = '{}'",
+        org_id.replace('\'', ""),
+        arm.agent_name.replace('\'', "")
+    );
+    if let Some(env) = arm.env.as_deref() {
+        filters.push_str(&format!(
+            " AND gen_ai_agent_env = '{}'",
+            env.replace('\'', "")
+        ));
+    }
+    if let Some(version) = arm.version.as_deref() {
+        filters.push_str(&format!(
+            " AND gen_ai_agent_version = '{}'",
+            version.replace('\'', "")
+        ));
+    }
+
+    let sql = format!(
+        "SELECT latency_sketch, cost, cost_sqsum, cost_n FROM \"{stream_name}\" \
+         WHERE _timestamp >= {} AND _timestamp < {} AND {filters} \
+         LIMIT 10000",
+        arm.start_time, arm.end_time
+    );
+
+    let schema = infra::schema::get(org_id, stream_name, StreamType::Logs).await;
+    if schema.is_err() {
+        return ArmAggregate::default();
+    }
+
+    let req = config::meta::search::Request {
+        query: config::meta::search::Query {
+            sql,
+            from: 0,
+            size: 10000,
+            start_time: arm.start_time,
+            end_time: arm.end_time,
+            quick_mode: false,
+            query_type: "".to_string(),
+            track_total_hits: false,
+            uses_zo_fn: false,
+            query_fn: None,
+            skip_wal: false,
+            action_id: None,
+            histogram_interval: 0,
+            streaming_id: None,
+            streaming_output: false,
+            sampling_config: None,
+            sampling_ratio: None,
+            timezone: None,
+        },
+        encoding: config::meta::search::RequestEncoding::Empty,
+        regions: vec![],
+        clusters: vec![],
+        timeout: 30,
+        search_type: None,
+        search_event_context: None,
+        use_cache: false,
+        clear_cache: false,
+        local_mode: Some(false),
+        agent_options: None,
+    };
+
+    let trace_id = config::ider::generate();
+    match crate::search::search(&trace_id, org_id, StreamType::Logs, None, &req).await {
+        Ok(resp) => aggregate_cost_hits(&resp.hits),
+        Err(e) => {
+            log::error!("[AgentSignals] compare read query failed for org '{org_id}': {e}");
+            ArmAggregate::default()
+        }
+    }
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn compare_agent_versions(
+    axum::extract::Path(org_id): axum::extract::Path<String>,
+    axum::Json(req): axum::Json<CompareRequest>,
+) -> HttpResponse {
+    use o2_enterprise::enterprise::agent_signals::compare::{
+        MetricDelta, merge_sketches, quantile_delta_ci, welch_mean_diff_ci,
+    };
+
+    let agg_a = fetch_arm_aggregate(&org_id, &req.a).await;
+    let agg_b = fetch_arm_aggregate(&org_id, &req.b).await;
+
+    let insufficient = || MetricDelta {
+        a: 0.0,
+        b: 0.0,
+        delta: 0.0,
+        lo: 0.0,
+        hi: 0.0,
+        straddles_zero: true,
+        insufficient: true,
+    };
+
+    let merged_a = merge_sketches(&agg_a.sketches).unwrap_or(None);
+    let merged_b = merge_sketches(&agg_b.sketches).unwrap_or(None);
+
+    let (p50, p95, p99) = match (&merged_a, &merged_b) {
+        (Some(sa), Some(sb)) => (
+            quantile_delta_ci(sa, sb, 0.5, 0.90),
+            quantile_delta_ci(sa, sb, 0.95, 0.90),
+            quantile_delta_ci(sa, sb, 0.99, 0.90),
+        ),
+        _ => (insufficient(), insufficient(), insufficient()),
+    };
+
+    let cost = welch_mean_diff_ci(
+        agg_a.cost_sum,
+        agg_a.cost_sqsum,
+        agg_a.cost_n,
+        agg_b.cost_sum,
+        agg_b.cost_sqsum,
+        agg_b.cost_n,
+        0.90,
+    );
+
+    MetaHttpResponse::json(serde_json::json!({
+        "p50": p50,
+        "p95": p95,
+        "p99": p99,
+        "cost": cost,
+    }))
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn compare_agent_versions(
+    axum::extract::Path(_org_id): axum::extract::Path<String>,
+    axum::Json(_req): axum::Json<CompareRequest>,
+) -> HttpResponse {
+    fn insufficient() -> serde_json::Value {
+        serde_json::json!({
+            "a": 0.0,
+            "b": 0.0,
+            "delta": 0.0,
+            "lo": 0.0,
+            "hi": 0.0,
+            "straddles_zero": true,
+            "insufficient": true,
+        })
+    }
+
+    MetaHttpResponse::json(serde_json::json!({
+        "p50": insufficient(),
+        "p95": insufficient(),
+        "p99": insufficient(),
+        "cost": insufficient(),
+        "note": "CI math requires the enterprise build; point-only comparison is not available in OSS.",
+    }))
+}
+
+#[cfg(test)]
+mod compare_tests {
+    use super::*;
+
+    #[test]
+    fn aggregate_cost_hits_sums_moments_and_collects_sketches() {
+        let hits = vec![
+            serde_json::json!({
+                "latency_sketch": "sketchA",
+                "cost": 1.5,
+                "cost_sqsum": 2.25,
+                "cost_n": 3,
+            }),
+            serde_json::json!({
+                "latency_sketch": "sketchB",
+                "cost": 2.0,
+                "cost_sqsum": 4.0,
+                "cost_n": 5,
+            }),
+            // A row missing the sketch/cost fields should not break the fold.
+            serde_json::json!({ "org_id": "o1" }),
+        ];
+
+        let agg = aggregate_cost_hits(&hits);
+        assert_eq!(agg.sketches, vec!["sketchA".to_string(), "sketchB".to_string()]);
+        assert!((agg.cost_sum - 3.5).abs() < 1e-9);
+        assert!((agg.cost_sqsum - 6.25).abs() < 1e-9);
+        assert_eq!(agg.cost_n, 8);
+    }
+
+    #[test]
+    fn aggregate_cost_hits_empty_input_is_zeroed_default() {
+        let agg = aggregate_cost_hits(&[]);
+        assert_eq!(agg, ArmAggregate::default());
+    }
+}
