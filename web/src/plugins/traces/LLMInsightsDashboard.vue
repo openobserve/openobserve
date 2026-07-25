@@ -59,16 +59,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @stream-change="onStreamChange"
     >
       <template #trailing>
+        <!-- Only offered when the selected agent actually has ≥2 versions to
+             compare. A disabled button reads as "broken"; hiding the affordance
+             when it can't apply is cleaner (ui-architect empty-affordance rule).
+             The tooltip explains the concept when the entry IS available. -->
         <OTooltip
-          :content="t('traces.lLMInsightsDashboard.compareEntryDisabledHint')"
-          :disabled="canCompare"
+          v-if="canCompare && !compareMode"
+          :content="t('traces.lLMInsightsDashboard.compareEntryHint')"
         >
           <OButton
             variant="outline"
             size="sm"
             icon-left="compare-arrows"
             data-test="llm-insights-compare-entry"
-            :disabled="!canCompare"
             @click="enterCompareMode"
           >
             {{ t('traces.lLMInsightsDashboard.compareEntry') }}
@@ -510,6 +513,15 @@ watch(
     });
   },
 );
+
+// Changing the agent identity (name or env) while comparing invalidates the
+// current A/B pair — those versions belong to the OLD agent. Exit compare mode
+// so a stale comparison never lingers under a different agent's picker (the
+// user re-enters compare for the new agent). Version alone is NOT an identity
+// change (it's the very dimension being compared) and must not trigger this.
+watch([selectedAgentName, selectedEnv], () => {
+  if (compareMode.value) exitCompareMode();
+});
 
 // --- Panel result cache (the dashboards IndexedDB cache) --------------------
 // PanelSchemaRenderer restores a panel's data from IndexedDB on mount and skips
@@ -953,7 +965,18 @@ watch(loading, (isLoading, wasLoading) => {
   if (wasLoading && !isLoading) lastRunAt.value = Date.now();
 });
 
-defineExpose({ refresh, lastRunAt, loading, compareDateDisabled, versionCompare });
+defineExpose({
+  refresh,
+  lastRunAt,
+  loading,
+  compareDateDisabled,
+  versionCompare,
+  // Exposed for tests: compareMode + the cascade identity refs so the
+  // auto-exit-on-agent-change behavior is assertable.
+  compareMode,
+  selectedAgentName,
+  selectedEnv,
+});
 
 onMounted(() => {
   // Only kick off the stream-list load here. The insights fetch is driven by the

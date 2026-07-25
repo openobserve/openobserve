@@ -219,7 +219,7 @@ describe("LLMInsightsDashboard — version compare entry", () => {
     expect(btn.attributes("disabled")).toBeFalsy();
   });
 
-  it("disables the compare entry when the agent has only 1 version", async () => {
+  it("hides the compare entry when the agent has only 1 version (no greyed-out button)", async () => {
     mockListAgents.mockResolvedValue({ agents: [AGENT_V15] });
     mockListVersionsForCompare.mockResolvedValue([AGENT_V15]);
     const wrapper = mountDashboard();
@@ -227,9 +227,9 @@ describe("LLMInsightsDashboard — version compare entry", () => {
     await flushPromises();
     await (wrapper.vm as any).loadInsights();
     await flushPromises();
+    // A disabled button reads as broken; the affordance is HIDDEN instead.
     const btn = wrapper.find('[data-test="llm-insights-compare-entry"]');
-    expect(btn.exists()).toBe(true);
-    expect(btn.attributes("disabled")).toBeDefined();
+    expect(btn.exists()).toBe(false);
   });
 });
 
@@ -267,6 +267,34 @@ describe("LLMInsightsDashboard — compare mode surfaces", () => {
     await wrapper.findComponent({ name: "VersionCompareView" }).vm.$emit("exit");
     await flushPromises();
 
+    expect(wrapper.find('[data-test="llm-insights-compare-view"]').exists()).toBe(false);
+  });
+
+  it("auto-exits compare mode when the agent name changes — no stale comparison lingers", async () => {
+    // Two DISTINCT agent names so the reconciler keeps the switched-to value
+    // (an invalid name would be reset, defeating the assertion).
+    const OTHER_AGENT = { ...AGENT_V15, name: "search-agent", id: "b1", version: "2.0.0" };
+    mockListAgents.mockResolvedValue({ agents: [AGENT_V15, AGENT_V14, OTHER_AGENT] });
+    mockListVersionsForCompare.mockResolvedValue([AGENT_V15, AGENT_V14]);
+
+    const wrapper = mountDashboard();
+    await flushPromises();
+    await flushPromises();
+    await (wrapper.vm as any).loadInsights();
+    await flushPromises();
+
+    await wrapper.find('[data-test="llm-insights-compare-entry"]').trigger("click");
+    await flushPromises();
+    await flushPromises();
+    expect((wrapper.vm as any).compareMode).toBe(true);
+    expect(wrapper.find('[data-test="llm-insights-compare-view"]').exists()).toBe(true);
+
+    // Switch to a different, VALID agent — the old A/B pair belongs to the old agent.
+    (wrapper.vm as any).selectedAgentName = "search-agent";
+    await flushPromises();
+    await flushPromises();
+
+    expect((wrapper.vm as any).compareMode).toBe(false);
     expect(wrapper.find('[data-test="llm-insights-compare-view"]').exists()).toBe(false);
   });
 });

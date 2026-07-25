@@ -6940,8 +6940,8 @@
     "lLMInsightsDashboard": {
       "stream": "Stream",
       "agent": "Agent",
-      "compareEntry": "Compare versions…",
-      "compareEntryDisabledHint": "Needs at least 2 versions of this agent to compare",
+      "compareEntry": "Compare versions",
+      "compareEntryHint": "Compare two versions of this agent side by side",
       "failedToLoad": "Failed to load Insights",
       "retry": "Retry",
       "noAgentsInRange": "No Agents In This Range",
