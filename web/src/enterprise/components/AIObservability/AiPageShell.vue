@@ -43,20 +43,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :scroll="false"
   >
     <template #actions>
-      <date-time
-        ref="dateTimeRef"
-        auto-apply
-        menu-align="end"
-        :default-type="dateState.valueType"
-        :default-absolute-time="{
-          startTime: dateState.startTime ?? 0,
-          endTime: dateState.endTime ?? 0,
-        }"
-        :default-relative-time="dateState.relativeTimePeriod ?? ''"
-        :data-test="`${dataTest}-date-time`"
-        class="h-8"
-        @on:date-change="$emit('date-change', $event)"
-      />
+      <!-- Compare mode (version-compare) makes windows per-version, so the
+           page-level picker is disabled and explains why via a tooltip. Wrapping
+           in OTooltip even when enabled is harmless — `disabled` on OTooltip
+           itself suppresses the bubble in that case. -->
+      <OTooltip :content="dateDisabledTooltip ?? ''" :disabled="!dateDisabled || !dateDisabledTooltip">
+        <date-time
+          ref="dateTimeRef"
+          auto-apply
+          menu-align="end"
+          :default-type="dateState.valueType"
+          :default-absolute-time="{
+            startTime: dateState.startTime ?? 0,
+            endTime: dateState.endTime ?? 0,
+          }"
+          :default-relative-time="dateState.relativeTimePeriod ?? ''"
+          :disable="dateDisabled"
+          :data-test="`${dataTest}-date-time`"
+          class="h-8"
+          @on:date-change="$emit('date-change', $event)"
+        />
+      </OTooltip>
       <!-- Last-refresh + refresh control, consistent across every AI page
            header. -->
       <div
@@ -83,6 +90,7 @@ import type { AiDateState } from "@/enterprise/composables/useAiDateRange";
 import DateTime from "@/components/DateTime.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 defineProps<{
   /** Page prefix — the header derives `${dataTest}-page`,
@@ -101,6 +109,13 @@ defineProps<{
   lastRunAt: number | null;
   /** Whether a refresh is in flight — disables + spins the refresh control. */
   isLoading: boolean;
+  /** Disables the page date-picker (version-compare modes with per-version
+      windows: sinceRollout / manual). Defaults to false — every other page
+      leaves the picker enabled. */
+  dateDisabled?: boolean;
+  /** Tooltip explaining WHY the picker is disabled. Only shown when
+      `dateDisabled` is true. */
+  dateDisabledTooltip?: string;
 }>();
 
 defineEmits<{

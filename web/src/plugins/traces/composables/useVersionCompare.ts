@@ -130,7 +130,17 @@ export function useVersionCompare() {
       });
   }
 
-  async function run(stream: string): Promise<void> {
+  /**
+   * @param manualWindows optional caller-supplied windows for `align ===
+   *   "manual"` (the manual-override escape hatch — spec §8). When provided,
+   *   the given arm's resolved window is REPLACED with the caller's window
+   *   (still passed through `resolveCompareWindows`'s manual branch for the
+   *   other arm / overlap bookkeeping); only meaningful in manual align mode.
+   */
+  async function run(
+    stream: string,
+    manualWindows?: { a?: { start: number; end: number }; b?: { start: number; end: number } },
+  ): Promise<void> {
     if (!a.value || !b.value) return;
 
     if (isUnset(a.value) || isUnset(b.value)) {
@@ -163,6 +173,12 @@ export function useVersionCompare() {
       nowMicros,
       align.value,
     );
+    // Manual override: replace one or both arm windows with the caller's
+    // explicit start/end (the t0-skew escape hatch). Only meaningful in
+    // manual mode, but applied unconditionally when supplied — the resolver's
+    // manual branch already returns natural windows as the baseline.
+    if (manualWindows?.a) resolved.a = manualWindows.a;
+    if (manualWindows?.b) resolved.b = manualWindows.b;
     windows.value = resolved;
 
     const runner = makeRunner();
@@ -225,6 +241,12 @@ export function useVersionCompare() {
     run,
     kpiA: armA.kpi,
     kpiB: armB.kpi,
+    // Sparklines from each arm's own useLLMInsights instance — additive
+    // exposure so consumers (VersionOverlayChart wiring) can rebase the
+    // per-arm bucket series onto elapsed-hours/wall-clock without a second
+    // fetch. Populated once `run()`'s fetchAll passes resolve.
+    sparklinesA: armA.sparklines,
+    sparklinesB: armB.sparklines,
     loadingA: armA.loading,
     loadingB: armB.loading,
     errorA: armA.error,

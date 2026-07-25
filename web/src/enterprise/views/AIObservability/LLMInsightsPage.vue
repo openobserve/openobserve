@@ -23,6 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :date-state="dateState"
     :last-run-at="dashboardLastRunAt"
     :is-loading="isLoading"
+    :date-disabled="compareDateDisabled"
+    :date-disabled-tooltip="t('aiObservability.versionCompare.datePickerDisabled')"
     @date-change="onDateChange"
     @refresh="refresh"
   >
@@ -37,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from "vue";
+import { ref, onMounted, nextTick, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import AiPageShell from "@/enterprise/components/AIObservability/AiPageShell.vue";
 import LLMInsightsDashboard from "@/plugins/traces/LLMInsightsDashboard.vue";
@@ -64,6 +66,14 @@ const {
 
 const streamName = ref("");
 const dashboardRef = ref<any>(null);
+
+// Compare mode makes windows per-version (sinceRollout/manual align), so the
+// page date-picker is disabled while those modes are active. sameWallClock
+// keeps it enabled — the shared picker drives both arms in that mode. The
+// dashboard exposes `compareDateDisabled` (see LLMInsightsDashboard's
+// defineExpose); read it reactively via a computed since template refs aren't
+// reactive to their exposed refs' inner value changes across re-renders.
+const compareDateDisabled = computed(() => !!dashboardRef.value?.compareDateDisabled);
 
 // Whole-page "last refresh" indicator (logs-style). The dashboard stamps
 // `lastRunAt` when its KPI fetch settles and exposes its own `loading`; the

@@ -6940,6 +6940,8 @@
     "lLMInsightsDashboard": {
       "stream": "Stream",
       "agent": "Agent",
+      "compareEntry": "Compare versions…",
+      "compareEntryDisabledHint": "Needs at least 2 versions of this agent to compare",
       "failedToLoad": "Failed to load Insights",
       "retry": "Retry",
       "noAgentsInRange": "No Agents In This Range",
@@ -7956,6 +7958,15 @@
       }
     },
     "versionCompare": {
+      "entry": "Compare versions…",
+      "entryDisabledHint": "Needs at least 2 versions of this agent to compare",
+      "datePickerDisabled": "Windows are per-version in this mode",
+      "manual": {
+        "startA": "A start",
+        "endA": "A end",
+        "startB": "B start",
+        "endB": "B end"
+      },
       "bar": {
         "versionA": "Version A",
         "versionB": "Version B",

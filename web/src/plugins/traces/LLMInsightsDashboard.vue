@@ -57,8 +57,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :agents-loaded="agentsLoaded"
       @filter-mode-change="onFilterModeChange"
       @stream-change="onStreamChange"
+    >
+      <template #trailing>
+        <OTooltip
+          :content="t('traces.lLMInsightsDashboard.compareEntryDisabledHint')"
+          :disabled="canCompare"
+        >
+          <OButton
+            variant="outline"
+            size="sm"
+            icon-left="compare-arrows"
+            data-test="llm-insights-compare-entry"
+            :disabled="!canCompare"
+            @click="enterCompareMode"
+          >
+            {{ t('traces.lLMInsightsDashboard.compareEntry') }}
+          </OButton>
+        </OTooltip>
+      </template>
+    </AiScopeBar>
+
+    <VersionCompareView
+      v-if="compareMode"
+      :version-list="compareVersionList"
+      :stream="effectiveStream"
+      :windows="versionCompare.windows.value"
+      :result="versionCompare.result.value"
+      :sparklines-a="versionCompare.sparklinesA.value"
+      :sparklines-b="versionCompare.sparklinesB.value"
+      class="flex-1 overflow-y-auto pb-3"
+      data-test="llm-insights-compare-view"
+      @exit="exitCompareMode"
+      @run="onCompareRun"
     />
 
+    <!-- Single-select dashboard body — hidden entirely while compareMode is
+         ON (VersionCompareView renders in its place above). Grouped under one
+         `<template>` so the v-if/v-else-if chain across skeleton / error /
+         empty states / dashboard content stays intact without adding a DOM
+         wrapper node. -->
+    <template v-if="!compareMode">
     <!-- Full-page skeleton only until the stream list is known. Once we have a
          stream, we fall through to the content so the trend/table panels mount
          and fire their queries immediately — in parallel with the KPI fetch,
@@ -235,6 +273,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            dedicated "Agent Behavior" page under Monitor. LLM Insights keeps the
            cost/latency/error story; behavior lives beside Agent Graph. -->
     </div>
+    </template>
   </div>
 </template>
 
@@ -268,6 +307,9 @@ import genAiAgentMappingService, {
 import { buildAgentTraceFilter } from "./llmAgentFilter";
 import { useAgentScope } from "@/enterprise/composables/useAgentScope";
 import AiScopeBar from "@/enterprise/components/AIObservability/AiScopeBar.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import VersionCompareView from "@/enterprise/components/AIObservability/VersionCompareView.vue";
+import { useVersionCompare } from "./composables/useVersionCompare";
 
 const { getStreams } = useStreams();
 const { t } = useI18n();
@@ -385,6 +427,69 @@ const {
 const agentFilterClause = computed(() =>
   buildAgentTraceFilter(effectiveAgent.value, effectiveStream.value),
 );
+
+// --- Version compare mode ----------------------------------------------------
+// "Compare versions…" swaps the single-select dashboard body for
+// VersionCompareView. Disabled (entry hidden behind a disabled OButton) when
+// the currently-selected agent has fewer than 2 versions across the wide
+// (retention-scoped) enumeration — checked via `versions` (page-window-scoped,
+// cheap) first; the wide-window `listVersionsForCompare` call is what actually
+// feeds the compare bar once entered (enumeration must ignore the page
+// date-picker window per the plan's baseline-enumeration requirement).
+const compareMode = ref(false);
+const compareVersionList = ref<GenAiAgentListItem[]>([]);
+const versionCompare = useVersionCompare();
+
+// Cheap pre-check from the already-loaded cascade `versions` list (scoped to
+// the page window) — good enough to gate the entry button without an extra
+// network call on every render. The wide-window list (loaded on entry) is the
+// source of truth for the compare bar's own options.
+const canCompare = computed(() => {
+  const real = versions.value.filter((v) => v.value !== "__unset__");
+  return real.length >= 2 && !!selectedAgentName.value;
+});
+
+// Exposed to the parent (LLMInsightsPage) so the page-level date-picker can be
+// disabled in sinceRollout/manual align modes (their windows are per-version,
+// not the page window) and re-enabled in sameWallClock (which the shared
+// picker drives). Mirrors the align mode owned by VersionCompareView.
+const compareAlign = ref<"sinceRollout" | "sameWallClock" | "manual">("sinceRollout");
+const compareDateDisabled = computed(
+  () => compareMode.value && compareAlign.value !== "sameWallClock",
+);
+
+async function enterCompareMode() {
+  if (!canCompare.value) return;
+  compareMode.value = true;
+  const orgId = store.state.selectedOrganization?.identifier;
+  if (!orgId || !selectedAgentName.value) return;
+  const nowMicros = Date.now() * 1000;
+  compareVersionList.value = await genAiAgentMappingService.listVersionsForCompare(
+    orgId,
+    selectedAgentName.value,
+    selectedEnv.value === "__unset__" ? null : selectedEnv.value,
+    nowMicros,
+  );
+}
+
+function exitCompareMode() {
+  compareMode.value = false;
+  compareVersionList.value = [];
+  versionCompare.windows.value = null;
+  versionCompare.result.value = null;
+}
+
+async function onCompareRun(payload: {
+  a: GenAiAgentListItem;
+  b: GenAiAgentListItem;
+  align: "sinceRollout" | "sameWallClock" | "manual";
+  manual?: { a?: { start: number; end: number }; b?: { start: number; end: number } };
+}) {
+  compareAlign.value = payload.align;
+  versionCompare.align.value = payload.align;
+  versionCompare.setPair(payload.a, payload.b);
+  await versionCompare.run(effectiveStream.value, payload.manual);
+}
 
 // --- Panel result cache (the dashboards IndexedDB cache) --------------------
 // PanelSchemaRenderer restores a panel's data from IndexedDB on mount and skips
@@ -828,7 +933,7 @@ watch(loading, (isLoading, wasLoading) => {
   if (wasLoading && !isLoading) lastRunAt.value = Date.now();
 });
 
-defineExpose({ refresh, lastRunAt, loading });
+defineExpose({ refresh, lastRunAt, loading, compareDateDisabled });
 
 onMounted(() => {
   // Only kick off the stream-list load here. The insights fetch is driven by the
