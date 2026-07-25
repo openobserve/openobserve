@@ -50,3 +50,40 @@ export function classifyVerdict(ci: DiffCI, dir: MetricDir, enoughSample: boolea
   if (ci.straddlesZero) return "nochange";
   return ci.lower > 0 ? "higher" : "lower";
 }
+
+// stats.ts (part 2 — percentile/mean/bootstrap)
+export function percentile(xs: number[], q: number): number {
+  if (xs.length === 0) return 0;
+  const s = [...xs].sort((a, b) => a - b);
+  const idx = q * (s.length - 1);
+  const lo = Math.floor(idx), hi = Math.ceil(idx);
+  if (lo === hi) return s[lo];
+  return s[lo] + (s[hi] - s[lo]) * (idx - lo);
+}
+export function mean(xs: number[]): number {
+  return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0;
+}
+export type Estimator = (xs: number[]) => number;
+
+// deterministic LCG so tests are reproducible under a seed
+function lcg(seed: number) { let s = seed >>> 0; return () => (s = (s * 1664525 + 1013904223) >>> 0) / 0x100000000; }
+
+function resampleEstimate(xs: number[], est: Estimator, rnd: () => number): number {
+  const n = xs.length; const r: number[] = new Array(n);
+  for (let i = 0; i < n; i++) r[i] = xs[(rnd() * n) | 0];
+  return est(r);
+}
+
+export function bootstrapDiffCI(
+  sampleA: number[], sampleB: number[], est: Estimator, iters: number, level: number, seed: number,
+): DiffCI {
+  const rnd = lcg(seed);
+  const diffs: number[] = new Array(iters);
+  for (let i = 0; i < iters; i++) diffs[i] = resampleEstimate(sampleA, est, rnd) - resampleEstimate(sampleB, est, rnd);
+  diffs.sort((a, b) => a - b);
+  const alpha = (1 - level) / 2;
+  const lower = percentile(diffs, alpha);
+  const upper = percentile(diffs, 1 - alpha);
+  const delta = est(sampleA) - est(sampleB);
+  return { delta, lower, upper, straddlesZero: lower <= 0 && upper >= 0 };
+}
