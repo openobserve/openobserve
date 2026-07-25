@@ -7786,6 +7786,32 @@
   },
   "aiObservability": {
     "title": "AI Observability",
+    "deltaStrip": {
+      "metricLabel": {
+        "volume": "Volume",
+        "errorRate": "Error rate",
+        "p50": "P50 latency",
+        "p95": "P95 latency",
+        "p99": "P99 latency",
+        "cost": "Cost / trace"
+      },
+      "insufficientLabel": "indicative",
+      "tooltip": {
+        "ciRange": "{level}% CI: {lower} to {upper}",
+        "method": "Method: {method}",
+        "associativeHigher": "B is higher than A — the environments differ, so this is associative, not proof B caused it.",
+        "associativeLower": "B is lower than A — the environments differ, so this is associative, not proof B caused it.",
+        "causalRegressed": "B regressed vs A under the same wall-clock window.",
+        "causalImproved": "B improved vs A under the same wall-clock window.",
+        "insufficient": "Not enough samples yet for a confident verdict — treat this delta as indicative only."
+      }
+    },
+    "overlayChart": {
+      "seriesA": "Version A",
+      "seriesB": "Version B",
+      "xAxisSinceRollout": "Hours since rollout",
+      "xAxisWallClock": "Time"
+    },
     "sections": {
       "monitor": "Monitor",
       "evaluate": "Evaluate"
@@ -7927,6 +7953,27 @@
         "loopExplain": "A high repeat rate usually means the agent isn't caching results or is retrying. Open the worst traces below to see the repeated calls.",
         "failExplain": "These are the actual error messages behind this failure class — read them to find the fix, or open a trace to see where it happened.",
         "costExplain": "These traces drove this agent's spend. Open the most expensive ones to see what ran."
+      }
+    },
+    "versionCompare": {
+      "bar": {
+        "versionA": "Version A",
+        "versionB": "Version B",
+        "align": "Align",
+        "alignSinceRollout": "Since each rollout",
+        "alignSameWallClock": "Same wall-clock",
+        "alignManual": "Manual",
+        "exit": "Exit compare",
+        "samePickHint": "Pick two different versions to compare"
+      },
+      "banner": {
+        "smallSample": "Too little data to compare — A has {nA}, B has {nB}. Widen the window or wait for more traffic.",
+        "disjoint": "These versions ran at different times — differences may reflect traffic changes, not the version itself.",
+        "partial": "These versions were partially concurrent — differences may be partly explained by when each ran."
+      },
+      "windowCard": {
+        "label": "{env} · {version} — {window} · {count} traces",
+        "clamp": "baseline only ran {deltaHours}h — comparing each version's {deltaHours}h."
       }
     }
   },
