@@ -25,7 +25,7 @@ use config::{
         pipeline::components::NodeData,
         self_reporting::{
             error::{ErrorData, ErrorSource, PipelineError},
-            usage::{TriggerData, TriggerDataStatus, TriggerDataType},
+            usage::{TriggerData, RunOutcome, TriggerDataType},
         },
         stream::{StreamParams, StreamType},
         triggers::ScheduledTriggerData,
@@ -60,6 +60,39 @@ use crate::{
     ingestion::ingestion_service,
     pipeline::batch_execution::ExecutablePipeline,
 };
+
+/// Fold this evaluation's outcome into the alert's durable state (Part IV of
+/// `alerts.md`).
+///
+/// Best-effort by design: state persistence must never fail an evaluation that
+/// has already run and notified. Failures are logged, not propagated.
+async fn persist_alert_run_state(alert_id: &str, outcome: &RunOutcome) {
+    use config::meta::alerts::state::{ROLLUP_GROUP_KEY, apply_outcome};
+
+    // `Skipped` runs are dropped by `apply_outcome` so a silenced evaluation
+    // cannot erase a real firing state.
+    let prev = match infra::table::alert_states::get(alert_id, ROLLUP_GROUP_KEY).await {
+        Ok(p) => p,
+        Err(e) => {
+            log::warn!("[SCHEDULER] could not read alert state for {alert_id}: {e}");
+            return;
+        }
+    };
+
+    let update = apply_outcome(
+        alert_id,
+        ROLLUP_GROUP_KEY,
+        prev.as_ref(),
+        outcome.clone(),
+        now_micros(),
+    );
+    if update.is_noop() {
+        return;
+    }
+    if let Err(e) = infra::table::alert_states::persist(&update).await {
+        log::error!("[SCHEDULER] could not persist alert state for {alert_id}: {e}");
+    }
+}
 
 pub async fn handle_triggers(
     trace_id: &str,
@@ -169,7 +202,7 @@ async fn handle_anomaly_detection_triggers(
             next_run_at: trigger.next_run_at,
             is_realtime: false,
             is_silenced: false,
-            status: TriggerDataStatus::Skipped,
+            status: RunOutcome::Skipped,
             start_time: now_micros(),
             end_time: now_micros(),
             retries: trigger.retries,
@@ -194,22 +227,29 @@ async fn handle_anomaly_detection_triggers(
             )
             .await
             {
+                // The outcome now carries whether anything was FOUND, not merely
+                // that detection ran. This is what lets the history API stop
+                // deriving `anomaly`/`normal` from `success_response`.
                 Ok(count) => (
-                    TriggerDataStatus::Completed,
+                    if count > 0 {
+                        RunOutcome::Firing
+                    } else {
+                        RunOutcome::Normal
+                    },
                     None,
                     Some(serde_json::json!({ "anomalies_found": count }).to_string()),
                     count,
                 ),
                 Err(e) => {
                     log::error!("[anomaly_detection] detection failed for {anomaly_id}: {e}");
-                    (TriggerDataStatus::Failed, Some(e.to_string()), None, 0i32)
+                    (RunOutcome::Error, Some(e.to_string()), None, 0i32)
                 }
             }
         }
         #[cfg(not(feature = "enterprise"))]
         {
             (
-                TriggerDataStatus::Skipped,
+                RunOutcome::Skipped,
                 Some("enterprise feature not enabled".to_string()),
                 None,
                 0i32,
@@ -254,7 +294,9 @@ async fn handle_anomaly_detection_triggers(
     // processed by the training scheduler yet, or processed but status not yet
     // flipped), move it to Active so the UI reflects the real state.
     #[cfg(feature = "enterprise")]
-    if trigger_status == TriggerDataStatus::Completed && config.is_trained {
+    // "Detection ran cleanly" is now either Firing or Normal — both mean the
+    // model executed; they differ only in whether anomalies were found.
+    if matches!(trigger_status, RunOutcome::Firing | RunOutcome::Normal) && config.is_trained {
         use o2_enterprise::enterprise::anomaly_detection::types::Status as AnomalyStatus;
         if config.status != AnomalyStatus::Active.to_i32() {
             use sea_orm::{ActiveModelTrait, IntoActiveModel, Set};
@@ -424,7 +466,7 @@ async fn handle_alert_triggers(
                     org: trigger.org.clone(),
                     module: TriggerDataType::Alert,
                     key: format!("/{}", trigger.module_key),
-                    status: TriggerDataStatus::Failed,
+                    status: RunOutcome::Error,
                     scheduler_trace_id: Some(scheduler_trace_id.clone()),
                     error: Some("Alert not found. Deleting trigger job.".to_string()),
                     time_in_queue_ms: Some(time_in_queue),
@@ -468,7 +510,7 @@ async fn handle_alert_triggers(
                     org: trigger.org.clone(),
                     module: TriggerDataType::Alert,
                     key: format!("/{}", trigger.module_key),
-                    status: TriggerDataStatus::Failed,
+                    status: RunOutcome::Error,
                     scheduler_trace_id: Some(scheduler_trace_id.clone()),
                     error: Some(format!("Error getting alert by id: {e}")),
                     time_in_queue_ms: Some(time_in_queue),
@@ -506,7 +548,7 @@ async fn handle_alert_triggers(
             org: trigger.org.clone(),
             module: TriggerDataType::Alert,
             key: format!("/{}", trigger.module_key),
-            status: TriggerDataStatus::Failed,
+            status: RunOutcome::Error,
             scheduler_trace_id: Some(scheduler_trace_id.clone()),
             error: Some("Alert id is not a valid ksuid. Deleting trigger job.".to_string()),
             time_in_queue_ms: Some(time_in_queue),
@@ -703,7 +745,7 @@ async fn handle_alert_triggers(
                 next_run_at: triggered_at,
                 is_realtime: trigger.is_realtime,
                 is_silenced: trigger.is_silenced,
-                status: TriggerDataStatus::Skipped,
+                status: RunOutcome::Skipped,
                 start_time,
                 end_time: *skipped_last_timestamp,
                 retries: trigger.retries,
@@ -743,7 +785,7 @@ async fn handle_alert_triggers(
         next_run_at: new_trigger.next_run_at,
         is_realtime: trigger.is_realtime,
         is_silenced: trigger.is_silenced,
-        status: TriggerDataStatus::Completed,
+        status: RunOutcome::Firing,
         start_time,
         end_time: final_end_time,
         retries: trigger.retries,
@@ -772,7 +814,7 @@ async fn handle_alert_triggers(
     trigger_data_stream.evaluation_took_in_secs = Some(evaluation_took);
     if result.is_err() {
         let err = result.err().unwrap();
-        trigger_data_stream.status = TriggerDataStatus::Failed;
+        trigger_data_stream.status = RunOutcome::Error;
         let err_string = err.to_string();
         log::error!(
             "[SCHEDULER trace_id {scheduler_trace_id}] alert {} evaluation failed: {}",
@@ -1241,7 +1283,10 @@ async fn handle_alert_triggers(
                         .await?;
                         trigger_data_stream.next_run_at = now;
                     }
-                    trigger_data_stream.status = TriggerDataStatus::Failed;
+                    // The condition DID match; only delivery failed. Recording
+                    // this as a plain error would lose the firing entirely and
+                    // undercount every time a destination is down.
+                    trigger_data_stream.status = RunOutcome::NotifyFailed;
                     trigger_data_stream.error =
                         Some(format!("error sending notification for alert: {e}"));
                 }
@@ -1264,7 +1309,13 @@ async fn handle_alert_triggers(
         db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         trigger_data_stream.start_time = start_time;
         trigger_data_stream.end_time = trigger_results.end_time;
-        trigger_data_stream.status = TriggerDataStatus::ConditionNotSatisfied;
+        trigger_data_stream.status = RunOutcome::Normal;
+    }
+
+    // Persist durable run state BEFORE the lossy stream publish (Part IV of
+    // alerts.md). `alert.id` is the ksuid the state rows are keyed on.
+    if let Some(alert_id) = alert.id.as_ref() {
+        persist_alert_run_state(&alert_id.to_string(), &trigger_data_stream.status).await;
     }
 
     log::debug!(
@@ -1427,7 +1478,7 @@ async fn handle_report_triggers(
                 next_run_at: now,
                 is_realtime: trigger.is_realtime,
                 is_silenced: trigger.is_silenced,
-                status: TriggerDataStatus::Failed,
+                status: RunOutcome::Error,
                 start_time: trigger.start_time.unwrap_or_default(),
                 end_time: trigger.end_time.unwrap_or_default(),
                 retries: trigger.retries,
@@ -1578,7 +1629,7 @@ async fn handle_report_triggers(
         next_run_at: new_trigger.next_run_at,
         is_realtime: trigger.is_realtime,
         is_silenced: trigger.is_silenced,
-        status: TriggerDataStatus::Completed,
+        status: RunOutcome::Succeeded,
         start_time: trigger.start_time.unwrap_or_default(),
         end_time: trigger.end_time.unwrap_or_default(),
         retries: trigger.retries,
@@ -1678,7 +1729,7 @@ async fn handle_report_triggers(
                 .await?;
             }
             trigger_data_stream.end_time = now_micros();
-            trigger_data_stream.status = TriggerDataStatus::Failed;
+            trigger_data_stream.status = RunOutcome::Error;
             trigger_data_stream.error = Some(format!("error processing report: {e}"));
         }
     }
@@ -1769,7 +1820,7 @@ async fn handle_derived_stream_triggers(
                     next_run_at: new_trigger.next_run_at,
                     is_realtime: new_trigger.is_realtime,
                     is_silenced: new_trigger.is_silenced,
-                    status: TriggerDataStatus::Failed,
+                    status: RunOutcome::Error,
                     start_time: 0,
                     end_time: 0,
                     retries: new_trigger.retries,
@@ -1851,7 +1902,7 @@ async fn handle_derived_stream_triggers(
             next_run_at: new_trigger.next_run_at,
             is_realtime: new_trigger.is_realtime,
             is_silenced: new_trigger.is_silenced,
-            status: TriggerDataStatus::Failed,
+            status: RunOutcome::Error,
             start_time: 0,
             end_time: 0,
             retries: new_trigger.retries,
@@ -1888,7 +1939,7 @@ async fn handle_derived_stream_triggers(
             next_run_at: new_trigger.next_run_at,
             is_realtime: new_trigger.is_realtime,
             is_silenced: new_trigger.is_silenced,
-            status: TriggerDataStatus::Failed,
+            status: RunOutcome::Error,
             start_time: 0,
             end_time: 0,
             retries: new_trigger.retries,
@@ -2033,7 +2084,7 @@ async fn handle_derived_stream_triggers(
         next_run_at: new_trigger.next_run_at,
         is_realtime: new_trigger.is_realtime,
         is_silenced: new_trigger.is_silenced,
-        status: TriggerDataStatus::Completed,
+        status: RunOutcome::Firing,
         start_time: if let Some(start) = start {
             start
         } else {
@@ -2075,7 +2126,7 @@ async fn handle_derived_stream_triggers(
             false,
             Some(trigger.next_run_at),
         )?;
-        trigger_data_stream.status = TriggerDataStatus::Skipped;
+        trigger_data_stream.status = RunOutcome::Skipped;
         trigger_data_stream.end_time = aligned_end_time;
         trigger_data_stream.next_run_at = new_trigger.next_run_at;
         trigger_data_stream.start_time = start_time;
@@ -2144,7 +2195,7 @@ async fn handle_derived_stream_triggers(
             );
 
             // update TriggerData that's to be reported to _meta
-            trigger_data_stream.status = TriggerDataStatus::Failed;
+            trigger_data_stream.status = RunOutcome::Error;
             trigger_data_stream.error = Some(err_msg.clone());
             trigger_data_stream.retries += 1;
 
@@ -2292,7 +2343,7 @@ async fn handle_derived_stream_triggers(
                     new_trigger.retries += 1;
 
                     // trigger_data_stream
-                    trigger_data_stream.status = TriggerDataStatus::Failed;
+                    trigger_data_stream.status = RunOutcome::Error;
                     trigger_data_stream.error = Some(err.clone());
                     trigger_data_stream.retries += 1;
 
@@ -2322,7 +2373,7 @@ async fn handle_derived_stream_triggers(
                     new_trigger.org,
                     new_trigger.module_key
                 );
-                trigger_data_stream.status = TriggerDataStatus::ConditionNotSatisfied;
+                trigger_data_stream.status = RunOutcome::Normal;
                 trigger_data_stream.query_took = trigger_results.query_took;
 
                 // move the time range forward by frequency and continue
@@ -2348,17 +2399,17 @@ async fn handle_derived_stream_triggers(
     // run at In that case, the trigger will be picked up again by the scheduler
     // at the next batch immediately Once it reaches max retries, the trigger
     // will be run again at the next scheduled time.
-    if !(trigger_data_stream.status == TriggerDataStatus::Failed
+    if !(trigger_data_stream.status == RunOutcome::Error
         && new_trigger.retries < max_retries)
     {
         let need_to_catch_up = end < aligned_supposed_to_be_run_at;
         // If the trigger didn't fail, we need to reset the `retries` count.
         // Only cumulative failures should be used to check with `max_retries`
-        if trigger_data_stream.status != TriggerDataStatus::Failed {
+        if trigger_data_stream.status != RunOutcome::Error {
             new_trigger.retries = 0;
         }
 
-        if trigger_data_stream.status != TriggerDataStatus::Failed && need_to_catch_up {
+        if trigger_data_stream.status != RunOutcome::Error && need_to_catch_up {
             // Go to the next nun at, but use the same trigger start time
             new_trigger.next_run_at = derived_stream.trigger_condition.get_next_trigger_time(
                 false,
@@ -2486,7 +2537,7 @@ async fn handle_backfill_triggers(
                 org: trigger.org.clone(),
                 module: TriggerDataType::Backfill,
                 key: job_id.clone(),
-                status: TriggerDataStatus::Failed,
+                status: RunOutcome::Error,
                 scheduler_trace_id: Some(scheduler_trace_id.clone()),
                 error: Some(format!(
                     "Failed to fetch backfill job config: {e}. Deleting trigger job."
@@ -2569,7 +2620,7 @@ async fn handle_backfill_triggers(
                 org: trigger.org.clone(),
                 module: TriggerDataType::Backfill,
                 key: job_id.clone(),
-                status: TriggerDataStatus::Failed,
+                status: RunOutcome::Error,
                 scheduler_trace_id: Some(scheduler_trace_id.clone()),
                 error: Some(format!("Failed to parse backfill trigger data: {e}")),
                 time_in_queue_ms: Some(
@@ -2627,7 +2678,7 @@ async fn handle_backfill_triggers(
                 org: trigger.org.clone(),
                 module: TriggerDataType::Backfill,
                 key: job_id.clone(),
-                status: TriggerDataStatus::Failed,
+                status: RunOutcome::Error,
                 scheduler_trace_id: Some(scheduler_trace_id.clone()),
                 error: Some("Missing backfill job data in trigger".to_string()),
                 time_in_queue_ms: Some(
@@ -2668,7 +2719,7 @@ async fn handle_backfill_triggers(
                     org: trigger.org.clone(),
                     module: TriggerDataType::Backfill,
                     key: job_id.clone(),
-                    status: TriggerDataStatus::Failed,
+                    status: RunOutcome::Error,
                     scheduler_trace_id: Some(scheduler_trace_id.clone()),
                     error: Some(format!(
                         "Failed to fetch pipeline after max retries: {e}. Deleting trigger job."
@@ -2702,7 +2753,7 @@ async fn handle_backfill_triggers(
                     org: trigger.org.clone(),
                     module: TriggerDataType::Backfill,
                     key: job_id.clone(),
-                    status: TriggerDataStatus::Failed,
+                    status: RunOutcome::Error,
                     scheduler_trace_id: Some(scheduler_trace_id.clone()),
                     error: Some(format!("Failed to fetch pipeline: {e}. Retrying.")),
                     time_in_queue_ms: Some(
@@ -2743,7 +2794,7 @@ async fn handle_backfill_triggers(
                 org: trigger.org.clone(),
                 module: TriggerDataType::Backfill,
                 key: job_id.clone(),
-                status: TriggerDataStatus::Failed,
+                status: RunOutcome::Error,
                 scheduler_trace_id: Some(scheduler_trace_id.clone()),
                 error: Some("Pipeline is not scheduled. Deleting trigger job.".to_string()),
                 time_in_queue_ms: Some(
@@ -2781,7 +2832,7 @@ async fn handle_backfill_triggers(
                 org: trigger.org.clone(),
                 module: TriggerDataType::Backfill,
                 key: job_id.clone(),
-                status: TriggerDataStatus::Failed,
+                status: RunOutcome::Error,
                 scheduler_trace_id: Some(scheduler_trace_id.clone()),
                 error: Some(format!(
                     "Failed to get destination streams: {e}. Deleting trigger job."
@@ -3102,7 +3153,7 @@ async fn handle_backfill_triggers(
                 next_run_at,
                 is_realtime: false,
                 is_silenced: false,
-                status: TriggerDataStatus::Failed,
+                status: RunOutcome::Error,
                 start_time: query_start_time,
                 end_time: query_end_time,
                 retries: new_retries,
@@ -3192,7 +3243,7 @@ async fn handle_backfill_triggers(
                 next_run_at,
                 is_realtime: false,
                 is_silenced: false,
-                status: TriggerDataStatus::Failed,
+                status: RunOutcome::Error,
                 start_time: query_start_time,
                 end_time: query_end_time,
                 retries: new_retries,
@@ -3295,7 +3346,7 @@ async fn handle_backfill_triggers(
                     next_run_at,
                     is_realtime: false,
                     is_silenced: false,
-                    status: TriggerDataStatus::Failed,
+                    status: RunOutcome::Error,
                     start_time: query_start_time,
                     end_time: query_end_time,
                     retries: new_retries,
@@ -3451,7 +3502,7 @@ async fn handle_backfill_triggers(
             next_run_at,
             is_realtime: false,
             is_silenced: false,
-            status: TriggerDataStatus::Failed,
+            status: RunOutcome::Error,
             start_time: query_start_time,
             end_time: query_end_time,
             retries: new_retries,
@@ -3507,11 +3558,11 @@ async fn handle_backfill_triggers(
 
         // Determine trigger status based on data availability and ingestion success
         let trigger_status = if ingestion_error.is_some() {
-            TriggerDataStatus::Failed
+            RunOutcome::Error
         } else if has_data {
-            TriggerDataStatus::Completed
+            RunOutcome::Succeeded
         } else {
-            TriggerDataStatus::ConditionNotSatisfied
+            RunOutcome::Normal
         };
 
         // Publish trigger usage for completion (last chunk)
@@ -3589,11 +3640,11 @@ async fn handle_backfill_triggers(
 
         // Determine trigger status based on data availability and ingestion success
         let trigger_status = if ingestion_error.is_some() {
-            TriggerDataStatus::Failed
+            RunOutcome::Error
         } else if has_data {
-            TriggerDataStatus::Completed
+            RunOutcome::Succeeded
         } else {
-            TriggerDataStatus::ConditionNotSatisfied
+            RunOutcome::Normal
         };
 
         // Publish trigger usage for this chunk

@@ -149,6 +149,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
             </div>
             <div class="flex items-center gap-4 px-3 py-2">
+              <!-- Alert Type -->
+              <div class="flex items-center gap-1.5">
+                <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
+                  {{ t("alerts.alertType") }}
+                </div>
+                <OFormSelect
+                  data-test="add-alert-type-select-dropdown"
+                  name="is_real_time"
+                  :options="alertTypeOptions"
+                  :disabled="beingUpdated || anomalyEditMode"
+                  class="alert-type-select min-w-27.5 @max-[900px]/stream-config:min-w-23.75 @max-[750px]/stream-config:min-w-21.25 @max-[600px]/stream-config:min-w-18.75"
+                  :searchable="false"
+                />
+              </div>
+
               <!-- Stream Type -->
               <div class="flex items-center gap-1.5">
                 <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
@@ -184,21 +199,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip
                   v-if="!formData.stream_type"
                   :content="t('alerts.selectStreamTypeFirst')"
-                />
-              </div>
-
-              <!-- Alert Type -->
-              <div class="flex items-center gap-1.5">
-                <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
-                  {{ t("alerts.alertType") }}
-                </div>
-                <OFormSelect
-                  data-test="add-alert-type-select-dropdown"
-                  name="is_real_time"
-                  :options="alertTypeOptions"
-                  :disabled="beingUpdated || anomalyEditMode"
-                  class="alert-type-select min-w-27.5 @max-[900px]/stream-config:min-w-23.75 @max-[750px]/stream-config:min-w-21.25 @max-[600px]/stream-config:min-w-18.75"
-                  :searchable="false"
                 />
               </div>
             </div>

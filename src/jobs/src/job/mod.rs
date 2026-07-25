@@ -904,7 +904,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
             |org_id, anomaly_id, anomaly_name, success, error_msg, start_us, end_us| {
                 Box::pin(async move {
                     use config::meta::self_reporting::usage::{
-                        TriggerData, TriggerDataStatus, TriggerDataType,
+                        TriggerData, RunOutcome, TriggerDataType,
                     };
                     usage_reporting::publish_triggers_usage(TriggerData {
                         _timestamp: start_us,
@@ -915,9 +915,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         is_realtime: false,
                         is_silenced: false,
                         status: if success {
-                            TriggerDataStatus::Completed
+                            RunOutcome::Succeeded
                         } else {
-                            TriggerDataStatus::Failed
+                            RunOutcome::Error
                         },
                         start_time: start_us,
                         end_time: end_us,

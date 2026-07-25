@@ -33,6 +33,7 @@ use crate::{
 pub mod alert;
 pub mod deduplication;
 pub mod incidents;
+pub mod state;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq, Default)]
 #[serde(default)]

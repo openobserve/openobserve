@@ -1107,27 +1107,46 @@ export const BADGE_GROUPS = {
   },
 
   // Alert run state (alert history) — icon, PILL (status badge).
+  //
+  // The backend vocabulary is `firing | normal | succeeded | error |
+  // notify_failed | skipped` (RunOutcome). The legacy values below
+  // (`completed`, `condition_not_satisfied`, `failed`, `ok`, `success`) are kept
+  // so history rows written before the rename still render, and can be dropped
+  // once those rows age out of the triggers stream's retention window.
   alertState: {
     mode: "icon",
     shape: "pill",
     values: {
+      // ── firing states ──
       firing: { variant: "error-soft", icon: "error-outline" },
-      error: { variant: "error-soft", icon: "error-outline" },
       anomaly: { variant: "error-soft", icon: "error-outline" },
-      // `completed` = a finished/OK run → GREEN. It is NOT a firing state for the
-      // badge (the timeline aggregates it under firing separately, but the per-row
-      // badge reads as Ok).
-      completed: { variant: "success-soft", icon: "check-circle-outline" },
+      // Condition matched but delivery failed — still a firing state, flagged
+      // distinctly so a broken destination is visible.
+      notifyfailed: { variant: "error-soft", icon: "sync-problem", label: "Notify Failed" },
+      // LEGACY: `completed` meant "the alert fired" for condition-bearing
+      // modules. It is a firing state — the previous green rendering
+      // contradicted both the backend and the timeline aggregation.
+      completed: { variant: "error-soft", icon: "error-outline", label: "Firing" },
+
+      // ── non-firing states ──
+      normal: { variant: "success-soft", icon: "check-circle-outline" },
+      succeeded: { variant: "success-soft", icon: "check-circle-outline" },
+      // LEGACY aliases for `normal`.
       ok: { variant: "success-soft", icon: "check-circle-outline", label: "Ok" },
       success: { variant: "success-soft", icon: "check-circle-outline" },
-      normal: { variant: "success-soft", icon: "check-circle-outline" },
-      // A non-firing/passed evaluation. The histogram counts these as "Ok", so
-      // the badge shows "Ok" too. Key MUST be normalised (no separators) so
-      // "condition_not_satisfied", "Condition Not Satisfied", etc. all resolve here.
-      conditionnotsatisfied: { variant: "success-soft", icon: "check-circle-outline", label: "Ok" },
+      conditionnotsatisfied: {
+        variant: "success-soft",
+        icon: "check-circle-outline",
+        label: "Normal",
+      },
+
+      // ── evaluation problems ──
+      error: { variant: "error-soft", icon: "cancel" },
+      failed: { variant: "error-soft", icon: "cancel" },
+
+      // ── neither ──
       skipped: { variant: "warning-soft", icon: "block" },
       flapping: { variant: "warning-soft", icon: "bolt", label: "Flapping" },
-      failed: { variant: "error-soft", icon: "cancel" },
       pending: { variant: "blue-soft", icon: "schedule" },
     },
     fallback: { variant: "default-soft", icon: "help-outline" },

@@ -778,6 +778,12 @@ pub async fn delete_by_id<C: ConnectionTrait>(
     match db::alerts::alert::delete_by_id(conn, org_id, alert_id).await {
         Ok(_) => {
             remove_ownership(org_id, "alerts", Authz::new(&alert_id_str)).await;
+            // Alert run state is owned by the alert's lifecycle (Part IV of
+            // alerts.md), so it goes when the alert does. Best-effort: a
+            // leftover state row must not fail the delete.
+            if let Err(e) = infra::table::alert_states::delete_by_alert(&alert_id_str).await {
+                log::warn!("failed to delete alert state for {alert_id_str}: {e}");
+            }
             Ok(())
         }
         Err(e) => Err(e.into()),

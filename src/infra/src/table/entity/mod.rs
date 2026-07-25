@@ -19,6 +19,8 @@ pub mod enrichment_table_urls;
 pub mod enrichment_tables;
 pub mod folders;
 pub mod gen_ai_agents;
+pub mod alert_state_transitions;
+pub mod alert_states;
 pub mod incident_events;
 pub mod kv_store;
 pub mod model_pricing;

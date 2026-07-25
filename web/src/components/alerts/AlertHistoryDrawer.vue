@@ -357,6 +357,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { ref, watch, computed } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
+import { isFiringOutcome, isOkOutcome } from "@/utils/alerts/runOutcome";
 import { formatTimestamp } from "@/utils/date";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -419,13 +420,13 @@ const isLoadingHistory = ref(false);
 const MIN_FLAP_TRANSITIONS = 3; // firing↔ok flips within a run to call it flapping
 const MIN_FLAP_WINDOW = 4; // minimum consecutive rows needed
 
+// Classification is shared with the timeline and the overview so the three
+// cannot disagree about a status again — see utils/alerts/runOutcome.
 function rowIsFiring(s: string) {
-  const v = s?.toLowerCase();
-  return v === "firing" || v === "error" || v === "anomaly" || v === "completed";
+  return isFiringOutcome(s);
 }
 function rowIsOk(s: string) {
-  const v = s?.toLowerCase();
-  return v === "ok" || v === "success" || v === "normal" || v === "condition_not_satisfied";
+  return isOkOutcome(s);
 }
 
 // Build a boolean mask: true = row is inside a flapping run.
@@ -717,10 +718,11 @@ const getRowClass = (row: any) => {
   if (row?._child) {
     return "!bg-surface-subtle";
   }
-  const status = row?.status?.toLowerCase();
-  const isFiringStatus =
-    status === "firing" || status === "error" || status === "anomaly" || status === "completed";
-  if (isFiringStatus) {
+  // The row wash means "needs attention", which covers both a firing alert and
+  // an evaluation that errored. They are distinguished by the status badge —
+  // only the classification of "did it fire" is shared with the timeline.
+  const status = String(row?.status ?? "").toLowerCase();
+  if (isFiringOutcome(status) || status === "error" || status === "failed") {
     return "!bg-status-error-bg";
   }
   return "";

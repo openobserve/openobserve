@@ -70,6 +70,20 @@ pub struct ListAlertsResponseBodyItem {
     /// Last error message from training or detection. Only present for `anomaly_detection` items.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_error: Option<String>,
+    /// Outcome of the most recent evaluation: "firing" | "normal" | "error" |
+    /// "notify_failed" | "succeeded". Absent when the alert has never run.
+    ///
+    /// This is the LAST RUN OUTCOME, not a live "currently firing" flag —
+    /// always render it alongside `last_outcome_at`. See Part IV of alerts.md.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_outcome: Option<String>,
+    /// When `last_outcome` was recorded (microseconds).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_outcome_at: Option<i64>,
+    /// When `last_outcome` last CHANGED (microseconds) — i.e. how long the
+    /// alert has been in its current state.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_outcome_since: Option<i64>,
 }
 
 /// HTTP response body for `EnableAlert` endpoint.
@@ -137,6 +151,9 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             last_trained_at: None,
             status: None,
             last_error: None,
+            last_outcome: None,
+            last_outcome_at: None,
+            last_outcome_since: None,
         })
     }
 }
@@ -206,6 +223,11 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
         is_real_time: false,
         last_trained_at: v.get("training_completed_at").and_then(|t| t.as_i64()),
         status,
+        // Anomaly configs do not flow through the alert scheduler's state
+        // write path; leave run state unset rather than implying "never fired".
+        last_outcome: None,
+        last_outcome_at: None,
+        last_outcome_since: None,
         last_error: v
             .get("last_error")
             .and_then(|e| e.as_str())
@@ -284,6 +306,9 @@ mod tests {
             last_trained_at: None,
             status: None,
             last_error: None,
+            last_outcome: None,
+            last_outcome_at: None,
+            last_outcome_since: None,
         };
         let json = serde_json::to_value(&item).unwrap();
         let obj = json.as_object().unwrap();

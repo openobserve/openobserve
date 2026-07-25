@@ -298,6 +298,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OTag>
               </template>
 
+              <template #cell-last_outcome="{ row }">
+                <!--
+                  Only rendered for enabled alerts: a disabled alert keeps
+                  whatever outcome it last recorded, so showing it would display
+                  "Firing" forever on something that is not running.
+                -->
+                <OTooltip
+                  v-if="showRunOutcome(row)"
+                  :content="runOutcomeTooltip(row)"
+                >
+                  <OTag
+                    type="alertState"
+                    :value="row.last_outcome"
+                    size="sm"
+                    :data-test="`alert-list-${row.name}-last-outcome`"
+                  />
+                </OTooltip>
+                <span v-else class="text-text-body">—</span>
+              </template>
+
               <template #cell-period="{ row }">
                 {{
                   row.period
@@ -699,6 +719,7 @@ import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 
 import { convertUnixToDateFormat as convertUnixToFormat } from "@/utils/date";
+import { outcomeLabel, shouldShowRunOutcome } from "@/utils/alerts/runOutcome";
 import { useI18n } from "vue-i18n";
 import { debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
@@ -959,6 +980,23 @@ export default defineComponent({
       return row?.enabled ? "active" : "paused";
     };
 
+    // ── Last run outcome (Part IV) ─────────────────────────────────────────
+    // A disabled alert freezes its last outcome, so the badge is suppressed
+    // unless the alert is actually running — otherwise a paused alert would
+    // advertise "Firing" indefinitely.
+    const showRunOutcome = (row: any): boolean =>
+      shouldShowRunOutcome(row?.enabled, row?.last_outcome);
+
+    // Never present the outcome as live state: it is the result of the LAST
+    // evaluation, so it is always qualified with when that ran.
+    const runOutcomeTooltip = (row: any): string => {
+      const at = row?.last_outcome_at
+        ? convertUnixToDateFormat(row.last_outcome_at)
+        : null;
+      const label = outcomeLabel(row?.last_outcome);
+      return at ? `${label} ${t("alerts.asOf")} ${at}` : label;
+    };
+
     // Full-row highlight — only the EXCEPTIONS get a wash, so attention goes to
     // what's off, not what's fine: failed=light red, paused=muted grey, active
     // stays clean (its state still reads from the green left rail).
@@ -1168,6 +1206,20 @@ export default defineComponent({
           id: "state",
           accessorKey: "enabled",
           header: t("alerts.state"),
+          cell: " ",
+          sortable: true,
+          resizable: true,
+          hideable: true,
+          size: COL.status,
+          meta: { align: "left" },
+        },
+        // "last_outcome" — did the most recent evaluation fire? Distinct from
+        // "state" (is it running?) and from the anomaly-only "status" (is the
+        // model trained?). Backed by the alert_states rollup row.
+        {
+          id: "last_outcome",
+          accessorKey: "last_outcome",
+          header: t("alerts.lastOutcome"),
           cell: " ",
           sortable: true,
           resizable: true,
@@ -1484,6 +1536,12 @@ export default defineComponent({
             last_satisfied_at: convertUnixToDateFormat(data.last_satisfied_at),
             last_trained_at: "",
             status: "--",
+            // Durable run state from the alert_states rollup row (Part IV).
+            // This is the LAST RUN outcome, not a live firing flag — always
+            // paired with last_outcome_at so the UI can say "as of <time>".
+            last_outcome: data.last_outcome ?? null,
+            last_outcome_at: data.last_outcome_at ?? null,
+            last_outcome_since: data.last_outcome_since ?? null,
             selected: false,
             type: data.condition.type,
             folder_name: {
@@ -2861,6 +2919,8 @@ export default defineComponent({
       folders,
       splitterModel,
       alertStateLoadingMap,
+      showRunOutcome,
+      runOutcomeTooltip,
       toggleAlertState,
       templates,
       routeTo,

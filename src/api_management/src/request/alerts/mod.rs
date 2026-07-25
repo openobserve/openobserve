@@ -879,7 +879,43 @@ pub async fn list_alerts(
         list
     };
 
+    // Enrich with durable run state (Part IV of alerts.md). One batched query
+    // over the page that is actually being returned — not per alert.
+    let mut list = list;
+    enrich_with_run_state(&mut list).await;
+
     MetaHttpResponse::json(ListAlertsResponseBody { list })
+}
+
+/// Attach `last_outcome` / `last_outcome_at` / `last_outcome_since` to a page of
+/// alerts from the `alert_states` rollup rows.
+///
+/// Best-effort: if the lookup fails the list is still returned, just without run
+/// state. A state table problem must not take down the alerts page.
+async fn enrich_with_run_state(list: &mut [ListAlertsResponseBodyItem]) {
+    if list.is_empty() {
+        return;
+    }
+    let ids: Vec<String> = list.iter().map(|i| i.alert_id.to_string()).collect();
+    let states = match infra::table::alert_states::get_rollups(&ids).await {
+        Ok(s) => s,
+        Err(e) => {
+            log::warn!("failed to load alert run state for list: {e}");
+            return;
+        }
+    };
+    if states.is_empty() {
+        return;
+    }
+    let by_id: std::collections::HashMap<_, _> =
+        states.into_iter().map(|s| (s.alert_id.clone(), s)).collect();
+    for item in list.iter_mut() {
+        if let Some(state) = by_id.get(&item.alert_id.to_string()) {
+            item.last_outcome = state.last_outcome.as_ref().map(|o| o.to_string());
+            item.last_outcome_at = state.last_outcome_at;
+            item.last_outcome_since = state.since;
+        }
+    }
 }
 
 /// EnableAlert

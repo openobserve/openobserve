@@ -4449,6 +4449,8 @@
     "alertType": "Alert Type",
     "streamType": "Stream Type",
     "state": "State",
+    "lastOutcome": "Last Outcome",
+    "asOf": "as of",
     "realTime": "Realtime",
     "scheduled": "Scheduled",
     "anomalyDetection": "Anomalies",

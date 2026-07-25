@@ -18,6 +18,7 @@ use axum::{
     response::Response,
 };
 use chrono::{Duration, Utc};
+use config::meta::self_reporting::usage::{TriggerDataType, normalize_outcome};
 use config::{
     meta::{
         search::{Query as SearchQuery, Request as SearchRequest},
@@ -348,28 +349,26 @@ pub async fn get_alert_history(
             .hits
             .into_iter()
             .map(|hit| {
+                // Post-cutover rows already carry `firing`/`normal` directly;
+                // legacy rows stored `completed` regardless of the anomaly
+                // count, so the normalizer re-reads `success_response` for
+                // those. See Part III of alerts.md.
                 let raw_status = hit
                     .get("status")
                     .and_then(|v| v.as_str())
                     .unwrap_or("unknown");
-                // Derive result: parse anomalies_found from success_response JSON.
-                let anomaly_count = hit
-                    .get("success_response")
-                    .and_then(|v| v.as_str())
+                let success_response = hit.get("success_response").and_then(|v| v.as_str());
+                let anomaly_count = success_response
                     .and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok())
                     .and_then(|v| v["anomalies_found"].as_i64())
                     .unwrap_or(0);
-                let result = match raw_status {
-                    "failed" => "failed".to_string(),
-                    "skipped" => "skipped".to_string(),
-                    _ => {
-                        if anomaly_count > 0 {
-                            "anomaly".to_string()
-                        } else {
-                            "normal".to_string()
-                        }
-                    }
-                };
+                let result = normalize_outcome(
+                    raw_status,
+                    &TriggerDataType::AnomalyDetection,
+                    success_response,
+                )
+                .map(|o| o.to_string())
+                .unwrap_or_else(|| "unknown".to_string());
                 AlertHistoryEntry {
                     timestamp: hit.get("_timestamp").and_then(|v| v.as_i64()).unwrap_or(0),
                     alert_name: String::new(),
@@ -702,11 +701,20 @@ pub async fn get_alert_history(
                 .and_then(|v| v.as_str())
                 .unwrap_or(&org_id)
                 .to_string(),
+            // Normalize legacy values so the API speaks one vocabulary across
+            // the retention window (Part III of alerts.md).
             status: hit
                 .get("status")
                 .and_then(|v| v.as_str())
-                .unwrap_or("unknown")
-                .to_string(),
+                .and_then(|raw| {
+                    normalize_outcome(
+                        raw,
+                        &TriggerDataType::Alert,
+                        hit.get("success_response").and_then(|v| v.as_str()),
+                    )
+                })
+                .map(|o| o.to_string())
+                .unwrap_or_else(|| "unknown".to_string()),
             is_realtime: hit
                 .get("is_realtime")
                 .and_then(|v| v.as_bool())
@@ -936,24 +944,16 @@ pub async fn get_all_anomaly_history(
             .get("status")
             .and_then(|v| v.as_str())
             .unwrap_or("unknown");
-        let anomaly_count = hit
-            .get("success_response")
-            .and_then(|v| v.as_str())
+        let success_response = hit.get("success_response").and_then(|v| v.as_str());
+        let anomaly_count = success_response
             .and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok())
             .and_then(|v| v["anomalies_found"].as_i64())
             .unwrap_or(0);
 
-        let status = match raw_status {
-            "failed" => "failed",
-            "skipped" => "skipped",
-            _ => {
-                if anomaly_count > 0 {
-                    "anomaly"
-                } else {
-                    "normal"
-                }
-            }
-        };
+        let status =
+            normalize_outcome(raw_status, &TriggerDataType::AnomalyDetection, success_response)
+                .map(|o| o.to_string())
+                .unwrap_or_else(|| "unknown".to_string());
 
         bucket.push(serde_json::json!({
             "timestamp": hit.get("_timestamp").and_then(|v| v.as_i64()).unwrap_or(0),

@@ -92,3 +92,5 @@ tests/ui-testing/.env.old
 /.claude/skills/*
 !/.claude/skills/ui-architect/
 !/.claude/skills/eslint-error-handling/
+
+alert_mock

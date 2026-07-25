@@ -49,16 +49,147 @@ pub fn is_reserved_self_reporting_stream(stream_name: &str) -> bool {
     RESERVED_SELF_REPORTING_STREAMS.contains(&stream_name)
 }
 
+/// Outcome of a single scheduled evaluation — "did it fire?".
+///
+/// Part III of `alerts.md`. Replaces the former `TriggerDataStatus`, whose
+/// `Completed` variant collided by name with `TriggerStatus::Completed` (the
+/// job-queue state) while meaning something entirely different.
+///
+/// Condition-bearing modules (alerts, derived streams, anomaly detection) use
+/// [`RunOutcome::Firing`] / [`RunOutcome::Normal`]; modules with no condition
+/// (reports, workflows, synthetics) use [`RunOutcome::Succeeded`].
+///
+/// The legacy vocabulary is accepted on **read** via serde aliases so that
+/// `TriggerData` records written by an older build — which are read back as a
+/// typed struct from the on-disk self-reporting queue — do not panic the ingest
+/// task after an upgrade. Legacy values are never written. Because `completed`
+/// was module-dependent it aliases to the neutral `Succeeded` and is corrected
+/// by [`TriggerData::normalize_legacy_outcome`].
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub enum TriggerDataStatus {
-    #[serde(rename = "completed")]
-    Completed,
-    #[serde(rename = "failed")]
-    Failed,
-    #[serde(rename = "condition_not_satisfied")]
-    ConditionNotSatisfied,
+pub enum RunOutcome {
+    /// Condition matched — the alert triggered and the notification was sent.
+    #[serde(rename = "firing")]
+    Firing,
+    /// Evaluated cleanly; nothing to alert on.
+    #[serde(rename = "normal", alias = "condition_not_satisfied")]
+    Normal,
+    /// Non-condition modules: report sent, derived stream written.
+    #[serde(rename = "succeeded", alias = "completed")]
+    Succeeded,
+    /// The evaluation itself failed (query error, timeout).
+    #[serde(rename = "error", alias = "failed")]
+    Error,
+    /// Never evaluated — silenced, paused, org deleting.
     #[serde(rename = "skipped")]
     Skipped,
+    /// Condition matched but delivery failed. Still a firing state: without
+    /// this, a webhook outage silently undercounts firings.
+    #[serde(rename = "notify_failed")]
+    NotifyFailed,
+}
+
+impl RunOutcome {
+    /// True when the alert actually triggered. `NotifyFailed` counts — the
+    /// condition matched, only delivery failed.
+    pub fn is_firing(&self) -> bool {
+        matches!(self, Self::Firing | Self::NotifyFailed)
+    }
+
+    /// Durable integer form, stored in `alert_states.last_outcome` (Part IV).
+    ///
+    /// These values are persisted — never reorder or reuse them.
+    pub fn to_i32(&self) -> i32 {
+        match self {
+            Self::Firing => 0,
+            Self::Normal => 1,
+            Self::Succeeded => 2,
+            Self::Error => 3,
+            Self::Skipped => 4,
+            Self::NotifyFailed => 5,
+        }
+    }
+
+    pub fn from_i32(v: i32) -> Option<Self> {
+        match v {
+            0 => Some(Self::Firing),
+            1 => Some(Self::Normal),
+            2 => Some(Self::Succeeded),
+            3 => Some(Self::Error),
+            4 => Some(Self::Skipped),
+            5 => Some(Self::NotifyFailed),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Firing => "firing",
+            Self::Normal => "normal",
+            Self::Succeeded => "succeeded",
+            Self::Error => "error",
+            Self::Skipped => "skipped",
+            Self::NotifyFailed => "notify_failed",
+        }
+    }
+}
+
+impl std::fmt::Display for RunOutcome {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Parse `anomalies_found` out of an anomaly run's `success_response` JSON.
+/// A missing or unparseable payload counts as zero — never as firing.
+fn anomalies_found(success_response: Option<&str>) -> i64 {
+    success_response
+        .and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok())
+        .and_then(|v| v["anomalies_found"].as_i64())
+        .unwrap_or(0)
+}
+
+/// Map a raw `status` string from the `triggers` stream onto a [`RunOutcome`].
+///
+/// Handles both vocabularies, so it works across the retention window in which
+/// pre- and post-cutover rows coexist. Returns `None` for values that belong to
+/// neither.
+///
+/// This is the read-side migration described in Part III of `alerts.md`. It is
+/// temporary: once legacy rows age out of the triggers stream's retention
+/// window, only the passthrough branch is reachable and the rest can be deleted.
+pub fn normalize_outcome(
+    raw: &str,
+    module: &TriggerDataType,
+    success_response: Option<&str>,
+) -> Option<RunOutcome> {
+    match raw.to_lowercase().as_str() {
+        // ── current vocabulary ──
+        "firing" => Some(RunOutcome::Firing),
+        "normal" => Some(RunOutcome::Normal),
+        "succeeded" => Some(RunOutcome::Succeeded),
+        "error" => Some(RunOutcome::Error),
+        "skipped" => Some(RunOutcome::Skipped),
+        "notify_failed" => Some(RunOutcome::NotifyFailed),
+
+        // ── legacy vocabulary ──
+        "condition_not_satisfied" => Some(RunOutcome::Normal),
+        "failed" => Some(RunOutcome::Error),
+        "completed" => Some(match module {
+            // Anomaly rows stored `completed` whenever detection RAN, even with
+            // zero anomalies — the count lives in `success_response`.
+            TriggerDataType::AnomalyDetection => {
+                if anomalies_found(success_response) > 0 {
+                    RunOutcome::Firing
+                } else {
+                    RunOutcome::Normal
+                }
+            }
+            m if m.is_condition_bearing() => RunOutcome::Firing,
+            _ => RunOutcome::Succeeded,
+        }),
+
+        _ => None,
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -83,6 +214,17 @@ pub enum TriggerDataType {
     Synthetics,
 }
 
+impl TriggerDataType {
+    /// Whether this module evaluates a condition, and so can meaningfully be
+    /// "firing". Modules without one report [`RunOutcome::Succeeded`] instead.
+    pub fn is_condition_bearing(&self) -> bool {
+        matches!(
+            self,
+            Self::Alert | Self::DerivedStream | Self::AnomalyDetection
+        )
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct TriggerData {
@@ -93,7 +235,7 @@ pub struct TriggerData {
     pub next_run_at: i64,
     pub is_realtime: bool,
     pub is_silenced: bool,
-    pub status: TriggerDataStatus,
+    pub status: RunOutcome,
     pub start_time: i64,
     pub end_time: i64,
     pub retries: i32,
@@ -131,7 +273,7 @@ impl Default for TriggerData {
             next_run_at: 0,
             is_realtime: false,
             is_silenced: false,
-            status: TriggerDataStatus::Completed,
+            status: RunOutcome::Succeeded,
             start_time: 0,
             end_time: 0,
             retries: 0,
@@ -172,7 +314,7 @@ impl TriggerData {
             next_run_at: 0,
             is_realtime: false,
             is_silenced: false,
-            status: TriggerDataStatus::Completed,
+            status: RunOutcome::Succeeded,
             start_time: 0,
             end_time: 0,
             retries: 0,
@@ -193,6 +335,29 @@ impl TriggerData {
             grouped: Some(false),
             group_size: Some(0),
         }
+    }
+
+    /// Correct a legacy `completed` outcome that was read in through the
+    /// [`RunOutcome::Succeeded`] serde alias.
+    ///
+    /// Call this after deserializing a `TriggerData` that may have been written
+    /// by an older build (see `self_reporting::persistence`). Safe and
+    /// idempotent: current code never writes `Succeeded` for a condition-bearing
+    /// module, so a `Succeeded` on one of those can only be a legacy record.
+    pub fn normalize_legacy_outcome(&mut self) {
+        if self.status != RunOutcome::Succeeded || !self.module.is_condition_bearing() {
+            return;
+        }
+        self.status = match self.module {
+            TriggerDataType::AnomalyDetection => {
+                if anomalies_found(self.success_response.as_deref()) > 0 {
+                    RunOutcome::Firing
+                } else {
+                    RunOutcome::Normal
+                }
+            }
+            _ => RunOutcome::Firing,
+        };
     }
 
     /// Returns all field names for TriggerData struct by introspecting a sample instance.
@@ -653,6 +818,397 @@ impl From<FileMeta> for RequestStats {
 }
 
 #[cfg(test)]
+mod run_outcome_tests {
+    use super::*;
+
+    // ── Serialization: the wire vocabulary ──────────────────────────────────
+
+    #[test]
+    fn test_run_outcome_serialization() {
+        assert_eq!(
+            serde_json::to_string(&RunOutcome::Firing).unwrap(),
+            "\"firing\""
+        );
+        assert_eq!(
+            serde_json::to_string(&RunOutcome::Normal).unwrap(),
+            "\"normal\""
+        );
+        assert_eq!(
+            serde_json::to_string(&RunOutcome::Succeeded).unwrap(),
+            "\"succeeded\""
+        );
+        assert_eq!(
+            serde_json::to_string(&RunOutcome::Error).unwrap(),
+            "\"error\""
+        );
+        assert_eq!(
+            serde_json::to_string(&RunOutcome::Skipped).unwrap(),
+            "\"skipped\""
+        );
+        assert_eq!(
+            serde_json::to_string(&RunOutcome::NotifyFailed).unwrap(),
+            "\"notify_failed\""
+        );
+    }
+
+    #[test]
+    fn test_run_outcome_deserialization_roundtrip() {
+        for outcome in [
+            RunOutcome::Firing,
+            RunOutcome::Normal,
+            RunOutcome::Succeeded,
+            RunOutcome::Error,
+            RunOutcome::Skipped,
+            RunOutcome::NotifyFailed,
+        ] {
+            let s = serde_json::to_string(&outcome).unwrap();
+            let back: RunOutcome = serde_json::from_str(&s).unwrap();
+            assert_eq!(outcome, back, "roundtrip failed for {outcome:?}");
+        }
+    }
+
+    /// The old vocabulary MUST still deserialize. `TriggerData` is read back as a
+    /// typed struct from the on-disk self-reporting queue
+    /// (`persistence.rs:121`, an `.unwrap()`), so records written by a previous
+    /// build must not panic the ingest task after an upgrade.
+    #[test]
+    fn test_run_outcome_accepts_legacy_values_leniently() {
+        assert_eq!(
+            serde_json::from_str::<RunOutcome>("\"condition_not_satisfied\"").unwrap(),
+            RunOutcome::Normal
+        );
+        assert_eq!(
+            serde_json::from_str::<RunOutcome>("\"failed\"").unwrap(),
+            RunOutcome::Error
+        );
+        // `completed` is module-dependent, so it lands on the neutral variant and
+        // is corrected by `TriggerData::normalize_legacy_outcome`.
+        assert_eq!(
+            serde_json::from_str::<RunOutcome>("\"completed\"").unwrap(),
+            RunOutcome::Succeeded
+        );
+    }
+
+    /// Legacy values must never be *written* — aliases are read-only.
+    #[test]
+    fn test_run_outcome_never_serializes_legacy_values() {
+        for outcome in [RunOutcome::Normal, RunOutcome::Error, RunOutcome::Succeeded] {
+            let s = serde_json::to_string(&outcome).unwrap();
+            assert!(
+                !["\"completed\"", "\"failed\"", "\"condition_not_satisfied\""].contains(&s.as_str()),
+                "{outcome:?} must not serialize to a legacy value, got {s}"
+            );
+        }
+    }
+
+    /// A full legacy `TriggerData` payload must survive the round trip that
+    /// `persistence.rs` performs, and land on the right outcome per module.
+    #[test]
+    fn test_trigger_data_normalize_legacy_outcome() {
+        // Condition-bearing module: legacy `completed` really meant "fired".
+        let mut td = TriggerData {
+            module: TriggerDataType::Alert,
+            status: serde_json::from_str("\"completed\"").unwrap(),
+            ..Default::default()
+        };
+        td.normalize_legacy_outcome();
+        assert_eq!(td.status, RunOutcome::Firing);
+
+        // Anomaly with no anomalies found is NOT firing.
+        let mut td = TriggerData {
+            module: TriggerDataType::AnomalyDetection,
+            status: serde_json::from_str("\"completed\"").unwrap(),
+            success_response: Some(r#"{"anomalies_found":0}"#.to_string()),
+            ..Default::default()
+        };
+        td.normalize_legacy_outcome();
+        assert_eq!(td.status, RunOutcome::Normal);
+
+        let mut td = TriggerData {
+            module: TriggerDataType::AnomalyDetection,
+            status: serde_json::from_str("\"completed\"").unwrap(),
+            success_response: Some(r#"{"anomalies_found":7}"#.to_string()),
+            ..Default::default()
+        };
+        td.normalize_legacy_outcome();
+        assert_eq!(td.status, RunOutcome::Firing);
+
+        // Non-condition module: `succeeded` is correct and must be left alone.
+        let mut td = TriggerData {
+            module: TriggerDataType::Report,
+            status: serde_json::from_str("\"completed\"").unwrap(),
+            ..Default::default()
+        };
+        td.normalize_legacy_outcome();
+        assert_eq!(td.status, RunOutcome::Succeeded);
+    }
+
+    /// The fixup must be idempotent and must not corrupt new-vocabulary records.
+    #[test]
+    fn test_normalize_legacy_outcome_is_idempotent_and_safe() {
+        for outcome in [
+            RunOutcome::Firing,
+            RunOutcome::Normal,
+            RunOutcome::Error,
+            RunOutcome::Skipped,
+            RunOutcome::NotifyFailed,
+        ] {
+            let mut td = TriggerData {
+                module: TriggerDataType::Alert,
+                status: outcome.clone(),
+                ..Default::default()
+            };
+            td.normalize_legacy_outcome();
+            assert_eq!(td.status, outcome, "fixup must not alter {outcome:?}");
+            td.normalize_legacy_outcome();
+            assert_eq!(td.status, outcome, "fixup must be idempotent");
+        }
+    }
+
+    // ── is_firing: the defect fix from Part III ─────────────────────────────
+
+    #[test]
+    fn test_is_firing() {
+        assert!(RunOutcome::Firing.is_firing());
+        // The whole point of `notify_failed`: the alert DID fire, delivery did
+        // not. It must still count toward firing totals.
+        assert!(RunOutcome::NotifyFailed.is_firing());
+
+        assert!(!RunOutcome::Normal.is_firing());
+        assert!(!RunOutcome::Succeeded.is_firing());
+        assert!(!RunOutcome::Error.is_firing());
+        assert!(!RunOutcome::Skipped.is_firing());
+    }
+
+    // ── Integer mapping: needed for the Part IV `last_outcome INT` column ────
+
+    /// These integers are DURABLE — they are what lands in the Part IV
+    /// `last_outcome INT` column. Pin the literal values: a roundtrip-only test
+    /// still passes if the variants are reordered, at which point every stored
+    /// row silently changes meaning.
+    #[test]
+    fn test_run_outcome_i32_values_are_pinned() {
+        assert_eq!(RunOutcome::Firing.to_i32(), 0);
+        assert_eq!(RunOutcome::Normal.to_i32(), 1);
+        assert_eq!(RunOutcome::Succeeded.to_i32(), 2);
+        assert_eq!(RunOutcome::Error.to_i32(), 3);
+        assert_eq!(RunOutcome::Skipped.to_i32(), 4);
+        assert_eq!(RunOutcome::NotifyFailed.to_i32(), 5);
+
+        assert_eq!(RunOutcome::from_i32(0), Some(RunOutcome::Firing));
+        assert_eq!(RunOutcome::from_i32(1), Some(RunOutcome::Normal));
+        assert_eq!(RunOutcome::from_i32(2), Some(RunOutcome::Succeeded));
+        assert_eq!(RunOutcome::from_i32(3), Some(RunOutcome::Error));
+        assert_eq!(RunOutcome::from_i32(4), Some(RunOutcome::Skipped));
+        assert_eq!(RunOutcome::from_i32(5), Some(RunOutcome::NotifyFailed));
+    }
+
+    #[test]
+    fn test_run_outcome_i32_roundtrip() {
+        for outcome in [
+            RunOutcome::Firing,
+            RunOutcome::Normal,
+            RunOutcome::Succeeded,
+            RunOutcome::Error,
+            RunOutcome::Skipped,
+            RunOutcome::NotifyFailed,
+        ] {
+            let n = outcome.to_i32();
+            assert_eq!(
+                RunOutcome::from_i32(n),
+                Some(outcome.clone()),
+                "i32 roundtrip failed for {outcome:?} (got {n})"
+            );
+        }
+    }
+
+    #[test]
+    fn test_run_outcome_from_i32_rejects_unknown() {
+        assert_eq!(RunOutcome::from_i32(-1), None);
+        assert_eq!(RunOutcome::from_i32(99), None);
+    }
+
+    // ── Condition-bearing modules ───────────────────────────────────────────
+
+    #[test]
+    fn test_is_condition_bearing() {
+        assert!(TriggerDataType::Alert.is_condition_bearing());
+        assert!(TriggerDataType::DerivedStream.is_condition_bearing());
+        assert!(TriggerDataType::AnomalyDetection.is_condition_bearing());
+
+        assert!(!TriggerDataType::Report.is_condition_bearing());
+        assert!(!TriggerDataType::CachedReport.is_condition_bearing());
+        assert!(!TriggerDataType::Workflow.is_condition_bearing());
+        assert!(!TriggerDataType::Synthetics.is_condition_bearing());
+        assert!(!TriggerDataType::Backfill.is_condition_bearing());
+        assert!(!TriggerDataType::AnomalyDetectionTraining.is_condition_bearing());
+    }
+
+    // ── normalize_outcome: the read-side migration (Part III) ───────────────
+
+    #[test]
+    fn test_normalize_legacy_completed_alert_is_firing() {
+        assert_eq!(
+            normalize_outcome("completed", &TriggerDataType::Alert, None),
+            Some(RunOutcome::Firing)
+        );
+    }
+
+    #[test]
+    fn test_normalize_legacy_completed_derived_stream_is_firing() {
+        assert_eq!(
+            normalize_outcome("completed", &TriggerDataType::DerivedStream, None),
+            Some(RunOutcome::Firing)
+        );
+    }
+
+    /// Anomaly rows store `completed` whenever detection RAN, even with zero
+    /// anomalies (`handlers.rs:198`). The count lives in `success_response`, so
+    /// the normalizer must parse it — mirroring `history.rs:362`.
+    #[test]
+    fn test_normalize_legacy_completed_anomaly_with_anomalies_is_firing() {
+        assert_eq!(
+            normalize_outcome(
+                "completed",
+                &TriggerDataType::AnomalyDetection,
+                Some(r#"{"anomalies_found":3}"#),
+            ),
+            Some(RunOutcome::Firing)
+        );
+    }
+
+    #[test]
+    fn test_normalize_legacy_completed_anomaly_without_anomalies_is_normal() {
+        assert_eq!(
+            normalize_outcome(
+                "completed",
+                &TriggerDataType::AnomalyDetection,
+                Some(r#"{"anomalies_found":0}"#),
+            ),
+            Some(RunOutcome::Normal)
+        );
+    }
+
+    /// A missing or unparseable `success_response` must not be read as firing.
+    #[test]
+    fn test_normalize_legacy_completed_anomaly_missing_response_is_normal() {
+        assert_eq!(
+            normalize_outcome("completed", &TriggerDataType::AnomalyDetection, None),
+            Some(RunOutcome::Normal)
+        );
+        assert_eq!(
+            normalize_outcome(
+                "completed",
+                &TriggerDataType::AnomalyDetection,
+                Some("not json"),
+            ),
+            Some(RunOutcome::Normal)
+        );
+    }
+
+    #[test]
+    fn test_normalize_legacy_completed_non_condition_module_is_succeeded() {
+        assert_eq!(
+            normalize_outcome("completed", &TriggerDataType::Report, None),
+            Some(RunOutcome::Succeeded)
+        );
+        assert_eq!(
+            normalize_outcome("completed", &TriggerDataType::Workflow, None),
+            Some(RunOutcome::Succeeded)
+        );
+    }
+
+    #[test]
+    fn test_normalize_legacy_condition_not_satisfied_is_normal() {
+        assert_eq!(
+            normalize_outcome("condition_not_satisfied", &TriggerDataType::Alert, None),
+            Some(RunOutcome::Normal)
+        );
+    }
+
+    #[test]
+    fn test_normalize_legacy_failed_is_error() {
+        assert_eq!(
+            normalize_outcome("failed", &TriggerDataType::Alert, None),
+            Some(RunOutcome::Error)
+        );
+    }
+
+    #[test]
+    fn test_normalize_legacy_skipped_unchanged() {
+        assert_eq!(
+            normalize_outcome("skipped", &TriggerDataType::Alert, None),
+            Some(RunOutcome::Skipped)
+        );
+    }
+
+    /// Post-cutover rows already carry the new vocabulary and must pass through.
+    #[test]
+    fn test_normalize_new_vocabulary_passthrough() {
+        for (raw, expected) in [
+            ("firing", RunOutcome::Firing),
+            ("normal", RunOutcome::Normal),
+            ("succeeded", RunOutcome::Succeeded),
+            ("error", RunOutcome::Error),
+            ("skipped", RunOutcome::Skipped),
+            ("notify_failed", RunOutcome::NotifyFailed),
+        ] {
+            assert_eq!(
+                normalize_outcome(raw, &TriggerDataType::Alert, None),
+                Some(expected),
+                "passthrough failed for {raw}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_normalize_is_case_insensitive() {
+        assert_eq!(
+            normalize_outcome("COMPLETED", &TriggerDataType::Alert, None),
+            Some(RunOutcome::Firing)
+        );
+        assert_eq!(
+            normalize_outcome("Firing", &TriggerDataType::Alert, None),
+            Some(RunOutcome::Firing)
+        );
+    }
+
+    #[test]
+    fn test_normalize_unknown_returns_none() {
+        assert_eq!(normalize_outcome("", &TriggerDataType::Alert, None), None);
+        assert_eq!(
+            normalize_outcome("banana", &TriggerDataType::Alert, None),
+            None
+        );
+    }
+
+    // ── TriggerData still serializes its outcome under `status` ─────────────
+
+    /// Part III deliberately keeps the stream FIELD name `status` and changes
+    /// only the values — no schema change. Guard that.
+    #[test]
+    fn test_trigger_data_field_is_still_named_status() {
+        let td = TriggerData {
+            status: RunOutcome::Firing,
+            ..Default::default()
+        };
+        let v = serde_json::to_value(&td).unwrap();
+        assert_eq!(v.get("status").and_then(|s| s.as_str()), Some("firing"));
+        assert!(
+            v.get("outcome").is_none(),
+            "must NOT introduce an `outcome` field on the triggers stream"
+        );
+    }
+
+    #[test]
+    fn test_reflection_sample_still_exposes_status_field() {
+        let names = TriggerData::get_field_names();
+        assert!(names.contains(&"status".to_string()));
+        assert!(!names.contains(&"outcome".to_string()));
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::meta::{
@@ -793,45 +1349,9 @@ mod tests {
         assert!(!UsageType::Retention.is_function());
     }
 
-    #[test]
-    fn test_trigger_data_status_serialization() {
-        assert_eq!(
-            serde_json::to_string(&TriggerDataStatus::Completed).unwrap(),
-            "\"completed\""
-        );
-        assert_eq!(
-            serde_json::to_string(&TriggerDataStatus::Failed).unwrap(),
-            "\"failed\""
-        );
-        assert_eq!(
-            serde_json::to_string(&TriggerDataStatus::ConditionNotSatisfied).unwrap(),
-            "\"condition_not_satisfied\""
-        );
-        assert_eq!(
-            serde_json::to_string(&TriggerDataStatus::Skipped).unwrap(),
-            "\"skipped\""
-        );
-    }
-
-    #[test]
-    fn test_trigger_data_status_deserialization() {
-        assert_eq!(
-            serde_json::from_str::<TriggerDataStatus>("\"completed\"").unwrap(),
-            TriggerDataStatus::Completed
-        );
-        assert_eq!(
-            serde_json::from_str::<TriggerDataStatus>("\"failed\"").unwrap(),
-            TriggerDataStatus::Failed
-        );
-        assert_eq!(
-            serde_json::from_str::<TriggerDataStatus>("\"condition_not_satisfied\"").unwrap(),
-            TriggerDataStatus::ConditionNotSatisfied
-        );
-        assert_eq!(
-            serde_json::from_str::<TriggerDataStatus>("\"skipped\"").unwrap(),
-            TriggerDataStatus::Skipped
-        );
-    }
+    // NOTE: `TriggerDataStatus` serialization/deserialization tests were replaced
+    // by the `run_outcome_tests` module above when the enum became `RunOutcome`
+    // (Part III of alerts.md).
 
     #[test]
     fn test_trigger_data_type_serialization() {
@@ -883,7 +1403,7 @@ mod tests {
             next_run_at: 1234567890,
             is_realtime: true,
             is_silenced: false,
-            status: TriggerDataStatus::Completed,
+            status: RunOutcome::Succeeded,
             start_time: 1234567890,
             end_time: 1234567890,
             retries: 0,
