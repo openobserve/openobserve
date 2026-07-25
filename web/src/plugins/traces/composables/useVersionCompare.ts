@@ -29,6 +29,7 @@ import {
   compareAgentVersions,
   type GenAiAgentListItem,
   type CompareAgentVersionsResponse,
+  type ErrorDiff,
 } from "@/services/gen-ai-agent-mapping.service";
 import { useLLMInsights } from "./useLLMInsights";
 import { resolveCompareWindows, type AlignMode, type CompareWindows } from "../versionCompare/windows";
@@ -79,6 +80,11 @@ export function useVersionCompare() {
   const windows = ref<CompareWindows | null>(null);
   const result = ref<CompareResult | null>(null);
   const sampledNote = ref<string | null>(null);
+  // Tri-state error diff (introduced/fixed/shared failure classes) — only
+  // present on the sketch-merge endpoint path. Null on the raw-sample
+  // fallback path (no error diff computed from raw traces) and reset on
+  // every setPair() so a stale diff never survives a version swap.
+  const errorDiff = ref<ErrorDiff | null>(null);
 
   const sameVariant = computed(() => isSameVariant(a.value, b.value));
 
@@ -87,6 +93,7 @@ export function useVersionCompare() {
     b.value = variantB;
     windows.value = null;
     result.value = null;
+    errorDiff.value = null;
     armA.error.value = null;
     armB.error.value = null;
   }
@@ -261,6 +268,7 @@ export function useVersionCompare() {
       );
       // No raw scan on this path — nothing to disclose as sample-capped.
       sampledNote.value = null;
+      errorDiff.value = endpointResponse.error_diff ?? null;
       return;
     }
 
@@ -292,6 +300,10 @@ export function useVersionCompare() {
     });
 
     const [samplesA, samplesB] = await Promise.all([sampleAPromise, sampleBPromise]);
+
+    // Raw-sample fallback path has no error diff (only the sketch-merge
+    // endpoint computes it).
+    errorDiff.value = null;
 
     result.value = buildCompareResult(
       armA.kpi.value,
@@ -327,6 +339,7 @@ export function useVersionCompare() {
     windows,
     result,
     sampledNote,
+    errorDiff,
     sameVariant,
   };
 }

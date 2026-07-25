@@ -32,11 +32,40 @@ export interface MetricDelta {
   insufficient: boolean;
 }
 
+/** One failure class that appears in only one arm (introduced/fixed). Mirrors
+ * the backend `SoleError` struct — field names are NOT camelCased on the
+ * wire. */
+export interface SoleError {
+  fail_class: string;
+  count: number;
+}
+
+/** A failure class present in both arms, with per-arm counts + the delta
+ * (count_a - count_b... mirrors backend `SharedError` struct exactly). */
+export interface SharedError {
+  fail_class: string;
+  count_a: number;
+  count_b: number;
+  delta: number;
+}
+
+/** Tri-state error diff between arm A and arm B. Mirrors the backend
+ * `ErrorDiff` struct (`o2_enterprise/.../agent_signals/compare.rs`) exactly —
+ * field names are NOT camelCased on the wire. `insufficient` is true when
+ * neither arm had failure data to compare. */
+export interface ErrorDiff {
+  introduced: SoleError[];
+  fixed: SoleError[];
+  shared: SharedError[];
+  insufficient: boolean;
+}
+
 export interface CompareAgentVersionsResponse {
   p50: MetricDelta;
   p95: MetricDelta;
   p99: MetricDelta;
   cost: MetricDelta;
+  error_diff: ErrorDiff;
 }
 
 /**

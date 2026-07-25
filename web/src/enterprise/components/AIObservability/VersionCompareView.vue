@@ -121,6 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <VersionDeltaStrip v-else-if="result" :result="result" />
+      <VersionErrorDiff v-if="result" :error-diff="props.errorDiff ?? null" />
       <span
         v-if="sampledNote"
         class="text-xs text-text-muted"
@@ -159,12 +160,14 @@ import VersionCompareBar from "./VersionCompareBar.vue";
 import VersionCompareBanner from "./VersionCompareBanner.vue";
 import VersionWindowCard from "./VersionWindowCard.vue";
 import VersionDeltaStrip from "./VersionDeltaStrip.vue";
+import VersionErrorDiff from "./VersionErrorDiff.vue";
 import VersionOverlayChart, { type OverlayPoint, type OverlayMode } from "./VersionOverlayChart.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 import type { AlignMode, CompareWindows } from "@/plugins/traces/versionCompare/windows";
 import type { CompareResult } from "@/plugins/traces/versionCompare/compareResult";
 import type { LLMSparklineSeries } from "@/plugins/traces/composables/useLLMInsights";
+import type { ErrorDiff } from "@/services/gen-ai-agent-mapping.service";
 
 defineOptions({ name: "VersionCompareView" });
 
@@ -174,6 +177,7 @@ const props = defineProps<{
   stream: string;
   windows: CompareWindows | null;
   result: CompareResult | null;
+  errorDiff?: ErrorDiff | null;
   sparklinesA: LLMSparklineSeries | null;
   sparklinesB: LLMSparklineSeries | null;
   sampledNote?: string | null;

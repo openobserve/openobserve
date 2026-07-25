@@ -314,6 +314,61 @@ describe("useVersionCompare — sketch endpoint (Task 7)", () => {
     expect(errorRate.verdict).not.toBe("insufficient");
   });
 
+  it("exposes error_diff from the endpoint response on the errorDiff ref", async () => {
+    const errorDiff = {
+      introduced: [{ fail_class: "timeout", count: 3 }],
+      fixed: [{ fail_class: "rate_limit", count: 1 }],
+      shared: [{ fail_class: "auth_error", count_a: 5, count_b: 2, delta: 3 }],
+      insufficient: false,
+    };
+    mockCompareAgentVersions.mockResolvedValue({
+      data: {
+        p50: sufficientDelta(100, 90, 10, 2, 18),
+        p95: sufficientDelta(300, 250, 50, 10, 90),
+        p99: sufficientDelta(500, 400, 100, 20, 180),
+        cost: sufficientDelta(0.01, 0.008, 0.002, 0.0005, 0.0035),
+        error_diff: errorDiff,
+      },
+    });
+
+    const vc = useVersionCompare();
+    const a = makeAgent({ version: "1.5.0" });
+    const b = makeAgent({
+      version: "1.4.0",
+      first_seen: 1000 * H - 200 * H,
+      last_seen: 1000 * H - 100 * H,
+    });
+    vc.setPair(a, b);
+
+    await vc.run("traces_stream");
+
+    expect(vc.errorDiff.value).toEqual(errorDiff);
+  });
+
+  it("leaves errorDiff null when the endpoint falls back to the raw-sample path", async () => {
+    mockCompareAgentVersions.mockResolvedValue({
+      data: {
+        p50: insufficientDelta(),
+        p95: insufficientDelta(),
+        p99: insufficientDelta(),
+        cost: insufficientDelta(),
+      },
+    });
+
+    const vc = useVersionCompare();
+    const a = makeAgent({ version: "1.5.0" });
+    const b = makeAgent({
+      version: "1.4.0",
+      first_seen: 1000 * H - 200 * H,
+      last_seen: 1000 * H - 100 * H,
+    });
+    vc.setPair(a, b);
+
+    await vc.run("traces_stream");
+
+    expect(vc.errorDiff.value).toBeNull();
+  });
+
   it("does NOT call fetchRawSample by default when the endpoint returns sufficient CIs", async () => {
     mockCompareAgentVersions.mockResolvedValue({
       data: {

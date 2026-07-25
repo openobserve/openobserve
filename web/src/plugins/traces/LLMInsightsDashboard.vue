@@ -86,6 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :stream="effectiveStream"
       :windows="versionCompare.windows.value"
       :result="versionCompare.result.value"
+      :error-diff="versionCompare.errorDiff.value"
       :sparklines-a="versionCompare.sparklinesA.value"
       :sparklines-b="versionCompare.sparklinesB.value"
       :sampled-note="versionCompare.sampledNote.value"
