@@ -66,6 +66,8 @@ pub struct GenAiAgentListItem {
     pub source_stream_type: String,
     pub env: Option<String>,
     pub version: Option<String>,
+    pub first_seen: Option<i64>,
+    pub last_seen: Option<i64>,
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -427,5 +429,7 @@ fn agent_item_from_registry_row(
         source_stream_type: row.stream_type,
         env: row.env,
         version: row.agent_version,
+        first_seen: Some(row.first_seen),
+        last_seen: Some(row.last_seen),
     })
 }
