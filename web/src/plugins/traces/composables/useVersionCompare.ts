@@ -25,10 +25,19 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
-import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
+import {
+  compareAgentVersions,
+  type GenAiAgentListItem,
+  type CompareAgentVersionsResponse,
+} from "@/services/gen-ai-agent-mapping.service";
 import { useLLMInsights } from "./useLLMInsights";
 import { resolveCompareWindows, type AlignMode, type CompareWindows } from "../versionCompare/windows";
-import { buildCompareResult, type CompareResult } from "../versionCompare/compareResult";
+import {
+  buildCompareResult,
+  buildCompareResultFromEndpoint,
+  endpointHasSufficientLatencyAndCost,
+  type CompareResult,
+} from "../versionCompare/compareResult";
 import { fetchRawSample, type RawSampleQueryRunner } from "../versionCompare/rawSample";
 import { buildAgentTraceFilter } from "../llmAgentFilter";
 import { SAMPLE_CAP } from "../versionCompare/constants";
@@ -209,6 +218,55 @@ export function useVersionCompare() {
         armB.error.value = e?.message || "Failed to fetch version B";
       });
 
+    // Default path: the sketch-merge compare endpoint for latency (p50/p95/
+    // p99) + cost. Error-rate + volume are NOT in the endpoint response (C2
+    // — no valid trace denominator in the rollup) and stay computed from the
+    // KPI fetches above, unchanged.
+    const orgId = store.state.selectedOrganization.identifier;
+    const endpointPromise: Promise<CompareAgentVersionsResponse | null> = compareAgentVersions(
+      orgId,
+      {
+        agent_name: va.name,
+        env: va.env ?? null,
+        version: va.version ?? null,
+        start_time: queryA.start,
+        end_time: queryA.end,
+      },
+      {
+        agent_name: vb.name,
+        env: vb.env ?? null,
+        version: vb.version ?? null,
+        start_time: queryB.start,
+        end_time: queryB.end,
+      },
+    )
+      .then((res: any) => res.data as CompareAgentVersionsResponse)
+      .catch(() => null);
+
+    const [, , endpointResponse] = await Promise.all([
+      fetchAPromise,
+      fetchBPromise,
+      endpointPromise,
+    ]);
+
+    const useEndpoint =
+      !!endpointResponse && endpointHasSufficientLatencyAndCost(endpointResponse);
+
+    if (useEndpoint && endpointResponse) {
+      result.value = buildCompareResultFromEndpoint(
+        armA.kpi.value,
+        armB.kpi.value,
+        endpointResponse,
+        resolved,
+      );
+      // No raw scan on this path — nothing to disclose as sample-capped.
+      sampledNote.value = null;
+      return;
+    }
+
+    // Fallback: the endpoint reported `insufficient` (or errored/threw) for
+    // latency/cost — fall back to the raw-sample bootstrap path so nothing
+    // regresses on sketch-absent windows.
     const filterA = buildAgentTraceFilter(va, stream);
     const filterB = buildAgentTraceFilter(vb, stream);
 
@@ -233,12 +291,7 @@ export function useVersionCompare() {
       return { durations: [], costs: [] };
     });
 
-    const [, , samplesA, samplesB] = await Promise.all([
-      fetchAPromise,
-      fetchBPromise,
-      sampleAPromise,
-      sampleBPromise,
-    ]);
+    const [samplesA, samplesB] = await Promise.all([sampleAPromise, sampleBPromise]);
 
     result.value = buildCompareResult(
       armA.kpi.value,

@@ -8,6 +8,54 @@
 import http from "./http";
 import { RETENTION_MS } from "@/plugins/traces/versionCompare/constants";
 
+/** One arm (A or B) of a version-compare request — mirrors the backend
+ * `CompareArm` struct (`src/core/src/traces/agent_signals/api.rs`). Times are
+ * epoch microseconds. */
+export interface CompareArmRequest {
+  agent_name: string;
+  env?: string | null;
+  version?: string | null;
+  start_time: number;
+  end_time: number;
+}
+
+/** Mirrors the backend `MetricDelta` struct
+ * (`o2_enterprise/.../agent_signals/compare.rs`) exactly — field names are
+ * NOT camelCased on the wire. */
+export interface MetricDelta {
+  a: number;
+  b: number;
+  delta: number;
+  lo: number;
+  hi: number;
+  straddles_zero: boolean;
+  insufficient: boolean;
+}
+
+export interface CompareAgentVersionsResponse {
+  p50: MetricDelta;
+  p95: MetricDelta;
+  p99: MetricDelta;
+  cost: MetricDelta;
+}
+
+/**
+ * POST /api/{org}/traces/agent_signals/compare — sketch-merge version
+ * comparison. Returns pre-aggregated latency (p50/p95/p99) + cost deltas
+ * with CIs; does NOT return error-rate (that stays on the KPI path — see
+ * `useVersionCompare.run`).
+ */
+export const compareAgentVersions = (
+  org_identifier: string,
+  a: CompareArmRequest,
+  b: CompareArmRequest,
+) => {
+  return http().post<CompareAgentVersionsResponse>(
+    `/api/${org_identifier}/traces/agent_signals/compare`,
+    { a, b },
+  );
+};
+
 export const GEN_AI_AGENT_MAPPING_DEFAULTS_URL =
   "https://raw.githubusercontent.com/openobserve/sdr_patterns/main/gen_ai_agent_mappings.json";
 

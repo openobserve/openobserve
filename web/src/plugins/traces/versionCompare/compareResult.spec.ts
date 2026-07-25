@@ -1,6 +1,7 @@
 // compareResult.spec.ts
 import { describe, it, expect } from "vitest";
-import { buildCompareResult } from "./compareResult";
+import { buildCompareResult, buildCompareResultFromEndpoint, endpointHasSufficientLatencyAndCost } from "./compareResult";
+import type { MetricDelta } from "@/services/gen-ai-agent-mapping.service";
 
 const kpi = (traceCount: number, errorCount: number, totalCost: number) => ({
   requestCount: traceCount, traceCount, errorCount, totalTokens: traceCount * 100, totalCost, p95DurationMicros: 0,
@@ -42,5 +43,103 @@ describe("buildCompareResult", () => {
     const errRate = r.metrics.find(m => m.key === "errorRate")!;
     expect(errRate.verdict).not.toBe("insufficient");
     expect(errRate.ci).not.toBeNull();
+  });
+});
+
+function md(overrides: Partial<MetricDelta> = {}): MetricDelta {
+  return { a: 100, b: 90, delta: 10, lo: 2, hi: 18, straddles_zero: false, insufficient: false, ...overrides };
+}
+
+describe("buildCompareResultFromEndpoint", () => {
+  it("maps p50/p95/p99/cost a/b/delta/CI from the endpoint MetricDelta shape", () => {
+    const endpoint = {
+      p50: md({ a: 100, b: 90, delta: 10, lo: 2, hi: 18 }),
+      p95: md({ a: 300, b: 250, delta: 50, lo: 10, hi: 90 }),
+      p99: md({ a: 500, b: 400, delta: 100, lo: 20, hi: 180 }),
+      cost: md({ a: 0.01, b: 0.008, delta: 0.002, lo: 0.0005, hi: 0.0035 }),
+    };
+    const r = buildCompareResultFromEndpoint(
+      kpi(500, 50, 5), kpi(500, 10, 4), endpoint, disjointWin,
+    );
+    const p50 = r.metrics.find(m => m.key === "p50")!;
+    expect(p50.a).toBe(100);
+    expect(p50.b).toBe(90);
+    expect(p50.ci).toEqual({ delta: 10, lower: 2, upper: 18, straddlesZero: false });
+
+    const p99 = r.metrics.find(m => m.key === "p99")!;
+    expect(p99.a).toBe(500);
+    expect(p99.b).toBe(400);
+    // p99 stays display-only — no CI/verdict even though the endpoint has a/b/delta.
+    expect(p99.ci).toBeNull();
+    expect(p99.flagged).toBe(false);
+  });
+
+  it("error-rate + volume are computed from KPI, NOT the endpoint (endpoint has no error-rate field)", () => {
+    const endpoint = {
+      p50: md(), p95: md(), p99: md(), cost: md(),
+    };
+    const r = buildCompareResultFromEndpoint(
+      kpi(500, 100, 5), kpi(500, 20, 4), endpoint, disjointWin,
+    );
+    const errRate = r.metrics.find(m => m.key === "errorRate")!;
+    expect(errRate.a).toBeCloseTo(0.2); // 100/500
+    expect(errRate.b).toBeCloseTo(0.04); // 20/500
+  });
+
+  it("straddles_zero:true MetricDelta -> verdict nochange", () => {
+    const endpoint = {
+      p50: md({ straddles_zero: true, lo: -5, hi: 5, delta: 0 }),
+      p95: md(), p99: md(), cost: md(),
+    };
+    const r = buildCompareResultFromEndpoint(
+      kpi(500, 10, 5), kpi(500, 10, 5), endpoint, disjointWin,
+    );
+    expect(r.metrics.find(m => m.key === "p50")!.verdict).toBe("nochange");
+  });
+
+  it("straddles_zero:false with delta>0 on p95 (up-worse) -> verdict higher", () => {
+    const endpoint = {
+      p50: md(),
+      p95: md({ straddles_zero: false, delta: 50, lo: 10, hi: 90 }),
+      p99: md(), cost: md(),
+    };
+    const r = buildCompareResultFromEndpoint(
+      kpi(500, 10, 5), kpi(500, 10, 5), endpoint, disjointWin,
+    );
+    expect(r.metrics.find(m => m.key === "p95")!.verdict).toBe("higher");
+  });
+
+  it("insufficient:true on a metric yields verdict insufficient and null ci for that metric only", () => {
+    const endpoint = {
+      p50: md({ insufficient: true }),
+      p95: md(), p99: md(), cost: md(),
+    };
+    const r = buildCompareResultFromEndpoint(
+      kpi(500, 10, 5), kpi(500, 10, 5), endpoint, disjointWin,
+    );
+    const p50 = r.metrics.find(m => m.key === "p50")!;
+    expect(p50.verdict).toBe("insufficient");
+    expect(p50.ci).toBeNull();
+    const p95 = r.metrics.find(m => m.key === "p95")!;
+    expect(p95.verdict).not.toBe("insufficient");
+  });
+});
+
+describe("endpointHasSufficientLatencyAndCost", () => {
+  it("true when p50/p95/cost are all sufficient (p99 ignored)", () => {
+    expect(endpointHasSufficientLatencyAndCost({
+      p50: md(), p95: md(), cost: md(),
+    })).toBe(true);
+  });
+  it("false when any of p50/p95/cost is insufficient", () => {
+    expect(endpointHasSufficientLatencyAndCost({
+      p50: md({ insufficient: true }), p95: md(), cost: md(),
+    })).toBe(false);
+    expect(endpointHasSufficientLatencyAndCost({
+      p50: md(), p95: md({ insufficient: true }), cost: md(),
+    })).toBe(false);
+    expect(endpointHasSufficientLatencyAndCost({
+      p50: md(), p95: md(), cost: md({ insufficient: true }),
+    })).toBe(false);
   });
 });

@@ -45,6 +45,26 @@ vi.mock("../versionCompare/rawSample", () => ({
   fetchRawSample: (...args: any[]) => mockFetchRawSample(...args),
 }));
 
+function insufficientDelta() {
+  return { a: 0, b: 0, delta: 0, lo: 0, hi: 0, straddles_zero: true, insufficient: true };
+}
+
+// Default: the sketch endpoint reports `insufficient` for every metric so
+// existing tests (written against the raw-sample fallback path) keep passing
+// without modification. Tests that want the sketch (default) path override
+// this mock's resolved value per-test.
+const mockCompareAgentVersions = vi.fn(async () => ({
+  data: {
+    p50: insufficientDelta(),
+    p95: insufficientDelta(),
+    p99: insufficientDelta(),
+    cost: insufficientDelta(),
+  },
+}));
+vi.mock("@/services/gen-ai-agent-mapping.service", () => ({
+  compareAgentVersions: (...args: any[]) => mockCompareAgentVersions(...args),
+}));
+
 vi.mock("vuex", () => ({
   useStore: vi.fn(() => ({
     state: {
@@ -94,6 +114,15 @@ beforeEach(() => {
   mockInstances.length = 0;
   mockFetchRawSample.mockClear();
   mockFetchRawSample.mockResolvedValue({ durations: [], costs: [] });
+  mockCompareAgentVersions.mockClear();
+  mockCompareAgentVersions.mockResolvedValue({
+    data: {
+      p50: insufficientDelta(),
+      p95: insufficientDelta(),
+      p99: insufficientDelta(),
+      cost: insufficientDelta(),
+    },
+  });
 });
 
 describe("useVersionCompare — setup", () => {
@@ -236,6 +265,143 @@ describe("useVersionCompare — run", () => {
 
     expect(vc.sampledNote.value).toBeTruthy();
     expect(typeof vc.sampledNote.value).toBe("string");
+  });
+});
+
+describe("useVersionCompare — sketch endpoint (Task 7)", () => {
+  function sufficientDelta(a: number, b: number, delta: number, lo: number, hi: number) {
+    return { a, b, delta, lo, hi, straddles_zero: lo <= 0 && hi >= 0, insufficient: false };
+  }
+
+  it("calls the compare endpoint and maps p50/p95/p99/cost into the result; error-rate still comes from KPI, not the endpoint", async () => {
+    mockCompareAgentVersions.mockResolvedValue({
+      data: {
+        p50: sufficientDelta(100, 90, 10, 2, 18),
+        p95: sufficientDelta(300, 250, 50, 10, 90),
+        p99: sufficientDelta(500, 400, 100, 20, 180),
+        cost: sufficientDelta(0.01, 0.008, 0.002, 0.0005, 0.0035),
+      },
+    });
+
+    const vc = useVersionCompare();
+    const a = makeAgent({ version: "1.5.0" });
+    const b = makeAgent({
+      version: "1.4.0",
+      first_seen: 1000 * H - 200 * H,
+      last_seen: 1000 * H - 100 * H,
+    });
+    vc.setPair(a, b);
+
+    const [armA, armB] = mockInstances;
+    armA.kpi.value = { ...armA.kpi.value, traceCount: 500, errorCount: 50 };
+    armB.kpi.value = { ...armB.kpi.value, traceCount: 500, errorCount: 10 };
+
+    await vc.run("traces_stream");
+
+    expect(mockCompareAgentVersions).toHaveBeenCalledTimes(1);
+    // Endpoint drives latency/cost.
+    const p50 = vc.result.value!.metrics.find((m) => m.key === "p50")!;
+    expect(p50.a).toBe(100);
+    expect(p50.b).toBe(90);
+    expect(p50.ci?.delta).toBe(10);
+    const cost = vc.result.value!.metrics.find((m) => m.key === "cost")!;
+    expect(cost.ci?.delta).toBeCloseTo(0.002);
+    // Error-rate comes from the KPI mock, NOT the endpoint (endpoint has no
+    // error-rate field at all).
+    const errorRate = vc.result.value!.metrics.find((m) => m.key === "errorRate")!;
+    expect(errorRate.a).toBeCloseTo(0.1); // 50/500
+    expect(errorRate.b).toBeCloseTo(0.02); // 10/500
+    expect(errorRate.verdict).not.toBe("insufficient");
+  });
+
+  it("does NOT call fetchRawSample by default when the endpoint returns sufficient CIs", async () => {
+    mockCompareAgentVersions.mockResolvedValue({
+      data: {
+        p50: sufficientDelta(100, 90, 10, 2, 18),
+        p95: sufficientDelta(300, 250, 50, 10, 90),
+        p99: sufficientDelta(500, 400, 100, 20, 180),
+        cost: sufficientDelta(0.01, 0.008, 0.002, 0.0005, 0.0035),
+      },
+    });
+
+    const vc = useVersionCompare();
+    const a = makeAgent({ version: "1.5.0" });
+    const b = makeAgent({
+      version: "1.4.0",
+      first_seen: 1000 * H - 200 * H,
+      last_seen: 1000 * H - 100 * H,
+    });
+    vc.setPair(a, b);
+
+    await vc.run("traces_stream");
+
+    expect(mockFetchRawSample).not.toHaveBeenCalled();
+  });
+
+  it("falls back to fetchRawSample when the endpoint reports insufficient for latency", async () => {
+    // Default beforeEach mock already returns all-insufficient.
+    const vc = useVersionCompare();
+    const a = makeAgent({ version: "1.5.0" });
+    const b = makeAgent({
+      version: "1.4.0",
+      first_seen: 1000 * H - 200 * H,
+      last_seen: 1000 * H - 100 * H,
+    });
+    vc.setPair(a, b);
+
+    await vc.run("traces_stream");
+
+    expect(mockCompareAgentVersions).toHaveBeenCalledTimes(1);
+    expect(mockFetchRawSample).toHaveBeenCalledTimes(2);
+  });
+
+  it("falls back to fetchRawSample when the endpoint call rejects/errors", async () => {
+    mockCompareAgentVersions.mockRejectedValue(new Error("network error"));
+
+    const vc = useVersionCompare();
+    const a = makeAgent({ version: "1.5.0" });
+    const b = makeAgent({
+      version: "1.4.0",
+      first_seen: 1000 * H - 200 * H,
+      last_seen: 1000 * H - 100 * H,
+    });
+    vc.setPair(a, b);
+
+    await vc.run("traces_stream");
+
+    expect(mockFetchRawSample).toHaveBeenCalledTimes(2);
+    expect(vc.result.value).not.toBeNull();
+  });
+
+  it("maps a straddles_zero:true MetricDelta to verdict nochange, and a clear p95 regression (straddles_zero:false, delta>0) to verdict higher", async () => {
+    mockCompareAgentVersions.mockResolvedValue({
+      data: {
+        p50: sufficientDelta(100, 100, 0, -5, 5), // straddles zero
+        p95: sufficientDelta(300, 200, 100, 20, 180), // clear regression, up-worse
+        p99: sufficientDelta(500, 400, 100, 20, 180),
+        cost: sufficientDelta(0.01, 0.01, 0, -0.001, 0.001),
+      },
+    });
+
+    const vc = useVersionCompare();
+    const a = makeAgent({ version: "1.5.0" });
+    const b = makeAgent({
+      version: "1.4.0",
+      first_seen: 1000 * H - 200 * H,
+      last_seen: 1000 * H - 100 * H,
+    });
+    vc.setPair(a, b);
+
+    const [armA, armB] = mockInstances;
+    armA.kpi.value = { ...armA.kpi.value, traceCount: 500 };
+    armB.kpi.value = { ...armB.kpi.value, traceCount: 500 };
+
+    await vc.run("traces_stream");
+
+    const p50 = vc.result.value!.metrics.find((m) => m.key === "p50")!;
+    expect(p50.verdict).toBe("nochange");
+    const p95 = vc.result.value!.metrics.find((m) => m.key === "p95")!;
+    expect(p95.verdict).toBe("higher");
   });
 });
 
