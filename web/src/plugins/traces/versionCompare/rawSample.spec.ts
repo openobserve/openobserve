@@ -93,6 +93,15 @@ describe("fetchRawSample", () => {
     expect(result.costs).toEqual([0.5, 1.25, 0]);
   });
 
+  it("passes the window (startMicros, endMicros) to the runner — the engine needs them to scan partitions (regression: was 0/0 → empty sample → false 'insufficient')", async () => {
+    const runner = vi.fn().mockResolvedValue([]);
+    await fetchRawSample("default", "", 111, 222, runner, 2000);
+    const [sqlArg, startArg, endArg] = runner.mock.calls[0];
+    expect(sqlArg).toContain("ORDER BY rand()");
+    expect(startArg).toBe(111);
+    expect(endArg).toBe(222);
+  });
+
   it("defaults cap to SAMPLE_CAP when not provided", async () => {
     const runner = vi.fn().mockResolvedValue([]);
     await fetchRawSample("default", "", 1000, 2000, runner);

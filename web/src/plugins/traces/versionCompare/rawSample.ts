@@ -73,7 +73,15 @@ interface RawSampleHit {
  * Result of a query-runner invocation: the raw hit rows collected across
  * the streaming response.
  */
-export type RawSampleQueryRunner = (sql: string) => Promise<RawSampleHit[]>;
+// The runner receives the window in microseconds as well as the SQL, because
+// the streaming-search payload needs `start_time`/`end_time` set for the engine
+// to scan the right partitions — the time predicate baked into the SQL string
+// is NOT sufficient on its own (with 0/0 the search returns no rows).
+export type RawSampleQueryRunner = (
+  sql: string,
+  startMicros: number,
+  endMicros: number,
+) => Promise<RawSampleHit[]>;
 
 /**
  * Fetch a uniform-random raw sample of `{ duration, cost }` for the
@@ -95,7 +103,7 @@ export async function fetchRawSample(
   cap: number = SAMPLE_CAP,
 ): Promise<{ durations: number[]; costs: number[] }> {
   const sql = buildRawSampleSql(stream, agentFilter, startMicros, endMicros, cap);
-  const hits = await runner(sql);
+  const hits = await runner(sql, startMicros, endMicros);
 
   const durations: number[] = [];
   const costs: number[] = [];

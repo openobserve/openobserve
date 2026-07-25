@@ -89,7 +89,7 @@ export function useVersionCompare() {
    * the bootstrap needs the whole sample at once.
    */
   function makeRunner(): RawSampleQueryRunner {
-    return (sql: string) =>
+    return (sql: string, startMicros: number, endMicros: number) =>
       new Promise((resolve, reject) => {
         const traceId = generateTraceContext().traceId;
         const useBase64 = store.state.zoConfig?.sql_base64_enabled;
@@ -99,8 +99,11 @@ export function useVersionCompare() {
             queryReq: {
               query: {
                 sql: useBase64 ? b64EncodeUnicode(sql) : sql,
-                start_time: 0,
-                end_time: 0,
+                // The engine scans partitions by these bounds — they MUST be the
+                // arm's real window (µs), not 0/0, or the search returns no rows
+                // and every latency/cost metric falsely reads "insufficient".
+                start_time: startMicros,
+                end_time: endMicros,
                 from: 0,
                 size: SAMPLE_CAP,
               },
