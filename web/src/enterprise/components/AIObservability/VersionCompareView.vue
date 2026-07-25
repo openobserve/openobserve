@@ -25,9 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   this component only renders the body once compare mode is ON and a version
   list is available.
 
-  Manual override (align === "manual"): reveals two per-arm datetime-local
-  inputs. Changing one calls `run()` with that arm's window pinned to the
-  caller-supplied value — kept intentionally minimal (two OInput fields, no
+  Manual override (align === "manual"): reveals two per-arm ODateTimeRange
+  controls. Changing one calls `run()` with that arm's window pinned to the
+  caller-supplied value — kept intentionally minimal (two range pickers, no
   extra chrome) per the plan's "don't over-engineer" note.
 -->
 <template>
@@ -47,45 +47,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OContent v-if="align === 'manual'">
       <OCard class="border border-border-default bg-surface-panel" data-test="version-compare-manual-override">
         <OCardSection role="body" class="flex items-center gap-3">
-          <OInput
-            type="datetime-local"
-            :model-value="manualStartA"
-            :label="t('aiObservability.versionCompare.manual.startA')"
-            label-position="inside"
-            size="sm"
-            width="sm"
-            data-test="version-compare-manual-a-start"
-            @update:model-value="(v) => onManualChange('a', 'start', v as string)"
+          <ODateTimeRange
+            mode="absolute"
+            disable-relative
+            with-seconds
+            :label="t('aiObservability.versionCompare.manual.windowA')"
+            :start-date="manualStartDateA"
+            :start-time="manualStartTimeA"
+            :end-date="manualEndDateA"
+            :end-time="manualEndTimeA"
+            data-test="version-compare-manual-a-window"
+            @change="(v) => onManualRangeChange('a', v)"
           />
-          <OInput
-            type="datetime-local"
-            :model-value="manualEndA"
-            :label="t('aiObservability.versionCompare.manual.endA')"
-            label-position="inside"
-            size="sm"
-            width="sm"
-            data-test="version-compare-manual-a-end"
-            @update:model-value="(v) => onManualChange('a', 'end', v as string)"
-          />
-          <OInput
-            type="datetime-local"
-            :model-value="manualStartB"
-            :label="t('aiObservability.versionCompare.manual.startB')"
-            label-position="inside"
-            size="sm"
-            width="sm"
-            data-test="version-compare-manual-b-start"
-            @update:model-value="(v) => onManualChange('b', 'start', v as string)"
-          />
-          <OInput
-            type="datetime-local"
-            :model-value="manualEndB"
-            :label="t('aiObservability.versionCompare.manual.endB')"
-            label-position="inside"
-            size="sm"
-            width="sm"
-            data-test="version-compare-manual-b-end"
-            @update:model-value="(v) => onManualChange('b', 'end', v as string)"
+          <ODateTimeRange
+            mode="absolute"
+            disable-relative
+            with-seconds
+            :label="t('aiObservability.versionCompare.manual.windowB')"
+            :start-date="manualStartDateB"
+            :start-time="manualStartTimeB"
+            :end-date="manualEndDateB"
+            :end-time="manualEndTimeB"
+            data-test="version-compare-manual-b-window"
+            @change="(v) => onManualRangeChange('b', v)"
           />
         </OCardSection>
       </OCard>
@@ -145,10 +129,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import OInput from "@/lib/forms/Input/OInput.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
+import type { DateTimeRangeAbsoluteValue } from "@/lib/forms/DateTimeRange/ODateTimeRange.types";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import VersionCompareBar from "./VersionCompareBar.vue";
 import VersionCompareBanner from "./VersionCompareBanner.vue";
@@ -218,7 +203,10 @@ function seedDefaults() {
     selectedA.value = sorted[0].version as string;
   }
 }
-watch(() => props.versionList, seedDefaults, { immediate: true });
+// NOTE: the `{ immediate: true }` watch that drives seedDefaults is registered
+// AFTER requestRun()/armAMeta/armBMeta are defined (below) — seedDefaults calls
+// requestRun(), which reads armAMeta.value, so an immediate watch here would hit
+// a temporal-dead-zone `Cannot access 'armAMeta' before initialization` crash.
 
 const armAMeta = computed<GenAiAgentListItem | null>(
   () => props.versionList.find((v) => v.version === selectedA.value) ?? null,
@@ -258,6 +246,10 @@ function requestRun(manual?: { a?: { start: number; end: number }; b?: { start: 
   emit("run", { a, b, align: align.value, manual });
 }
 
+// Registered here (not at seedDefaults' definition) so requestRun/armAMeta/
+// armBMeta are initialized before the immediate fire — avoids a TDZ crash.
+watch(() => props.versionList, seedDefaults, { immediate: true });
+
 function onSelectA(v: string) {
   selectedA.value = v;
   requestRun();
@@ -272,30 +264,42 @@ function onAlignChange(v: AlignMode) {
 }
 
 // ── Manual override ────────────────────────────────────────────────────────
-// datetime-local strings (no timezone) — converted to epoch microseconds on
-// change. Kept minimal per the plan: no persistence, no validation beyond
-// "both start/end present for an arm".
-const manualStartA = ref("");
-const manualEndA = ref("");
-const manualStartB = ref("");
-const manualEndB = ref("");
+// Each arm is an ODateTimeRange in absolute mode — date/time strings (no
+// timezone) converted to epoch microseconds on change. Kept minimal per the
+// plan: no persistence, no validation beyond "both start/end present for an
+// arm".
+const manualStartDateA = ref("");
+const manualStartTimeA = ref("");
+const manualEndDateA = ref("");
+const manualEndTimeA = ref("");
+const manualStartDateB = ref("");
+const manualStartTimeB = ref("");
+const manualEndDateB = ref("");
+const manualEndTimeB = ref("");
 
-function toMicros(datetimeLocal: string): number | null {
-  if (!datetimeLocal) return null;
-  const ms = new Date(datetimeLocal).getTime();
+function toMicros(date: string, time: string): number | null {
+  if (!date || !time) return null;
+  const ms = new Date(`${date}T${time}`).getTime();
   return Number.isNaN(ms) ? null : ms * 1000;
 }
 
-function onManualChange(arm: "a" | "b", edge: "start" | "end", value: string) {
-  if (arm === "a" && edge === "start") manualStartA.value = value;
-  if (arm === "a" && edge === "end") manualEndA.value = value;
-  if (arm === "b" && edge === "start") manualStartB.value = value;
-  if (arm === "b" && edge === "end") manualEndB.value = value;
+function onManualRangeChange(arm: "a" | "b", value: DateTimeRangeAbsoluteValue) {
+  if (arm === "a") {
+    manualStartDateA.value = value.startDate;
+    manualStartTimeA.value = value.startTime;
+    manualEndDateA.value = value.endDate;
+    manualEndTimeA.value = value.endTime;
+  } else {
+    manualStartDateB.value = value.startDate;
+    manualStartTimeB.value = value.startTime;
+    manualEndDateB.value = value.endDate;
+    manualEndTimeB.value = value.endTime;
+  }
 
-  const aStart = toMicros(manualStartA.value);
-  const aEnd = toMicros(manualEndA.value);
-  const bStart = toMicros(manualStartB.value);
-  const bEnd = toMicros(manualEndB.value);
+  const aStart = toMicros(manualStartDateA.value, manualStartTimeA.value);
+  const aEnd = toMicros(manualEndDateA.value, manualEndTimeA.value);
+  const bStart = toMicros(manualStartDateB.value, manualStartTimeB.value);
+  const bEnd = toMicros(manualEndDateB.value, manualEndTimeB.value);
 
   const manual: { a?: { start: number; end: number }; b?: { start: number; end: number } } = {};
   if (arm === "a" && aStart != null && aEnd != null) manual.a = { start: aStart, end: aEnd };

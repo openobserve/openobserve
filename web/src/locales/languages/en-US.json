@@ -7965,10 +7965,8 @@
       "datePickerDisabled": "Windows are per-version in this mode",
       "sampledNote": "Latency & cost intervals are computed from up to {cap} randomly-sampled traces per version.",
       "manual": {
-        "startA": "A start",
-        "endA": "A end",
-        "startB": "B start",
-        "endB": "B end"
+        "windowA": "Version A window",
+        "windowB": "Version B window"
       },
       "bar": {
         "versionA": "Version A",
