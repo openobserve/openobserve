@@ -63,12 +63,21 @@ describe("VersionWindowCard", () => {
     expect(wrapper.find('[data-test="version-window-card-a-label"]').text()).toContain("250");
   });
 
-  it("renders clamp copy when limitedBy names this arm's counterpart", () => {
-    // arm=a, limitedBy="b" means b's window was the limiter — a is being clamped
+  it("renders clamp copy with a human-formatted duration (not a raw float)", () => {
+    // arm=a, limitedBy="b" means b's window was the limiter — a is being clamped.
+    // formatDuration(6) → "6.0h" (never a raw "6" or "0.00994...").
     const wrapper = mountCard({ arm: "a", limitedBy: "b", deltaHours: 6 });
     const clamp = wrapper.find('[data-test="version-window-card-a-clamp"]');
     expect(clamp.exists()).toBe(true);
-    expect(clamp.text()).toContain("6h");
+    expect(clamp.text()).toContain("6.0h");
+  });
+
+  it("formats a sub-minute clamp window as seconds, never a raw hours float", () => {
+    // 0.00994h ≈ 36s — the exact bug the user flagged ("0.009945833...h").
+    const wrapper = mountCard({ arm: "a", limitedBy: "b", deltaHours: 0.009945833 });
+    const clamp = wrapper.find('[data-test="version-window-card-a-clamp"]');
+    expect(clamp.text()).toContain("36s");
+    expect(clamp.text()).not.toContain("0.00");
   });
 
   it("does not render clamp copy when limitedBy is null", () => {

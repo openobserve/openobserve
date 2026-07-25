@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="text-xs text-text-secondary"
         :data-test="`version-window-card-${arm}-clamp`"
       >
-        {{ t("aiObservability.versionCompare.windowCard.clamp", { deltaHours }) }}
+        {{ t("aiObservability.versionCompare.windowCard.clamp", { duration: clampDuration }) }}
       </span>
     </OCardSection>
   </OCard>
@@ -63,6 +63,7 @@ import { useI18n } from "vue-i18n";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import type { Win } from "@/plugins/traces/versionCompare/windows";
+import { formatDuration } from "@/plugins/traces/versionCompare/formatDuration";
 
 const props = defineProps<{
   /** Which compare arm this card represents. */
@@ -81,8 +82,7 @@ const props = defineProps<{
 const { t } = useI18n();
 
 function formatWindow(win: Win): string {
-  const hours = Math.max(0, (win.end - win.start) / 3_600_000_000);
-  return `${hours.toFixed(1)}h`;
+  return formatDuration((win.end - win.start) / 3_600_000_000);
 }
 
 const label = computed(() =>
@@ -99,4 +99,6 @@ const label = computed(() =>
 // clamped down to match it).
 const counterpart = computed<"a" | "b">(() => (props.arm === "a" ? "b" : "a"));
 const showClamp = computed(() => props.limitedBy === counterpart.value);
+// Pre-formatted clamp duration (never a raw float in the copy).
+const clampDuration = computed(() => formatDuration(props.deltaHours));
 </script>

@@ -89,6 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :sparklines-a="versionCompare.sparklinesA.value"
       :sparklines-b="versionCompare.sparklinesB.value"
       :sampled-note="versionCompare.sampledNote.value"
+      :loading="versionCompare.loadingA.value || versionCompare.loadingB.value"
       class="flex-1 overflow-y-auto pb-3"
       data-test="llm-insights-compare-view"
       @exit="exitCompareMode"

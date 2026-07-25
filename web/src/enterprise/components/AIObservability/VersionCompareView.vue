@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :delta-hours="deltaHours"
       />
 
-      <div v-if="windows" class="flex flex-wrap gap-3">
+      <div v-if="windows" class="grid grid-cols-1 gap-2.5 md:grid-cols-2">
         <VersionWindowCard
           arm="a"
           :env="armAMeta?.env ?? ''"
@@ -106,7 +106,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <VersionDeltaStrip v-if="result" :result="result" />
+      <!-- Delta strip waits on the raw-sample bootstrap (slowest queries); show a
+           card-shaped skeleton row while loading so it never looks frozen. -->
+      <div
+        v-if="loading && !result"
+        class="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6"
+        data-test="version-compare-strip-skeleton"
+      >
+        <OSkeleton
+          v-for="n in 6"
+          :key="n"
+          type="rect"
+          class="h-20 rounded-surface"
+        />
+      </div>
+      <VersionDeltaStrip v-else-if="result" :result="result" />
       <span
         v-if="sampledNote"
         class="text-xs text-text-muted"
@@ -115,8 +129,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ sampledNote }}
       </span>
 
+      <OSkeleton
+        v-if="loading && !windows"
+        type="rect"
+        class="h-55 w-full rounded-surface"
+        data-test="version-compare-chart-skeleton"
+      />
       <VersionOverlayChart
-        v-if="windows"
+        v-else-if="windows"
         :series-a="overlaySeriesA"
         :series-b="overlaySeriesB"
         :mode="overlayMode"
@@ -140,6 +160,7 @@ import VersionCompareBanner from "./VersionCompareBanner.vue";
 import VersionWindowCard from "./VersionWindowCard.vue";
 import VersionDeltaStrip from "./VersionDeltaStrip.vue";
 import VersionOverlayChart, { type OverlayPoint, type OverlayMode } from "./VersionOverlayChart.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 import type { AlignMode, CompareWindows } from "@/plugins/traces/versionCompare/windows";
 import type { CompareResult } from "@/plugins/traces/versionCompare/compareResult";
@@ -156,6 +177,8 @@ const props = defineProps<{
   sparklinesA: LLMSparklineSeries | null;
   sparklinesB: LLMSparklineSeries | null;
   sampledNote?: string | null;
+  /** Either arm's queries are in flight — drives the results skeleton. */
+  loading?: boolean;
 }>();
 
 const emit = defineEmits<{

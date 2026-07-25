@@ -7985,7 +7985,7 @@
       },
       "windowCard": {
         "label": "{env} · {version} — {window} · {count} traces",
-        "clamp": "baseline only ran {deltaHours}h — comparing each version's {deltaHours}h."
+        "clamp": "Baseline only ran {duration} — comparing each version's first {duration}."
       }
     }
   },

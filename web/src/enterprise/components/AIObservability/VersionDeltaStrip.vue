@@ -29,11 +29,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   ("regressed/improved") depending on `associative`.
 -->
 <template>
-  <div class="flex flex-wrap gap-3" data-test="version-delta-strip">
+  <!-- Even grid (matches the page's KpiCardRow layout + gap-2.5) rather than
+       flex-wrap, so the metric cells align in columns instead of stretching. -->
+  <div
+    class="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6"
+    data-test="version-delta-strip"
+  >
     <OCard
       v-for="metric in result.metrics"
       :key="metric.key"
-      class="min-w-32 flex-1 rounded-surface! border border-border-default bg-surface-panel"
+      class="rounded-surface! border border-border-default bg-surface-panel"
       :data-test="`version-delta-strip-cell-${metric.key}`"
     >
       <OCardSection role="body" class="flex flex-col gap-1 p-3!">
