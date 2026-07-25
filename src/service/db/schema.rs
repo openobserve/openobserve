@@ -626,7 +626,6 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         }
         let mut w = STREAM_SETTINGS.write().await;
         w.insert(item_key.to_string(), settings);
-        infra::schema::set_stream_settings_atomic(w.clone());
         drop(w);
         let mut w = STREAM_SCHEMAS_LATEST.write().await;
         w.insert(
@@ -653,6 +652,11 @@ pub async fn cache() -> Result<(), anyhow::Error> {
             log::info!("Stream schemas Cached progress: {}/{}", i, keys.len());
         }
     }
+    // sync the atomic cache once after the loop; cloning the settings map per
+    // stream inside the loop is O(n^2) and stalls startup with many streams
+    let w = STREAM_SETTINGS.read().await;
+    infra::schema::set_stream_settings_atomic(w.clone());
+    drop(w);
     log::info!("Stream schemas Cached {keys_num} streams");
     Ok(())
 }
