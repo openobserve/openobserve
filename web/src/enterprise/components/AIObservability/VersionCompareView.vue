@@ -44,54 +44,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- Manual override: two per-arm windows, visible only in manual mode. -->
-    <div
-      v-if="align === 'manual'"
-      class="flex items-center gap-3 px-page-edge"
-      data-test="version-compare-manual-override"
-    >
-      <OInput
-        type="datetime-local"
-        :model-value="manualStartA"
-        :label="t('aiObservability.versionCompare.manual.startA')"
-        label-position="inside"
-        size="sm"
-        width="sm"
-        data-test="version-compare-manual-a-start"
-        @update:model-value="(v) => onManualChange('a', 'start', v as string)"
-      />
-      <OInput
-        type="datetime-local"
-        :model-value="manualEndA"
-        :label="t('aiObservability.versionCompare.manual.endA')"
-        label-position="inside"
-        size="sm"
-        width="sm"
-        data-test="version-compare-manual-a-end"
-        @update:model-value="(v) => onManualChange('a', 'end', v as string)"
-      />
-      <OInput
-        type="datetime-local"
-        :model-value="manualStartB"
-        :label="t('aiObservability.versionCompare.manual.startB')"
-        label-position="inside"
-        size="sm"
-        width="sm"
-        data-test="version-compare-manual-b-start"
-        @update:model-value="(v) => onManualChange('b', 'start', v as string)"
-      />
-      <OInput
-        type="datetime-local"
-        :model-value="manualEndB"
-        :label="t('aiObservability.versionCompare.manual.endB')"
-        label-position="inside"
-        size="sm"
-        width="sm"
-        data-test="version-compare-manual-b-end"
-        @update:model-value="(v) => onManualChange('b', 'end', v as string)"
-      />
-    </div>
+    <OContent v-if="align === 'manual'">
+      <OCard class="border border-border-default bg-surface-panel" data-test="version-compare-manual-override">
+        <OCardSection role="body" class="flex items-center gap-3">
+          <OInput
+            type="datetime-local"
+            :model-value="manualStartA"
+            :label="t('aiObservability.versionCompare.manual.startA')"
+            label-position="inside"
+            size="sm"
+            width="sm"
+            data-test="version-compare-manual-a-start"
+            @update:model-value="(v) => onManualChange('a', 'start', v as string)"
+          />
+          <OInput
+            type="datetime-local"
+            :model-value="manualEndA"
+            :label="t('aiObservability.versionCompare.manual.endA')"
+            label-position="inside"
+            size="sm"
+            width="sm"
+            data-test="version-compare-manual-a-end"
+            @update:model-value="(v) => onManualChange('a', 'end', v as string)"
+          />
+          <OInput
+            type="datetime-local"
+            :model-value="manualStartB"
+            :label="t('aiObservability.versionCompare.manual.startB')"
+            label-position="inside"
+            size="sm"
+            width="sm"
+            data-test="version-compare-manual-b-start"
+            @update:model-value="(v) => onManualChange('b', 'start', v as string)"
+          />
+          <OInput
+            type="datetime-local"
+            :model-value="manualEndB"
+            :label="t('aiObservability.versionCompare.manual.endB')"
+            label-position="inside"
+            size="sm"
+            width="sm"
+            data-test="version-compare-manual-b-end"
+            @update:model-value="(v) => onManualChange('b', 'end', v as string)"
+          />
+        </OCardSection>
+      </OCard>
+    </OContent>
 
-    <div class="px-page-edge flex flex-col gap-2.5">
+    <OContent class="flex flex-col gap-2.5">
       <VersionCompareBanner
         v-if="windows"
         :overlap="windows.overlap"
@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :mode="overlayMode"
         class="h-55"
       />
-    </div>
+    </OContent>
   </div>
 </template>
 
@@ -146,6 +146,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OContent from "@/lib/core/Content/OContent.vue";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import VersionCompareBar from "./VersionCompareBar.vue";
 import VersionCompareBanner from "./VersionCompareBanner.vue";

@@ -30,48 +30,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="flex flex-wrap gap-3" data-test="version-delta-strip">
-    <div
+    <OCard
       v-for="metric in result.metrics"
       :key="metric.key"
-      class="flex min-w-32 flex-1 flex-col gap-1 rounded-surface border border-border-default bg-surface-panel px-3 py-2"
+      class="min-w-32 flex-1 rounded-surface! border border-border-default bg-surface-panel"
       :data-test="`version-delta-strip-cell-${metric.key}`"
     >
-      <span class="text-xs text-text-secondary">{{ metricLabel(metric.key) }}</span>
+      <OCardSection role="body" class="flex flex-col gap-1 p-3!">
+        <span class="text-xs text-text-secondary">{{ metricLabel(metric.key) }}</span>
 
-      <span class="text-sm text-text-body" :data-test="`version-delta-strip-values-${metric.key}`">
-        <span class="text-accent font-medium">{{ formatValue(metric.key, metric.a) }}</span>
-        <span class="text-text-muted"> / </span>
-        <span class="text-series-b font-medium">{{ formatValue(metric.key, metric.b) }}</span>
-      </span>
-
-      <span
-        class="inline-flex items-center gap-1 text-sm font-semibold"
-        :class="deltaColorClass(metric)"
-        :data-test="`version-delta-strip-delta-${metric.key}`"
-      >
-        <template v-if="metric.ci">
-          <OTooltip :content="tooltipText(metric)" side="top">
-            <span :data-test="`version-delta-strip-delta-value-${metric.key}`">{{ formatDelta(metric) }}</span>
-          </OTooltip>
-        </template>
-        <template v-else>
-          <span :data-test="`version-delta-strip-delta-value-${metric.key}`">{{ formatDelta(metric) }}</span>
-        </template>
-        <span
-          v-if="metric.verdict === 'insufficient'"
-          class="text-2xs font-normal text-text-muted"
-          :data-test="`version-delta-strip-indicative-${metric.key}`"
-        >
-          {{ t("aiObservability.deltaStrip.insufficientLabel") }}
+        <span class="text-sm text-text-body" :data-test="`version-delta-strip-values-${metric.key}`">
+          <span class="text-accent font-medium">{{ formatValue(metric.key, metric.a) }}</span>
+          <span class="text-text-muted"> / </span>
+          <span class="text-series-b font-medium">{{ formatValue(metric.key, metric.b) }}</span>
         </span>
-      </span>
-    </div>
+
+        <span
+          class="inline-flex items-center gap-1 text-sm font-semibold"
+          :class="deltaColorClass(metric)"
+          :data-test="`version-delta-strip-delta-${metric.key}`"
+        >
+          <template v-if="metric.ci">
+            <OTooltip :content="tooltipText(metric)" side="top">
+              <span :data-test="`version-delta-strip-delta-value-${metric.key}`">{{ formatDelta(metric) }}</span>
+            </OTooltip>
+          </template>
+          <template v-else>
+            <span :data-test="`version-delta-strip-delta-value-${metric.key}`">{{ formatDelta(metric) }}</span>
+          </template>
+          <span
+            v-if="metric.verdict === 'insufficient'"
+            class="text-2xs font-normal text-text-muted"
+            :data-test="`version-delta-strip-indicative-${metric.key}`"
+          >
+            {{ t("aiObservability.deltaStrip.insufficientLabel") }}
+          </span>
+        </span>
+      </OCardSection>
+    </OCard>
   </div>
 </template>
 
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import type { CompareResult, MetricKey, MetricResult } from "@/plugins/traces/versionCompare/compareResult";
 
 const props = defineProps<{ result: CompareResult }>();
