@@ -195,6 +195,31 @@ fn aggregate_cost_hits(hits: &[serde_json::Value]) -> ArmAggregate {
     agg
 }
 
+/// Pure helper: fold a set of `_agent_signals` failure-pass hits into a
+/// `fail_class -> summed count` map. Mirrors [`aggregate_cost_hits`]'s dedup
+/// logic so double-processed rollup windows don't double-count failures.
+fn aggregate_failure_hits(hits: &[serde_json::Value]) -> std::collections::HashMap<String, u64> {
+    let mut map: std::collections::HashMap<String, u64> = std::collections::HashMap::new();
+    // Dedup by window `_timestamp`: see `aggregate_cost_hits` for why. Hits
+    // arrive `_timestamp DESC`, so the FIRST row seen for a timestamp is the
+    // newest ingest — keep it, skip the rest.
+    let mut seen_windows: std::collections::HashSet<i64> = std::collections::HashSet::new();
+    for hit in hits {
+        let ts = hit.get("_timestamp").and_then(|v| v.as_i64());
+        if let Some(ts) = ts
+            && !seen_windows.insert(ts)
+        {
+            continue; // duplicate window row — already counted the newest
+        }
+        let fail_class = hit.get("fail_class").and_then(|v| v.as_str());
+        let count = hit.get("count").and_then(|v| v.as_u64());
+        if let (Some(fail_class), Some(count)) = (fail_class, count) {
+            *map.entry(fail_class.to_string()).or_insert(0) += count;
+        }
+    }
+    map
+}
+
 #[cfg(feature = "enterprise")]
 async fn fetch_arm_aggregate(org_id: &str, arm: &CompareArm) -> ArmAggregate {
     use config::meta::stream::StreamType;
@@ -283,16 +308,107 @@ async fn fetch_arm_aggregate(org_id: &str, arm: &CompareArm) -> ArmAggregate {
 }
 
 #[cfg(feature = "enterprise")]
+async fn fetch_arm_failures(org_id: &str, arm: &CompareArm) -> std::collections::HashMap<String, u64> {
+    use config::meta::stream::StreamType;
+
+    let stream_name = "_agent_signals";
+
+    let mut filters = format!(
+        "org_id = '{}' AND signal_type = 'failure' AND agent_name = '{}'",
+        org_id.replace('\'', ""),
+        arm.agent_name.replace('\'', "")
+    );
+    if let Some(env) = arm.env.as_deref() {
+        filters.push_str(&format!(
+            " AND gen_ai_agent_env = '{}'",
+            env.replace('\'', "")
+        ));
+    }
+    if let Some(version) = arm.version.as_deref() {
+        filters.push_str(&format!(
+            " AND gen_ai_agent_version = '{}'",
+            version.replace('\'', "")
+        ));
+    }
+
+    // Select `_timestamp` so the fold can dedup to ONE row per rollup window.
+    // The rollup stamps every row of a window at its window-end `ts`, so a
+    // window that was double-processed (e.g. multiple alert-managers racing the
+    // offset-ownership handoff, or a reset that overlapped an already-processed
+    // window) produces duplicate rows sharing a `_timestamp`. Merging all of
+    // them would double-count that window's failures — so dedup by
+    // `_timestamp` (keep the newest ingest) before merging.
+    let sql = format!(
+        "SELECT _timestamp, fail_class, count FROM \"{stream_name}\" \
+         WHERE _timestamp >= {} AND _timestamp < {} AND {filters} \
+         ORDER BY _timestamp DESC \
+         LIMIT 10000",
+        arm.start_time, arm.end_time
+    );
+
+    let schema = infra::schema::get(org_id, stream_name, StreamType::Logs).await;
+    if schema.is_err() {
+        return std::collections::HashMap::new();
+    }
+
+    let req = config::meta::search::Request {
+        query: config::meta::search::Query {
+            sql,
+            from: 0,
+            size: 10000,
+            start_time: arm.start_time,
+            end_time: arm.end_time,
+            quick_mode: false,
+            query_type: "".to_string(),
+            track_total_hits: false,
+            uses_zo_fn: false,
+            query_fn: None,
+            skip_wal: false,
+            action_id: None,
+            histogram_interval: 0,
+            streaming_id: None,
+            streaming_output: false,
+            sampling_config: None,
+            sampling_ratio: None,
+            timezone: None,
+        },
+        encoding: config::meta::search::RequestEncoding::Empty,
+        regions: vec![],
+        clusters: vec![],
+        timeout: 30,
+        search_type: None,
+        search_event_context: None,
+        use_cache: false,
+        clear_cache: false,
+        local_mode: Some(false),
+        agent_options: None,
+    };
+
+    let trace_id = config::ider::generate();
+    match crate::search::search(&trace_id, org_id, StreamType::Logs, None, &req).await {
+        Ok(resp) => aggregate_failure_hits(&resp.hits),
+        Err(e) => {
+            log::error!("[AgentSignals] compare failure query failed for org '{org_id}': {e}");
+            std::collections::HashMap::new()
+        }
+    }
+}
+
+#[cfg(feature = "enterprise")]
 pub async fn compare_agent_versions(
     axum::extract::Path(org_id): axum::extract::Path<String>,
     axum::Json(req): axum::Json<CompareRequest>,
 ) -> HttpResponse {
     use o2_enterprise::enterprise::agent_signals::compare::{
-        MetricDelta, merge_sketches, quantile_delta_ci, welch_mean_diff_ci,
+        MetricDelta, error_class_diff, merge_sketches, quantile_delta_ci, welch_mean_diff_ci,
     };
 
     let agg_a = fetch_arm_aggregate(&org_id, &req.a).await;
     let agg_b = fetch_arm_aggregate(&org_id, &req.b).await;
+
+    let fails_a = fetch_arm_failures(&org_id, &req.a).await;
+    let fails_b = fetch_arm_failures(&org_id, &req.b).await;
+    let error_diff = error_class_diff(&fails_a, &fails_b);
 
     let insufficient = || MetricDelta {
         a: 0.0,
@@ -331,6 +447,7 @@ pub async fn compare_agent_versions(
         "p95": p95,
         "p99": p99,
         "cost": cost,
+        "error_diff": error_diff,
     }))
 }
 
@@ -356,6 +473,12 @@ pub async fn compare_agent_versions(
         "p95": insufficient(),
         "p99": insufficient(),
         "cost": insufficient(),
+        "error_diff": {
+            "introduced": [],
+            "fixed": [],
+            "shared": [],
+            "insufficient": true,
+        },
         "note": "CI math requires the enterprise build; point-only comparison is not available in OSS.",
     }))
 }
@@ -411,5 +534,24 @@ mod compare_tests {
     fn aggregate_cost_hits_empty_input_is_zeroed_default() {
         let agg = aggregate_cost_hits(&[]);
         assert_eq!(agg, ArmAggregate::default());
+    }
+
+    #[test]
+    fn aggregate_failure_hits_dedups_duplicate_window_rows_and_sums_by_class() {
+        // Two rows share _timestamp=1000 (a double-processed window); only the
+        // FIRST (newest ingest, since input is _timestamp DESC) must count.
+        let hits = vec![
+            serde_json::json!({ "_timestamp": 2000, "fail_class": "timeout", "count": 5 }),
+            serde_json::json!({ "_timestamp": 1000, "fail_class": "timeout", "count": 3 }),
+            serde_json::json!({ "_timestamp": 1000, "fail_class": "timeout", "count": 3 }),
+            serde_json::json!({ "_timestamp": 3000, "fail_class": "rate_limit", "count": 2 }),
+            // A row missing fail_class should be skipped without breaking the fold.
+            serde_json::json!({ "_timestamp": 4000, "count": 1 }),
+        ];
+
+        let agg = aggregate_failure_hits(&hits);
+        assert_eq!(agg.get("timeout"), Some(&8), "timeout not double-counted");
+        assert_eq!(agg.get("rate_limit"), Some(&2));
+        assert_eq!(agg.len(), 2);
     }
 }
