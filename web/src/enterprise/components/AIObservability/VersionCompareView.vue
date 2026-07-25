@@ -208,20 +208,39 @@ const align = ref<AlignMode>("sinceRollout");
 const selectedA = ref<string>("");
 const selectedB = ref<string>("");
 
+// `listVersionsForCompare` returns one row per version PER time-bucket, so a
+// version that was active across N windows appears N times. Collapse to one
+// entry per version string (keeping the earliest first_seen — a version's true
+// rollout time is its first appearance, not the latest bucket's). Both the
+// dropdown options and the default-seed logic MUST work off this deduped set:
+// without it, `sorted[0]`/`sorted[1]` can land on two duplicates of the SAME
+// version, seeding A === B, which gates `run()` off and leaves the compare body
+// blank forever (reads to the user as "panels never load").
+const uniqueVersions = computed<GenAiAgentListItem[]>(() => {
+  const byVersion = new Map<string, GenAiAgentListItem>();
+  for (const v of props.versionList) {
+    if (v.version == null) continue;
+    const key = v.version as string;
+    const existing = byVersion.get(key);
+    if (!existing || (v.first_seen ?? Infinity) < (existing.first_seen ?? Infinity)) {
+      byVersion.set(key, v);
+    }
+  }
+  return [...byVersion.values()];
+});
+
 const versionOptions = computed<SelectOption[]>(() =>
-  props.versionList
-    .filter((v) => v.version != null)
-    .map((v) => ({ label: v.version as string, value: v.version as string })),
+  uniqueVersions.value.map((v) => ({ label: v.version as string, value: v.version as string })),
 );
 
-// Default: B = the immediately-previous version, A = current (latest). The
-// list arrives in the service's first-seen order; sort by first_seen desc so
-// "current" and "previous" are well-defined regardless of API ordering.
+// Default: B = the immediately-previous version, A = current (latest). Sort the
+// DEDUPED versions by first_seen desc so "current" and "previous" are two
+// distinct versions regardless of how many buckets each spanned.
 function seedDefaults() {
   if (selectedA.value && selectedB.value) return;
-  const sorted = [...props.versionList]
-    .filter((v) => v.version != null)
-    .sort((x, y) => (y.first_seen ?? 0) - (x.first_seen ?? 0));
+  const sorted = [...uniqueVersions.value].sort(
+    (x, y) => (y.first_seen ?? 0) - (x.first_seen ?? 0),
+  );
   if (sorted.length >= 2) {
     selectedA.value = sorted[0].version as string;
     selectedB.value = sorted[1].version as string;

@@ -129,12 +129,26 @@ pub async fn get_agent_signals(
     MetaHttpResponse::forbidden("Not Supported")
 }
 
+/// How far back (µs) to read a version's rollup rows from `_agent_signals`.
+///
+/// CRITICAL: `_agent_signals` rows are stamped at ROLLUP-PROCESSING time
+/// (`_timestamp` = when the rollup ran), NOT span-time. A version whose spans
+/// are days old is still rolled up "now", so its sketch row is stamped "now".
+/// Filtering by the arm's span-time window (`first_seen`/`last_seen`) therefore
+/// MISSES the rows. The sketch already IS the per-version aggregate, so the
+/// correct scope is the `(agent, env, version)` IDENTITY over a wide
+/// rollup-write bound — not the span-time window. 30 days matches the FE's
+/// version-enumeration retention.
+const COMPARE_ROLLUP_LOOKBACK_MICROS: i64 = 30 * 24 * 60 * 60 * 1_000_000;
+
 /// One arm (A or B) of a version-compare request.
 #[derive(Debug, Clone, Deserialize)]
 pub struct CompareArm {
     pub agent_name: String,
     pub env: Option<String>,
     pub version: Option<String>,
+    /// Span-time window of the version (kept for the response's window cards);
+    /// NOT used to filter `_agent_signals` (see COMPARE_ROLLUP_LOOKBACK_MICROS).
     pub start_time: i64,
     pub end_time: i64,
 }
@@ -251,12 +265,17 @@ async fn fetch_arm_aggregate(org_id: &str, arm: &CompareArm) -> ArmAggregate {
     // window) produces duplicate rows sharing a `_timestamp`. Merging all of
     // them would double-count that window's latency/cost — so dedup by
     // `_timestamp` (keep the newest ingest) before merging.
+    // Scope by (agent,env,version) IDENTITY over a wide rollup-write bound — NOT
+    // the arm's span-time window (which misses rows stamped at rollup time; see
+    // COMPARE_ROLLUP_LOOKBACK_MICROS). The sketch already aggregates the version's
+    // spans, so all of its rollup rows over retention merge to the full distribution.
+    let read_end = chrono::Utc::now().timestamp_micros();
+    let read_start = read_end - COMPARE_ROLLUP_LOOKBACK_MICROS;
     let sql = format!(
         "SELECT _timestamp, latency_sketch, cost, cost_sqsum, cost_n FROM \"{stream_name}\" \
-         WHERE _timestamp >= {} AND _timestamp < {} AND {filters} \
+         WHERE _timestamp >= {read_start} AND _timestamp < {read_end} AND {filters} \
          ORDER BY _timestamp DESC \
-         LIMIT 10000",
-        arm.start_time, arm.end_time
+         LIMIT 10000"
     );
 
     let schema = infra::schema::get(org_id, stream_name, StreamType::Logs).await;
@@ -269,8 +288,8 @@ async fn fetch_arm_aggregate(org_id: &str, arm: &CompareArm) -> ArmAggregate {
             sql,
             from: 0,
             size: 10000,
-            start_time: arm.start_time,
-            end_time: arm.end_time,
+            start_time: read_start,
+            end_time: read_end,
             quick_mode: false,
             query_type: "".to_string(),
             track_total_hits: false,
@@ -338,12 +357,15 @@ async fn fetch_arm_failures(org_id: &str, arm: &CompareArm) -> std::collections:
     // window) produces duplicate rows sharing a `_timestamp`. Merging all of
     // them would double-count that window's failures — so dedup by
     // `_timestamp` (keep the newest ingest) before merging.
+    // Identity + wide rollup-write bound (same rationale as fetch_arm_aggregate —
+    // rows are stamped at rollup time, not span-time).
+    let read_end = chrono::Utc::now().timestamp_micros();
+    let read_start = read_end - COMPARE_ROLLUP_LOOKBACK_MICROS;
     let sql = format!(
         "SELECT _timestamp, fail_class, count FROM \"{stream_name}\" \
-         WHERE _timestamp >= {} AND _timestamp < {} AND {filters} \
+         WHERE _timestamp >= {read_start} AND _timestamp < {read_end} AND {filters} \
          ORDER BY _timestamp DESC \
-         LIMIT 10000",
-        arm.start_time, arm.end_time
+         LIMIT 10000"
     );
 
     let schema = infra::schema::get(org_id, stream_name, StreamType::Logs).await;
@@ -356,8 +378,8 @@ async fn fetch_arm_failures(org_id: &str, arm: &CompareArm) -> std::collections:
             sql,
             from: 0,
             size: 10000,
-            start_time: arm.start_time,
-            end_time: arm.end_time,
+            start_time: read_start,
+            end_time: read_end,
             quick_mode: false,
             query_type: "".to_string(),
             track_total_hits: false,

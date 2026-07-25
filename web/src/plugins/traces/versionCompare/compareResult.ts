@@ -114,5 +114,11 @@ export function buildCompareResultFromEndpoint(
 export function endpointHasSufficientLatencyAndCost(endpoint: {
   p50: MetricDelta; p95: MetricDelta; cost: MetricDelta;
 }): boolean {
-  return !endpoint.p50.insufficient && !endpoint.p95.insufficient && !endpoint.cost.insufficient;
+  // Gate on p95 (the headline latency metric) only. p50 can legitimately be
+  // `insufficient` when its density probe degenerates on tightly-clustered data
+  // (it still carries a valid point estimate) — that must NOT discard the whole
+  // endpoint result and trigger the expensive raw-sample + bootstrap fallback
+  // (a ~3s synchronous block). If p95 came back from the merged sketch, the
+  // endpoint path is good; p50/cost render their own point/insufficient state.
+  return !endpoint.p95.insufficient;
 }

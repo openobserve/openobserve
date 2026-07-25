@@ -26,10 +26,10 @@ const AGENT_A: GenAiAgentListItem = {
 };
 const AGENT_B: GenAiAgentListItem = { ...AGENT_A, id: "a2", version: "1.4.0" };
 
-function mountView() {
+function mountView(versionList: GenAiAgentListItem[] = [AGENT_A, AGENT_B]) {
   return mount(VersionCompareView, {
     props: {
-      versionList: [AGENT_A, AGENT_B],
+      versionList,
       stream: "s",
       windows: null,
       result: null,
@@ -60,6 +60,32 @@ function mountView() {
     },
   });
 }
+
+describe("VersionCompareView — default version seeding", () => {
+  it("seeds A and B to two DISTINCT versions even when versionList has duplicate rows per version", () => {
+    // `listVersionsForCompare` returns one row per version PER time-bucket, so a
+    // version active across several windows appears multiple times. Sorting the
+    // raw list by first_seen and taking [0]/[1] can pick two duplicates of the
+    // SAME version → A === B → run() gated off → blank panels. Dedup must prevent
+    // that. Here 2.1.0 appears 3× and 2.0.0 3× (interleaved) — the regression
+    // repro from the ddsketch_test org.
+    const v21 = (fs: number): GenAiAgentListItem => ({ ...AGENT_A, version: "2.1.0", first_seen: fs });
+    const v20 = (fs: number): GenAiAgentListItem => ({ ...AGENT_A, version: "2.0.0", first_seen: fs });
+    const dupes = [
+      v21(1_784_989_582_452_101), v21(1_784_989_582_452_101),
+      v20(1_784_989_422_452_101), v20(1_784_989_422_452_101),
+      v21(1_784_989_113_443_419), v20(1_784_988_953_443_419),
+    ];
+    const w = mountView(dupes);
+    const runEvents = w.emitted("run");
+    expect(runEvents).toBeTruthy();
+    const payload = runEvents!.at(-1)![0] as any;
+    // A = latest (2.1.0), B = previous (2.0.0) — NOT two copies of 2.1.0.
+    expect(payload.a.version).toBe("2.1.0");
+    expect(payload.b.version).toBe("2.0.0");
+    expect(payload.a.version).not.toBe(payload.b.version);
+  });
+});
 
 describe("VersionCompareView — manual override wiring (the O2 ODateTimeRange path)", () => {
   it("uses ODateTimeRange (not native datetime-local) for each arm in manual mode", async () => {

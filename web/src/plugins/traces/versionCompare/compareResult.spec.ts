@@ -126,20 +126,22 @@ describe("buildCompareResultFromEndpoint", () => {
 });
 
 describe("endpointHasSufficientLatencyAndCost", () => {
-  it("true when p50/p95/cost are all sufficient (p99 ignored)", () => {
+  it("true when p95 is sufficient (uses the endpoint path)", () => {
     expect(endpointHasSufficientLatencyAndCost({
       p50: md(), p95: md(), cost: md(),
     })).toBe(true);
   });
-  it("false when any of p50/p95/cost is insufficient", () => {
+  it("stays true when p50 or cost is insufficient but p95 is good — p50-insufficient (clustered-data density-probe degeneracy) must NOT trigger the ~3s bootstrap fallback", () => {
     expect(endpointHasSufficientLatencyAndCost({
       p50: md({ insufficient: true }), p95: md(), cost: md(),
-    })).toBe(false);
-    expect(endpointHasSufficientLatencyAndCost({
-      p50: md(), p95: md({ insufficient: true }), cost: md(),
-    })).toBe(false);
+    })).toBe(true);
     expect(endpointHasSufficientLatencyAndCost({
       p50: md(), p95: md(), cost: md({ insufficient: true }),
+    })).toBe(true);
+  });
+  it("false only when p95 (the headline metric) is insufficient → raw fallback", () => {
+    expect(endpointHasSufficientLatencyAndCost({
+      p50: md(), p95: md({ insufficient: true }), cost: md(),
     })).toBe(false);
   });
 });
