@@ -161,21 +161,36 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 
-const props = defineProps<{
-  seriesA: OverlayPoint[];
-  seriesB: OverlayPoint[];
-  mode: OverlayMode;
-}>();
+const props = withDefaults(
+  defineProps<{
+    seriesA: OverlayPoint[];
+    seriesB: OverlayPoint[];
+    mode: OverlayMode;
+    /** Unit of the rebased x axis in sinceRollout mode; drives the axis label
+     *  so ticks read "Minutes/Hours/Days since rollout" (not raw hours). */
+    xUnit?: "minutes" | "hours" | "days";
+    /** Actual version strings for the legend/series names (e.g. "1.4.0"). Falls
+     *  back to the generic "Version A/B" only when a version is unknown. */
+    versionA?: string;
+    versionB?: string;
+  }>(),
+  { xUnit: "hours", versionA: "", versionB: "" },
+);
 
 const { t } = useI18n();
 
-const labelA = computed(() => t("aiObservability.overlayChart.seriesA"));
-const labelB = computed(() => t("aiObservability.overlayChart.seriesB"));
-const xAxisLabel = computed(() =>
-  props.mode === "sinceRollout"
-    ? t("aiObservability.overlayChart.xAxisSinceRollout")
-    : t("aiObservability.overlayChart.xAxisWallClock"),
-);
+// Show the real version the user picked ("1.4.0"), not a generic "Version A".
+const labelA = computed(() => props.versionA || t("aiObservability.overlayChart.seriesA"));
+const labelB = computed(() => props.versionB || t("aiObservability.overlayChart.seriesB"));
+const xAxisLabel = computed(() => {
+  if (props.mode !== "sinceRollout") return t("aiObservability.overlayChart.xAxisWallClock");
+  const byUnit: Record<string, string> = {
+    minutes: "aiObservability.overlayChart.xAxisSinceRolloutMinutes",
+    hours: "aiObservability.overlayChart.xAxisSinceRolloutHours",
+    days: "aiObservability.overlayChart.xAxisSinceRolloutDays",
+  };
+  return t(byUnit[props.xUnit] ?? "aiObservability.overlayChart.xAxisSinceRollout");
+});
 
 const panelSchema = computed(() =>
   buildOverlaySchema({

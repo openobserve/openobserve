@@ -25,13 +25,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   this component only renders the body once compare mode is ON and a version
   list is available.
 
-  Manual override (align === "manual"): reveals two per-arm ODateTimeRange
-  controls. Changing one calls `run()` with that arm's window pinned to the
-  caller-supplied value — kept intentionally minimal (two range pickers, no
-  extra chrome) per the plan's "don't over-engineer" note.
+  Manual override (align === "manual"): each version picker's window slot swaps
+  its "auto:" caption for the app-standard DateTime picker (same as the page
+  header). Changing one calls `run()` with that arm's window pinned to the
+  chosen value. The slot is a fixed h-8 line so toggling modes never shifts the
+  layout.
 -->
 <template>
   <div class="flex flex-col gap-2.5" data-test="version-compare-view">
+    <!-- Compare bar. The per-arm Manual date windows live INSIDE the bar, under
+         each version picker (via the window-a/window-b slots) — so switching to
+         Manual swaps a caption for an editable picker in place, with no separate
+         full-width row appearing and shoving the metrics/chart down. -->
     <VersionCompareBar
       :versions="versionOptions"
       :a="selectedA"
@@ -41,39 +46,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:b="onSelectB"
       @update:align="onAlignChange"
       @exit="emit('exit')"
-    />
-
-    <!-- Manual override: two per-arm windows, visible only in manual mode. -->
-    <OContent v-if="align === 'manual'">
-      <OCard class="border border-border-default bg-surface-panel" data-test="version-compare-manual-override">
-        <OCardSection role="body" class="flex items-center gap-3">
-          <ODateTimeRange
-            mode="absolute"
+    >
+      <!-- Fixed-height (h-8) slot so switching Since↔Manual never changes the row
+           height: the app-standard DateTime picker and the "auto:" caption both
+           occupy the same 2rem line, eliminating the layout shift. -->
+      <template #window-a>
+        <div class="flex h-8 w-full items-center">
+          <DateTime
+            v-if="align === 'manual'"
+            auto-apply
             disable-relative
-            with-seconds
-            :label="t('aiObservability.versionCompare.manual.windowA')"
-            :start-date="manualStartDateA"
-            :start-time="manualStartTimeA"
-            :end-date="manualEndDateA"
-            :end-time="manualEndTimeA"
+            :default-type="'absolute'"
+            :default-absolute-time="manualDefaultA"
+            class="h-8 w-full"
             data-test="version-compare-manual-a-window"
-            @change="(v) => onManualRangeChange('a', v)"
+            @on:date-change="(v: unknown) => onManualDateChange('a', v)"
           />
-          <ODateTimeRange
-            mode="absolute"
+          <span
+            v-else-if="autoWindowA"
+            class="px-1 text-xs text-text-muted"
+            data-test="version-compare-auto-window-a"
+          >
+            {{ autoWindowA }}
+          </span>
+        </div>
+      </template>
+      <template #window-b>
+        <div class="flex h-8 w-full items-center">
+          <DateTime
+            v-if="align === 'manual'"
+            auto-apply
             disable-relative
-            with-seconds
-            :label="t('aiObservability.versionCompare.manual.windowB')"
-            :start-date="manualStartDateB"
-            :start-time="manualStartTimeB"
-            :end-date="manualEndDateB"
-            :end-time="manualEndTimeB"
+            :default-type="'absolute'"
+            :default-absolute-time="manualDefaultB"
+            class="h-8 w-full"
             data-test="version-compare-manual-b-window"
-            @change="(v) => onManualRangeChange('b', v)"
+            @on:date-change="(v: unknown) => onManualDateChange('b', v)"
           />
-        </OCardSection>
-      </OCard>
-    </OContent>
+          <span
+            v-else-if="autoWindowB"
+            class="px-1 text-xs text-text-muted"
+            data-test="version-compare-auto-window-b"
+          >
+            {{ autoWindowB }}
+          </span>
+        </div>
+      </template>
+    </VersionCompareBar>
 
     <OContent class="flex flex-col gap-2.5">
       <VersionCompareBanner
@@ -85,7 +104,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :delta-hours="deltaHours"
       />
 
-      <div v-if="windows" class="grid grid-cols-1 gap-2.5 md:grid-cols-2">
+      <!-- Comparison caption: two compact inline identity chips (version · window
+           · N traces) in one row, reading as a caption for the metrics below
+           rather than two oversized boxes. -->
+      <div
+        v-if="windows"
+        class="flex flex-wrap items-center gap-x-6 gap-y-1"
+        data-test="version-compare-arm-summary"
+      >
         <VersionWindowCard
           arm="a"
           :env="armAMeta?.env ?? ''"
@@ -121,7 +147,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <VersionDeltaStrip v-else-if="result" :result="result" />
-      <VersionErrorDiff v-if="result" :error-diff="props.errorDiff ?? null" />
+      <VersionErrorDiff
+        v-if="result"
+        :error-diff="props.errorDiff ?? null"
+        :version-a="armAMeta?.version ?? selectedA"
+        :version-b="armBMeta?.version ?? selectedB"
+      />
       <span
         v-if="sampledNote"
         class="text-xs text-text-muted"
@@ -136,11 +167,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="h-55 w-full rounded-surface"
         data-test="version-compare-chart-skeleton"
       />
+      <!-- A line needs >=2 points per series. In sameWallClock mode a wide page
+           window can collapse a short-lived version into a single coarse
+           histogram bucket (one point → nothing to draw), so guide the user to
+           narrow the range instead of showing a blank grid. -->
+      <div
+        v-else-if="windows && !chartPlottable"
+        class="flex h-55 items-center justify-center rounded-surface border border-border-default bg-surface-panel px-4 text-center"
+        data-test="version-overlay-chart-lowres"
+      >
+        <span class="text-xs text-text-muted">{{ t("aiObservability.overlayChart.lowResolution") }}</span>
+      </div>
       <VersionOverlayChart
         v-else-if="windows"
         :series-a="overlaySeriesA"
         :series-b="overlaySeriesB"
         :mode="overlayMode"
+        :x-unit="overlayXUnit.key"
+        :version-a="armAMeta?.version ?? selectedA"
+        :version-b="armBMeta?.version ?? selectedB"
         class="h-55"
       />
     </OContent>
@@ -151,10 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import OContent from "@/lib/core/Content/OContent.vue";
-import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
-import type { DateTimeRangeAbsoluteValue } from "@/lib/forms/DateTimeRange/ODateTimeRange.types";
+import DateTime from "@/components/DateTime.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import VersionCompareBar from "./VersionCompareBar.vue";
 import VersionCompareBanner from "./VersionCompareBanner.vue";
@@ -166,6 +208,7 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 import type { AlignMode, CompareWindows } from "@/plugins/traces/versionCompare/windows";
 import type { CompareResult } from "@/plugins/traces/versionCompare/compareResult";
+import { formatDuration } from "@/plugins/traces/versionCompare/formatDuration";
 import type { LLMSparklineSeries } from "@/plugins/traces/composables/useLLMInsights";
 import type { ErrorDiff } from "@/services/gen-ai-agent-mapping.service";
 
@@ -261,29 +304,72 @@ const armBMeta = computed<GenAiAgentListItem | null>(
   () => props.versionList.find((v) => v.version === selectedB.value) ?? null,
 );
 
+// Short "auto:" caption for a resolved window, shown under each version picker in
+// non-manual modes so the Manual date-picker slot reserves its space (no layout
+// shift) and the user sees which window is in effect without opening anything.
+function autoWindowLabel(win?: { start: number; end: number }): string {
+  if (!win) return "";
+  return t("aiObservability.versionCompare.bar.autoWindow", {
+    duration: formatDuration((win.end - win.start) / 3_600_000_000),
+  });
+}
+const autoWindowA = computed(() => autoWindowLabel(props.windows?.a));
+const autoWindowB = computed(() => autoWindowLabel(props.windows?.b));
+
 const deltaHours = computed(() =>
   props.windows ? Math.max(0, props.windows.deltaMicros / 3_600_000_000) : 0,
 );
 
 const overlayMode = computed<OverlayMode>(() => (align.value === "sameWallClock" ? "sameWallClock" : "sinceRollout"));
 
-// Overlay series: rebase each arm's sparkline buckets onto elapsed hours
-// across its resolved window (sinceRollout/manual) or onto the shared
-// wall-clock window (sameWallClock) — sparklines carry no per-bucket
-// timestamp, so buckets are evenly distributed across the window duration.
-function toOverlayPoints(series: LLMSparklineSeries | null, win: { start: number; end: number } | undefined): OverlayPoint[] {
+// Overlay x-axis unit. The rebased x used to be raw fractional HOURS, so a
+// short-lived version rendered axis ticks like "0.0395787h" — unreadable and
+// meaningless. Instead pick a human unit from the largest arm span: minutes for
+// sub-2h data (the common short-rollout case), hours for sub-2d, else days. Both
+// arms share one unit so their x-values stay comparable on the same axis.
+type XUnit = { key: "minutes" | "hours" | "days"; perHour: number };
+function winHours(win?: { start: number; end: number }): number {
+  if (!win) return 0;
+  return Math.max(0, (win.end - win.start) / 3_600_000_000);
+}
+const overlayXUnit = computed<XUnit>(() => {
+  const maxHours = Math.max(winHours(props.windows?.a), winHours(props.windows?.b));
+  if (maxHours < 2) return { key: "minutes", perHour: 60 };
+  if (maxHours < 48) return { key: "hours", perHour: 1 };
+  return { key: "days", perHour: 1 / 24 };
+});
+
+// Rebase each arm's sparkline buckets onto elapsed-x (in overlayXUnit) across
+// its resolved window (sinceRollout/manual) or the shared wall-clock window
+// (sameWallClock) — sparklines carry no per-bucket timestamp, so buckets are
+// evenly distributed across the window duration.
+function toOverlayPoints(
+  series: LLMSparklineSeries | null,
+  win: { start: number; end: number } | undefined,
+  unit: XUnit,
+): OverlayPoint[] {
   if (!series || !win) return [];
   const values = series.cost;
   if (!values.length) return [];
-  const hours = Math.max(0, (win.end - win.start) / 3_600_000_000);
+  const span = winHours(win) * unit.perHour;
   return values.map((y, i) => ({
-    x: values.length > 1 ? (i / (values.length - 1)) * hours : 0,
+    // Round x to 2 decimals: the axis is a value type, so an unrounded elapsed
+    // value renders as a full-precision float tick (e.g. "2.1920511627906976").
+    x: values.length > 1 ? Math.round(((i / (values.length - 1)) * span) * 100) / 100 : 0,
     y,
   }));
 }
 
-const overlaySeriesA = computed(() => toOverlayPoints(props.sparklinesA, props.windows?.a));
-const overlaySeriesB = computed(() => toOverlayPoints(props.sparklinesB, props.windows?.b));
+const overlaySeriesA = computed(() => toOverlayPoints(props.sparklinesA, props.windows?.a, overlayXUnit.value));
+const overlaySeriesB = computed(() => toOverlayPoints(props.sparklinesB, props.windows?.b, overlayXUnit.value));
+
+// A line chart needs >=2 points on at least one series to draw anything. When
+// both arms collapse to a single bucket (common in sameWallClock over a wide
+// page window), there's nothing to plot — render the low-resolution note
+// instead of a blank grid.
+const chartPlottable = computed(
+  () => overlaySeriesA.value.length >= 2 || overlaySeriesB.value.length >= 2,
+);
 
 function requestRun(manual?: { a?: { start: number; end: number }; b?: { start: number; end: number } }) {
   const a = armAMeta.value;
@@ -306,52 +392,64 @@ function onSelectB(v: string) {
 }
 function onAlignChange(v: AlignMode) {
   align.value = v;
+  // Manual mode keeps the last good comparison on entry — the pickers are seeded
+  // to each arm's current auto window, and we only re-run when the user actually
+  // edits a picker (onManualDateChange). Running here (or on the DateTime's
+  // mount-time emit) would query half-initialized windows and render NaN/0.
+  if (v === "manual") {
+    // Each DateTime fires ONE `on:date-change` on mount (auto-apply seeding its
+    // default). Arm those two mount-emits to be swallowed so entering Manual
+    // doesn't trigger a run — DateTime's own `userChangedValue` is unreliable
+    // here (it's `true` on the mount emit, not `false`).
+    ignoreNextEmitA.value = true;
+    ignoreNextEmitB.value = true;
+    return;
+  }
   requestRun();
 }
 
 // ── Manual override ────────────────────────────────────────────────────────
-// Each arm is an ODateTimeRange in absolute mode — date/time strings (no
-// timezone) converted to epoch microseconds on change. Kept minimal per the
-// plan: no persistence, no validation beyond "both start/end present for an
-// arm".
-const manualStartDateA = ref("");
-const manualStartTimeA = ref("");
-const manualEndDateA = ref("");
-const manualEndTimeA = ref("");
-const manualStartDateB = ref("");
-const manualStartTimeB = ref("");
-const manualEndDateB = ref("");
-const manualEndTimeB = ref("");
+// Per-arm manual windows (epoch µs), captured from the app-standard DateTime
+// component's `on:date-change` payload — the SAME picker the page header and the
+// rest of the app use, so the Manual controls look/behave consistently.
+const manualWinA = ref<{ start: number; end: number } | null>(null);
+const manualWinB = ref<{ start: number; end: number } | null>(null);
+// Swallow each picker's one mount-time `on:date-change` (the seeding emit) so
+// entering Manual never auto-runs with a half-initialized window.
+const ignoreNextEmitA = ref(false);
+const ignoreNextEmitB = ref(false);
 
-function toMicros(date: string, time: string): number | null {
-  if (!date || !time) return null;
-  const ms = new Date(`${date}T${time}`).getTime();
-  return Number.isNaN(ms) ? null : ms * 1000;
-}
+// DateTime emits { startTime, endTime } already in epoch µs (see its
+// getConsumableDateTime). Seed both pickers to each arm's resolved auto window so
+// the popup opens on a sensible range rather than an arbitrary default.
+const manualDefaultA = computed(() => ({
+  startTime: props.windows?.a.start ?? 0,
+  endTime: props.windows?.a.end ?? 0,
+}));
+const manualDefaultB = computed(() => ({
+  startTime: props.windows?.b.start ?? 0,
+  endTime: props.windows?.b.end ?? 0,
+}));
 
-function onManualRangeChange(arm: "a" | "b", value: DateTimeRangeAbsoluteValue) {
-  if (arm === "a") {
-    manualStartDateA.value = value.startDate;
-    manualStartTimeA.value = value.startTime;
-    manualEndDateA.value = value.endDate;
-    manualEndTimeA.value = value.endTime;
-  } else {
-    manualStartDateB.value = value.startDate;
-    manualStartTimeB.value = value.startTime;
-    manualEndDateB.value = value.endDate;
-    manualEndTimeB.value = value.endTime;
-  }
+function onManualDateChange(arm: "a" | "b", payload: unknown) {
+  const p = payload as { startTime?: number; endTime?: number };
+  if (p?.startTime == null || p?.endTime == null) return;
+  // Swallow the one mount-time seeding emit per picker (armed on entering Manual)
+  // so it doesn't trigger a run with a half-initialized window → NaN. Still record
+  // the seeded window so a later edit of the OTHER arm pins this one correctly.
+  const seedWin = { start: p.startTime, end: p.endTime };
+  if (arm === "a" && ignoreNextEmitA.value) { ignoreNextEmitA.value = false; manualWinA.value = seedWin; return; }
+  if (arm === "b" && ignoreNextEmitB.value) { ignoreNextEmitB.value = false; manualWinB.value = seedWin; return; }
+  const win = { start: p.startTime, end: p.endTime };
+  if (arm === "a") manualWinA.value = win;
+  else manualWinB.value = win;
 
-  const aStart = toMicros(manualStartDateA.value, manualStartTimeA.value);
-  const aEnd = toMicros(manualEndDateA.value, manualEndTimeA.value);
-  const bStart = toMicros(manualStartDateB.value, manualStartTimeB.value);
-  const bEnd = toMicros(manualEndDateB.value, manualEndTimeB.value);
-
-  const manual: { a?: { start: number; end: number }; b?: { start: number; end: number } } = {};
-  if (arm === "a" && aStart != null && aEnd != null) manual.a = { start: aStart, end: aEnd };
-  if (arm === "b" && bStart != null && bEnd != null) manual.b = { start: bStart, end: bEnd };
-  if (!manual.a && !manual.b) return;
-  requestRun(manual);
+  // Re-run with BOTH arms pinned — include the other arm's already-chosen (or
+  // seeded auto) window so a single edit never leaves the untouched arm querying
+  // an empty window (the NaN bug). Falls back to the auto default when unedited.
+  const winA = arm === "a" ? win : (manualWinA.value ?? { start: manualDefaultA.value.startTime, end: manualDefaultA.value.endTime });
+  const winB = arm === "b" ? win : (manualWinB.value ?? { start: manualDefaultB.value.startTime, end: manualDefaultB.value.endTime });
+  requestRun({ a: winA, b: winB });
 }
 
 defineExpose({ align });

@@ -40,16 +40,23 @@ function mountView(versionList: GenAiAgentListItem[] = [AGENT_A, AGENT_B]) {
       stubs: {
         VersionCompareBar: {
           ...stub("VersionCompareBar", ["update:a", "update:b", "update:align", "exit"]),
+          // Render the window-a/window-b slots: the per-arm Manual date pickers
+          // now live inside the bar (under each version picker), not in a
+          // separate row, so the stub must project those slots for the manual
+          // wiring tests to reach the ODateTimeRange controls.
+          template: `<div data-test="stub-VersionCompareBar"><slot /><slot name="window-a" /><slot name="window-b" /></div>`,
         },
         VersionCompareBanner: stub("VersionCompareBanner"),
         VersionWindowCard: stub("VersionWindowCard"),
         VersionDeltaStrip: stub("VersionDeltaStrip"),
         VersionOverlayChart: stub("VersionOverlayChart"),
-        // ODateTimeRange stub emits the same `change` payload shape the real one does.
-        ODateTimeRange: {
-          name: "ODateTimeRange",
-          props: ["mode", "disableRelative", "withSeconds", "label", "dataTest"],
-          emits: ["change"],
+        // DateTime is the app-standard picker (same as the page header). Its stub
+        // emits `on:date-change` with the epoch-µs { startTime, endTime } payload
+        // the real component produces.
+        DateTime: {
+          name: "DateTime",
+          props: ["autoApply", "disableRelative", "defaultType", "defaultAbsoluteTime", "dataTest"],
+          emits: ["on:date-change"],
           template: `<div :data-test="dataTest"></div>`,
         },
         OContent: { template: "<div><slot /></div>" },
@@ -87,8 +94,8 @@ describe("VersionCompareView — default version seeding", () => {
   });
 });
 
-describe("VersionCompareView — manual override wiring (the O2 ODateTimeRange path)", () => {
-  it("uses ODateTimeRange (not native datetime-local) for each arm in manual mode", async () => {
+describe("VersionCompareView — manual override wiring (the app-standard DateTime path)", () => {
+  it("uses the app-standard DateTime picker for each arm in manual mode", async () => {
     const w = mountView();
     // Switch the (stubbed) bar to manual mode.
     w.findComponent({ name: "VersionCompareBar" }).vm.$emit("update:align", "manual");
@@ -98,39 +105,50 @@ describe("VersionCompareView — manual override wiring (the O2 ODateTimeRange p
     const bWindow = w.find('[data-test="version-compare-manual-b-window"]');
     expect(aWindow.exists()).toBe(true);
     expect(bWindow.exists()).toBe(true);
-    // No native datetime-local anywhere.
+    // Both pickers are the shared DateTime component (not a native input or the
+    // O2-lib ODateTimeRange).
+    const pickers = w
+      .findAllComponents({ name: "DateTime" })
+      .filter((c) => String(c.attributes("data-test") ?? "").includes("version-compare-manual"));
+    expect(pickers.length).toBe(2);
     expect(w.html()).not.toContain("datetime-local");
   });
 
-  it("converts an ODateTimeRange change to an epoch-µs manual window and emits `run` for that arm", async () => {
+  it("swallows each picker's mount-time seed emit, then a real edit runs with BOTH arms pinned", async () => {
     const w = mountView();
     w.findComponent({ name: "VersionCompareBar" }).vm.$emit("update:align", "manual");
     await w.vm.$nextTick();
 
-    // Emit an absolute date/time range on arm A's control.
-    const aRange = w
-      .findAllComponents({ name: "ODateTimeRange" })
+    const aPicker = w
+      .findAllComponents({ name: "DateTime" })
       .find((c) => c.attributes("data-test") === "version-compare-manual-a-window")!;
-    aRange.vm.$emit("change", {
-      startDate: "2026-07-01",
-      startTime: "00:00:00",
-      endDate: "2026-07-02",
-      endTime: "00:00:00",
-      timezone: "UTC",
-    });
+    const bPicker = w
+      .findAllComponents({ name: "DateTime" })
+      .find((c) => c.attributes("data-test") === "version-compare-manual-b-window")!;
+
+    // 1) Both pickers fire their mount-time seeding emit — these must be SWALLOWED
+    //    (no manual run yet; entering Manual keeps the last good comparison).
+    const runsBefore = (w.emitted("run") ?? []).length;
+    aPicker.vm.$emit("on:date-change", { startTime: 1, endTime: 2, valueType: "absolute" });
+    bPicker.vm.$emit("on:date-change", { startTime: 3, endTime: 4, valueType: "absolute" });
+    await w.vm.$nextTick();
+    // The last run (if any) is NOT a manual run — the seeds were swallowed.
+    const afterSeed = w.emitted("run") ?? [];
+    if (afterSeed.length > runsBefore) {
+      expect((afterSeed.at(-1)![0] as any).align).not.toBe("manual");
+    }
+
+    // 2) A REAL user edit of arm A now runs, pinning BOTH arms (B at its seeded 3–4).
+    const start = new Date("2026-07-01T00:00:00").getTime() * 1000;
+    const end = new Date("2026-07-02T00:00:00").getTime() * 1000;
+    aPicker.vm.$emit("on:date-change", { startTime: start, endTime: end, valueType: "absolute" });
     await w.vm.$nextTick();
 
-    const runEvents = w.emitted("run");
-    expect(runEvents).toBeTruthy();
-    const payload = runEvents!.at(-1)![0] as any;
+    const payload = w.emitted("run")!.at(-1)![0] as any;
     expect(payload.align).toBe("manual");
-    // 2026-07-01T00:00:00 local → ms → *1000 µs. Assert it's the right arm and a finite µs value.
-    expect(payload.manual.a).toBeTruthy();
-    const expectedStart = new Date("2026-07-01T00:00:00").getTime() * 1000;
-    const expectedEnd = new Date("2026-07-02T00:00:00").getTime() * 1000;
-    expect(payload.manual.a.start).toBe(expectedStart);
-    expect(payload.manual.a.end).toBe(expectedEnd);
-    // Arm B untouched → not in this payload.
-    expect(payload.manual.b).toBeUndefined();
+    expect(payload.manual.a.start).toBe(start);
+    expect(payload.manual.a.end).toBe(end);
+    // Arm B pinned to its swallowed seed (3–4), NOT left empty → no NaN.
+    expect(payload.manual.b).toEqual({ start: 3, end: 4 });
   });
 });

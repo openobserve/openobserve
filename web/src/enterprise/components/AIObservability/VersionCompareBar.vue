@@ -26,69 +26,89 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   a hint not a hard block).
 -->
 <template>
-  <div class="flex items-center gap-3 px-page-edge py-2 border-b border-border-default">
-    <div class="w-40 flex-shrink-0">
-      <OSelect
-        :model-value="a"
-        :label="t('aiObservability.versionCompare.bar.versionA')"
-        label-position="inside"
-        :options="optionsWithoutUnset"
-        labelKey="label"
-        valueKey="value"
-        class="w-full rounded-default"
-        data-test="version-compare-bar-a"
-        @update:model-value="(v: unknown) => emit('update:a', v as string)"
-      />
+  <!-- Two-row grid so every control shares one baseline. Row 1 holds the version
+       pickers + the Align toggle + exit (all on the same line). Row 2 holds each
+       arm's window slot directly under its picker. Fixed row-1 height means the
+       Align bar never looks offset from the pickers, and the window row keeps a
+       constant height whether it shows an "auto:" caption or a date picker (no
+       layout shift when toggling Manual mode). -->
+  <div class="px-page-edge py-2 border-b border-border-default">
+    <div class="flex items-center gap-3">
+      <div class="w-64 flex-shrink-0">
+        <OSelect
+          :model-value="a"
+          :label="t('aiObservability.versionCompare.bar.versionA')"
+          label-position="inside"
+          :options="optionsWithoutUnset"
+          labelKey="label"
+          valueKey="value"
+          class="w-full rounded-default"
+          data-test="version-compare-bar-a"
+          @update:model-value="(v: unknown) => emit('update:a', v as string)"
+        />
+      </div>
+
+      <div class="w-64 flex-shrink-0">
+        <OSelect
+          :model-value="b"
+          :label="t('aiObservability.versionCompare.bar.versionB')"
+          label-position="inside"
+          :options="optionsWithoutUnset"
+          labelKey="label"
+          valueKey="value"
+          class="w-full rounded-default"
+          data-test="version-compare-bar-b"
+          @update:model-value="(v: unknown) => emit('update:b', v as string)"
+        />
+      </div>
+
+      <OToggleGroup
+        :model-value="align"
+        type="single"
+        data-test="version-compare-bar-align"
+        :label="t('aiObservability.versionCompare.bar.align')"
+        @update:model-value="(v: unknown) => emit('update:align', v as AlignMode)"
+      >
+        <OToggleGroupItem value="sinceRollout" size="sm">
+          {{ t("aiObservability.versionCompare.bar.alignSinceRollout") }}
+        </OToggleGroupItem>
+        <OToggleGroupItem value="sameWallClock" size="sm">
+          {{ t("aiObservability.versionCompare.bar.alignSameWallClock") }}
+        </OToggleGroupItem>
+        <OToggleGroupItem value="manual" size="sm">
+          {{ t("aiObservability.versionCompare.bar.alignManual") }}
+        </OToggleGroupItem>
+      </OToggleGroup>
+
+      <!-- Labeled (not a bare X): "Exit compare" makes it obvious this leaves
+           comparison mode and returns to the single-version view. -->
+      <OButton
+        variant="outline"
+        size="sm"
+        icon-left="close"
+        data-test="version-compare-bar-exit"
+        @click="emit('exit')"
+      >
+        {{ t("aiObservability.versionCompare.bar.exit") }}
+      </OButton>
     </div>
 
-    <div class="w-40 flex-shrink-0">
-      <OSelect
-        :model-value="b"
-        :label="t('aiObservability.versionCompare.bar.versionB')"
-        label-position="inside"
-        :options="optionsWithoutUnset"
-        labelKey="label"
-        valueKey="value"
-        class="w-full rounded-default"
-        data-test="version-compare-bar-b"
-        @update:model-value="(v: unknown) => emit('update:b', v as string)"
-      />
+    <!-- Window row: each date-picker slot is the SAME w-64 as its version picker
+         column above. overflow-hidden caps the DateTime trigger (which is content-
+         width / w-fit internally and can't be shrunk via props) to exactly the
+         column width, so the pickers line up flush under the version dropdowns. -->
+    <div v-if="$slots['window-a'] || $slots['window-b']" class="mt-1 flex items-start gap-3">
+      <div class="w-64 flex-shrink-0 overflow-hidden"><slot name="window-a" /></div>
+      <div class="w-64 flex-shrink-0 overflow-hidden"><slot name="window-b" /></div>
     </div>
 
     <span
       v-if="sameVersion"
       data-test="version-compare-bar-same-hint"
-      class="text-xs text-text-secondary"
+      class="mt-1 block text-xs text-text-secondary"
     >
       {{ t("aiObservability.versionCompare.bar.samePickHint") }}
     </span>
-
-    <OToggleGroup
-      :model-value="align"
-      type="single"
-      data-test="version-compare-bar-align"
-      :label="t('aiObservability.versionCompare.bar.align')"
-      @update:model-value="(v: unknown) => emit('update:align', v as AlignMode)"
-    >
-      <OToggleGroupItem value="sinceRollout" size="sm">
-        {{ t("aiObservability.versionCompare.bar.alignSinceRollout") }}
-      </OToggleGroupItem>
-      <OToggleGroupItem value="sameWallClock" size="sm">
-        {{ t("aiObservability.versionCompare.bar.alignSameWallClock") }}
-      </OToggleGroupItem>
-      <OToggleGroupItem value="manual" size="sm">
-        {{ t("aiObservability.versionCompare.bar.alignManual") }}
-      </OToggleGroupItem>
-    </OToggleGroup>
-
-    <OButton
-      variant="ghost"
-      size="icon-sm"
-      icon-left="close"
-      data-test="version-compare-bar-exit"
-      :aria-label="t('aiObservability.versionCompare.bar.exit')"
-      @click="emit('exit')"
-    />
   </div>
 </template>
 

@@ -30,31 +30,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   arm a = accent, arm b = series-b.
 -->
 <template>
-  <OCard
-    class="min-w-48 flex-1 rounded-surface! border border-border-default bg-surface-panel"
+  <!-- Compact inline identity chip (not a full card): the arm's series-color
+       dot + "version — window · N traces". Two of these sit in a tight legend
+       row above the metrics, so the sample-size context reads as a caption for
+       the comparison rather than two oversized boxes. -->
+  <div
+    class="inline-flex items-center gap-2"
     :data-test="`version-window-card-${arm}`"
   >
-    <OCardSection role="body" class="flex flex-col gap-1 p-3!">
-      <div class="flex items-center gap-2">
-        <span
-          class="h-2 w-2 shrink-0 rounded-full"
-          :class="arm === 'a' ? 'bg-accent' : 'bg-series-b'"
-          :data-test="`version-window-card-${arm}-chip`"
-        />
-        <span class="text-sm text-text-body" :data-test="`version-window-card-${arm}-label`">
-          {{ label }}
-        </span>
-      </div>
-
-      <span
-        v-if="showClamp"
-        class="text-xs text-text-secondary"
-        :data-test="`version-window-card-${arm}-clamp`"
-      >
-        {{ t("aiObservability.versionCompare.windowCard.clamp", { duration: clampDuration }) }}
-      </span>
-    </OCardSection>
-  </OCard>
+    <span
+      class="h-2 w-2 shrink-0 rounded-full"
+      :class="arm === 'a' ? 'bg-accent' : 'bg-series-b'"
+      :data-test="`version-window-card-${arm}-chip`"
+    />
+    <span class="text-sm text-text-body" :data-test="`version-window-card-${arm}-label`">
+      {{ label }}
+    </span>
+    <span
+      v-if="showClamp"
+      class="text-xs text-text-secondary"
+      :data-test="`version-window-card-${arm}-clamp`"
+    >
+      {{ t("aiObservability.versionCompare.windowCard.clamp", { duration: clampDuration }) }}
+    </span>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -85,13 +84,20 @@ function formatWindow(win: Win): string {
   return formatDuration((win.end - win.start) / 3_600_000_000);
 }
 
+// Omit the env prefix entirely when the agent has no env set — otherwise the
+// label renders a dangling "· 1.4.0 …" with an empty env before the separator.
 const label = computed(() =>
-  t("aiObservability.versionCompare.windowCard.label", {
-    env: props.env,
-    version: props.version,
-    window: formatWindow(props.window),
-    count: props.traceCount,
-  }),
+  t(
+    props.env
+      ? "aiObservability.versionCompare.windowCard.label"
+      : "aiObservability.versionCompare.windowCard.labelNoEnv",
+    {
+      env: props.env,
+      version: props.version,
+      window: formatWindow(props.window),
+      count: props.traceCount,
+    },
+  ),
 );
 
 // This arm's counterpart is the OTHER arm — clamp copy renders on this card

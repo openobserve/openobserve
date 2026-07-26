@@ -82,6 +82,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import type { CompareResult, MetricKey, MetricResult } from "@/plugins/traces/versionCompare/compareResult";
+import { formatMicros } from "@/plugins/traces/versionCompare/formatDuration";
 
 const props = defineProps<{ result: CompareResult }>();
 
@@ -95,7 +96,9 @@ const COST_KEYS: MetricKey[] = ["cost"];
 
 function formatValue(key: MetricKey, value: number): string {
   if (PERCENT_KEYS.includes(key)) return `${(value * 100).toFixed(2)}%`;
-  if (MS_KEYS.includes(key)) return `${value.toFixed(0)}ms`;
+  // p50/p95/p99 arrive in MICROSECONDS (span `duration` unit) — humanize to
+  // µs/ms/s/m rather than printing the raw µs count as a giant "ms" number.
+  if (MS_KEYS.includes(key)) return formatMicros(value);
   if (COST_KEYS.includes(key)) return `$${value.toFixed(4)}`;
   return value.toFixed(1);
 }
@@ -119,16 +122,23 @@ function deltaColorClass(metric: MetricResult): string {
 function tooltipText(metric: MetricResult): string {
   if (!metric.ci) return "";
   const level = 90;
+  // Format the CI bounds in the metric's own unit: latency bounds are µs diffs
+  // (humanize), cost bounds are dollars, everything else is a plain number.
+  const fmtBound = (v: number): string => {
+    if (MS_KEYS.includes(metric.key)) return formatMicros(Math.abs(v)) + (v < 0 ? " faster" : " slower");
+    if (COST_KEYS.includes(metric.key)) return `$${v.toFixed(4)}`;
+    return v.toFixed(4);
+  };
   const range = t("aiObservability.deltaStrip.tooltip.ciRange", {
     level,
-    lower: metric.ci.lower.toFixed(4),
-    upper: metric.ci.upper.toFixed(4),
+    lower: fmtBound(metric.ci.lower),
+    upper: fmtBound(metric.ci.upper),
   });
   const method = t("aiObservability.deltaStrip.tooltip.method", {
     method:
       metric.key === "errorRate"
-        ? t("aiObservability.deltaStrip.methodNewcombe")
-        : t("aiObservability.deltaStrip.methodBootstrap"),
+        ? t("aiObservability.deltaStrip.tooltip.methodNewcombe")
+        : t("aiObservability.deltaStrip.tooltip.methodBootstrap"),
   });
   const verdictText = verdictWording(metric);
   return [verdictText, range, method].filter(Boolean).join(" ");

@@ -31,8 +31,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="rounded-surface! border border-border-default bg-surface-panel"
     data-test="version-error-diff"
   >
-    <OCardSection role="header" class="p-3!">
+    <OCardSection role="header" class="flex flex-col gap-0.5 p-3!">
       <span class="text-sm font-semibold text-text-body">{{ t("aiObservability.errorDiff.title") }}</span>
+      <span v-if="!showEmpty" class="text-xs text-text-muted">
+        {{ t("aiObservability.errorDiff.subtitle", { a: labelA, b: labelB }) }}
+      </span>
     </OCardSection>
 
     <OCardSection v-if="showEmpty" role="body" class="p-3! pt-0!">
@@ -46,8 +49,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="errorDiff!.introduced.length"
         data-test="version-error-diff-group-introduced"
       >
-        <span class="text-2xs font-semibold uppercase text-error-600">
-          {{ t("aiObservability.errorDiff.introduced") }}
+        <span class="flex items-baseline gap-1.5">
+          <span class="text-xs font-semibold uppercase text-error-600">
+            {{ t("aiObservability.errorDiff.introduced") }}
+          </span>
+          <span class="text-xs text-text-muted">{{ t("aiObservability.errorDiff.introducedHint", { b: labelB }) }}</span>
         </span>
         <ul class="mt-1 flex flex-col gap-0.5">
           <li
@@ -63,8 +69,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div v-if="errorDiff!.fixed.length" data-test="version-error-diff-group-fixed">
-        <span class="text-2xs font-semibold uppercase text-success-600">
-          {{ t("aiObservability.errorDiff.fixed") }}
+        <span class="flex items-baseline gap-1.5">
+          <span class="text-xs font-semibold uppercase text-success-600">
+            {{ t("aiObservability.errorDiff.fixed") }}
+          </span>
+          <span class="text-xs text-text-muted">{{ t("aiObservability.errorDiff.fixedHint", { b: labelB }) }}</span>
         </span>
         <ul class="mt-1 flex flex-col gap-0.5">
           <li
@@ -80,9 +89,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div v-if="errorDiff!.shared.length" data-test="version-error-diff-group-shared">
-        <span class="text-2xs font-semibold uppercase text-text-secondary">
-          {{ t("aiObservability.errorDiff.shared") }}
-        </span>
+        <div class="flex items-baseline justify-between">
+          <span class="flex items-baseline gap-1.5">
+            <span class="text-xs font-semibold uppercase text-text-secondary">
+              {{ t("aiObservability.errorDiff.shared") }}
+            </span>
+            <span class="text-xs text-text-muted">{{ t("aiObservability.errorDiff.sharedHint") }}</span>
+          </span>
+          <span class="inline-flex items-center gap-1 text-xs">
+            <span class="text-accent font-medium">{{ labelA }}</span>
+            <span class="text-text-muted">→</span>
+            <span class="text-series-b font-medium">{{ labelB }}</span>
+          </span>
+        </div>
         <ul class="mt-1 flex flex-col gap-0.5">
           <li
             v-for="row in errorDiff!.shared"
@@ -117,11 +136,22 @@ import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import type { ErrorDiff } from "@/services/gen-ai-agent-mapping.service";
 
-const props = defineProps<{
-  errorDiff: ErrorDiff | null;
-}>();
+const props = withDefaults(
+  defineProps<{
+    errorDiff: ErrorDiff | null;
+    /** Actual version strings so headings read "1.4.0"/"1.5.0", not "A"/"B". */
+    versionA?: string;
+    versionB?: string;
+  }>(),
+  { versionA: "", versionB: "" },
+);
 
 const { t } = useI18n();
+
+// Human labels for the two arms — the real version when known, else the generic
+// "Version A/B" fallback so the panel is never blank.
+const labelA = computed(() => props.versionA || t("aiObservability.errorDiff.legendA"));
+const labelB = computed(() => props.versionB || t("aiObservability.errorDiff.legendB"));
 
 const showEmpty = computed(() => !props.errorDiff || props.errorDiff.insufficient);
 

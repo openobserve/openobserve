@@ -164,6 +164,9 @@ export function useVersionCompare() {
     sharedWindow?: { start: number; end: number },
   ): Promise<void> {
     if (!a.value || !b.value) return;
+    const __t0 = performance.now();
+    // eslint-disable-next-line no-console
+    console.warn("[compare-timing] run() start", { a: a.value.version, b: b.value.version, align: align.value });
 
     if (isUnset(a.value) || isUnset(b.value)) {
       if (isUnset(a.value)) armA.error.value = UNSET_ERROR;
@@ -250,11 +253,14 @@ export function useVersionCompare() {
       .then((res: any) => res.data as CompareAgentVersionsResponse)
       .catch(() => null);
 
+    const __fetchStart = performance.now();
     const [, , endpointResponse] = await Promise.all([
       fetchAPromise,
       fetchBPromise,
       endpointPromise,
     ]);
+    // eslint-disable-next-line no-console
+    console.warn(`[compare-timing] fetch+endpoint (concurrent): ${(performance.now() - __fetchStart).toFixed(0)}ms`, { endpointReturned: !!endpointResponse });
 
     const useEndpoint =
       !!endpointResponse && endpointHasSufficientLatencyAndCost(endpointResponse);
@@ -269,8 +275,12 @@ export function useVersionCompare() {
       // No raw scan on this path — nothing to disclose as sample-capped.
       sampledNote.value = null;
       errorDiff.value = endpointResponse.error_diff ?? null;
+      // eslint-disable-next-line no-console
+      console.warn(`[compare-timing] TOTAL (fast sketch path): ${(performance.now() - __t0).toFixed(0)}ms`);
       return;
     }
+    // eslint-disable-next-line no-console
+    console.warn(`[compare-timing] endpoint insufficient → RAW-SAMPLE BOOTSTRAP FALLBACK (the slow path) at ${(performance.now() - __t0).toFixed(0)}ms`);
 
     // Fallback: the endpoint reported `insufficient` (or errored/threw) for
     // latency/cost — fall back to the raw-sample bootstrap path so nothing
@@ -299,12 +309,16 @@ export function useVersionCompare() {
       return { durations: [], costs: [] };
     });
 
+    const __sampleStart = performance.now();
     const [samplesA, samplesB] = await Promise.all([sampleAPromise, sampleBPromise]);
+    // eslint-disable-next-line no-console
+    console.warn(`[compare-timing] raw-sample fetch: ${(performance.now() - __sampleStart).toFixed(0)}ms`, { nA: samplesA.durations.length, nB: samplesB.durations.length });
 
     // Raw-sample fallback path has no error diff (only the sketch-merge
     // endpoint computes it).
     errorDiff.value = null;
 
+    const __bootStart = performance.now();
     result.value = buildCompareResult(
       armA.kpi.value,
       armB.kpi.value,
@@ -313,6 +327,10 @@ export function useVersionCompare() {
       resolved,
       1,
     );
+    // eslint-disable-next-line no-console
+    console.warn(`[compare-timing] bootstrap CI compute (SYNCHRONOUS, blocks main thread): ${(performance.now() - __bootStart).toFixed(0)}ms`);
+    // eslint-disable-next-line no-console
+    console.warn(`[compare-timing] TOTAL (raw-sample fallback path): ${(performance.now() - __t0).toFixed(0)}ms`);
 
     // Sample-cap disclosure: latency/cost intervals only ever see up to
     // SAMPLE_CAP randomly-sampled traces per arm, regardless of traceCount —

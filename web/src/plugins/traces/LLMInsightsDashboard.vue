@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="llm-insights"
       all-agents
       agent-skeleton
+      :show-version="!compareMode"
       :labels="{
         agent: t('traces.lLMInsightsDashboard.agent'),
         stream: t('traces.lLMInsightsDashboard.stream'),
