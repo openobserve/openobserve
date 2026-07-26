@@ -19,6 +19,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="step-content rounded-default bg-surface-overlay border-border-default h-full overflow-y-auto border px-3 py-4"
     >
+      <!-- Priority & tags (Feature 2). Anomaly configs appear in the same
+           alert list, so they carry the same triage metadata. -->
+      <div class="mb-6! flex items-start pb-0!">
+        <div class="flex items-center font-semibold" style="width: 190px; height: 36px">
+          {{ t("alerts.priority") }}
+          <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
+            <OTooltip :content="t('alerts.priorityTooltip')" side="right" />
+          </OIcon>
+        </div>
+        <div class="flex h-11 items-center">
+          <OSelect
+            v-model="configModel.priority"
+            :options="priorityOptions"
+            labelKey="label"
+            valueKey="value"
+            :searchable="false"
+            clearable
+            width="xs"
+            :placeholder="t('alerts.priorityUnset')"
+            data-test="anomaly-priority-select"
+          />
+        </div>
+      </div>
+
+      <div class="mb-6! flex items-start pb-0!">
+        <div class="flex items-center font-semibold" style="width: 190px; height: 36px">
+          {{ t("alerts.tags") }}
+          <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
+            <OTooltip :content="t('alerts.tagsTooltip')" side="right" />
+          </OIcon>
+        </div>
+        <div class="min-w-60 flex-1">
+          <OTagInput
+            v-model="tagsModel"
+            :placeholder="t('alerts.placeholders.addTag')"
+            data-test="anomaly-tags-input"
+          />
+        </div>
+      </div>
+
       <!-- Enable Notifications toggle -->
       <div class="mb-6! flex items-start pb-0!">
         <div class="flex items-center font-semibold" style="width: 190px; height: 36px">
@@ -128,6 +168,7 @@ import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTagInput from "@/lib/forms/TagInput/OTagInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -135,7 +176,7 @@ import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 
 export default defineComponent({
   name: "AnomalyAlerting",
-  components: { OButton, OSwitch, OSelect, OTooltip, OIcon, OTag },
+  components: { OButton, OSwitch, OSelect, OTagInput, OTooltip, OIcon, OTag },
 
   props: {
     config: {
@@ -157,6 +198,24 @@ export default defineComponent({
 
     // Alias for the config prop; same reference, mutation stays identical.
     const configModel = computed(() => props.config);
+
+    // Value is the INTEGER storage id so the form holds exactly what the API
+    // serializes; "P3" is display only.
+    const priorityOptions = [1, 2, 3, 4, 5].map((value) => ({
+      label: `P${value}`,
+      value,
+    }));
+
+    // `config` is an untyped bag supplied by the parent, and not every caller
+    // pre-populates `tags` — OTagInput reads `.length`, so binding straight to
+    // a possibly-undefined field throws on mount. Default on read, write back
+    // to the config so edits still propagate.
+    const tagsModel = computed({
+      get: () => props.config.tags ?? [],
+      set: (v: string[]) => {
+        props.config.tags = v;
+      },
+    });
 
     // Dynamically decide how many chips to show based on text length.
     // Restored from pre-refactor version; the template still depends on it.
@@ -190,6 +249,8 @@ export default defineComponent({
       t,
       store,
       configModel,
+      priorityOptions,
+      tagsModel,
       openAddDestination,
       visibleChipCount,
     };

@@ -92,13 +92,18 @@ pub struct UpdateAnomalyConfigRequest {
     pub enabled: Option<bool>,
     pub folder_id: Option<String>,
     pub owner: Option<String>,
-    /// `None` leaves the stored priority untouched; `Some(None)` is not
-    /// expressible here, so clearing is done by sending `priority: null`,
-    /// which serde maps to `None` — matching how the other optional fields
-    /// on this struct behave.
+    /// Double-option so "absent" and "explicit null" stay distinguishable
+    /// (same shape as `TimedAnnotationUpdate::end_time`):
+    ///   * `None`             — field not supplied, leave the stored value
+    ///   * `Some(None)`       — clear the priority
+    ///   * `Some(Some(p))`    — set it
+    ///
+    /// A plain `Option` cannot express "clear", which made priority the only
+    /// field on an anomaly config that could be set but never unset — and
+    /// inconsistent with alerts, where clearing works.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<u8>, example = 3)]
-    pub priority: Option<config::meta::alerts::priority::AlertPriority>,
+    pub priority: Option<Option<config::meta::alerts::priority::AlertPriority>>,
     /// `None` leaves stored tags untouched; `Some(vec![])` clears them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tags: Option<Vec<String>>,
@@ -649,8 +654,10 @@ pub async fn update_config(
     // Feature 2. `None` means "not supplied, leave as-is"; an explicit value
     // replaces it. Tags go through the same normalization as the alerts path,
     // so an edit cannot smuggle in a form the filter will never match.
+    // `Some(None)` clears, `Some(Some(_))` sets, `None` leaves alone — so a
+    // partial update (e.g. enable/disable) cannot wipe the priority.
     if let Some(priority) = req.priority {
-        active_model.priority = Set(Some(priority.to_i32()));
+        active_model.priority = Set(priority.map(|p| p.to_i32()));
     }
     if let Some(tags) = req.tags {
         let normalized = config::meta::alerts::tags::normalize_tags(&tags)

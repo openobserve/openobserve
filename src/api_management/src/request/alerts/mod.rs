@@ -587,7 +587,10 @@ async fn build_and_run_anomaly_update(
         enabled: fields.enabled,
         folder_id: fields.folder_id,
         owner,
-        priority: alert.priority,
+        // The v2 PUT carries the FULL alert body, so this is replace
+        // semantics: wrapping in `Some` means an omitted priority clears it,
+        // matching how tags behave one line down.
+        priority: Some(alert.priority),
         // `Some(vec![])` clears; the shared body always supplies a Vec,
         // so an edit that removes every tag does clear them.
         tags: Some(alert.tags),
