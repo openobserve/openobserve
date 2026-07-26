@@ -124,3 +124,109 @@ export function shouldShowRunOutcome(
 ): boolean {
   return Boolean(enabled) && Boolean(lastOutcome);
 }
+
+// ── Alert LEVEL (alerts_2.md Feature 1) ─────────────────────────────────────
+// A separate axis from RunOutcome above: outcome answers "did the evaluation
+// fire?", level answers "how bad?". An alert can be `firing` at `warning`, or
+// `notify_failed` at `critical`. Never merge the two.
+
+/** Levels the backend can send. */
+export type AlertLevel = "ok" | "warning" | "critical" | "no_data";
+
+/**
+ * Severity ordering, mirroring `AlertLevel::severity_rank` in Rust.
+ *
+ * Deliberately NOT the storage id: `no_data` persists as 3 but ranks below
+ * `warning` — "we don't know" is not worse than "we know it's bad". Used for
+ * the most-severe rollup across groups.
+ */
+const LEVEL_RANK: Record<AlertLevel, number> = {
+  ok: 0,
+  no_data: 1,
+  warning: 2,
+  critical: 3,
+};
+
+export function levelRank(level: unknown): number {
+  const v = String(level ?? "").trim().toLowerCase();
+  return LEVEL_RANK[v as AlertLevel] ?? -1;
+}
+
+/** Levels that mean the alert is currently triggered. */
+export function isFiringLevel(level: unknown): boolean {
+  const v = String(level ?? "").trim().toLowerCase();
+  return v === "warning" || v === "critical";
+}
+
+/** Most severe of a set of levels; null when empty or all unrecognised. */
+export function mostSevereLevel(levels: unknown[]): AlertLevel | null {
+  let best: AlertLevel | null = null;
+  for (const l of levels) {
+    const v = String(l ?? "").trim().toLowerCase() as AlertLevel;
+    if (!(v in LEVEL_RANK)) continue;
+    if (best === null || LEVEL_RANK[v] > LEVEL_RANK[best]) best = v;
+  }
+  return best;
+}
+
+/**
+ * Whether to render a level badge at all.
+ *
+ * Same rule as the run-outcome badge: a disabled alert freezes whatever level
+ * it last had, so showing it would advertise "Critical" forever on something
+ * that is not running (alerts_2.md §7.6).
+ */
+export function shouldShowLevel(
+  enabled: boolean | undefined,
+  level: string | null | undefined,
+): boolean {
+  return Boolean(enabled) && Boolean(level) && levelRank(level) >= 0;
+}
+
+/**
+ * T-10 condition summary for a history row: `"112 >= 100"`.
+ *
+ * Normal rows carry no matched threshold (only the observed value), so they
+ * render `"112"` alone; rows written before the value-context fields existed
+ * render `"—"`. Zero-safe: an actual value of 0 is a real observation.
+ */
+export function conditionSummary(row: {
+  actual_value?: unknown;
+  threshold_value?: unknown;
+  threshold_operator?: unknown;
+  value_is_lower_bound?: unknown;
+}): string {
+  const fmt = (v: unknown): string => {
+    const n = Number(v);
+    return Number.isFinite(n) ? String(n) : String(v);
+  };
+  if (row.actual_value === undefined || row.actual_value === null) return "—";
+  // §7.5: a legacy capped count fetch records min(true_count, fetch_size) —
+  // the backend flags it and the value renders as a lower bound, not exact.
+  const prefix = row.value_is_lower_bound === true ? "≥" : "";
+  const parts = [prefix + fmt(row.actual_value)];
+  if (
+    row.threshold_value !== undefined &&
+    row.threshold_value !== null &&
+    row.threshold_operator
+  ) {
+    parts.push(String(row.threshold_operator), fmt(row.threshold_value));
+  }
+  return parts.join(" ");
+}
+
+/** Human label for a level. */
+export function levelLabel(level: unknown): string {
+  switch (String(level ?? "").trim().toLowerCase()) {
+    case "critical":
+      return "Critical";
+    case "warning":
+      return "Warning";
+    case "ok":
+      return "Ok";
+    case "no_data":
+      return "No Data";
+    default:
+      return "Unknown";
+  }
+}

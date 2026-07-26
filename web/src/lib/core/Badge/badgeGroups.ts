@@ -117,6 +117,25 @@ export const BADGE_GROUPS = {
     },
   },
 
+  // Alert severity LEVEL (alerts_2.md Feature 1) — dot, PILL.
+  //
+  // A separate axis from `alertState` above, which renders the run OUTCOME
+  // ("did it fire?"). This renders "how bad?". An alert can be `firing` at
+  // `warning`, so the two badges can and do appear side by side.
+  alertLevel: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      critical: { variant: "error-soft" },
+      warning: { variant: "warning-soft" },
+      ok: { variant: "success-soft", label: "Ok" },
+      // Reserved: the policy that produces it ships in Phase 2. Neutral rather
+      // than warning-coloured — "we don't know" is not "we know it's bad".
+      nodata: { variant: "default-soft", label: "No Data" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
   // Incident lifecycle. Labels are i18n keys (resolved by OTag).
   incidentStatus: {
     mode: "dot",

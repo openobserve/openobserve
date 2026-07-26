@@ -128,6 +128,15 @@ impl TryFrom<alerts::Model> for MetaAlert {
             sql: value.query_sql,
             promql: value.query_promql,
             promql_condition: query_promql_condition.map(|c| c.into()),
+            // Rides `trigger_thresholds` alongside the other level knobs (D1),
+            // so no further schema change is needed.
+            promql_warning_value: value
+                .trigger_thresholds
+                .clone()
+                .and_then(|v| {
+                    serde_json::from_value::<config::meta::alerts::level::ThresholdConfig>(v).ok()
+                })
+                .and_then(|t| t.promql_warning),
             aggregation: query_aggregation.map(|a| a.into()),
             vrl_function: value.query_vrl_function,
             search_event_type: query_search_event_type.map(|t| t.into()),
@@ -141,6 +150,23 @@ impl TryFrom<alerts::Model> for MetaAlert {
             period: value.trigger_period_seconds / 60,
             operator: trigger_threshold_operator.into(),
             threshold: value.trigger_threshold_count,
+            // Unpack the level axis from `trigger_thresholds` (D1). A missing
+            // or unparseable blob degrades to a single-level alert rather than
+            // failing the load — one bad row must not take the alert list down.
+            warning_threshold: value
+                .trigger_thresholds
+                .clone()
+                .and_then(|v| {
+                    serde_json::from_value::<config::meta::alerts::level::ThresholdConfig>(v).ok()
+                })
+                .and_then(|t| t.warning),
+            notify_on_warning: value
+                .trigger_thresholds
+                .clone()
+                .and_then(|v| {
+                    serde_json::from_value::<config::meta::alerts::level::ThresholdConfig>(v).ok()
+                })
+                .and_then(|t| t.notify_on_warning),
             frequency: value.trigger_frequency_seconds,
             cron: value.trigger_frequency_cron.unwrap_or_default(),
             frequency_type: trigger_frequency_type.into(),
@@ -663,6 +689,19 @@ fn update_mutable_fields(
             .to_string();
     let trigger_period_seconds = alert.trigger_condition.period * 60;
     let trigger_threshold_count = alert.trigger_condition.threshold;
+    // Level axis -> `trigger_thresholds` JSON (decision D1). Stored as NULL
+    // rather than an empty object when nothing is configured, so a
+    // single-level alert has no column value at all.
+    let threshold_config = config::meta::alerts::level::ThresholdConfig {
+        warning: alert.trigger_condition.warning_threshold,
+        notify_on_warning: alert.trigger_condition.notify_on_warning,
+        promql_warning: alert.query_condition.promql_warning_value,
+    };
+    let trigger_thresholds = if threshold_config.is_empty() {
+        None
+    } else {
+        Some(serde_json::to_value(&threshold_config)?)
+    };
     let trigger_frequency_type: i16 =
         intermediate::TriggerFrequencyType::from(alert.trigger_condition.frequency_type).into();
     let trigger_frequency_seconds = alert.trigger_condition.frequency;
@@ -715,6 +754,7 @@ fn update_mutable_fields(
     alert_am.trigger_threshold_operator = Set(trigger_threshold_operator);
     alert_am.trigger_period_seconds = Set(trigger_period_seconds);
     alert_am.trigger_threshold_count = Set(trigger_threshold_count);
+    alert_am.trigger_thresholds = Set(trigger_thresholds);
     alert_am.trigger_frequency_type = Set(trigger_frequency_type);
     alert_am.trigger_frequency_seconds = Set(trigger_frequency_seconds);
     alert_am.trigger_frequency_cron = Set(trigger_frequency_cron);
@@ -790,6 +830,7 @@ mod tests {
             trigger_threshold_operator: ">".to_string(),
             trigger_period_seconds: 900, // 15 min × 60
             trigger_threshold_count: 100,
+            trigger_thresholds: None,
             trigger_frequency_type: 1, // Seconds
             trigger_frequency_seconds: 300,
             trigger_frequency_cron: None,

@@ -28,23 +28,52 @@ use config::{
 use infra::table::entity::alert_dedup_state;
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 
+/// Append the evaluated level to a fingerprint for MULTI-LEVEL alerts.
+///
+/// A Warning batch and a Critical batch must never share a dedup identity —
+/// otherwise deduplication discards the Warning→Critical escalation that the
+/// scheduler explicitly allowed through silence (§7.1). Single-level alerts
+/// keep their legacy fingerprints byte-for-byte, so existing dedup state is
+/// not invalidated on upgrade. The `|level:` separator is deliberately not
+/// the `,dim=val` shape, so dimension parsing never mistakes it for a field.
+fn with_level_component(
+    base: String,
+    alert: &Alert,
+    level: Option<config::meta::alerts::level::AlertLevel>,
+) -> String {
+    let multi_level = alert.trigger_condition.warning_threshold.is_some()
+        || alert
+            .query_condition
+            .aggregation
+            .as_ref()
+            .is_some_and(|a| a.warning_value.is_some())
+        || alert.query_condition.promql_warning_value.is_some();
+    match (multi_level, level) {
+        (true, Some(l)) => format!("{base}|level:{l}"),
+        _ => base,
+    }
+}
+
 /// Calculate fingerprint for an alert result row
 ///
-/// Delegates to enterprise implementation.
+/// Delegates to enterprise implementation; the evaluated level is appended as
+/// an implicit component for multi-level alerts (see `with_level_component`).
 pub fn calculate_fingerprint(
     alert: &Alert,
     result_row: &Map<String, Value>,
     config: &DeduplicationConfig,
     org_config: Option<&GlobalDeduplicationConfig>,
     semantic_groups: &[config::meta::correlation::FieldAlias],
+    level: Option<config::meta::alerts::level::AlertLevel>,
 ) -> String {
-    o2_enterprise::enterprise::alerts::dedup::calculate_fingerprint(
+    let base = o2_enterprise::enterprise::alerts::dedup::calculate_fingerprint(
         alert,
         result_row,
         config,
         org_config,
         semantic_groups,
-    )
+    );
+    with_level_component(base, alert, level)
 }
 
 /// Get or create deduplication state
@@ -161,6 +190,7 @@ pub async fn apply_deduplication(
     db: &DatabaseConnection,
     alert: &Alert,
     result_rows: Vec<Map<String, Value>>,
+    level: Option<config::meta::alerts::level::AlertLevel>,
 ) -> Result<(Vec<Map<String, Value>>, bool), sea_orm::DbErr> {
     // Check if per-alert deduplication is enabled
     let dedup_config = match &alert.deduplication {
@@ -185,6 +215,7 @@ pub async fn apply_deduplication(
         dedup_config,
         org_config.as_ref(),
         &semantic_groups,
+        level,
     )
     .await
     .map(|result| (result, true))
@@ -198,6 +229,7 @@ async fn apply_deduplication_impl(
     dedup_config: &DeduplicationConfig,
     org_config: Option<&GlobalDeduplicationConfig>,
     semantic_groups: &[config::meta::correlation::FieldAlias],
+    level: Option<config::meta::alerts::level::AlertLevel>,
 ) -> Result<Vec<Map<String, Value>>, sea_orm::DbErr> {
     let now = o2_enterprise::enterprise::alerts::dedup::current_timestamp_micros();
     let alert_id = alert.get_unique_key();
@@ -212,8 +244,14 @@ async fn apply_deduplication_impl(
     let mut deduplicated_rows = Vec::new();
 
     for row in result_rows {
-        let fingerprint =
-            calculate_fingerprint(alert, &row, dedup_config, org_config, semantic_groups);
+        let fingerprint = calculate_fingerprint(
+            alert,
+            &row,
+            dedup_config,
+            org_config,
+            semantic_groups,
+            level,
+        );
 
         // Check if this fingerprint exists and is within time window
         let should_send = match get_dedup_state(db, &fingerprint).await? {

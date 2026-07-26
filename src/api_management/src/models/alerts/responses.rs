@@ -84,6 +84,16 @@ pub struct ListAlertsResponseBodyItem {
     /// alert has been in its current state.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_outcome_since: Option<i64>,
+    /// Severity of the last classification: "ok" | "warning" | "critical".
+    ///
+    /// A SEPARATE axis from `last_outcome`: that says whether the evaluation
+    /// fired, this says how bad. An alert can be `firing` at `warning`.
+    /// Absent for single-level alerts that never classified.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub level: Option<String>,
+    /// When `level` last CHANGED — powers "critical for 20 minutes".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub level_since: Option<i64>,
 }
 
 /// HTTP response body for `EnableAlert` endpoint.
@@ -154,6 +164,8 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             last_outcome: None,
             last_outcome_at: None,
             last_outcome_since: None,
+            level: None,
+            level_since: None,
         })
     }
 }
@@ -228,6 +240,8 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
         last_outcome: None,
         last_outcome_at: None,
         last_outcome_since: None,
+        level: None,
+        level_since: None,
         last_error: v
             .get("last_error")
             .and_then(|e| e.as_str())
@@ -309,6 +323,8 @@ mod tests {
             last_outcome: None,
             last_outcome_at: None,
             last_outcome_since: None,
+            level: None,
+            level_since: None,
         };
         let json = serde_json::to_value(&item).unwrap();
         let obj = json.as_object().unwrap();

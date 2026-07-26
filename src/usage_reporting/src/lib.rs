@@ -626,6 +626,11 @@ mod tests {
             dedup_count: None,
             grouped: None,
             group_size: None,
+            actual_value: None,
+            threshold_value: None,
+            threshold_operator: None,
+            level: None,
+            group_label: None,
         }
     }
 

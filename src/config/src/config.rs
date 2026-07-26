@@ -53,7 +53,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
 // 54: m20260725_000001_create_alert_states_tables (alert run state, Part IV)
-pub const DB_SCHEMA_VERSION: u64 = 54;
+// 55: m20260725_000002_add_threshold_and_level_columns (multi-level thresholds)
+pub const DB_SCHEMA_VERSION: u64 = 55;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1741,6 +1742,12 @@ pub struct Limit {
     pub http_slow_log_threshold: u64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_INTERVAL", default = 10)] // seconds
     pub alert_schedule_interval: i64,
+    #[env_config(
+        name = "ZO_ALERT_HYBRID_COUNT_THRESHOLD",
+        default = 100,
+        help = "Count-based alerts whose row sentinel exceeds this switch to a COUNT(*) decision query plus a 100-row payload sample (alerts_2.md 4.4c). Clamped up to the 100-row floor."
+    )]
+    pub alert_hybrid_count_threshold: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_CONCURRENCY", default = 5)]
     pub alert_schedule_concurrency: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_TIMEOUT", default = 90)] // seconds

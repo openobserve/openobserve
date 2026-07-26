@@ -18,7 +18,7 @@ use arrow_schema::{DataType, Schema};
 use async_trait::async_trait;
 use chrono::{Duration, Utc};
 use config::{
-    TIMESTAMP_COL_NAME, ider,
+    TIMESTAMP_COL_NAME, get_config, ider,
     meta::{
         alerts::{
             AggFunction, AlertConditionParams, Condition, ConditionList, Operator, QueryCondition,
@@ -165,6 +165,17 @@ impl QueryConditionExt for QueryCondition {
                 };
                 let end = end_time;
                 let condition = self.promql_condition.as_ref().unwrap();
+                // Multi-level PromQL (alerts_2.md §4.4, same strategy as the
+                // SQL HAVING): query at the LESS severe value so the warning
+                // band comes back too, then classify each series below.
+                // Single-level alerts widen to critical, i.e. the expression is
+                // byte-identical to before.
+                let promql_critical = to_float(&condition.value);
+                let promql_filter = config::meta::alerts::aggregation_level::widened_threshold(
+                    condition.operator,
+                    promql_critical,
+                    self.promql_warning_value,
+                );
                 let req = promql_service::MetricsQueryRequest {
                     query: format!(
                         "({}) {} {}",
@@ -173,7 +184,7 @@ impl QueryConditionExt for QueryCondition {
                             &Operator::EqualTo => "==".to_string(),
                             _ => condition.operator.to_string(),
                         },
-                        to_float(&condition.value)
+                        promql_filter
                     ),
                     start,
                     end,
@@ -205,15 +216,18 @@ impl QueryConditionExt for QueryCondition {
                 .await
                 {
                     Ok(v) => v,
-                    Err(_) => {
-                        return Ok(eval_results);
+                    // A failed search is an ERROR, not an empty result. Returning
+                    // Ok here would record outcome=Normal/level=Ok and refresh
+                    // `level_at`, silently clearing a prior Critical (§7.6 —
+                    // errors must leave the level axis untouched).
+                    Err(e) => {
+                        return Err(anyhow::anyhow!("PromQL search error for alert query: {e}"));
                     }
                 };
                 let config::meta::promql::value::Value::Matrix(value) = resp else {
-                    log::warn!(
-                        "Alert evaluate: trace_id: {trace_id}, PromQL query {v} returned unexpected response: {resp:?}"
-                    );
-                    return Ok(eval_results);
+                    return Err(anyhow::anyhow!(
+                        "PromQL query returned unexpected (non-matrix) response: {resp:?}"
+                    ));
                 };
                 let values: Vec<_> =
                     value
@@ -231,16 +245,54 @@ impl QueryConditionExt for QueryCondition {
                         })
                         .collect();
 
-                let threshold = trigger_condition.threshold as usize;
-                eval_results.data = match trigger_condition.operator {
-                    Operator::EqualTo => (values.len() == threshold).then_some(values),
-                    Operator::NotEqualTo => (values.len() != threshold).then_some(values),
-                    Operator::GreaterThan => (values.len() > threshold).then_some(values),
-                    Operator::GreaterThanEquals => (values.len() >= threshold).then_some(values),
-                    Operator::LessThan => (values.len() < threshold).then_some(values),
-                    Operator::LessThanEquals => (values.len() <= threshold).then_some(values),
-                    _ => None,
-                };
+                // Two axes, exactly like aggregation: each SERIES is classified
+                // against the promql condition value, then the SERIES COUNT is
+                // gated by `trigger_condition`. Counting series alone would
+                // ignore severity and fire spuriously on the widened set.
+                let series_values: Vec<f64> = values
+                    .iter()
+                    .filter_map(|v| v.get("value").and_then(|x| x.as_f64()))
+                    .collect();
+                let level = config::meta::alerts::aggregation_level::evaluate_level_over_items(
+                    &series_values,
+                    condition.operator,
+                    promql_critical,
+                    self.promql_warning_value,
+                    trigger_condition,
+                );
+                // Worst series' value, so history reports one coherent
+                // observation rather than a bare series count. Direction is
+                // operator-aware: for `<`/`<=` the worst offender is the MIN.
+                //
+                // KNOWN LIMITATION (§7.5): the PromQL filter is widened only
+                // to the warning level, so a healthy run returns no series and
+                // records actual_value=None — history shows "— → Ok". An
+                // unfiltered observation query would fix it; deliberately
+                // deferred to the SLO work.
+                eval_results.actual_value = config::meta::alerts::level::worst_observed_value(
+                    &series_values,
+                    condition.operator,
+                );
+                // T-9: label the worst SERIES by its PromQL labels, so history
+                // shows which series the value came from.
+                eval_results.group_label = eval_results.actual_value.and_then(|w| {
+                    values
+                        .iter()
+                        .find(|v| v.get("value").and_then(|x| x.as_f64()) == Some(w))
+                        .map(|v| {
+                            v.iter()
+                                .filter(|(k, _)| k != &"_timestamp" && k != &"value")
+                                .map(|(k, val)| match val.as_str() {
+                                    Some(s) => format!("{k}={s}"),
+                                    None => format!("{k}={val}"),
+                                })
+                                .collect::<Vec<_>>()
+                                .join(",")
+                        })
+                        .filter(|label| !label.is_empty())
+                });
+                eval_results.level = level;
+                eval_results.data = level.map(|_| values);
                 log::info!(
                     "Alert evaluate: trace_id: {trace_id}, PromQL query {v} returned response after filtering: {eval_results:?}"
                 );
@@ -283,10 +335,61 @@ impl QueryConditionExt for QueryCondition {
         } else {
             Some(end_time - time_diff)
         };
+        // Hybrid count evaluation (alerts_2.md §4.4c). Guards, in order:
+        //  - threshold bypass (search_event_type) — no threshold, no hybrid;
+        //  - aggregation — already exact, needs per-group rows;
+        //  - VRL — transforms rows post-query, a SQL count could disagree;
+        //  - multi-window — separate SQL list, out of scope v1.
+        let hybrid = self.search_event_type.is_none()
+            && self.aggregation.is_none()
+            && self.vrl_function.is_none()
+            && self
+                .multi_time_range
+                .as_ref()
+                .is_none_or(|mtr| mtr.is_empty())
+            && matches!(
+                config::meta::alerts::level::evaluation_strategy(
+                    trigger_condition,
+                    get_config().limit.alert_hybrid_count_threshold,
+                ),
+                config::meta::alerts::level::EvaluationStrategy::CountPlusSample { .. }
+            );
+
+        // Exact count from the COUNT(*) pre-query; also carries the decision.
+        let mut hybrid_exact_count: Option<f64> = None;
+        if hybrid {
+            let count_resp = run_alert_count_query(
+                &trace_id,
+                org_id,
+                stream_type,
+                &sql,
+                (start_time.unwrap_or(end_time - time_diff), end_time),
+                search_type,
+                search_event_context.clone(),
+            )
+            .await?;
+            let exact = count_resp.0;
+            eval_results.query_took = Some(count_resp.1);
+            eval_results.actual_value = Some(exact);
+            let level = config::meta::alerts::level::evaluate_level(exact, trigger_condition);
+            eval_results.level = level;
+            if level.is_none() {
+                // Not firing: the count alone decides. No payload query at all
+                // — a healthy hybrid evaluation is CHEAPER than the old
+                // 100-row floor fetch.
+                return Ok(eval_results);
+            }
+            hybrid_exact_count = Some(exact);
+        }
+
         let size = if self.search_event_type.is_some() {
             -1
+        } else if hybrid {
+            // Decision already made from the exact count; this fetch is only
+            // the notification payload sample.
+            config::meta::alerts::level::PAYLOAD_SAMPLE_ROWS
         } else {
-            std::cmp::max(100, trigger_condition.threshold)
+            config::meta::alerts::level::required_search_size(trigger_condition)
         };
 
         let req_start = std::time::Instant::now();
@@ -521,22 +624,190 @@ impl QueryConditionExt for QueryCondition {
             Some(search_event_type) => search_event_type == SearchEventType::Alerts,
         };
         eval_results.data = if apply_threshold {
-            let threshold = trigger_condition.threshold as usize;
-            match trigger_condition.operator {
-                Operator::EqualTo => (records.len() == threshold).then_some(records),
-                Operator::NotEqualTo => (records.len() != threshold).then_some(records),
-                Operator::GreaterThan => (records.len() > threshold).then_some(records),
-                Operator::GreaterThanEquals => (records.len() >= threshold).then_some(records),
-                Operator::LessThan => (records.len() < threshold).then_some(records),
-                Operator::LessThanEquals => (records.len() <= threshold).then_some(records),
-                _ => None,
+            match self.aggregation.as_ref() {
+                // ── Aggregation alerts ──────────────────────────────────────
+                // The threshold is `having.value` / `warning_value` applied to
+                // each row's aggregate, NOT a row count. The SQL HAVING was
+                // widened to the less severe threshold (alerts_2.md §4.4), so
+                // the returned set deliberately includes the warning band and
+                // MUST be re-classified here — counting rows would both ignore
+                // severity and fire spuriously on the widened set.
+                Some(agg) => {
+                    // Classify each group's aggregate, then re-apply the
+                    // GROUP-COUNT threshold. Both axes must hold — dropping the
+                    // count silently rewrites "for at least 3 groups" as "for
+                    // any group".
+                    let classified: Vec<_> = records
+                        .iter()
+                        .filter_map(|r| r.get("alert_agg_value").and_then(|v| v.as_f64()))
+                        .collect();
+
+                    let level =
+                        config::meta::alerts::aggregation_level::evaluate_aggregation_alert(
+                            &classified,
+                            agg,
+                            trigger_condition,
+                        )
+                        .unwrap_or(None);
+
+                    // Report the worst group's value, so history's
+                    // "fired at X against Y" is one coherent observation.
+                    // Direction is operator-aware: for `<`/`<=` the worst
+                    // offender is the MIN, not the max.
+                    //
+                    // KNOWN LIMITATION (§7.5): the HAVING filter is widened
+                    // only to the warning level, so a healthy run returns no
+                    // rows and records actual_value=None — history shows
+                    // "— → Ok". Dropping the filter would cost a full
+                    // per-group fetch on every healthy evaluation;
+                    // deliberately deferred to the SLO work.
+                    let offenders: Vec<f64> = classified
+                        .iter()
+                        .filter(|v| {
+                            config::meta::alerts::aggregation_level::evaluate_aggregation_level(
+                                **v, agg,
+                            )
+                            .ok()
+                            .flatten()
+                            .is_some()
+                        })
+                        .cloned()
+                        .collect();
+                    let worst = config::meta::alerts::level::worst_observed_value(
+                        &offenders,
+                        agg.having.operator,
+                    );
+
+                    // T-9: identify WHICH group produced the worst value, so
+                    // history reads "avg(cpu)=97.2 for host=b" and not just a
+                    // number. Label = the group_by columns of that row.
+                    let group_label = worst.and_then(|w| {
+                        let group_by = agg.group_by.as_deref().unwrap_or(&[]);
+                        if group_by.is_empty() {
+                            return None;
+                        }
+                        records
+                            .iter()
+                            .find(|r| r.get("alert_agg_value").and_then(|v| v.as_f64()) == Some(w))
+                            .map(|r| {
+                                group_by
+                                    .iter()
+                                    .filter_map(|col| {
+                                        r.get(col).map(|v| match v.as_str() {
+                                            Some(s) => format!("{col}={s}"),
+                                            None => format!("{col}={v}"),
+                                        })
+                                    })
+                                    .collect::<Vec<_>>()
+                                    .join(",")
+                            })
+                            .filter(|label| !label.is_empty())
+                    });
+
+                    eval_results.level = level;
+                    eval_results.actual_value = worst;
+                    eval_results.group_label = group_label;
+                    level.map(|_| records)
+                }
+                // ── Count-based alerts ──────────────────────────────────────
+                None => {
+                    // Hybrid mode already decided from COUNT(*) — and it only
+                    // reaches here when firing, so `data` is Some
+                    // unconditionally. Re-deriving from the 100-row payload
+                    // sample would silently overwrite the exact count with a
+                    // clamped one.
+                    if let Some(exact) = hybrid_exact_count {
+                        eval_results.actual_value = Some(exact);
+                        // level already set from the exact count
+                        Some(records)
+                    } else {
+                        let actual = records.len() as f64;
+                        let level =
+                            config::meta::alerts::level::evaluate_level(actual, trigger_condition);
+                        eval_results.actual_value = Some(actual);
+                        // The fetch was capped at `size`; a full page means the
+                        // true count may be higher — record it as a lower
+                        // bound so history can render "≥ N" (§7.5).
+                        eval_results.value_is_lower_bound =
+                            size > 0 && records.len() as i64 >= size;
+                        eval_results.level = level;
+                        level.map(|_| records)
+                    }
+                }
             }
         } else {
+            // Threshold bypassed (non-alert search event types) — no level.
             Some(records)
         };
 
         Ok(eval_results)
     }
+}
+
+/// Run the §4.4c COUNT(*) decision query for a hybrid count-based alert.
+///
+/// Returns `(exact_count, query_took_ms)`. The user's SQL runs verbatim inside
+/// the wrapper, over the same time window the payload query would use, so the
+/// two cannot disagree about which rows exist.
+#[allow(clippy::too_many_arguments)]
+async fn run_alert_count_query(
+    trace_id: &str,
+    org_id: &str,
+    stream_type: StreamType,
+    sql: &str,
+    (start_time, end_time): (i64, i64),
+    search_type: Option<SearchEventType>,
+    search_event_context: Option<SearchEventContext>,
+) -> Result<(f64, i64), anyhow::Error> {
+    let req = config::meta::search::Request {
+        query: config::meta::search::Query {
+            sql: config::meta::alerts::level::count_query_sql(sql),
+            from: 0,
+            // COUNT(*) over a subquery yields exactly one row.
+            size: 1,
+            start_time,
+            end_time,
+            quick_mode: false,
+            query_type: "".to_string(),
+            track_total_hits: false,
+            action_id: None,
+            uses_zo_fn: false,
+            query_fn: None, // guard upstream: hybrid excludes VRL alerts
+            skip_wal: false,
+            sampling_config: None,
+            sampling_ratio: None,
+            streaming_output: false,
+            streaming_id: None,
+            histogram_interval: 0,
+            timezone: None,
+        },
+        encoding: config::meta::search::RequestEncoding::Empty,
+        regions: vec![],
+        clusters: vec![],
+        timeout: 0,
+        search_type,
+        search_event_context,
+        use_cache: false,
+        clear_cache: false,
+        local_mode: None,
+        agent_options: None,
+    };
+    let resp = SearchService::grpc_search::grpc_search(
+        trace_id,
+        org_id,
+        stream_type,
+        None,
+        &req,
+        Some(RoleGroup::Background),
+    )
+    .await?;
+    let count = resp
+        .hits
+        .first()
+        .and_then(|h| h.get("zo_alert_count"))
+        .and_then(|v| v.as_f64().or_else(|| v.as_i64().map(|i| i as f64)))
+        .ok_or_else(|| anyhow::anyhow!("alert count query returned no zo_alert_count column"))?;
+    Ok((count, resp.took as i64))
 }
 
 #[async_trait]
@@ -1077,7 +1348,22 @@ pub async fn build_sql(
                 ));
             }
         };
-        build_expr(&agg.having, "alert_agg_value", data_type)?
+        // Multi-level aggregations (alerts_2.md §4.4, option B): widen the
+        // HAVING clause to the LESS severe threshold so every group that could
+        // be warning-or-worse comes back, then classify each group in Rust via
+        // the shared helper. Filtering on the critical threshold would drop the
+        // entire warning band inside the database, where nothing downstream
+        // could recover it.
+        //
+        // Single-level aggregations widen to the critical value, i.e. the
+        // clause is byte-identical to before.
+        let filter_value = config::meta::alerts::aggregation_level::having_filter_value(agg)
+            .map_err(|e| anyhow::anyhow!("Invalid aggregation threshold: {e}"))?;
+        let widened = Condition {
+            value: serde_json::json!(filter_value),
+            ..agg.having.clone()
+        };
+        build_expr(&widened, "alert_agg_value", data_type)?
     };
 
     let func_expr = match agg.function {

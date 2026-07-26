@@ -18,11 +18,10 @@ use axum::{
     response::Response,
 };
 use chrono::{Duration, Utc};
-use config::meta::self_reporting::usage::{TriggerDataType, normalize_outcome};
 use config::{
     meta::{
         search::{Query as SearchQuery, Request as SearchRequest},
-        self_reporting::usage::TRIGGERS_STREAM,
+        self_reporting::usage::{TRIGGERS_STREAM, TriggerDataType, normalize_outcome},
         stream::StreamType,
     },
     utils::time::now_micros,
@@ -95,6 +94,29 @@ pub struct AlertHistoryEntry {
     /// Number of anomalies found in this evaluation run (anomaly detection only).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub anomaly_count: Option<i32>,
+    // ── Value context (T-9/T-10, alerts_2.md §7.5) ──────────────────────────
+    // Absent on rows written before these fields existed; the UI renders "—".
+    /// Severity of the matched threshold: "ok" | "warning" | "critical".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub level: Option<String>,
+    /// The value that was compared (row count, or the aggregate).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub actual_value: Option<f64>,
+    /// The threshold that matched. Absent on `normal` rows — T-10 renders
+    /// those as actual value + Ok, with no threshold.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub threshold_value: Option<f64>,
+    /// Operator, so the row reads standalone ("112 >= 100").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub threshold_operator: Option<String>,
+    /// Which group/series produced `actual_value` ("host=b,region=eu");
+    /// absent for count alerts and pre-change rows.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group_label: Option<String>,
+    /// True when `actual_value` is a LOWER BOUND (legacy capped count fetch,
+    /// §7.5) — the UI renders "≥ N". Absent = exact.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value_is_lower_bound: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -394,6 +416,14 @@ pub async fn get_alert_history(
                     grouped: None,
                     group_size: None,
                     anomaly_count: Some(anomaly_count as i32),
+                    // Anomaly rows: the count IS the observed value; the level
+                    // comes from the normalized outcome upstream.
+                    level: None,
+                    actual_value: Some(anomaly_count as f64),
+                    threshold_value: None,
+                    threshold_operator: None,
+                    group_label: None,
+                    value_is_lower_bound: None,
                 }
             })
             .collect();
@@ -634,7 +664,8 @@ pub async fn get_alert_history(
     // Step 2: Get the actual paginated results
     // Build data query with LIMIT/OFFSET for pagination
     let data_sql = format!(
-        "SELECT _timestamp, org, key, status, is_realtime, is_silenced, \
+        "SELECT _timestamp, org, key, status, level, actual_value, threshold_value, \
+         threshold_operator, group_label, value_is_lower_bound, is_realtime, is_silenced, \
          start_time, end_time, retries, \
          delay_in_secs, evaluation_took_in_secs, \
          source_node, query_took, error \
@@ -752,6 +783,25 @@ pub async fn get_alert_history(
                 .and_then(|v| v.as_i64())
                 .map(|v| v as i32),
             anomaly_count: None,
+            // Value context (T-9). `level` is stored as an int; map it back to
+            // the string vocabulary the UI already understands.
+            level: hit
+                .get("level")
+                .and_then(|v| v.as_i64())
+                .and_then(|v| config::meta::alerts::level::AlertLevel::from_i32(v as i32))
+                .map(|l| l.to_string()),
+            actual_value: hit.get("actual_value").and_then(|v| v.as_f64()),
+            threshold_value: hit.get("threshold_value").and_then(|v| v.as_f64()),
+            threshold_operator: hit
+                .get("threshold_operator")
+                .and_then(|v| v.as_str())
+                .map(String::from),
+            group_label: hit
+                .get("group_label")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
+                .map(String::from),
+            value_is_lower_bound: hit.get("value_is_lower_bound").and_then(|v| v.as_bool()),
         });
     }
 
@@ -950,10 +1000,13 @@ pub async fn get_all_anomaly_history(
             .and_then(|v| v["anomalies_found"].as_i64())
             .unwrap_or(0);
 
-        let status =
-            normalize_outcome(raw_status, &TriggerDataType::AnomalyDetection, success_response)
-                .map(|o| o.to_string())
-                .unwrap_or_else(|| "unknown".to_string());
+        let status = normalize_outcome(
+            raw_status,
+            &TriggerDataType::AnomalyDetection,
+            success_response,
+        )
+        .map(|o| o.to_string())
+        .unwrap_or_else(|| "unknown".to_string());
 
         bucket.push(serde_json::json!({
             "timestamp": hit.get("_timestamp").and_then(|v| v.as_i64()).unwrap_or(0),
@@ -1031,6 +1084,12 @@ mod tests {
             grouped: None,
             group_size: None,
             anomaly_count: None,
+            level: None,
+            actual_value: None,
+            threshold_value: None,
+            threshold_operator: None,
+            group_label: None,
+            value_is_lower_bound: None,
         };
 
         assert_eq!(entry.alert_name, "test_alert");
@@ -1082,6 +1141,12 @@ mod tests {
             grouped: None,
             group_size: None,
             anomaly_count: None,
+            level: None,
+            actual_value: None,
+            threshold_value: None,
+            threshold_operator: None,
+            group_label: None,
+            value_is_lower_bound: None,
         };
 
         let response = AlertHistoryResponse {
@@ -1122,6 +1187,12 @@ mod tests {
             grouped: None,
             group_size: None,
             anomaly_count: None,
+            level: None,
+            actual_value: None,
+            threshold_value: None,
+            threshold_operator: None,
+            group_label: None,
+            value_is_lower_bound: None,
         };
 
         assert_eq!(entry.status, "error");
@@ -1336,6 +1407,12 @@ mod tests {
             grouped: Some(false),
             group_size: None,
             anomaly_count: None,
+            level: None,
+            actual_value: None,
+            threshold_value: None,
+            threshold_operator: None,
+            group_label: None,
+            value_is_lower_bound: None,
         };
 
         let json = serde_json::to_string(&entry).unwrap();
@@ -1373,6 +1450,12 @@ mod tests {
             grouped: None,
             group_size: None,
             anomaly_count: None,
+            level: None,
+            actual_value: None,
+            threshold_value: None,
+            threshold_operator: None,
+            group_label: None,
+            value_is_lower_bound: None,
         };
 
         let response = AlertHistoryResponse {
@@ -1416,6 +1499,12 @@ mod tests {
             grouped: None,
             group_size: None,
             anomaly_count: None,
+            level: None,
+            actual_value: None,
+            threshold_value: None,
+            threshold_operator: None,
+            group_label: None,
+            value_is_lower_bound: None,
         };
         let json = serde_json::to_value(&entry).unwrap();
         let obj = json.as_object().unwrap();
@@ -1452,6 +1541,12 @@ mod tests {
             grouped: Some(true),
             group_size: Some(3),
             anomaly_count: Some(2),
+            level: None,
+            actual_value: None,
+            threshold_value: None,
+            threshold_operator: None,
+            group_label: None,
+            value_is_lower_bound: None,
         };
         let json = serde_json::to_value(&entry).unwrap();
         let obj = json.as_object().unwrap();

@@ -94,3 +94,4 @@ tests/ui-testing/.env.old
 !/.claude/skills/eslint-error-handling/
 
 alert_mock
+node_modules/

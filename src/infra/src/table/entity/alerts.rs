@@ -35,6 +35,9 @@ pub struct Model {
     pub trigger_threshold_operator: String,
     pub trigger_period_seconds: i64,
     pub trigger_threshold_count: i64,
+    /// Level/threshold configuration blob (`ThresholdConfig`). `None` = a
+    /// single-level alert. Decision D1 in `alerts_2.md`.
+    pub trigger_thresholds: Option<Json>,
     pub trigger_frequency_type: i16,
     pub trigger_frequency_seconds: i64,
     pub trigger_frequency_cron: Option<String>,
@@ -108,6 +111,7 @@ mod tests {
             trigger_threshold_operator: ">".to_string(),
             trigger_period_seconds: 60,
             trigger_threshold_count: 10,
+            trigger_thresholds: None,
             trigger_frequency_type: 0,
             trigger_frequency_seconds: 300,
             trigger_frequency_cron: None,

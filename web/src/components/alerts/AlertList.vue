@@ -719,7 +719,12 @@ import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 
 import { convertUnixToDateFormat as convertUnixToFormat } from "@/utils/date";
-import { outcomeLabel, shouldShowRunOutcome } from "@/utils/alerts/runOutcome";
+import {
+  levelLabel,
+  outcomeLabel,
+  shouldShowLevel,
+  shouldShowRunOutcome,
+} from "@/utils/alerts/runOutcome";
 import { useI18n } from "vue-i18n";
 import { debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
@@ -989,6 +994,13 @@ export default defineComponent({
 
     // Never present the outcome as live state: it is the result of the LAST
     // evaluation, so it is always qualified with when that ran.
+    const showLevel = (row: any): boolean => shouldShowLevel(row?.enabled, row?.level);
+    const levelTooltip = (row: any): string => {
+      const at = row?.level_since ? convertUnixToDateFormat(row.level_since) : null;
+      const label = levelLabel(row?.level);
+      return at ? `${label} ${t("alerts.asOf")} ${at}` : label;
+    };
+
     const runOutcomeTooltip = (row: any): string => {
       const at = row?.last_outcome_at
         ? convertUnixToDateFormat(row.last_outcome_at)
@@ -1220,6 +1232,19 @@ export default defineComponent({
           id: "last_outcome",
           accessorKey: "last_outcome",
           header: t("alerts.lastOutcome"),
+          cell: " ",
+          sortable: true,
+          resizable: true,
+          hideable: true,
+          size: COL.status,
+          meta: { align: "left" },
+        },
+        // "level" — how bad, distinct from last_outcome (did it fire) and from
+        // state (is it running). Only meaningful for multi-level alerts.
+        {
+          id: "level",
+          accessorKey: "level",
+          header: t("alerts.level"),
           cell: " ",
           sortable: true,
           resizable: true,
@@ -1540,6 +1565,9 @@ export default defineComponent({
             // This is the LAST RUN outcome, not a live firing flag — always
             // paired with last_outcome_at so the UI can say "as of <time>".
             last_outcome: data.last_outcome ?? null,
+            // Severity axis (alerts_2.md Feature 1) — independent of outcome.
+            level: data.level ?? null,
+            level_since: data.level_since ?? null,
             last_outcome_at: data.last_outcome_at ?? null,
             last_outcome_since: data.last_outcome_since ?? null,
             selected: false,
@@ -2921,6 +2949,8 @@ export default defineComponent({
       alertStateLoadingMap,
       showRunOutcome,
       runOutcomeTooltip,
+      showLevel,
+      levelTooltip,
       toggleAlertState,
       templates,
       routeTo,

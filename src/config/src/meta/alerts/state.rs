@@ -22,7 +22,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::meta::self_reporting::usage::RunOutcome;
+use crate::meta::{alerts::level::AlertLevel, self_reporting::usage::RunOutcome};
 
 /// `group_key` of the per-alert rollup row. Grouped monitors additionally get
 /// one row per label set; the rollup row is what list views read.
@@ -38,6 +38,18 @@ pub struct AlertState {
     pub last_outcome_at: Option<i64>,
     /// When `last_outcome` last *changed*. Stable across repeated same-outcome runs.
     pub since: Option<i64>,
+    // ── Level axis (alerts_2.md §7.2) ───────────────────────────────────────
+    // Independent of the outcome axis above: `firing -> notify_failed` moves
+    // `since` while the level (and `level_since`) stay put.
+    /// Severity of the last successful classification. `None` = no level
+    /// (single-level legacy alert, or never classified).
+    pub level: Option<AlertLevel>,
+    /// When `level` last *changed* — powers "critical for 20 minutes".
+    pub level_since: Option<i64>,
+    /// When `level` was last *computed* from a successful evaluation.
+    /// Freshness, not change-time: composite staleness (§6.4) runs on this, so
+    /// an alert erroring every minute cannot look fresh while its level rots.
+    pub level_at: Option<i64>,
 }
 
 impl AlertState {
@@ -49,6 +61,9 @@ impl AlertState {
             last_outcome: None,
             last_outcome_at: None,
             since: None,
+            level: None,
+            level_since: None,
+            level_at: None,
         }
     }
 
@@ -67,6 +82,10 @@ pub struct StateTransition {
     /// `None` on the first evaluation of an alert.
     pub from_outcome: Option<RunOutcome>,
     pub to_outcome: RunOutcome,
+    /// Level before/after. `None` when the alert has no level axis, or when
+    /// this transition was driven purely by an outcome change.
+    pub from_level: Option<AlertLevel>,
+    pub to_level: Option<AlertLevel>,
     pub at: i64,
 }
 
@@ -112,13 +131,14 @@ pub fn should_persist(outcome: &RunOutcome) -> bool {
 ///
 /// - `Skipped` observations are dropped (see [`should_persist`]).
 /// - A changed outcome moves `since` and emits a transition.
-/// - A repeated outcome refreshes `last_outcome_at` but leaves `since` alone and
-///   emits no transition — this is what keeps writes transition-bounded.
+/// - A repeated outcome refreshes `last_outcome_at` but leaves `since` alone and emits no
+///   transition — this is what keeps writes transition-bounded.
 pub fn apply_outcome(
     alert_id: &str,
     group_key: &str,
     prev: Option<&AlertState>,
     outcome: RunOutcome,
+    level: Option<AlertLevel>,
     at: i64,
 ) -> StateUpdate {
     if !should_persist(&outcome) {
@@ -132,13 +152,38 @@ pub fn apply_outcome(
 
     let alert_id = alert_id.to_string();
     let group_key = group_key.to_string();
-    let previous_outcome = prev.and_then(|p| p.last_outcome.clone());
-    let changed = previous_outcome.as_ref() != Some(&outcome);
 
-    let since = if changed {
+    // ── Outcome axis ────────────────────────────────────────────────────────
+    let previous_outcome = prev.and_then(|p| p.last_outcome.clone());
+    let outcome_changed = previous_outcome.as_ref() != Some(&outcome);
+    let since = if outcome_changed {
         Some(at)
     } else {
         prev.and_then(|p| p.since).or(Some(at))
+    };
+
+    // ── Level axis (independent of the above) ───────────────────────────────
+    let previous_level = prev.and_then(|p| p.level);
+    let (level, level_since, level_at, level_changed) = match level {
+        // No level computed this run — e.g. a query error. Carry the whole
+        // level axis forward untouched, including freshness: an evaluation
+        // that observed nothing must not make the level look fresh.
+        None => (
+            previous_level,
+            prev.and_then(|p| p.level_since),
+            prev.and_then(|p| p.level_at),
+            false,
+        ),
+        Some(new_level) => {
+            let changed = previous_level != Some(new_level);
+            let level_since = if changed {
+                Some(at)
+            } else {
+                prev.and_then(|p| p.level_since).or(Some(at))
+            };
+            // Freshness always advances on a successful classification.
+            (Some(new_level), level_since, Some(at), changed)
+        }
     };
 
     let state = AlertState {
@@ -147,13 +192,20 @@ pub fn apply_outcome(
         last_outcome: Some(outcome.clone()),
         last_outcome_at: Some(at),
         since,
+        level,
+        level_since,
+        level_at,
     };
 
-    let transition = changed.then(|| StateTransition {
+    // A change on EITHER axis is a transition — an escalation while still
+    // `firing` must be recorded, as must a delivery failure at a steady level.
+    let transition = (outcome_changed || level_changed).then(|| StateTransition {
         alert_id,
         group_key,
         from_outcome: previous_outcome,
         to_outcome: outcome,
+        from_level: previous_level,
+        to_level: level,
         at,
     });
 
@@ -174,6 +226,9 @@ mod tests {
             last_outcome: Some(outcome),
             last_outcome_at: Some(at),
             since: Some(since),
+            level: None,
+            level_since: None,
+            level_at: None,
         }
     }
 
@@ -218,7 +273,14 @@ mod tests {
     #[test]
     fn test_skipped_never_overwrites_existing_state() {
         let existing = prev(RunOutcome::Firing, 100, 100);
-        let update = apply_outcome("alert-1", ROLLUP_GROUP_KEY, Some(&existing), RunOutcome::Skipped, 200);
+        let update = apply_outcome(
+            "alert-1",
+            ROLLUP_GROUP_KEY,
+            Some(&existing),
+            RunOutcome::Skipped,
+            None,
+            200,
+        );
 
         assert!(
             update.is_noop(),
@@ -228,13 +290,27 @@ mod tests {
 
     #[test]
     fn test_skipped_on_fresh_alert_writes_nothing() {
-        let update = apply_outcome("alert-1", ROLLUP_GROUP_KEY, None, RunOutcome::Skipped, 100);
+        let update = apply_outcome(
+            "alert-1",
+            ROLLUP_GROUP_KEY,
+            None,
+            RunOutcome::Skipped,
+            None,
+            100,
+        );
         assert!(update.is_noop());
     }
 
     #[test]
     fn test_first_evaluation_creates_state_and_transition() {
-        let update = apply_outcome("alert-1", ROLLUP_GROUP_KEY, None, RunOutcome::Firing, 100);
+        let update = apply_outcome(
+            "alert-1",
+            ROLLUP_GROUP_KEY,
+            None,
+            RunOutcome::Firing,
+            None,
+            100,
+        );
 
         let state = update.state.expect("first evaluation must persist state");
         assert_eq!(state.last_outcome, Some(RunOutcome::Firing));
@@ -260,7 +336,14 @@ mod tests {
     #[test]
     fn test_repeated_same_outcome_emits_no_transition() {
         let existing = prev(RunOutcome::Normal, 100, 100);
-        let update = apply_outcome("alert-1", ROLLUP_GROUP_KEY, Some(&existing), RunOutcome::Normal, 200);
+        let update = apply_outcome(
+            "alert-1",
+            ROLLUP_GROUP_KEY,
+            Some(&existing),
+            RunOutcome::Normal,
+            None,
+            200,
+        );
 
         let state = update.state.expect("state should still refresh");
         assert_eq!(
@@ -282,7 +365,14 @@ mod tests {
     #[test]
     fn test_outcome_change_moves_since_and_emits_transition() {
         let existing = prev(RunOutcome::Normal, 100, 50);
-        let update = apply_outcome("alert-1", ROLLUP_GROUP_KEY, Some(&existing), RunOutcome::Firing, 200);
+        let update = apply_outcome(
+            "alert-1",
+            ROLLUP_GROUP_KEY,
+            Some(&existing),
+            RunOutcome::Firing,
+            None,
+            200,
+        );
 
         let state = update.state.unwrap();
         assert_eq!(state.last_outcome, Some(RunOutcome::Firing));
@@ -297,7 +387,14 @@ mod tests {
     #[test]
     fn test_recovery_transition_is_recorded() {
         let existing = prev(RunOutcome::Firing, 100, 100);
-        let update = apply_outcome("alert-1", ROLLUP_GROUP_KEY, Some(&existing), RunOutcome::Normal, 300);
+        let update = apply_outcome(
+            "alert-1",
+            ROLLUP_GROUP_KEY,
+            Some(&existing),
+            RunOutcome::Normal,
+            None,
+            300,
+        );
 
         let t = update
             .transition
@@ -312,7 +409,14 @@ mod tests {
     #[test]
     fn test_firing_to_notify_failed_transitions() {
         let existing = prev(RunOutcome::Firing, 100, 100);
-        let update = apply_outcome("alert-1", ROLLUP_GROUP_KEY, Some(&existing), RunOutcome::NotifyFailed, 200);
+        let update = apply_outcome(
+            "alert-1",
+            ROLLUP_GROUP_KEY,
+            Some(&existing),
+            RunOutcome::NotifyFailed,
+            None,
+            200,
+        );
 
         let state = update.state.unwrap();
         assert!(state.is_firing(), "notify_failed is still a firing state");
@@ -323,7 +427,14 @@ mod tests {
     #[test]
     fn test_state_preserves_identity_from_previous_row() {
         let existing = prev(RunOutcome::Normal, 100, 100);
-        let update = apply_outcome("alert-1", ROLLUP_GROUP_KEY, Some(&existing), RunOutcome::Firing, 200);
+        let update = apply_outcome(
+            "alert-1",
+            ROLLUP_GROUP_KEY,
+            Some(&existing),
+            RunOutcome::Firing,
+            None,
+            200,
+        );
 
         let state = update.state.unwrap();
         assert_eq!(state.alert_id, "alert-1");
@@ -342,8 +453,18 @@ mod tests {
             last_outcome: Some(RunOutcome::Firing),
             last_outcome_at: Some(100),
             since: Some(100),
+            level: None,
+            level_since: None,
+            level_at: None,
         };
-        let update = apply_outcome("alert-1", "pod=a", Some(&pod_a), RunOutcome::Normal, 200);
+        let update = apply_outcome(
+            "alert-1",
+            "pod=a",
+            Some(&pod_a),
+            RunOutcome::Normal,
+            None,
+            200,
+        );
         let state = update.state.unwrap();
 
         assert_eq!(

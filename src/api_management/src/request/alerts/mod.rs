@@ -907,13 +907,17 @@ async fn enrich_with_run_state(list: &mut [ListAlertsResponseBodyItem]) {
     if states.is_empty() {
         return;
     }
-    let by_id: std::collections::HashMap<_, _> =
-        states.into_iter().map(|s| (s.alert_id.clone(), s)).collect();
+    let by_id: std::collections::HashMap<_, _> = states
+        .into_iter()
+        .map(|s| (s.alert_id.clone(), s))
+        .collect();
     for item in list.iter_mut() {
         if let Some(state) = by_id.get(&item.alert_id.to_string()) {
             item.last_outcome = state.last_outcome.as_ref().map(|o| o.to_string());
             item.last_outcome_at = state.last_outcome_at;
             item.last_outcome_since = state.since;
+            item.level = state.level.map(|l| l.to_string());
+            item.level_since = state.level_since;
         }
     }
 }

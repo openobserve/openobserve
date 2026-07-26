@@ -20,7 +20,10 @@
 //! This module is the persistence layer only.
 
 use config::meta::{
-    alerts::state::{AlertState, ROLLUP_GROUP_KEY, StateTransition, StateUpdate},
+    alerts::{
+        level::AlertLevel,
+        state::{AlertState, ROLLUP_GROUP_KEY, StateTransition, StateUpdate},
+    },
     self_reporting::usage::RunOutcome,
 };
 use sea_orm::{
@@ -45,6 +48,11 @@ impl From<alert_states::Model> for AlertState {
             last_outcome: m.last_outcome.and_then(RunOutcome::from_i32),
             last_outcome_at: m.last_outcome_at,
             since: m.since,
+            // Like `last_outcome`, an uninterpretable level degrades to None
+            // ("never classified") rather than failing the read.
+            level: m.level.and_then(AlertLevel::from_i32),
+            level_since: m.level_since,
+            level_at: m.level_at,
         }
     }
 }
@@ -112,6 +120,9 @@ pub async fn persist(update: &StateUpdate) -> Result<(), errors::Error> {
         last_outcome: Set(state.last_outcome.as_ref().map(|o| o.to_i32())),
         last_outcome_at: Set(state.last_outcome_at),
         since: Set(state.since),
+        level: Set(state.level.map(|l| l.to_i32())),
+        level_since: Set(state.level_since),
+        level_at: Set(state.level_at),
     };
 
     // Upsert on the composite primary key — rows are created lazily on an
@@ -126,6 +137,9 @@ pub async fn persist(update: &StateUpdate) -> Result<(), errors::Error> {
                 alert_states::Column::LastOutcome,
                 alert_states::Column::LastOutcomeAt,
                 alert_states::Column::Since,
+                alert_states::Column::Level,
+                alert_states::Column::LevelSince,
+                alert_states::Column::LevelAt,
             ])
             .to_owned(),
         )
@@ -138,6 +152,8 @@ pub async fn persist(update: &StateUpdate) -> Result<(), errors::Error> {
             group_key: Set(t.group_key.clone()),
             from_outcome: Set(t.from_outcome.as_ref().map(|o| o.to_i32())),
             to_outcome: Set(t.to_outcome.to_i32()),
+            from_level: Set(t.from_level.map(|l| l.to_i32())),
+            to_level: Set(t.to_level.map(|l| l.to_i32())),
             at: Set(t.at),
             ..Default::default()
         }
@@ -168,6 +184,8 @@ pub async fn list_transitions(
                 group_key: m.group_key,
                 from_outcome: m.from_outcome.and_then(RunOutcome::from_i32),
                 to_outcome: RunOutcome::from_i32(m.to_outcome)?,
+                from_level: m.from_level.and_then(AlertLevel::from_i32),
+                to_level: m.to_level.and_then(AlertLevel::from_i32),
                 at: m.at,
             })
         })
@@ -213,6 +231,9 @@ mod tests {
             last_outcome,
             last_outcome_at: Some(1_750_000_000_000_000),
             since: Some(1_749_000_000_000_000),
+            level: None,
+            level_since: None,
+            level_at: None,
         }
     }
 

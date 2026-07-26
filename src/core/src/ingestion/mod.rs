@@ -29,7 +29,7 @@ use config::{
     ider::SnowflakeIdGenerator,
     meta::{
         alerts::alert::Alert,
-        self_reporting::usage::{RequestStats, TriggerData, RunOutcome, TriggerDataType},
+        self_reporting::usage::{RequestStats, RunOutcome, TriggerData, TriggerDataType},
         stream::{PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
     },
     utils::{flatten, json::*, schema::format_partition_key},
@@ -173,7 +173,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             alert.name
         );
         match alert
-            .send_notification(&trace_id, val, now, None, now)
+            .send_notification(&trace_id, val, now, None, now, None, None)
             .await
         {
             Err(e) => {

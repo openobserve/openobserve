@@ -38,6 +38,10 @@ pub struct PendingBatch {
     pub timer_started_at: i64,
     pub group_wait_seconds: i64,
     pub max_group_size: usize,
+    /// Evaluated level shared by every entry in this batch. Well-defined
+    /// because the fingerprint carries the level as an implicit component for
+    /// multi-level alerts — a Warning batch and a Critical batch are distinct.
+    pub level: Option<config::meta::alerts::level::AlertLevel>,
 }
 
 /// An alert waiting in a batch
@@ -57,6 +61,7 @@ impl PendingBatch {
         rows: Vec<json::Map<String, json::Value>>,
         group_wait_seconds: i64,
         max_group_size: usize,
+        level: Option<config::meta::alerts::level::AlertLevel>,
     ) -> Self {
         let now = Utc::now().timestamp_micros();
         Self {
@@ -70,6 +75,7 @@ impl PendingBatch {
             timer_started_at: now,
             group_wait_seconds,
             max_group_size,
+            level,
         }
     }
 
@@ -110,6 +116,7 @@ pub fn add_to_batch(
     rows: Vec<json::Map<String, json::Value>>,
     group_wait_seconds: i64,
     max_group_size: usize,
+    level: Option<config::meta::alerts::level::AlertLevel>,
 ) -> bool {
     let mut batch_ready = false;
     let mut is_new_batch = false;
@@ -161,6 +168,7 @@ pub fn add_to_batch(
                 rows,
                 group_wait_seconds,
                 max_group_size,
+                level,
             )
         });
 
@@ -378,6 +386,13 @@ pub async fn send_grouped_notification(
             rows_end_time,
             start_time,
             evaluation_timestamp,
+            // Well-defined for the whole batch: the fingerprint carries the
+            // level as an implicit component for multi-level alerts, so every
+            // entry classified the same. `{alert_level}` renders it.
+            batch.level,
+            // A batch aggregates several evaluations; no single exact count
+            // describes it — `{alert_count}` falls back to the row total.
+            None,
         )
         .await
     {
@@ -450,6 +465,7 @@ mod tests {
             vec![],
             30,
             10,
+            None,
         );
         assert_eq!(batch.alerts.len(), 1);
         assert!(!batch.is_full());
@@ -464,6 +480,7 @@ mod tests {
             vec![],
             30,
             2,
+            None,
         );
         assert!(!batch.is_full());
         let added = batch.add_alert(make_alert(), vec![]);
@@ -480,6 +497,7 @@ mod tests {
             vec![],
             30,
             1,
+            None,
         );
         assert!(batch.is_full());
         let added = batch.add_alert(make_alert(), vec![]);
@@ -496,6 +514,7 @@ mod tests {
             vec![],
             3600, // 1 hour wait
             10,
+            None,
         );
         assert!(!batch.is_expired());
     }
@@ -512,6 +531,7 @@ mod tests {
             vec![],
             3600,
             10,
+            None,
         );
         assert!(!ready);
         assert!(PENDING_BATCHES.contains_key(&fp));
@@ -559,6 +579,7 @@ mod tests {
             vec![],
             3600,
             10,
+            None,
         );
 
         let batch = get_ready_batch(&fp);

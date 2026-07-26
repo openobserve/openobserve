@@ -107,6 +107,37 @@ pub enum AlertError {
     #[error("Alert destination or workflows is required")]
     AlertDestinationMissing,
 
+    /// The warning/critical pair is invalid for the chosen operator.
+    /// "Less severe" is direction-dependent — see `level::validate_thresholds`.
+    #[error("Invalid warning threshold: {0}")]
+    InvalidWarningThreshold(config::meta::alerts::level::ThresholdError),
+
+    /// Aggregation alerts carry their thresholds in `aggregation.having.value`
+    /// / `aggregation.warning_value`, validated separately (§4.4).
+    #[error("Invalid aggregation warning value: {0}")]
+    InvalidAggregationThreshold(config::meta::alerts::aggregation_level::AggThresholdError),
+
+    /// Realtime alerts are out of scope for multi-level thresholds (D12):
+    /// they persist no state and never classify a level.
+    #[error("Warning thresholds are not supported on real-time alerts")]
+    WarningThresholdOnRealtimeAlert,
+
+    /// A PromQL warning value without the condition it qualifies.
+    #[error("A PromQL warning value requires a PromQL condition")]
+    PromqlWarningWithoutCondition,
+
+    /// On aggregation and PromQL alerts, `trigger_condition.threshold` is a
+    /// COVERAGE gate (group/series count), not severity — a warning there is
+    /// explicitly disallowed (D13). Severity warnings belong to the family's
+    /// own field: `aggregation.warning_value` / `promql_warning_value`.
+    #[error(
+        "warning_threshold is not supported on {family} alerts: the count threshold is coverage, not severity — use {field} instead"
+    )]
+    WarningOnCoverageGate {
+        family: &'static str,
+        field: &'static str,
+    },
+
     #[error("Alert already exists")]
     CreateAlreadyExists,
 
@@ -419,6 +450,69 @@ async fn prepare_alert(
 
     if alert.is_real_time && alert.query_condition.query_type != QueryType::Custom {
         return Err(AlertError::RealtimeMissingCustomQuery);
+    }
+
+    // Multi-level thresholds (alerts_2.md Feature 1). Rejected at write time so
+    // an unreachable warning level can never reach the evaluator.
+    //
+    // Realtime alerts persist no state and never classify a level (D12), so
+    // EVERY warning family is rejected on them — not just the count one.
+    if alert.is_real_time
+        && (alert.trigger_condition.warning_threshold.is_some()
+            || alert
+                .query_condition
+                .aggregation
+                .as_ref()
+                .is_some_and(|a| a.warning_value.is_some())
+            || alert.query_condition.promql_warning_value.is_some())
+    {
+        return Err(AlertError::WarningThresholdOnRealtimeAlert);
+    }
+    if alert.trigger_condition.warning_threshold.is_some() {
+        // On aggregation/PromQL alerts the count threshold is a COVERAGE gate
+        // (group/series count), and a coverage warning is disallowed (D13).
+        if alert.query_condition.aggregation.is_some() {
+            return Err(AlertError::WarningOnCoverageGate {
+                family: "aggregation",
+                field: "aggregation.warning_value",
+            });
+        }
+        if alert.query_condition.promql_condition.is_some()
+            || alert.query_condition.query_type == QueryType::PromQL
+        {
+            return Err(AlertError::WarningOnCoverageGate {
+                family: "PromQL",
+                field: "promql_warning_value",
+            });
+        }
+        config::meta::alerts::level::validate_thresholds(
+            alert.trigger_condition.operator,
+            alert.trigger_condition.threshold,
+            alert.trigger_condition.warning_threshold,
+        )
+        .map_err(AlertError::InvalidWarningThreshold)?;
+    }
+
+    // Aggregation alerts use a different threshold pair entirely (§4.4): the
+    // critical value lives in `having.value` and the warning in
+    // `warning_value`. Validate whenever an aggregation is present, so a
+    // non-numeric `having.value` is caught at write time rather than failing
+    // every evaluation.
+    if let Some(agg) = alert.query_condition.aggregation.as_ref() {
+        config::meta::alerts::aggregation_level::validate_aggregation_thresholds(agg)
+            .map_err(AlertError::InvalidAggregationThreshold)?;
+    }
+
+    // PromQL carries a third threshold family: the condition value baked into
+    // the query. Its warning needs the same §4.5 direction check, measured
+    // against `promql_condition.operator`.
+    if let Some(warning) = alert.query_condition.promql_warning_value {
+        let Some(pc) = alert.query_condition.promql_condition.as_ref() else {
+            return Err(AlertError::PromqlWarningWithoutCondition);
+        };
+        let critical = config::utils::json::get_float_value(&pc.value);
+        config::meta::alerts::level::validate_thresholds_f64(pc.operator, critical, Some(warning))
+            .map_err(AlertError::InvalidWarningThreshold)?;
     }
 
     match alert.query_condition.query_type {
@@ -879,6 +973,8 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
             synthetic_row,
             notify,
             now,
+            // Manual triggers evaluate nothing; no level to map.
+            None,
         )
         .await
         {
@@ -916,7 +1012,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     let trace_id = format!("trig_id_{trace_id}");
     let (success_message, err_message) = if !incident_routed {
         alert
-            .send_notification(&trace_id, &[], now, None, now)
+            .send_notification(&trace_id, &[], now, None, now, None, None)
             .await?
     } else {
         (String::new(), String::new())
@@ -961,6 +1057,8 @@ pub async fn trigger_by_name(
             synthetic_row,
             notify,
             now,
+            // Manual triggers evaluate nothing; no level to map.
+            None,
         )
         .await
         {
@@ -998,7 +1096,7 @@ pub async fn trigger_by_name(
     let trace_id = format!("trig_name_{trace_id}");
     let (success_message, err_message) = if !incident_routed {
         alert
-            .send_notification(&trace_id, &[], now, None, now)
+            .send_notification(&trace_id, &[], now, None, now, None, None)
             .await?
     } else {
         (String::new(), String::new())
@@ -1020,6 +1118,10 @@ pub trait AlertExt: Sync + Send + 'static {
 
     /// Returns a tuple containing a boolean - if all the send notification jobs successfully
     /// and the error message if any
+    /// `level` is the severity this evaluation classified (alerts_2.md T-5).
+    /// `None` for single-level alerts and for paths with no classification —
+    /// templates then render `{alert_level}` as empty.
+    #[allow(clippy::too_many_arguments)]
     async fn send_notification(
         &self,
         trace_id: &str,
@@ -1027,6 +1129,11 @@ pub trait AlertExt: Sync + Send + 'static {
         rows_end_time: i64,
         start_time: Option<i64>,
         evaluation_timestamp: i64,
+        level: Option<config::meta::alerts::level::AlertLevel>,
+        // The exact evaluated observation (T-9). Hybrid count evaluation
+        // samples only PAYLOAD_SAMPLE_ROWS rows for the payload, so
+        // `rows.len()` caps at 100 — `{alert_count}` must come from here.
+        actual_value: Option<f64>,
     ) -> Result<(String, String), AlertError>;
 }
 
@@ -1069,6 +1176,8 @@ impl AlertExt for Alert {
         rows_end_time: i64,
         start_time: Option<i64>,
         evaluation_timestamp: i64,
+        level: Option<config::meta::alerts::level::AlertLevel>,
+        actual_value: Option<f64>,
     ) -> Result<(String, String), AlertError> {
         let mut err_message = "".to_string();
         let mut success_message = "".to_string();
@@ -1139,6 +1248,8 @@ impl AlertExt for Alert {
                 rows_end_time,
                 start_time,
                 evaluation_timestamp,
+                level,
+                actual_value,
             )
             .await
             {
@@ -1278,6 +1389,7 @@ pub(crate) async fn dispatch_notification(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn send_notification(
     alert: &Alert,
     dest_type: &DestinationType,
@@ -1286,6 +1398,8 @@ async fn send_notification(
     rows_end_time: i64,
     start_time: Option<i64>,
     evaluation_timestamp: i64,
+    level: Option<config::meta::alerts::level::AlertLevel>,
+    actual_value: Option<f64>,
 ) -> Result<String, anyhow::Error> {
     let org_name = if let Some(org) = ORGANIZATIONS.read().await.get(&alert.org_id) {
         org.name.clone()
@@ -1320,6 +1434,8 @@ async fn send_notification(
             start_time,
             evaluation_timestamp,
             is_email,
+            level,
+            actual_value,
         },
         metadata,
     )
@@ -1337,6 +1453,8 @@ async fn send_notification(
                 start_time,
                 evaluation_timestamp,
                 is_email,
+                level,
+                actual_value,
             },
             metadata,
         )
@@ -1605,6 +1723,14 @@ fn process_row_template(
                 &alert.trigger_condition.threshold.to_string(),
             )
             .replace("{alert_count}", &alert_count.to_string())
+            .replace(
+                "{alert_warning_threshold}",
+                &alert
+                    .trigger_condition
+                    .warning_threshold
+                    .map(|w| w.to_string())
+                    .unwrap_or_default(),
+            )
             .replace("{alert_start_time}", &alert_start_time_str)
             .replace("{alert_end_time}", &alert_end_time_str);
 
@@ -1643,6 +1769,19 @@ struct ProcessTemplateOptions {
     pub start_time: Option<i64>,
     pub evaluation_timestamp: i64,
     pub is_email: bool,
+    /// Severity classified by this evaluation, for `{alert_level}`.
+    pub level: Option<config::meta::alerts::level::AlertLevel>,
+    /// Exact evaluated observation (T-9); `{alert_count}` for count alerts.
+    pub actual_value: Option<f64>,
+}
+
+/// Render an f64 that is usually an integral count without a trailing `.0`.
+fn fmt_observed(v: f64) -> String {
+    if v.is_finite() && v.fract() == 0.0 {
+        format!("{}", v as i64)
+    } else {
+        v.to_string()
+    }
 }
 
 async fn process_dest_template(
@@ -1660,9 +1799,38 @@ async fn process_dest_template(
         start_time,
         evaluation_timestamp,
         is_email,
+        level,
+        actual_value,
     } = options;
-    // format values
-    let alert_count = rows.len();
+    // {alert_count}: for count-family alerts, the EXACT evaluated count —
+    // hybrid evaluation (§4.4c) samples only PAYLOAD_SAMPLE_ROWS rows for the
+    // payload, so `rows.len()` would render 48,213 real matches as "100".
+    // Aggregation/PromQL payloads are groups/series; their length stands.
+    let is_count_family = alert.query_condition.aggregation.is_none()
+        && alert.query_condition.promql_condition.is_none();
+    let alert_count = match actual_value {
+        Some(v) if is_count_family => fmt_observed(v),
+        _ => rows.len().to_string(),
+    };
+    // T-5: family-aware threshold variables. `{alert_threshold}` keeps its
+    // legacy meaning (the count threshold); `{alert_threshold_crit}` /
+    // `{alert_threshold_warn}` resolve from the ACTIVE threshold family, so an
+    // aggregation or PromQL notification reports the comparison it actually
+    // made.
+    let (family_crit, family_warn) = if let Some(agg) = alert.query_condition.aggregation.as_ref() {
+        config::meta::alerts::aggregation_level::aggregation_thresholds(agg)
+            .unwrap_or((alert.trigger_condition.threshold as f64, None))
+    } else if let Some(pc) = alert.query_condition.promql_condition.as_ref() {
+        (
+            config::utils::json::get_float_value(&pc.value),
+            alert.query_condition.promql_warning_value,
+        )
+    } else {
+        (
+            alert.trigger_condition.threshold as f64,
+            alert.trigger_condition.warning_threshold.map(|w| w as f64),
+        )
+    };
     let mut vars = HashMap::with_capacity(rows.len());
     for row in rows.iter() {
         for (key, value) in row.iter() {
@@ -1827,7 +1995,25 @@ async fn process_dest_template(
             "{alert_threshold}",
             &alert.trigger_condition.threshold.to_string(),
         )
-        .replace("{alert_count}", &alert_count.to_string())
+        .replace("{alert_count}", &alert_count)
+        // Multi-level threshold variables (alerts_2.md T-5). `{alert_level}` is
+        // what lets a template branch warning vs critical wording — per-level
+        // DESTINATIONS are Phase 4; v1 routing is template-side.
+        .replace(
+            "{alert_level}",
+            &level.map(|l| l.to_string()).unwrap_or_default(),
+        )
+        .replace("{alert_threshold_crit}", &fmt_observed(family_crit))
+        .replace(
+            "{alert_threshold_warn}",
+            &family_warn.map(fmt_observed).unwrap_or_default(),
+        )
+        // Legacy alias for `{alert_threshold_warn}` — now family-aware too;
+        // previously it always read the count-family warning.
+        .replace(
+            "{alert_warning_threshold}",
+            &family_warn.map(fmt_observed).unwrap_or_default(),
+        )
         .replace("{alert_start_time}", &alert_start_time_str)
         .replace("{alert_end_time}", &alert_end_time_str)
         .replace("{alert_url}", &alert_url)
@@ -2359,6 +2545,93 @@ async fn permitted_alerts(
     .map_err(|err| AlertError::PermittedAlertsValidator(err.to_string()))?;
 
     Ok(permitted_objects)
+}
+
+#[cfg(test)]
+mod threshold_validation_tests {
+    //! Write-time validation of the warning/critical pair (alerts_2.md T-6).
+    //! The pure matrix lives in `config::meta::alerts::level`; these cover the
+    //! wiring — that the save path actually rejects, and maps to HTTP 400.
+
+    use config::meta::alerts::{
+        Operator,
+        level::{ThresholdError, validate_thresholds},
+    };
+
+    use super::AlertError;
+
+    /// The error must survive the wrap into `AlertError` with its cause intact,
+    /// so the API can tell the user *why* the pair was rejected.
+    #[test]
+    fn test_invalid_pair_wraps_into_alert_error() {
+        let err = validate_thresholds(Operator::GreaterThan, 50, Some(100)).unwrap_err();
+        let wrapped = AlertError::InvalidWarningThreshold(err);
+        let msg = wrapped.to_string();
+        assert!(
+            msg.contains("less severe"),
+            "the reason must reach the user, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_unorderable_operator_reason_reaches_the_user() {
+        let err = validate_thresholds(Operator::EqualTo, 100, Some(50)).unwrap_err();
+        assert_eq!(err, ThresholdError::OperatorNotOrderable(Operator::EqualTo));
+        let msg = AlertError::InvalidWarningThreshold(err).to_string();
+        assert!(msg.contains("no severity ordering"), "got: {msg}");
+    }
+
+    /// D13: on aggregation/PromQL alerts the count threshold is COVERAGE, not
+    /// severity — a warning attached to it must be rejected with a message
+    /// that points at the family's own warning field.
+    #[test]
+    fn test_coverage_gate_warning_error_names_the_right_field() {
+        let msg = AlertError::WarningOnCoverageGate {
+            family: "aggregation",
+            field: "aggregation.warning_value",
+        }
+        .to_string();
+        assert!(msg.contains("coverage"), "got: {msg}");
+        assert!(msg.contains("aggregation.warning_value"), "got: {msg}");
+
+        let msg = AlertError::WarningOnCoverageGate {
+            family: "PromQL",
+            field: "promql_warning_value",
+        }
+        .to_string();
+        assert!(msg.contains("promql_warning_value"), "got: {msg}");
+    }
+
+    /// D12: realtime alerts are out of scope for levels entirely.
+    #[test]
+    fn test_realtime_rejection_has_its_own_error() {
+        let msg = AlertError::WarningThresholdOnRealtimeAlert.to_string();
+        assert!(
+            msg.contains("real-time"),
+            "realtime rejection must be distinguishable from a bad pair, got: {msg}"
+        );
+    }
+
+    /// G5: an alert that configures no warning threshold must never be
+    /// rejected, whatever its operator — including the unorderable ones.
+    #[test]
+    fn test_single_level_alerts_are_never_rejected() {
+        for op in [
+            Operator::EqualTo,
+            Operator::NotEqualTo,
+            Operator::GreaterThan,
+            Operator::GreaterThanEquals,
+            Operator::LessThan,
+            Operator::LessThanEquals,
+            Operator::Contains,
+            Operator::NotContains,
+        ] {
+            assert!(
+                validate_thresholds(op, 100, None).is_ok(),
+                "operator {op:?} must stay valid with no warning threshold"
+            );
+        }
+    }
 }
 
 #[cfg(test)]
@@ -3234,6 +3507,8 @@ mod tests {
             start_time: None,
             evaluation_timestamp: 0,
             is_email: false,
+            level: None,
+            actual_value: None,
         };
 
         let result = process_dest_template(
@@ -3280,6 +3555,8 @@ mod tests {
             start_time: None,
             evaluation_timestamp: 0,
             is_email: false,
+            level: None,
+            actual_value: None,
         };
 
         let result = process_dest_template(
@@ -3320,6 +3597,8 @@ mod tests {
             start_time: None,
             evaluation_timestamp: 0,
             is_email: false,
+            level: None,
+            actual_value: None,
         };
 
         let result = process_dest_template(
@@ -3366,6 +3645,8 @@ mod tests {
             start_time: None,
             evaluation_timestamp: 0,
             is_email: false,
+            level: None,
+            actual_value: None,
         };
 
         let result = process_dest_template(
@@ -3452,6 +3733,8 @@ mod tests {
             start_time: None,
             evaluation_timestamp: 0,
             is_email: false,
+            level: None,
+            actual_value: None,
         };
 
         let result = process_dest_template(
@@ -3507,6 +3790,8 @@ mod tests {
             start_time: None,
             evaluation_timestamp: 0,
             is_email: false,
+            level: None,
+            actual_value: None,
         };
 
         let result = process_dest_template(
@@ -3549,6 +3834,8 @@ mod tests {
             start_time: None,
             evaluation_timestamp: 0,
             is_email: false,
+            level: None,
+            actual_value: None,
         };
 
         let result = process_dest_template(
@@ -4078,6 +4365,8 @@ mod tests {
             start_time: None,
             evaluation_timestamp: 0,
             is_email: false,
+            level: None,
+            actual_value: None,
         };
 
         let result = process_dest_template(
@@ -4111,6 +4400,8 @@ mod tests {
             start_time: None,
             evaluation_timestamp: 0,
             is_email: false,
+            level: None,
+            actual_value: None,
         };
 
         let result = process_dest_template(
@@ -4127,5 +4418,105 @@ mod tests {
         let parsed: Value = serde_json::from_str(&result).unwrap();
         assert_eq!(parsed["full"], "hello world");
         assert_eq!(parsed["short"], "hello");
+    }
+
+    /// §4.4c: hybrid evaluation samples only 100 payload rows but knows the
+    /// exact count. `{alert_count}` must render the exact count, not the
+    /// sample size.
+    #[tokio::test]
+    async fn test_alert_count_uses_exact_count_for_count_alerts() {
+        let mut row = Map::new();
+        row.insert("x".to_string(), json!(1));
+        let rows = vec![row; 3]; // payload sample: 3 rows
+        let alert = Alert::default(); // count family: no aggregation, no promql
+        let options = ProcessTemplateOptions {
+            rows_end_time: 0,
+            start_time: None,
+            evaluation_timestamp: 0,
+            is_email: false,
+            level: None,
+            actual_value: Some(48213.0), // exact COUNT(*)
+        };
+        let result = process_dest_template(
+            "test_org",
+            "count={alert_count}",
+            &alert,
+            &rows,
+            &[Value::String("".into())],
+            options,
+            &hashbrown::HashMap::new(),
+        )
+        .await;
+        assert_eq!(result, "count=48213");
+    }
+
+    /// Without an exact count (legacy single-query path may not set it),
+    /// `{alert_count}` falls back to the payload length.
+    #[tokio::test]
+    async fn test_alert_count_falls_back_to_rows_len() {
+        let mut row = Map::new();
+        row.insert("x".to_string(), json!(1));
+        let rows = vec![row; 3];
+        let alert = Alert::default();
+        let options = ProcessTemplateOptions {
+            rows_end_time: 0,
+            start_time: None,
+            evaluation_timestamp: 0,
+            is_email: false,
+            level: None,
+            actual_value: None,
+        };
+        let result = process_dest_template(
+            "test_org",
+            "count={alert_count}",
+            &alert,
+            &rows,
+            &[Value::String("".into())],
+            options,
+            &hashbrown::HashMap::new(),
+        )
+        .await;
+        assert_eq!(result, "count=3");
+    }
+
+    /// T-5: `{alert_threshold_crit}`/`{alert_threshold_warn}` resolve from the
+    /// ACTIVE threshold family — for an aggregation alert that is
+    /// `having.value`/`warning_value`, not the count pair.
+    #[tokio::test]
+    async fn test_threshold_vars_resolve_from_aggregation_family() {
+        let mut alert = Alert::default();
+        alert.trigger_condition.threshold = 1; // count gate — NOT the answer
+        alert.query_condition.aggregation = Some(config::meta::alerts::Aggregation {
+            group_by: None,
+            function: config::meta::alerts::AggFunction::Avg,
+            having: config::meta::alerts::Condition {
+                column: "value".into(),
+                operator: config::meta::alerts::Operator::GreaterThanEquals,
+                value: json!(85.5),
+                ignore_case: false,
+            },
+            warning_value: Some(70.0),
+        });
+        let options = ProcessTemplateOptions {
+            rows_end_time: 0,
+            start_time: None,
+            evaluation_timestamp: 0,
+            is_email: false,
+            level: None,
+            actual_value: Some(91.2),
+        };
+        let result = process_dest_template(
+            "test_org",
+            "crit={alert_threshold_crit} warn={alert_threshold_warn} count={alert_count}",
+            &alert,
+            &[],
+            &[Value::String("".into())],
+            options,
+            &hashbrown::HashMap::new(),
+        )
+        .await;
+        // aggregation family: crit/warn come from having/warning_value; and
+        // alert_count stays payload-length (groups), NOT actual_value.
+        assert_eq!(result, "crit=85.5 warn=70 count=0");
     }
 }

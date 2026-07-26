@@ -449,6 +449,13 @@ pub enum IncidentCorrelationOutcome {
         incident_id: String,
         service_name: String,
     },
+    /// The alert re-fired at a HIGHER severity than the incident currently
+    /// carries (Warning→Critical, T-8). The incident's severity was upgraded
+    /// and a notification must be sent — an escalation is never a repeat.
+    SeverityEscalated {
+        incident_id: String,
+        service_name: String,
+    },
 }
 
 impl IncidentCorrelationOutcome {
@@ -456,7 +463,8 @@ impl IncidentCorrelationOutcome {
         match self {
             Self::NewIncidentCreated { incident_id, .. }
             | Self::NewAlertTypeJoined { incident_id, .. }
-            | Self::ExistingAlertRepeated { incident_id, .. } => incident_id,
+            | Self::ExistingAlertRepeated { incident_id, .. }
+            | Self::SeverityEscalated { incident_id, .. } => incident_id,
         }
     }
 
@@ -464,7 +472,8 @@ impl IncidentCorrelationOutcome {
         match self {
             Self::NewIncidentCreated { service_name, .. }
             | Self::NewAlertTypeJoined { service_name, .. }
-            | Self::ExistingAlertRepeated { service_name, .. } => service_name,
+            | Self::ExistingAlertRepeated { service_name, .. }
+            | Self::SeverityEscalated { service_name, .. } => service_name,
         }
     }
 }

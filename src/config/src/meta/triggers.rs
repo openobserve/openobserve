@@ -99,6 +99,20 @@ pub struct ScheduledTriggerData {
     pub last_satisfied_at: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub backfill_job: Option<BackfillJob>,
+    // ── Multi-level silence (alerts_2.md §7.1) ──────────────────────────────
+    // For alerts WITH a warning threshold, silence stops suppressing
+    // *evaluation* and suppresses only *delivery* — otherwise a
+    // Warning→Critical escalation during a silence window can never be
+    // observed. Single-level alerts keep the legacy behaviour (next_run_at is
+    // pushed forward) and never set these.
+    /// Deliver nothing until this timestamp, unless the level escalates.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delivery_silenced_until: Option<i64>,
+    /// Severity of the last DELIVERED notification (`AlertLevel::to_i32`).
+    /// Escalation is measured against this, not against the previous
+    /// evaluation — otherwise a flap down and back up would re-notify.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_notified_level: Option<i32>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -174,6 +188,8 @@ mod tests {
             tolerance: 42,
             last_satisfied_at: Some(999),
             backfill_job: None,
+            delivery_silenced_until: None,
+            last_notified_level: None,
         };
         data.reset();
         assert!(data.period_end_time.is_none());
@@ -197,6 +213,8 @@ mod tests {
             tolerance: 10,
             last_satisfied_at: Some(9_999_999),
             backfill_job: None,
+            delivery_silenced_until: None,
+            last_notified_level: None,
         };
         let json = data.to_json_string();
         let restored = ScheduledTriggerData::from_json_string(&json).unwrap();
@@ -357,6 +375,8 @@ mod tests {
             period_end_time: Some(500),
             tolerance: 5,
             last_satisfied_at: None,
+            delivery_silenced_until: None,
+            last_notified_level: None,
             backfill_job: Some(BackfillJob {
                 current_position: 42,
                 deletion_status: DeletionStatus::Pending,

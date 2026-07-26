@@ -169,6 +169,59 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
     );
   }
 
+  // Optional WARNING fields (alerts_2.md Feature 1) get the same last-mile
+  // repair: the inputs produce raw strings, and clearing one leaves "".
+  // A configured value must ship numeric (the Rust fields are Option<i64>/
+  // Option<f64>), and a blank must be DELETED — a serialized "" is a 400.
+  const normalizeOptionalNumber = (obj: any, key: string) => {
+    if (!obj || !(key in obj)) return;
+    const v = obj[key];
+    if (v === "" || v === null || v === undefined) {
+      delete obj[key];
+      return;
+    }
+    obj[key] = toNumericValue(v);
+  };
+  normalizeOptionalNumber(payload.trigger_condition, "warning_threshold");
+  normalizeOptionalNumber(payload.query_condition?.aggregation, "warning_value");
+  normalizeOptionalNumber(payload.query_condition, "promql_warning_value");
+
+  // Family exclusivity (D13): a warning left over from another tab/mode must
+  // not ship — the backend rejects warning_threshold on aggregation/PromQL
+  // alerts (their count threshold is coverage, not severity), and
+  // promql_warning_value is meaningless off the promql tab.
+  if (
+    getSelectedTab.value === "promql" ||
+    (isAggregationEnabled.value && getSelectedTab.value === "custom")
+  ) {
+    delete (payload.trigger_condition as any).warning_threshold;
+  }
+  if (getSelectedTab.value !== "promql") {
+    delete (payload.query_condition as any).promql_warning_value;
+  }
+  // Realtime alerts carry no warning family at all (D12) — and the form hides
+  // the fields when realtime is selected, so anything left over from a
+  // scheduled configuration is invisible to the user. The backend rejects it;
+  // stripping here keeps the scheduled→realtime switch saveable.
+  if (payload.is_real_time === true) {
+    delete (payload.trigger_condition as any).warning_threshold;
+    delete (payload.trigger_condition as any).notify_on_warning;
+    delete (payload.query_condition as any).promql_warning_value;
+    if (payload.query_condition.aggregation) {
+      delete (payload.query_condition.aggregation as any).warning_value;
+    }
+  }
+  // notify_on_warning is meaningless without a warning threshold — drop it so
+  // single-level alerts stay byte-identical to their legacy payloads.
+  const hasAnyWarning =
+    "warning_threshold" in payload.trigger_condition ||
+    (payload.query_condition?.aggregation &&
+      "warning_value" in payload.query_condition.aggregation) ||
+    "promql_warning_value" in (payload.query_condition ?? {});
+  if (!hasAnyWarning) {
+    delete (payload.trigger_condition as any).notify_on_warning;
+  }
+
   if (formData.query_condition.vrl_function) {
     payload.query_condition.vrl_function = b64EncodeUnicode(
       formData.query_condition.vrl_function.trim(),

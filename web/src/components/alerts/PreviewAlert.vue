@@ -44,7 +44,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+
 import { ref, watch, onMounted, computed, nextTick } from "vue";
+import { buildThresholdMarkLines } from "@/utils/alerts/thresholdMarkLines";
 import PanelSchemaRenderer from "../dashboards/PanelSchemaRenderer.vue";
 import { reactive } from "vue";
 import { onBeforeMount } from "vue";
@@ -463,9 +465,20 @@ const fetchQuerySchema = async () => {
         label: field,
       }));
 
-      const thresholdValue =
-        props.formData.query_condition?.aggregation?.having?.value ??
-        props.formData.trigger_condition?.threshold;
+      const aggregationCfg = props.formData.query_condition?.aggregation;
+      const hasHavingValue =
+        aggregationCfg?.having?.value !== undefined &&
+        aggregationCfg?.having?.value !== null &&
+        aggregationCfg?.having?.value !== "";
+      const thresholdValue = hasHavingValue
+        ? aggregationCfg.having.value
+        : props.formData.trigger_condition?.threshold;
+      // Warning must come from the same threshold family as the critical value
+      // (aggregate value vs row count) — mixing the two would draw a line on
+      // the wrong scale.
+      const warningValue = hasHavingValue
+        ? aggregationCfg?.warning_value
+        : props.formData.trigger_condition?.warning_threshold;
 
       dashboardPanelData.data.type = "line";
       dashboardPanelData.data.queryType = "sql";
@@ -501,13 +514,10 @@ const fetchQuerySchema = async () => {
       ];
       dashboardPanelData.data.queries[0].fields.z = [];
       dashboardPanelData.data.queries[0].fields.breakdown = breakdown;
-      dashboardPanelData.data.config.mark_line = [
-        {
-          name: "Threshold",
-          type: "yAxis",
-          value: String(thresholdValue ?? ""),
-        },
-      ];
+      dashboardPanelData.data.config.mark_line = buildThresholdMarkLines(
+        thresholdValue,
+        warningValue,
+      );
 
       if (
         !dashboardPanelData.data.queries[0].fields.filter ||
@@ -573,15 +583,12 @@ const fetchQuerySchema = async () => {
     dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;
     dashboardPanelData.data.queries[0].fields.stream_type = props.formData.stream_type;
     dashboardPanelData.data.queryType = "sql";
-    dashboardPanelData.data.config.mark_line = props.formData.trigger_condition?.threshold
-      ? [
-          {
-            name: "Threshold",
-            type: "yAxis",
-            value: String(props.formData.trigger_condition.threshold),
-          },
-        ]
-      : [];
+    // Critical + optional Warning marklines (alerts_2.md Feature 1). Both are
+    // drawn so the two bands are visible on the preview, matching the mock.
+    dashboardPanelData.data.config.mark_line = buildThresholdMarkLines(
+      props.formData.trigger_condition?.threshold,
+      props.formData.trigger_condition?.warning_threshold,
+    );
 
     // Set the fields from schema
     dashboardPanelData.data.queries[0].fields.x = fields.x;
@@ -1047,11 +1054,10 @@ const refreshData = () => {
     dashboardPanelData.data.type = "line"; // Default chart type for PromQL time-series
 
     // Add threshold mark line from promql_condition
-    const promqlThreshold = props.formData.query_condition?.promql_condition?.value;
-    dashboardPanelData.data.config.mark_line =
-      promqlThreshold !== undefined && promqlThreshold !== null && promqlThreshold !== ""
-        ? [{ name: "Threshold", type: "yAxis", value: String(promqlThreshold) }]
-        : [];
+    dashboardPanelData.data.config.mark_line = buildThresholdMarkLines(
+      props.formData.query_condition?.promql_condition?.value,
+      props.formData.query_condition?.promql_warning_value,
+    );
 
     // Update both refs together to prevent double watcher triggers
     const newChartData = cloneDeep(dashboardPanelData.data);
@@ -1097,19 +1103,12 @@ const refreshData = () => {
     dashboardPanelData.data.config.table_dynamic_columns = false; // VRL not supported in custom mode
     dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;
     dashboardPanelData.data.queries[0].fields.stream_type = props.formData.stream_type;
-    const thresholdValue = props.formData.trigger_condition?.threshold;
-
     dashboardPanelData.data.queryType = "sql";
     dashboardPanelData.data.type = "line"; // Line chart for histogram
-    dashboardPanelData.data.config.mark_line = thresholdValue
-      ? [
-          {
-            name: "Threshold",
-            type: "yAxis",
-            value: String(thresholdValue),
-          },
-        ]
-      : [];
+    dashboardPanelData.data.config.mark_line = buildThresholdMarkLines(
+      props.formData.trigger_condition?.threshold,
+      props.formData.trigger_condition?.warning_threshold,
+    );
 
     // Update both refs together to prevent double watcher triggers
     const newChartData = cloneDeep(dashboardPanelData.data);

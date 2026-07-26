@@ -69,6 +69,13 @@ impl From<AlertError> for Response {
             | AlertError::AlertDestinationMissing
             | AlertError::TemplateNotConfigured { .. }
             | AlertError::RealtimeMissingCustomQuery
+            // Both are user input errors -> 400, same as the other
+            // trigger-condition validations.
+            | AlertError::InvalidWarningThreshold(_)
+            | AlertError::InvalidAggregationThreshold(_)
+            | AlertError::WarningThresholdOnRealtimeAlert
+            | AlertError::WarningOnCoverageGate { .. }
+            | AlertError::PromqlWarningWithoutCondition
             | AlertError::SqlMissingQuery
             | AlertError::SqlContainsSelectStar
             | AlertError::PromqlMissingQuery

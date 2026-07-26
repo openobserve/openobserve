@@ -610,6 +610,87 @@ describe("QueryConfig.schema — conditions tree", () => {
       });
       expect(paths(r)).toContain("query_condition.conditions.conditions.0.value");
     });
+
+    // ── Warning/critical matrix (alerts_2.md §4.5) — blocks submit ──────────
+    describe("warning threshold matrix", () => {
+      it("count family: warning >= critical for '>=' blocks submit at the field path", () => {
+        const r = parse({
+          _meta: { tab: "sql" },
+          trigger_condition: { operator: ">=", threshold: 3, warning_threshold: 5 },
+        });
+        expect(r.success).toBe(false);
+        expect(paths(r)).toContain("trigger_condition.warning_threshold");
+      });
+
+      it("count family: warning below critical passes (strings included)", () => {
+        expect(
+          parse({
+            _meta: { tab: "sql" },
+            trigger_condition: { operator: ">=", threshold: "5", warning_threshold: "3" },
+          }).success,
+        ).toBe(true);
+      });
+
+      it("blank warning = single-level alert = valid", () => {
+        expect(
+          parse({
+            _meta: { tab: "sql" },
+            trigger_condition: { operator: ">=", threshold: 3, warning_threshold: "" },
+          }).success,
+        ).toBe(true);
+      });
+
+      it("unordered operators (=, !=) reject any warning", () => {
+        const r = parse({
+          _meta: { tab: "sql" },
+          trigger_condition: { operator: "=", threshold: 3, warning_threshold: 2 },
+        });
+        expect(paths(r)).toContain("trigger_condition.warning_threshold");
+      });
+
+      it("aggregation family: warning_value vs having.value on having.operator", () => {
+        const agg = {
+          group_by: ["host"],
+          function: "avg",
+          having: { column: "value", operator: "<=", value: 90 },
+          // For <= the warning must be HIGHER than critical; 80 is wrong.
+          warning_value: 80,
+        };
+        const r = parse({
+          _meta: { selectedFunction: "avg", aggregationEnabled: true },
+          query_condition: { aggregation: agg },
+        });
+        expect(paths(r)).toContain("query_condition.aggregation.warning_value");
+
+        expect(
+          parse({
+            _meta: { selectedFunction: "avg", aggregationEnabled: true },
+            query_condition: { aggregation: { ...agg, warning_value: 96 } },
+          }).success,
+        ).toBe(true);
+      });
+
+      it("promql family: promql_warning_value vs promql_condition", () => {
+        const r = parse({
+          _meta: { tab: "promql" },
+          query_condition: {
+            promql_condition: { operator: ">=", value: 1 },
+            promql_warning_value: 2,
+          },
+        });
+        expect(paths(r)).toContain("query_condition.promql_warning_value");
+
+        expect(
+          parse({
+            _meta: { tab: "promql" },
+            query_condition: {
+              promql_condition: { operator: ">=", value: 1 },
+              promql_warning_value: 0.5,
+            },
+          }).success,
+        ).toBe(true);
+      });
+    });
   });
 
   describe("queryConfigDefaults", () => {

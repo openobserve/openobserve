@@ -177,6 +177,23 @@ pub struct TriggerCondition {
     #[schema(example = 100)]
     pub threshold_count: i64,
 
+    /// Optional WARNING threshold, sharing `operator` with `threshold` — one
+    /// operator for both levels, no mixed directions. Omitted = single-level
+    /// alert, i.e. exactly the current behaviour. Must be strictly less severe than `threshold` —
+    /// "less severe" is operator-dependent, so `>` requires a smaller value and
+    /// `<` a larger one; `=`/`!=`/`contains` reject it outright.
+    #[serde(rename = "warning_threshold", skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    #[schema(example = 50)]
+    pub warning_threshold_count: Option<i64>,
+
+    /// Whether a Warning-level match sends a notification. Defaults to true —
+    /// opting out is explicit. Set false for "page me only on critical" —
+    /// warnings still update state, history and the UI.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(example = true)]
+    pub notify_on_warning: Option<bool>,
+
     /// How often (in minutes) to run the alert query. Used with frequency_type="minutes".
     #[serde(rename = "frequency")]
     #[serde(default)]
@@ -293,6 +310,11 @@ pub struct QueryCondition {
 
     /// Condition to apply to PromQL results. Required with type="promql".
     pub promql_condition: Option<Condition>,
+    /// Optional WARNING value for the PromQL condition, sharing
+    /// `promql_condition.operator` with critical. Omitted = single-level.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(example = 300.0)]
+    pub promql_warning_value: Option<f64>,
 
     /// Aggregation configuration for "custom" query type.
     pub aggregation: Option<Aggregation>,
@@ -314,7 +336,15 @@ pub struct QueryCondition {
 pub struct Aggregation {
     pub group_by: Option<Vec<String>>,
     pub function: AggFunction,
+    /// CRITICAL threshold for the aggregate value.
     pub having: Condition,
+    /// Optional WARNING threshold, sharing `having.operator` and
+    /// `having.column` with critical. Omitted = single-level aggregation
+    /// alert. Must be strictly less severe than `having.value` — direction
+    /// depends on the operator.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(example = 50.0)]
+    pub warning_value: Option<f64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -459,6 +489,8 @@ impl From<meta_alerts::TriggerCondition> for TriggerCondition {
             period_minutes: value.period,
             operator: value.operator.into(),
             threshold_count: value.threshold,
+            warning_threshold_count: value.warning_threshold,
+            notify_on_warning: value.notify_on_warning,
             frequency_minutes: value.frequency / 60,
             cron: value.cron,
             frequency_type: value.frequency_type.into(),
@@ -496,6 +528,7 @@ impl From<meta_alerts::QueryCondition> for QueryCondition {
             sql: value.sql,
             promql: value.promql,
             promql_condition: value.promql_condition.map(|pc| pc.into()),
+            promql_warning_value: value.promql_warning_value,
             aggregation: value.aggregation.map(|a| a.into()),
             vrl_function: value.vrl_function,
             search_event_type: value.search_event_type.map(|t| t.into()),
@@ -512,6 +545,7 @@ impl From<meta_alerts::Aggregation> for Aggregation {
             group_by: value.group_by,
             function: value.function.into(),
             having: value.having.into(),
+            warning_value: value.warning_value,
         }
     }
 }
@@ -643,6 +677,8 @@ impl From<TriggerCondition> for meta_alerts::TriggerCondition {
             period: value.period_minutes,
             operator: value.operator.into(),
             threshold: value.threshold_count,
+            warning_threshold: value.warning_threshold_count,
+            notify_on_warning: value.notify_on_warning,
             frequency: value.frequency_minutes * 60,
             cron: value.cron,
             frequency_type: value.frequency_type.into(),
@@ -679,6 +715,7 @@ impl From<QueryCondition> for meta_alerts::QueryCondition {
             sql: value.sql,
             promql: value.promql,
             promql_condition: value.promql_condition.map(|pc| pc.into()),
+            promql_warning_value: value.promql_warning_value,
             aggregation: value.aggregation.map(|a| a.into()),
             vrl_function: value.vrl_function,
             search_event_type: value.search_event_type.map(|t| t.into()),
@@ -695,6 +732,7 @@ impl From<Aggregation> for meta_alerts::Aggregation {
             group_by: value.group_by,
             function: value.function.into(),
             having: value.having.into(),
+            warning_value: value.warning_value,
         }
     }
 }
@@ -1186,6 +1224,8 @@ mod tests {
     #[test]
     fn test_trigger_condition_from_meta_converts_frequency_to_minutes() {
         let meta = meta_alerts::TriggerCondition {
+            warning_threshold: None,
+            notify_on_warning: None,
             period: 15,
             operator: meta_alerts::Operator::GreaterThan,
             threshold: 5,
@@ -1211,6 +1251,8 @@ mod tests {
     #[test]
     fn test_trigger_condition_to_meta_converts_frequency_to_seconds() {
         let tc = TriggerCondition {
+            warning_threshold_count: None,
+            notify_on_warning: None,
             period_minutes: 10,
             operator: Operator::LessThan,
             threshold_count: 3,
@@ -1236,6 +1278,7 @@ mod tests {
     #[test]
     fn test_aggregation_from_meta() {
         let meta = meta_alerts::Aggregation {
+            warning_value: None,
             group_by: Some(vec!["service".to_string(), "region".to_string()]),
             function: meta_alerts::AggFunction::Count,
             having: meta_alerts::Condition {
@@ -1257,6 +1300,7 @@ mod tests {
     #[test]
     fn test_aggregation_to_meta() {
         let agg = Aggregation {
+            warning_value: None,
             group_by: None,
             function: AggFunction::Avg,
             having: Condition {
@@ -1280,6 +1324,7 @@ mod tests {
             sql: Some("SELECT count(*) FROM logs".to_string()),
             promql: None,
             promql_condition: None,
+            promql_warning_value: None,
             aggregation: None,
             vrl_function: None,
             search_event_type: None,
@@ -1300,6 +1345,7 @@ mod tests {
             sql: Some("SELECT count(*) FROM logs".to_string()),
             promql: None,
             promql_condition: None,
+            promql_warning_value: None,
             aggregation: None,
             vrl_function: Some("fn".to_string()),
             search_event_type: None,

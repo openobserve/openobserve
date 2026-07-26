@@ -182,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Stream Name -->
-              <div class="flex items-center gap-1.5">
+              <div class="flex min-w-0 flex-1 items-center gap-1.5">
                 <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
                   {{ t("alerts.stream_name") }} <span class="text-text-body">*</span>
                 </div>
@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="add-alert-stream-name-select-dropdown"
                   :options="indexOptions"
                   :loading="isFetchingStreams"
-                  class="stream-name-select w-40! @max-[900px]/stream-config:w-30! @max-[750px]/stream-config:w-27.5! @max-[600px]/stream-config:w-20!"
+                  class="stream-name-select w-full! min-w-0"
                   :disabled="beingUpdated || anomalyEditMode || !formData.stream_type"
                   @update:model-value="updateStreamFields($event)"
                 />

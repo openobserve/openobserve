@@ -115,6 +115,11 @@ pub struct QueryAggregation {
     pub group_by: Option<Vec<String>>,
     pub function: AggFunction,
     pub having: QueryCondition,
+    /// Warning threshold for multi-level aggregation alerts (alerts_2.md §4.4).
+    /// `#[serde(default)]` so aggregations stored before this field existed
+    /// still deserialize — absent = single-level.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub warning_value: Option<f64>,
 }
 
 impl From<MetaAggregation> for QueryAggregation {
@@ -123,6 +128,7 @@ impl From<MetaAggregation> for QueryAggregation {
             group_by: value.group_by,
             function: value.function.into(),
             having: value.having.into(),
+            warning_value: value.warning_value,
         }
     }
 }
@@ -133,6 +139,7 @@ impl From<QueryAggregation> for MetaAggregation {
             group_by: value.group_by,
             function: value.function.into(),
             having: value.having.into(),
+            warning_value: value.warning_value,
         }
     }
 }
@@ -1424,6 +1431,7 @@ mod tests {
     #[test]
     fn test_query_aggregation_from_meta() {
         let meta = MetaAggregation {
+            warning_value: None,
             group_by: Some(vec!["service".to_string()]),
             function: MetaAggFunction::Count,
             having: MetaCondition {
@@ -1446,6 +1454,7 @@ mod tests {
     #[test]
     fn test_meta_aggregation_from_query_aggregation() {
         let qa = QueryAggregation {
+            warning_value: None,
             group_by: None,
             function: AggFunction::Avg,
             having: QueryCondition {

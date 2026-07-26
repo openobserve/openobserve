@@ -6,6 +6,12 @@ import {
   outcomeBucket,
   outcomeLabel,
   shouldShowRunOutcome,
+  levelRank,
+  isFiringLevel,
+  mostSevereLevel,
+  shouldShowLevel,
+  levelLabel,
+  conditionSummary,
 } from "@/utils/alerts/runOutcome";
 
 describe("runOutcome classification", () => {
@@ -125,5 +131,98 @@ describe("runOutcome classification", () => {
       expect(shouldShowRunOutcome(true, "firing")).toBe(true);
       expect(shouldShowRunOutcome(true, "normal")).toBe(true);
     });
+  });
+});
+
+describe("alert level classification", () => {
+  it("ranks severity, not storage id", () => {
+    // no_data persists as 3 but must rank BELOW warning.
+    expect(levelRank("ok")).toBe(0);
+    expect(levelRank("no_data")).toBe(1);
+    expect(levelRank("warning")).toBe(2);
+    expect(levelRank("critical")).toBe(3);
+    expect(levelRank("no_data")).toBeLessThan(levelRank("warning"));
+  });
+
+  it("treats unknown levels as unrecognised", () => {
+    expect(levelRank("banana")).toBe(-1);
+    expect(levelRank(null)).toBe(-1);
+    expect(levelRank(undefined)).toBe(-1);
+  });
+
+  it("counts warning and critical as firing levels", () => {
+    expect(isFiringLevel("critical")).toBe(true);
+    expect(isFiringLevel("warning")).toBe(true);
+    expect(isFiringLevel("ok")).toBe(false);
+    // no_data notifies only under an explicit policy — not firing by itself.
+    expect(isFiringLevel("no_data")).toBe(false);
+  });
+
+  it("picks the most severe level for a rollup", () => {
+    expect(mostSevereLevel(["ok", "warning", "critical"])).toBe("critical");
+    expect(mostSevereLevel(["ok", "no_data"])).toBe("no_data");
+    expect(mostSevereLevel(["ok"])).toBe("ok");
+    expect(mostSevereLevel([])).toBeNull();
+    expect(mostSevereLevel(["banana", "nonsense"])).toBeNull();
+  });
+
+  it("hides the level badge for disabled or never-classified alerts", () => {
+    // A disabled alert freezes its level; showing it would advertise
+    // "Critical" forever on something that is not running.
+    expect(shouldShowLevel(false, "critical")).toBe(false);
+    expect(shouldShowLevel(true, null)).toBe(false);
+    expect(shouldShowLevel(true, "banana")).toBe(false);
+    expect(shouldShowLevel(true, "critical")).toBe(true);
+  });
+
+  it("labels levels readably", () => {
+    expect(levelLabel("critical")).toBe("Critical");
+    expect(levelLabel("no_data")).toBe("No Data");
+    expect(levelLabel("")).toBe("Unknown");
+  });
+});
+
+// T-10: the history "Condition" column reads standalone.
+describe("conditionSummary", () => {
+  it("full context renders 'actual operator threshold'", () => {
+    expect(
+      conditionSummary({ actual_value: 112, threshold_value: 100, threshold_operator: ">=" }),
+    ).toBe("112 >= 100");
+  });
+
+  it("normal rows have no matched threshold — actual value alone", () => {
+    expect(conditionSummary({ actual_value: 42, threshold_operator: ">=" })).toBe("42");
+  });
+
+  it("pre-change rows (no actual value) render an em dash", () => {
+    expect(conditionSummary({})).toBe("—");
+    expect(conditionSummary({ threshold_value: 100, threshold_operator: ">=" })).toBe("—");
+  });
+
+  it("zero is a real observation, not an empty value", () => {
+    expect(
+      conditionSummary({ actual_value: 0, threshold_value: 5, threshold_operator: "<" }),
+    ).toBe("0 < 5");
+  });
+
+  // §7.5: a capped SingleQuery count is a lower bound, never shown as exact.
+  it("renders a ≥ prefix when the backend flags a capped count", () => {
+    expect(
+      conditionSummary({
+        actual_value: 101,
+        threshold_value: 100,
+        threshold_operator: ">=",
+        value_is_lower_bound: true,
+      }),
+    ).toBe("≥101 >= 100");
+    // absent or false = exact, no prefix
+    expect(
+      conditionSummary({
+        actual_value: 101,
+        threshold_value: 100,
+        threshold_operator: ">=",
+        value_is_lower_bound: false,
+      }),
+    ).toBe("101 >= 100");
   });
 });

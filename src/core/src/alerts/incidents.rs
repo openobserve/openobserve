@@ -482,6 +482,10 @@ pub async fn correlate_alert_to_incident(
     result_row: &Map<String, Value>,
     notify_rows: &[Map<String, Value>],
     triggered_at: i64,
+    // T-8: the evaluated level drives new-incident severity (Critical → P2,
+    // Warning → P3). None (manual triggers, single-level alerts) keeps the
+    // enterprise default.
+    eval_level: Option<config::meta::alerts::level::AlertLevel>,
 ) -> Result<Option<IncidentCorrelationOutcome>, anyhow::Error> {
     // Extract labels from result row as HashMap
     let mut labels: HashMap<String, String> = result_row
@@ -579,6 +583,7 @@ pub async fn correlate_alert_to_incident(
         triggered_at,
         &correlation_reason,
         &service_name,
+        eval_level,
     )
     .await?;
 
@@ -632,9 +637,11 @@ pub async fn correlate_alert_to_incident(
     if !notify_rows.is_empty() {
         match &outcome {
             IncidentCorrelationOutcome::NewIncidentCreated { incident_id, .. }
-            | IncidentCorrelationOutcome::NewAlertTypeJoined { incident_id, .. } => {
+            | IncidentCorrelationOutcome::NewAlertTypeJoined { incident_id, .. }
+            | IncidentCorrelationOutcome::SeverityEscalated { incident_id, .. } => {
                 let event = match &outcome {
                     IncidentCorrelationOutcome::NewIncidentCreated { .. } => "new_incident_created",
+                    IncidentCorrelationOutcome::SeverityEscalated { .. } => "severity_escalated",
                     _ => "new_alert_correlated",
                 };
                 let merged_destinations =
@@ -784,15 +791,23 @@ async fn create_new_incident(
     triggered_at: i64,
     correlation_reason: &str,
     service_name: &str,
+    eval_level: Option<config::meta::alerts::level::AlertLevel>,
 ) -> Result<IncidentCorrelationOutcome, anyhow::Error> {
-    let severity = o2_enterprise::enterprise::alerts::incidents::determine_severity(None);
+    // T-8: the evaluated level maps to incident severity — Critical opens a
+    // P2, Warning a P3. Without a level (manual trigger, single-level alert)
+    // the enterprise default stands.
+    let severity = match eval_level {
+        Some(config::meta::alerts::level::AlertLevel::Critical) => "P2".to_string(),
+        Some(config::meta::alerts::level::AlertLevel::Warning) => "P3".to_string(),
+        _ => o2_enterprise::enterprise::alerts::incidents::determine_severity(None).to_string(),
+    };
 
     let title =
         o2_enterprise::enterprise::alerts::incidents::generate_title(&alert.name, group_values);
 
     let incident = infra::table::alert_incidents::create(
         org_id,
-        severity,
+        &severity,
         serde_json::to_value(group_values)?,
         &key_type.to_string(),
         triggered_at,
@@ -866,7 +881,7 @@ async fn create_new_incident(
         && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::incidents_create(
             org_id,
             &key_type.to_string(),
-            severity,
+            &severity,
             serde_json::to_value(group_values)?,
             triggered_at,
             Some(title),
@@ -953,6 +968,7 @@ async fn find_or_create_incident(
     triggered_at: i64,
     correlation_reason: &str,
     service_name: &str,
+    eval_level: Option<config::meta::alerts::level::AlertLevel>,
 ) -> Result<IncidentCorrelationOutcome, anyhow::Error> {
     use config::meta::alerts::incidents::{DimensionRelationship, KeyType};
 
@@ -997,6 +1013,62 @@ async fn find_or_create_incident(
                 &alert.name,
                 triggered_at,
             );
+
+            // T-8/§7.1: a repeat at HIGHER severity is an ESCALATION, not a
+            // repeat. A Warning-created P3 incident must upgrade to P2 and
+            // notify when the alert re-fires at Critical — the scheduler's
+            // silence layer explicitly let this delivery through, and
+            // suppressing it here would lose the only page for the
+            // escalation.
+            use config::meta::alerts::incidents::{IncidentEvent, IncidentSeverity};
+            let level_severity = eval_level.and_then(|l| match l {
+                config::meta::alerts::level::AlertLevel::Critical => Some(IncidentSeverity::P2),
+                config::meta::alerts::level::AlertLevel::Warning => Some(IncidentSeverity::P3),
+                _ => None,
+            });
+            // P1 is most urgent; higher urgency = escalation.
+            let urgency = |s: IncidentSeverity| match s {
+                IncidentSeverity::P1 => 4u8,
+                IncidentSeverity::P2 => 3,
+                IncidentSeverity::P3 => 2,
+                IncidentSeverity::P4 => 1,
+            };
+            if let Some(new_severity) = level_severity
+                && let Ok(current_severity) = incident.severity.parse::<IncidentSeverity>()
+                && urgency(new_severity) > urgency(current_severity)
+            {
+                infra::table::alert_incidents::update_severity(
+                    org_id,
+                    &incident.id,
+                    &new_severity.to_string(),
+                )
+                .await?;
+                if let Err(e) = infra::table::incident_events::append(
+                    org_id,
+                    &incident.id,
+                    IncidentEvent::severity_upgrade(
+                        current_severity,
+                        new_severity,
+                        format!("alert '{}' escalated to {}", alert.name, new_severity),
+                    ),
+                )
+                .await
+                {
+                    log::error!(
+                        "[Incidents] Failed to record severity-upgrade event for incident {}: {e}",
+                        incident.id
+                    );
+                }
+                log::info!(
+                    "[Incidents] Incident {} escalated {current_severity} -> {new_severity} by alert '{}'",
+                    incident.id,
+                    alert.name
+                );
+                return Ok(IncidentCorrelationOutcome::SeverityEscalated {
+                    incident_id: incident.id,
+                    service_name: service_name.to_string(),
+                });
+            }
 
             return Ok(IncidentCorrelationOutcome::ExistingAlertRepeated {
                 incident_id: incident.id,
@@ -1200,6 +1272,7 @@ async fn find_or_create_incident(
         triggered_at,
         correlation_reason,
         service_name,
+        eval_level,
     )
     .await
 }

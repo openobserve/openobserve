@@ -17,7 +17,7 @@ use std::collections::HashMap;
 
 use config::meta::{
     pipeline::components::NodeData,
-    self_reporting::usage::{TriggerData, RunOutcome, TriggerDataType},
+    self_reporting::usage::{RunOutcome, TriggerData, TriggerDataType},
 };
 use db::{
     self,

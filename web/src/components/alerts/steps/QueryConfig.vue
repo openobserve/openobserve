@@ -88,72 +88,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-bold whitespace-nowrap"
                     >{{ t("alerts.threshold") }}*</span
                   >
-                  <div class="flex flex-nowrap items-start gap-2">
-                    <div class="max-w-45 min-w-32.5">
-                      <OSelect
-                        v-model="selectedFunction"
-                        :options="logFunctionOptions"
-                        labelKey="label"
-                        valueKey="value"
-                        @update:model-value="onLogFunctionChange"
-                      />
-                      <OTooltip
-                        :content="
-                          logFunctionOptions.find((o: any) => o.value === selectedFunction)
-                            ?.tooltip || ''
-                        "
-                        :delay="400"
-                      />
-                    </div>
-                    <!-- "of [field]" shown for measure modes -->
-                    <template v-if="selectedFunction !== 'total_events'">
-                      <span
-                        class="text-text-secondary text-compact leading-8.5 font-semibold whitespace-nowrap"
-                        >{{ t("alerts.conditionOf") }}</span
-                      >
-                      <OFormSelect
-                        name="query_condition.aggregation.having.column"
-                        :options="numericColumns"
-                        searchable
-                        :placeholder="t('alerts.placeholders.selectColumn')"
-                        :class="['max-w-50 min-w-35']"
-                        @update:model-value="onLogMeasureColumnChange($event)"
-                      />
-                    </template>
-
-                    <!-- COUNT mode -->
-                    <template v-if="selectedFunction === 'total_events'">
-                      <OFormSelect
-                        name="trigger_condition.operator"
-                        :options="numericOperators"
-                        class="max-w-30 min-w-17.5"
-                        data-test="alert-trigger-operator-select"
-                        :searchable="false"
-                        @update:model-value="onTriggerOperatorChange"
-                      />
-                      <!-- Message hangs under the threshold field it describes. -->
-                      <div class="flex max-w-20 min-w-15 flex-col gap-1">
-                        <OFormInput
-                          name="trigger_condition.threshold"
-                          type="number"
-                          data-test="alert-trigger-threshold-input"
-                          @blur="restoreDefaultThreshold"
-                          min="1"
-                          @update:model-value="onTriggerThresholdChange($event)"
-                        >
-                          <template #error />
-                        </OFormInput>
-                        <div
-                          v-if="thresholdError"
-                          class="text-input-error-text text-xs whitespace-nowrap"
-                          data-test="alert-if-row-logs-error"
-                          role="alert"
-                        >
-                          {{ thresholdError }}
-                        </div>
+                  <div class="flex flex-col gap-1.5">
+                    <!-- Measurement sentence: WHAT to measure. Severity rows
+                         below say WHEN it fires (mock: multi-alert-form.html). -->
+                    <div class="flex flex-nowrap items-start gap-2">
+                      <div class="max-w-45 min-w-32.5">
+                        <OSelect
+                          v-model="selectedFunction"
+                          :options="logFunctionOptions"
+                          labelKey="label"
+                          valueKey="value"
+                          @update:model-value="onLogFunctionChange"
+                        />
+                        <OTooltip
+                          :content="
+                            logFunctionOptions.find((o: any) => o.value === selectedFunction)
+                              ?.tooltip || ''
+                          "
+                          :delay="400"
+                        />
                       </div>
+                      <!-- "of [field]" shown for measure modes -->
+                      <template v-if="selectedFunction !== 'total_events'">
+                        <span
+                          class="text-text-secondary text-compact leading-8.5 font-semibold whitespace-nowrap"
+                          >{{ t("alerts.conditionOf") }}</span
+                        >
+                        <OFormSelect
+                          name="query_condition.aggregation.having.column"
+                          :options="numericColumns"
+                          searchable
+                          :placeholder="t('alerts.placeholders.selectColumn')"
+                          :class="['max-w-50 min-w-35']"
+                          @update:model-value="onLogMeasureColumnChange($event)"
+                        />
+                      </template>
                       <span
-                        v-if="streamName"
+                        v-if="selectedFunction === 'total_events' && streamName"
                         class="text-text-secondary text-compact leading-8.5 font-semibold whitespace-nowrap"
                         >{{
                           t("alerts.matchingTypeFound", {
@@ -161,40 +132,203 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           })
                         }}</span
                       >
+                    </div>
+
+                    <!-- COUNT mode severity rows -->
+                    <template v-if="selectedFunction === 'total_events'">
+                      <div class="flex items-start gap-2">
+                        <span
+                          class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                          >{{ t("alerts.criticalIf") }}</span
+                        >
+                        <OFormSelect
+                          name="trigger_condition.operator"
+                          :options="numericOperators"
+                          width="xs"
+                          data-test="alert-trigger-operator-select"
+                          :searchable="false"
+                          @update:model-value="onTriggerOperatorChange"
+                        />
+                        <!-- Message hangs under the threshold field it describes. -->
+                        <div class="flex flex-col gap-1">
+                          <OFormInput
+                            name="trigger_condition.threshold"
+                            type="number"
+                            width="xs"
+                            data-test="alert-trigger-threshold-input"
+                            @blur="restoreDefaultThreshold"
+                            min="1"
+                            @update:model-value="onTriggerThresholdChange($event)"
+                          >
+                            <template #error />
+                          </OFormInput>
+                          <div
+                            v-if="thresholdError"
+                            class="text-input-error-text text-xs whitespace-nowrap"
+                            data-test="alert-if-row-logs-error"
+                            role="alert"
+                          >
+                            {{ thresholdError }}
+                          </div>
+                        </div>
+                      </div>
+                      <!-- Optional WARNING level (alerts_2.md Feature 1). Shares
+                           critical's operator, so the row only echoes it. -->
+                      <div v-if="countWarningVisible" class="flex items-start gap-2">
+                        <span
+                          class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                          >{{ t("alerts.warningIf") }}</span
+                        >
+                        <span
+                          class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
+                          >{{ triggerOperator }}</span
+                        >
+                        <div class="flex flex-col gap-1">
+                          <OFormInput
+                            name="trigger_condition.warning_threshold"
+                            type="number"
+                            width="xs"
+                            data-test="alert-warning-threshold-input-136"
+                            :placeholder="t('alerts.optional')"
+                          >
+                            <template #error />
+                          </OFormInput>
+                          <div
+                            v-if="warningThresholdError"
+                            class="text-input-error-text text-xs whitespace-nowrap"
+                            data-test="alert-warning-threshold-error-136"
+                            role="alert"
+                          >
+                            {{ warningThresholdError }}
+                          </div>
+                        </div>
+                        <div class="flex items-center gap-1 leading-8.5">
+                          <OFormCheckbox
+                            name="trigger_condition.notify_on_warning"
+                            :label="t('alerts.notifyOnWarning')"
+                            data-test="alert-notify-on-warning-checkbox"
+                          />
+                          <OTooltip :content="t('alerts.notifyOnWarningTooltip')" :delay="300" />
+                        </div>
+                        <OButton
+                          variant="ghost"
+                          size="icon-circle-sm"
+                          class="text-icon-color hover:text-status-error-text"
+                          :aria-label="t('alerts.removeWarning')"
+                          data-test="alert-remove-warning-button"
+                          @click="removeCountWarning"
+                        >
+                          <OIcon name="close" size="sm" />
+                        </OButton>
+                      </div>
+                      <div v-else>
+                        <OButton
+                          variant="ghost-primary"
+                          size="sm"
+                          data-test="alert-add-warning-button"
+                          @click="addCountWarning"
+                        >
+                          <OIcon name="add" size="sm" />
+                          {{ t("alerts.addWarning") }}
+                        </OButton>
+                      </div>
                     </template>
 
-                    <!-- MEASURE mode -->
+                    <!-- MEASURE mode severity rows -->
                     <template v-else>
-                      <span
-                        class="text-text-secondary text-compact leading-8.5 font-semibold whitespace-nowrap"
-                        >{{ t("alerts.conditionIs") }}</span
-                      >
-                      <OFormSelect
-                        name="query_condition.aggregation.having.operator"
-                        :options="numericOperators"
-                        :searchable="false"
-                        class="max-w-30 min-w-17.5"
-                        data-test="alert-condition-operator-select"
-                        @update:model-value="onConditionOperatorChange"
-                      />
-                      <!-- Message hangs under the value field it describes. -->
-                      <div class="flex max-w-30 min-w-20 flex-col gap-1">
-                        <OFormInput
-                          name="query_condition.aggregation.having.value"
-                          type="number"
-                          :placeholder="t('alerts.placeholders.value')"
-                          @update:model-value="onConditionValueChange($event)"
+                      <div class="flex items-start gap-2">
+                        <span
+                          class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                          >{{ t("alerts.criticalIf") }}</span
                         >
-                          <template #error />
-                        </OFormInput>
-                        <div
-                          v-if="havingValueError"
-                          class="text-input-error-text text-xs whitespace-nowrap"
-                          data-test="alert-if-row-logs-value-error"
-                          role="alert"
-                        >
-                          {{ havingValueError }}
+                        <OFormSelect
+                          name="query_condition.aggregation.having.operator"
+                          :options="numericOperators"
+                          :searchable="false"
+                          width="xs"
+                          data-test="alert-condition-operator-select"
+                          @update:model-value="onConditionOperatorChange"
+                        />
+                        <!-- Message hangs under the value field it describes. -->
+                        <div class="flex flex-col gap-1">
+                          <OFormInput
+                            name="query_condition.aggregation.having.value"
+                            type="number"
+                            width="xs"
+                            :placeholder="t('alerts.placeholders.value')"
+                            @update:model-value="onConditionValueChange($event)"
+                          >
+                            <template #error />
+                          </OFormInput>
+                          <div
+                            v-if="havingValueError"
+                            class="text-input-error-text text-xs whitespace-nowrap"
+                            data-test="alert-if-row-logs-value-error"
+                            role="alert"
+                          >
+                            {{ havingValueError }}
+                          </div>
                         </div>
+                      </div>
+                      <!-- Optional WARNING level (alerts_2.md Feature 1). Shares
+                           critical's operator, so the row only echoes it. -->
+                      <div v-if="aggWarningVisible" class="flex items-start gap-2">
+                        <span
+                          class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                          >{{ t("alerts.warningIf") }}</span
+                        >
+                        <span
+                          class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
+                          >{{ conditionOperator }}</span
+                        >
+                        <div class="flex flex-col gap-1">
+                          <OFormInput
+                            name="query_condition.aggregation.warning_value"
+                            type="number"
+                            width="xs"
+                            data-test="alert-aggregation-warning-value-input-182"
+                            :placeholder="t('alerts.optional')"
+                          >
+                            <template #error />
+                          </OFormInput>
+                          <div
+                            v-if="aggregationWarningError"
+                            class="text-input-error-text text-xs whitespace-nowrap"
+                            data-test="alert-aggregation-warning-value-error-182"
+                            role="alert"
+                          >
+                            {{ aggregationWarningError }}
+                          </div>
+                        </div>
+                        <div class="flex items-center gap-1 leading-8.5">
+                          <OFormCheckbox
+                            name="trigger_condition.notify_on_warning"
+                            :label="t('alerts.notifyOnWarning')"
+                            data-test="alert-notify-on-warning-checkbox"
+                          />
+                          <OTooltip :content="t('alerts.notifyOnWarningTooltip')" :delay="300" />
+                        </div>
+                        <OButton
+                          variant="ghost"
+                          size="icon-circle-sm"
+                          class="text-icon-color hover:text-status-error-text"
+                          :aria-label="t('alerts.removeWarning')"
+                          data-test="alert-remove-warning-button"
+                          @click="removeAggWarning"
+                        >
+                          <OIcon name="close" size="sm" />
+                        </OButton>
+                      </div>
+                      <div v-else>
+                        <OButton
+                          variant="ghost-primary"
+                          size="sm"
+                          data-test="alert-add-warning-button"
+                          @click="addAggWarning"
+                        >
+                          <OIcon name="add" size="sm" />
+                          {{ t("alerts.addWarning") }}
+                        </OButton>
                       </div>
                     </template>
                   </div>
@@ -274,10 +408,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:model-value="onTriggerOperatorChange"
                     />
                     <!-- Message hangs under the threshold field it describes. -->
-                    <div class="flex max-w-20 min-w-15 flex-col gap-1">
+                    <div class="flex flex-col gap-1">
                       <OFormInput
                         name="trigger_condition.threshold"
                         type="number"
+                        width="xs"
                         min="1"
                         @update:model-value="onTriggerThresholdChange($event)"
                         @blur="restoreDefaultThreshold"
@@ -305,127 +440,264 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="text-text-heading text-compact min-w-22.5 shrink-0 leading-8.5 font-bold whitespace-nowrap"
                     >{{ t("alerts.threshold") }}*</span
                   >
-                  <div class="flex flex-nowrap items-start gap-2">
-                    <div class="max-w-45 min-w-32.5">
-                      <OSelect
-                        v-model="selectedFunction"
-                        :options="logFunctionOptions"
-                        labelKey="label"
-                        valueKey="value"
-                        @update:model-value="onMetricFunctionChange"
-                      />
-                      <OTooltip
-                        :content="
-                          logFunctionOptions.find((o: any) => o.value === selectedFunction)
-                            ?.tooltip || ''
-                        "
-                        :delay="400"
-                      />
-                    </div>
-
-                    <!-- "of [field]" hidden for count mode -->
-                    <template v-if="selectedFunction !== 'total_events'">
-                      <span
-                        class="text-text-secondary text-compact leading-8.5 font-semibold whitespace-nowrap"
-                        >{{ t("alerts.conditionOf") }}</span
-                      >
-                      <div class="relative inline-flex">
-                        <OFormSelect
-                          name="query_condition.aggregation.having.column"
-                          :options="columns"
-                          searchable
-                          :placeholder="t('alerts.placeholders.selectColumn')"
-                          :readonly="
-                            inputData.aggregation?.having?.column === 'value' &&
-                            columns.some(
-                              (c: any) => (typeof c === 'string' ? c : c.value) === 'value',
-                            )
-                          "
-                          :disable="
-                            inputData.aggregation?.having?.column === 'value' &&
-                            columns.some(
-                              (c: any) => (typeof c === 'string' ? c : c.value) === 'value',
-                            )
-                          "
-                          @update:model-value="onLogMeasureColumnChange($event)"
-                          class="max-w-50 min-w-35"
+                  <div class="flex flex-col gap-1.5">
+                    <!-- Measurement sentence: WHAT to measure. Severity rows
+                         below say WHEN it fires (mock: multi-alert-form.html). -->
+                    <div class="flex flex-nowrap items-start gap-2">
+                      <div class="max-w-45 min-w-32.5">
+                        <OSelect
+                          v-model="selectedFunction"
+                          :options="logFunctionOptions"
+                          labelKey="label"
+                          valueKey="value"
+                          @update:model-value="onMetricFunctionChange"
                         />
                         <OTooltip
-                          v-if="
-                            inputData.aggregation?.having?.column === 'value' &&
-                            columns.some(
-                              (c: any) => (typeof c === 'string' ? c : c.value) === 'value',
-                            )
+                          :content="
+                            logFunctionOptions.find((o: any) => o.value === selectedFunction)
+                              ?.tooltip || ''
                           "
-                          :content="t('alerts.metricsValueFieldTooltip')"
-                          :delay="300"
-                          side="bottom"
+                          :delay="400"
                         />
                       </div>
-                      <span
-                        class="text-text-secondary text-compact leading-8.5 font-semibold whitespace-nowrap"
-                        >{{ t("alerts.conditionIs") }}</span
-                      >
-                    </template>
 
-                    <!-- Count mode for metrics -->
-                    <template v-if="selectedFunction === 'total_events'">
-                      <OFormSelect
-                        name="trigger_condition.operator"
-                        :options="numericOperators"
-                        :searchable="false"
-                        @update:model-value="onTriggerOperatorChange"
-                      />
-                      <!-- Message hangs under the threshold field it describes. -->
-                      <div class="flex max-w-30 min-w-20 flex-col gap-1">
-                        <OFormInput
-                          name="trigger_condition.threshold"
-                          type="number"
-                          @update:model-value="onTriggerThresholdChange($event)"
+                      <!-- "of [field]" hidden for count mode -->
+                      <template v-if="selectedFunction !== 'total_events'">
+                        <span
+                          class="text-text-secondary text-compact leading-8.5 font-semibold whitespace-nowrap"
+                          >{{ t("alerts.conditionOf") }}</span
                         >
-                          <template #error />
-                        </OFormInput>
-                        <div
-                          v-if="thresholdError"
-                          class="text-input-error-text text-xs whitespace-nowrap"
-                          data-test="alert-if-row-metrics-error"
-                          role="alert"
-                        >
-                          {{ thresholdError }}
+                        <div class="relative inline-flex">
+                          <OFormSelect
+                            name="query_condition.aggregation.having.column"
+                            :options="columns"
+                            searchable
+                            :placeholder="t('alerts.placeholders.selectColumn')"
+                            :readonly="
+                              inputData.aggregation?.having?.column === 'value' &&
+                              columns.some(
+                                (c: any) => (typeof c === 'string' ? c : c.value) === 'value',
+                              )
+                            "
+                            :disable="
+                              inputData.aggregation?.having?.column === 'value' &&
+                              columns.some(
+                                (c: any) => (typeof c === 'string' ? c : c.value) === 'value',
+                              )
+                            "
+                            @update:model-value="onLogMeasureColumnChange($event)"
+                            class="max-w-50 min-w-35"
+                          />
+                          <OTooltip
+                            v-if="
+                              inputData.aggregation?.having?.column === 'value' &&
+                              columns.some(
+                                (c: any) => (typeof c === 'string' ? c : c.value) === 'value',
+                              )
+                            "
+                            :content="t('alerts.metricsValueFieldTooltip')"
+                            :delay="300"
+                            side="bottom"
+                          />
                         </div>
-                      </div>
+                      </template>
                       <span
+                        v-if="selectedFunction === 'total_events'"
                         class="text-text-secondary text-compact leading-8.5 font-semibold whitespace-nowrap"
                         >{{ t("alerts.matchingMetricsFound") }}</span
                       >
+                    </div>
+
+                    <!-- Count mode severity rows -->
+                    <template v-if="selectedFunction === 'total_events'">
+                      <div class="flex items-start gap-2">
+                        <span
+                          class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                          >{{ t("alerts.criticalIf") }}</span
+                        >
+                        <OFormSelect
+                          name="trigger_condition.operator"
+                          :options="numericOperators"
+                          :searchable="false"
+                          width="xs"
+                          @update:model-value="onTriggerOperatorChange"
+                        />
+                        <!-- Message hangs under the threshold field it describes. -->
+                        <div class="flex flex-col gap-1">
+                          <OFormInput
+                            name="trigger_condition.threshold"
+                            type="number"
+                            width="xs"
+                            @update:model-value="onTriggerThresholdChange($event)"
+                          >
+                            <template #error />
+                          </OFormInput>
+                          <div
+                            v-if="thresholdError"
+                            class="text-input-error-text text-xs whitespace-nowrap"
+                            data-test="alert-if-row-metrics-error"
+                            role="alert"
+                          >
+                            {{ thresholdError }}
+                          </div>
+                        </div>
+                      </div>
+                      <!-- Optional WARNING level (alerts_2.md Feature 1). Shares
+                           critical's operator, so the row only echoes it. -->
+                      <div v-if="countWarningVisible" class="flex items-start gap-2">
+                        <span
+                          class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                          >{{ t("alerts.warningIf") }}</span
+                        >
+                        <span
+                          class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
+                          >{{ triggerOperator }}</span
+                        >
+                        <div class="flex flex-col gap-1">
+                          <OFormInput
+                            name="trigger_condition.warning_threshold"
+                            type="number"
+                            width="xs"
+                            data-test="alert-warning-threshold-input-381"
+                            :placeholder="t('alerts.optional')"
+                          >
+                            <template #error />
+                          </OFormInput>
+                          <div
+                            v-if="warningThresholdError"
+                            class="text-input-error-text text-xs whitespace-nowrap"
+                            data-test="alert-warning-threshold-error-381"
+                            role="alert"
+                          >
+                            {{ warningThresholdError }}
+                          </div>
+                        </div>
+                        <div class="flex items-center gap-1 leading-8.5">
+                          <OFormCheckbox
+                            name="trigger_condition.notify_on_warning"
+                            :label="t('alerts.notifyOnWarning')"
+                            data-test="alert-notify-on-warning-checkbox"
+                          />
+                          <OTooltip :content="t('alerts.notifyOnWarningTooltip')" :delay="300" />
+                        </div>
+                        <OButton
+                          variant="ghost"
+                          size="icon-circle-sm"
+                          class="text-icon-color hover:text-status-error-text"
+                          :aria-label="t('alerts.removeWarning')"
+                          data-test="alert-remove-warning-button"
+                          @click="removeCountWarning"
+                        >
+                          <OIcon name="close" size="sm" />
+                        </OButton>
+                      </div>
+                      <div v-else>
+                        <OButton
+                          variant="ghost-primary"
+                          size="sm"
+                          data-test="alert-add-warning-button"
+                          @click="addCountWarning"
+                        >
+                          <OIcon name="add" size="sm" />
+                          {{ t("alerts.addWarning") }}
+                        </OButton>
+                      </div>
                     </template>
 
-                    <!-- Measure mode for metrics -->
+                    <!-- Measure mode severity rows -->
                     <template v-else>
-                      <OFormSelect
-                        name="query_condition.aggregation.having.operator"
-                        :options="numericOperators"
-                        :searchable="false"
-                        @update:model-value="onConditionOperatorChange"
-                      />
-                      <!-- Message hangs under the value field it describes. -->
-                      <div class="flex max-w-30 min-w-20 flex-col gap-1">
-                        <OFormInput
-                          name="query_condition.aggregation.having.value"
-                          type="number"
-                          :placeholder="t('alerts.placeholders.value')"
-                          @update:model-value="onConditionValueChange($event)"
+                      <div class="flex items-start gap-2">
+                        <span
+                          class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                          >{{ t("alerts.criticalIf") }}</span
                         >
-                          <template #error />
-                        </OFormInput>
-                        <div
-                          v-if="havingValueError"
-                          class="text-input-error-text text-xs whitespace-nowrap"
-                          data-test="alert-if-row-metrics-value-error"
-                          role="alert"
-                        >
-                          {{ havingValueError }}
+                        <OFormSelect
+                          name="query_condition.aggregation.having.operator"
+                          :options="numericOperators"
+                          :searchable="false"
+                          width="xs"
+                          @update:model-value="onConditionOperatorChange"
+                        />
+                        <!-- Message hangs under the value field it describes. -->
+                        <div class="flex flex-col gap-1">
+                          <OFormInput
+                            name="query_condition.aggregation.having.value"
+                            type="number"
+                            width="xs"
+                            :placeholder="t('alerts.placeholders.value')"
+                            @update:model-value="onConditionValueChange($event)"
+                          >
+                            <template #error />
+                          </OFormInput>
+                          <div
+                            v-if="havingValueError"
+                            class="text-input-error-text text-xs whitespace-nowrap"
+                            data-test="alert-if-row-metrics-value-error"
+                            role="alert"
+                          >
+                            {{ havingValueError }}
+                          </div>
                         </div>
+                      </div>
+                      <!-- Optional WARNING level (alerts_2.md Feature 1). Shares
+                           critical's operator, so the row only echoes it. -->
+                      <div v-if="aggWarningVisible" class="flex items-start gap-2">
+                        <span
+                          class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                          >{{ t("alerts.warningIf") }}</span
+                        >
+                        <span
+                          class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
+                          >{{ conditionOperator }}</span
+                        >
+                        <div class="flex flex-col gap-1">
+                          <OFormInput
+                            name="query_condition.aggregation.warning_value"
+                            type="number"
+                            width="xs"
+                            data-test="alert-aggregation-warning-value-input-413"
+                            :placeholder="t('alerts.optional')"
+                          >
+                            <template #error />
+                          </OFormInput>
+                          <div
+                            v-if="aggregationWarningError"
+                            class="text-input-error-text text-xs whitespace-nowrap"
+                            data-test="alert-aggregation-warning-value-error-413"
+                            role="alert"
+                          >
+                            {{ aggregationWarningError }}
+                          </div>
+                        </div>
+                        <div class="flex items-center gap-1 leading-8.5">
+                          <OFormCheckbox
+                            name="trigger_condition.notify_on_warning"
+                            :label="t('alerts.notifyOnWarning')"
+                            data-test="alert-notify-on-warning-checkbox"
+                          />
+                          <OTooltip :content="t('alerts.notifyOnWarningTooltip')" :delay="300" />
+                        </div>
+                        <OButton
+                          variant="ghost"
+                          size="icon-circle-sm"
+                          class="text-icon-color hover:text-status-error-text"
+                          :aria-label="t('alerts.removeWarning')"
+                          data-test="alert-remove-warning-button"
+                          @click="removeAggWarning"
+                        >
+                          <OIcon name="close" size="sm" />
+                        </OButton>
+                      </div>
+                      <div v-else>
+                        <OButton
+                          variant="ghost-primary"
+                          size="sm"
+                          data-test="alert-add-warning-button"
+                          @click="addAggWarning"
+                        >
+                          <OIcon name="add" size="sm" />
+                          {{ t("alerts.addWarning") }}
+                        </OButton>
                       </div>
                     </template>
                   </div>
@@ -502,10 +774,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:model-value="onTriggerOperatorChange"
                     />
                     <!-- Message hangs under the threshold field it describes. -->
-                    <div class="flex max-w-20 min-w-15 flex-col gap-1">
+                    <div class="flex flex-col gap-1">
                       <OFormInput
                         name="trigger_condition.threshold"
                         type="number"
+                        width="xs"
                         min="1"
                         @update:model-value="onTriggerThresholdChange($event)"
                         @blur="restoreDefaultThreshold"
@@ -810,6 +1083,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       }}</span>
                     </div>
                   </div>
+
+                  <!-- Prewritten PromQL samples (metrics rule catalogue).
+                       Chips INSERT into an empty editor only; with content
+                       present they disable rather than silently replace. -->
+                  <div
+                    v-if="localTab === 'promql' && promqlSamples.length"
+                    class="border-border-default bg-surface-subtle flex shrink-0 flex-wrap items-center gap-1.5 border-t px-2.5 py-1.5"
+                    data-test="alert-promql-samples"
+                  >
+                    <span class="text-text-secondary text-2xs font-semibold whitespace-nowrap">{{
+                      t("alerts.promqlExamples")
+                    }}</span>
+                    <button
+                      v-for="sample in promqlSamples"
+                      :key="sample.id"
+                      type="button"
+                      class="disabled:opacity-45"
+                      :disabled="!canInsertPromqlSample"
+                      :data-test="`alert-promql-sample-${sample.id}`"
+                      @click="insertPromqlSample(sample)"
+                    >
+                      <OTag type="exampleChip" value="dim" :label="sample.label" />
+                      <OTooltip
+                        :content="
+                          canInsertPromqlSample ? sample.query : t('alerts.promqlSampleDisabled')
+                        "
+                        :delay="300"
+                      />
+                    </button>
+                  </div>
                 </div>
 
                 <!-- VRL pane — with its own header, side-by-side with SQL pane -->
@@ -1004,37 +1307,105 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="text-text-heading text-compact w-40 min-w-40 shrink-0 leading-8.5 font-bold whitespace-nowrap"
                   >{{ t("alerts.alertIfNoOfEvents") }} *</span
                 >
-                <div class="flex items-start gap-2">
-                  <OFormSelect
-                    name="trigger_condition.operator"
-                    :options="numericOperators"
-                    :searchable="false"
-                    data-test="alert-trigger-operator-select"
-                    @update:model-value="onTriggerOperatorChange"
-                  />
-                  <!-- The message belongs to the threshold, so it hangs under the
-                     threshold — not at the row's left edge. The column is capped
-                     to the field's width and the message is nowrap, so it spills
-                     right into empty space instead of widening the row. -->
-                  <div class="flex max-w-20 min-w-15 flex-col gap-1">
-                    <OFormInput
-                      name="trigger_condition.threshold"
-                      type="number"
-                      data-test="alert-trigger-threshold-input"
-                      min="1"
-                      @update:model-value="onTriggerThresholdChange($event)"
-                      @blur="restoreDefaultThreshold"
+                <div class="flex flex-col gap-1.5">
+                  <div class="flex items-start gap-2">
+                    <span
+                      class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                      >{{ t("alerts.criticalIf") }}</span
                     >
-                      <template #error />
-                    </OFormInput>
-                    <div
-                      v-if="thresholdError"
-                      class="text-input-error-text text-xs whitespace-nowrap"
-                      data-test="alert-trigger-threshold-error"
-                      role="alert"
-                    >
-                      {{ thresholdError }}
+                    <OFormSelect
+                      name="trigger_condition.operator"
+                      :options="numericOperators"
+                      :searchable="false"
+                      width="xs"
+                      data-test="alert-trigger-operator-select"
+                      @update:model-value="onTriggerOperatorChange"
+                    />
+                    <!-- The message belongs to the threshold, so it hangs under the
+                       threshold — not at the row's left edge. The column is capped
+                       to the field's width and the message is nowrap, so it spills
+                       right into empty space instead of widening the row. -->
+                    <div class="flex flex-col gap-1">
+                      <OFormInput
+                        name="trigger_condition.threshold"
+                        type="number"
+                        width="xs"
+                        data-test="alert-trigger-threshold-input"
+                        min="1"
+                        @update:model-value="onTriggerThresholdChange($event)"
+                        @blur="restoreDefaultThreshold"
+                      >
+                        <template #error />
+                      </OFormInput>
+                      <div
+                        v-if="thresholdError"
+                        class="text-input-error-text text-xs whitespace-nowrap"
+                        data-test="alert-trigger-threshold-error"
+                        role="alert"
+                      >
+                        {{ thresholdError }}
+                      </div>
                     </div>
+                  </div>
+                  <!-- Optional WARNING level (alerts_2.md Feature 1). Shares
+                       critical's operator, so the row only echoes it. -->
+                  <div v-if="countWarningVisible" class="flex items-start gap-2">
+                    <span
+                      class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                      >{{ t("alerts.warningIf") }}</span
+                    >
+                    <span
+                      class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
+                      >{{ triggerOperator }}</span
+                    >
+                    <div class="flex flex-col gap-1">
+                      <OFormInput
+                        name="trigger_condition.warning_threshold"
+                        type="number"
+                        width="xs"
+                        data-test="alert-warning-threshold-input-1020"
+                        :placeholder="t('alerts.optional')"
+                      >
+                        <template #error />
+                      </OFormInput>
+                      <div
+                        v-if="warningThresholdError"
+                        class="text-input-error-text text-xs whitespace-nowrap"
+                        data-test="alert-warning-threshold-error-1020"
+                        role="alert"
+                      >
+                        {{ warningThresholdError }}
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-1 leading-8.5">
+                      <OFormCheckbox
+                        name="trigger_condition.notify_on_warning"
+                        :label="t('alerts.notifyOnWarning')"
+                        data-test="alert-notify-on-warning-checkbox"
+                      />
+                      <OTooltip :content="t('alerts.notifyOnWarningTooltip')" :delay="300" />
+                    </div>
+                    <OButton
+                      variant="ghost"
+                      size="icon-circle-sm"
+                      class="text-icon-color hover:text-status-error-text"
+                      :aria-label="t('alerts.removeWarning')"
+                      data-test="alert-remove-warning-button"
+                      @click="removeCountWarning"
+                    >
+                      <OIcon name="close" size="sm" />
+                    </OButton>
+                  </div>
+                  <div v-else>
+                    <OButton
+                      variant="ghost-primary"
+                      size="sm"
+                      data-test="alert-add-warning-button"
+                      @click="addCountWarning"
+                    >
+                      <OIcon name="add" size="sm" />
+                      {{ t("alerts.addWarning") }}
+                    </OButton>
                   </div>
                 </div>
               </div>
@@ -1051,34 +1422,104 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       side="top"
                     />
                   </span>
-                  <div class="flex items-start gap-2">
-                    <OFormSelect
-                      name="query_condition.promql_condition.operator"
-                      :options="numericOperators"
-                      :searchable="false"
-                      data-test="alert-threshold-operator-select"
-                      class="max-w-30 min-w-17.5"
-                      @update:model-value="onPromqlOperatorChange"
-                    />
-                    <!-- Message hangs under the value field it describes. -->
-                    <div class="flex max-w-30 min-w-15 flex-col gap-1">
-                      <OFormInput
-                        name="query_condition.promql_condition.value"
-                        type="number"
-                        data-test="alert-threshold-value-input"
-                        :debounce="300"
-                        @update:model-value="onPromqlValueChange"
+                  <div class="flex flex-col gap-1.5">
+                    <div class="flex items-start gap-2">
+                      <span
+                        class="text-status-error-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                        >{{ t("alerts.criticalIf") }}</span
                       >
-                        <template #error />
-                      </OFormInput>
-                      <div
-                        v-if="promqlValueError"
-                        class="text-input-error-text text-xs whitespace-nowrap"
-                        data-test="alert-threshold-value-error"
-                        role="alert"
-                      >
-                        {{ promqlValueError }}
+                      <OFormSelect
+                        name="query_condition.promql_condition.operator"
+                        :options="numericOperators"
+                        :searchable="false"
+                        data-test="alert-threshold-operator-select"
+                        width="xs"
+                        @update:model-value="onPromqlOperatorChange"
+                      />
+                      <!-- Message hangs under the value field it describes. -->
+                      <div class="flex flex-col gap-1">
+                        <OFormInput
+                          name="query_condition.promql_condition.value"
+                          type="number"
+                          width="xs"
+                          data-test="alert-threshold-value-input"
+                          :debounce="300"
+                          @update:model-value="onPromqlValueChange"
+                        >
+                          <template #error />
+                        </OFormInput>
+                        <div
+                          v-if="promqlValueError"
+                          class="text-input-error-text text-xs whitespace-nowrap"
+                          data-test="alert-threshold-value-error"
+                          role="alert"
+                        >
+                          {{ promqlValueError }}
+                        </div>
                       </div>
+                    </div>
+                    <!-- Optional WARNING on the PromQL VALUE (alerts_2.md Feature 1).
+                         PromQL bakes the threshold into the query itself, so severity
+                         belongs here — not on the series-count row, which is coverage.
+                         Shares critical's operator, so the row only echoes it. -->
+                    <div v-if="promqlWarningVisible" class="flex items-start gap-2">
+                      <span
+                        class="text-status-warning-text text-compact w-22 shrink-0 leading-8.5 font-semibold whitespace-nowrap"
+                        >{{ t("alerts.warningIf") }}</span
+                      >
+                      <span
+                        class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
+                        >{{ promqlOperatorEcho }}</span
+                      >
+                      <div class="flex flex-col gap-1">
+                        <OFormInput
+                          name="query_condition.promql_warning_value"
+                          type="number"
+                          width="xs"
+                          data-test="alert-promql-warning-value-input"
+                          :placeholder="t('alerts.optional')"
+                          :debounce="300"
+                        >
+                          <template #error />
+                        </OFormInput>
+                        <div
+                          v-if="promqlWarningError"
+                          class="text-input-error-text text-xs whitespace-nowrap"
+                          data-test="alert-promql-warning-value-error"
+                          role="alert"
+                        >
+                          {{ promqlWarningError }}
+                        </div>
+                      </div>
+                      <div class="flex items-center gap-1 leading-8.5">
+                        <OFormCheckbox
+                          name="trigger_condition.notify_on_warning"
+                          :label="t('alerts.notifyOnWarning')"
+                          data-test="alert-notify-on-warning-checkbox"
+                        />
+                        <OTooltip :content="t('alerts.notifyOnWarningTooltip')" :delay="300" />
+                      </div>
+                      <OButton
+                        variant="ghost"
+                        size="icon-circle-sm"
+                        class="text-icon-color hover:text-status-error-text"
+                        :aria-label="t('alerts.removeWarning')"
+                        data-test="alert-remove-warning-button"
+                        @click="removePromqlWarning"
+                      >
+                        <OIcon name="close" size="sm" />
+                      </OButton>
+                    </div>
+                    <div v-else>
+                      <OButton
+                        variant="ghost-primary"
+                        size="sm"
+                        data-test="alert-add-warning-button"
+                        @click="addPromqlWarning"
+                      >
+                        <OIcon name="add" size="sm" />
+                        {{ t("alerts.addWarning") }}
+                      </OButton>
                     </div>
                   </div>
                 </div>
@@ -1100,10 +1541,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:model-value="onTriggerOperatorChange"
                     />
                     <!-- Message hangs under the threshold field it describes. -->
-                    <div class="flex max-w-20 min-w-15 flex-col gap-1">
+                    <div class="flex flex-col gap-1">
                       <OFormInput
                         name="trigger_condition.threshold"
                         type="number"
+                        width="xs"
                         min="1"
                         @update:model-value="onTriggerThresholdChange($event)"
                         @blur="restoreDefaultThreshold"
@@ -1196,6 +1638,9 @@ import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
+import useStreams from "@/composables/useStreams";
+import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
+import { alertPromqlSamples } from "@/utils/alerts/promqlSamples";
 import FilterGroup from "@/components/alerts/FilterGroup.vue";
 import QueryEditorDialog from "@/components/alerts/QueryEditorDialog.vue";
 import CustomConfirmDialog from "@/components/alerts/CustomConfirmDialog.vue";
@@ -1205,8 +1650,10 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
@@ -1218,6 +1665,8 @@ const UnifiedQueryEditor = defineAsyncComponent(() => import("@/components/Query
 export default defineComponent({
   name: "Step2QueryConfig",
   components: {
+    OFormCheckbox,
+    OTag,
     FilterGroup,
     QueryEditorDialog,
     CustomConfirmDialog,
@@ -1512,13 +1961,69 @@ export default defineComponent({
     );
     const noStreamForPlaceholder = computed(() => !props.streamName);
     const isSqlModeForPlaceholder = computed(() => localTab.value === "sql");
-    const { placeholder: inlineEditorPlaceholder } = useQueryPlaceholder(
+    const { placeholder: sqlEditorPlaceholder } = useQueryPlaceholder(
       streamFieldsForPlaceholder,
       ref({}),
       isSqlModeForPlaceholder,
       noStreamForPlaceholder,
       { noStreamText: t("pipeline.queryEditorPlaceholder") },
     );
+
+    // ─── PromQL samples from the metrics-page rule catalogue ─────────
+    // `useQueryPlaceholder` is logs/SQL-only — it used to leak SQL samples
+    // into the PromQL tab. PromQL gets its own samples, derived from the same
+    // variant rules that drive each metric card's function dialog
+    // (metricDefaults "Rule set A"), so they are real queries for the actual
+    // metric. The rate window binds to the alert's period.
+    const { getStream } = useStreams();
+    const promqlMetricType = ref("");
+    watch(
+      () => [props.streamName, props.streamType, localTab.value],
+      async () => {
+        promqlMetricType.value = "";
+        if (props.streamType !== "metrics" || !props.streamName) return;
+        try {
+          const stream: any = await getStream(props.streamName, "metrics", false);
+          promqlMetricType.value = stream?.metrics_meta?.metric_type ?? "";
+        } catch {
+          // Unknown type falls back to gauge-style samples — safe, just blander.
+        }
+      },
+      { immediate: true },
+    );
+    const promqlSamples = computed(() =>
+      props.streamType === "metrics" && props.streamName
+        ? alertPromqlSamples({
+            metricName: props.streamName,
+            metricType: promqlMetricType.value || undefined,
+            labels: (props.columns as any[]).map((c: any) =>
+              typeof c === "string" ? c : (c.value ?? c.label ?? ""),
+            ),
+            periodMinutes: Number(fv("trigger_condition.period")) || undefined,
+          })
+        : [],
+    );
+    const promqlPlaceholderEnabled = computed(
+      () => localTab.value === "promql" && promqlSamples.value.length > 0,
+    );
+    const { placeholder: promqlEditorPlaceholder } = useTypewriterPlaceholder(
+      computed(() => promqlSamples.value.map((s) => s.query)),
+      { enabled: promqlPlaceholderEnabled },
+    );
+    const inlineEditorPlaceholder = computed(() =>
+      localTab.value === "promql" && promqlSamples.value.length
+        ? promqlEditorPlaceholder.value
+        : sqlEditorPlaceholder.value,
+    );
+
+    // Chips insert only into an EMPTY editor — silently replacing a
+    // half-written query is the one way this feature makes someone angry.
+    const canInsertPromqlSample = computed(() => !localPromqlQuery.value);
+    const insertPromqlSample = (sample: { query: string }) => {
+      if (!canInsertPromqlSample.value) return;
+      updatePromqlQuery(sample.query);
+      queryEditorPlaceholderFlag.value = false;
+    };
 
     const onBlurInlineSqlEditor = async () => {
       queryEditorPlaceholderFlag.value =
@@ -1754,9 +2259,95 @@ export default defineComponent({
     const thresholdError = form.useStore((s: any) =>
       firstFieldError(s.fieldMeta?.["trigger_condition.threshold"]?.errors ?? []),
     );
+    // Warning validation, §4.5 matrix. "Less severe" is OPERATOR-DEPENDENT —
+    // a plain `warning < critical` check is wrong for `<`/`<=`, and `=`/`!=`
+    // have no ordering so they reject a warning outright. Mirrors the backend
+    // `validate_thresholds` so the user is told before submit, not by a 400.
+    const matrixError = (w: any, c: any, op: any): string => {
+      if (w === null || w === undefined || w === "") return "";
+      const wn = Number(w);
+      const cn = Number(c);
+      if (Number.isNaN(wn) || Number.isNaN(cn)) return "";
+      if (op === "=" || op === "!=") {
+        return t("alerts.warnOperatorUnordered", { operator: op });
+      }
+      if ((op === ">" || op === ">=") && !(wn < cn)) {
+        return t("alerts.warnMustBeLower", { warning: wn, critical: cn, operator: op });
+      }
+      if ((op === "<" || op === "<=") && !(wn > cn)) {
+        return t("alerts.warnMustBeHigher", { warning: wn, critical: cn, operator: op });
+      }
+      return "";
+    };
+    // Count-based warning (trigger_condition), for modes where the threshold
+    // IS the row/series count.
+    const warningThresholdError = form.useStore((s: any) => {
+      const tc = s.values?.trigger_condition ?? {};
+      return matrixError(tc.warning_threshold, tc.threshold, tc.operator);
+    });
+    // Aggregate-VALUE warning (Aggregation.warning_value), read against
+    // `having.operator` — that is the comparison an aggregation alert makes.
+    const aggregationWarningError = form.useStore((s: any) => {
+      const agg = s.values?.query_condition?.aggregation ?? {};
+      return matrixError(agg.warning_value, agg.having?.value, agg.having?.operator);
+    });
+    // PromQL warning validated against `promql_condition.operator`.
+    const promqlWarningError = form.useStore((s: any) => {
+      const qc = s.values?.query_condition ?? {};
+      return matrixError(
+        qc.promql_warning_value,
+        qc.promql_condition?.value,
+        qc.promql_condition?.operator,
+      );
+    });
     const promqlValueError = form.useStore((s: any) =>
       firstFieldError(s.fieldMeta?.["query_condition.promql_condition.value"]?.errors ?? []),
     );
+    // ── Severity rows ──────────────────────────────────────────────────────
+    // Critical and Warning are stacked rows (mock: multi-alert-form.html), not
+    // one long sentence. Warning shares Critical's operator, so its row only
+    // ECHOES the operator read-only. The row is progressive-disclosure: hidden
+    // until the alert has a warning value or the user clicks "Add warning".
+    const hasWarnValue = (v: any) => v !== undefined && v !== null && v !== "";
+    const countWarningSet = form.useStore((s: any) =>
+      hasWarnValue(s.values?.trigger_condition?.warning_threshold),
+    );
+    const aggWarningSet = form.useStore((s: any) =>
+      hasWarnValue(s.values?.query_condition?.aggregation?.warning_value),
+    );
+    const promqlWarningSet = form.useStore((s: any) =>
+      hasWarnValue(s.values?.query_condition?.promql_warning_value),
+    );
+    const promqlOperatorEcho = form.useStore(
+      (s: any) => s.values?.query_condition?.promql_condition?.operator ?? ">=",
+    );
+    const showCountWarningRow = ref(false);
+    const showAggWarningRow = ref(false);
+    const showPromqlWarningRow = ref(false);
+    const countWarningVisible = computed(
+      () => showCountWarningRow.value || countWarningSet.value,
+    );
+    const aggWarningVisible = computed(
+      () => showAggWarningRow.value || aggWarningSet.value,
+    );
+    const promqlWarningVisible = computed(
+      () => showPromqlWarningRow.value || promqlWarningSet.value,
+    );
+    const addCountWarning = () => (showCountWarningRow.value = true);
+    const addAggWarning = () => (showAggWarningRow.value = true);
+    const addPromqlWarning = () => (showPromqlWarningRow.value = true);
+    const removeCountWarning = () => {
+      setFV("trigger_condition.warning_threshold", "");
+      showCountWarningRow.value = false;
+    };
+    const removeAggWarning = () => {
+      setFV("query_condition.aggregation.warning_value", "");
+      showAggWarningRow.value = false;
+    };
+    const removePromqlWarning = () => {
+      setFV("query_condition.promql_warning_value", "");
+      showPromqlWarningRow.value = false;
+    };
     const checkEveryError = form.useStore((s: any) =>
       firstFieldError(s.fieldMeta?.["_ui.checkEvery"]?.errors ?? []),
     );
@@ -2832,6 +3423,19 @@ export default defineComponent({
       cronError,
       cronDescription,
       thresholdError,
+      warningThresholdError,
+      aggregationWarningError,
+      promqlWarningError,
+      promqlOperatorEcho,
+      countWarningVisible,
+      aggWarningVisible,
+      promqlWarningVisible,
+      addCountWarning,
+      addAggWarning,
+      addPromqlWarning,
+      removeCountWarning,
+      removeAggWarning,
+      removePromqlWarning,
       promqlValueError,
       checkEveryError,
       havingValueError,
@@ -2871,6 +3475,9 @@ export default defineComponent({
       autoCompleteSuggestions,
       handleInlineQueryUpdate,
       inlineEditorPlaceholder,
+      promqlSamples,
+      canInsertPromqlSample,
+      insertPromqlSample,
       onPromqlOperatorChange,
       onPromqlValueChange,
       syncMetricGroupByToProps,

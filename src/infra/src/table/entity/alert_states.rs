@@ -15,6 +15,12 @@ pub struct Model {
     pub last_outcome_at: Option<i64>,
     /// When `last_outcome` last changed.
     pub since: Option<i64>,
+    /// `AlertLevel::to_i32`. `None` = never classified.
+    pub level: Option<i32>,
+    /// When `level` last changed.
+    pub level_since: Option<i64>,
+    /// When `level` was last computed from a successful evaluation (freshness).
+    pub level_at: Option<i64>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

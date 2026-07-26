@@ -25,7 +25,7 @@ use config::{
         pipeline::components::NodeData,
         self_reporting::{
             error::{ErrorData, ErrorSource, PipelineError},
-            usage::{TriggerData, RunOutcome, TriggerDataType},
+            usage::{RunOutcome, TriggerData, TriggerDataType},
         },
         stream::{StreamParams, StreamType},
         triggers::ScheduledTriggerData,
@@ -66,7 +66,11 @@ use crate::{
 ///
 /// Best-effort by design: state persistence must never fail an evaluation that
 /// has already run and notified. Failures are logged, not propagated.
-async fn persist_alert_run_state(alert_id: &str, outcome: &RunOutcome) {
+async fn persist_alert_run_state(
+    alert_id: &str,
+    outcome: &RunOutcome,
+    level: Option<config::meta::alerts::level::AlertLevel>,
+) {
     use config::meta::alerts::state::{ROLLUP_GROUP_KEY, apply_outcome};
 
     // `Skipped` runs are dropped by `apply_outcome` so a silenced evaluation
@@ -84,6 +88,7 @@ async fn persist_alert_run_state(alert_id: &str, outcome: &RunOutcome) {
         ROLLUP_GROUP_KEY,
         prev.as_ref(),
         outcome.clone(),
+        level,
         now_micros(),
     );
     if update.is_noop() {
@@ -669,6 +674,8 @@ async fn handle_alert_triggers(
             period_end_time: None,
             tolerance: 0,
             last_satisfied_at: None,
+            delivery_silenced_until: None,
+            last_notified_level: None,
             backfill_job: None,
         }
     };
@@ -865,6 +872,14 @@ async fn handle_alert_triggers(
             )
             .await?;
         }
+        // Persist the error outcome (Part IV): without this, a previously
+        // firing alert whose query starts failing keeps `firing` in
+        // alert_states indefinitely while every evaluation errors.
+        if let Some(alert_id) = alert.id.as_ref() {
+            // Query failed: no level was computed, so the level axis carries
+            // forward untouched (including its freshness clock).
+            persist_alert_run_state(&alert_id.to_string(), &trigger_data_stream.status, None).await;
+        }
         publish_triggers_usage(trigger_data_stream);
 
         // [ENTERPRISE] Mark completion even on failure
@@ -875,6 +890,54 @@ async fn handle_alert_triggers(
     }
 
     let trigger_results = result.unwrap();
+    // Classified severity for this evaluation (alerts_2.md Feature 1). Captured
+    // once here so every downstream path — state persistence and the trigger
+    // record — reports the same level.
+    // `matched_level` is None when no threshold matched. `eval_level` is the
+    // level to RECORD for this completed evaluation — Ok in that case, never
+    // None. Both the state row and the stream record use `eval_level`, so they
+    // cannot disagree; passing the raw `matched_level` to state persistence is
+    // what previously wrote NULL level on healthy runs.
+    let matched_level = trigger_results.level;
+    let eval_level =
+        Some(config::meta::alerts::level::level_for_successful_evaluation(matched_level));
+
+    // T-9 value context: what was observed, against what, with which operator.
+    //
+    // Aggregation alerts carry their thresholds in `having` / `warning_value`,
+    // not in `trigger_condition` — reporting the count-path operator and
+    // threshold here would describe a comparison that never happened.
+    trigger_data_stream.actual_value = trigger_results.actual_value;
+    trigger_data_stream.group_label = trigger_results.group_label.clone();
+    trigger_data_stream.value_is_lower_bound = trigger_results.value_is_lower_bound.then_some(true);
+    let (ctx_operator, ctx_critical, ctx_warning) =
+        if let Some(agg) = alert.query_condition.aggregation.as_ref() {
+            let (crit, warn) = config::meta::alerts::aggregation_level::aggregation_thresholds(agg)
+                .unwrap_or((alert.trigger_condition.threshold as f64, None));
+            (agg.having.operator, crit, warn)
+        } else if let Some(pc) = alert.query_condition.promql_condition.as_ref() {
+            // PromQL compares the sample VALUE from `promql_condition`, not the
+            // series count — reporting the trigger_condition operator/threshold
+            // here would describe a comparison the alert never made.
+            (
+                pc.operator,
+                config::utils::json::get_float_value(&pc.value),
+                alert.query_condition.promql_warning_value,
+            )
+        } else {
+            (
+                alert.trigger_condition.operator,
+                alert.trigger_condition.threshold as f64,
+                alert.trigger_condition.warning_threshold.map(|w| w as f64),
+            )
+        };
+    trigger_data_stream.threshold_operator = Some(ctx_operator.to_string());
+    // Only a MATCHED threshold is recorded — a healthy run has none (T-10).
+    trigger_data_stream.threshold_value = matched_level.map(|l| match l {
+        config::meta::alerts::level::AlertLevel::Warning => ctx_warning.unwrap_or(ctx_critical),
+        _ => ctx_critical,
+    });
+    trigger_data_stream.level = eval_level.map(|l| l.to_i32());
     trigger_data_stream.query_took = trigger_results.query_took;
     log::debug!(
         "[SCHEDULER trace_id {scheduler_trace_id}] result of alert {} evaluation matched condition: {}",
@@ -898,7 +961,28 @@ async fn handle_alert_triggers(
             trigger_data.tolerance = tolerance;
         }
     }
-    if trigger_results.data.is_some() && alert.trigger_condition.silence > 0 {
+    // ── Silence: evaluation-skip vs delivery-suppression (alerts_2.md §7.1) ──
+    //
+    // Single-level alerts keep the legacy behaviour: push `next_run_at` past
+    // the silence window, i.e. stop evaluating (G5 — no behaviour change).
+    //
+    // Multi-level alerts must keep evaluating, otherwise a Warning->Critical
+    // escalation inside the window is never observed and no fingerprint scheme
+    // can recover it. For them, silence suppresses DELIVERY only; the decision
+    // is made by `delivery_decision` further down.
+    // Multi-level if ANY warning source is configured. There are three, one per
+    // threshold family, and checking only `trigger_condition` would leave
+    // aggregation- and PromQL-warning alerts on the legacy silence path where
+    // an escalation can never be observed.
+    let multi_level = alert.trigger_condition.warning_threshold.is_some()
+        || alert
+            .query_condition
+            .aggregation
+            .as_ref()
+            .is_some_and(|a| a.warning_value.is_some())
+        || alert.query_condition.promql_warning_value.is_some();
+    let notify_on_warning = alert.trigger_condition.notify_on_warning;
+    if trigger_results.data.is_some() && alert.trigger_condition.silence > 0 && !multi_level {
         new_trigger.next_run_at =
             alert
                 .trigger_condition
@@ -919,8 +1003,69 @@ async fn handle_alert_triggers(
     }
 
     // send notification
+    // ── §7.1 delivery decision ──────────────────────────────────────────────
+    // Computed for multi-level alerts only; single-level alerts short-circuit
+    // to `Deliver` so their behaviour is bit-for-bit unchanged (G5).
+    let delivery = if multi_level {
+        config::meta::alerts::level::delivery_decision(
+            eval_level.unwrap_or(config::meta::alerts::level::AlertLevel::Ok),
+            trigger_data
+                .last_notified_level
+                .and_then(config::meta::alerts::level::AlertLevel::from_i32),
+            trigger_data.delivery_silenced_until,
+            triggered_at,
+            notify_on_warning,
+        )
+    } else {
+        config::meta::alerts::level::DeliveryDecision::Deliver
+    };
+    if !delivery.should_deliver() && multi_level {
+        log::info!(
+            "[SCHEDULER trace_id {scheduler_trace_id}] delivery suppressed ({delivery:?}) for {}/{}",
+            new_trigger.org,
+            alert.name
+        );
+    }
+    // Record the delivery outcome so the NEXT evaluation can detect escalation.
+    // Both fields must move together: `last_notified_level` is the baseline
+    // escalation is measured against, and the silence window restarts from this
+    // delivery. Writing only one would either re-page forever or never again.
+    //
+    // Called ONLY on paths where the notification was actually delivered (or
+    // handed to a delivery mechanism that owns it: grouping batch, incident
+    // correlation). `last_notified_level`'s contract is the last DELIVERED
+    // level — stamping it before a send that then FAILS would make the retry
+    // look like a repeat inside an active silence window and suppress it.
+    let record_delivery = |trigger_data: &mut ScheduledTriggerData| {
+        if multi_level && delivery.resets_silence() {
+            trigger_data.last_notified_level = eval_level.map(|l| l.to_i32());
+            trigger_data.delivery_silenced_until = if alert.trigger_condition.silence > 0 {
+                Some(
+                    triggered_at
+                        + Duration::try_minutes(alert.trigger_condition.silence)
+                            .unwrap_or_default()
+                            .num_microseconds()
+                            .unwrap_or(0),
+                )
+            } else {
+                None
+            };
+        }
+    };
+
+    // Whether the condition MATCHED this evaluation. Kept separate from the
+    // notification predicate below: a `<`/`<=` alert can match with an EMPTY
+    // payload, and a matched evaluation can be delivery-suppressed — in both
+    // cases outcome/state/history must still say "fired", only the
+    // notification is skipped.
+    let condition_matched = trigger_results.data.is_some();
+    let payload_empty = trigger_results.data.as_ref().is_none_or(|d| d.is_empty());
+
     if let Some(data) = trigger_results.data
         && !data.is_empty()
+        // Suppressed deliveries still record state and history; only the
+        // notification is skipped.
+        && delivery.should_deliver()
     {
         // Check if grouping is enabled BEFORE deduplication (enterprise-only feature)
         #[cfg(feature = "enterprise")]
@@ -958,12 +1103,16 @@ async fn handle_alert_triggers(
                             .await;
 
                     if let Some(first_row) = data.first() {
+                        // Level is an implicit fingerprint component: a
+                        // Warning batch must never absorb a Critical
+                        // escalation (§7.1).
                         crate::alerts::deduplication::calculate_fingerprint(
                             &alert,
                             first_row,
                             dedup_config,
                             org_config.as_ref(),
                             &semantic_groups,
+                            eval_level,
                         )
                     } else {
                         alert.get_unique_key()
@@ -987,8 +1136,16 @@ async fn handle_alert_triggers(
                     data.clone(),
                     grouping_config.group_wait_seconds,
                     grouping_config.max_group_size,
+                    eval_level,
                 );
 
+                // Whether the batch handoff counts as a DELIVERY for the
+                // silence/escalation baseline. Queued = yes (the flush worker
+                // owns it from here). Immediately flushed = only if the send
+                // actually succeeded — stamping a failed send would start a
+                // silence window with zero destinations reached and suppress
+                // the retry.
+                let mut grouped_delivery_ok = true;
                 if batch_ready {
                     log::info!(
                         "[SCHEDULER trace_id {scheduler_trace_id}] Batch {fingerprint} reached max size, sending immediately",
@@ -1004,6 +1161,7 @@ async fn handle_alert_triggers(
                             "[SCHEDULER trace_id {scheduler_trace_id}] Failed to send grouped notification: {}",
                             e
                         );
+                        grouped_delivery_ok = false;
                     }
                 } else {
                     log::debug!(
@@ -1021,7 +1179,10 @@ async fn handle_alert_triggers(
                     1
                 });
 
-                // Alert added to batch, don't send individual notification
+                // Alert added to batch, don't send individual notification.
+                if grouped_delivery_ok {
+                    record_delivery(&mut trigger_data);
+                }
                 trigger_data.period_end_time = if should_store_last_end_time {
                     Some(trigger_results.end_time)
                 } else {
@@ -1029,6 +1190,16 @@ async fn handle_alert_triggers(
                 };
                 new_trigger.data = json::to_string(&trigger_data).unwrap();
                 db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                // The alert fired; grouping only batches the delivery. State
+                // must reflect the firing (Part IV write-coverage).
+                if let Some(alert_id) = alert.id.as_ref() {
+                    persist_alert_run_state(
+                        &alert_id.to_string(),
+                        &trigger_data_stream.status,
+                        eval_level,
+                    )
+                    .await;
+                }
                 publish_triggers_usage(trigger_data_stream);
                 return Ok(());
             }
@@ -1037,7 +1208,13 @@ async fn handle_alert_triggers(
         // Apply deduplication if enabled (enterprise-only feature)
         #[cfg(feature = "enterprise")]
         let data = if let Some(db) = ORM_CLIENT.get() {
-            match crate::alerts::deduplication::apply_deduplication(db, &alert, data.clone()).await
+            match crate::alerts::deduplication::apply_deduplication(
+                db,
+                &alert,
+                data.clone(),
+                eval_level,
+            )
+            .await
             {
                 Ok((deduplicated_data, deduplicated)) => {
                     if deduplicated_data.is_empty() && deduplicated {
@@ -1060,6 +1237,16 @@ async fn handle_alert_triggers(
                         };
                         new_trigger.data = json::to_string(&trigger_data).unwrap();
                         db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                        // Condition matched; only the notification was
+                        // deduplicated away. State must reflect the firing.
+                        if let Some(alert_id) = alert.id.as_ref() {
+                            persist_alert_run_state(
+                                &alert_id.to_string(),
+                                &trigger_data_stream.status,
+                                eval_level,
+                            )
+                            .await;
+                        }
                         publish_triggers_usage(trigger_data_stream);
                         return Ok(());
                     }
@@ -1123,6 +1310,7 @@ async fn handle_alert_triggers(
                 first_row,
                 &data,
                 triggered_at,
+                eval_level,
             )
             .await
             {
@@ -1190,6 +1378,7 @@ async fn handle_alert_triggers(
         if incident_handled_notification {
             // Notification was handled (sent or suppressed) inside correlate_alert_to_incident.
             // Still advance the trigger state so the scheduler moves forward normally.
+            record_delivery(&mut trigger_data);
             trigger_data.period_end_time = if should_store_last_end_time {
                 Some(trigger_results.end_time)
             } else {
@@ -1206,6 +1395,8 @@ async fn handle_alert_triggers(
                     trigger_results.end_time,
                     Some(start_time),
                     triggered_at,
+                    eval_level,
+                    trigger_results.actual_value,
                 )
                 .await
             {
@@ -1227,6 +1418,9 @@ async fn handle_alert_triggers(
                         );
                     }
                     trigger_data_stream.success_response = Some(success_msg);
+                    // Notification was sent (possibly partially) — this IS a
+                    // delivery for silence/escalation purposes.
+                    record_delivery(&mut trigger_data);
                     // Notification was sent successfully, store the last used end_time in the
                     // triggers
                     trigger_data.period_end_time = if should_store_last_end_time {
@@ -1293,13 +1487,28 @@ async fn handle_alert_triggers(
             }
         }
     } else {
-        log::info!(
-            "[SCHEDULER trace_id {scheduler_trace_id}] Alert conditions not satisfied, org: {}, module_key: {}",
-            new_trigger.org,
-            new_trigger.module_key
-        );
-        // Condition did not match, store the last used end_time in the triggers
-        // In the next run, the alert will be checked from the last end_time
+        if condition_matched {
+            // The condition DID match — this branch was reached because the
+            // payload is empty (`<`/`<=` matching zero rows) or delivery was
+            // suppressed (silence window / warning policy). Outcome, state and
+            // history must still say "fired"; only the notification is
+            // skipped. `trigger_data_stream.status` is initialised to Firing,
+            // so it is deliberately NOT overwritten here.
+            log::info!(
+                "[SCHEDULER trace_id {scheduler_trace_id}] Alert fired without notification ({delivery:?}, payload empty: {payload_empty}), org: {}, module_key: {}",
+                new_trigger.org,
+                new_trigger.module_key
+            );
+        } else {
+            log::info!(
+                "[SCHEDULER trace_id {scheduler_trace_id}] Alert conditions not satisfied, org: {}, module_key: {}",
+                new_trigger.org,
+                new_trigger.module_key
+            );
+            trigger_data_stream.status = RunOutcome::Normal;
+        }
+        // Store the last used end_time in the triggers; in the next run, the
+        // alert will be checked from the last end_time
         trigger_data.period_end_time = if should_store_last_end_time {
             Some(trigger_results.end_time)
         } else {
@@ -1309,13 +1518,17 @@ async fn handle_alert_triggers(
         db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         trigger_data_stream.start_time = start_time;
         trigger_data_stream.end_time = trigger_results.end_time;
-        trigger_data_stream.status = RunOutcome::Normal;
     }
 
     // Persist durable run state BEFORE the lossy stream publish (Part IV of
     // alerts.md). `alert.id` is the ksuid the state rows are keyed on.
     if let Some(alert_id) = alert.id.as_ref() {
-        persist_alert_run_state(&alert_id.to_string(), &trigger_data_stream.status).await;
+        persist_alert_run_state(
+            &alert_id.to_string(),
+            &trigger_data_stream.status,
+            eval_level,
+        )
+        .await;
     }
 
     log::debug!(
@@ -2390,6 +2603,8 @@ async fn handle_derived_stream_triggers(
             period_end_time: Some(start_time),
             tolerance: 0,
             last_satisfied_at: None,
+            delivery_silenced_until: None,
+            last_notified_level: None,
             backfill_job: None,
         })
         .unwrap();
@@ -2399,9 +2614,7 @@ async fn handle_derived_stream_triggers(
     // run at In that case, the trigger will be picked up again by the scheduler
     // at the next batch immediately Once it reaches max retries, the trigger
     // will be run again at the next scheduled time.
-    if !(trigger_data_stream.status == RunOutcome::Error
-        && new_trigger.retries < max_retries)
-    {
+    if !(trigger_data_stream.status == RunOutcome::Error && new_trigger.retries < max_retries) {
         let need_to_catch_up = end < aligned_supposed_to_be_run_at;
         // If the trigger didn't fail, we need to reset the `retries` count.
         // Only cumulative failures should be used to check with `max_retries`

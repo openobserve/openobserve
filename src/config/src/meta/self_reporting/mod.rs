@@ -380,6 +380,12 @@ mod tests {
             dedup_count: None,
             grouped: None,
             group_size: None,
+            actual_value: None,
+            threshold_value: None,
+            threshold_operator: None,
+            level: None,
+            group_label: None,
+            value_is_lower_bound: None,
         };
 
         let result = queue
@@ -914,6 +920,12 @@ mod tests {
             dedup_count: None,
             grouped: None,
             group_size: None,
+            actual_value: None,
+            threshold_value: None,
+            threshold_operator: None,
+            level: None,
+            group_label: None,
+            value_is_lower_bound: None,
         };
 
         let error_data = error::ErrorData {
@@ -982,6 +994,12 @@ mod tests {
             dedup_count: None,
             grouped: None,
             group_size: None,
+            actual_value: None,
+            threshold_value: None,
+            threshold_operator: None,
+            level: None,
+            group_label: None,
+            value_is_lower_bound: None,
         };
 
         let trigger_data2 = TriggerData {
@@ -1040,6 +1058,12 @@ mod tests {
             dedup_count: None,
             grouped: None,
             group_size: None,
+            actual_value: None,
+            threshold_value: None,
+            threshold_operator: None,
+            level: None,
+            group_label: None,
+            value_is_lower_bound: None,
         };
 
         // Should succeed when queue has space

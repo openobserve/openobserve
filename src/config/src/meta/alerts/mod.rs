@@ -30,10 +30,15 @@ use crate::{
     },
 };
 
+pub mod aggregation_level;
 pub mod alert;
+pub mod composite;
 pub mod deduplication;
+pub mod grouping;
 pub mod incidents;
+pub mod level;
 pub mod state;
+pub mod state_level;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq, Default)]
 #[serde(default)]
@@ -43,7 +48,19 @@ pub struct TriggerCondition {
     #[serde(default)]
     pub operator: Operator, // >=
     #[serde(default)]
-    pub threshold: i64, // 3 times
+    pub threshold: i64, // 3 times = CRITICAL level
+    /// Warning threshold, sharing `operator` with `threshold` — one operator
+    /// for both levels, no mixed directions (T-2). `None` = single-level
+    /// alert, i.e. exactly the legacy behaviour.
+    /// Validated by `level::validate_thresholds` — "less severe" is
+    /// direction-dependent, so this is NOT simply `< threshold`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub warning_threshold: Option<i64>,
+    /// Whether a Warning-level match delivers a notification (D11).
+    /// `None` = true — warnings notify unless explicitly opted out.
+    /// Persisted in `trigger_thresholds`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub notify_on_warning: Option<bool>,
     /// (seconds)
     #[serde(default)]
     pub frequency: i64, // 1 minute
@@ -327,6 +344,24 @@ pub struct TriggerEvalResults {
     pub data: Option<Vec<Map<String, Value>>>,
     pub end_time: i64,
     pub query_took: Option<i64>,
+    /// Severity of the matched threshold (`alerts_2.md` Feature 1).
+    /// `None` when nothing matched, or for evaluations with no level axis.
+    /// Always `Some` when `data` is `Some` for a condition-bearing module.
+    pub level: Option<level::AlertLevel>,
+    /// The value that was compared — row count, or the aggregate for
+    /// aggregation alerts. Recorded on the trigger record (T-9) so history can
+    /// show "112 vs 100". For count alerts this is a LOWER BOUND once the
+    /// search cap is reached (`alerts_2.md` §7.5).
+    pub actual_value: Option<f64>,
+    /// Which group/series produced `actual_value` ("host=b,region=eu"), for
+    /// grouped aggregation and PromQL alerts (T-9). `None` for count alerts —
+    /// a row count has no group identity.
+    pub group_label: Option<String>,
+    /// True when `actual_value` is a LOWER BOUND, not exact: the legacy
+    /// SingleQuery count path fetched exactly its cap, so the true count may
+    /// be higher (§7.5). History renders a `≥` prefix. Hybrid evaluations are
+    /// always exact.
+    pub value_is_lower_bound: bool,
 }
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
@@ -360,6 +395,13 @@ pub struct QueryCondition {
     pub sql: Option<String>,
     pub promql: Option<String>,              // (cpu usage / cpu total)
     pub promql_condition: Option<Condition>, // value >= 80
+    /// WARNING value for the PromQL condition (alerts_2.md Feature 1).
+    ///
+    /// A sibling field rather than a member of `Condition`, which is shared by
+    /// every filter in the product and must not grow alert-specific knobs.
+    /// Shares `promql_condition.operator` with critical. `None` = single-level.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub promql_warning_value: Option<f64>,
     pub aggregation: Option<Aggregation>,
     #[serde(default)]
     pub vrl_function: Option<String>,
@@ -529,7 +571,15 @@ impl IntoIterator for ConditionList {
 pub struct Aggregation {
     pub group_by: Option<Vec<String>>,
     pub function: AggFunction,
+    /// CRITICAL threshold. `having.value` is untyped (`serde_json::Value`) and
+    /// may be an int, a float, or a numeric string.
     pub having: Condition,
+    /// WARNING threshold, sharing `having.operator` and `having.column` with
+    /// critical (alerts_2.md §4.4). `None` = single-level aggregation alert,
+    /// i.e. exactly the legacy behaviour. Stored as f64 because aggregate
+    /// values (averages, percentiles) are not integers.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub warning_value: Option<f64>,
 }
 
 impl MemorySize for Aggregation {

@@ -261,6 +261,33 @@ pub struct TriggerData {
     pub grouped: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub group_size: Option<i32>,
+    // ── Value context (T-9, alerts_2.md §7.5) ───────────────────────────────
+    // Lets history answer "fired at 112 against threshold 100" from the stream
+    // alone. `#[serde(default)]` is load-bearing: records written before these
+    // fields existed must still deserialize.
+    /// Observed value: row count for count alerts, `alert_agg_value` for
+    /// aggregation alerts. For count alerts this is a LOWER BOUND once the
+    /// search cap is reached.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actual_value: Option<f64>,
+    /// The threshold that matched. `None` on `normal` rows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub threshold_value: Option<f64>,
+    /// Operator, so the record reads standalone ("112 >= 100").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub threshold_operator: Option<String>,
+    /// Computed `AlertLevel` as i32 — `Ok` on normal rows, never absent for a
+    /// level-bearing evaluation. `None` for non-condition modules and
+    /// error/skipped runs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub level: Option<i32>,
+    /// Which group produced `actual_value` (worst group; D8).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_label: Option<String>,
+    /// True when `actual_value` is a LOWER BOUND (legacy SingleQuery count
+    /// fetch hit its cap, §7.5) — history renders "≥ N". Absent = exact.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub value_is_lower_bound: Option<bool>,
 }
 
 impl Default for TriggerData {
@@ -292,6 +319,12 @@ impl Default for TriggerData {
             dedup_count: None,
             grouped: None,
             group_size: None,
+            actual_value: None,
+            threshold_value: None,
+            threshold_operator: None,
+            level: None,
+            group_label: None,
+            value_is_lower_bound: None,
         }
     }
 }
@@ -334,6 +367,12 @@ impl TriggerData {
             dedup_count: Some(0),
             grouped: Some(false),
             group_size: Some(0),
+            actual_value: Some(0.0),
+            threshold_value: Some(0.0),
+            threshold_operator: Some(String::new()),
+            level: Some(0),
+            group_label: Some(String::new()),
+            value_is_lower_bound: Some(false),
         }
     }
 
@@ -895,7 +934,8 @@ mod run_outcome_tests {
         for outcome in [RunOutcome::Normal, RunOutcome::Error, RunOutcome::Succeeded] {
             let s = serde_json::to_string(&outcome).unwrap();
             assert!(
-                !["\"completed\"", "\"failed\"", "\"condition_not_satisfied\""].contains(&s.as_str()),
+                !["\"completed\"", "\"failed\"", "\"condition_not_satisfied\""]
+                    .contains(&s.as_str()),
                 "{outcome:?} must not serialize to a legacy value, got {s}"
             );
         }
@@ -1206,6 +1246,126 @@ mod run_outcome_tests {
         assert!(names.contains(&"status".to_string()));
         assert!(!names.contains(&"outcome".to_string()));
     }
+
+    // ── T-9: value context on the trigger record (alerts_2.md §7.5) ─────────
+    // "Fired at 112 against threshold 100" must be reconstructable from the
+    // triggers stream alone. Today both values exist only as notification
+    // template variables and never reach the stream.
+
+    #[test]
+    fn test_trigger_data_records_actual_and_threshold() {
+        let td = TriggerData {
+            module: TriggerDataType::Alert,
+            status: RunOutcome::Firing,
+            actual_value: Some(112.0),
+            threshold_value: Some(100.0),
+            threshold_operator: Some(">=".to_string()),
+            level: Some(2), // AlertLevel::Critical
+            ..Default::default()
+        };
+        let v = serde_json::to_value(&td).unwrap();
+
+        assert_eq!(v.get("actual_value").and_then(|x| x.as_f64()), Some(112.0));
+        assert_eq!(
+            v.get("threshold_value").and_then(|x| x.as_f64()),
+            Some(100.0)
+        );
+        assert_eq!(
+            v.get("threshold_operator").and_then(|x| x.as_str()),
+            Some(">=")
+        );
+        assert_eq!(v.get("level").and_then(|x| x.as_i64()), Some(2));
+    }
+
+    /// A healthy run must still record what it observed — that is what makes
+    /// "how close did we get?" answerable from history. Per T-10 (as revised):
+    /// normal rows display actual value + Ok; only firing/warning rows display
+    /// a threshold.
+    #[test]
+    fn test_normal_runs_record_actual_value_and_level_ok() {
+        let td = TriggerData {
+            module: TriggerDataType::Alert,
+            status: RunOutcome::Normal,
+            actual_value: Some(12.0),
+            threshold_value: None,
+            // Level is the COMPUTED level: Ok (0) for a level-bearing normal
+            // run — never absent. `None` is reserved for non-condition modules
+            // and error/skipped runs (alerts_2.md §7.5).
+            level: Some(0),
+            ..Default::default()
+        };
+        assert_eq!(td.actual_value, Some(12.0));
+        assert_eq!(
+            td.threshold_value, None,
+            "no threshold matched, so none is recorded (T-10: rendered without one)"
+        );
+        assert_eq!(td.level, Some(0), "normal rows carry level = Ok, not None");
+    }
+
+    #[test]
+    fn test_value_fields_are_optional_and_omitted_when_unset() {
+        // Non-condition modules (reports, workflows) have no values to record;
+        // the fields must not bloat every record.
+        let td = TriggerData {
+            module: TriggerDataType::Report,
+            status: RunOutcome::Succeeded,
+            ..Default::default()
+        };
+        let v = serde_json::to_value(&td).unwrap();
+        assert!(v.get("actual_value").is_none());
+        assert!(v.get("threshold_value").is_none());
+        assert!(v.get("level").is_none());
+    }
+
+    /// The stream schema is generated by reflection, so new fields must appear
+    /// in the reflection sample or fresh orgs get a schema without them.
+    #[test]
+    fn test_reflection_sample_includes_the_value_context_fields() {
+        let names = TriggerData::get_field_names();
+        for f in [
+            "actual_value",
+            "threshold_value",
+            "threshold_operator",
+            "level",
+            "group_label",
+        ] {
+            assert!(
+                names.contains(&f.to_string()),
+                "reflection sample must include `{f}` or new orgs get a schema without it"
+            );
+        }
+    }
+
+    /// D8: one record per evaluation, carrying the worst group's context.
+    #[test]
+    fn test_group_label_identifies_which_group_produced_the_value() {
+        let td = TriggerData {
+            module: TriggerDataType::Alert,
+            status: RunOutcome::Firing,
+            actual_value: Some(500.0),
+            threshold_value: Some(100.0),
+            group_label: Some("host=b".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(td.group_label.as_deref(), Some("host=b"));
+    }
+
+    #[test]
+    fn test_legacy_records_without_value_context_still_deserialize() {
+        // Rows written before T-9 have none of these fields.
+        let legacy = r#"{
+            "_timestamp": 0, "org": "o", "module": "alert", "key": "k",
+            "next_run_at": 0, "is_realtime": false, "is_silenced": false,
+            "status": "firing", "start_time": 0, "end_time": 0, "retries": 0,
+            "error": null, "success_response": null, "is_partial": null,
+            "delay_in_secs": null, "evaluation_took_in_secs": null,
+            "source_node": null, "query_took": null, "scheduler_trace_id": null,
+            "time_in_queue_ms": null
+        }"#;
+        let td: TriggerData = serde_json::from_str(legacy).unwrap();
+        assert_eq!(td.actual_value, None);
+        assert_eq!(td.level, None);
+    }
 }
 
 #[cfg(test)]
@@ -1422,6 +1582,12 @@ mod tests {
             dedup_count: None,
             grouped: None,
             group_size: None,
+            actual_value: None,
+            threshold_value: None,
+            threshold_operator: None,
+            level: None,
+            group_label: None,
+            value_is_lower_bound: None,
         };
 
         let json = serde_json::to_string(&trigger_data).unwrap();
